@@ -64,11 +64,11 @@ public:
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
-  Counter& counterx(StatName name) override { return counters_.get(name); }
+  Counter& counterFromStatName(StatName name) override { return counters_.get(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugex(StatName name) override { return gauges_.get(name); }
-  Histogram& histogramx(StatName name) override {
+  Gauge& gaugeFromStatName(StatName name) override { return gauges_.get(name); }
+  Histogram& histogramFromStatName(StatName name) override {
     Histogram& histogram = histograms_.get(name);
     return histogram;
   }
@@ -85,15 +85,15 @@ public:
 
   Counter& counter(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
-    return counterx(storage.statName());
+    return counterFromStatName(storage.statName());
   }
   Gauge& gauge(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
-    return gaugex(storage.statName());
+    return gaugeFromStatName(storage.statName());
   }
   Histogram& histogram(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
-    return histogramx(storage.statName());
+    return histogramFromStatName(storage.statName());
   }
 
   void clear();

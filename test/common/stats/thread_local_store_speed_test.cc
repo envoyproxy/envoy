@@ -43,7 +43,7 @@ public:
 
   void accessCounters() {
     for (auto& stat_name_storage : stat_names_) {
-      store_.counterx(stat_name_storage->statName());
+      store_.counterFromStatName(stat_name_storage->statName());
     }
   }
 

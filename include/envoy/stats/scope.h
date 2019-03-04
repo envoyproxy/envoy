@@ -44,19 +44,19 @@ public:
   /**
    * @return a counter within the scope's namespace.
    */
-  virtual Counter& counterx(StatName name) PURE;
+  virtual Counter& counterFromStatName(StatName name) PURE;
   virtual Counter& counter(const std::string& name) PURE;
 
   /**
    * @return a gauge within the scope's namespace.
    */
-  virtual Gauge& gaugex(StatName name) PURE;
+  virtual Gauge& gaugeFromStatName(StatName name) PURE;
   virtual Gauge& gauge(const std::string& name) PURE;
 
   /**
    * @return a histogram within the scope's namespace with a particular value type.
    */
-  virtual Histogram& histogramx(StatName name) PURE;
+  virtual Histogram& histogramFromStatName(StatName name) PURE;
   virtual Histogram& histogram(const std::string& name) PURE;
 
   /**

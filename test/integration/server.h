@@ -75,32 +75,32 @@ public:
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
-  Counter& counterx(StatName name) override {
+  Counter& counterFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counterx(name);
+    return wrapped_scope_->counterFromStatName(name);
   }
 
-  Gauge& gaugex(StatName name) override {
+  Gauge& gaugeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gaugex(name);
+    return wrapped_scope_->gaugeFromStatName(name);
   }
 
-  Histogram& histogramx(StatName name) override {
+  Histogram& histogramFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogramx(name);
+    return wrapped_scope_->histogramFromStatName(name);
   }
 
   Counter& counter(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
-    return counterx(storage.statName());
+    return counterFromStatName(storage.statName());
   }
   Gauge& gauge(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
-    return gaugex(storage.statName());
+    return gaugeFromStatName(storage.statName());
   }
   Histogram& histogram(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
-    return histogramx(storage.statName());
+    return histogramFromStatName(storage.statName());
   }
 
   const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
@@ -121,9 +121,9 @@ class TestIsolatedStoreImpl : public StoreRoot {
 public:
   TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
-  Counter& counterx(StatName name) override {
+  Counter& counterFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return store_.counterx(name);
+    return store_.counterFromStatName(name);
   }
   Counter& counter(const std::string& name) override {
     Thread::LockGuard lock(lock_);
@@ -134,17 +134,17 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Gauge& gaugex(StatName name) override {
+  Gauge& gaugeFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return store_.gaugex(name);
+    return store_.gaugeFromStatName(name);
   }
   Gauge& gauge(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.gauge(name);
   }
-  Histogram& histogramx(StatName name) override {
+  Histogram& histogramFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return store_.histogramx(name);
+    return store_.histogramFromStatName(name);
   }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
