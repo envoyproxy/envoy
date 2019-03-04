@@ -12,6 +12,7 @@
 #include "server/options_impl_platform_linux.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -315,6 +316,14 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
             test_options_impl.statsOptions().maxStatSuffixLength());
   EXPECT_EQ(regular_options_impl->hotRestartDisabled(), test_options_impl.hotRestartDisabled());
   EXPECT_EQ(regular_options_impl->cpusetThreadsEnabled(), test_options_impl.cpusetThreadsEnabled());
+}
+
+TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Both --concurrency and --cpuset-threads options are set; not applying --cpuset-threads.",
+      std::unique_ptr<OptionsImpl> options =
+          createOptionsImpl("envoy -c hello --concurrency 42 --cpuset-threads"));
 }
 
 #if defined(__linux__)

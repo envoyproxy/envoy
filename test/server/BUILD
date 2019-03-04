@@ -115,6 +115,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/server:options_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )
