@@ -1106,7 +1106,7 @@ TEST_F(Http1ClientConnectionImplTest, TestLargeResponseHeadersAccepted) {
 
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
   codec_->dispatch(buffer);
-  std::string long_header = "big: " + std::string(64 * 1024, 'q') + "\r\n";
+  std::string long_header = "big: " + std::string(79 * 1024, 'q') + "\r\n";
   buffer = Buffer::OwnedImpl(long_header + "\r\n");
   codec_->dispatch(buffer);
 }

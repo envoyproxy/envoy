@@ -333,8 +333,11 @@ private:
  */
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
+  // The default max_response_headers_kb of 80 KiB is the vanilla http_parser
+  // behaviour. Once this becomes a configurable setting, the default parameter
+  // will no longer be required.
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       uint32_t max_response_headers_kb = 0x7fffffff);
+                       uint32_t max_response_headers_kb = 80);
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
 
