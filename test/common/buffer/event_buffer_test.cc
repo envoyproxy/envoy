@@ -6,7 +6,7 @@ namespace {
 
 // This reproduces the underlying libevent issue in OwnedImplTest.PrependEmpty.
 // It seems to be a minimal reproducer, drop any step or switch to copies and
-// the test passes.
+// the test passes. See also https://github.com/libevent/libevent/issues/774.
 TEST(EventBufferTest, PrependEmpty) {
   // Two buffers.
   evbuffer* buf = evbuffer_new();
@@ -27,16 +27,16 @@ TEST(EventBufferTest, PrependEmpty) {
   // Try and append "bar" to buf. This prepends, rather than appends!
   evbuffer_add(buf, "bar", 3);
   const char* s = reinterpret_cast<char*>(evbuffer_pullup(buf, -1));
-  // This fails today, with "baroo"!
+  // This used to fail with "baroo"!
   EXPECT_STREQ("oobar", s);
 
   evbuffer_free(buf);
   evbuffer_free(other_buf);
 }
 
-// This is another buffer corruption example, which doesn't seem to relate to
+// This is another buffer corruption regression, which doesn't seem to relate to
 // either owned referenced buffers or empty prepends, discovered via Envoy
-// buffer fuzzing.
+// buffer fuzzing. See https://github.com/libevent/libevent/issues/778.
 TEST(EventBufferTest, ChunkSwapCorruption) {
   // Two buffers.
   evbuffer* buf = evbuffer_new();
@@ -80,7 +80,7 @@ TEST(EventBufferTest, ChunkSwapCorruption) {
   rc = evbuffer_remove_buffer(buf, other_buf, 11);
   ASSERT_EQ(rc, 11);
 
-  // This fails today, we observe "aaaaaabcddd" instead!
+  // This used to fail with "aaaaaabcddd" instead!
   const char* s = reinterpret_cast<char*>(evbuffer_pullup(other_buf, -1));
   EXPECT_STREQ("aaaaaabdddc", s);
 
