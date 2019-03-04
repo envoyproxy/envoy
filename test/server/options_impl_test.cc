@@ -11,8 +11,10 @@
 #include "server/options_impl.h"
 #include "server/options_impl_platform_linux.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -328,6 +330,8 @@ TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
 
 #if defined(__linux__)
 
+using testing::Return;
+
 class OptionsImplPlatformLinuxTest : public testing::Test {
 public:
 };
@@ -353,6 +357,18 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest3) {
   unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
   unsigned int fake_hw_threads = fake_cpuset_size - 1;
 
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
+  // When sched_getaffinity() fails, expect to get the hardware thread count.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
+
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
 }
 
