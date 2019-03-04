@@ -203,8 +203,8 @@ TEST_F(CodeUtilityTest, PerZoneStats) {
 }
 
 TEST_F(CodeUtilityTest, ResponseTimingTest) {
-  Stats::MockStore global_store;  // (symbol_table_);
-  Stats::MockStore cluster_scope; // (symbol_table_);
+  Stats::MockStore global_store;
+  Stats::MockStore cluster_scope;
 
   Http::CodeStats::ResponseTimingInfo info{
       global_store, cluster_scope, "prefix.",    std::chrono::milliseconds(5),
@@ -248,17 +248,6 @@ protected:
     return CodeStatsImpl::stripTrailingDot(prefix);
   }
 
-  std::string join(const std::vector<absl::string_view>& v) {
-    std::vector<std::unique_ptr<Stats::StatNameTempStorage>> storage_vec;
-    std::vector<Stats::StatName> stat_name_vec;
-    for (auto str : v) {
-      storage_vec.emplace_back(std::make_unique<Stats::StatNameTempStorage>(str, symbol_table_));
-      stat_name_vec.push_back(storage_vec.back()->statName());
-    }
-    Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(stat_name_vec);
-    return symbol_table_.toString(Stats::StatName(stat_name_storage.get()));
-  }
-
   Stats::SymbolTableImpl symbol_table_;
   CodeStatsImpl code_stats_;
 };
@@ -268,14 +257,6 @@ TEST_F(CodeStatsTest, StripTrailingDot) {
   EXPECT_EQ("foo", stripTrailingDot("foo."));
   EXPECT_EQ(".foo", stripTrailingDot(".foo"));  // no change
   EXPECT_EQ("foo.", stripTrailingDot("foo..")); // only one dot gets stripped.
-}
-
-TEST_F(CodeStatsTest, Join) {
-  EXPECT_EQ("hello.world", join({"hello", "world"}));
-  EXPECT_EQ("hello.world", join({"", "hello", "world"})); // leading empty token ignored.
-  // EXPECT_EQ("hello.", join({"hello", ""}));               // trailing empty token not ignored.
-  EXPECT_EQ("hello", join({"hello"}));
-  EXPECT_EQ("", join({""}));
 }
 
 } // namespace Http

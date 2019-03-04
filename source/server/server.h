@@ -185,7 +185,6 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
   Event::TimeSystem& timeSystem() override { return time_system_; }
   Stats::SymbolTable& symbolTable() override { return stats_store_.symbolTable(); }
-  // Http::CodeStats& codeStats() override { return code_stats_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();

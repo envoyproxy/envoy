@@ -27,7 +27,6 @@ namespace Stats {
 
 class MockMetric : public virtual Metric {
 public:
-  // explicit MockMetric(SymbolTable& symbol_table);
   MockMetric();
   ~MockMetric();
 
@@ -40,7 +39,6 @@ public:
     ~MetricName();
 
     void operator=(absl::string_view str);
-    void operator=(StatName stat_name);
 
     std::string name() const { return name_; }
     StatName statName() const { return stat_name_storage_->statName(); }
@@ -58,15 +56,12 @@ public:
   // creates a deadlock in gmock and is an unintended use of mock functions.
   std::string name() const override { return name_.name(); }
   StatName statName() const override { return name_.statName(); }
-  // MOCK_CONST_METHOD0(tags, std::vector<Tag>());
   std::vector<Tag> tags() const override { return tags_; }
   void setTagExtractedName(absl::string_view name);
   std::string tagExtractedName() const override {
     return tag_extracted_name_.empty() ? name() : tag_extracted_name_;
   }
   StatName tagExtractedStatName() const override { return tag_extracted_stat_name_->statName(); }
-
-  // MOCK_CONST_METHOD0(tagExtractedName, std::string());
 
   Test::Global<FakeSymbolTableImpl> symbol_table_; // Must outlive name_.
   MetricName name_;
@@ -80,7 +75,6 @@ private:
 class MockCounter : public Counter, public MockMetric {
 public:
   MockCounter();
-  // explicit MockCounter(SymbolTable& symbol_table);
   ~MockCounter();
 
   MOCK_METHOD1(add, void(uint64_t amount));
@@ -98,7 +92,6 @@ public:
 class MockGauge : public Gauge, public MockMetric {
 public:
   MockGauge();
-  // explicit MockGauge(SymbolTable& symbol_table);
   ~MockGauge();
 
   MOCK_METHOD1(add, void(uint64_t amount));
@@ -116,7 +109,6 @@ public:
 class MockHistogram : public Histogram, public MockMetric {
 public:
   MockHistogram();
-  // explicit MockHistogram(SymbolTable& symbol_table);
   ~MockHistogram();
 
   MOCK_METHOD1(recordValue, void(uint64_t value));
@@ -128,7 +120,6 @@ public:
 class MockParentHistogram : public ParentHistogram, public MockMetric {
 public:
   MockParentHistogram();
-  // explicit MockParentHistogram(SymbolTable& symbol_table);
   ~MockParentHistogram();
 
   void merge() override {}
@@ -172,7 +163,6 @@ public:
 
 class MockStore : public Store {
 public:
-  // explicit MockStore(SymbolTable& symbol_table);
   MockStore();
   ~MockStore();
 
@@ -196,7 +186,6 @@ public:
   const SymbolTable& symbolTable() const override { return symbol_table_.get(); }
 
   Test::Global<FakeSymbolTableImpl> symbol_table_;
-  // SymbolTable& symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
   StatsOptionsImpl stats_options_;

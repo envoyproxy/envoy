@@ -451,7 +451,7 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   // are all based on the untruncated name.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 
-  // Outside the stats system, no Enovy code can see the truncated view, so
+  // Outside the stats system, no Envoy code can see the truncated view, so
   // lookups for truncated names will fail.
   EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
 
