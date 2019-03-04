@@ -139,7 +139,8 @@ protected:
   typedef std::function<Network::ClientConnectionPtr()> ConnectionCreationFunction;
   // Sends a simple header-only HTTP request, and waits for a response.
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
-                                                    int upstream_index);
+                                                    int upstream_index,
+                                                    const std::string& path = "/test/long/url");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
 
@@ -152,7 +153,8 @@ protected:
                                               int upstream_index = 0);
 =======
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
-                                              int upstream_index = 0);
+                                              int upstream_index = 0,
+                                              const std::string& path = "/test/long/url");
   void testRequestAndResponseShutdownWithActiveConnection();
 <<<<<<< HEAD
 >>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)

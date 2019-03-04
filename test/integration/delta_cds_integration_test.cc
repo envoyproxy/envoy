@@ -71,13 +71,19 @@ static_resources:
               name: integration
               routes:
               - route:
-                  cluster: cluster_0
+                  cluster: cluster_1
                 match:
-                  prefix: "/"
+                  prefix: "/cluster1"
+              - route:
+                  cluster: cluster_2
+                match:
+                  prefix: "/cluster2"
               domains: "*"
 )EOF";
-const char ClusterName[] = "cluster_0";
-const int UpstreamIndex = 1;
+const char ClusterName1[] = "cluster_1";
+const char ClusterName2[] = "cluster_2";
+const int UpstreamIndex1 = 1;
+const int UpstreamIndex2 = 2;
 
 class CdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
 public:
@@ -91,7 +97,7 @@ public:
   }
 
   // TODO(fredlas) Move to test/config/utility.cc once there are other xDS tests that use gRPC.
-  envoy::api::v2::Cluster buildCluster(const std::string& name) {
+  envoy::api::v2::Cluster buildCluster(const std::string& name, int upstream_index) {
     return TestUtility::parseYaml<envoy::api::v2::Cluster>(
         fmt::format(R"EOF(
       name: {}
@@ -110,7 +116,7 @@ public:
       http2_protocol_options: {{}}
     )EOF",
                     name, name, Network::Test::getLoopbackAddressString(ipVersion()),
-                    fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port()));
+                    fake_upstreams_[upstream_index]->localAddress()->ip()->port()));
   }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
@@ -140,7 +146,7 @@ public:
     // cluster in the bootstrap config - which we don't want since we're testing dynamic CDS!
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
                                                   timeSystem(), enable_half_close_));
-    fake_upstreams_[UpstreamIndex]->set_allow_unexpected_disconnects(false);
+    fake_upstreams_[UpstreamIndex1]->set_allow_unexpected_disconnects(false);
 
     // Now that the upstream has been created, process Envoy's request to discover it.
     // (First, we have to let Envoy establish its connection to the CDS server.)
@@ -153,9 +159,10 @@ public:
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-    sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "1");
+    sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>(
+        {buildCluster(ClusterName1, UpstreamIndex1)}, {}, "1");
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
-    // the DiscoveryResponse describing cluster_0 that we sent.
+    // the DiscoveryResponse describing cluster_1 that we sent.
     // 2 because the statically specified CDS server itself counts as a cluster.
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
@@ -178,41 +185,101 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_IN
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
 <<<<<<< HEAD
+<<<<<<< HEAD
   testRouterHeaderOnlyRequestAndResponse(true, nullptr, 1);
 =======
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
 >>>>>>> bring in final touches from CDS integration test PR
+=======
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+>>>>>>> added integration test with second cluster
 
-  // Tell Envoy that cluster_0 is gone.
+  // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({}, {ClusterName}, "42");
+  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({}, {ClusterName1}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
-  // the DiscoveryResponse that says cluster_0 is gone.
+  // the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
 
-  // Now that cluster_0 is gone, the listener (with its routing to cluster_0) should 503.
+  // Now that cluster_1 is gone, the listener (with its routing to cluster_1) should 503.
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
 
-  // Tell Envoy that cluster_0 is back.
+  // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "413");
+  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName1, UpstreamIndex1)},
+                                                      {}, "413");
 
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
-  // the DiscoveryResponse describing cluster_0 that we sent. Again, 2 includes CDS server.
+  // the DiscoveryResponse describing cluster_1 that we sent. Again, 2 includes CDS server.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
   // Does *not* call our initialize().
+<<<<<<< HEAD
 <<<<<<< HEAD
   testRouterHeaderOnlyRequestAndResponse(true, nullptr, 1);
 =======
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
 >>>>>>> bring in final touches from CDS integration test PR
+=======
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+
+  cleanupUpstreamAndDownstream();
+}
+
+// Tests adding a cluster, adding another, then removing the first.
+TEST_P(CdsIntegrationTest, TwoClusters) {
+  // Calls our initialize(), which includes establishing a listener, route, and cluster.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // Add another fake upstream, to be cluster_2.
+  fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
+                                                timeSystem(), enable_half_close_));
+  fake_upstreams_[UpstreamIndex2]->set_allow_unexpected_disconnects(false);
+
+  // Tell Envoy that cluster_2 is here.
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
+  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName2, UpstreamIndex2)},
+                                                      {}, "42");
+  // The '3' includes the fake CDS server.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+
+  // A request for cluster_2 should be fine.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // Tell Envoy that cluster_1 is gone.
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
+  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({}, {ClusterName1}, "42");
+  // We can continue the test once we're sure that Envoy's ClusterManager has made use of
+  // the DiscoveryResponse that says cluster_1 is gone.
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+
+  // Even with cluster_1 is gone, a request for cluster_2 should be fine.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // Tell Envoy that cluster_1 is back.
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
+  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName1, UpstreamIndex1)},
+                                                      {}, "413");
+
+  // We can continue the test once we're sure that Envoy's ClusterManager has made use of
+  // the DiscoveryResponse describing cluster_1 that we sent. Again, 3 includes CDS server.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+
+  // Does *not* call our initialize().
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+>>>>>>> added integration test with second cluster
 
   cleanupUpstreamAndDownstream();
 }
