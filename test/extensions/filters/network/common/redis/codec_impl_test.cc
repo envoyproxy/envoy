@@ -5,6 +5,7 @@
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
 
+#include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -60,6 +61,18 @@ TEST_F(RedisEncoderDecoderImplTest, SimpleString) {
   EXPECT_EQ("\"simple string\"", value.toString());
   encoder_.encode(value, buffer_);
   EXPECT_EQ("+simple string\r\n", buffer_.toString());
+  decoder_.decode(buffer_);
+  EXPECT_EQ(value, *decoded_values_[0]);
+  EXPECT_EQ(0UL, buffer_.length());
+}
+
+TEST_F(RedisEncoderDecoderImplTest, BulkString) {
+  RespValue value;
+  value.type(RespType::BulkString);
+  value.asString() = "bulk string";
+  EXPECT_EQ("\"bulk string\"", value.toString());
+  encoder_.encode(value, buffer_);
+  EXPECT_EQ("$11\r\nbulk string\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());

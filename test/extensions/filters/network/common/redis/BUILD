@@ -27,6 +27,7 @@ envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
     deps = [
+        ":redis_mocks",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
