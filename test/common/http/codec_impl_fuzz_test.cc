@@ -343,8 +343,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
                                                                 stats_store, client_http2settings,
                                                                 max_request_headers_kb);
   } else {
-    client = absl::make_unique<Http1::ClientConnectionImpl>(client_connection, client_callbacks,
-                                                            max_request_headers_kb);
+    client = absl::make_unique<Http1::ClientConnectionImpl>(client_connection, client_callbacks);
   }
 
   NiceMock<Network::MockConnection> server_connection;
