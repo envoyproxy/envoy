@@ -964,6 +964,8 @@ TEST_P(Http2CodecImplTest, TestManyLargeRequestHeadersUnderPerHeaderLimit) {
 }
 
 TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtMaxConfigurable) {
+  // Raising the limit past this triggers some unexpected nghttp2 error.
+  // Further debugging required to increase past ~96 KiB.
   max_request_headers_kb_ = 96;
   initialize();
 
