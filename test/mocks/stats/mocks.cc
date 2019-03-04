@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "common/stats/symbol_table_impl.h"
+#include "common/stats/fake_symbol_table_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -128,7 +128,7 @@ MockStore::MockStore(SymbolTable& symbol_table)
 MockStore::~MockStore() {}
 
 MockIsolatedStatsStore::MockIsolatedStatsStore()
-    : IsolatedStoreImpl(Test::Global<Stats::SymbolTableImpl>::get()) {}
+    : IsolatedStoreImpl(Test::Global<Stats::FakeSymbolTableImpl>::get()) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() { IsolatedStoreImpl::clear(); }
 
 } // namespace Stats

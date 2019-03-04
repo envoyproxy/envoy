@@ -105,6 +105,7 @@ envoy_cc_test_library(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_options_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",

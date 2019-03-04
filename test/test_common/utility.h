@@ -21,6 +21,7 @@
 #include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/printers.h"
@@ -504,7 +505,7 @@ public:
   ~TestAllocator() { EXPECT_EQ(0, hash_set_.size()); }
 
 private:
-  SymbolTableImpl symbol_table_;
+  FakeSymbolTableImpl symbol_table_;
   Thread::MutexBasicLockable mutex_;
   TestBlockMemoryHashSetOptions block_hash_options_;
   std::unique_ptr<uint8_t[]> block_memory_;

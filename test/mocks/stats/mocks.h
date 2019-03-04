@@ -14,6 +14,7 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -187,7 +188,7 @@ public:
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& symbolTable() const override { return symbol_table_; }
 
-  SymbolTableImpl owned_symbol_table_;
+  FakeSymbolTableImpl owned_symbol_table_;
   SymbolTable& symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
@@ -198,7 +199,7 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : private Test::Global<Stats::SymbolTableImpl>,
+class MockIsolatedStatsStore : private Test::Global<Stats::FakeSymbolTableImpl>,
                                public IsolatedStoreImpl {
 public:
   MockIsolatedStatsStore();
