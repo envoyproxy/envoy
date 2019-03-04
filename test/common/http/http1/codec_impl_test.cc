@@ -28,7 +28,7 @@ namespace Envoy {
 namespace Http {
 namespace Http1 {
 
-class Http1ServerConnectionImplTest : public ::testing::Test {
+class Http1ServerConnectionImplTest : public testing::Test {
 public:
   void initialize() {
     codec_ = std::make_unique<ServerConnectionImpl>(connection_, callbacks_, codec_settings_);

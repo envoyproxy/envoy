@@ -28,6 +28,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace Common {
 namespace Statsd {
+namespace {
 
 class TcpStatsdSinkTest : public testing::Test {
 public:
@@ -193,6 +194,7 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
   tls_.shutdownThread();
 }
 
+} // namespace
 } // namespace Statsd
 } // namespace Common
 } // namespace StatSinks

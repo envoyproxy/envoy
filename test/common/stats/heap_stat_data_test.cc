@@ -10,6 +10,7 @@
 
 namespace Envoy {
 namespace Stats {
+namespace {
 
 class HeapStatDataTest : public testing::Test {
 protected:
@@ -66,5 +67,6 @@ TEST_F(HeapStatDataTest, HeapAlloc) {
   alloc_.free(*stat_3);
 }
 
+} // namespace
 } // namespace Stats
 } // namespace Envoy

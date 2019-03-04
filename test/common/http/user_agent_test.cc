@@ -15,6 +15,7 @@ using testing::Property;
 
 namespace Envoy {
 namespace Http {
+namespace {
 
 TEST(UserAgentTest, All) {
   Stats::MockStore stat_store;
@@ -74,5 +75,6 @@ TEST(UserAgentTest, All) {
   }
 }
 
+} // namespace
 } // namespace Http
 } // namespace Envoy

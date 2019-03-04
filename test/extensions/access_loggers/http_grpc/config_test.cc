@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+namespace {
 
 class HttpGrpcAccessLogConfigTest : public testing::Test {
 public:
@@ -56,6 +57,7 @@ TEST_F(HttpGrpcAccessLogConfigTest, Ok) {
   EXPECT_NE(nullptr, dynamic_cast<HttpGrpcAccessLog*>(instance.get()));
 }
 
+} // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
 } // namespace Extensions

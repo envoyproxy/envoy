@@ -14,7 +14,6 @@
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
@@ -78,13 +77,13 @@ public:
         .WillRepeatedly(ReturnRef(stream_info_));
 
     EXPECT_CALL(log_manager_, createAccessLog(_)).WillOnce(Return(file_));
-    access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSystem()));
+    access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSource()));
   }
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
     filter_ = std::make_unique<TestProxyFilter>("test.", store_, runtime_, access_log_,
                                                 fault_config_, drain_decision_, generator_,
-                                                dispatcher_.timeSystem(), emit_dynamic_metadata);
+                                                dispatcher_.timeSource(), emit_dynamic_metadata);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -115,7 +114,8 @@ public:
   NiceMock<TestStatStore> store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::shared_ptr<Filesystem::MockFile> file_{new NiceMock<Filesystem::MockFile>()};
+  std::shared_ptr<Envoy::AccessLog::MockAccessLogFile> file_{
+      new NiceMock<Envoy::AccessLog::MockAccessLogFile>()};
   AccessLogSharedPtr access_log_;
   FaultConfigSharedPtr fault_config_;
   std::unique_ptr<TestProxyFilter> filter_;

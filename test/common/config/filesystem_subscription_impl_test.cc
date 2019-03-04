@@ -12,8 +12,8 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class FilesystemSubscriptionImplTest : public FilesystemSubscriptionTestHarness,
-                                       public testing::Test {};
+class FilesystemSubscriptionImplTest : public testing::Test,
+                                       public FilesystemSubscriptionTestHarness {};
 
 // Validate that the client can recover from bad JSON responses.
 TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {

@@ -18,12 +18,13 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
+namespace {
 
 class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
-  typedef Grpc::MockAsyncStream MockMetricsStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse>
-      MetricsServiceCallbacks;
+  using MockMetricsStream = Grpc::MockAsyncStream;
+  using MetricsServiceCallbacks =
+      Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse>;
 
   GrpcMetricsStreamerImplTest() {
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
@@ -153,6 +154,7 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
   EXPECT_EQ(1, (*streamer_).metric_count);
 }
 
+} // namespace
 } // namespace MetricsService
 } // namespace StatSinks
 } // namespace Extensions

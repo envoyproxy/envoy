@@ -294,7 +294,7 @@ public:
   // Tests using this will be of the form IpVersions/SslSocketTest.HalfClose/IPv4
   // instead of IpVersions/SslSocketTest.HalfClose/1
   static std::string
-  ipTestParamsToString(const testing::TestParamInfo<Network::Address::IpVersion>& params) {
+  ipTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
     return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   }
 
@@ -398,28 +398,6 @@ private:
   Thread::CondVar cv_;
   Thread::MutexBasicLockable mutex_;
   bool ready_{false};
-};
-
-// TODO(sbelair2) Perform the fd close in the close of the IoHandle-
-// i.e., ScopedIoHandleCloser should incorporate the ScopedFdCloser
-class ScopedIoHandleCloser {
-public:
-  ScopedIoHandleCloser(Network::IoHandlePtr& io_handle);
-  ~ScopedIoHandleCloser();
-
-private:
-  Network::IoHandlePtr& io_handle_;
-};
-
-// TODO(sbelair2) Clean up ScopedFdCloser everywhere IOHandle is used-
-// ScopedFdCloser should no longer be needed.
-class ScopedFdCloser {
-public:
-  ScopedFdCloser(int fd);
-  ~ScopedFdCloser();
-
-private:
-  int fd_;
 };
 
 /**
@@ -536,7 +514,10 @@ ThreadFactory& threadFactoryForTest();
 } // namespace Thread
 
 namespace Api {
+ApiPtr createApiForTest();
 ApiPtr createApiForTest(Stats::Store& stat_store);
+ApiPtr createApiForTest(Event::TimeSystem& time_system);
+ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {

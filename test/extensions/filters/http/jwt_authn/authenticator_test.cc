@@ -27,10 +27,11 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
-class AuthenticatorTest : public ::testing::Test {
+class AuthenticatorTest : public testing::Test {
 public:
-  void SetUp() {
+  void SetUp() override {
     MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
     CreateAuthenticator();
   }
@@ -410,6 +411,7 @@ TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
   expectVerifyStatus(Status::JwksPemBadBase64, headers);
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

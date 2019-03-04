@@ -40,6 +40,7 @@ public:
   Http::Protocol protocol() const override { return Http::Protocol::Http11; }
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
+  bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
 
@@ -125,9 +126,9 @@ protected:
 /**
  * Production implementation of the ConnPoolImpl.
  */
-class ConnPoolImplProd : public ConnPoolImpl {
+class ProdConnPoolImpl : public ConnPoolImpl {
 public:
-  ConnPoolImplProd(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
+  ProdConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options)
       : ConnPoolImpl(dispatcher, host, priority, options) {}

@@ -25,8 +25,9 @@ using ::testing::Return;
 
 namespace Envoy {
 namespace Config {
+namespace {
 
-class SubscriptionFactoryTest : public ::testing::Test {
+class SubscriptionFactoryTest : public testing::Test {
 public:
   SubscriptionFactoryTest()
       : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)) {}
@@ -85,7 +86,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterEmpty) {
 TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
   envoy::api::v2::core::ConfigSource config;
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
 
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
   config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
@@ -102,7 +103,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
 TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
   envoy::api::v2::core::ConfigSource config;
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
 
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
   config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
@@ -134,7 +135,7 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterSingleton) {
 TEST_F(SubscriptionFactoryTest, RestClusterMultiton) {
   envoy::api::v2::core::ConfigSource config;
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
 
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
 
@@ -155,7 +156,7 @@ TEST_F(SubscriptionFactoryTest, RestClusterMultiton) {
 TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
   envoy::api::v2::core::ConfigSource config;
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
 
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
 
@@ -202,7 +203,7 @@ TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::UNSUPPORTED_REST_LEGACY);
   api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
@@ -220,7 +221,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   api_config_source->mutable_request_timeout()->set_seconds(5);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
@@ -240,7 +241,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   api_config_source->add_cluster_names("static_cluster");
   api_config_source->mutable_refresh_delay()->set_seconds(1);
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
@@ -267,7 +268,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
   api_config_source->add_cluster_names("static_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
@@ -285,7 +286,7 @@ TEST_F(SubscriptionFactoryTest, GrpcSubscription) {
   envoy::api::v2::core::GrpcService expected_grpc_service;
   expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("static_cluster");
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
@@ -338,7 +339,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, DynamicCluster) {
     api_config_source->add_cluster_names("static_cluster");
   }
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
@@ -360,7 +361,7 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
     api_config_source->add_cluster_names("static_cluster");
   }
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("static_cluster", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info()).Times(2);
@@ -372,5 +373,6 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
       "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
 }
 
+} // namespace
 } // namespace Config
 } // namespace Envoy

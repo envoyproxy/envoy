@@ -79,10 +79,9 @@ static_resources:
 const char ClusterName[] = "cluster_0";
 const int UpstreamIndex = 1;
 
-class CdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
+class CdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
 public:
-  CdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {}
+  CdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), Config) {}
 
   void TearDown() override {
     cleanUpXdsConnection();

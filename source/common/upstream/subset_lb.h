@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "common/common/macros.h"
@@ -23,8 +24,8 @@ class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::ups
 public:
   SubsetLoadBalancer(
       LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
-      ClusterStats& stats, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-      const LoadBalancerSubsetInfo& subsets,
+      ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+      Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
       const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
       const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>& least_request_config,
       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
@@ -69,14 +70,22 @@ private:
 
     bool empty() { return empty_; }
 
-    HostSubsetImpl* getOrCreateHostSubset(uint32_t priority) {
-      return reinterpret_cast<HostSubsetImpl*>(&getOrCreateHostSet(priority));
+    const HostSubsetImpl* getOrCreateHostSubset(uint32_t priority) {
+      return reinterpret_cast<const HostSubsetImpl*>(&getOrCreateHostSet(priority));
     }
 
     void triggerCallbacks() {
       for (size_t i = 0; i < hostSetsPerPriority().size(); ++i) {
-        getOrCreateHostSubset(i)->triggerCallbacks();
+        runReferenceUpdateCallbacks(i, {}, {});
       }
+    }
+
+    void updateSubset(uint32_t priority, const HostVector& hosts_added,
+                      const HostVector& hosts_removed, HostPredicate predicate) {
+      reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
+          ->update(hosts_added, hosts_removed, predicate);
+
+      runUpdateCallbacks(hosts_added, hosts_removed);
     }
 
     // Thread aware LB if applicable.
@@ -153,6 +162,7 @@ private:
   const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> least_request_config_;
   const envoy::api::v2::Cluster::CommonLbConfig common_config_;
   ClusterStats& stats_;
+  Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
 
@@ -165,6 +175,7 @@ private:
   Common::CallbackHandle* original_priority_set_callback_handle_;
 
   LbSubsetEntryPtr fallback_subset_;
+  LbSubsetEntryPtr panic_mode_subset_;
 
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
   LbSubsetMap subsets_;

@@ -12,10 +12,10 @@
 namespace Envoy {
 namespace {
 
-class StatsIntegrationTest : public BaseIntegrationTest,
-                             public testing::TestWithParam<Network::Address::IpVersion> {
+class StatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                             public BaseIntegrationTest {
 public:
-  StatsIntegrationTest() : BaseIntegrationTest(GetParam(), realTime()) {}
+  StatsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
 
   void TearDown() override {
     test_server_.reset();

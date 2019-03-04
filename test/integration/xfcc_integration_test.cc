@@ -22,7 +22,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "integration.h"
-#include "ssl_integration_test.h"
 #include "utility.h"
 
 namespace Envoy {

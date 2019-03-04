@@ -37,6 +37,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Upstream {
 namespace OriginalDstClusterTest {
+namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -464,10 +465,10 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
             new HostVector(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()));
         const HostsPerLocalityConstSharedPtr empty_hosts_per_locality{new HostsPerLocalityImpl()};
 
-        second.getOrCreateHostSet(0).updateHosts(
-            HostSetImpl::updateHostsParams(new_hosts, empty_hosts_per_locality, healthy_hosts,
-                                           empty_hosts_per_locality),
-            {}, added, removed, absl::nullopt);
+        second.updateHosts(0,
+                           HostSetImpl::updateHostsParams(new_hosts, empty_hosts_per_locality,
+                                                          healthy_hosts, empty_hosts_per_locality),
+                           {}, added, removed, absl::nullopt);
       });
 
   EXPECT_CALL(membership_updated_, ready());
@@ -631,6 +632,7 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   EXPECT_EQ(host3, nullptr);
 }
 
+} // namespace
 } // namespace OriginalDstClusterTest
 } // namespace Upstream
 } // namespace Envoy

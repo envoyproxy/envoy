@@ -18,11 +18,10 @@ namespace {
 
 class AsyncClientManagerImplTest : public testing::Test {
 public:
-  AsyncClientManagerImplTest() : api_(Api::createApiForTest(api_stats_store_)) {}
+  AsyncClientManagerImplTest() : api_(Api::createApiForTest()) {}
 
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::IsolatedStoreImpl api_stats_store_;
   Stats::MockStore scope_;
   DangerousDeprecatedTestTime test_time_;
   Api::ApiPtr api_;
@@ -34,7 +33,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
@@ -59,7 +58,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());

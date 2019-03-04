@@ -900,9 +900,11 @@ TEST_P(AdminInstanceTest, Runtime) {
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
-      {"string_key", {"override", {}, {}}}, {"extra_key", {"bar", {}, {}}}};
+      {"string_key", {"override", {}, {}, {}}}, {"extra_key", {"bar", {}, {}, {}}}};
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
-      {"string_key", {"foo", {}, {}}}, {"int_key", {"1", 1, {}}}, {"other_key", {"bar", {}, {}}}};
+      {"string_key", {"foo", {}, {}, {}}},
+      {"int_key", {"1", 1, {}, {}}},
+      {"other_key", {"bar", {}, {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
@@ -993,7 +995,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
 
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   cluster_map.emplace(cluster.info_->name_, cluster);
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
@@ -1033,6 +1035,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
       .WillByDefault(Return(false));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
       .WillByDefault(Return(true));
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
@@ -1090,7 +1094,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       },
      ],
      "health_status": {
-      "eds_health_status": "HEALTHY",
+      "eds_health_status": "DEGRADED",
       "failed_active_health_check": true,
       "failed_outlier_check": true,
       "failed_active_degraded_check": true
@@ -1223,6 +1227,7 @@ private:
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
   PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
+
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     Stats::StatNameTempStorage storage(name, symbol_table_);
     counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));

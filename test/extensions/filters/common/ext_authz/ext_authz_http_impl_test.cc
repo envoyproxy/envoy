@@ -29,12 +29,12 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
+namespace {
 
 class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest()
-      : cm_{}, async_client_{},
-        async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
+      : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
     ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
         .WillByDefault(ReturnRef(async_client_));
   }
@@ -377,6 +377,7 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   client_.cancel();
 }
 
+} // namespace
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

@@ -36,7 +36,6 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::TestWithParam;
 using testing::Values;
 using testing::WithArgs;
 
@@ -44,6 +43,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
+namespace {
 
 template <class T> class HttpFilterTestBase : public T {
 public:
@@ -89,12 +89,12 @@ public:
   HttpFilterTest() = default;
 };
 
-typedef envoy::config::filter::http::ext_authz::v2::ExtAuthz CreateFilterConfigFunc();
+using CreateFilterConfigFunc = envoy::config::filter::http::ext_authz::v2::ExtAuthz();
 
 class HttpFilterTestParam
     : public HttpFilterTestBase<testing::TestWithParam<CreateFilterConfigFunc*>> {
 public:
-  virtual void SetUp() override { initialize(""); }
+  void SetUp() override { initialize(""); }
 };
 
 template <bool failure_mode_allow_value, bool http_client>
@@ -685,6 +685,7 @@ TEST_F(HttpFilterTestParam, ResetDuringCall) {
   filter_->onDestroy();
 }
 
+} // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters
 } // namespace Extensions

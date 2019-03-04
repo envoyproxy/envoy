@@ -18,7 +18,6 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::TestWithParam;
 using testing::Values;
 
 namespace Envoy {
@@ -143,7 +142,7 @@ public:
   Buffer::OwnedImpl buffer_;
 };
 
-class ThriftObjectImplTest : public ThriftObjectImplTestBase, public testing::Test {};
+class ThriftObjectImplTest : public testing::Test, public ThriftObjectImplTestBase {};
 
 // Test parsing an empty struct (just a stop field).
 TEST_F(ThriftObjectImplTest, ParseEmptyStruct) {
@@ -163,7 +162,7 @@ TEST_F(ThriftObjectImplTest, ParseEmptyStruct) {
 }
 
 class ThriftObjectImplValueTest : public ThriftObjectImplTestBase,
-                                  public TestWithParam<FieldType> {};
+                                  public testing::TestWithParam<FieldType> {};
 
 INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, ThriftObjectImplValueTest,
                          Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,

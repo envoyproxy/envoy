@@ -162,7 +162,7 @@ private:
       const HostDescription& host,
       std::function<void(envoy::data::core::v2alpha::HealthCheckEvent&)> callback) const;
   TimeSource& time_source_;
-  Filesystem::FileSharedPtr file_;
+  AccessLog::AccessLogFileSharedPtr file_;
 };
 
 } // namespace Upstream

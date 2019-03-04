@@ -34,7 +34,7 @@ class MainCommonBase {
 public:
   // Consumer must guarantee that all passed references are alive until this object is
   // destructed.
-  MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
+  MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
                  Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                  Thread::ThreadFactory& thread_factory);
@@ -64,7 +64,7 @@ public:
                     const AdminRequestFn& handler);
 
 protected:
-  Envoy::OptionsImpl& options_;
+  const Envoy::OptionsImpl& options_;
   Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;

@@ -41,7 +41,8 @@ namespace Router {
   COUNTER(no_cluster)                                                                              \
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_direct_response)                                                                      \
-  COUNTER(rq_total)
+  COUNTER(rq_total)                                                                                \
+  COUNTER(rq_reset_after_downstream_response_started)                                              \
 // clang-format on
 
 /**
@@ -113,7 +114,7 @@ public:
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
-                     context.timeSource(), context.httpContext()) {
+                     context.api().timeSource(), context.httpContext()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
@@ -337,6 +338,7 @@ private:
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
+    StreamInfo::UpstreamTiming upstream_timing_;
     Http::HeaderMap* upstream_headers_{};
     Http::HeaderMap* upstream_trailers_{};
 
@@ -375,7 +377,7 @@ private:
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
   void onUpstreamComplete();
   void onUpstreamReset(UpstreamResetType type,
-                       const absl::optional<Http::StreamResetReason>& reset_reason);
+                       const absl::optional<Http::StreamResetReason> reset_reason);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
   bool setupRedirect(const Http::HeaderMap& headers);

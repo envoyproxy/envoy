@@ -8,9 +8,9 @@
 from __future__ import print_function
 
 import argparse
+import logging
 import os
 import shutil
-import logging
 import subprocess
 import sys
 
@@ -202,6 +202,9 @@ if __name__ == "__main__":
   errors += checkUnfixableError("elvis_operator.cc", "Don't use the '?:' operator")
   errors += checkUnfixableError("testing_test.cc",
                                 "Don't use 'using testing::Test;, elaborate the type instead")
+  errors += checkUnfixableError(
+      "serialize_as_string.cc",
+      "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
   errors += checkUnfixableError(
       "version_history.rst",
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "

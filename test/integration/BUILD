@@ -159,6 +159,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "protocol_integration_test",
+    srcs = [
+        "protocol_integration_test.cc",
+    ],
+    # As this test has many H1/H2/v4/v6 tests it takes a while to run.
+    # Shard it enough to bring the run time in line with other integration tests.
+    shard_count = 3,
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/health_check:config",
+        "//test/integration/filters:random_pause_filter_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "http2_upstream_integration_test",
     srcs = [
         "http2_upstream_integration_test.cc",
@@ -220,6 +239,7 @@ envoy_cc_test_library(
         "//test/common/upstream:utility_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
         "//test/integration/filters:headers_only_filter_config_lib",
+        "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",
@@ -244,6 +264,9 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "idle_timeout_integration_test",
     srcs = ["idle_timeout_integration_test.cc"],
+    # As this test has many pauses for idle timeouts, it takes a while to run.
+    # Shard it enough to bring the run time in line with other integration tests.
+    shard_count = 2,
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:test_time_lib",
@@ -536,32 +559,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "ssl_integration_test",
-    srcs = [
-        "ssl_integration_test.cc",
-        "ssl_integration_test.h",
-    ],
-    data = [
-        "//test/config/integration/certs",
-    ],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/event:dispatcher_includes",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/network:connection_lib",
-        "//source/common/network:utility_lib",
-        "//source/extensions/filters/listener/tls_inspector:config",
-        "//source/extensions/transport_sockets/tls:config",
-        "//source/extensions/transport_sockets/tls:context_config_lib",
-        "//source/extensions/transport_sockets/tls:context_lib",
-        "//test/mocks/secret:secret_mocks",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/transport_socket/tap/v2alpha:tap_cc",
-        "@envoy_api//envoy/data/tap/v2alpha:transport_cc",
-    ],
-)
-
-envoy_cc_test(
     name = "tcp_proxy_integration_test",
     srcs = [
         "tcp_proxy_integration_test.cc",
@@ -640,7 +637,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xfcc_integration_test",
     srcs = [
-        "ssl_integration_test.h",
         "xfcc_integration_test.cc",
         "xfcc_integration_test.h",
     ],

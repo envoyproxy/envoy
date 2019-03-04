@@ -74,8 +74,6 @@ public:
 
 class RouterUpstreamLogTest : public testing::Test {
 public:
-  RouterUpstreamLogTest() {}
-
   void init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog> upstream_log) {
     envoy::config::filter::http::router::v2::Router router_proto;
 
@@ -139,7 +137,7 @@ public:
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 
-    EXPECT_CALL(*router_->retry_state_, shouldRetry(_, _, _)).WillOnce(Return(RetryStatus::No));
+    EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
 
     Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl(response_headers_init));
     response_headers->insertStatus().value(response_code);
@@ -174,7 +172,7 @@ public:
     HttpTestUtility::addDefaultHeaders(headers);
     router_->decodeHeaders(headers, true);
 
-    router_->retry_state_->expectRetry();
+    router_->retry_state_->expectResetRetry();
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(504));
     per_try_timeout_->callback_();
@@ -193,7 +191,7 @@ public:
     router_->retry_state_->callback_();
 
     // Normal response.
-    EXPECT_CALL(*router_->retry_state_, shouldRetry(_, _, _)).WillOnce(Return(RetryStatus::No));
+    EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
     Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
     EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                 putHttpResponseCode(200));

@@ -7,8 +7,7 @@
 #include "gtest/gtest.h"
 
 using testing::Combine;
-using testing::TestParamInfo;
-using testing::TestWithParam;
+using ::testing::TestParamInfo;
 using testing::Values;
 
 namespace Envoy {
@@ -17,8 +16,8 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 class ThriftConnManagerIntegrationTest
-    : public BaseThriftIntegrationTest,
-      public TestWithParam<std::tuple<TransportType, ProtocolType, bool>> {
+    : public testing::TestWithParam<std::tuple<TransportType, ProtocolType, bool>>,
+      public BaseThriftIntegrationTest {
 public:
   static void SetUpTestSuite() {
     thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(

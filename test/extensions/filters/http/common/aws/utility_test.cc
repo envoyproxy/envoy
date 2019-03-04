@@ -12,6 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 namespace Aws {
+namespace {
 
 // Headers must be in alphabetical order by virtue of std::map
 TEST(UtilityTest, CanonicalizeHeadersInAlphabeticalOrder) {
@@ -146,6 +147,7 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   EXPECT_EQ("", names);
 }
 
+} // namespace
 } // namespace Aws
 } // namespace Common
 } // namespace HttpFilters

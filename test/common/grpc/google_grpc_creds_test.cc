@@ -17,9 +17,8 @@ namespace {
 
 class CredsUtilityTest : public testing::Test {
 public:
-  CredsUtilityTest() : api_(Api::createApiForTest(stats_store_)) {}
+  CredsUtilityTest() : api_(Api::createApiForTest()) {}
 
-  Stats::MockIsolatedStatsStore stats_store_;
   Api::ApiPtr api_;
 };
 

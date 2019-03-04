@@ -170,7 +170,7 @@ route_config:
 
 class ThriftRateLimitPolicyEntryTest : public testing::Test {
 public:
-  void initialize(const std::string yaml) {
+  void initialize(const std::string& yaml) {
     envoy::api::v2::route::RateLimit rate_limit;
     MessageUtil::loadFromYaml(yaml, rate_limit);
 
