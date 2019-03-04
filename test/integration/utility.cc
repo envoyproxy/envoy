@@ -52,8 +52,7 @@ void BufferingStreamDecoder::onComplete() {
   on_complete_cb_();
 }
 
-void BufferingStreamDecoder::onResetStream(Http::StreamResetReason,
-                                           absl::string_view transport_failure_reason) {
+void BufferingStreamDecoder::onResetStream(Http::StreamResetReason, absl::string_view) {
   ADD_FAILURE();
 }
 
