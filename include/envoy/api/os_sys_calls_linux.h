@@ -1,5 +1,9 @@
 #pragma once
 
+#if !defined(__linux__)
+#error "Linux platform file is part of non-Linux build."
+#endif
+
 #include <sched.h>
 
 #include "envoy/api/os_sys_calls_common.h"

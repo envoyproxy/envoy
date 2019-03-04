@@ -1,3 +1,7 @@
+#if !defined(__linux__)
+#error "Linux platform file is part of non-Linux build."
+#endif
+
 #include "common/api/os_sys_calls_impl_linux.h"
 
 #include <errno.h>

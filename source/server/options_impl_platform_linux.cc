@@ -1,3 +1,7 @@
+#if !defined(__linux__)
+#error "Linux platform file is part of non-Linux build."
+#endif
+
 #include "server/options_impl_platform_linux.h"
 
 #include <sched.h>
