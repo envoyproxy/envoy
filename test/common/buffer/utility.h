@@ -22,7 +22,7 @@ enum class BufferImplementation {
 class BufferImplementationParamTest : public testing::TestWithParam<BufferImplementation> {
 protected:
   BufferImplementationParamTest() {
-    OwnedImpl::useOldImplForTest(GetParam() == BufferImplementation::Old);
+    OwnedImpl::useOldImpl(GetParam() == BufferImplementation::Old);
   }
 
   virtual ~BufferImplementationParamTest() {}

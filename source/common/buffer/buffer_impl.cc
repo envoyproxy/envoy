@@ -91,6 +91,7 @@ void OwnedImpl::prepend(absl::string_view data) {
 
 void OwnedImpl::prepend(Instance& data) {
   ASSERT(&data != this);
+  ASSERT(isSameBufferImpl(data));
   // See the comments in move() for why we do the static_cast.
   if (old_impl_) {
     ASSERT(dynamic_cast<LibEventInstance*>(&data) != nullptr);
@@ -295,6 +296,7 @@ void* OwnedImpl::linearize(uint32_t size) {
 
 void OwnedImpl::move(Instance& rhs) {
   ASSERT(&rhs != this);
+  ASSERT(isSameBufferImpl(rhs));
   if (old_impl_) {
     // We do the static cast here because in practice we only have one buffer implementation right
     // now and this is safe. Using the evbuffer move routines require having access to both
@@ -323,6 +325,7 @@ void OwnedImpl::move(Instance& rhs) {
 
 void OwnedImpl::move(Instance& rhs, uint64_t length) {
   ASSERT(&rhs != this);
+  ASSERT(isSameBufferImpl(rhs));
   if (old_impl_) {
     // See move() above for why we do the static cast.
     int rc = evbuffer_remove_buffer(static_cast<LibEventInstance&>(rhs).buffer().get(),
@@ -688,16 +691,16 @@ void OwnedImpl::appendSliceForTest(absl::string_view data) {
 }
 
 void OwnedImpl::useOldImpl(bool use_old_impl) {
-  static bool called_already = false;
-  if (use_old_impl != use_old_impl_) {
-    RELEASE_ASSERT(!called_already,
-                   "It is unsafe to change the buffer implementation without a restart");
-    use_old_impl_ = use_old_impl;
-  }
-  called_already = true;
+  use_old_impl_ = use_old_impl;
 }
 
-void OwnedImpl::useOldImplForTest(bool use_old_impl) { use_old_impl_ = use_old_impl; }
+bool OwnedImpl::isSameBufferImpl(const Instance& rhs) const {
+  const OwnedImpl* other = dynamic_cast<const OwnedImpl*>(&rhs);
+  if (other == nullptr) {
+    return false;
+  }
+  return usesOldImpl() == other->usesOldImpl();
+}
 
 bool OwnedImpl::use_old_impl_ = false;
 

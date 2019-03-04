@@ -525,22 +525,22 @@ public:
 
   /**
    * @param use_old_impl whether to use the evbuffer-based implementation for new buffers
-   * @warning This method may be called at most once; it will terminate the program if called
-   *          twice. It should be called before any OwnedImpl objects are created. The reason
-   *          is that it is unsafe to mix and match buffers with different implementations.
-   *          The move() method, in particular, only works if the source and destination
-   *          objects are using the same destination.
+   * @warning Except for testing code, this method should be called at most once per process,
+   *          before any OwnedImpl objects are created. The reason is that it is unsafe to
+   *          mix and match buffers with different implementations. The move() method,
+   *          in particular, only works if the source and destination objects are using
+   *          the same destination.
    */
   static void useOldImpl(bool use_old_impl);
 
-  /**
-   * Variant of useOldImpl that may be called repeatedly to switch between the
-   * old and new implementations (for use in test code only).
-   * @param use_old_impl whether to use the evbuffer-based implementation for new buffers.
-   */
-  static void useOldImplForTest(bool use_old_impl);
-
 private:
+  /**
+   * @param rhs another buffer
+   * @return whether the rhs buffer is also an instance of OwnedImpl (or a subclass) that
+   *         uses the same internal implementation as this buffer.
+   */
+  bool isSameBufferImpl(const Instance& rhs) const;
+
   /** Whether to use the old evbuffer implementation when constructing new OwnedImpl objects. */
   static bool use_old_impl_;
 
