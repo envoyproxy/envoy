@@ -110,7 +110,6 @@ public:
 private:
   FilterConfigSharedPtr config_;
   HttpPerRequestTapperPtr tapper_;
-  const Http::HeaderMap* request_trailers_{};
 };
 
 } // namespace TapFilter

@@ -15,8 +15,8 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
-
 namespace {
+
 const std::string header = R"EOF(
 { "header": {"name": "key", "exact_match": "value"} }
 )EOF";

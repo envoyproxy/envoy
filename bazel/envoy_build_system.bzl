@@ -174,8 +174,7 @@ def envoy_external_dep_path(dep):
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
-        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("tcmalloc_debug"),
-        "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
+        "//conditions:default": envoy_external_dep_path("gperftools"),
     })
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
@@ -184,8 +183,7 @@ def tcmalloc_external_dep(repository):
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
-        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("tcmalloc_debug")],
-        "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
+        "//conditions:default": [envoy_external_dep_path("gperftools")],
     })
 
 # Transform the package path (e.g. include/envoy/common) into a path for
@@ -196,11 +194,17 @@ def envoy_include_prefix(path):
         return "/".join(path.split("/")[1:])
     return None
 
+def filter_windows_keys(cache_entries = {}):
+    # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
+    # rules_foreign_cc will figure it out for us
+    return {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
+
 # External CMake C++ library targets should be specified with this function. This defaults
 # to building the dependencies with ninja
 def envoy_cmake_external(
         name,
         cache_entries = {},
+        debug_cache_entries = {},
         cmake_options = ["-GNinja"],
         make_commands = ["ninja", "ninja install"],
         lib_source = "",
@@ -210,9 +214,8 @@ def envoy_cmake_external(
         pdb_name = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
         **kwargs):
-    # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
-    # rules_foreign_cc will figure it out for us
-    cache_entries_no_build_type = {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
+    cache_entries_debug = dict(cache_entries)
+    cache_entries_debug.update(debug_cache_entries)
 
     pf = ""
     if copy_pdb:
@@ -233,8 +236,10 @@ def envoy_cmake_external(
     cmake_external(
         name = name,
         cache_entries = select({
-            "@envoy//bazel:windows_x86_64": cache_entries_no_build_type,
-            "//conditions:default": cache_entries,
+            "@envoy//bazel:windows_opt_build": filter_windows_keys(cache_entries),
+            "@envoy//bazel:windows_x86_64": filter_windows_keys(cache_entries_debug),
+            "@envoy//bazel:opt_build": cache_entries,
+            "//conditions:default": cache_entries_debug,
         }),
         cmake_options = cmake_options,
         generate_crosstool_file = select({
@@ -508,7 +513,6 @@ def envoy_cc_test_library(
         tags = []):
     deps = deps + [
         repository + "//test/test_common:printers_includes",
-        repository + "//test/test_common:test_base",
     ]
     envoy_cc_test_infrastructure_library(
         name,

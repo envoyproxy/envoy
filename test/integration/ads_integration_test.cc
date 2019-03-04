@@ -59,8 +59,7 @@ admin:
 
 class AdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
 public:
-  AdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
+  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
     create_xds_upstream_ = true;
     tls_xds_upstream_ = true;
   }
@@ -610,7 +609,7 @@ class AdsFailIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                public HttpIntegrationTest {
 public:
   AdsFailIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
     create_xds_upstream_ = true;
   }
 
@@ -650,7 +649,7 @@ class AdsConfigIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AdsConfigIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), config) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {
     create_xds_upstream_ = true;
   }
 

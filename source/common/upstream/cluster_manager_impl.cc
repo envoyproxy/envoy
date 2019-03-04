@@ -689,14 +689,14 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   tls_->runOnAllThreads([this, name = cluster.info()->name(), priority, hosts_copy,
                          healthy_hosts_copy, degraded_hosts_copy, hosts_per_locality_copy,
                          healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy,
-                         locality_weights = host_set->localityWeights(), hosts_added,
-                         hosts_removed]() {
+                         locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
+                         overprovisioning_factor = host_set->overprovisioningFactor()]() {
     ThreadLocalClusterManagerImpl::updateClusterMembership(
         name, priority,
         HostSetImpl::updateHostsParams(hosts_copy, hosts_per_locality_copy, healthy_hosts_copy,
                                        healthy_hosts_per_locality_copy, degraded_hosts_copy,
                                        degraded_hosts_per_locality_copy),
-        locality_weights, hosts_added, hosts_removed, *tls_);
+        locality_weights, hosts_added, hosts_removed, *tls_, overprovisioning_factor);
   });
 }
 
@@ -968,7 +968,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority,
     PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, ThreadLocal::Slot& tls) {
+    const HostVector& hosts_removed, ThreadLocal::Slot& tls, uint64_t overprovisioning_factor) {
 
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
 
@@ -978,7 +978,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
             hosts_added.size(), hosts_removed.size());
   cluster_entry->priority_set_.updateHosts(priority, std::move(update_hosts_params),
                                            std::move(locality_weights), hosts_added, hosts_removed,
-                                           absl::nullopt);
+                                           overprovisioning_factor);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {

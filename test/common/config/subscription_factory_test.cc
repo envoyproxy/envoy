@@ -25,6 +25,7 @@ using ::testing::Return;
 
 namespace Envoy {
 namespace Config {
+namespace {
 
 class SubscriptionFactoryTest : public testing::Test {
 public:
@@ -372,5 +373,6 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
       "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
 }
 
+} // namespace
 } // namespace Config
 } // namespace Envoy

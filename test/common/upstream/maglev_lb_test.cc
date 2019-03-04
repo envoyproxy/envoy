@@ -7,6 +7,7 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -298,5 +299,6 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   EXPECT_EQ(MaglevTable::DefaultTableSize - 1023, counts[0]);
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy
