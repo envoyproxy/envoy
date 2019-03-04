@@ -93,7 +93,7 @@ Users are encouraged to go to :repo:`DEPRECATED.md <DEPRECATED.md>` to see how t
 migrate to the new code path and make sure it is suitable for their use case.
 
 In the second phase the message and filename will be added to
-:repo:`runtime_features.h <source/common/runtime/runtime_features.h>`
+:repo:`runtime_features.cc <source/common/runtime/runtime_features.cc>`
 and use of that configuration field will cause the config to be rejected by default. 
 This fail-by-default mode can be overridden in runtime configuration by setting
 envoy.deprecated_features.filename.proto:fieldname to true. For example, for a deprecated field

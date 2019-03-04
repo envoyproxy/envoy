@@ -28,6 +28,8 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 
+#include "common/runtime/runtime_features.h"
+
 #include "absl/strings/match.h"
 #include "test/test_common/test_base.h"
 #include "spdlog/spdlog.h"
@@ -36,6 +38,19 @@
 
 #include "gtest/gtest.h"
 namespace Envoy {
+class RuntimeFeaturesPeer {
+public:
+  static bool addFeature(const std::string& feature) {
+    return const_cast<Runtime::RuntimeFeatures*>(&Runtime::RuntimeFeaturesDefaults::get())
+        ->enabled_features_.insert(feature)
+        .second;
+  }
+  static void removeFeature(const std::string& feature) {
+    const_cast<Runtime::RuntimeFeatures*>(&Runtime::RuntimeFeaturesDefaults::get())
+        ->enabled_features_.erase(feature);
+  }
+};
+
 namespace {
 
 std::string findAndRemove(const std::regex& pattern, int& argc, char**& argv) {
@@ -61,27 +76,22 @@ class RuntimeManagingListener : public ::testing::EmptyTestEventListener {
 public:
   RuntimeManagingListener(std::string& runtime_override) : runtime_override_(runtime_override) {}
 
-  // On each test start, create and register a runtime instance, with this specific feature set to
-  // true.
+  // On each test start, edit RuntimeFeaturesDefaults with our custom runtime defaults.
   void OnTestStart(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      runtime_state_ = std::make_unique<RuntimeState>();
-      Runtime::LoaderSingleton::getExisting()->mergeValues({{runtime_override_, "true"}});
+      if (!RuntimeFeaturesPeer::addFeature(runtime_override_)) {
+        // If the entry was already in the hash map, don't remove it OnTestEnd.
+        runtime_override_.clear();
+      }
     }
   }
 
-  // As each test ends, clean up the singleton state.
-  void OnTestEnd(const ::testing::TestInfo&) override { runtime_state_.reset(); }
-
-  struct RuntimeState {
-    NiceMock<ThreadLocal::MockInstance> tls;
-    Stats::IsolatedStoreImpl store;
-    Runtime::MockRandomGenerator rand;
-    Runtime::ScopedLoaderSingleton loader{
-        Runtime::LoaderPtr{new Runtime::LoaderImpl(rand, store, tls)}};
-  };
-
-  std::unique_ptr<RuntimeState> runtime_state_;
+  // As each test ends, clean up the RuntimeFeaturesDefaults state.
+  void OnTestEnd(const ::testing::TestInfo&) override {
+    if (!runtime_override_.empty()) {
+      RuntimeFeaturesPeer::addFeature(runtime_override_);
+    }
+  }
   std::string runtime_override_;
 };
 

@@ -10,7 +10,10 @@ envoy_package()
 
 envoy_cc_library(
     name = "runtime_lib",
-    srcs = ["runtime_impl.cc"],
+    srcs = [
+        "runtime_features.cc",
+        "runtime_impl.cc",
+    ],
     hdrs = [
         "runtime_features.h",
         "runtime_impl.h",
