@@ -549,9 +549,10 @@ Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::HeaderMap
       res = Http::Code::BadRequest;
     } else {
       Profiler::Heap::stopProfiler();
-      response.add(fmt::format("Heap profiler stopped. Please checkout {}. See "
-                               "http://goog-perftools.sourceforge.net/doc/heap_profiler.html",
-                               profile_path_));
+      response.add(
+          fmt::format("Heap profiler stopped and data written to {}. See "
+                      "http://goog-perftools.sourceforge.net/doc/heap_profiler.html for details.",
+                      profile_path_));
       res = Http::Code::OK;
     }
   }
