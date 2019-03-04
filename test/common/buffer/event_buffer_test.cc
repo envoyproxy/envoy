@@ -4,8 +4,8 @@
 namespace Envoy {
 namespace {
 
-// This repros the underlying libevent issue in OwnedImplTest.PrependEmpty. It
-// seems to be a minimal reproducer, drop any step or switch to copies and
+// This reproduces the underlying libevent issue in OwnedImplTest.PrependEmpty.
+// It seems to be a minimal reproducer, drop any step or switch to copies and
 // the test passes.
 TEST(EventBufferTest, PrependEmpty) {
   // Two buffers.
@@ -34,7 +34,7 @@ TEST(EventBufferTest, PrependEmpty) {
   evbuffer_free(other_buf);
 }
 
-// This is another buffer corruption example, which doesn't seem to relateto
+// This is another buffer corruption example, which doesn't seem to relate to
 // either owned referenced buffers or empty prepends, discovered via Envoy
 // buffer fuzzing.
 TEST(EventBufferTest, ChunkSwapCorruption) {
@@ -42,12 +42,12 @@ TEST(EventBufferTest, ChunkSwapCorruption) {
   evbuffer* buf = evbuffer_new();
   evbuffer* other_buf = evbuffer_new();
 
-  // buf:       aaaaaa
-  // other_buf:
+  // buf:       "aaaaaa"
+  // other_buf: ""
   evbuffer_add(buf, "aaaaaa", 6);
 
-  // buf:       aaaaaab
-  // other_buf:
+  // buf:       "aaaaaab"
+  // other_buf: ""
   evbuffer_iovec iovecs[2];
   int ret = evbuffer_reserve_space(buf, 971, iovecs, 2);
   ASSERT_EQ(ret, 2);
@@ -60,23 +60,23 @@ TEST(EventBufferTest, ChunkSwapCorruption) {
   int rc = evbuffer_commit_space(buf, iovecs, 1);
   ASSERT_EQ(rc, 0);
 
-  // buf:       aaaaaab
-  // other_buf: dddcc
+  // buf:       "aaaaaab"
+  // other_buf: "dddcc"
   evbuffer_add(other_buf, "cc", 2);
   evbuffer_prepend(other_buf, "ddd", 3);
 
-  // buf:
-  // other_buf: aaaaaabdddcc
+  // buf:       ""
+  // other_buf: "aaaaaabdddcc"
   rc = evbuffer_prepend_buffer(other_buf, buf);
   ASSERT_EQ(rc, 0);
 
-  // buf:       aaaaaabdddcc
-  // other_buf:
+  // buf:       "aaaaaabdddcc"
+  // other_buf: ""
   rc = evbuffer_add_buffer(buf, other_buf);
   ASSERT_EQ(rc, 0);
 
-  // buf:       c
-  // other_buf: aaaaaabdddc
+  // buf:       "c"
+  // other_buf: "aaaaaabdddc"
   rc = evbuffer_remove_buffer(buf, other_buf, 11);
   ASSERT_EQ(rc, 11);
 
