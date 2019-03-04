@@ -690,9 +690,7 @@ void OwnedImpl::appendSliceForTest(absl::string_view data) {
   appendSliceForTest(data.data(), data.size());
 }
 
-void OwnedImpl::useOldImpl(bool use_old_impl) {
-  use_old_impl_ = use_old_impl;
-}
+void OwnedImpl::useOldImpl(bool use_old_impl) { use_old_impl_ = use_old_impl; }
 
 bool OwnedImpl::isSameBufferImpl(const Instance& rhs) const {
   const OwnedImpl* other = dynamic_cast<const OwnedImpl*>(&rhs);
