@@ -25,12 +25,14 @@ namespace Server {
 /**
  * Shared memory segment. This structure is laid directly into shared memory and is used amongst
  * all running envoy processes.
+ * TODO(fredlas) delete this class in followup PR.
  */
 class SharedMemory {
 public:
   static void configure(uint64_t max_num_stats, uint64_t max_stat_name_len);
   static std::string version(uint64_t max_num_stats, const Stats::StatsOptions& stats_options);
 
+  // TODO(fredlas) move to HotRestartImpl
   // Made public for testing.
   static const uint64_t VERSION;
 
@@ -123,7 +125,7 @@ public:
   // Server::HotRestart
   void drainParentListeners() override;
   int duplicateParentListenSocket(const std::string& address) override;
-  void getParentStats(GetParentStatsInfo& info) override;
+  std::unique_ptr<envoy::api::v2::core::HotRestartMessage> getParentStats() override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   void shutdownParentAdmin(ShutdownParentAdminInfo& info) override;
   void terminateParent() override;

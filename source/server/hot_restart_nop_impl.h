@@ -20,7 +20,7 @@ public:
   // Server::HotRestart
   void drainParentListeners() override {}
   int duplicateParentListenSocket(const std::string&) override { return -1; }
-  void getParentStats(GetParentStatsInfo& info) override { memset(&info, 0, sizeof(info)); }
+  std::unique_ptr<envoy::api::v2::core::HotRestartMessage> getParentStats() override { return nullptr; }
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
   void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
   void terminateParent() override {}

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/hot_restart.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stat_data_allocator.h"
@@ -20,11 +21,6 @@ class Instance;
  */
 class HotRestart {
 public:
-  struct GetParentStatsInfo {
-    uint64_t memory_allocated_;
-    uint64_t num_connections_;
-  }; // TODO(fredlas) remove once we've switched to sending ALL stats by RPC
-
   struct ShutdownParentAdminInfo {
     time_t original_start_time_;
   };
@@ -49,7 +45,7 @@ public:
    * Retrieve stats from our parent process.
    * @param info will be filled with information from our parent if it can be retrieved.
    */
-  virtual void getParentStats(GetParentStatsInfo& info) PURE;
+  virtual std::unique_ptr<envoy::api::v2::core::HotRestartMessage> getParentStats() PURE;
 
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a

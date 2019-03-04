@@ -32,10 +32,9 @@ int HotRestartingChild::duplicateParentListenSocket(const std::string& address) 
   return wrapped_reply->reply().pass_listen_socket().fd();
 }
 
-void HotRestartingChild::getParentStats(HotRestart::GetParentStatsInfo& info) {
-  memset(&info, 0, sizeof(info));
+std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
   if (restart_epoch_ == 0 || parent_terminated_) {
-    return;
+    return nullptr;
   }
 
   HotRestartMessage wrapped_request;
@@ -43,11 +42,11 @@ void HotRestartingChild::getParentStats(HotRestart::GetParentStatsInfo& info) {
   sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
-  RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
-                 "Did not get a StatsReply for our StatsRequest.");
-  // TODO(fredlas) this is where the stat transferring, to be added later in this PR, will go.
-  info.memory_allocated_ = wrapped_reply->reply().stats().memory_allocated();
-  info.num_connections_ = wrapped_reply->reply().stats().num_connections();
+  if (!replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats)) {
+    ENVOY_LOG(error, "Did not get a StatsReply for our StatsRequest. Will not merge stats from hot restart parent.");
+    return nullptr;
+  }
+  return wrapped_reply;
 }
 
 void HotRestartingChild::drainParentListeners() {
@@ -82,6 +81,7 @@ void HotRestartingChild::terminateParent() {
   wrapped_request.mutable_request()->mutable_terminate();
   sendHotRestartMessage(parent_address_, wrapped_request);
   parent_terminated_ = true;
+  // TODO TODO is it safe to assume that at this point we will receive no more stat updates from the parent? if so, here would be a good place to empty out the "cur parent stats values" map
 }
 
 } // namespace Server

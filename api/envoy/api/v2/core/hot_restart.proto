@@ -40,10 +40,13 @@ message HotRestartMessage {
       uint64 original_start_time = 1;
     }
     message Stats {
-      repeated envoy.admin.v2alpha.SimpleMetric stats = 1;
-      // TODO(fredlas) temporary within this PR:
-      uint64 memory_allocated = 2;
-      uint64 num_connections = 3;
+      // Values for special server_stats, which are separate from the ordinary stats store.
+      uint64 memory_allocated = 1;
+      uint64 num_connections = 2;
+
+      // The parent's current values for various stats in its stats store.
+      repeated envoy.admin.v2alpha.SimpleMetric counters = 3;
+      repeated envoy.admin.v2alpha.SimpleMetric gauges = 4;
     }
     oneof reply {
       // When this oneof is of the PassListenSocketReply type, there is a special

@@ -63,11 +63,8 @@ void HotRestartingParent::onSocketEvent() {
     }
 
     case HotRestartMessage::Request::kStats: {
-      HotRestart::GetParentStatsInfo info;
-      server_->getParentStats(info);
       HotRestartMessage wrapped_reply;
-      wrapped_reply.mutable_reply()->mutable_stats()->set_memory_allocated(info.memory_allocated_);
-      wrapped_reply.mutable_reply()->mutable_stats()->set_num_connections(info.num_connections_);
+      server_->exportStatsToChild(wrapped_reply.mutable_reply()->mutable_stats());
       sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }

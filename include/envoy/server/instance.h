@@ -6,6 +6,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/api/v2/core/hot_restart.pb.h"
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/context.h"
@@ -87,10 +88,10 @@ public:
   virtual void failHealthcheck(bool fail) PURE;
 
   /**
-   * Fetch server stats specific to this process vs. global shared stats in a hot restart scenario.
-   * @param info supplies the stats structure to fill.
+   * Export all stats, including stats specific to this process, for a hot restart.
+   * @return envoy::api::v2::core::HotRestartMessage::Reply::Stats
    */
-  virtual void getParentStats(HotRestart::GetParentStatsInfo& info) PURE;
+  virtual void exportStatsToChild(envoy::api::v2::core::HotRestartMessage::Reply::Stats* stats) PURE;
 
   /**
    * @return whether external healthchecks are currently failed or not.

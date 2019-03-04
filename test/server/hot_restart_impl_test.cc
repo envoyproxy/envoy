@@ -15,6 +15,7 @@
 #include "absl/strings/string_view.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
@@ -27,7 +28,7 @@ namespace Server {
 class HotRestartImplTest : public TestBase {
 public:
   void setup() {
-    EXPECT_CALL(os_sys_calls_, shmUnlink(_));
+    EXPECT_CALL(os_sys_calls_, shmUnlink(_)).Times(AnyNumber());
     EXPECT_CALL(os_sys_calls_, shmOpen(_, _, _));
     EXPECT_CALL(os_sys_calls_, ftruncate(_, _)).WillOnce(WithArg<1>(Invoke([this](off_t size) {
       buffer_.resize(size);

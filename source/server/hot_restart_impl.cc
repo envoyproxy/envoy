@@ -40,25 +40,33 @@ static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
 
 SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, const Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  
 
   const uint64_t entry_size = Stats::RawStatData::structSizeWithOptions(options.statsOptions());
   const uint64_t total_size = sizeof(SharedMemory) + stats_set_size;
 
-  int flags = O_RDWR;
-  const std::string shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
-  if (options.restartEpoch() == 0) {
-    flags |= O_CREAT | O_EXCL;
-
-    // If we are meant to be first, attempt to unlink a previous shared memory instance. If this
-    // is a clean restart this should then allow the shm_open() call below to succeed.
-    os_sys_calls.shmUnlink(shmem_name.c_str());
-  }
+  int flags = O_RDWR | O_CREAT | O_EXCL;
+  // TODO TODO can leave out this transitional stuff, and skip straight to ripping out shmem
+  // entirely, if it's ok to have all of that in the same PR.
+  // TODO(fredlas) temporary setup: "shared" memory that only you actually use. All of this shared
+  // memory stuff is getting removed in a followup PR.
+  const std::string transitional_shmem_name = fmt::format("/envoy_temp_shared_memory_{}", options.restartEpoch() % 3);
+  // If we are meant to be first, attempt to unlink a previous shared memory instance. If this
+  // is a clean restart this should then allow the shm_open() call below to succeed.
+  os_sys_calls.shmUnlink(transitional_shmem_name.c_str());
+  
+  
+  // We are removing shared memory. Get rid of the shared memory that an Envoy of the previous
+  // hot restart compatibility version would have been using.
+  const std::string original_shmem_name = fmt::format("/envoy_shared_memory_{}", options.baseId());
+  os_sys_calls.shmUnlink(original_shmem_name.c_str());
+  
 
   const Api::SysCallIntResult result =
-      os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
+      os_sys_calls.shmOpen(transitional_shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
   if (result.rc_ == -1) {
     PANIC(fmt::format("cannot open shared memory region {} check user permissions. Error: {}",
-                      shmem_name, strerror(result.errno_)));
+                      transitional_shmem_name, strerror(result.errno_)));
   }
 
   if (options.restartEpoch() == 0) {
@@ -86,7 +94,6 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, const Options& o
     RELEASE_ASSERT(shmem->max_stats_ == options.maxStats(), "");
     RELEASE_ASSERT(shmem->entry_size_ == entry_size, "");
   }
-
   // Stats::RawStatData must be naturally aligned for atomics to work properly.
   RELEASE_ASSERT(
       (reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(Stats::RawStatDataSet)) == 0,
@@ -101,7 +108,6 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, const Options& o
   if (old_flags & Flags::INITIALIZING) {
     throw EnvoyException("previous envoy process is still initializing");
   }
-
   return *shmem;
 }
 
@@ -153,7 +159,9 @@ int HotRestartImpl::duplicateParentListenSocket(const std::string& address) {
   return as_child_.duplicateParentListenSocket(address);
 }
 
-void HotRestartImpl::getParentStats(GetParentStatsInfo& info) { as_child_.getParentStats(info); }
+std::unique_ptr<envoy::api::v2::core::HotRestartMessage> HotRestartImpl::getParentStats() {
+  return as_child_.getParentStats();
+}
 
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   as_parent_.initialize(dispatcher, server);
@@ -165,7 +173,9 @@ void HotRestartImpl::shutdownParentAdmin(ShutdownParentAdminInfo& info) {
 
 void HotRestartImpl::terminateParent() { as_child_.terminateParent(); }
 
-void HotRestartImpl::shutdown() { as_parent_.shutdown(); }
+void HotRestartImpl::shutdown() {
+  as_parent_.shutdown();
+}
 
 std::string HotRestartImpl::version() {
   Thread::LockGuard lock(stat_lock_);

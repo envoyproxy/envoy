@@ -8,7 +8,6 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/hot_restart.pb.h"
 #include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"

@@ -107,6 +107,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "@envoy_api//envoy/api/v2/core:hot_restart_cc",
     ],
 )
 

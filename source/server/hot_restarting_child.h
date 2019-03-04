@@ -8,12 +8,12 @@ namespace Server {
 /**
  * The child half of hot restarting. Issues requests and commands to the parent.
  */
-class HotRestartingChild : HotRestartingBase {
+class HotRestartingChild : HotRestartingBase, Logger::Loggable<Logger::Id::main> {
 public:
   HotRestartingChild(int base_id, int restart_epoch);
 
   int duplicateParentListenSocket(const std::string& address);
-  void getParentStats(HotRestart::GetParentStatsInfo& info);
+  std::unique_ptr<envoy::api::v2::core::HotRestartMessage> getParentStats();
   void drainParentListeners();
   void shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo& info);
   void terminateParent();
