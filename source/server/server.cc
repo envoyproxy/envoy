@@ -125,13 +125,7 @@ void InstanceImpl::drainListeners() {
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) {
-  // We keep liveness state in shared memory so the parent process sees the same state.
-  // TODO(fredlas) looks like this currently relies on shared memory for the child to convey
-  // important(?) state to the parent. We may need to add an RPC type for this to the hot restart
-  // protocol, unless it really is ok for the parent to not get healthcheck fail commands.
-  server_stats_->live_.set(!fail);
-}
+void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
                                        Stats::Source& source) {
