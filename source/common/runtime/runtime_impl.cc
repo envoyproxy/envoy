@@ -23,6 +23,7 @@ namespace Envoy {
 namespace Runtime {
 
 bool runtimeFeatureEnabled(const std::string& feature) {
+  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->snapshot().runtimeFeatureEnabled(feature);
   }

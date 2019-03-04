@@ -7,7 +7,6 @@
 #include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
-class RuntimeFeaturesPeer;
 namespace Runtime {
 
 class RuntimeFeatures {
@@ -28,7 +27,7 @@ public:
   }
 
 private:
-  friend class Envoy::RuntimeFeaturesPeer;
+  friend class RuntimeFeaturesPeer;
 
   absl::flat_hash_set<std::string> disallowed_features_;
   absl::flat_hash_set<std::string> enabled_features_;

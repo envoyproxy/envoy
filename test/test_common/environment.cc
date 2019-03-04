@@ -20,11 +20,11 @@
 #include "common/common/compiler_requirements.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
-#include "common/runtime/runtime_impl.h"
 #include "common/common/utility.h"
 
 #include "server/options_impl.h"
 
+#include "test/common/runtime/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
 
@@ -37,20 +37,8 @@
 #include "tclap/CmdLine.h"
 
 #include "gtest/gtest.h"
-namespace Envoy {
-class RuntimeFeaturesPeer {
-public:
-  static bool addFeature(const std::string& feature) {
-    return const_cast<Runtime::RuntimeFeatures*>(&Runtime::RuntimeFeaturesDefaults::get())
-        ->enabled_features_.insert(feature)
-        .second;
-  }
-  static void removeFeature(const std::string& feature) {
-    const_cast<Runtime::RuntimeFeatures*>(&Runtime::RuntimeFeaturesDefaults::get())
-        ->enabled_features_.erase(feature);
-  }
-};
 
+namespace Envoy {
 namespace {
 
 std::string findAndRemove(const std::regex& pattern, int& argc, char**& argv) {
@@ -79,7 +67,7 @@ public:
   // On each test start, edit RuntimeFeaturesDefaults with our custom runtime defaults.
   void OnTestStart(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      if (!RuntimeFeaturesPeer::addFeature(runtime_override_)) {
+      if (!Runtime::RuntimeFeaturesPeer::addFeature(runtime_override_)) {
         // If the entry was already in the hash map, don't remove it OnTestEnd.
         runtime_override_.clear();
       }
@@ -89,7 +77,7 @@ public:
   // As each test ends, clean up the RuntimeFeaturesDefaults state.
   void OnTestEnd(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      RuntimeFeaturesPeer::addFeature(runtime_override_);
+      Runtime::RuntimeFeaturesPeer::addFeature(runtime_override_);
     }
   }
   std::string runtime_override_;
