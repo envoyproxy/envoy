@@ -42,6 +42,7 @@ Network::FilterStatus Router::transportEnd() {
     // No response expected
     upstream_request_->onResponseComplete();
     cleanup();
+    ENVOY_LOG(debug, "dubbo upstream request: the message is one-way and no response is required");
   }
 
   filter_complete_ = true;
@@ -207,12 +208,14 @@ void Router::UpstreamRequest::resetStream() {
     ASSERT(!conn_data_);
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
     conn_pool_handle_ = nullptr;
+    ENVOY_LOG(debug, "dubbo upstream request: reset connection pool handler");
   }
 
   if (conn_data_) {
     ASSERT(!conn_pool_handle_);
     conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
     conn_data_.reset();
+    ENVOY_LOG(debug, "dubbo upstream request: reset connection data");
   }
 }
 
