@@ -31,7 +31,7 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
     // Request data (size 5000) and added data by DecodeHeadersReturnStopAllFilter (size 1) are
     // received together.
-    EXPECT_TRUE(data.length() == 5001 || data.length() == 5002);
+    EXPECT_TRUE(data.length() == 70001 || data.length() == 70002);
     Buffer::OwnedImpl added_data("a");
     return Http::FilterDataStatus::Continue;
   }

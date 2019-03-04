@@ -30,7 +30,7 @@ public:
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
     // decodeData will only be called once after iteration resumes.
-    EXPECT_EQ(data.length(), 5000);
+    EXPECT_EQ(data.length(), 70000);
     Buffer::OwnedImpl added_data("a");
     decoder_callbacks_->addDecodedData(added_data, false);
     return Http::FilterDataStatus::Continue;

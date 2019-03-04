@@ -437,8 +437,14 @@ TEST_P(Http2IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeReques
 TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAll) { testDecodeHeadersReturnsStopAll(); }
 
 TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAllWatermark) {
-  // TODO(soya3129): enable h2 for this test.
-  // testDecodeHeadersReturnsStopAllWatermark();
+  // Sets initial stream window to min value to make the client sensitive to a low watermark.
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
+            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+      });
+  testDecodeHeadersReturnsStopAllWatermark();
 }
 
 TEST_P(Http2IntegrationTest, TwoFiltersDecodeHeadersReturnsStopAll) {

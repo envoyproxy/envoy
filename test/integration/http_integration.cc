@@ -962,8 +962,8 @@ name: passthrough-filter
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  const int count = 50;
-  const int size = 100;
+  const int count = 70;
+  const int size = 1000;
   const int added_decoded_data_size = 1;
   for (int i = 0; i < count - 1; i++) {
     codec_client_->sendData(*request_encoder_, size, false);
@@ -1022,8 +1022,8 @@ name: passthrough-filter
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  const int count = 50;
-  const int size = 100;
+  const int count = 70;
+  const int size = 1000;
   const int added_decoded_data_size = 1;
   for (int i = 0; i < count - 1; i++) {
     codec_client_->sendData(*request_encoder_, size, false);
@@ -1084,8 +1084,8 @@ name: passthrough-filter
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  const int count = 10;
-  const int size = 500;
+  const int count = 70;
+  const int size = 1000;
   const int added_decoded_data_size = 1;
   for (int i = 0; i < count - 1; i++) {
     codec_client_->sendData(*request_encoder_, size, false);

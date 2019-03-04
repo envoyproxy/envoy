@@ -21,7 +21,7 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
     // Request data length (size 5000) + data from addDecodedData() called in dataDecode (size 1).
     // Or data from addDecodedData() called in dataTrailers (size 1)
-    EXPECT_TRUE(data.length() == 5001 || data.length() == 1);
+    EXPECT_TRUE(data.length() == 70001 || data.length() == 1);
     return Http::FilterDataStatus::Continue;
   }
 
