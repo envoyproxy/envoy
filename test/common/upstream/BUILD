@@ -6,6 +6,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -384,6 +385,7 @@ envoy_cc_test(
     name = "cluster_factory_impl_test",
     srcs = ["cluster_factory_impl_test.cc"],
     deps = [
+        ":cluster_factory_config_proto_cc",
         ":utility_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codec_interface",
@@ -406,8 +408,12 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:cluster_factory_config_proto_cc",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_proto_library(
+    name = "cluster_factory_config_proto",
+    srcs = [":cluster_factory_config.proto"],
 )

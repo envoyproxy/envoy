@@ -4,6 +4,4 @@ package test.common.upstream;
 
 message CustomStaticConfig {
   uint32 priority = 1;
-  string address = 2;
-  uint32 port_value = 3;
 }

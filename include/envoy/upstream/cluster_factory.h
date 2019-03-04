@@ -25,8 +25,6 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/outlier_detection.h"
 
-#include "include/envoy/thread_local/_virtual_includes/thread_local_interface/envoy/thread_local/thread_local.h"
-
 namespace Envoy {
 namespace Upstream {
 
@@ -100,6 +98,8 @@ public:
   virtual Ssl::ContextManager& sslContextManager() PURE;
 
   /**
+   * TODO(hyang): Remove this and only expose the scope, this would require refactoring
+   * TransportSocketFactoryContext
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;

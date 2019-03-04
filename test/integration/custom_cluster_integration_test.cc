@@ -4,8 +4,8 @@
 #include "common/upstream/load_balancer_impl.h"
 
 #include "test/config/utility.h"
+#include "test/integration/clusters/cluster_factory_config.pb.h"
 #include "test/integration/http_integration.h"
-#include "test/proto/cluster_factory_config.pb.h"
 #include "test/test_common/test_base.h"
 
 namespace Envoy {
@@ -69,7 +69,7 @@ public:
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
-      test::common::upstream::CustomStaticConfig config;
+      test::integration::clusters::CustomStaticConfig config;
       config.set_priority(10);
       config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
       config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());

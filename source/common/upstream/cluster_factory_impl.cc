@@ -46,7 +46,6 @@ ClusterSharedPtr ClusterFactoryImplBase::create(
       cluster_type = Extensions::Clusters::ClusterTypes::get().OriginalDst;
       break;
     case envoy::api::v2::Cluster::EDS:
-      // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
       cluster_type = Extensions::Clusters::ClusterTypes::get().Eds;
       break;
     default:

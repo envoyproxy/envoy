@@ -5,6 +5,7 @@ load(
     "envoy_cc_binary",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -13,6 +14,7 @@ envoy_cc_test_library(
     name = "custom_static_cluster",
     srcs = ["custom_static_cluster.cc"],
     deps = [
+        ":cluster_factory_config_proto_cc",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/upstream:cluster_factory_interface",
@@ -27,8 +29,12 @@ envoy_cc_test_library(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",
-        "//test/proto:cluster_factory_config_proto_cc",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_proto_library(
+    name = "cluster_factory_config_proto",
+    srcs = [":cluster_factory_config.proto"],
 )

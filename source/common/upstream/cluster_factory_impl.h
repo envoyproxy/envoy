@@ -48,8 +48,6 @@
 
 #include "extensions/clusters/well_known_names.h"
 
-#include "include/envoy/thread_local/_virtual_includes/thread_local_interface/envoy/thread_local/thread_local.h"
-
 namespace Envoy {
 namespace Upstream {
 
@@ -183,7 +181,6 @@ private:
  * @param ConfigProto is the configuration protobuf.
  */
 template <class ConfigProto> class ConfigurableClusterFactoryBase : public ClusterFactoryImplBase {
-
 public:
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message.

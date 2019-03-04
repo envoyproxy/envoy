@@ -14,8 +14,8 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/proto/cluster_factory_config.pb.h"
-#include "test/proto/cluster_factory_config.pb.validate.h"
+#include "test/integration/clusters/cluster_factory_config.pb.h"
+#include "test/integration/clusters/cluster_factory_config.pb.validate.h"
 #include "test/test_common/registry.h"
 
 namespace Envoy {
@@ -64,15 +64,15 @@ private:
   const uint32_t port_;
 };
 
-class CustomStaticClusterFactory
-    : public Upstream::ConfigurableClusterFactoryBase<test::common::upstream::CustomStaticConfig> {
+class CustomStaticClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
+                                       test::integration::clusters::CustomStaticConfig> {
 public:
   CustomStaticClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.custom_static") {}
 
 private:
   Upstream::ClusterImplBaseSharedPtr createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster,
-      const test::common::upstream::CustomStaticConfig& proto_config,
+      const test::integration::clusters::CustomStaticConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override {
