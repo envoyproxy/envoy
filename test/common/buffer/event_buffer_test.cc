@@ -65,13 +65,13 @@ TEST(EventBufferTest, ChunkSwapCorruption) {
   evbuffer_add(other_buf, "cc", 2);
   evbuffer_prepend(other_buf, "ddd", 3);
 
-  // buf:       
+  // buf:
   // other_buf: aaaaaabdddcc
   rc = evbuffer_prepend_buffer(other_buf, buf);
   ASSERT_EQ(rc, 0);
 
   // buf:       aaaaaabdddcc
-  // other_buf: 
+  // other_buf:
   rc = evbuffer_add_buffer(buf, other_buf);
   ASSERT_EQ(rc, 0);
 
