@@ -32,6 +32,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Tracing {
+namespace {
 
 TEST(HttpTracerUtilityTest, IsTracing) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -403,5 +404,6 @@ TEST_F(HttpTracerImplTest, BasicFunctionalityNodeSet) {
   tracer_->startSpan(config_, request_headers_, stream_info_, {Reason::Sampling, true});
 }
 
+} // namespace
 } // namespace Tracing
 } // namespace Envoy

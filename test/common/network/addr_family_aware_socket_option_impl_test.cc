@@ -193,6 +193,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, GetSocketOptionCannotDetermineVersio
       socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
   EXPECT_FALSE(result.has_value());
 }
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

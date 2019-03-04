@@ -31,7 +31,6 @@ using testing::StrNe;
 
 namespace Envoy {
 namespace ConfigTest {
-
 namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
