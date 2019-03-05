@@ -29,6 +29,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+namespace {
 
 TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;
@@ -307,6 +308,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
                             "Provided name for static registration lookup was empty.");
 }
 
+} // namespace
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

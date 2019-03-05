@@ -10,6 +10,7 @@
 
 namespace Envoy {
 namespace Json {
+namespace {
 
 class JsonLoaderTest : public testing::Test {
 protected:
@@ -474,5 +475,6 @@ admin:
                              "Unexpected YAML exception");
 }
 
+} // namespace
 } // namespace Json
 } // namespace Envoy

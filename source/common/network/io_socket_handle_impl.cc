@@ -12,7 +12,7 @@ using Envoy::Api::SysCallSizeResult;
 namespace Envoy {
 namespace Network {
 
-IoError::IoErrorCode IoSocketError::errorCode() const {
+Api::IoError::IoErrorCode IoSocketError::errorCode() const {
   switch (errno_) {
   case EAGAIN:
     // EAGAIN should use specific error ENVOY_ERROR_AGAIN.
@@ -39,18 +39,18 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
 }
 
 // Deallocate memory only if the error is not ENVOY_ERROR_AGAIN.
-void deleteIoError(IoError* err) {
+void deleteIoError(Api::IoError* err) {
   ASSERT(err != nullptr);
   if (err != ENVOY_ERROR_AGAIN) {
     delete err;
   }
 }
 
-IoHandleCallUintResult IoSocketHandleImpl::close() {
+Api::IoCallUintResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  return IoHandleCallResult<uint64_t>(rc, IoErrorPtr(nullptr, deleteIoError));
+  return Api::IoCallResult<uint64_t>(rc, Api::IoErrorPtr(nullptr, deleteIoError));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }

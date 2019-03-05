@@ -35,6 +35,7 @@ protected:
 TEST_F(StreamInfoImplTest, TimingTest) {
   MonotonicTime pre_start = test_time_.timeSystem().monotonicTime();
   StreamInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem());
+  Envoy::StreamInfo::UpstreamTiming upstream_timing;
   MonotonicTime post_start = test_time_.timeSystem().monotonicTime();
 
   const MonotonicTime& start = info.startTimeMonotonic();
@@ -48,19 +49,23 @@ TEST_F(StreamInfoImplTest, TimingTest) {
       checkDuration(std::chrono::nanoseconds{0}, info.lastDownstreamRxByteReceived());
 
   EXPECT_FALSE(info.firstUpstreamTxByteSent());
-  info.onFirstUpstreamTxByteSent();
+  upstream_timing.onFirstUpstreamTxByteSent(test_time_.timeSystem());
+  info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.firstUpstreamTxByteSent());
 
   EXPECT_FALSE(info.lastUpstreamTxByteSent());
-  info.onLastUpstreamTxByteSent();
+  upstream_timing.onLastUpstreamTxByteSent(test_time_.timeSystem());
+  info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.lastUpstreamTxByteSent());
 
   EXPECT_FALSE(info.firstUpstreamRxByteReceived());
-  info.onFirstUpstreamRxByteReceived();
+  upstream_timing.onFirstUpstreamRxByteReceived(test_time_.timeSystem());
+  info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.firstUpstreamRxByteReceived());
 
   EXPECT_FALSE(info.lastUpstreamRxByteReceived());
-  info.onLastUpstreamRxByteReceived();
+  upstream_timing.onLastUpstreamRxByteReceived(test_time_.timeSystem());
+  info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.lastUpstreamRxByteReceived());
 
   EXPECT_FALSE(info.firstDownstreamTxByteSent());

@@ -8,6 +8,7 @@
 namespace Envoy {
 namespace Event {
 namespace Test {
+namespace {
 
 class TestTimeSystemTest : public testing::Test {
 protected:
@@ -45,6 +46,7 @@ TEST_F(TestTimeSystemTest, RealThenSimSerial) {
   { SimulatedTimeSystem t1; }
 }
 
+} // namespace
 } // namespace Test
 } // namespace Event
 } // namespace Envoy

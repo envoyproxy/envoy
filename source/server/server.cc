@@ -125,10 +125,7 @@ void InstanceImpl::drainListeners() {
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) {
-  // We keep liveness state in shared memory so the parent process sees the same state.
-  server_stats_->live_.set(!fail);
-}
+void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
                                        Stats::Source& source) {
@@ -168,7 +165,7 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
   info.num_connections_ = numConnections();
 }
 
-bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
+bool InstanceImpl::healthCheckFailed() { return !server_stats_->live_.value(); }
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
@@ -235,7 +232,8 @@ void InstanceImpl::initialize(const Options& options,
 
   const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
-      ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
+      ServerStats{ALL_SERVER_STATS(POOL_BOOL_INDICATOR_PREFIX(stats_store_, server_stats_prefix),
+                                   POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix))});
 
   server_stats_->concurrency_.set(options_.concurrency());

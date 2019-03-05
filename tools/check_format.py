@@ -39,9 +39,6 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './test/test_common/utility.cc', './test/test_common/utility.h',
                        './test/integration/integration.h')
 
-# Files in these paths can use std::get_time
-GET_TIME_WHITELIST = ('./test/test_common/utility.cc')
-
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = ('./test/common/protobuf/utility_test.cc',
                                  './test/common/grpc/codec_test.cc')
@@ -223,10 +220,6 @@ def whitelistedForRealTime(file_path):
   return file_path in REAL_TIME_WHITELIST
 
 
-def whitelistedForGetTime(file_path):
-  return file_path in GET_TIME_WHITELIST
-
-
 def whitelistedForSerializeAsString(file_path):
   return file_path in SERIALIZE_AS_STRING_WHITELIST
 
@@ -392,12 +385,24 @@ def checkSourceLine(line, file_path, reportError):
        'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
        'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
-  if not whitelistedForGetTime(file_path):
-    if "std::get_time" in line:
-      if "test/" in file_path:
-        reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
-      else:
-        reportError("Don't use std::get_time; use the injectable time system")
+  # Check that we use the absl::Time library
+  if "std::get_time" in line:
+    if "test/" in file_path:
+      reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
+    else:
+      reportError("Don't use std::get_time; use the injectable time system")
+  if "std::put_time" in line:
+    reportError("Don't use std::put_time; use absl::Time equivalent instead")
+  if "gmtime" in line:
+    reportError("Don't use gmtime; use absl::Time equivalent instead")
+  if "mktime" in line:
+    reportError("Don't use mktime; use absl::Time equivalent instead")
+  if "localtime" in line:
+    reportError("Don't use localtime; use absl::Time equivalent instead")
+  if "strftime" in line:
+    reportError("Don't use strftime; use absl::FormatTime instead")
+  if "strptime" in line:
+    reportError("Don't use strptime; use absl::FormatTime instead")
   if 'std::atomic_' in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.

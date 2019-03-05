@@ -89,6 +89,18 @@ socket tap is truncated, the trace will indicate truncation via the :ref:`read_t
 <envoy_api_field_data.tap.v2alpha.SocketBufferedTrace.write_truncated>` fields as well as the body
 :ref:`truncated <envoy_api_field_data.tap.v2alpha.Body.truncated>` field.
 
+Streaming
+---------
+
+The tap transport socket supports both buffered and streaming, controlled by the :ref:`streaming
+<envoy_api_field_service.tap.v2alpha.OutputConfig.streaming>` setting. When buffering,
+:ref:`SocketBufferedTrace <envoy_api_msg_data.tap.v2alpha.SocketBufferedTrace>` messages are
+emitted. When streaming, a series of :ref:`SocketStreamedTraceSegment
+<envoy_api_msg_data.tap.v2alpha.SocketStreamedTraceSegment>` are emitted.
+
+See the :ref:`HTTP tap filter streaming <config_http_filters_tap_streaming>` documentation for more
+information. Most of the concepts overlap between the HTTP filter and the transport socket.
+
 PCAP generation
 ---------------
 

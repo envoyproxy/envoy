@@ -40,7 +40,6 @@ using testing::Return;
 
 namespace Envoy {
 namespace Network {
-
 namespace {
 
 // List of IP address (in human readable format).
@@ -294,6 +293,7 @@ private:
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
 };
+
 } // namespace
 
 class DnsResolverImplPeer {

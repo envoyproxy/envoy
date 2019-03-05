@@ -176,7 +176,7 @@ ExpectationSet expectContainerEnd(MockProtocol& proto, MockDecoderEventHandler& 
   return s;
 }
 
-} // end namespace
+} // namespace
 
 class DecoderStateMachineTestBase {
 public:

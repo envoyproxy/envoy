@@ -446,6 +446,7 @@ public:
   COUNTER  (lb_subsets_removed)                                                                    \
   COUNTER  (lb_subsets_selected)                                                                   \
   COUNTER  (lb_subsets_fallback)                                                                   \
+  COUNTER  (lb_subsets_fallback_panic)                                                             \
   COUNTER  (original_dst_host_invalid)                                                             \
   COUNTER  (upstream_cx_total)                                                                     \
   GAUGE    (upstream_cx_active)                                                                    \
@@ -523,11 +524,11 @@ public:
  * Cluster circuit breakers stats.
  */
 // clang-format off
-#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GAUGE)                                                  \
-  GAUGE (cx_open)                                                                                  \
-  GAUGE (rq_pending_open)                                                                          \
-  GAUGE (rq_open)                                                                                  \
-  GAUGE (rq_retry_open)
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(BOOL_INDICATOR)                                         \
+  BOOL_INDICATOR (cx_open)                                                                         \
+  BOOL_INDICATOR (rq_pending_open)                                                                 \
+  BOOL_INDICATOR (rq_open)                                                                         \
+  BOOL_INDICATOR (rq_retry_open)
 // clang-format on
 
 /**
@@ -548,7 +549,7 @@ struct ClusterLoadReportStats {
  * Struct definition for cluster circuit breakers stats. @see stats_macros.h
  */
 struct ClusterCircuitBreakersStats {
-  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_BOOL_INDICATOR_STRUCT)
 };
 
 /**

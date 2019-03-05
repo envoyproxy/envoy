@@ -23,12 +23,12 @@ public:
       Upstream::HealthCheckEventLoggerPtr&& event_logger,
       Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory);
 
-  static const Extensions::NetworkFilters::RedisProxy::RespValue& pingHealthCheckRequest() {
+  static const NetworkFilters::Common::Redis::RespValue& pingHealthCheckRequest() {
     static HealthCheckRequest* request = new HealthCheckRequest();
     return request->request_;
   }
 
-  static const Extensions::NetworkFilters::RedisProxy::RespValue&
+  static const NetworkFilters::Common::Redis::RespValue&
   existsHealthCheckRequest(const std::string& key) {
     static HealthCheckRequest* request = new HealthCheckRequest(key);
     return request->request_;
@@ -60,7 +60,7 @@ private:
     bool enableHashtagging() const override { return false; }
 
     // Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks
-    void onResponse(Extensions::NetworkFilters::RedisProxy::RespValuePtr&& value) override;
+    void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
 
     // Network::ConnectionCallbacks
@@ -79,7 +79,7 @@ private:
     HealthCheckRequest(const std::string& key);
     HealthCheckRequest();
 
-    Extensions::NetworkFilters::RedisProxy::RespValue request_;
+    NetworkFilters::Common::Redis::RespValue request_;
   };
 
   typedef std::unique_ptr<RedisActiveHealthCheckSession> RedisActiveHealthCheckSessionPtr;

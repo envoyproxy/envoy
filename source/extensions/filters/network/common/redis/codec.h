@@ -10,7 +10,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 /**
  * All RESP types as defined here: https://redis.io/topics/protocol
@@ -133,7 +134,8 @@ public:
   ProtocolError(const std::string& error) : EnvoyException(error) {}
 };
 
-} // namespace RedisProxy
+} // namespace Redis
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

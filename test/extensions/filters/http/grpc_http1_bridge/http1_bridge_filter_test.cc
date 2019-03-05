@@ -21,6 +21,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
+namespace {
 
 class GrpcHttp1BridgeFilterTest : public testing::Test {
 public:
@@ -212,6 +213,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));
 }
 
+} // namespace
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters
 } // namespace Extensions

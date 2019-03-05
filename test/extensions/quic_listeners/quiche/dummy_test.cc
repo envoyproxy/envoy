@@ -7,12 +7,14 @@ namespace Envoy {
 namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
+namespace {
 
 TEST(DummyTest, Dummy) {
   http2::Http2String foo = "bar";
   EXPECT_EQ("bar cowbell", moreCowbell(foo));
 }
 
+} // namespace
 } // namespace Quiche
 } // namespace QuicListeners
 } // namespace Extensions
