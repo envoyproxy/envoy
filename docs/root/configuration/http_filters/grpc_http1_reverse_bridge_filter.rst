@@ -1,11 +1,11 @@
-.. _config_http_filters_grpc_reverse_bridge:
+.. _config_http_filters_grpc_http1_reverse_bridge:
 
 gRPC HTTP/1.1 reverse bridge
 ============================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
 * :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
-* This filter should be configured with the name *envoy.grpc_http1_reverse_bridge*.
+* This filter should be configured with the name *envoy.filters.http.grpc_http1_reverse_bridge*.
 
 This is a filter that enables converting an incoming gRPC request into a HTTP/1.1 request to allow
 a server that does not understand HTTP/2 or gRPC semantics to handle the request.

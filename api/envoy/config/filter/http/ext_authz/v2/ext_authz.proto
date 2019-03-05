@@ -3,8 +3,8 @@ syntax = "proto3";
 package envoy.config.filter.http.ext_authz.v2;
 
 option java_outer_classname = "ExtAuthzProto";
-option java_package = "io.envoyproxy.envoy.config.filter.http.ext_authz.v2";
 option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.http.ext_authz.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
@@ -16,7 +16,8 @@ import "envoy/type/matcher/string.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: External Authorization]
-// ExtAuthz :ref:`configuration overview <config_http_filters_ext_authz>`.
+// External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
+
 message ExtAuthz {
   // External authorization service configuration.
   oneof services {
