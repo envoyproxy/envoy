@@ -110,10 +110,8 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
 
   // Read readonly flag, if it's there.
   bool readonly{};
-  try {
+  if (data.length() >= offset + 1) {
     BufferHelper::peekBool(data, offset, readonly);
-  } catch (EnvoyException& e) {
-    // Old libraries don't populate the readonly field.
   }
 
   callbacks_.onConnect(readonly);
