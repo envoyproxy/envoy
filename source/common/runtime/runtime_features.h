@@ -9,6 +9,7 @@
 namespace Envoy {
 namespace Runtime {
 
+// TODO(alyssawilk) convert these to string view.
 class RuntimeFeatures {
 public:
   RuntimeFeatures();
