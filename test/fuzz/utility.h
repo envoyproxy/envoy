@@ -11,12 +11,27 @@ namespace Envoy {
 namespace Fuzz {
 
 // Convert from test proto Headers to TestHeaderMapImpl.
-inline Http::TestHeaderMapImpl fromHeaders(const test::fuzz::Headers& headers) {
+inline Http::TestHeaderMapImpl
+fromHeaders(const test::fuzz::Headers& headers,
+            const std::unordered_set<std::string>& ignore_headers = {}) {
   Http::TestHeaderMapImpl header_map;
   for (const auto& header : headers.headers()) {
+    // HeaderMapImpl and places such as the route lookup should never see strings with embedded NULL
+    // values, the HTTP codecs should reject them. So, don't inject any such strings into the fuzz
+    // tests.
+    const auto clean = [](const std::string& s) {
+      const auto n = s.find('\0');
+      if (n == std::string::npos) {
+        return s;
+      }
+      return s.substr(0, n);
+    };
     // When we are injecting headers, we don't allow the key to ever be empty,
     // since calling code is not supposed to do this.
-    header_map.addCopy(header.key().empty() ? "not-empty" : header.key(), header.value());
+    const std::string key = header.key().empty() ? "not-empty" : clean(header.key());
+    if (ignore_headers.find(StringUtil::toLower(key)) != ignore_headers.end()) {
+      header_map.addCopy(key, clean(header.value()));
+    }
   }
   return header_map;
 }
