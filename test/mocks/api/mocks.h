@@ -60,6 +60,8 @@ public:
   MOCK_METHOD3(writev, SysCallSizeResult(int, const iovec*, int));
   MOCK_METHOD3(readv, SysCallSizeResult(int, const iovec*, int));
   MOCK_METHOD4(recv, SysCallSizeResult(int socket, void* buffer, size_t length, int flags));
+  MOCK_METHOD6(recvfrom, SysCallSizeResult(int sockfd, void* buffer, size_t length, int flags,
+                                           struct sockaddr* addr, socklen_t* addrlen));
 
   MOCK_METHOD3(shmOpen, SysCallIntResult(const char*, int, mode_t));
   MOCK_METHOD1(shmUnlink, SysCallIntResult(const char*));

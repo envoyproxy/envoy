@@ -37,23 +37,7 @@ namespace Http {
 constexpr bool DebugMode = false;
 
 Http::TestHeaderMapImpl fromSanitizedHeaders(const test::fuzz::Headers& headers) {
-  // When we are injecting headers, we don't allow the key to ever be empty,
-  // since calling code is not supposed to do this. Also disallowed
-  // transfer-encoding.
-  test::fuzz::Headers sanitized_headers;
-  for (const auto& header : headers.headers()) {
-    const std::string key = StringUtil::toLower(header.key());
-
-    if (key == "transfer-encoding") {
-      continue;
-    }
-
-    auto* sane_header = sanitized_headers.add_headers();
-    sane_header->set_key(key.empty() ? "non-empty" : key);
-    sane_header->set_value(header.value());
-  }
-
-  return Fuzz::fromHeaders(sanitized_headers);
+  return Fuzz::fromHeaders(headers, {"transfer-encoding"});
 }
 
 // Convert from test proto Http1ServerSettings to Http1Settings.
@@ -385,8 +369,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
                                                                 max_request_headers_kb);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
-    server = absl::make_unique<Http1::ServerConnectionImpl>(server_connection, server_callbacks,
-                                                            server_http1settings);
+    server = absl::make_unique<Http1::ServerConnectionImpl>(
+        server_connection, server_callbacks, server_http1settings, max_request_headers_kb);
   }
 
   ReorderBuffer client_write_buf{*server};

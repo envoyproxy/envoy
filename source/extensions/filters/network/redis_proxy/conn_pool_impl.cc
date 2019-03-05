@@ -19,8 +19,8 @@ ConfigImpl::ConfigImpl(
       enable_hashtagging_(config.enable_hashtagging()) {}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                             EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const Config& config) {
+                             Common::Redis::EncoderPtr&& encoder,
+                             Common::Redis::DecoderFactory& decoder_factory, const Config& config) {
 
   std::unique_ptr<ClientImpl> client(
       new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory, config));
@@ -33,7 +33,8 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 }
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config)
+                       Common::Redis::EncoderPtr&& encoder,
+                       Common::Redis::DecoderFactory& decoder_factory, const Config& config)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })) {
@@ -53,7 +54,8 @@ ClientImpl::~ClientImpl() {
 
 void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
-PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
+PoolRequest* ClientImpl::makeRequest(const Common::Redis::RespValue& request,
+                                     PoolCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
   pending_requests_.emplace_back(*this, callbacks);
@@ -89,7 +91,7 @@ void ClientImpl::onConnectOrOpTimeout() {
 void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
-  } catch (ProtocolError&) {
+  } catch (Common::Redis::ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::REQUEST_FAILED);
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
     host_->stats().rq_error_.inc();
@@ -140,7 +142,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void ClientImpl::onRespValue(RespValuePtr&& value) {
+void ClientImpl::onRespValue(Common::Redis::RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
   if (!request.canceled_) {
@@ -185,8 +187,9 @@ ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config) {
-  return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
-                            config);
+  return ClientImpl::create(host, dispatcher,
+                            Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()},
+                            decoder_factory_, config);
 }
 
 InstanceImpl::InstanceImpl(
@@ -200,7 +203,8 @@ InstanceImpl::InstanceImpl(
   });
 }
 
-PoolRequest* InstanceImpl::makeRequest(const std::string& key, const RespValue& value,
+PoolRequest* InstanceImpl::makeRequest(const std::string& key,
+                                       const Common::Redis::RespValue& value,
                                        PoolCallbacks& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().makeRequest(key, value, callbacks);
 }
@@ -274,7 +278,7 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
 }
 
 PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
-                                                        const RespValue& request,
+                                                        const Common::Redis::RespValue& request,
                                                         PoolCallbacks& callbacks) {
   if (cluster_ == nullptr) {
     ASSERT(client_map_.empty());
