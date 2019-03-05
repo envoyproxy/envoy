@@ -27,7 +27,6 @@ def _repository_impl(name, **kwargs):
         **kwargs
     )
 
-
 def _default_envoy_build_config_impl(ctx):
     ctx.file("WORKSPACE", "")
     ctx.file("BUILD.bazel", "")
