@@ -203,6 +203,22 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(ReturnRef(requested_server_name));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
+    std::string upstream_transport_failure_reason = "SSL error";
+    EXPECT_CALL(stream_info, upstreamTransportFailureReason())
+        .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
+    EXPECT_EQ("SSL error", upstream_format.format(header, header, header, stream_info));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
+    std::string upstream_transport_failure_reason;
+    EXPECT_CALL(stream_info, upstreamTransportFailureReason())
+        .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
+    EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+  }
 }
 
 TEST(AccessLogFormatterTest, requestHeaderFormatter) {

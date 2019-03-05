@@ -21,13 +21,16 @@ namespace TransportSockets {
 namespace Tls {
 
 namespace {
+
+constexpr absl::string_view NotReadyReason{"SSL error: secret is not ready"};
+
 // This SslSocket will be used when SSL secret is not fetched from SDS server.
 class NotReadySslSocket : public Network::TransportSocket {
 public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
   std::string protocol() const override { return EMPTY_STRING; }
-  std::string failureReason() const override { return "SSL error: secret is not ready"; }
+  absl::string_view failureReason() const override { return NotReadyReason; }
   bool canFlushClose() override { return true; }
   void closeSocket(Network::ConnectionEvent) override {}
   Network::IoResult doRead(Buffer::Instance&) override { return {PostIoAction::Close, 0, false}; }
@@ -342,7 +345,7 @@ std::string SslSocket::protocol() const {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
-std::string SslSocket::failureReason() const { return failure_reason_; }
+absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
 std::string SslSocket::serialNumberPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));

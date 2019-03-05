@@ -34,7 +34,7 @@ std::string TsiSocket::protocol() const {
   return EMPTY_STRING;
 }
 
-std::string TsiSocket::failureReason() const {
+absl::string_view TsiSocket::failureReason() const {
   // TODO(htuch): Implement error reason for TSI.
   return EMPTY_STRING;
 }

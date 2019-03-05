@@ -46,11 +46,11 @@ public:
   /**
    * Called when a pool error occurred and no connection could be acquired for making the request.
    * @param reason supplies the failure reason.
-   * @param reason_details supplies the details of the failure reason
+   * @param transport_failure_reason supplies the details of the transport failure reason.
    * @param host supplies the description of the host that caused the failure. This may be nullptr
    *             if no host was involved in the failure (for example overflow).
    */
-  virtual void onPoolFailure(PoolFailureReason reason, absl::string_view reason_details,
+  virtual void onPoolFailure(PoolFailureReason reason, absl::string_view transport_failure_reason,
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**

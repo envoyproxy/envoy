@@ -1123,7 +1123,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
 }
 
 void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
-                                            absl::string_view reason_details,
+                                            absl::string_view transport_failure_reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
@@ -1137,7 +1137,7 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
-  onResetStream(reset_reason, reason_details);
+  onResetStream(reset_reason, transport_failure_reason);
 }
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,

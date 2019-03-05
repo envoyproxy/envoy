@@ -594,7 +594,7 @@ void ConnectionImpl::onDelayedCloseTimeout() {
   closeSocket(ConnectionEvent::LocalClose);
 }
 
-std::string ConnectionImpl::transportFailureReason() const {
+absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
 

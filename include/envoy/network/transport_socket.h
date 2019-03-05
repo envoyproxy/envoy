@@ -109,7 +109,7 @@ public:
    * @return std::string the last failure reason occurred on the transport socket. If no failure
    *         has been occurred the empty string is returned.
    */
-  virtual std::string failureReason() const PURE;
+  virtual absl::string_view failureReason() const PURE;
 
   /**
    * @return bool whether the socket can be flushed and closed.

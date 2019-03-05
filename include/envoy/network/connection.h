@@ -266,7 +266,7 @@ public:
    * @return std::string the failure reason of the underlying transport socket, if no failure
    *         occurred an empty string is returned.
    */
-  virtual std::string transportFailureReason() const PURE;
+  virtual absl::string_view transportFailureReason() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

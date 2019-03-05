@@ -134,6 +134,7 @@ public:
   /**
    * Fires when a stream has been remote reset.
    * @param reason supplies the reset reason.
+   * @param transport_failure_reason supplies underlying transport failure reason.
    */
   virtual void onResetStream(StreamResetReason reason,
                              absl::string_view transport_failure_reason) PURE;

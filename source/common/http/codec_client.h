@@ -81,7 +81,7 @@ public:
   /**
    * @return the underlying connection error.
    */
-  std::string connectionFailureReason() { return connection_->transportFailureReason(); }
+  absl::string_view connectionFailureReason() { return connection_->transportFailureReason(); }
 
   /**
    * @return size_t the number of outstanding requests that have not completed or been reset.

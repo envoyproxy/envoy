@@ -20,7 +20,7 @@ public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
-  std::string failureReason() const override;
+  absl::string_view failureReason() const override;
   bool canFlushClose() override;
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
