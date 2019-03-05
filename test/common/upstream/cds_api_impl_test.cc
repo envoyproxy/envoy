@@ -539,6 +539,7 @@ resources:
   interval_timer_->callback_();
 
   EXPECT_CALL(*interval_timer_, enableTimer(_));
+
   callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
 
   EXPECT_EQ("", cds_->versionInfo());
