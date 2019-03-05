@@ -158,7 +158,7 @@ TEST(DubboProtocolImplTest, decode) {
   {
     addInt64(buffer, 0);
     addInt64(buffer, 0);
-    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context, metadata), EnvoyException,
                               "invalid dubbo message magic number 0");
     buffer.drain(buffer.length());
   }
@@ -170,7 +170,7 @@ TEST(DubboProtocolImplTest, decode) {
     addInt32(buffer, DubboProtocolImpl::MaxBodySize + 1);
     std::string exception_string =
         fmt::format("invalid dubbo message size {}", DubboProtocolImpl::MaxBodySize + 1);
-    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context, metadata), EnvoyException,
                               exception_string);
     buffer.drain(buffer.length());
   }

@@ -150,3 +150,15 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "router_filter_config_test",
+    srcs = ["router_filter_config_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        ":mocks_lib",
+        "//source/extensions/filters/network/dubbo_proxy/filters:well_known_names",
+        "//source/extensions/filters/network/dubbo_proxy/router:config",
+        "//test/mocks/server:server_mocks",
+    ],
+)
