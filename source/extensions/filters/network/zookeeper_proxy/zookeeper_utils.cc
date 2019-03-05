@@ -25,7 +25,7 @@ void BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset, std::s
   int32_t len = 0;
   peekInt32(buffer, offset, len);
 
-  if (buffer.length() < (offset + len) || !len) {
+  if (buffer.length() < (offset + len) || len == 0) {
     return;
   }
 
