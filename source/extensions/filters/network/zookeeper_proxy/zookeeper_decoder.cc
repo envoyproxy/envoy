@@ -95,7 +95,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 
 #define CHECK_LENGTH(LEN, MINL)                                                                    \
   if (LEN < MINL) {                                                                                \
-    throw new EnvoyException("Package is too small");                                              \
+    throw EnvoyException("Package is too small");                                                  \
   }
 
 void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
@@ -292,7 +292,7 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
       break;
     default:
       // Should not happen.
-      throw new EnvoyException("Unknown type within a transaction");
+      throw EnvoyException("Unknown type within a transaction");
     }
   }
 
