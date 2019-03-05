@@ -15,6 +15,9 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
+// [#protodoc-title: JWT Authentication]
+// JWT Authentication :ref:`configuration overview <config_http_filters_jwt_authn>`.
+
 // Please see following for JWT authentication flow:
 //
 // * `JSON Web Token (JWT) <https://tools.ietf.org/html/rfc7519>`_
