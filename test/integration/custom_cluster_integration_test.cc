@@ -6,7 +6,6 @@
 #include "test/config/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/test_base.h"
 
 namespace Envoy {
 namespace {
@@ -25,7 +24,7 @@ static_resources:
     cluster_type:
         name: envoy.clusters.custom_static
         typed_config:
-          "@type": type.googleapis.com/test.common.upstream.CustomStaticConfig
+          "@type": type.googleapis.com/test.integration.clusters.CustomStaticConfig
           priority: 10
           address: 127.0.0.1
           port_value: 0
@@ -56,7 +55,7 @@ static_resources:
 )EOF";
 
 // Integration test for cluster extension using CustomStaticCluster.
-class CustomClusterIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class CustomClusterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {
 public:
   CustomClusterIntegrationTest()
