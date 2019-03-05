@@ -40,6 +40,8 @@ void SdsApi::initialize(std::function<void()> callback) {
   subscription_->start({sds_config_name_}, *this);
 }
 
+void SdsApi::cancel() { initialize_callback_ = nullptr; }
+
 void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&) {
   if (resources.empty()) {
     throw EnvoyException(

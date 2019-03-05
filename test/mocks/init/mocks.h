@@ -18,6 +18,7 @@ public:
   ~MockTarget();
 
   MOCK_METHOD1(initialize, void(std::function<void()> callback));
+  MOCK_METHOD0(cancel, void());
 
   std::function<void()> callback_;
 };

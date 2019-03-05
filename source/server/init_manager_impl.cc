@@ -10,22 +10,17 @@
 namespace Envoy {
 namespace Server {
 
-InitManagerImpl::InitManagerImpl(absl::string_view description)
-    : canceled_(std::make_shared<bool>(false)), description_(description) {
+InitManagerImpl::InitManagerImpl(absl::string_view description) : description_(description) {
   TRACE_INIT_MANAGER("constructor");
 }
 
 InitManagerImpl::~InitManagerImpl() {
-  switch (state_) {
-  case State::NotInitialized:
-    TRACE_INIT_MANAGER("destructor, not initialized");
-    break;
-  case State::Initializing:
-    TRACE_INIT_MANAGER("destructor, canceling initialization");
-    *canceled_ = true;
-    break;
-  case State::Initialized:
-    TRACE_INIT_MANAGER("destructor, initialized");
+  TRACE_INIT_MANAGER("destructor");
+  if (state_ == State::Initializing) {
+    for (auto& target : targets_) {
+      TRACE_INIT_MANAGER("canceling {}", target.second);
+      target.first->cancel();
+    }
   }
 }
 
@@ -51,16 +46,14 @@ void InitManagerImpl::initialize(std::function<void()> callback) {
 
 void InitManagerImpl::initializeTarget(TargetWithDescription& target) {
   TRACE_INIT_MANAGER("invoking initializeTarget {}", target.second);
-  target.first->initialize([canceled = canceled_, this, &target]() -> void {
-    if (!*canceled) {
-      TRACE_INIT_MANAGER("completed initializeTarget {}", target.second);
-      ASSERT(std::find(targets_.begin(), targets_.end(), target) != targets_.end());
-      targets_.remove(target);
-      if (targets_.empty()) {
-        TRACE_INIT_MANAGER("initialized");
-        state_ = State::Initialized;
-        callback_();
-      }
+  target.first->initialize([this, &target]() -> void {
+    TRACE_INIT_MANAGER("completed initializeTarget {}", target.second);
+    ASSERT(std::find(targets_.begin(), targets_.end(), target) != targets_.end());
+    targets_.remove(target);
+    if (targets_.empty()) {
+      TRACE_INIT_MANAGER("initialized");
+      state_ = State::Initialized;
+      callback_();
     }
   });
 }

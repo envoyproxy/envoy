@@ -35,6 +35,8 @@ void LdsApiImpl::initialize(std::function<void()> callback) {
   subscription_->start({}, *this);
 }
 
+void LdsApiImpl::cancel() { initialize_callback_ = nullptr; }
+
 void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });

@@ -51,7 +51,6 @@ public:
 
   MOCK_METHOD0(onDestroy, void());
 
-  Init::MockTarget target_;
   MockDrainManager* drain_manager_ = new MockDrainManager();
   Configuration::FactoryContext* context_{};
 };
@@ -72,20 +71,20 @@ protected:
    * 4) Creates a mock local drain manager for the listener.
    */
   ListenerHandle* expectListenerCreate(
-      bool need_init,
+      bool need_init, Init::Target& target,
       envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
     ListenerHandle* raw_listener = new ListenerHandle();
     EXPECT_CALL(listener_factory_, createDrainManager_(drain_type))
         .WillOnce(Return(raw_listener->drain_manager_));
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(Invoke(
-            [raw_listener, need_init](
+            [raw_listener, need_init, &target](
                 const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
                 Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &context;
               if (need_init) {
-                context.initManager().registerTarget(notifier->target_, "");
+                context.initManager().registerTarget(target, "");
               }
               return {[notifier](Network::FilterManager&) -> void {}};
             }));
@@ -505,8 +504,9 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
     drain_type: MODIFY_ONLY
   )EOF";
 
+  Init::MockTarget target_foo;
   ListenerHandle* listener_foo =
-      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, target_foo, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -527,7 +527,8 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(false);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(false, target_foo);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -542,8 +543,9 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo_different_address =
-      expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+  Init::MockTarget target_foo_different_address;
+  ListenerHandle* listener_foo_different_address = expectListenerCreate(
+      false, target_foo_different_address, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_different_address_json), "",
@@ -573,7 +575,8 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(false);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(false, target_foo);
 
   EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(Api::SysCallIntResult{5, 0}));
   EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
@@ -603,7 +606,8 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(false);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(false, target_foo);
 
   EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(Api::SysCallIntResult{5, 0}));
@@ -630,7 +634,8 @@ TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(false);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(false, target_foo);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", false));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -701,7 +706,8 @@ address:
 filter_chains: {}
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(false);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(false, target_foo);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "version1", true));
@@ -743,7 +749,8 @@ per_connection_buffer_limit_bytes: 10
 
   time_system_.setSystemTime(std::chrono::milliseconds(2002002002002));
 
-  ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
+  Init::MockTarget target_foo_update1;
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(false, target_foo_update1);
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml),
                                             "version2", true));
@@ -784,7 +791,8 @@ dynamic_draining_listeners:
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
   // removal.
-  ListenerHandle* listener_foo_update2 = expectListenerCreate(false);
+  Init::MockTarget target_foo_update2;
+  ListenerHandle* listener_foo_update2 = expectListenerCreate(false, target_foo_update2);
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo_update1->drain_manager_, startDrainSequence(_));
@@ -843,7 +851,8 @@ address:
 filter_chains: {}
   )EOF";
 
-  ListenerHandle* listener_bar = expectListenerCreate(false);
+  Init::MockTarget target_bar;
+  ListenerHandle* listener_bar = expectListenerCreate(false, target_bar);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(
@@ -864,9 +873,10 @@ address:
 filter_chains: {}
   )EOF";
 
-  ListenerHandle* listener_baz = expectListenerCreate(true);
+  Init::MockTarget target_baz;
+  ListenerHandle* listener_baz = expectListenerCreate(true, target_baz);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-  EXPECT_CALL(listener_baz->target_, initialize(_));
+  EXPECT_CALL(target_baz, initialize(_));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_yaml), "version5", true));
   EXPECT_EQ(2UL, manager_->listeners().size());
@@ -928,12 +938,13 @@ dynamic_draining_listeners:
   }
   )EOF";
 
-  ListenerHandle* listener_baz_update1 = expectListenerCreate(true);
-  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
+  Init::MockTarget target_baz_update1;
+  ListenerHandle* listener_baz_update1 = expectListenerCreate(true, target_baz_update1);
+  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([&target_baz]() -> void {
     // Call the initialize callback during destruction like RDS will.
-    listener_baz->target_.callback_();
+    target_baz.callback_();
   }));
-  EXPECT_CALL(listener_baz_update1->target_, initialize(_));
+  EXPECT_CALL(target_baz_update1, initialize(_));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_update1_json), "", true));
   EXPECT_EQ(2UL, manager_->listeners().size());
@@ -941,7 +952,7 @@ dynamic_draining_listeners:
 
   // Finish initialization for baz which should make it active.
   EXPECT_CALL(*worker_, addListener(_, _));
-  listener_baz_update1->target_.callback_();
+  target_baz_update1.callback_();
   EXPECT_EQ(3UL, manager_->listeners().size());
   worker_->callAddCompletion(true);
   checkStats(3, 3, 0, 0, 3, 0);
@@ -970,7 +981,8 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
       new Network::Address::Ipv4Instance("127.0.0.1", 1234));
   ON_CALL(*listener_factory_.socket_, localAddress()).WillByDefault(ReturnRef(local_address));
 
-  ListenerHandle* listener_foo = expectListenerCreate(false);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(false, target_foo);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
@@ -987,7 +999,8 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   checkStats(1, 0, 1, 0, 0, 1);
 
   // Add foo again. We should use the socket from draining.
-  ListenerHandle* listener_foo2 = expectListenerCreate(false);
+  Init::MockTarget target_foo2;
+  ListenerHandle* listener_foo2 = expectListenerCreate(false, target_foo2);
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   worker_->callAddCompletion(true);
@@ -1014,7 +1027,8 @@ TEST_F(ListenerManagerImplTest, CantBindSocket) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(true);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(true, target_foo);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
       .WillOnce(Throw(EnvoyException("can't bind")));
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -1036,7 +1050,8 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(false);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(false, target_foo);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
@@ -1088,27 +1103,30 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(true);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(true, target_foo);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-  EXPECT_CALL(listener_foo->target_, initialize(_));
+  EXPECT_CALL(target_foo, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   EXPECT_EQ(0UL, manager_->listeners().size());
   checkStats(1, 0, 0, 1, 0, 0);
 
   // Remove foo.
   EXPECT_CALL(*listener_foo, onDestroy());
+  EXPECT_CALL(target_foo, cancel());
   EXPECT_TRUE(manager_->removeListener("foo"));
   EXPECT_EQ(0UL, manager_->listeners().size());
   checkStats(1, 0, 1, 0, 0, 0);
 
   // Add foo again and initialize it.
-  listener_foo = expectListenerCreate(true);
+  listener_foo = expectListenerCreate(true, target_foo);
+  target_foo.callback_ = nullptr;
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-  EXPECT_CALL(listener_foo->target_, initialize(_));
+  EXPECT_CALL(target_foo, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   checkStats(2, 0, 1, 1, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _));
-  listener_foo->target_.callback_();
+  target_foo.callback_();
   worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(2, 0, 1, 0, 1, 0);
@@ -1124,8 +1142,9 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo_update1 = expectListenerCreate(true);
-  EXPECT_CALL(listener_foo_update1->target_, initialize(_));
+  Init::MockTarget target_foo_update1;
+  ListenerHandle* listener_foo_update1 = expectListenerCreate(true, target_foo_update1);
+  EXPECT_CALL(target_foo_update1, initialize(_));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json), "", true));
   EXPECT_EQ(1UL, manager_->listeners().size());
@@ -1133,6 +1152,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
 
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
+  EXPECT_CALL(target_foo_update1, cancel());
   EXPECT_CALL(*worker_, stopListener(_));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -1161,7 +1181,8 @@ TEST_F(ListenerManagerImplTest, AddListenerFailure) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(false);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(false, target_foo);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
@@ -1210,9 +1231,10 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   }
   )EOF";
 
-  ListenerHandle* listener_foo = expectListenerCreate(true);
+  Init::MockTarget target_foo;
+  ListenerHandle* listener_foo = expectListenerCreate(true, target_foo);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, false));
-  EXPECT_CALL(listener_foo->target_, initialize(_));
+  EXPECT_CALL(target_foo, initialize(_));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
 
   // Add bar with same non-binding address. Should fail.
@@ -1225,7 +1247,8 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   }
   )EOF";
 
-  ListenerHandle* listener_bar = expectListenerCreate(true);
+  Init::MockTarget target_bar;
+  ListenerHandle* listener_bar = expectListenerCreate(true, target_bar);
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json), "", true),
@@ -1234,10 +1257,10 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
 
   // Move foo to active and then try to add again. This should still fail.
   EXPECT_CALL(*worker_, addListener(_, _));
-  listener_foo->target_.callback_();
+  target_foo.callback_();
   worker_->callAddCompletion(true);
 
-  listener_bar = expectListenerCreate(true);
+  listener_bar = expectListenerCreate(true, target_bar);
   EXPECT_CALL(*listener_bar, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       manager_->addOrUpdateListener(parseListenerFromJson(listener_bar_json), "", true),

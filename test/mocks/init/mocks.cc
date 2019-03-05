@@ -17,6 +17,10 @@ MockTarget::MockTarget() {
         EXPECT_EQ(nullptr, callback_);
         callback_ = callback;
       }));
+  ON_CALL(*this, cancel()).WillByDefault(Invoke([this]() {
+    EXPECT_NE(nullptr, callback_);
+    callback_ = nullptr;
+  }));
 }
 
 MockTarget::~MockTarget() {}
