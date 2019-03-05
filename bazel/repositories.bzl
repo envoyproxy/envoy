@@ -267,6 +267,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_gperftools_gperftools()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
+    _com_github_luajit_luajit()
     _com_github_madler_zlib()
     _com_github_nanopb_nanopb()
     _com_github_nghttp2_nghttp2()
@@ -696,6 +697,23 @@ def _com_github_google_jwt_verify():
         name = "jwt_verify_lib",
         actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )
+
+def _com_github_luajit_luajit():
+    location = REPOSITORY_LOCATIONS["com_github_luajit_luajit"]
+    http_archive(
+        name = "com_github_luajit_luajit",
+        build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:luajit.patch"],
+        patch_args = ["-p1"],
+        patch_cmds = ["chmod u+x build.py"],
+        **location
+    )
+
+    native.bind(
+        name = "luajit",
+        actual = "@envoy//bazel/foreign_cc:luajit",
+    )
+
 
 def _com_github_gperftools_gperftools():
     location = REPOSITORY_LOCATIONS["com_github_gperftools_gperftools"]

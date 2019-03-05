@@ -86,6 +86,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "grpc-1.16.1",
         urls = ["https://github.com/grpc/grpc/archive/v1.16.1.tar.gz"],
     ),
+    com_github_luajit_luajit = dict(
+        sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
+        strip_prefix = "LuaJIT-2.1.0-beta3",
+        urls = ["https://github.com/LuaJIT/LuaJIT/archive/v2.1.0-beta3.tar.gz"],
+    ),
     com_github_nanopb_nanopb = dict(
         sha256 = "b8dd5cb0d184d424ddfea13ddee3f7b0920354334cbb44df434d55e5f0086b12",
         strip_prefix = "nanopb-0.3.9.2",
