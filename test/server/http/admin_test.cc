@@ -678,15 +678,11 @@ TEST_P(AdminInstanceTest, AdminHeapProfiler) {
 
 #ifdef PROFILER_AVAILABLE
   EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=y", header_map, data));
-  EXPECT_TRUE(Profiler::Heap::profilerEnabled());
-#else
-  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=y", header_map, data));
-  EXPECT_FALSE(Profiler::Heap::profilerEnabled());
-#endif
-
-#ifdef PROFILER_AVAILABLE
+  EXPECT_TRUE(Profiler::Heap::isProfilerStarted());
   EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=n", header_map, data));
 #else
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_FALSE(Profiler::Heap::isProfilerStarted());
   EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=n", header_map, data));
 #endif
 
