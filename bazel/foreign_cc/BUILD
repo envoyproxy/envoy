@@ -39,7 +39,6 @@ configure_make(
     ],
 )
 
-
 envoy_cmake_external(
     name = "ares",
     cache_entries = {

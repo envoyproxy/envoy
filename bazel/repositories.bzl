@@ -714,7 +714,6 @@ def _com_github_luajit_luajit():
         actual = "@envoy//bazel/foreign_cc:luajit",
     )
 
-
 def _com_github_gperftools_gperftools():
     location = REPOSITORY_LOCATIONS["com_github_gperftools_gperftools"]
     http_archive(
