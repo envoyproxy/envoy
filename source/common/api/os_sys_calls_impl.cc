@@ -38,6 +38,12 @@ SysCallSizeResult OsSysCallsImpl::recv(int socket, void* buffer, size_t length, 
   return {rc, errno};
 }
 
+SysCallSizeResult OsSysCallsImpl::recvfrom(int sockfd, void* buffer, size_t length, int flags,
+                                           struct sockaddr* addr, socklen_t* addrlen) {
+  const ssize_t rc = ::recvfrom(sockfd, buffer, length, flags, addr, addrlen);
+  return {rc, errno};
+}
+
 SysCallIntResult OsSysCallsImpl::shmOpen(const char* name, int oflag, mode_t mode) {
   const int rc = ::shm_open(name, oflag, mode);
   return {rc, errno};

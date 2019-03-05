@@ -1,4 +1,5 @@
 #include <chrono>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -8,7 +9,12 @@
 #include "common/common/utility.h"
 
 #include "server/options_impl.h"
+#include "server/options_impl_platform_linux.h"
 
+#include "test/mocks/api/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -67,7 +73,7 @@ TEST_F(OptionsImplTest, All) {
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 "
       "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
-      "--disable-hot-restart");
+      "--disable-hot-restart --cpuset-threads");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -85,6 +91,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_EQ(true, options->hotRestartDisabled());
+  EXPECT_EQ(true, options->cpusetThreadsEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -94,6 +101,7 @@ TEST_F(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   bool hot_restart_disabled = options->hotRestartDisabled();
   bool signal_handling_enabled = options->signalHandlingEnabled();
+  bool cpuset_threads_enabled = options->cpusetThreadsEnabled();
   Stats::StatsOptionsImpl stats_options;
   stats_options.max_obj_name_length_ = 54321;
   stats_options.max_stat_suffix_length_ = 1234;
@@ -119,6 +127,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setStatsOptions(stats_options);
   options->setHotRestartDisabled(!options->hotRestartDisabled());
   options->setSignalHandling(!options->signalHandlingEnabled());
+  options->setCpusetThreads(!options->cpusetThreadsEnabled());
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
@@ -142,6 +151,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(stats_options.max_stat_suffix_length_, options->statsOptions().maxStatSuffixLength());
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
   EXPECT_EQ(!signal_handling_enabled, options->signalHandlingEnabled());
+  EXPECT_EQ(!cpuset_threads_enabled, options->cpusetThreadsEnabled());
 
   // Validate that CommandLineOptions is constructed correctly.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
@@ -172,6 +182,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->statsOptions().maxObjNameLength(), command_line_options->max_obj_name_len());
   EXPECT_EQ(options->hotRestartDisabled(), command_line_options->disable_hot_restart());
   EXPECT_EQ(options->mutexTracingEnabled(), command_line_options->enable_mutex_tracing());
+  EXPECT_EQ(options->cpusetThreadsEnabled(), command_line_options->cpuset_threads());
 }
 
 TEST_F(OptionsImplTest, DefaultParams) {
@@ -182,6 +193,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
   EXPECT_EQ(false, options->hotRestartDisabled());
+  EXPECT_EQ(false, options->cpusetThreadsEnabled());
 
   // Validate that CommandLineOptions is constructed correctly with default params.
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
@@ -193,6 +205,7 @@ TEST_F(OptionsImplTest, DefaultParams) {
             command_line_options->local_address_ip_version());
   EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::Serve, command_line_options->mode());
   EXPECT_EQ(false, command_line_options->disable_hot_restart());
+  EXPECT_EQ(false, command_line_options->cpuset_threads());
 }
 
 // Validates that the server_info proto is in sync with the options.
@@ -304,7 +317,62 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
   EXPECT_EQ(regular_options_impl->statsOptions().maxStatSuffixLength(),
             test_options_impl.statsOptions().maxStatSuffixLength());
   EXPECT_EQ(regular_options_impl->hotRestartDisabled(), test_options_impl.hotRestartDisabled());
+  EXPECT_EQ(regular_options_impl->cpusetThreadsEnabled(), test_options_impl.cpusetThreadsEnabled());
 }
+
+TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Both --concurrency and --cpuset-threads options are set; not applying --cpuset-threads.",
+      std::unique_ptr<OptionsImpl> options =
+          createOptionsImpl("envoy -c hello --concurrency 42 --cpuset-threads"));
+}
+
+#if defined(__linux__)
+
+using testing::Return;
+
+class OptionsImplPlatformLinuxTest : public testing::Test {
+public:
+};
+
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest1) {
+  // Success case: cpuset size and hardware thread count are the same.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = fake_cpuset_size;
+
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest2) {
+  // Success case: cpuset size is half of the hardware thread count.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
+
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest3) {
+  // Failure case: cpuset size is bigger than the hardware thread count.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = fake_cpuset_size - 1;
+
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
+  // When sched_getaffinity() fails, expect to get the hardware thread count.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
+
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
+}
+
+#endif
 
 } // namespace
 } // namespace Envoy
