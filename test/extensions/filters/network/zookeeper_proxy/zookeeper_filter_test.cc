@@ -121,13 +121,16 @@ public:
   }
 
   Buffer::OwnedImpl encodePathVersion(const std::string& path, const int32_t version,
-                                      const int32_t opcode = enumToInt(OpCodes::GETDATA)) const {
+                                      const int32_t opcode = enumToInt(OpCodes::GETDATA),
+                                      const bool txn = false) const {
     Buffer::OwnedImpl buffer;
 
-    buffer.writeBEInt<int32_t>(16 + path.length());
-    buffer.writeBEInt<int32_t>(1000);
-    // Opcode.
-    buffer.writeBEInt<int32_t>(opcode);
+    if (!txn) {
+      buffer.writeBEInt<int32_t>(16 + path.length());
+      buffer.writeBEInt<int32_t>(1000);
+      buffer.writeBEInt<int32_t>(opcode);
+    }
+
     // Path.
     addString(buffer, path);
     // Version
@@ -151,13 +154,14 @@ public:
 
   Buffer::OwnedImpl encodeCreateRequest(const std::string& path, const std::string& data,
                                         const bool ephemeral, const bool sequence,
-                                        const bool txn = false) const {
+                                        const bool txn = false,
+                                        const int32_t opcode = enumToInt(OpCodes::CREATE)) const {
     Buffer::OwnedImpl buffer;
 
     if (!txn) {
       buffer.writeBEInt<int32_t>(24 + path.length() + data.length());
       buffer.writeBEInt<int32_t>(1000);
-      buffer.writeBEInt<int32_t>(enumToInt(OpCodes::CREATE));
+      buffer.writeBEInt<int32_t>(opcode);
     }
 
     // Path.
@@ -180,13 +184,15 @@ public:
   }
 
   Buffer::OwnedImpl encodeSetRequest(const std::string& path, const std::string& data,
-                                     const int32_t version) const {
+                                     const int32_t version, const bool txn = false) const {
     Buffer::OwnedImpl buffer;
 
-    buffer.writeBEInt<int32_t>(20 + path.length() + data.length());
-    buffer.writeBEInt<int32_t>(1000);
-    // Opcode.
-    buffer.writeBEInt<int32_t>(enumToInt(OpCodes::SETDATA));
+    if (!txn) {
+      buffer.writeBEInt<int32_t>(20 + path.length() + data.length());
+      buffer.writeBEInt<int32_t>(1000);
+      buffer.writeBEInt<int32_t>(enumToInt(OpCodes::SETDATA));
+    }
+
     // Path.
     addString(buffer, path);
     // Data.
@@ -419,6 +425,20 @@ TEST_F(ZooKeeperFilterTest, CreateRequest) {
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
+TEST_F(ZooKeeperFilterTest, CreateRequest2) {
+  initialize();
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(
+      encodeCreateRequest("/foo", "bar", false, false, false, enumToInt(OpCodes::CREATE2))));
+
+  expectSetDynamicMetadata(
+      {{"opname", "create2"}, {"path", "/foo"}, {"ephemeral", "false"}, {"sequence", "false"}});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().create2_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
 TEST_F(ZooKeeperFilterTest, SetRequest) {
   initialize();
 
@@ -441,6 +461,19 @@ TEST_F(ZooKeeperFilterTest, GetChildrenRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().getchildren_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, GetChildrenRequest2) {
+  initialize();
+
+  Buffer::InstancePtr data(
+      new Buffer::OwnedImpl(encodePathWatch("/foo", false, enumToInt(OpCodes::GETCHILDREN2))));
+
+  expectSetDynamicMetadata({{"opname", "getchildren2"}, {"path", "/foo"}, {"watch", "false"}});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().getchildren2_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
@@ -522,14 +555,22 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
 
   Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", false, false, true);
   Buffer::OwnedImpl create2 = encodeCreateRequest("/bar", "1", false, false, true);
+  Buffer::OwnedImpl check1 = encodePathVersion("/foo", 100, enumToInt(OpCodes::CHECK), true);
+  Buffer::OwnedImpl set1 = encodeSetRequest("/bar", "2", -1, true);
+
   std::vector<std::pair<int32_t, Buffer::OwnedImpl>> ops;
   ops.push_back(std::make_pair(enumToInt(OpCodes::CREATE), std::move(create1)));
   ops.push_back(std::make_pair(enumToInt(OpCodes::CREATE), std::move(create2)));
+  ops.push_back(std::make_pair(enumToInt(OpCodes::CHECK), std::move(check1)));
+  ops.push_back(std::make_pair(enumToInt(OpCodes::SETDATA), std::move(set1)));
+
   Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeMultiRequest(ops)));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().multi_rq_.value());
   EXPECT_EQ(2UL, config_->stats().create_rq_.value());
+  EXPECT_EQ(1UL, config_->stats().setdata_rq_.value());
+  EXPECT_EQ(1UL, config_->stats().check_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
