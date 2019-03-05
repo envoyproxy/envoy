@@ -95,9 +95,8 @@ private:
    */
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
-        : parent_(parent), headers_continued_(false), continue_headers_continued_(false),
-          iteration_state_(IterationState::Continue), end_stream_(false),
-          dual_filter_(dual_filter) {}
+        : iteration_state_(IterationState::Continue), parent_(parent), headers_continued_(false),
+          continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
@@ -132,16 +131,15 @@ private:
 
     // Functions to set or get iteration state.
     bool canIterate() { return iteration_state_ == IterationState::Continue; }
-    bool shouldNotIterate() { return iteration_state_ != IterationState::Continue; }
     bool stoppedAll() {
       return iteration_state_ == IterationState::StopAllBuffer ||
              iteration_state_ == IterationState::StopAllWatermark;
     }
-    void allowIteration() { iteration_state_ = IterationState::Continue; }
+    void allowIteration() {
+      ASSERT(iteration_state_ != IterationState::Continue);
+      iteration_state_ = IterationState::Continue;
+    }
 
-    ActiveStream& parent_;
-    bool headers_continued_ : 1;
-    bool continue_headers_continued_ : 1;
     // The state of iteration.
     enum class IterationState {
       Continue,            // Iteration has not stopped for any frame type.
@@ -152,6 +150,9 @@ private:
                            // be buffered until high watermark is reached.
     };
     IterationState iteration_state_;
+    ActiveStream& parent_;
+    bool headers_continued_ : 1;
+    bool continue_headers_continued_ : 1;
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;
@@ -330,6 +331,8 @@ private:
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
+    // Returns true is filter has stopped iteration for all frame types. Otherwise, returns false.
+    bool handleDataIfStopAll(ActiveStreamDecoderFilter& filter, Buffer::Instance& data);
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason reason) override;
