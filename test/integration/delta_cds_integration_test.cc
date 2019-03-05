@@ -190,15 +190,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, DeltaCdsIntegrationTest,
 // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
 TEST_P(DeltaCdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
-<<<<<<< HEAD
-<<<<<<< HEAD
-  testRouterHeaderOnlyRequestAndResponse(true, nullptr, 1);
-=======
-  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
->>>>>>> bring in final touches from CDS integration test PR
-=======
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
->>>>>>> added integration test with second cluster
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
@@ -226,13 +218,6 @@ TEST_P(DeltaCdsIntegrationTest, CdsClusterUpDownUp) {
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
 
   // Does *not* call our initialize().
-<<<<<<< HEAD
-<<<<<<< HEAD
-  testRouterHeaderOnlyRequestAndResponse(true, nullptr, 1);
-=======
-  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
->>>>>>> bring in final touches from CDS integration test PR
-=======
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
 
   cleanupUpstreamAndDownstream();
@@ -285,7 +270,6 @@ TEST_P(DeltaCdsIntegrationTest, TwoClusters) {
 
   // Does *not* call our initialize().
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
->>>>>>> added integration test with second cluster
 
   cleanupUpstreamAndDownstream();
 }

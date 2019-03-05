@@ -41,23 +41,23 @@ public:
    * @throw EnvoyException with reason if the config changes are rejected. Otherwise the changes
    *        are accepted. Accepted changes have their version_info reflected in subsequent requests.
    */
-  virtual void onIncrementalConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) PURE;
+  virtual void
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
    * invokes an exception.
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
-  virtual void onIncrementalConfigUpdateFailed(const EnvoyException* e) PURE;
+  virtual void onConfigUpdateFailed(const EnvoyException* e) PURE;
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
    * a RouteConfiguration, based on the underlying resource type.
    */
-  virtual std::string incrementalResourceName(const ProtobufWkt::Any& resource) PURE;
+  virtual std::string resourceName(const ProtobufWkt::Any& resource) PURE;
 };
 
 /**

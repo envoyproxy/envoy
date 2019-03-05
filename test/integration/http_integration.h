@@ -147,21 +147,12 @@ protected:
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
                                             ConnectionCreationFunction* creator = nullptr);
-<<<<<<< HEAD
-  void testRouterHeaderOnlyRequestAndResponse(bool leave_upstream_open,
-                                              ConnectionCreationFunction* creator = nullptr,
-                                              int upstream_index = 0);
-=======
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
                                               int upstream_index = 0,
                                               const std::string& path = "/test/long/url");
   void testRequestAndResponseShutdownWithActiveConnection();
-<<<<<<< HEAD
->>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
-=======
 
   // Disconnect tests
->>>>>>> test: moving H1/H2 shared tests into their own file. (#5941)
   void testRouterUpstreamDisconnectBeforeRequestComplete();
   void
   testRouterUpstreamDisconnectBeforeResponseComplete(ConnectionCreationFunction* creator = nullptr);

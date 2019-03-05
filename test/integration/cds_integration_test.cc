@@ -9,7 +9,7 @@
 #include "common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
-#include "test/integration/incremental_xds_integration_test_base.h"
+#include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -38,14 +38,14 @@ admin:
 dynamic_resources:
   cds_config:
     api_config_source:
-      api_type: {}
+      api_type: GRPC
       grpc_services:
         envoy_grpc:
           cluster_name: my_cds_cluster
 static_resources:
   clusters:
   - name: my_cds_cluster
-    http2_protocol_options: {{}}
+    http2_protocol_options: {}
     hosts:
       socket_address:
         address: 127.0.0.1
@@ -79,19 +79,9 @@ static_resources:
 const char ClusterName[] = "cluster_0";
 const int UpstreamIndex = 1;
 
-<<<<<<< HEAD
-class CdsIntegrationTestBase : public IncrementalXdsIntegrationTestBase,
-                               public Grpc::GrpcClientIntegrationParamTest {
-=======
 class CdsIntegrationTest : public Grpc::GrpcClientIntegrationParamTest, public HttpIntegrationTest {
->>>>>>> Fix all tests that were failing the test-base assert due to multi-inheritance order. (#5855)
 public:
-<<<<<<< HEAD
-  CdsIntegrationTestBase(const std::string& config)
-      : IncrementalXdsIntegrationTestBase(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
-=======
   CdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), Config) {}
->>>>>>> test: Make it easier to use simulated time in integration test, and switch hds_integration_test to use it. (#6139)
 
   void TearDown() override {
     cleanUpXdsConnection();
@@ -123,7 +113,7 @@ public:
   }
 
   // Overridden to insert this stuff into the initialize() at the very beginning of
-  // HttpIntegrationTest::testRouterRequestAndResponseWithBody().
+  // HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse().
   void initialize() override {
     // Controls how many fake_upstreams_.emplace_back(new FakeUpstream) will happen in
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
@@ -132,7 +122,7 @@ public:
     setUpstreamCount(1);                                  // the CDS cluster
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
 
-    // BaseIntegrationTest::initialize() does many things:
+    // HttpIntegrationTest::initialize() does many things:
     // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
     // 2) It updates your bootstrap config with the ports your fake upstreams are actually listening
     //    on (since you're supposed to leave them as 0).
@@ -142,7 +132,7 @@ public:
     //    the bootstrap config have come up, and registering them in a port map (see lookupPort()).
     //    However, this test needs to defer all of that to later.
     defer_listener_finalization_ = true;
-    IncrementalXdsIntegrationTestBase::initialize();
+    HttpIntegrationTest::initialize();
 
     // Create the regular (i.e. not an xDS server) upstream. We create it manually here after
     // initialize() because finalize() expects all fake_upstreams_ to correspond to a static
@@ -161,8 +151,9 @@ public:
     xds_stream_->startGrpcStream();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-    sendDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "1");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+    sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                   {buildCluster(ClusterName)}, "1");
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_0 that we sent.
     // 2 because the statically specified CDS server itself counts as a cluster.
@@ -173,50 +164,8 @@ public:
     test_server_->waitUntilListenersReady();
     registerTestServerPorts({"http"});
   }
-
-  // 1) Envoy starts up with no static clusters (other than the CDS-over-gRPC server).
-  // 2) Envoy is told of a cluster via CDS.
-  // 3) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
-  // 4) Envoy is told that cluster is gone.
-  // 5) We send Envoy a request, which should 503.
-  // 6) Envoy is told that the cluster is back.
-  // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
-  void testCdsClusterUpDownUp() {
-    // Calls our initialize(), which includes establishing a listener, route, and cluster.
-    testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
-
-    // Tell Envoy that cluster_0 is gone.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-    sendDiscoveryResponse<envoy::api::v2::Cluster>({}, {ClusterName}, "42");
-    // We can continue the test once we're sure that Envoy's ClusterManager has made use of
-    // the DiscoveryResponse that says cluster_0 is gone.
-    test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
-
-    // Now that cluster_0 is gone, the listener (with its routing to cluster_0) should 503.
-    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-        lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("503", response->headers().Status()->value().c_str());
-
-    cleanupUpstreamAndDownstream();
-    codec_client_->waitForDisconnect();
-
-    // Tell Envoy that cluster_0 is back.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
-    sendDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName)}, {}, "413");
-
-    // We can continue the test once we're sure that Envoy's ClusterManager has made use of
-    // the DiscoveryResponse describing cluster_0 that we sent. Again, 2 includes CDS server.
-    test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
-
-    // Does *not* call our initialize().
-    testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
-
-    cleanupUpstreamAndDownstream();
-  }
 };
 
-<<<<<<< HEAD
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // 1) Envoy starts up with no static clusters (other than the CDS-over-gRPC server).
@@ -260,26 +209,6 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 
   cleanupUpstreamAndDownstream();
 }
-=======
-class IncrementalCdsIntegrationTest : public CdsIntegrationTestBase {
-public:
-  IncrementalCdsIntegrationTest()
-      : CdsIntegrationTestBase(fmt::format(Config, "INCREMENTAL_GRPC")) {}
-};
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, IncrementalCdsIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
-TEST_P(IncrementalCdsIntegrationTest, CdsClusterUpDownUp) { testCdsClusterUpDownUp(); }
-
-// Now that vanilla CDS is just a translation layer over incremental CDS, its behavior
-// is mechanically identical to incremental. The only difference from the incremental
-// test is that this one's bootstrap config requests non-incremental gRPC CDS.
-class CdsIntegrationTest : public CdsIntegrationTestBase {
-public:
-  CdsIntegrationTest() : CdsIntegrationTestBase(fmt::format(Config, "GRPC")) {}
-};
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
-TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) { testCdsClusterUpDownUp(); }
->>>>>>> snapshot
 
 } // namespace
 } // namespace Envoy

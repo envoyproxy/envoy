@@ -466,17 +466,8 @@ void InstanceImpl::run() {
                                             [this]() -> void { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
-<<<<<<< HEAD
-  ENVOY_LOG(error, "starting main dispatch loop");
-  auto watchdog = guard_dog_->createWatchDog(Thread::Thread::currentThreadId());
-=======
   ENVOY_LOG(info, "starting main dispatch loop");
-<<<<<<< HEAD
-  auto watchdog = guard_dog_->createWatchDog(Thread::currentThreadId());
->>>>>>> Wire thread creation through the Api interface (#5016)
-=======
   auto watchdog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
->>>>>>> thread: add Windows implementation (#5072)
   watchdog->startWatchdog(*dispatcher_);
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");

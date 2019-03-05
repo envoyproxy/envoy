@@ -68,13 +68,7 @@ public:
             Utility::apiConfigSourceRequestTimeout(api_config_source),
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats));
         break;
-<<<<<<< HEAD
       case envoy::api::v2::core::ApiConfigSource::GRPC:
-=======
-      case envoy::api::v2::core::ApiConfigSource::GRPC: {
-        // TODO(fredlas) once all gRPC xDSes are reimplemented as wrappers around incremental
-        //               xDS, there should be an exception or assert(false) or something here.
->>>>>>> snapshot
         result.reset(new GrpcSubscriptionImpl<ResourceType>(
             local_info,
             Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),

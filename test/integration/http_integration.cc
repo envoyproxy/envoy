@@ -343,18 +343,9 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
   checkSimpleRequestSuccess(request_size, response_size, response.get());
 }
 
-<<<<<<< HEAD
-void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    bool leave_upstream_open, ConnectionCreationFunction* create_connection, int upstream_index) {
-=======
 IntegrationStreamDecoderPtr
 HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
-<<<<<<< HEAD
-                                           int upstream_index) {
->>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
-=======
                                            int upstream_index, const std::string& path) {
->>>>>>> added integration test with second cluster
   // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
   if (!initialized()) {
@@ -367,21 +358,9 @@ HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_co
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"x-lyft-user-id", "123"}};
-<<<<<<< HEAD
-  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0,
-                                                upstream_index);
-
-  // The following allows us to test shutting down the server with active connection pool
-  // connections.
-  if (!leave_upstream_open) {
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-    test_server_.reset();
-  }
-=======
   return sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0,
                                        upstream_index);
 }
->>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
 
 void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
     ConnectionCreationFunction* create_connection, int upstream_index, const std::string& path) {

@@ -251,23 +251,7 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // We can now potentially create the CDS API once the backing cluster exists.
   if (bootstrap.dynamic_resources().has_cds_config()) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-    const auto& cds_config = bootstrap.dynamic_resources().cds_config();
-    if (cds_config.config_source_specifier_case() ==
-            envoy::api::v2::core::ConfigSource::kApiConfigSource &&
-        cds_config.api_config_source().api_type() ==
-            envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC) {
-      cds_api_ = factory_.createIncrementalCds(cds_config, eds_config_, *this);
-    } else {
-      cds_api_ = factory_.createCds(cds_config, eds_config_, *this);
-    }
-=======
     cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), *this);
->>>>>>> config: removing the legacy rest API (#5522)
-=======
-    cds_api_ = factory_.createCds(bootstrap.dynamic_resources().cds_config(), *this);
->>>>>>> address comments, undo xds as incremental xds wrapper
     init_helper_.setCds(cds_api_.get());
   } else {
     init_helper_.setCds(nullptr);
@@ -1264,50 +1248,8 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
 
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                                                ClusterManager& cm) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_);
-=======
   return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_,
                             api_);
->>>>>>> filesystem: convert free functions to object methods (#5692)
-}
-
-CdsApiPtr ProdClusterManagerFactory::createIncrementalCds(
-<<<<<<< HEAD
-    const envoy::api::v2::core::ConfigSource& cds_config,
-    const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm) {
-  return CdsIncremental::create(cds_config, eds_config, cm, main_thread_dispatcher_, random_,
-                                local_info_, stats_);
-=======
-    const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm) {
-<<<<<<< HEAD
-  return CdsIncremental::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_,
-                                stats_);
->>>>>>> bring in final touches from CDS integration test PR
-=======
-  return cds_config.api_config_source().api_type() ==
-<<<<<<< HEAD
-                 envoy::api::v2::core::ApiConfigSource::INCREMENTAL_GRPC
-             ? CdsApiIncrementalImpl::create(cds_config, cm, main_thread_dispatcher_, random_,
-                                             local_info_, stats_)
-=======
-                 envoy::api::v2::core::ApiConfigSource::DELTA_GRPC
-             ? CdsApiDeltaImpl::create(cds_config, cm, main_thread_dispatcher_, random_,
-                                       local_info_, stats_, api_)
->>>>>>> rename incremental to delta
-             : CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_,
-                                  stats_);
->>>>>>> address comments, undo xds as incremental xds wrapper
-=======
-  return CdsApiIncrementalImpl::create(cds_config, cm, main_thread_dispatcher_, random_,
-                                       local_info_, stats_);
->>>>>>> snapshot
-=======
-  return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_,
-                            api_);
->>>>>>> consolidate CdsApiImpl
 }
 
 } // namespace Upstream

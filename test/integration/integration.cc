@@ -379,30 +379,11 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-<<<<<<< HEAD
-<<<<<<< HEAD
-  std::cerr<<"createGeneratedApiTestServer START"<<std::endl;//TODO REMOVE
-  // AH HAH!!!!!!!!!! IT IS HERE!!!!!!!!! HERE IS WHERE IT GOES WRONG
-  test_server_ = IntegrationTestServer::create(
-<<<<<<< HEAD
-      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_);
-  std::cerr<<"createGeneratedApiTestServer test_server_ created"<<std::endl;//TODO REMOVE
-=======
-      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_, *api_);
->>>>>>> Wire thread creation through the Api interface (#5016)
-  if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
-=======
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_,
-                                               pre_worker_start_test_steps_, deterministic_,
-                                               timeSystem(), *api_, defer_listener_finalization_);
-=======
   test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function_,
                                                deterministic_, timeSystem(), *api_,
                                                defer_listener_finalization_);
->>>>>>> Modified docs and variable names (#5776)
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
->>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.
     test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);

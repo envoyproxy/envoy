@@ -43,40 +43,13 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
 } // namespace Server
 
-<<<<<<< HEAD
-IntegrationTestServerPtr
-IntegrationTestServer::create(const std::string& config_path,
-                              const Network::Address::IpVersion version,
-                              std::function<void()> pre_worker_start_test_steps, bool deterministic,
-<<<<<<< HEAD
-                              Event::TestTimeSystem& time_system) {
-<<<<<<< HEAD
-  std::cerr<<"constructing IntegrationTestServer"<<std::endl;
-  IntegrationTestServerPtr server{new IntegrationTestServer(time_system, config_path)};
-  std::cerr<<"starting IntegrationTestServer"<<std::endl;
-=======
-  IntegrationTestServerPtr server{
-      std::make_unique<IntegrationTestServerImpl>(time_system, config_path)};
->>>>>>> Refactor integration test server to allow specialization by derived classes (#4803)
-=======
-                              Event::TestTimeSystem& time_system, Api::Api& api) {
-  IntegrationTestServerPtr server{
-      std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
->>>>>>> Wire thread creation through the Api interface (#5016)
-  server->start(version, pre_worker_start_test_steps, deterministic);
-=======
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
-<<<<<<< HEAD
-  server->start(version, pre_worker_start_test_steps, deterministic, defer_listener_finalization);
->>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
-=======
   server->start(version, on_server_init_function, deterministic, defer_listener_finalization);
->>>>>>> Modified docs and variable names (#5776)
   return server;
 }
 
@@ -110,17 +83,11 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
   // Wait for the server to be created and the number of initial listeners to wait for to be set.
   server_set_.waitReady();
 
-<<<<<<< HEAD
-  // Now wait for the initial listeners (if any) to actually be listening on the worker.
-  // At this point the server is up and ready for testing.
-  waitUntilListenersReady();
-=======
   if (!defer_listener_finalization) {
     // Now wait for the initial listeners (if any) to actually be listening on the worker.
     // At this point the server is up and ready for testing.
     waitUntilListenersReady();
   }
->>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
 
   // If we are tapping, spin up tcpdump.
   const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
@@ -173,13 +140,7 @@ void IntegrationTestServer::serverReady() {
 
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
-  std::cerr<<"threadRoutine BEGIN"<<std::endl;
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
-<<<<<<< HEAD
-  std::cerr<<"created OptionsImpl"<<std::endl;
-  Server::HotRestartNopImpl restarter;
-=======
->>>>>>> Refactor integration test server to allow specialization by derived classes (#4803)
   Thread::MutexBasicLockable lock;
 
   Runtime::RandomGeneratorPtr random_generator;
@@ -188,27 +149,6 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   } else {
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
-<<<<<<< HEAD
-  std::cerr<<"about to create InstanceImpl"<<std::endl;
-  server_ = std::make_unique<Server::InstanceImpl>(
-      options, time_system_, Network::Utility::getLocalAddress(version), *this, restarter,
-      stats_store, lock, *this, std::move(random_generator), tls);
-  std::cerr<<"finished creating InstanceImpl"<<std::endl;
-  pending_listeners_ = server_->listenerManager().listeners().size();
-  std::cerr<<"pending_listeners_ size"<<pending_listeners_<<std::endl;
-  ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
-  if (server_ == nullptr)
-    std::cerr<<"how is this nullptr after a make_unique?"<<std::endl;
-  // This is technically thread unsafe (assigning to a shared_ptr accessed
-  // across threads), but because we synchronize below on server_set, the only
-  // consumer on the main test thread in ~IntegrationTestServer will not race.
-  admin_address_ = server_->admin().socket().localAddress(); // TODO TODO TODO SEGFAULT HERE
-  std::cerr<<"about to run setReady"<<std::endl;
-  server_set_.setReady();
-  std::cerr<<"about to run server_"<<std::endl;
-  server_->run();
-  server_.reset();
-=======
   createAndRunEnvoyServer(options, time_system_, Network::Utility::getLocalAddress(version), *this,
                           lock, *this, std::move(random_generator));
 }
@@ -242,7 +182,6 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
   Network::Address::InstanceConstSharedPtr admin_address(admin_address_);
   admin_address_ = nullptr;
   server_ = nullptr;
->>>>>>> Refactor integration test server to allow specialization by derived classes (#4803)
   stat_store_ = nullptr;
 
   if (admin_address != nullptr) {

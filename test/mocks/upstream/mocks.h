@@ -250,19 +250,6 @@ public:
   MOCK_METHOD2(createCds,
                CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm));
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-  MOCK_METHOD3(createIncrementalCds,
-               CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config,
-                         const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                         ClusterManager& cm));
-=======
-  MOCK_METHOD2(createIncrementalCds,
-               CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm));
->>>>>>> bring in final touches from CDS integration test PR
-
-=======
->>>>>>> address comments, undo xds as incremental xds wrapper
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
 };

@@ -278,11 +278,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponse) {
   enable_request_timeout_ = true;
-<<<<<<< HEAD
-  testRouterHeaderOnlyRequestAndResponse(true);
-=======
   testRouterHeaderOnlyRequestAndResponse();
->>>>>>> test: Add non-aggregated CDS-over-gRPC integration test (#5228)
 }
 
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutConfiguredRequestResponseWithBody) {

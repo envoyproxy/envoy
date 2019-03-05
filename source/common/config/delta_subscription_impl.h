@@ -45,16 +45,9 @@ public:
                    ResourceNameDiff>(std::move(async_client), service_method, random, dispatcher,
                                      scope, rate_limit_settings),
         type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
-<<<<<<< HEAD
         local_info_(local_info), stats_(stats) {
     request_.set_type_url(type_url_);
     request_.mutable_node()->MergeFrom(local_info_.node());
-=======
-        stats_(stats) {
-    request_.set_type_url(type_url_);
-    request_.mutable_node()->MergeFrom(local_info.node());
-    establishNewStream();
->>>>>>> snapshot
   }
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
@@ -102,14 +95,11 @@ public:
     request_.clear_initial_resource_versions();
   }
 
-<<<<<<< HEAD
   void subscribe(const std::vector<std::string>& resources) {
     ENVOY_LOG(debug, "delta subscribe for " + type_url_);
     buildAndQueueDiscoveryRequest(resources);
   }
 
-=======
->>>>>>> snapshot
   void pause() {
     ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url_);
     ASSERT(!paused_);
@@ -130,17 +120,10 @@ public:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                       const std::string& version_info) {
-<<<<<<< HEAD
-    callbacks_->onIncrementalConfigUpdate(added_resources, removed_resources, version_info);
-    // TODO update versions of added_resources and removed_resources into resources_.... well,
-    // i guess removed_resources just get removed? since there's no provision for "it got removed"
-    // to have a version associated here; it's just a list of string resource names.
-=======
     callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
     for (const auto& resource : added_resources) {
       resources_[resource.name()] = resource.version();
     }
->>>>>>> add name field to Resource proto
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
     stats_.version_.set(HashUtil::xxHash64(version_info));
@@ -161,13 +144,7 @@ public:
       stats_.update_rejected_.inc();
       ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
       stats_.update_attempt_.inc();
-<<<<<<< HEAD
-      if (callbacks_) {
-        callbacks_->onIncrementalConfigUpdateFailed(&e);
-      }
-=======
       callbacks_->onConfigUpdateFailed(&e);
->>>>>>> address comments
       ::google::rpc::Status* error_detail = request_.mutable_error_detail();
       error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
       error_detail->set_message(e.what());
@@ -193,26 +170,15 @@ public:
     stats_.update_failure_.inc();
     ENVOY_LOG(debug, "delta update for {} failed", type_url_);
     stats_.update_attempt_.inc();
-<<<<<<< HEAD
-    if (callbacks_) {
-      callbacks_->onIncrementalConfigUpdateFailed(nullptr);
-    }
-=======
     callbacks_->onConfigUpdateFailed(nullptr);
->>>>>>> address comments
   }
 
   // Config::DeltaSubscription
   void start(const std::vector<std::string>& resources,
              SubscriptionCallbacks<ResourceType>& callbacks) override {
     callbacks_ = &callbacks;
-<<<<<<< HEAD
     establishNewStream();
     subscribe(resources);
-=======
-
-    buildAndQueueDiscoveryRequest(resources);
->>>>>>> snapshot
     // The attempt stat here is maintained for the purposes of having consistency between ADS and
     // individual DeltaSubscriptions. Since ADS is push based and muxed, the notion of an
     // "attempt" for a given xDS API combined by ADS is not really that meaningful.
@@ -220,7 +186,7 @@ public:
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    buildAndQueueDiscoveryRequest(resources);
+    subscribe(resources);
     stats_.update_attempt_.inc();
   }
 
@@ -236,22 +202,11 @@ private:
   envoy::api::v2::DeltaDiscoveryRequest request_;
   // Paused via pause()?
   bool paused_{};
-<<<<<<< HEAD
-
-  std::queue<ResourceNameDiff> request_queue_;
-  // Detects when Envoy is making too many requests.
-
-<<<<<<< HEAD
-=======
   absl::optional<ResourceNameDiff> pending_;
 
   const LocalInfo::LocalInfo& local_info_;
 
->>>>>>> address comments
   SubscriptionStats stats_;
-=======
-  IncrementalSubscriptionStats stats_;
->>>>>>> snapshot
 };
 
 } // namespace Config

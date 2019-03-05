@@ -313,23 +313,6 @@ public:
                               ClusterManager& cm) PURE;
 
   /**
-<<<<<<< HEAD
-   * Create an incremental CDS API provider from configuration proto. cds_config should
-   * have api_config_source.api_type == INCREMENTAL_GRPC.
-   */
-<<<<<<< HEAD
-  virtual CdsApiPtr
-  createIncrementalCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                       ClusterManager& cm) PURE;
-=======
-  virtual CdsApiPtr createIncrementalCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                                         ClusterManager& cm) PURE;
->>>>>>> bring in final touches from CDS integration test PR
-
-  /**
-=======
->>>>>>> address comments, undo xds as incremental xds wrapper
    * Returns the secret manager.
    */
   virtual Secret::SecretManager& secretManager() PURE;

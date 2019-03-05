@@ -14,7 +14,6 @@ envoy_cc_library(
     srcs = ["cds_api_impl.cc"],
     hdrs = ["cds_api_impl.h"],
     deps = [
-        ":cds_api_incremental_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -29,72 +28,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    name = "cds_incremental_lib",
-    srcs = ["cds_incremental.cc"],
-    hdrs = ["cds_incremental.h"],
-=======
-    name = "cds_api_incremental_lib",
-    srcs = ["cds_api_incremental_impl.cc"],
-    hdrs = ["cds_api_incremental_impl.h"],
->>>>>>> address comments, undo xds as incremental xds wrapper
-=======
-    name = "cds_api_incremental_lib",
-    srcs = ["cds_api_incremental_impl.cc"],
-    hdrs = ["cds_api_incremental_impl.h"],
->>>>>>> snapshot
-=======
-    name = "cds_api_delta_lib",
-    srcs = ["cds_api_delta_impl.cc"],
-    hdrs = ["cds_api_delta_impl.h"],
->>>>>>> rename incremental to delta
-    deps = [
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//source/common/common:cleanup_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/config:resources_lib",
-        "//source/common/config:subscription_factory_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-    ],
-)
-
-envoy_cc_library(
-<<<<<<< HEAD
-    name = "cds_subscription_lib",
-    srcs = ["cds_subscription.cc"],
-    hdrs = ["cds_subscription.h"],
-    deps = [
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/json:json_object_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/config:cds_json_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/http:headers_lib",
-        "//source/common/http:rest_api_fetcher_lib",
-        "//source/common/json:config_schemas_lib",
-        "//source/common/json:json_loader_lib",
-        "@envoy_api//envoy/api/v2:cds_cc",
-    ],
-)
-
-envoy_cc_library(
-=======
->>>>>>> config: removing the legacy rest API (#5522)
-=======
->>>>>>> trim unused cds_subscription_lib from BUILD
-=======
->>>>>>> consolidate CdsApiImpl
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
