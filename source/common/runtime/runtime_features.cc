@@ -8,7 +8,7 @@ namespace Runtime {
 // These features should not be overridden with run-time guards without a bug
 // being filed on github as once high risk features are true by default, the
 // old code path will be removed with the next release.
-const char* runtime_features[] = {
+constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
     // Disabled
@@ -18,7 +18,7 @@ const char* runtime_features[] = {
 // TODO(alyssawilk) handle deprecation of reloadable_features. Ideally runtime
 // override of a deprecated feature will log(warn) on runtime-load if not deprecated
 // and hard-fail once it has been deprecated.
-const char* disallowed_features[] = {
+constexpr const char* disallowed_features[] = {
     // Acts as both a test entry for deprecated.proto and a marker for the Envoy
     // deprecation scripts.
     "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal",
