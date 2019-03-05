@@ -28,7 +28,7 @@ const char EmptyVersion[] = "";
 
 /**
  * Manages the logic of a (non-aggregated) delta xDS subscription.
- * TOOD(fredlas) add aggregation support.
+ * TODO(fredlas) add aggregation support.
  */
 template <class ResourceType>
 class DeltaSubscriptionImpl
