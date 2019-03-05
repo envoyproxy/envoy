@@ -18,8 +18,10 @@ apt update
 apt install -y g++-7
 update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 1000
 update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 1000
+update-alternatives --install /usr/bin/gcov gcov /usr/bin/gcov-7 1000
 update-alternatives --config gcc
 update-alternatives --config g++
+update-alternatives --config gcov
 # Bazel and related dependencies.
 apt-get install -y openjdk-8-jdk curl
 echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
