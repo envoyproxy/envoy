@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -56,17 +57,19 @@ UdpListenerImpl::ReceiveResult UdpListenerImpl::doRecvFrom(sockaddr_storage& pee
   const uint64_t num_slices = buffer->reserve(read_length, &slice, 1);
 
   ASSERT(num_slices == 1);
-  // TODO(conqerAtapple): Use os_syscalls
-  const ssize_t rc = ::recvfrom(socket_.ioHandle().fd(), slice.mem_, read_length, 0,
-                                reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
-  if (rc < 0) {
-    return ReceiveResult{Api::SysCallIntResult{static_cast<int>(rc), errno}, nullptr};
-  }
 
-  slice.len_ = std::min(slice.len_, static_cast<size_t>(rc));
+  auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+  const Api::SysCallSizeResult result =
+      os_sys_calls.recvfrom(socket_.ioHandle().fd(), slice.mem_, read_length, 0,
+                            reinterpret_cast<struct sockaddr*>(&peer_addr), &addr_len);
+  if (result.rc_ < 0) {
+    return ReceiveResult{Api::SysCallIntResult{static_cast<int>(result.rc_), result.errno_},
+                         nullptr};
+  }
+  slice.len_ = std::min(slice.len_, static_cast<size_t>(result.rc_));
   buffer->commit(&slice, 1);
 
-  return ReceiveResult{Api::SysCallIntResult{static_cast<int>(rc), 0}, std::move(buffer)};
+  return ReceiveResult{Api::SysCallIntResult{static_cast<int>(result.rc_), 0}, std::move(buffer)};
 }
 
 void UdpListenerImpl::onSocketEvent(short flags) {
