@@ -346,12 +346,12 @@ void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) const {
 
 void DecoderImpl::onData(Buffer::Instance& data) {
   uint64_t offset = 0;
-  while (offset < data.length()) {
-    try {
+  try {
+    while (offset < data.length()) {
       decode(data, offset);
-    } catch (EnvoyException& e) {
-      callbacks_.onDecodeError();
     }
+  } catch (EnvoyException& e) {
+    callbacks_.onDecodeError();
   }
 }
 
