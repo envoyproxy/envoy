@@ -241,12 +241,8 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # TODO(akonradi): use --local_cpu_resources flag once Bazel has a release
   # after 0.21.
   [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,4,1"
-  bazel coverage ${BAZEL_TEST_OPTIONS} --experimental_cc_coverage //test/common/common:base64_test  \
-    --instrumentation_filter=//source/...,//include/... \
-    --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main \
-    --combined_report=lcov
-  # TODO(htuch): genhtml report
-  # TODO(htuch): verify coverage against hard limit
+  ./test/run_envoy_bazel_coverage.sh
+  collect_build_profile
   exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
