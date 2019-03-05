@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
@@ -12,14 +11,13 @@ envoy_package()
 
 envoy_cc_test_library(
     name = "custom_static_cluster",
-    srcs = ["custom_static_cluster.cc"],
+    srcs = ["custom_static_cluster.h"],
     deps = [
         ":cluster_factory_config_proto_cc",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/upstream:cluster_factory_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/config:metadata_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
         "//source/common/singleton:manager_impl_lib",

@@ -11,27 +11,22 @@ namespace Clusters {
  */
 class ClusterTypeValues {
 public:
-  // Refer to the :ref:`static discovery type<arch_overview_service_discovery_types_static>`
-  // for an explanation.
+  // Static clusters (cluster that have a fixed number of hosts with resolved IP addresses).
   const std::string Static = "envoy.cluster.static";
 
-  // Refer to the :ref:`strict DNS discovery
-  // type<arch_overview_service_discovery_types_strict_dns>`
-  // for an explanation.
+  // Strict DNS (cluster that periodic DNS resolution and updates the host member set if the DNS
+  // members change).
   const std::string StrictDns = "envoy.cluster.strict_dns";
 
-  // Refer to the :ref:`logical DNS discovery
-  // type<arch_overview_service_discovery_types_logical_dns>`
-  // for an explanation.
+  // Logical DNS (cluster that creates a single logical host that wraps an async DNS resolver).
   const std::string LogicalDns = "envoy.cluster.logical_dns";
 
-  // Refer to the :ref:`service discovery type<arch_overview_service_discovery_types_eds>`
-  // for an explanation.
+  // Endpoint Discovery Service (dynamic cluster that reads host information from the Endpoint
+  // Discovery Service).
   const std::string Eds = "envoy.cluster.eds";
 
-  // Refer to the :ref:`original destination discovery
-  // type<arch_overview_service_discovery_types_original_destination>`
-  // for an explanation.
+  // Original destination (dynamic cluster that automatically adds hosts as needed based on the
+  // original destination address of the downstream connection).
   const std::string OriginalDst = "envoy.cluster.original_dst";
 };
 

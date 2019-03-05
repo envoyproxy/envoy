@@ -128,8 +128,7 @@ public:
    * with the provided parameters, it should throw an EnvoyException in the case of general error.
    * @param cluster supplies the general protobuf configuration for the cluster.
    * @param context supplies the cluster's context.
-   * @return ClusterSharedPtr the cluster instance. The returned ClusterSharedPtr should not be
-   * null.
+   * @return ClusterSharedPtr the cluster instance.
    */
   virtual ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster,
                                   ClusterFactoryContext& context) PURE;

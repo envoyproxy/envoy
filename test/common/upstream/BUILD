@@ -385,7 +385,6 @@ envoy_cc_test(
     name = "cluster_factory_impl_test",
     srcs = ["cluster_factory_impl_test.cc"],
     deps = [
-        ":cluster_factory_config_proto_cc",
         ":utility_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codec_interface",
@@ -401,6 +400,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
+        "//test/integration/clusters:custom_static_cluster",
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -411,9 +411,4 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
-)
-
-envoy_proto_library(
-    name = "cluster_factory_config_proto",
-    srcs = [":cluster_factory_config.proto"],
 )

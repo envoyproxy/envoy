@@ -98,7 +98,7 @@ private:
   Server::Admin& admin_;
   Singleton::Manager& singleton_manager_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
-  bool added_via_api_;
+  const bool added_via_api_;
   Api::Api& api_;
 };
 

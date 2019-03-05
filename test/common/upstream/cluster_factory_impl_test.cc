@@ -14,9 +14,10 @@
 
 #include "server/transport_socket_config_impl.h"
 
-#include "test/common/upstream/cluster_factory_config.pb.h"
-#include "test/common/upstream/cluster_factory_config.pb.validate.h"
 #include "test/common/upstream/utility.h"
+#include "test/integration/clusters/cluster_factory_config.pb.h"
+#include "test/integration/clusters/cluster_factory_config.pb.validate.h"
+#include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -36,32 +37,7 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class TestStaticClusterImpl : public ClusterImplBase {
-public:
-  TestStaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                        Server::Configuration::TransportSocketFactoryContext& factory_context,
-                        Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority)
-      : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
-        priority_(priority) {}
-
-  InitializePhase initializePhase() const override { return InitializePhase::Primary; }
-
-private:
-  // ClusterImplBase
-  void startPreInit() override {
-    HostVectorSharedPtr hosts(new HostVector({makeTestHost(this->info(), "tcp://127.0.0.1:80")}));
-    HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-    HostVector hosts_added{hosts->front()};
-    HostVector hosts_removed{};
-
-    this->prioritySet().updateHosts(
-        priority_,
-        HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
-        hosts_added, hosts_removed, absl::nullopt);
-  }
-  const uint32_t priority_;
-};
-
+// Test Cluster Factory without custom configuration
 class TestStaticClusterFactory : public ClusterFactoryImplBase {
 public:
   TestStaticClusterFactory() : ClusterFactoryImplBase("envoy.clusters.test_static") {}
@@ -70,28 +46,9 @@ public:
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override {
-    return std::make_unique<TestStaticClusterImpl>(cluster, context.runtime(),
-                                                   socket_factory_context, std::move(stats_scope),
-                                                   context.addedViaApi(), 1);
-  }
-};
-
-class ConfigurableTestStaticClusterFactory
-    : public ConfigurableClusterFactoryBase<test::common::upstream::CustomStaticConfig> {
-public:
-  ConfigurableTestStaticClusterFactory()
-      : ConfigurableClusterFactoryBase("envoy.clusters.test_static_config") {}
-
-private:
-  ClusterImplBaseSharedPtr createClusterWithConfig(
-      const envoy::api::v2::Cluster& cluster,
-      const test::common::upstream::CustomStaticConfig& proto_config,
-      ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
-      Stats::ScopePtr&& stats_scope) override {
-    return std::make_unique<TestStaticClusterImpl>(cluster, context.runtime(),
-                                                   socket_factory_context, std::move(stats_scope),
-                                                   context.addedViaApi(), proto_config.priority());
+    return std::make_unique<CustomStaticCluster>(cluster, context.runtime(), socket_factory_context,
+                                                 std::move(stats_scope), context.addedViaApi(), 1,
+                                                 "127.0.0.1", 80);
   }
 };
 
@@ -120,7 +77,7 @@ protected:
 
 class TestStaticClusterImplTest : public testing::Test, public ClusterFactoryTestBase {};
 
-TEST_F(TestStaticClusterImplTest, createWithoutConfig) {
+TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
   const std::string yaml = R"EOF(
       name: staticcluster
       connect_timeout: 0.25s
@@ -145,6 +102,7 @@ TEST_F(TestStaticClusterImplTest, createWithoutConfig) {
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[1]->hosts()[0]->hostname());
+  // the hosts field override by values hardcoded in the factory
   EXPECT_EQ("127.0.0.1", cluster->prioritySet()
                              .hostSetsPerPriority()[1]
                              ->hosts()[0]
@@ -156,7 +114,7 @@ TEST_F(TestStaticClusterImplTest, createWithoutConfig) {
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
-TEST_F(TestStaticClusterImplTest, createWithStructConfig) {
+TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
   const std::string yaml = R"EOF(
       name: staticcluster
       connect_timeout: 0.25s
@@ -166,14 +124,16 @@ TEST_F(TestStaticClusterImplTest, createWithStructConfig) {
           address: 10.0.0.1
           port_value: 443
       cluster_type:
-          name: envoy.clusters.test_static_config
+          name: envoy.clusters.custom_static
           typed_config:
             "@type": type.googleapis.com/google.protobuf.Struct
             value:
               priority: 10
+              address: 127.0.0.1
+              port_value: 80
     )EOF";
 
-  ConfigurableTestStaticClusterFactory factory;
+  CustomStaticClusterFactory factory;
   Registry::InjectFactory<ClusterFactory> registered_factory(factory);
 
   const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
@@ -196,7 +156,7 @@ TEST_F(TestStaticClusterImplTest, createWithStructConfig) {
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
-TEST_F(TestStaticClusterImplTest, createWithTypedConfig) {
+TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
   const std::string yaml = R"EOF(
       name: staticcluster
       connect_timeout: 0.25s
@@ -206,13 +166,15 @@ TEST_F(TestStaticClusterImplTest, createWithTypedConfig) {
           address: 10.0.0.1
           port_value: 443
       cluster_type:
-          name: envoy.clusters.test_static_config
+          name: envoy.clusters.custom_static
           typed_config:
-            "@type": type.googleapis.com/test.common.upstream.CustomStaticConfig
+            "@type": type.googleapis.com/test.integration.clusters.CustomStaticConfig
             priority: 10
+            address: 127.0.0.1
+            port_value: 80
     )EOF";
 
-  ConfigurableTestStaticClusterFactory factory;
+  CustomStaticClusterFactory factory;
   Registry::InjectFactory<ClusterFactory> registered_factory(factory);
 
   const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
@@ -235,7 +197,7 @@ TEST_F(TestStaticClusterImplTest, createWithTypedConfig) {
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
-TEST_F(TestStaticClusterImplTest, unsupportedClusterType) {
+TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -245,9 +207,9 @@ TEST_F(TestStaticClusterImplTest, unsupportedClusterType) {
         address: 10.0.0.1
         port_value: 443
     cluster_type:
-        name: envoy.clusters.test_static_config
+        name: envoy.clusters.bad_cluster_name
         typed_config:
-          "@type": type.googleapis.com/test.common.upstream.CustomStaticConfig
+          "@type": type.googleapis.com/test.integration.clusters.CustomStaticConfig
           priority: 10
   )EOF";
   // the factory is not registered, expect to throw
@@ -262,7 +224,7 @@ TEST_F(TestStaticClusterImplTest, unsupportedClusterType) {
       },
       EnvoyException,
       "Didn't find a registered cluster factory implementation for name: "
-      "'envoy.clusters.test_static_config'");
+      "'envoy.clusters.bad_cluster_name'");
 }
 
 } // namespace
