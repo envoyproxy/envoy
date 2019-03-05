@@ -60,12 +60,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "event_buffer_test",
-    srcs = ["event_buffer_test.cc"],
-    external_deps = ["event"],
-)
-
-envoy_cc_test(
     name = "watermark_buffer_test",
     srcs = ["watermark_buffer_test.cc"],
     deps = [
