@@ -85,9 +85,10 @@ const char ClusterName2[] = "cluster_2";
 const int UpstreamIndex1 = 1;
 const int UpstreamIndex2 = 2;
 
-class CdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
+class DeltaCdsIntegrationTest : public HttpIntegrationTest,
+                                public Grpc::GrpcClientIntegrationParamTest {
 public:
-  CdsIntegrationTest()
+  DeltaCdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), realTime(), Config) {}
 
   void TearDown() override {
@@ -173,7 +174,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_CASE_P(IpVersionsClientType, DeltaCdsIntegrationTest,
+                        GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // 1) Envoy starts up with no static clusters (other than the CDS-over-gRPC server).
 // 2) Envoy is told of a cluster via CDS.
@@ -182,7 +184,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, CdsIntegrationTest, GRPC_CLIENT_IN
 // 5) We send Envoy a request, which should 503.
 // 6) Envoy is told that the cluster is back.
 // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
-TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
+TEST_P(DeltaCdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -233,7 +235,7 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
 }
 
 // Tests adding a cluster, adding another, then removing the first.
-TEST_P(CdsIntegrationTest, TwoClusters) {
+TEST_P(DeltaCdsIntegrationTest, TwoClusters) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
   cleanupUpstreamAndDownstream();
