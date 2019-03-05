@@ -146,6 +146,8 @@ public:
   void debugPrint() const override;
 #endif
 
+  StoragePtr copyToBytes(absl::string_view name) override;
+
 private:
   friend class StatName;
   friend class StatNameTest;

@@ -75,7 +75,24 @@ public:
   void debugPrint() const override {}
 #endif
 
+  StoragePtr copyToBytes(absl::string_view name) override {
+    auto bytes = std::make_unique<uint8_t[]>(name.size() + StatNameSizeEncodingBytes);
+    uint8_t* buffer = saveLengthToBytesReturningNext(name.size(), bytes.get());
+    memcpy(buffer, name.data(), name.size());
+    return bytes;
+  }
+
 private:
+  // Saves the specified length into the byte array, returning the next byte.
+  // There is no guarantee that bytes will be aligned, so we can't cast to a
+  // uint16_t* and assign, but must individually copy the bytes.
+  static uint8_t* saveLengthToBytesReturningNext(uint64_t length, uint8_t* bytes) {
+    ASSERT(length < StatNameMaxSize);
+    *bytes++ = length & 0xff;
+    *bytes++ = length >> 8;
+    return bytes;
+  }
+
   SymbolEncoding encodeHelper(absl::string_view name) const {
     SymbolEncoding encoding;
     encoding.addStringForFakeSymbolTable(name);

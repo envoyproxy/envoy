@@ -296,11 +296,15 @@ void SymbolTableImpl::debugPrint() const {
 }
 #endif
 
-StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
-  SymbolEncoding encoding = table.encode(name);
-  bytes_ = std::make_unique<uint8_t[]>(encoding.bytesRequired());
-  encoding.moveToStorage(bytes_.get());
+SymbolTable::StoragePtr SymbolTableImpl::copyToBytes(absl::string_view name) {
+  SymbolEncoding encoding = encode(name);
+  auto bytes = std::make_unique<uint8_t[]>(encoding.bytesRequired());
+  encoding.moveToStorage(bytes.get());
+  return bytes;
 }
+
+StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
+    : bytes_(table.copyToBytes(name)) {}
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   uint64_t size = src.size();

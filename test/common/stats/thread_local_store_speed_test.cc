@@ -54,7 +54,7 @@ public:
   }
 
 private:
-  Stats::SymbolTableImpl symbol_table_;
+  Stats::FakeSymbolTableImpl symbol_table_;
   Event::SimulatedTimeSystem time_system_;
   Stats::StatsOptionsImpl options_;
   Stats::HeapStatDataAllocator heap_alloc_;

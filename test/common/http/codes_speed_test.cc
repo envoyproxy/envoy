@@ -10,6 +10,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "benchmark/benchmark.h"
@@ -53,7 +54,7 @@ public:
     code_stats_.chargeResponseTiming(info);
   }
 
-  Stats::SymbolTableImpl symbol_table_;
+  Stats::FakeSymbolTableImpl symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;

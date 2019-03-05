@@ -159,6 +159,8 @@ private:
    * @param stat_name the stat name.
    */
   virtual void incRefCount(const StatName& stat_name) PURE;
+
+  virtual StoragePtr copyToBytes(absl::string_view name) PURE;
 };
 
 using SharedSymbolTable = std::shared_ptr<SymbolTable>;
