@@ -31,6 +31,8 @@ public:
   // Network::TransportSocketFactory
   TransportSocketPtr createTransportSocket(TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
+  const Envoy::Ssl::CertificateValidationContextConfig*
+  certificateValidationContext() const override;
 };
 
 } // namespace Network

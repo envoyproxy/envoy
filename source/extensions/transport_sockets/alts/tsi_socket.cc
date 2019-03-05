@@ -248,6 +248,10 @@ TsiSocketFactory::TsiSocketFactory(HandshakerFactory handshaker_factory,
       handshake_validator_(std::move(handshake_validator)) {}
 
 bool TsiSocketFactory::implementsSecureTransport() const { return true; }
+const Envoy::Ssl::CertificateValidationContextConfig*
+TsiSocketFactory::certificateValidationContext() const {
+  return nullptr;
+}
 
 Network::TransportSocketPtr
 TsiSocketFactory::createTransportSocket(Network::TransportSocketOptionsSharedPtr) const {

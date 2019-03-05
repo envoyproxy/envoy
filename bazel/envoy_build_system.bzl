@@ -19,12 +19,12 @@ def _envoy_directory_genrule_impl(ctx):
     return [DefaultInfo(files = depset([tree]))]
 
 envoy_directory_genrule = rule(
-    implementation = _envoy_directory_genrule_impl,
     attrs = {
         "srcs": attr.label_list(),
         "cmd": attr.string(),
         "tools": attr.label_list(),
     },
+    implementation = _envoy_directory_genrule_impl,
 )
 
 # Compute the final copts based on various options.

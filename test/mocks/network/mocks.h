@@ -382,6 +382,7 @@ public:
   ~MockTransportSocketFactory();
 
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
+  MOCK_CONST_METHOD0(certificateValidationContext, Ssl::CertificateValidationContextConfig*());
   MOCK_CONST_METHOD1(createTransportSocket, TransportSocketPtr(TransportSocketOptionsSharedPtr));
 };
 

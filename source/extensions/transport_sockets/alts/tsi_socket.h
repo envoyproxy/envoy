@@ -98,6 +98,8 @@ public:
   TsiSocketFactory(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
 
   bool implementsSecureTransport() const override;
+  const Envoy::Ssl::CertificateValidationContextConfig*
+  certificateValidationContext() const override;
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
 

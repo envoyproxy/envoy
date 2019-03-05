@@ -415,6 +415,11 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
+const Envoy::Ssl::CertificateValidationContextConfig*
+ClientSslSocketFactory::certificateValidationContext() const {
+  return config_->certificateValidationContext();
+}
+
 void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
   {
@@ -454,6 +459,11 @@ ServerSslSocketFactory::createTransportSocket(Network::TransportSocketOptionsSha
 }
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
+
+const Envoy::Ssl::CertificateValidationContextConfig*
+ServerSslSocketFactory::certificateValidationContext() const {
+  return config_->certificateValidationContext();
+}
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");

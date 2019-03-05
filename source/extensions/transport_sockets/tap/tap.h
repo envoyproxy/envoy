@@ -46,6 +46,8 @@ public:
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
   bool implementsSecureTransport() const override;
+  const Envoy::Ssl::CertificateValidationContextConfig*
+  certificateValidationContext() const override;
 
 private:
   Network::TransportSocketFactoryPtr transport_socket_factory_;

@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/connection.h"
 
 #include "absl/types/optional.h"
@@ -180,6 +181,11 @@ public:
    * @return bool whether the transport socket implements secure transport.
    */
   virtual bool implementsSecureTransport() const PURE;
+
+  /**
+   * @return CertificateValidationContextConfig the certificate validation context config.
+   */
+  virtual const Ssl::CertificateValidationContextConfig* certificateValidationContext() const PURE;
 
   /**
    * @param options for creating the transport socket

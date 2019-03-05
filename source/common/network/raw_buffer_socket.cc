@@ -88,5 +88,9 @@ RawBufferSocketFactory::createTransportSocket(TransportSocketOptionsSharedPtr) c
 }
 
 bool RawBufferSocketFactory::implementsSecureTransport() const { return false; }
+const Envoy::Ssl::CertificateValidationContextConfig*
+RawBufferSocketFactory::certificateValidationContext() const {
+  return nullptr;
+}
 } // namespace Network
 } // namespace Envoy

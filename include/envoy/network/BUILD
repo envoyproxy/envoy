@@ -90,6 +90,7 @@ envoy_cc_library(
         ":io_handle_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/ssl:connection_interface",
+        "//include/envoy/ssl:context_config_interface",
     ],
 )
 

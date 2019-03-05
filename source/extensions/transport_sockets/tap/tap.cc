@@ -71,6 +71,11 @@ bool TapSocketFactory::implementsSecureTransport() const {
   return transport_socket_factory_->implementsSecureTransport();
 }
 
+const Envoy::Ssl::CertificateValidationContextConfig*
+TapSocketFactory::certificateValidationContext() const {
+  return transport_socket_factory_->certificateValidationContext();
+}
+
 } // namespace Tap
 } // namespace TransportSockets
 } // namespace Extensions
