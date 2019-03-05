@@ -3,9 +3,9 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 
-#include "extensions/filters/network/redis_proxy/codec_impl.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
 
-#include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -14,7 +14,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 class RedisEncoderDecoderImplTest : public testing::Test, public DecoderCallbacks {
 public:
@@ -60,6 +61,18 @@ TEST_F(RedisEncoderDecoderImplTest, SimpleString) {
   EXPECT_EQ("\"simple string\"", value.toString());
   encoder_.encode(value, buffer_);
   EXPECT_EQ("+simple string\r\n", buffer_.toString());
+  decoder_.decode(buffer_);
+  EXPECT_EQ(value, *decoded_values_[0]);
+  EXPECT_EQ(0UL, buffer_.length());
+}
+
+TEST_F(RedisEncoderDecoderImplTest, BulkString) {
+  RespValue value;
+  value.type(RespType::BulkString);
+  value.asString() = "bulk string";
+  EXPECT_EQ("\"bulk string\"", value.toString());
+  encoder_.encode(value, buffer_);
+  EXPECT_EQ("$11\r\nbulk string\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
@@ -188,7 +201,8 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidBulkStringExpectLF) {
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
-} // namespace RedisProxy
+} // namespace Redis
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
