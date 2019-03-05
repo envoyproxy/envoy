@@ -563,13 +563,8 @@ void Filter::updateOutlierDetection(const Http::Code code) {
   }
 }
 
-void Filter::onUpstreamAbort(const Http::Code code, const StreamInfo::ResponseFlag response_flags,
+void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flags,
                              const std::string& body, bool dropped) {
-  Upstream::HostDescriptionConstSharedPtr upstream_host;
-  if (upstream_request_) {
-    upstream_host = upstream_request_->upstream_host_;
-  }
-
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
@@ -581,6 +576,11 @@ void Filter::onUpstreamAbort(const Http::Code code, const StreamInfo::ResponseFl
     cleanup();
     callbacks_->resetStream();
   } else {
+    Upstream::HostDescriptionConstSharedPtr upstream_host;
+    if (upstream_request_) {
+      upstream_host = upstream_request_->upstream_host_;
+    }
+
     // This will destroy any created retry timers.
     cleanup();
 
@@ -605,14 +605,14 @@ void Filter::onUpstreamAbort(const Http::Code code, const StreamInfo::ResponseFl
   }
 }
 
-bool Filter::maybeRetryReset(const Http::StreamResetReason reset_reason) {
-  Upstream::HostDescriptionConstSharedPtr upstream_host;
-  if (upstream_request_) {
-    upstream_host = upstream_request_->upstream_host_;
-  }
-
+bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason) {
   // We don't retry on a global timeout or if we already started the response.
   if (!downstream_response_started_ && retry_state_) {
+    Upstream::HostDescriptionConstSharedPtr upstream_host;
+    if (upstream_request_) {
+      upstream_host = upstream_request_->upstream_host_;
+    }
+
     // Notify retry modifiers about the attempted host.
     if (upstream_host != nullptr) {
       retry_state_->onHostAttempted(upstream_host);
@@ -641,14 +641,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason) {
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
                    Http::Utility::resetReasonToString(reset_reason));
 
-  Upstream::HostDescriptionConstSharedPtr upstream_host;
-  if (upstream_request_) {
-    upstream_host = upstream_request_->upstream_host_;
-  }
-
-  const Http::Code code = Http::Code::ServiceUnavailable;
-
-  updateOutlierDetection(code);
+  updateOutlierDetection(Http::Code::ServiceUnavailable);
 
   if (maybeRetryReset(reset_reason)) {
     return;
@@ -660,7 +653,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason) {
                    Http::Utility::resetReasonToString(reset_reason));
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
-  onUpstreamAbort(code, response_flags, body, dropped);
+  onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped);
 }
 
 StreamInfo::ResponseFlag
