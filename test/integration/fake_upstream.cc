@@ -208,18 +208,18 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
 
 FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connection,
                                        Stats::Store& store, Type type,
-                                       Event::TestTimeSystem& time_system)
+                                       Event::TestTimeSystem& time_system,
+                                       uint32_t max_request_headers_kb)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
-    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(shared_connection_.connection(),
-                                                                 *this, Http::Http1Settings());
+    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
+        shared_connection_.connection(), *this, Http::Http1Settings(), max_request_headers_kb);
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
     settings.allow_metadata_ = true;
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, store, settings,
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+        shared_connection_.connection(), *this, store, settings, max_request_headers_kb);
     ASSERT(type == Type::HTTP2);
   }
 
@@ -432,7 +432,8 @@ void FakeUpstream::threadRoutine() {
 
 AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                                     FakeHttpConnectionPtr& connection,
-                                                    milliseconds timeout) {
+                                                    milliseconds timeout,
+                                                    uint32_t max_request_headers_kb) {
   Event::TestTimeSystem& time_system = timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   {
@@ -452,7 +453,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
     connection = std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_,
-                                                      time_system);
+                                                      time_system, max_request_headers_kb);
   }
   VERIFY_ASSERTION(connection->initialize());
   VERIFY_ASSERTION(connection->readDisable(false));
@@ -482,7 +483,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       } else {
         connection = std::make_unique<FakeHttpConnection>(
             upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_,
-            upstream.timeSystem());
+            upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));

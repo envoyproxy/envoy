@@ -369,8 +369,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
                                                                 max_request_headers_kb);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
-    server = absl::make_unique<Http1::ServerConnectionImpl>(server_connection, server_callbacks,
-                                                            server_http1settings);
+    server = absl::make_unique<Http1::ServerConnectionImpl>(
+        server_connection, server_callbacks, server_http1settings, max_request_headers_kb);
   }
 
   ReorderBuffer client_write_buf{*server};

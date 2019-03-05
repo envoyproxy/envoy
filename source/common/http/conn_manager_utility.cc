@@ -41,11 +41,11 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     ServerConnectionCallbacks& callbacks, Stats::Scope& scope, const Http1Settings& http1_settings,
     const Http2Settings& http2_settings, const uint32_t max_request_headers_kb) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
-    return ServerConnectionPtr{new Http2::ServerConnectionImpl(
-        connection, callbacks, scope, http2_settings, max_request_headers_kb)};
+    return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
+                                                         http2_settings, max_request_headers_kb);
   } else {
-    return ServerConnectionPtr{
-        new Http1::ServerConnectionImpl(connection, callbacks, http1_settings)};
+    return std::make_unique<Http1::ServerConnectionImpl>(connection, callbacks, http1_settings,
+                                                         max_request_headers_kb);
   }
 }
 

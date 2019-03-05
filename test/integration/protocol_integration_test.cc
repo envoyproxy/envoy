@@ -739,6 +739,14 @@ name: decode-headers-only
   EXPECT_EQ(0, upstream_request_->body().length());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
+  testLargeRequestHeaders(95, 60);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
+  testLargeRequestHeaders(95, 96);
+}
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
