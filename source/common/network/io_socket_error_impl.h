@@ -16,25 +16,17 @@ public:
   Api::IoError::IoErrorCode getErrorCode() const override;
   std::string getErrorDetails() const override;
 
+  // IoErrorCode::Again is used frequently. Define it to be a singleton to avoid frequent memory
+  // allocation of such instance. If this is used, IoHandleCallResult has to be instantiated with
+  // deleter deleteIoError() below to avoid deallocating memory for this error.
+  static IoSocketError* getIoSocketEagainInstance();
+
+  // Deallocate memory only if the error is not Again.
+  static void deleteIoError(Api::IoError* err);
+
 private:
   int errno_;
 };
-
-// IoErrorCode::Again is used frequently. Define it to be a singleton to avoid frequent memory
-// allocation of such instance. If this is used, IoHandleCallResult has to be instantiated with
-// deleter deleteIoError() below to avoid deallocating memory for this error.
-inline IoSocketError* getIoSocketEagainInstance() {
-  static auto* instance = new IoSocketError(EAGAIN);
-  return instance;
-}
-
-// Deallocate memory only if the error is not Again.
-inline void deleteIoError(Api::IoError* err) {
-  ASSERT(err != nullptr);
-  if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-    delete err;
-  }
-}
 
 } // namespace Network
 } // namespace Envoy

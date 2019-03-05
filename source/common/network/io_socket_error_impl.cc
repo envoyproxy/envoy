@@ -8,8 +8,8 @@ namespace Network {
 Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
   switch (errno_) {
   case EAGAIN:
-    RELEASE_ASSERT(this == getIoSocketEagainInstance(),
-                   "Didn't use getIoSocketEagainInstance() to generate `Again`.");
+    ASSERT(this == IoSocketError::getIoSocketEagainInstance(),
+           "Didn't use getIoSocketEagainInstance() to generate `Again`.");
     return IoErrorCode::Again;
   case ENOTSUP:
     return IoErrorCode::NoSupport;
@@ -25,6 +25,20 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
 }
 
 std::string IoSocketError::getErrorDetails() const { return ::strerror(errno_); }
+
+// static.
+IoSocketError* IoSocketError::getIoSocketEagainInstance() {
+  static auto* instance = new IoSocketError(EAGAIN);
+  return instance;
+}
+
+// static.
+void IoSocketError::deleteIoError(Api::IoError* err) {
+  ASSERT(err != nullptr);
+  if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+    delete err;
+  }
+}
 
 } // namespace Network
 } // namespace Envoy

@@ -26,7 +26,7 @@ Api::IoCallUintResult IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  return Api::IoCallResult<uint64_t>(rc, Api::IoErrorPtr(nullptr, deleteIoError));
+  return Api::IoCallResult<uint64_t>(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }
@@ -62,7 +62,7 @@ Api::IoCallUintResult IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
     }
   }
   if (num_slices_to_write == 0) {
-    return IO_CALL_RESULT_NO_ERROR;
+    return Api::ioCallUintResultNoError();
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result = os_syscalls.writev(fd_, iov.begin(), num_slices_to_write);
@@ -73,13 +73,16 @@ Api::IoCallUintResult
 IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& result) {
   if (result.rc_ >= 0) {
     // Return nullptr as IoError upon success.
-    return Api::IoCallUintResult(result.rc_, Api::IoErrorPtr(nullptr, deleteIoError));
+    return Api::IoCallUintResult(result.rc_,
+                                 Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
   }
   return Api::IoCallUintResult(
-      /*rc=*/0, (result.errno_ == EAGAIN
-                     // EAGAIN is frequent enough that its memory allocation should be avoided.
-                     ? Api::IoErrorPtr(getIoSocketEagainInstance(), deleteIoError)
-                     : Api::IoErrorPtr(new IoSocketError(result.errno_), deleteIoError)));
+      /*rc=*/0,
+      (result.errno_ == EAGAIN
+           // EAGAIN is frequent enough that its memory allocation should be avoided.
+           ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
+                             IoSocketError::deleteIoError)
+           : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
 }
 
 } // namespace Network

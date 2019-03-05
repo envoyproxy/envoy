@@ -63,8 +63,9 @@ template <typename T> struct IoCallResult {
 
 using IoCallUintResult = IoCallResult<uint64_t>;
 
-#define IO_CALL_RESULT_NO_ERROR                                                                    \
-  Api::IoCallUintResult(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}))
+inline Api::IoCallUintResult ioCallUintResultNoError() {
+  return IoCallUintResult(0, IoErrorPtr(nullptr, [](IoError*) {}));
+}
 
 } // namespace Api
 } // namespace Envoy

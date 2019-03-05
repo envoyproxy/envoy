@@ -9,9 +9,10 @@ namespace {
 
 TEST(IoSocketHandleImplTest, TestIoSocketError) {
   IoSocketError error1(EAGAIN);
-  EXPECT_DEATH(error1.getErrorCode(), "Didn't use getIoSocketEagainInstance()");
+  EXPECT_DEBUG_DEATH(error1.getErrorCode(),
+                     ".*assert failure: .* Details: Didn't use getIoSocketEagainInstance.*");
 
-  EXPECT_EQ(::strerror(EAGAIN), getIoSocketEagainInstance()->getErrorDetails());
+  EXPECT_EQ(::strerror(EAGAIN), IoSocketError::getIoSocketEagainInstance()->getErrorDetails());
 
   IoSocketError error3(ENOTSUP);
   EXPECT_EQ(IoSocketError::IoErrorCode::NoSupport, error3.getErrorCode());

@@ -43,7 +43,8 @@ public:
   // A convenience function to invoke on write() which fails the write with EAGAIN.
   Api::IoCallUintResult failWrite(Network::IoHandle&) {
     return Api::IoCallUintResult(
-        /*rc=*/0, Api::IoErrorPtr(Network::getIoSocketEagainInstance(), [](Api::IoError*) {}));
+        /*rc=*/0,
+        Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(), [](Api::IoError*) {}));
   }
 
   int bytes_written() const { return bytes_written_; }
