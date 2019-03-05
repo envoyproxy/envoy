@@ -16,12 +16,13 @@ namespace RedisHealthChecker {
  */
 class RedisHealthChecker : public Upstream::HealthCheckerImplBase {
 public:
-  RedisHealthChecker(
-      const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
-      const envoy::config::health_checker::redis::v2::Redis& redis_config,
-      Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-      Upstream::HealthCheckEventLoggerPtr&& event_logger,
-      Extensions::NetworkFilters::Common::Redis::ClientFactory& client_factory);
+  RedisHealthChecker(const Upstream::Cluster& cluster,
+                     const envoy::api::v2::core::HealthCheck& config,
+                     const envoy::config::health_checker::redis::v2::Redis& redis_config,
+                     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                     Runtime::RandomGenerator& random,
+                     Upstream::HealthCheckEventLoggerPtr&& event_logger,
+                     Extensions::NetworkFilters::Common::Redis::ClientFactory& client_factory);
 
   static const NetworkFilters::Common::Redis::RespValue& pingHealthCheckRequest() {
     static HealthCheckRequest* request = new HealthCheckRequest();

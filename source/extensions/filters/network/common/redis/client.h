@@ -2,6 +2,8 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "extensions/filters/network/common/redis/codec_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -64,8 +66,7 @@ public:
    * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
    *         for some reason.
    */
-  virtual PoolRequest* makeRequest(const RespValue& request,
-                                   PoolCallbacks& callbacks) PURE;
+  virtual PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<Client> ClientPtr;
@@ -114,7 +115,6 @@ public:
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                            const Config& config) PURE;
 };
-
 
 } // namespace Redis
 } // namespace Common

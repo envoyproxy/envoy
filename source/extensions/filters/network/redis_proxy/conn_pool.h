@@ -31,8 +31,8 @@ public:
    *         for some reason.
    */
   virtual Common::Redis::PoolRequest* makeRequest(const std::string& hash_key,
-                                   const Common::Redis::RespValue& request,
-                                   Common::Redis::PoolCallbacks& callbacks) PURE;
+                                                  const Common::Redis::RespValue& request,
+                                                  Common::Redis::PoolCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

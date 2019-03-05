@@ -25,9 +25,8 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 namespace {
 
-class RedisHealthCheckerTest
-    : public testing::Test,
-      public Extensions::NetworkFilters::Common::Redis::ClientFactory {
+class RedisHealthCheckerTest : public testing::Test,
+                               public Extensions::NetworkFilters::Common::Redis::ClientFactory {
 public:
   RedisHealthCheckerTest()
       : cluster_(new NiceMock<Upstream::MockClusterMockPrioritySet>()),

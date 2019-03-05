@@ -413,7 +413,8 @@ public:
   }
 
   // Common::Redis::ClientFactory
-  Common::Redis::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&, const Common::Redis::Config&) override {
+  Common::Redis::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
+                                  const Common::Redis::Config&) override {
     return Common::Redis::ClientPtr{create_(host)};
   }
 

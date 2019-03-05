@@ -4,8 +4,8 @@
 #include <list>
 #include <string>
 
-#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/common/redis/client.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 
@@ -64,8 +64,8 @@ public:
 
   MOCK_METHOD1(addConnectionCallbacks, void(Network::ConnectionCallbacks& callbacks));
   MOCK_METHOD0(close, void());
-  MOCK_METHOD2(makeRequest,
-               Common::Redis::PoolRequest*(const Common::Redis::RespValue& request, Common::Redis::PoolCallbacks& callbacks));
+  MOCK_METHOD2(makeRequest, Common::Redis::PoolRequest*(const Common::Redis::RespValue& request,
+                                                        Common::Redis::PoolCallbacks& callbacks));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
 };
@@ -94,9 +94,9 @@ public:
   MockInstance();
   ~MockInstance();
 
-  MOCK_METHOD3(makeRequest,
-               Common::Redis::PoolRequest*(const std::string& hash_key, const Common::Redis::RespValue& request,
-                            Common::Redis::PoolCallbacks& callbacks));
+  MOCK_METHOD3(makeRequest, Common::Redis::PoolRequest*(const std::string& hash_key,
+                                                        const Common::Redis::RespValue& request,
+                                                        Common::Redis::PoolCallbacks& callbacks));
 };
 
 } // namespace ConnPool

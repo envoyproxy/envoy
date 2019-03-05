@@ -61,8 +61,8 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:client_interface",
+        "//source/extensions/filters/network/common/redis:codec_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )

@@ -14,9 +14,8 @@
 #include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
 
-#include "extensions/filters/network/redis_proxy/command_splitter.h"
-
 #include "extensions/filters/network/common/redis/client.h"
+#include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 namespace Envoy {

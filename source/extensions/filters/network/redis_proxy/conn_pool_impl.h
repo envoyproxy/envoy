@@ -18,9 +18,8 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/load_balancer_impl.h"
 
-#include "extensions/filters/network/common/redis/codec_impl.h"
-
 #include "extensions/filters/network/common/redis/client.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 namespace Envoy {
@@ -50,9 +49,11 @@ class ClientImpl : public Common::Redis::Client,
                    public Common::Redis::DecoderCallbacks,
                    public Network::ConnectionCallbacks {
 public:
-  static Common::Redis::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                          Common::Redis::EncoderPtr&& encoder,
-                          Common::Redis::DecoderFactory& decoder_factory, const Common::Redis::Config& config);
+  static Common::Redis::ClientPtr create(Upstream::HostConstSharedPtr host,
+                                         Event::Dispatcher& dispatcher,
+                                         Common::Redis::EncoderPtr&& encoder,
+                                         Common::Redis::DecoderFactory& decoder_factory,
+                                         const Common::Redis::Config& config);
 
   ~ClientImpl();
 
@@ -62,7 +63,7 @@ public:
   }
   void close() override;
   Common::Redis::PoolRequest* makeRequest(const Common::Redis::RespValue& request,
-                           Common::Redis::PoolCallbacks& callbacks) override;
+                                          Common::Redis::PoolCallbacks& callbacks) override;
 
 private:
   struct UpstreamReadFilter : public Network::ReadFilterBaseImpl {
@@ -119,7 +120,7 @@ class ClientFactoryImpl : public Common::Redis::ClientFactory {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
   Common::Redis::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                   const Common::Redis::Config& config) override;
+                                  const Common::Redis::Config& config) override;
 
   static ClientFactoryImpl instance_;
 
@@ -130,13 +131,14 @@ private:
 class InstanceImpl : public Instance {
 public:
   InstanceImpl(
-      const std::string& cluster_name, Upstream::ClusterManager& cm, Common::Redis::ClientFactory& client_factory,
-      ThreadLocal::SlotAllocator& tls,
+      const std::string& cluster_name, Upstream::ClusterManager& cm,
+      Common::Redis::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
 
   // RedisProxy::ConnPool::Instance
-  Common::Redis::PoolRequest* makeRequest(const std::string& key, const Common::Redis::RespValue& request,
-                           Common::Redis::PoolCallbacks& callbacks) override;
+  Common::Redis::PoolRequest* makeRequest(const std::string& key,
+                                          const Common::Redis::RespValue& request,
+                                          Common::Redis::PoolCallbacks& callbacks) override;
 
 private:
   struct ThreadLocalPool;
@@ -160,8 +162,9 @@ private:
                            public Upstream::ClusterUpdateCallbacks {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
-    Common::Redis::PoolRequest* makeRequest(const std::string& key, const Common::Redis::RespValue& request,
-                             Common::Redis::PoolCallbacks& callbacks);
+    Common::Redis::PoolRequest* makeRequest(const std::string& key,
+                                            const Common::Redis::RespValue& request,
+                                            Common::Redis::PoolCallbacks& callbacks);
     void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
 
