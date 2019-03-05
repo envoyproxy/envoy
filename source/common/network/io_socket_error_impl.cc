@@ -26,13 +26,11 @@ Api::IoError::IoErrorCode IoSocketError::getErrorCode() const {
 
 std::string IoSocketError::getErrorDetails() const { return ::strerror(errno_); }
 
-// static.
 IoSocketError* IoSocketError::getIoSocketEagainInstance() {
   static auto* instance = new IoSocketError(EAGAIN);
   return instance;
 }
 
-// static.
 void IoSocketError::deleteIoError(Api::IoError* err) {
   ASSERT(err != nullptr);
   if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
