@@ -27,6 +27,8 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseConnect(data, offset, len);
     return;
   case enumToIntSigned(XidCodes::PING_XID):
+    // Skip opcode.
+    offset += 4;
     callbacks_.onPing();
     return;
   case enumToIntSigned(XidCodes::AUTH_XID):
