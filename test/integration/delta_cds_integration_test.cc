@@ -151,17 +151,11 @@ public:
 
     // Now that the upstream has been created, process Envoy's request to discover it.
     // (First, we have to let Envoy establish its connection to the CDS server.)
-    AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
-        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
-    RELEASE_ASSERT(result, result.message());
-    xds_stream_->startGrpcStream();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+    acceptXdsConnection();
 
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
     sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>(
-        {buildCluster(ClusterName1, UpstreamIndex1)}, {}, "1");
+        {buildCluster(ClusterName1, UpstreamIndex1)}, {}, "55");
     // We can continue the test once we're sure that Envoy's ClusterManager has made use of
     // the DiscoveryResponse describing cluster_1 that we sent.
     // 2 because the statically specified CDS server itself counts as a cluster.
@@ -171,6 +165,16 @@ public:
     // test framework's downstream listener port map.
     test_server_->waitUntilListenersReady();
     registerTestServerPorts({"http"});
+  }
+
+  void acceptXdsConnection() {
+    AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    xds_stream_->startGrpcStream();
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   }
 };
 
@@ -284,6 +288,52 @@ TEST_P(DeltaCdsIntegrationTest, TwoClusters) {
 >>>>>>> added integration test with second cluster
 
   cleanupUpstreamAndDownstream();
+}
+
+// Tests that when Envoy's xDS gRPC stream dis/reconnects, Envoy can inform the server of the
+// resources it already has: the reconnected stream need not start with a state-of-the-world update.
+TEST_P(DeltaCdsIntegrationTest, VersionsRememberedAfterReconnect) {
+  // Calls our initialize(), which includes establishing a listener, route, and cluster.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // Close the connection carrying Envoy's xDS gRPC stream...
+  AssertionResult result = xds_connection_->close();
+  RELEASE_ASSERT(result, result.message());
+  result = xds_connection_->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  xds_connection_.reset();
+  // ...and reconnect it.
+  acceptXdsConnection();
+
+  // Upon reconnecting, the Envoy should tell us its current resource versions.
+  envoy::api::v2::DeltaDiscoveryRequest request;
+  result = xds_stream_->waitForGrpcMessage(*dispatcher_, request);
+  RELEASE_ASSERT(result, result.message());
+  const auto& initial_resource_versions = request.initial_resource_versions();
+  EXPECT_EQ("55", initial_resource_versions.at(std::string(ClusterName1)));
+  EXPECT_EQ(1, initial_resource_versions.size());
+
+  // Add another fake upstream, to be cluster_2.
+  fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
+                                                timeSystem(), enable_half_close_));
+  fake_upstreams_[UpstreamIndex2]->set_allow_unexpected_disconnects(false);
+  // Tell Envoy that cluster_2 is here. This update does *not* need to include cluster_1,
+  // which Envoy should already know about despite the disconnect.
+  sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({buildCluster(ClusterName2, UpstreamIndex2)},
+                                                      {}, "42");
+  // The '3' includes the fake CDS server.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+
+  // A request for cluster_1 should be fine.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+  // A request for cluster_2 should be fine.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
 }
 
 } // namespace
