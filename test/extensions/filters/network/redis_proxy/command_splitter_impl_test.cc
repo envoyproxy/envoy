@@ -130,7 +130,7 @@ public:
     pool_callbacks_->onResponse(std::move(response1));
   }
 
-  ConnPool::PoolCallbacks* pool_callbacks_;
+  Common::Redis::PoolCallbacks* pool_callbacks_;
   ConnPool::MockPoolRequest pool_request_;
 };
 
@@ -353,7 +353,7 @@ public:
     pool_requests_.swap(tmp_pool_requests);
     for (uint32_t i = 0; i < num_gets; i++) {
       makeBulkStringArray(expected_requests_[i], {"get", std::to_string(i)});
-      ConnPool::PoolRequest* request_to_use = nullptr;
+      Common::Redis::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
@@ -366,7 +366,7 @@ public:
   }
 
   std::vector<Common::Redis::RespValue> expected_requests_;
-  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
+  std::vector<Common::Redis::PoolCallbacks*> pool_callbacks_;
   std::vector<ConnPool::MockPoolRequest> pool_requests_;
 };
 
@@ -556,7 +556,7 @@ public:
     pool_requests_.swap(tmp_pool_requests);
     for (uint32_t i = 0; i < num_sets; i++) {
       makeBulkStringArray(expected_requests_[i], {"set", std::to_string(i), std::to_string(i)});
-      ConnPool::PoolRequest* request_to_use = nullptr;
+      Common::Redis::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
@@ -569,7 +569,7 @@ public:
   }
 
   std::vector<Common::Redis::RespValue> expected_requests_;
-  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
+  std::vector<Common::Redis::PoolCallbacks*> pool_callbacks_;
   std::vector<ConnPool::MockPoolRequest> pool_requests_;
 };
 
@@ -679,7 +679,7 @@ public:
     pool_requests_.swap(tmp_pool_requests);
     for (uint32_t i = 0; i < num_commands; i++) {
       makeBulkStringArray(expected_requests_[i], {GetParam(), std::to_string(i)});
-      ConnPool::PoolRequest* request_to_use = nullptr;
+      Common::Redis::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
@@ -692,7 +692,7 @@ public:
   }
 
   std::vector<Common::Redis::RespValue> expected_requests_;
-  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
+  std::vector<Common::Redis::PoolCallbacks*> pool_callbacks_;
   std::vector<ConnPool::MockPoolRequest> pool_requests_;
 };
 

@@ -66,7 +66,7 @@ public:
     finishSetup();
   }
 
-  void setup(std::unique_ptr<Config>&& config) {
+  void setup(std::unique_ptr<Common::Redis::Config>&& config) {
     config_ = std::move(config);
     finishSetup();
   }
@@ -106,8 +106,8 @@ public:
   Common::Redis::DecoderCallbacks* callbacks_{};
   NiceMock<Network::MockClientConnection>* upstream_connection_{};
   Network::ReadFilterSharedPtr upstream_read_filter_;
-  std::unique_ptr<Config> config_;
-  ClientPtr client_;
+  std::unique_ptr<Common::Redis::Config> config_;
+  Common::Redis::ClientPtr client_;
 };
 
 TEST_F(RedisClientImplTest, Basic) {
@@ -118,7 +118,7 @@ TEST_F(RedisClientImplTest, Basic) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  Common::Redis::PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
   onConnected();
@@ -126,7 +126,7 @@ TEST_F(RedisClientImplTest, Basic) {
   Common::Redis::RespValue request2;
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
-  PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
+  Common::Redis::PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
   EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
@@ -164,7 +164,7 @@ TEST_F(RedisClientImplTest, Cancel) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  Common::Redis::PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
   onConnected();
@@ -172,7 +172,7 @@ TEST_F(RedisClientImplTest, Cancel) {
   Common::Redis::RespValue request2;
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
-  PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
+  Common::Redis::PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
   handle1->cancel();
@@ -213,7 +213,7 @@ TEST_F(RedisClientImplTest, FailAll) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  Common::Redis::PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
   onConnected();
@@ -239,7 +239,7 @@ TEST_F(RedisClientImplTest, FailAllWithCancel) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  Common::Redis::PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
   onConnected();
@@ -263,7 +263,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  Common::Redis::PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
   onConnected();
@@ -290,7 +290,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  Common::Redis::PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
   EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SERVER_FAILURE));
@@ -302,7 +302,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
 }
 
-class ConfigOutlierDisabled : public Config {
+class ConfigOutlierDisabled : public Common::Redis::Config {
   bool disableOutlierEvents() const override { return true; }
   std::chrono::milliseconds opTimeout() const override { return std::chrono::milliseconds(25); }
   bool enableHashtagging() const override { return false; }
@@ -316,7 +316,7 @@ TEST_F(RedisClientImplTest, OutlierDisabled) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  Common::Redis::PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
   EXPECT_CALL(host_->outlier_detector_, putResult(_)).Times(0);
@@ -336,7 +336,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  Common::Redis::PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
   EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::TIMEOUT));
@@ -357,7 +357,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
-  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  Common::Redis::PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
   onConnected();
@@ -380,11 +380,11 @@ TEST(RedisClientFactoryImplTest, Basic) {
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
   ConfigImpl config(createConnPoolSettings());
-  ClientPtr client = factory.create(host, dispatcher, config);
+  Common::Redis::ClientPtr client = factory.create(host, dispatcher, config);
   client->close();
 }
 
-class RedisConnPoolImplTest : public testing::Test, public ClientFactory {
+class RedisConnPoolImplTest : public testing::Test, public Common::Redis::ClientFactory {
 public:
   void setup(bool cluster_exists = true) {
     EXPECT_CALL(cm_, addThreadLocalClusterUpdateCallbacks_(_))
@@ -408,16 +408,16 @@ public:
     MockPoolRequest active_request;
     EXPECT_CALL(*client_, makeRequest(Ref(value), Ref(callbacks)))
         .WillOnce(Return(&active_request));
-    PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
+    Common::Redis::PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
     EXPECT_EQ(&active_request, request);
   }
 
-  // RedisProxy::ConnPool::ClientFactory
-  ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&, const Config&) override {
-    return ClientPtr{create_(host)};
+  // Common::Redis::ClientFactory
+  Common::Redis::ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher&, const Common::Redis::Config&) override {
+    return Common::Redis::ClientPtr{create_(host)};
   }
 
-  MOCK_METHOD1(create_, Client*(Upstream::HostConstSharedPtr host));
+  MOCK_METHOD1(create_, Common::Redis::Client*(Upstream::HostConstSharedPtr host));
 
   const std::string cluster_name_{"fake_cluster"};
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -446,7 +446,7 @@ TEST_F(RedisConnPoolImplTest, Basic) {
       }));
   EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
   EXPECT_CALL(*client, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
-  PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
+  Common::Redis::PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
   EXPECT_EQ(&active_request, request);
 
   EXPECT_CALL(*client, close());
@@ -493,7 +493,7 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
 
   Common::Redis::RespValue value;
   MockPoolCallbacks callbacks;
-  PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
+  Common::Redis::PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
   EXPECT_EQ(nullptr, request);
 
   // Now add the cluster. Request to the cluster should succeed.
@@ -547,7 +547,7 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
 
   MockPoolRequest active_request1;
   EXPECT_CALL(*client1, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request1));
-  PoolRequest* request1 = conn_pool_->makeRequest("hash_key", value, callbacks);
+  Common::Redis::PoolRequest* request1 = conn_pool_->makeRequest("hash_key", value, callbacks);
   EXPECT_EQ(&active_request1, request1);
 
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(host2));
@@ -555,7 +555,7 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
 
   MockPoolRequest active_request2;
   EXPECT_CALL(*client2, makeRequest(Ref(value), Ref(callbacks))).WillOnce(Return(&active_request2));
-  PoolRequest* request2 = conn_pool_->makeRequest("bar", value, callbacks);
+  Common::Redis::PoolRequest* request2 = conn_pool_->makeRequest("bar", value, callbacks);
   EXPECT_EQ(&active_request2, request2);
 
   EXPECT_CALL(*client2, close());
@@ -581,7 +581,7 @@ TEST_F(RedisConnPoolImplTest, NoHost) {
   Common::Redis::RespValue value;
   MockPoolCallbacks callbacks;
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
-  PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
+  Common::Redis::PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
   EXPECT_EQ(nullptr, request);
 
   tls_.shutdownThread();

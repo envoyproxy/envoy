@@ -71,6 +71,7 @@ envoy_cc_mock(
     deps = [
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
     ],

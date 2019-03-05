@@ -27,7 +27,7 @@ namespace {
 
 class RedisHealthCheckerTest
     : public testing::Test,
-      public Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory {
+      public Extensions::NetworkFilters::Common::Redis::ClientFactory {
 public:
   RedisHealthCheckerTest()
       : cluster_(new NiceMock<Upstream::MockClusterMockPrioritySet>()),
@@ -120,13 +120,13 @@ public:
                                random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
-  Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr
+  Extensions::NetworkFilters::Common::Redis::ClientPtr
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
-         const Extensions::NetworkFilters::RedisProxy::ConnPool::Config&) override {
-    return Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr{create_()};
+         const Extensions::NetworkFilters::Common::Redis::Config&) override {
+    return Extensions::NetworkFilters::Common::Redis::ClientPtr{create_()};
   }
 
-  MOCK_METHOD0(create_, Extensions::NetworkFilters::RedisProxy::ConnPool::Client*());
+  MOCK_METHOD0(create_, Extensions::NetworkFilters::Common::Redis::Client*());
 
   void expectSessionCreate() {
     interval_timer_ = new Event::MockTimer(&dispatcher_);
@@ -160,7 +160,7 @@ public:
   Event::MockTimer* interval_timer_{};
   Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient* client_{};
   Extensions::NetworkFilters::RedisProxy::ConnPool::MockPoolRequest pool_request_;
-  Extensions::NetworkFilters::RedisProxy::ConnPool::PoolCallbacks* pool_callbacks_{};
+  Extensions::NetworkFilters::Common::Redis::PoolCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisHealthChecker> health_checker_;
 };
 
