@@ -141,6 +141,11 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
+Stats::BoolIndicatorSharedPtr TestUtility::findBoolIndicator(Stats::Store& store,
+                                                             const std::string& name) {
+  return findByName(store.boolIndicators(), name);
+}
+
 std::list<Network::Address::InstanceConstSharedPtr>
 TestUtility::makeDnsResponse(const std::list<std::string>& addresses) {
   std::list<Network::Address::InstanceConstSharedPtr> ret;

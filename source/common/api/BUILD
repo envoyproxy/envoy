@@ -22,8 +22,16 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "os_sys_calls_lib",
-    srcs = ["os_sys_calls_impl.cc"],
-    hdrs = ["os_sys_calls_impl.h"],
+    srcs = ["os_sys_calls_impl.cc"] + select({
+        "@bazel_tools//src/conditions:linux_x86_64": ["os_sys_calls_impl_linux.cc"],
+        "@bazel_tools//src/conditions:linux_aarch64": ["os_sys_calls_impl_linux.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = ["os_sys_calls_impl.h"] + select({
+        "@bazel_tools//src/conditions:linux_x86_64": ["os_sys_calls_impl_linux.h"],
+        "@bazel_tools//src/conditions:linux_aarch64": ["os_sys_calls_impl_linux.h"],
+        "//conditions:default": [],
+    }),
     deps = [
         "//include/envoy/api:os_sys_calls_interface",
         "//source/common/singleton:threadsafe_singleton",

@@ -85,6 +85,11 @@ public:
     return wrapped_scope_->gauge(name);
   }
 
+  BoolIndicator& boolIndicator(const std::string& name) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->boolIndicator(name);
+  }
+
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogram(name);
@@ -119,6 +124,10 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauge(name);
   }
+  BoolIndicator& boolIndicator(const std::string& name) override {
+    Thread::LockGuard lock(lock_);
+    return store_.boolIndicator(name);
+  }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
@@ -134,7 +143,10 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauges();
   }
-
+  std::vector<BoolIndicatorSharedPtr> boolIndicators() const override {
+    Thread::LockGuard lock(lock_);
+    return store_.boolIndicators();
+  }
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     Thread::LockGuard lock(lock_);
     return store_.histograms();
@@ -194,6 +206,12 @@ public:
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization);
 
+  void waitForBoolIndicatorEq(const std::string& name, uint64_t value) {
+    while (boolIndicator(name) == nullptr || boolIndicator(name)->value() != value) {
+      time_system_.sleep(std::chrono::milliseconds(10));
+    }
+  }
+
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
       time_system_.sleep(std::chrono::milliseconds(10));
@@ -210,6 +228,12 @@ public:
     while (gauge(name) == nullptr || gauge(name)->value() != value) {
       time_system_.sleep(std::chrono::milliseconds(10));
     }
+  }
+
+  Stats::BoolIndicatorSharedPtr boolIndicator(const std::string& name) {
+    // When using the thread local store, only boolIndicators() is thread safe. This also allows us
+    // to test if an indicator exists at all versus just defaulting to false.
+    return TestUtility::findBoolIndicator(stat_store(), name);
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {

@@ -295,7 +295,7 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
 TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
   cluster_->resetResourceManager(1, 1, 1024, 1);
 
-  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
+  EXPECT_FALSE(cluster_->circuit_breakers_stats_.rq_pending_open_.value());
 
   NiceMock<Http::MockStreamDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
@@ -309,7 +309,7 @@ TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
   Http::ConnectionPool::Cancellable* handle2 = conn_pool_.newStream(outer_decoder2, callbacks2);
   EXPECT_EQ(nullptr, handle2);
 
-  EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
+  EXPECT_TRUE(cluster_->circuit_breakers_stats_.rq_pending_open_.value());
 
   handle->cancel();
 
@@ -436,7 +436,7 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
 TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   InSequence s;
 
-  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.cx_open_.value());
+  EXPECT_FALSE(cluster_->circuit_breakers_stats_.cx_open_.value());
 
   // Request 1 should kick off a new connection.
   NiceMock<Http::MockStreamDecoder> outer_decoder1;
@@ -451,7 +451,7 @@ TEST_F(Http1ConnPoolImplTest, MaxConnections) {
   ConnPoolCallbacks callbacks2;
   handle = conn_pool_.newStream(outer_decoder2, callbacks2);
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_overflow_.value());
-  EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.cx_open_.value());
+  EXPECT_TRUE(cluster_->circuit_breakers_stats_.cx_open_.value());
 
   EXPECT_NE(nullptr, handle);
 

@@ -9,8 +9,8 @@
 #include "common/common/fmt.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "extensions/filters/network/common/redis/supported_commands.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
-#include "extensions/filters/network/redis_proxy/supported_commands.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -27,11 +27,11 @@ public:
   NoOpSplitCallbacks() {}
   ~NoOpSplitCallbacks() {}
 
-  void onResponse(RespValuePtr&&) override {}
+  void onResponse(Common::Redis::RespValuePtr&&) override {}
 };
 
 class NullInstanceImpl : public ConnPool::Instance {
-  ConnPool::PoolRequest* makeRequest(const std::string&, const RespValue&,
+  ConnPool::PoolRequest* makeRequest(const std::string&, const Common::Redis::RespValue&,
                                      ConnPool::PoolCallbacks&) override {
     return nullptr;
   }
@@ -39,25 +39,26 @@ class NullInstanceImpl : public ConnPool::Instance {
 
 class CommandLookUpSpeedTest {
 public:
-  void makeBulkStringArray(RespValue& value, const std::vector<std::string>& strings) {
-    std::vector<RespValue> values(strings.size());
+  void makeBulkStringArray(Common::Redis::RespValue& value,
+                           const std::vector<std::string>& strings) {
+    std::vector<Common::Redis::RespValue> values(strings.size());
     for (uint64_t i = 0; i < strings.size(); i++) {
-      values[i].type(RespType::BulkString);
+      values[i].type(Common::Redis::RespType::BulkString);
       values[i].asString() = strings[i];
     }
 
-    value.type(RespType::Array);
+    value.type(Common::Redis::RespType::Array);
     value.asArray().swap(values);
   }
 
   void makeRequests() {
-    RespValue request;
-    for (const std::string& command : SupportedCommands::simpleCommands()) {
+    Common::Redis::RespValue request;
+    for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
       makeBulkStringArray(request, {command, "hello"});
       splitter_.makeRequest(request, callbacks_);
     }
 
-    for (const std::string& command : SupportedCommands::evalCommands()) {
+    for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
       makeBulkStringArray(request, {command, "hello"});
       splitter_.makeRequest(request, callbacks_);
     }
