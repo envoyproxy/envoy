@@ -31,7 +31,6 @@ public:
 
   Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request,
                                      Common::Redis::Client::PoolCallbacks& callbacks) override;
-
 private:
   struct Prefix {
     const std::string prefix;
