@@ -230,7 +230,9 @@ The following command operators are supported:
 
 %UPSTREAM_TRANSPORT_FAILURE_REASON%
   HTTP
-    The reason of upstream transport failure, this is usually upstream TLS connection failure with 503 response code.
+    If upstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    reason from the transport socket. The format of this field depends on the configured upstream
+    transport socket.
 
   TCP
     Not implemented ("-")
