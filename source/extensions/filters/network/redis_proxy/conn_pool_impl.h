@@ -19,6 +19,7 @@
 #include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
+
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 
