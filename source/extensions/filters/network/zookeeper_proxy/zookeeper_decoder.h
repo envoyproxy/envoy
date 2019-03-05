@@ -109,6 +109,7 @@ private:
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void skipStrings(Buffer::Instance& data, uint64_t& offset) const;
+  void checkLength(const int32_t len, const int32_t minlen) const;
 
   DecoderCallbacks& callbacks_;
 };

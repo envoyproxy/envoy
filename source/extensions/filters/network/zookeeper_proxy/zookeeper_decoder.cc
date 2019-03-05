@@ -95,13 +95,14 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   }
 }
 
-#define CHECK_LENGTH(LEN, MINL)                                                                    \
-  if (LEN < MINL) {                                                                                \
-    throw EnvoyException("Package is too small");                                                  \
+void DecoderImpl::checkLength(const int32_t len, const int32_t minlen) const {
+  if (len < minlen) {
+    throw EnvoyException("Package is too small");
   }
+}
 
 void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 28);
+  checkLength(len, 28);
 
   // Read password - skip zxid, timeout, and session id.
   std::string passwd;
@@ -118,7 +119,7 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
 }
 
 void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 20);
+  checkLength(len, 20);
 
   // Skip opcode + type.
   offset += 8;
@@ -131,7 +132,7 @@ void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uin
 }
 
 void DecoderImpl::parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 13);
+  checkLength(len, 13);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -157,7 +158,7 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) const {
 
 void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                      const bool two) {
-  CHECK_LENGTH(len, 20);
+  checkLength(len, 20);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -175,7 +176,7 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 20);
+  checkLength(len, 20);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -191,7 +192,7 @@ void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint
 
 void DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                           const bool two) {
-  CHECK_LENGTH(len, 14);
+  checkLength(len, 14);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -202,7 +203,7 @@ void DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offs
 }
 
 void DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 16);
+  checkLength(len, 16);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -213,7 +214,7 @@ void DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseExistsRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 13);
+  checkLength(len, 13);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -224,7 +225,7 @@ void DecoderImpl::parseExistsRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseGetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 8);
+  checkLength(len, 8);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -233,7 +234,7 @@ void DecoderImpl::parseGetAclRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 8);
+  checkLength(len, 8);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -245,7 +246,7 @@ void DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 8);
+  checkLength(len, 8);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -254,7 +255,7 @@ void DecoderImpl::parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uin
 }
 
 void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 8);
+  checkLength(len, 8);
 
   std::string path;
   BufferHelper::peekString(data, offset, path);
@@ -266,7 +267,7 @@ void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, ui
 
 void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   // Treat empty transactions as a decoding error, there should be at least 1 header.
-  CHECK_LENGTH(len, 17);
+  checkLength(len, 17);
 
   while (true) {
     int32_t type;
@@ -300,7 +301,7 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
 }
 
 void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 28);
+  checkLength(len, 28);
 
   // Skip joining.
   int32_t datalen;
@@ -320,7 +321,7 @@ void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset,
 }
 
 void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  CHECK_LENGTH(len, 12);
+  checkLength(len, 12);
 
   // Data watches.
   skipStrings(data, offset);
