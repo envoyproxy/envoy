@@ -228,6 +228,13 @@ The following command operators are supported:
   Local address of the upstream connection. If the address is an IP address it includes both
   address and port.
 
+%UPSTREAM_TRANSPORT_FAILURE_REASON%
+  HTTP
+    The reason of upstream transport failure, this is usually upstream TLS connection failure with 503 response code.
+
+  TCP
+    Not implemented ("-")
+
 %DOWNSTREAM_REMOTE_ADDRESS%
   Remote address of the downstream connection. If the address is an IP address it includes both
   address and port.
