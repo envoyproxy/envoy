@@ -27,8 +27,7 @@ Network::FilterStatus ZooKeeperFilter::onData(Buffer::Instance& data, bool) {
   return Network::FilterStatus::Continue;
 }
 
-Network::FilterStatus ZooKeeperFilter::onWrite(Buffer::Instance& data, bool) {
-  doDecode(data);
+Network::FilterStatus ZooKeeperFilter::onWrite(Buffer::Instance&, bool) {
   return Network::FilterStatus::Continue;
 }
 
