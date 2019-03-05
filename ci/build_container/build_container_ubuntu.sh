@@ -6,7 +6,7 @@ set -e
 apt-get update
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y wget software-properties-common make cmake git python python-pip python3 python3-pip \
-  unzip bc libtool ninja-build automake zip time golang gdb strace wireshark tshark tcpdump
+  unzip bc libtool ninja-build automake zip time golang gdb strace wireshark tshark tcpdump lcov
 # clang 7.
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main"
