@@ -20,9 +20,14 @@ MockDirectResponseEntry::~MockDirectResponseEntry() {}
 
 MockRetryState::MockRetryState() {}
 
-void MockRetryState::expectRetry() {
-  EXPECT_CALL(*this, shouldRetry(_, _, _))
-      .WillOnce(DoAll(SaveArg<2>(&callback_), Return(RetryStatus::Yes)));
+void MockRetryState::expectHeadersRetry() {
+  EXPECT_CALL(*this, shouldRetryHeaders(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
+}
+
+void MockRetryState::expectResetRetry() {
+  EXPECT_CALL(*this, shouldRetryReset(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
 }
 
 MockRetryState::~MockRetryState() {}

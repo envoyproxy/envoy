@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace InjectedResourceMonitor {
+namespace {
 
 class TestableInjectedResourceMonitor : public InjectedResourceMonitor {
 public:
@@ -100,6 +101,7 @@ TEST_F(InjectedResourceMonitorTest, ReportsErrorOnFileRead) {
   monitor_->updateResourceUsage(cb_);
 }
 
+} // namespace
 } // namespace InjectedResourceMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

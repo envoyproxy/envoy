@@ -41,6 +41,7 @@ using testing::StrictMock;
 
 namespace Envoy {
 namespace Network {
+namespace {
 
 TEST(RawBufferSocket, TestBasics) {
   TransportSocketPtr raw_buffer_socket(Network::Test::createRawBufferSocket());
@@ -1714,5 +1715,6 @@ TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
   connection->close(ConnectionCloseType::NoFlush);
 }
 
+} // namespace
 } // namespace Network
 } // namespace Envoy

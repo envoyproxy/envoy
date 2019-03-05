@@ -8,6 +8,7 @@
 #include "envoy/server/options.h"
 #include "envoy/stats/stats_options.h"
 
+#include "common/common/logger.h"
 #include "common/stats/stats_options_impl.h"
 
 #include "spdlog/spdlog.h"
@@ -16,7 +17,7 @@ namespace Envoy {
 /**
  * Implementation of Server::Options.
  */
-class OptionsImpl : public Server::Options {
+class OptionsImpl : public Server::Options, protected Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Parameters are max_num_stats, max_stat_name_len, hot_restart_enabled
@@ -73,6 +74,7 @@ public:
   void setSignalHandling(bool signal_handling_enabled) {
     signal_handling_enabled_ = signal_handling_enabled;
   }
+  void setCpusetThreads(bool cpuset_threads_enabled) { cpuset_threads_ = cpuset_threads_enabled; }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
@@ -107,6 +109,7 @@ public:
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   virtual Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
+  bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
   uint32_t count() const;
 
 private:
@@ -137,6 +140,7 @@ private:
   bool hot_restart_disabled_;
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
+  bool cpuset_threads_;
   uint32_t count_;
 };
 

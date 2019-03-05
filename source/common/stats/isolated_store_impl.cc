@@ -23,6 +23,11 @@ IsolatedStoreImpl::IsolatedStoreImpl()
         std::vector<Tag> tags;
         return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
       }),
+      bool_indicators_([this](const std::string& name) -> BoolIndicatorSharedPtr {
+        std::string tag_extracted_name = name;
+        std::vector<Tag> tags;
+        return alloc_.makeBoolIndicator(name, std::move(tag_extracted_name), std::move(tags));
+      }),
       histograms_([this](const std::string& name) -> HistogramSharedPtr {
         return std::make_shared<HistogramImpl>(name, *this, std::string(name), std::vector<Tag>());
       }) {}
@@ -38,6 +43,9 @@ struct IsolatedScopeImpl : public Scope {
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
   Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
+  BoolIndicator& boolIndicator(const std::string& name) override {
+    return parent_.boolIndicator(prefix_ + name);
+  }
   Histogram& histogram(const std::string& name) override {
     return parent_.histogram(prefix_ + name);
   }

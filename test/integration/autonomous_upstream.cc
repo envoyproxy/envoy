@@ -1,7 +1,6 @@
 #include "test/integration/autonomous_upstream.h"
 
 namespace Envoy {
-
 namespace {
 
 void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeaderMapImpl& headers) {
@@ -63,7 +62,8 @@ void AutonomousStream::sendResponse() {
 AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shared_connection,
                                                    Stats::Store& store, Type type,
                                                    AutonomousUpstream& upstream)
-    : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem()),
+    : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem(),
+                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
       upstream_(upstream) {}
 
 Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder,

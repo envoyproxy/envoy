@@ -11,6 +11,8 @@
 #include "common/common/version.h"
 #include "common/protobuf/utility.h"
 
+#include "server/options_impl_platform.h"
+
 #include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
@@ -117,6 +119,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                        "Disable hot restart functionality", cmd, false);
   TCLAP::SwitchArg enable_mutex_tracing(
       "", "enable-mutex-tracing", "Enable mutex contention tracing functionality", cmd, false);
+  TCLAP::SwitchArg cpuset_threads(
+      "", "cpuset-threads", "Get the default # of worker threads from cpuset size", cmd, false);
 
   cmd.setExceptionHandling(false);
   try {
@@ -154,6 +158,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
 
+  cpuset_threads_ = cpuset_threads.getValue();
+
   log_level_ = default_log_level;
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_string_views); i++) {
     if (log_level.getValue() == spdlog::level::level_string_views[i]) {
@@ -188,7 +194,20 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   // For base ID, scale what the user inputs by 10 so that we have spread for domain sockets.
   base_id_ = base_id.getValue() * 10;
-  concurrency_ = std::max(1U, concurrency.getValue());
+
+  if (!concurrency.isSet() && cpuset_threads_) {
+    // The 'concurrency' command line option wasn't set but the 'cpuset-threads'
+    // option was set. Use the number of CPUs assigned to the process cpuset, if
+    // that can be known.
+    concurrency_ = OptionsImplPlatform::getCpuCount();
+  } else {
+    if (concurrency.isSet() && cpuset_threads_ && cpuset_threads.isSet()) {
+      ENVOY_LOG(warn, "Both --concurrency and --cpuset-threads options are set; not applying "
+                      "--cpuset-threads.");
+    }
+    concurrency_ = std::max(1U, concurrency.getValue());
+  }
+
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
   allow_unknown_fields_ = allow_unknown_fields.getValue();
@@ -291,6 +310,7 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_max_obj_name_len(statsOptions().maxObjNameLength());
   command_line_options->set_disable_hot_restart(hotRestartDisabled());
   command_line_options->set_enable_mutex_tracing(mutexTracingEnabled());
+  command_line_options->set_cpuset_threads(cpusetThreadsEnabled());
   command_line_options->set_restart_epoch(restartEpoch());
   return command_line_options;
 }
@@ -303,6 +323,6 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       service_cluster_(service_cluster), service_node_(service_node), service_zone_(service_zone),
       file_flush_interval_msec_(10000), drain_time_(600), parent_shutdown_time_(900),
       mode_(Server::Mode::Serve), max_stats_(ENVOY_DEFAULT_MAX_STATS), hot_restart_disabled_(false),
-      signal_handling_enabled_(true), mutex_tracing_enabled_(false) {}
+      signal_handling_enabled_(true), mutex_tracing_enabled_(false), cpuset_threads_(false) {}
 
 } // namespace Envoy

@@ -17,6 +17,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Lua {
+namespace {
 
 class TestObject : public BaseLuaObject<TestObject> {
 public:
@@ -154,6 +155,7 @@ TEST_F(LuaTest, MarkDead) {
   lua_gc(cr1->luaState(), LUA_GCCOLLECT, 0);
 }
 
+} // namespace
 } // namespace Lua
 } // namespace Common
 } // namespace Filters

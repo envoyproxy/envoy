@@ -41,7 +41,7 @@ std::string StatsName(const std::string& a, const std::string& b) {
 
 OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config,
                                Stats::Scope& stats_scope)
-    : active_gauge_(stats_scope.gauge(StatsName(config.name(), "active"))) {
+    : active_indicator_(stats_scope.boolIndicator(StatsName(config.name(), "active"))) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
 
@@ -59,7 +59,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadA
     }
   }
 
-  active_gauge_.set(0);
+  active_indicator_.set(false);
 }
 
 bool OverloadAction::updateResourcePressure(const std::string& name, double pressure) {
@@ -69,11 +69,11 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
   ASSERT(it != triggers_.end());
   if (it->second->updateValue(pressure)) {
     if (it->second->isFired()) {
-      active_gauge_.set(1);
+      active_indicator_.set(true);
       const auto result = fired_triggers_.insert(name);
       ASSERT(result.second);
     } else {
-      active_gauge_.set(0);
+      active_indicator_.set(false);
       const auto result = fired_triggers_.erase(name);
       ASSERT(result == 1);
     }

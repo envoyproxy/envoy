@@ -482,7 +482,8 @@ public:
         fallback_policy_(subset_config.fallback_policy()),
         default_subset_(subset_config.default_subset()),
         locality_weight_aware_(subset_config.locality_weight_aware()),
-        scale_locality_weight_(subset_config.scale_locality_weight()) {
+        scale_locality_weight_(subset_config.scale_locality_weight()),
+        panic_mode_any_(subset_config.panic_mode_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
         subset_keys_.emplace_back(
@@ -500,6 +501,7 @@ public:
   const std::vector<std::set<std::string>>& subsetKeys() const override { return subset_keys_; }
   bool localityWeightAware() const override { return locality_weight_aware_; }
   bool scaleLocalityWeight() const override { return scale_locality_weight_; }
+  bool panicModeAny() const override { return panic_mode_any_; }
 
 private:
   const bool enabled_;
@@ -508,6 +510,7 @@ private:
   std::vector<std::set<std::string>> subset_keys_;
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
+  const bool panic_mode_any_;
 };
 
 } // namespace Upstream

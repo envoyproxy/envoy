@@ -319,7 +319,7 @@ void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>&
       values_.emplace(kv.first, SnapshotImpl::createEntry(kv.second));
     }
   }
-  stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
+  stats_.admin_overrides_active_.set(!values_.empty());
 }
 
 DiskLayer::DiskLayer(const std::string& name, const std::string& path, Api::Api& api)
@@ -331,7 +331,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
                               Api::Api& api) {
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throw EnvoyException(fmt::format("Walk recursion depth exceded {}", MaxWalkDepth));
+    throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {
@@ -429,8 +429,9 @@ DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";
-  RuntimeStats stats{
-      ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
+  RuntimeStats stats{ALL_RUNTIME_STATS(POOL_BOOL_INDICATOR_PREFIX(store, prefix),
+                                       POOL_COUNTER_PREFIX(store, prefix),
+                                       POOL_GAUGE_PREFIX(store, prefix))};
   return stats;
 }
 
