@@ -99,7 +99,7 @@ REPOSITORY_LOCATIONS = dict(
     com_github_nghttp2_nghttp2 = dict(
         sha256 = "6b222a264aca23d497f7878a7751bd9da12676717493fe747db49afb51daae79",
         strip_prefix = "nghttp2-1.36.0",
-        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.35.1/nghttp2-1.35.1.tar.gz"],
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.36.0/nghttp2-1.36.0.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
