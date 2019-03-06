@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
+namespace {
 
 TEST(DynamoUtility, PartitionIdStatString) {
   Stats::StatsOptionsImpl stats_options;
@@ -64,6 +65,7 @@ TEST(DynamoUtility, PartitionIdStatString) {
   }
 }
 
+} // namespace
 } // namespace Dynamo
 } // namespace HttpFilters
 } // namespace Extensions

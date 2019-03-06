@@ -23,6 +23,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
 namespace RedisHealthChecker {
+namespace {
 
 class RedisHealthCheckerTest
     : public testing::Test,
@@ -181,9 +182,9 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
-      new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::SimpleString);
+  NetworkFilters::Common::Redis::RespValuePtr response(
+      new NetworkFilters::Common::Redis::RespValue());
+  response->type(NetworkFilters::Common::Redis::RespType::SimpleString);
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
 
@@ -194,7 +195,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
+  response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
@@ -249,9 +250,9 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
-      new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::SimpleString);
+  NetworkFilters::Common::Redis::RespValuePtr response(
+      new NetworkFilters::Common::Redis::RespValue());
+  response->type(NetworkFilters::Common::Redis::RespType::SimpleString);
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
 
@@ -263,7 +264,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
+  response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
@@ -273,7 +274,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
+  response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectPingRequestCreate();
@@ -320,9 +321,9 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
   EXPECT_CALL(*event_logger_, logAddHealthy(_, _, false));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
-      new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::SimpleString);
+  NetworkFilters::Common::Redis::RespValuePtr response(
+      new NetworkFilters::Common::Redis::RespValue());
+  response->type(NetworkFilters::Common::Redis::RespType::SimpleString);
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
 
@@ -357,9 +358,9 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   // Success
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
-      new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::Integer);
+  NetworkFilters::Common::Redis::RespValuePtr response(
+      new NetworkFilters::Common::Redis::RespValue());
+  response->type(NetworkFilters::Common::Redis::RespType::Integer);
   response->asInteger() = 0;
   pool_callbacks_->onResponse(std::move(response));
 
@@ -370,8 +371,8 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::Integer);
+  response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
+  response->type(NetworkFilters::Common::Redis::RespType::Integer);
   response->asInteger() = 1;
   pool_callbacks_->onResponse(std::move(response));
 
@@ -381,7 +382,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   // Failure, no value
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
+  response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   EXPECT_CALL(*client_, close());
@@ -408,9 +409,9 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());
-  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
-      new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::SimpleString);
+  NetworkFilters::Common::Redis::RespValuePtr response(
+      new NetworkFilters::Common::Redis::RespValue());
+  response->type(NetworkFilters::Common::Redis::RespType::SimpleString);
   response->asString() = "PONG";
   pool_callbacks_->onResponse(std::move(response));
 
@@ -423,7 +424,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());
-  response = std::make_unique<Extensions::NetworkFilters::RedisProxy::RespValue>();
+  response = std::make_unique<NetworkFilters::Common::Redis::RespValue>();
   pool_callbacks_->onResponse(std::move(response));
 
   expectClientCreate();
@@ -462,6 +463,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.network_failure").value());
 }
 
+} // namespace
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers
 } // namespace Extensions

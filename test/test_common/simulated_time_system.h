@@ -118,5 +118,16 @@ public:
   }
 };
 
+// Class encapsulating a SimulatedTimeSystem, intended for integration tests.
+// Inherit from this mixin in a test fixture class to use a SimulatedTimeSystem
+// during the test.
+class TestUsingSimulatedTime {
+public:
+  SimulatedTimeSystem& simTime() { return sim_time_; }
+
+private:
+  SimulatedTimeSystem sim_time_;
+};
+
 } // namespace Event
 } // namespace Envoy

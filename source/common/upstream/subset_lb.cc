@@ -35,6 +35,14 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       scale_locality_weight_(subsets.scaleLocalityWeight()) {
   ASSERT(subsets.isEnabled());
 
+  if (subsets.panicModeAny()) {
+    HostPredicate predicate = [](const Host&) -> bool { return true; };
+
+    panic_mode_subset_ = std::make_unique<LbSubsetEntry>();
+    panic_mode_subset_->priority_subset_ = std::make_unique<PrioritySubsetImpl>(
+        *this, predicate, locality_weight_aware_, scale_locality_weight_);
+  }
+
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
   refreshSubsets();
 
@@ -96,8 +104,21 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
     return nullptr;
   }
 
-  stats_.lb_subsets_fallback_.inc();
-  return fallback_subset_->priority_subset_->lb_->chooseHost(context);
+  HostConstSharedPtr host = fallback_subset_->priority_subset_->lb_->chooseHost(context);
+  if (host != nullptr) {
+    stats_.lb_subsets_fallback_.inc();
+    return host;
+  }
+
+  if (panic_mode_subset_ != nullptr) {
+    HostConstSharedPtr host = panic_mode_subset_->priority_subset_->lb_->chooseHost(context);
+    if (host != nullptr) {
+      stats_.lb_subsets_fallback_panic_.inc();
+      return host;
+    }
+  }
+
+  return nullptr;
 }
 
 // Find a host from the subsets. Sets host_chosen to false and returns nullptr if the context has

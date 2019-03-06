@@ -58,7 +58,7 @@ public:
       setRetryTimer();
       return;
     }
-    control_plane_stats_.connected_state_.set(1);
+    control_plane_stats_.connected_state_.set(true);
     handleStreamEstablished();
   }
 
@@ -78,6 +78,10 @@ public:
   void onReceiveMessage(std::unique_ptr<ResponseProto>&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
+    // Some times during hot restarts this stat's value becomes inconsistent and will continue to
+    // have 0 till it is reconnected. Setting here ensures that it is consistent with the state of
+    // management server connection.
+    control_plane_stats_.connected_state_.set(1);
     handleResponse(std::move(message));
   }
 
@@ -88,7 +92,7 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
     ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
     stream_ = nullptr;
-    control_plane_stats_.connected_state_.set(0);
+    control_plane_stats_.connected_state_.set(false);
     handleEstablishmentFailure();
     setRetryTimer();
   }
@@ -131,7 +135,8 @@ private:
 
   ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
     const std::string control_plane_prefix = "control_plane.";
-    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
+    return {ALL_CONTROL_PLANE_STATS(POOL_BOOL_INDICATOR_PREFIX(scope, control_plane_prefix),
+                                    POOL_COUNTER_PREFIX(scope, control_plane_prefix),
                                     POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
   }
 

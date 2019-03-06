@@ -46,7 +46,7 @@ public:
 private:
   std::unordered_map<std::string, TriggerPtr> triggers_;
   std::unordered_set<std::string> fired_triggers_;
-  Stats::Gauge& active_gauge_;
+  Stats::BoolIndicator& active_indicator_;
 };
 
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {

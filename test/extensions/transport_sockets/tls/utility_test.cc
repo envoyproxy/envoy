@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+namespace {
 
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
@@ -98,6 +99,7 @@ TEST(UtilityTest, TestExpirationTime) {
   EXPECT_EQ(TEST_SAN_DNS_CERT_NOT_AFTER, formatted);
 }
 
+} // namespace
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

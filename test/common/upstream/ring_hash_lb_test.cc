@@ -23,6 +23,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -683,5 +684,6 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
   }
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -36,7 +36,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
-
 namespace {
 
 class TestNamedTransportConfigFactory : public NamedTransportConfigFactory {

@@ -73,10 +73,23 @@ REPOSITORY_LOCATIONS = dict(
         # 2018-03-06
         urls = ["https://github.com/google/libprotobuf-mutator/archive/c3d2faf04a1070b0b852b0efdef81e1a81ba925e.tar.gz"],
     ),
+    com_github_gperftools_gperftools = dict(
+        # TODO(cmluciano): Bump to release 2.8
+        # This sha is specifically chosen to fix ppc64le builds that require inclusion
+        # of asm/ptrace.h
+        sha256 = "18574813a062eee487bc1b761e8024a346075a7cb93da19607af362dc09565ef",
+        strip_prefix = "gperftools-fc00474ddc21fff618fc3f009b46590e241e425e",
+        urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
+    ),
     com_github_grpc_grpc = dict(
         sha256 = "a5342629fe1b689eceb3be4d4f167b04c70a84b9d61cf8b555e968bc500bdb5a",
         strip_prefix = "grpc-1.16.1",
         urls = ["https://github.com/grpc/grpc/archive/v1.16.1.tar.gz"],
+    ),
+    com_github_luajit_luajit = dict(
+        sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
+        strip_prefix = "LuaJIT-2.1.0-beta3",
+        urls = ["https://github.com/LuaJIT/LuaJIT/archive/v2.1.0-beta3.tar.gz"],
     ),
     com_github_nanopb_nanopb = dict(
         sha256 = "b8dd5cb0d184d424ddfea13ddee3f7b0920354334cbb44df434d55e5f0086b12",
@@ -116,9 +129,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "0ab250abac1def3d1e20e23e05ce827efa81db65c9004ccfff58d16404e3e369",
-        strip_prefix = "libevent-release-2.1.9-beta",
-        urls = ["https://github.com/libevent/libevent/archive/release-2.1.9-beta.tar.gz"],
+        sha256 = "53d4bb49b837944893b7caf9ae8eb43e94690ee5babea6469cc4a928722f99b1",
+        strip_prefix = "libevent-c4fbae3ae6166dddfa126734edd63213afa14dce",
+        urls = ["https://github.com/libevent/libevent/archive/c4fbae3ae6166dddfa126734edd63213afa14dce.tar.gz"],
     ),
     com_github_madler_zlib = dict(
         sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
@@ -184,15 +197,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/eb9225ce361affe561592e0912320b9db84985d0.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "46f1da3a6a6db66dd240cf95a5553198f7c6e98e6ac942fceb8a1cf03291d96e",
-        strip_prefix = "protobuf-7492b5681231c79f0265793fa57dc780ae2481d6",
-        # TODO(htuch): Switch back to released versions for protobuf when a release > 3.6.0 happens
-        # that includes:
-        # - https://github.com/protocolbuffers/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
-        # - https://github.com/protocolbuffers/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
-        # - https://github.com/protocolbuffers/protobuf/commit/fa252ec2a54acb24ddc87d48fed1ecfd458445fd
-        # - https://github.com/protocolbuffers/protobuf/commit/7492b5681231c79f0265793fa57dc780ae2481d6
-        urls = ["https://github.com/protocolbuffers/protobuf/archive/7492b5681231c79f0265793fa57dc780ae2481d6.tar.gz"],
+        sha256 = "3e933375ecc58d01e52705479b82f155aea2d02cc55d833f8773213e74f88363",
+        strip_prefix = "protobuf-3.7.0",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.7.0/protobuf-all-3.7.0.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         sha256 = "dedd76b0169eb8c72e479529301a1d9b914a4ccb4d2b5ddb4ebe92d63a7b2152",

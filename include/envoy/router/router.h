@@ -228,9 +228,8 @@ public:
   virtual bool enabled() PURE;
 
   /**
-   * Determine whether a request should be retried based on the response.
-   * @param response_headers supplies the response headers if available.
-   * @param reset_reason supplies the reset reason if available.
+   * Determine whether a request should be retried based on the response headers.
+   * @param response_headers supplies the response headers.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
@@ -238,9 +237,21 @@ public:
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
-  virtual RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
-                                  const absl::optional<Http::StreamResetReason>& reset_reason,
-                                  DoRetryCallback callback) PURE;
+  virtual RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
+                                         DoRetryCallback callback) PURE;
+
+  /**
+   * Determine whether a request should be retried after a reset based on the reason for the reset.
+   * @param reset_reason supplies the reset reason.
+   * @param callback supplies the callback that will be invoked when the retry should take place.
+   *                 This is used to add timed backoff, etc. The callback will never be called
+   *                 inline.
+   * @return RetryStatus if a retry should take place. @param callback will be called at some point
+   *         in the future. Otherwise a retry should not take place and the callback will never be
+   *         called. Calling code should proceed with error handling.
+   */
+  virtual RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
+                                       DoRetryCallback callback) PURE;
 
   /**
    * Called when a host was attempted but the request failed and is eligible for another retry.
