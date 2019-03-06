@@ -387,7 +387,7 @@ const std::string& SslSocket::pemEncodedPeerCertificateChain() const {
     return cached_pem_encoded_peer_cert_chain_;
   }
 
-  if (SSL_get_peer_cert_chain(ssl_.get()) == nullptr) {
+  if (!peerCertificateChainPresented()) {
     ASSERT(cached_pem_encoded_peer_cert_chain_.empty());
     return cached_pem_encoded_peer_cert_chain_;
   }
