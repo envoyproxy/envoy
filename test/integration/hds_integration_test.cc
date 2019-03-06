@@ -175,9 +175,10 @@ public:
   }
 
   // Checks if Envoy reported the health status of an endpoint correctly
-  bool checkEndpointHealthResponse(const envoy::service::discovery::v2::EndpointHealthResponse& response,
-                                   envoy::api::v2::core::HealthStatus expected_status,
-                                   const Network::Address::InstanceConstSharedPtr& address) {
+  bool
+  checkEndpointHealthResponse(const envoy::service::discovery::v2::EndpointHealthResponse& response,
+                              envoy::api::v2::core::HealthStatus expected_status,
+                              const Network::Address::InstanceConstSharedPtr& address) {
     for (const auto& endpoint_health : response.endpoints_health()) {
       if (address->ip()->addressAsString() !=
               absl::string_view(endpoint_health.endpoint().address().socket_address().address()) ||
