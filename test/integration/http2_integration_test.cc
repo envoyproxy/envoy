@@ -430,10 +430,6 @@ TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-TEST_P(Http2IntegrationTest, LargeHeadersInvokeResetStream) { testLargeRequestHeaders(62, 60); }
-
-TEST_P(Http2IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeRequestHeaders(62, 63); }
-
 TEST_P(Http2IntegrationTest, BadMagic) {
   initialize();
   Buffer::OwnedImpl buffer("hello");

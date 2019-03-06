@@ -6,6 +6,7 @@
 
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
+#include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -40,12 +41,12 @@ createConnPoolSettings() {
   return setting;
 }
 
-class RedisClientImplTest : public testing::Test, public DecoderFactory {
+class RedisClientImplTest : public testing::Test, public Common::Redis::DecoderFactory {
 public:
-  // RedisProxy::DecoderFactory
-  DecoderPtr create(DecoderCallbacks& callbacks) override {
+  // Commmon::Redis::DecoderFactory
+  Common::Redis::DecoderPtr create(Common::Redis::DecoderCallbacks& callbacks) override {
     callbacks_ = &callbacks;
-    return DecoderPtr{decoder_};
+    return Common::Redis::DecoderPtr{decoder_};
   }
 
   ~RedisClientImplTest() {
@@ -81,7 +82,8 @@ public:
     EXPECT_CALL(*upstream_connection_, connect());
     EXPECT_CALL(*upstream_connection_, noDelay(true));
 
-    client_ = ClientImpl::create(host_, dispatcher_, EncoderPtr{encoder_}, *this, *config_);
+    client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
+                                 *config_);
     EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
 
@@ -101,7 +103,7 @@ public:
   Event::MockTimer* connect_or_op_timer_{new Event::MockTimer(&dispatcher_)};
   MockEncoder* encoder_{new MockEncoder()};
   MockDecoder* decoder_{new MockDecoder()};
-  DecoderCallbacks* callbacks_{};
+  Common::Redis::DecoderCallbacks* callbacks_{};
   NiceMock<Network::MockClientConnection>* upstream_connection_{};
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::unique_ptr<Config> config_;
@@ -113,7 +115,7 @@ TEST_F(RedisClientImplTest, Basic) {
 
   setup();
 
-  RespValue request1;
+  Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
@@ -121,7 +123,7 @@ TEST_F(RedisClientImplTest, Basic) {
 
   onConnected();
 
-  RespValue request2;
+  Common::Redis::RespValue request2;
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
@@ -135,13 +137,13 @@ TEST_F(RedisClientImplTest, Basic) {
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     InSequence s;
-    RespValuePtr response1(new RespValue());
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response1));
 
-    RespValuePtr response2(new RespValue());
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
@@ -159,7 +161,7 @@ TEST_F(RedisClientImplTest, Cancel) {
 
   setup();
 
-  RespValue request1;
+  Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
@@ -167,7 +169,7 @@ TEST_F(RedisClientImplTest, Cancel) {
 
   onConnected();
 
-  RespValue request2;
+  Common::Redis::RespValue request2;
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
@@ -179,13 +181,13 @@ TEST_F(RedisClientImplTest, Cancel) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     InSequence s;
 
-    RespValuePtr response1(new RespValue());
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(_)).Times(0);
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response1));
 
-    RespValuePtr response2(new RespValue());
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
@@ -208,7 +210,7 @@ TEST_F(RedisClientImplTest, FailAll) {
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks;
   client_->addConnectionCallbacks(connection_callbacks);
 
-  RespValue request1;
+  Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
@@ -234,7 +236,7 @@ TEST_F(RedisClientImplTest, FailAllWithCancel) {
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks;
   client_->addConnectionCallbacks(connection_callbacks);
 
-  RespValue request1;
+  Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
@@ -258,7 +260,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
 
   setup();
 
-  RespValue request1;
+  Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
@@ -268,7 +270,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
 
   Buffer::OwnedImpl fake_data;
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    throw ProtocolError("error");
+    throw Common::Redis::ProtocolError("error");
   }));
   EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::REQUEST_FAILED));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -285,7 +287,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
 
   setup();
 
-  RespValue request1;
+  Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
@@ -311,7 +313,7 @@ TEST_F(RedisClientImplTest, OutlierDisabled) {
 
   setup(std::make_unique<ConfigOutlierDisabled>());
 
-  RespValue request1;
+  Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
@@ -331,7 +333,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
 
   setup();
 
-  RespValue request1;
+  Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
@@ -352,7 +354,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
 
   setup();
 
-  RespValue request1;
+  Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
@@ -401,7 +403,7 @@ public:
       client_ = new NiceMock<MockClient>();
       EXPECT_CALL(*this, create_(_)).WillOnce(Return(client_));
     }
-    RespValue value;
+    Common::Redis::RespValue value;
     MockPoolCallbacks callbacks;
     MockPoolRequest active_request;
     EXPECT_CALL(*client_, makeRequest(Ref(value), Ref(callbacks)))
@@ -430,7 +432,7 @@ TEST_F(RedisConnPoolImplTest, Basic) {
 
   setup();
 
-  RespValue value;
+  Common::Redis::RespValue value;
   MockPoolRequest active_request;
   MockPoolCallbacks callbacks;
   MockClient* client = new NiceMock<MockClient>();
@@ -456,7 +458,7 @@ TEST_F(RedisConnPoolImplTest, Hashtagging) {
 
   setup();
 
-  RespValue value;
+  Common::Redis::RespValue value;
   MockPoolCallbacks callbacks;
 
   auto expectHashKey = [](const std::string& s) {
@@ -489,7 +491,7 @@ TEST_F(RedisConnPoolImplTest, NoClusterAtConstruction) {
 
   setup(false);
 
-  RespValue value;
+  Common::Redis::RespValue value;
   MockPoolCallbacks callbacks;
   PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
   EXPECT_EQ(nullptr, request);
@@ -534,7 +536,7 @@ TEST_F(RedisConnPoolImplTest, HostRemove) {
   setup();
 
   MockPoolCallbacks callbacks;
-  RespValue value;
+  Common::Redis::RespValue value;
   std::shared_ptr<Upstream::Host> host1(new Upstream::MockHost());
   std::shared_ptr<Upstream::Host> host2(new Upstream::MockHost());
   MockClient* client1 = new NiceMock<MockClient>();
@@ -576,7 +578,7 @@ TEST_F(RedisConnPoolImplTest, NoHost) {
 
   setup();
 
-  RespValue value;
+  Common::Redis::RespValue value;
   MockPoolCallbacks callbacks;
   EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
   PoolRequest* request = conn_pool_->makeRequest("hash_key", value, callbacks);
@@ -590,7 +592,7 @@ TEST_F(RedisConnPoolImplTest, RemoteClose) {
 
   setup();
 
-  RespValue value;
+  Common::Redis::RespValue value;
   MockPoolRequest active_request;
   MockPoolCallbacks callbacks;
   MockClient* client = new NiceMock<MockClient>();
