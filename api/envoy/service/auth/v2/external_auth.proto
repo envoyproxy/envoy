@@ -40,11 +40,11 @@ message DeniedHttpResponse {
   envoy.type.HttpStatus status = 1 [(validate.rules).message.required = true];
 
   // This field allows the authorization service to send HTTP response headers
-  // to the the downstream client.
+  // to the downstream client.
   repeated envoy.api.v2.core.HeaderValueOption headers = 2;
 
   // This field allows the authorization service to send a response body data
-  // to the the downstream client.
+  // to the downstream client.
   string body = 3;
 }
 

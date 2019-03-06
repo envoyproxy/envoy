@@ -88,7 +88,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
         ENVOY_LOG(debug, "cds: add/update cluster '{}'", cluster_name);
       }
     } catch (const EnvoyException& e) {
-      exception_msgs.push_back(e.what());
+      exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what()));
     }
   }
 
@@ -102,7 +102,8 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   version_info_ = version_info;
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
-    throw EnvoyException(StringUtil::join(exception_msgs, "\n"));
+    throw EnvoyException(
+        fmt::format("Error adding/updating cluster(s) {}", StringUtil::join(exception_msgs, ", ")));
   }
 }
 

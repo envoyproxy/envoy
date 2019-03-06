@@ -278,7 +278,7 @@ private:
                             const HostDescriptionConstSharedPtr& host,
                             absl::optional<MonotonicTime> time);
 
-  Filesystem::FileSharedPtr file_;
+  AccessLog::AccessLogFileSharedPtr file_;
   TimeSource& time_source_;
 };
 

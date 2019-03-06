@@ -63,6 +63,23 @@ TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
 
+TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAll) { testDecodeHeadersReturnsStopAll(); }
+
+TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAllWatermark) {
+  // Sets initial stream window to min value to make the client sensitive to a low watermark.
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
+            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+      });
+  testDecodeHeadersReturnsStopAllWatermark();
+}
+
+TEST_P(Http2IntegrationTest, TwoFiltersDecodeHeadersReturnsStopAll) {
+  testTwoFiltersDecodeHeadersReturnsStopAll();
+}
+
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
 config: {}
@@ -429,27 +446,6 @@ TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {
 }
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
-
-TEST_P(Http2IntegrationTest, LargeHeadersInvokeResetStream) { testLargeRequestHeaders(62, 60); }
-
-TEST_P(Http2IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeRequestHeaders(62, 63); }
-
-TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAll) { testDecodeHeadersReturnsStopAll(); }
-
-TEST_P(Http2IntegrationTest, DecodeHeadersReturnsStopAllWatermark) {
-  // Sets initial stream window to min value to make the client sensitive to a low watermark.
-  config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
-        hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
-            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
-      });
-  testDecodeHeadersReturnsStopAllWatermark();
-}
-
-TEST_P(Http2IntegrationTest, TwoFiltersDecodeHeadersReturnsStopAll) {
-  testTwoFiltersDecodeHeadersReturnsStopAll();
-}
 
 TEST_P(Http2IntegrationTest, BadMagic) {
   initialize();

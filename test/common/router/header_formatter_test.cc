@@ -27,6 +27,8 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Router {
+namespace {
+
 static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::route::Route route;
   MessageUtil::loadFromYaml(yaml, route);
@@ -800,5 +802,6 @@ response_headers_to_remove: ["x-foo-header"]
   EXPECT_EQ("bar", header_map.get_("x-foo-header"));
 }
 
+} // namespace
 } // namespace Router
 } // namespace Envoy

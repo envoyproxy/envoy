@@ -27,7 +27,7 @@ A sample filter configuration could be:
 
   listener_filters:
     - name: "envoy.listener.tls_inspector"
-      config: {}
+      typed_config: {}
 
 Statistics
 ----------

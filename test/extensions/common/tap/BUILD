@@ -3,10 +3,21 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
 envoy_package()
+
+envoy_cc_test_library(
+    name = "common",
+    srcs = ["common.cc"],
+    hdrs = ["common.h"],
+    deps = [
+        "//source/extensions/common/tap:tap_interface",
+        "//test/test_common:utility_lib",
+    ],
+)
 
 envoy_cc_test(
     name = "admin_test",

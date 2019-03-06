@@ -15,6 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
+
 const char AllWithAny[] = R"(
 providers:
   provider_1:

@@ -8,7 +8,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 struct SupportedCommands {
   /**
@@ -60,7 +61,8 @@ struct SupportedCommands {
   static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
 };
 
-} // namespace RedisProxy
+} // namespace Redis
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

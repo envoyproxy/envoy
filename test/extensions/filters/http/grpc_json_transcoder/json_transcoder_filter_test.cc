@@ -41,6 +41,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
+namespace {
 
 class GrpcJsonTranscoderFilterTestBase {
 protected:
@@ -785,6 +786,7 @@ INSTANTIATE_TEST_SUITE_P(
     })",
             R"({"id":"101","gender":"MALE","last_name":"Shakespeare"})"}));
 
+} // namespace
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters
 } // namespace Extensions

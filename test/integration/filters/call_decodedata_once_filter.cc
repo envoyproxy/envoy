@@ -5,7 +5,8 @@
 #include "extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/common.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 

@@ -108,7 +108,7 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
-  EXPECT_EQ(1, stats_.gauge("control_plane.connected_state").value());
+  EXPECT_TRUE(stats_.boolIndicator("control_plane.connected_state").value());
   expectSendMessage("bar", {"z"}, "");
   auto bar_z_sub = grpc_mux_->subscribe("bar", {"z"}, callbacks_);
   expectSendMessage("bar", {"zz", "z"}, "");
@@ -146,7 +146,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_));
   grpc_mux_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
-  EXPECT_EQ(0, stats_.gauge("control_plane.connected_state").value());
+  EXPECT_FALSE(stats_.boolIndicator("control_plane.connected_state").value());
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
@@ -496,7 +496,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   EXPECT_EQ(0, stats_.counter("control_plane.pending_requests").value());
 }
 
-//  Verifies that a messsage with no resources is accepted.
+//  Verifies that a message with no resources is accepted.
 TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   setup();
 

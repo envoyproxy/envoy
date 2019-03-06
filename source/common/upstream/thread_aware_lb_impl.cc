@@ -5,6 +5,73 @@
 namespace Envoy {
 namespace Upstream {
 
+// TODO(mergeconflict): Adjust locality weights for partial availability, as is done in
+//                      HostSetImpl::effectiveLocalityWeight.
+namespace {
+
+void normalizeHostWeights(const HostVector& hosts, double normalized_locality_weight,
+                          NormalizedHostWeightVector& normalized_host_weights,
+                          double& min_normalized_weight, double& max_normalized_weight) {
+  uint32_t sum = 0;
+  for (const auto& host : hosts) {
+    sum += host->weight();
+  }
+
+  for (const auto& host : hosts) {
+    const double weight = host->weight() * normalized_locality_weight / sum;
+    normalized_host_weights.push_back({host, weight});
+    min_normalized_weight = std::min(min_normalized_weight, weight);
+    max_normalized_weight = std::max(max_normalized_weight, weight);
+  }
+}
+
+void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
+                              const LocalityWeights& locality_weights,
+                              NormalizedHostWeightVector& normalized_host_weights,
+                              double& min_normalized_weight, double& max_normalized_weight) {
+  ASSERT(locality_weights.size() == hosts_per_locality.get().size());
+
+  uint32_t sum = 0;
+  for (const auto weight : locality_weights) {
+    sum += weight;
+  }
+
+  // Locality weights (unlike host weights) may be 0. If _all_ locality weights were 0, bail out.
+  if (sum == 0) {
+    return;
+  }
+
+  // Compute normalized weights for all hosts in each locality. If a locality was assigned zero
+  // weight, all hosts in that locality will be skipped.
+  for (LocalityWeights::size_type i = 0; i < locality_weights.size(); ++i) {
+    if (locality_weights[i] != 0) {
+      const HostVector& hosts = hosts_per_locality.get()[i];
+      const double normalized_locality_weight = static_cast<double>(locality_weights[i]) / sum;
+      normalizeHostWeights(hosts, normalized_locality_weight, normalized_host_weights,
+                           min_normalized_weight, max_normalized_weight);
+    }
+  }
+}
+
+void normalizeWeights(const HostSet& host_set, bool in_panic,
+                      NormalizedHostWeightVector& normalized_host_weights,
+                      double& min_normalized_weight, double& max_normalized_weight) {
+  if (host_set.localityWeights() == nullptr || host_set.localityWeights()->empty()) {
+    // If we're not dealing with locality weights, just normalize weights for the flat set of hosts.
+    const auto& hosts = in_panic ? host_set.hosts() : host_set.healthyHosts();
+    normalizeHostWeights(hosts, 1.0, normalized_host_weights, min_normalized_weight,
+                         max_normalized_weight);
+  } else {
+    // Otherwise, normalize weights across all localities.
+    const auto& hosts_per_locality =
+        in_panic ? host_set.hostsPerLocality() : host_set.healthyHostsPerLocality();
+    normalizeLocalityWeights(hosts_per_locality, *(host_set.localityWeights()),
+                             normalized_host_weights, min_normalized_weight, max_normalized_weight);
+  }
+}
+
+} // namespace
+
 void ThreadAwareLoadBalancerBase::initialize() {
   // TODO(mattklein123): In the future, once initialized and the initial LB is built, it would be
   // better to use a background thread for computing LB updates. This has the substantial benefit
@@ -33,8 +100,15 @@ void ThreadAwareLoadBalancerBase::refresh() {
     // Copy panic flag from LoadBalancerBase. It is calculated when there is a change
     // in hosts set or hosts' health.
     per_priority_state->global_panic_ = per_priority_panic_[priority];
+
+    // Normalize host and locality weights such that the sum of all normalized weights is 1.
+    NormalizedHostWeightVector normalized_host_weights;
+    double min_normalized_weight = 1.0;
+    double max_normalized_weight = 0.0;
+    normalizeWeights(*host_set, per_priority_state->global_panic_, normalized_host_weights,
+                     min_normalized_weight, max_normalized_weight);
     per_priority_state->current_lb_ =
-        createLoadBalancer(*host_set, per_priority_state->global_panic_);
+        createLoadBalancer(normalized_host_weights, min_normalized_weight, max_normalized_weight);
   }
 
   {

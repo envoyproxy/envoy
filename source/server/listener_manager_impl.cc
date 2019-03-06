@@ -118,8 +118,8 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     }
     const std::string addr = fmt::format("unix://{}", address->asString());
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
-    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
-    if (io_handle->fd() != -1) {
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
+    if (io_handle->isOpen()) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
       return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
@@ -133,7 +133,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandle>(fd);
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
     if (socket_type == Network::Address::SocketType::Stream) {
       return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
     } else {
@@ -167,6 +167,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
       workers_started_(workers_started), hash_(hash),
+      dynamic_init_manager_(fmt::format("Listener {}", name)),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
@@ -417,6 +418,15 @@ void ListenerImpl::addFilterChainForSourceTypes(
     SourceTypesArray& source_types_array,
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
+  if (source_types_array[source_type] != nullptr) {
+    // We should never get here once all fields in FilterChainMatch are implemented. At this point,
+    // this can become an ASSERT. In principle, we could verify the various missing fields earlier,
+    // but best to have defense-in-depth here, since any mistake leads to potential
+    // heap-use-after-free when filter chains are unexpectedly destructed.
+    throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                     "effectively equivalent matching rules are defined",
+                                     address_->asString()));
+  }
   source_types_array[source_type] = filter_chain;
 }
 

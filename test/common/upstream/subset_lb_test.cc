@@ -174,9 +174,9 @@ public:
       configureHostSet(failover_host_metadata, *priority_set_.getMockHostSet(1));
     }
 
-    lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                     subset_info_, ring_hash_lb_config_, least_request_lb_config_,
-                                     common_config_));
+    lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_,
+                                     runtime_, random_, subset_info_, ring_hash_lb_config_,
+                                     least_request_lb_config_, common_config_));
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -220,9 +220,9 @@ public:
                                        local_hosts_per_locality_),
         {}, {}, {}, absl::nullopt);
 
-    lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, &local_priority_set_, stats_,
-                                     runtime_, random_, subset_info_, ring_hash_lb_config_,
-                                     least_request_lb_config_, common_config_));
+    lb_.reset(new SubsetLoadBalancer(
+        lb_type_, priority_set_, &local_priority_set_, stats_, stats_store_, runtime_, random_,
+        subset_info_, ring_hash_lb_config_, least_request_lb_config_, common_config_));
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
@@ -467,6 +467,26 @@ TEST_F(SubsetLoadBalancerTest, FallbackDefaultSubset) {
 
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(nullptr));
   EXPECT_EQ(1U, stats_.lb_subsets_fallback_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
+}
+
+TEST_F(SubsetLoadBalancerTest, FallbackPanicMode) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+  EXPECT_CALL(subset_info_, panicModeAny()).WillRepeatedly(Return(true));
+
+  // The default subset will be empty.
+  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"version", "none"}});
+  EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
+
+  init({
+      {"tcp://127.0.0.1:80", {{"version", "new"}}},
+      {"tcp://127.0.0.1:81", {{"version", "default"}}},
+  });
+
+  EXPECT_TRUE(lb_->chooseHost(nullptr) != nullptr);
+  EXPECT_EQ(1U, stats_.lb_subsets_fallback_panic_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
 }
 
@@ -1002,9 +1022,9 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
-                                   common_config_));
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
+                                   random_, subset_info_, ring_hash_lb_config_,
+                                   least_request_lb_config_, common_config_));
 
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 
@@ -1407,9 +1427,9 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
       },
       host_set_, {1, 100});
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
-                                   common_config_));
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
+                                   random_, subset_info_, ring_hash_lb_config_,
+                                   least_request_lb_config_, common_config_));
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -1436,9 +1456,9 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
       },
       host_set_, {1, 100});
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
-                                   common_config_));
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
+                                   random_, subset_info_, ring_hash_lb_config_,
+                                   least_request_lb_config_, common_config_));
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -1468,9 +1488,9 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
       },
       host_set_, {50, 50});
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
-                                   common_config_));
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
+                                   random_, subset_info_, ring_hash_lb_config_,
+                                   least_request_lb_config_, common_config_));
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   // Since we scale the locality weights by number of hosts removed, we expect to see the second
@@ -1510,9 +1530,9 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
       },
       host_set_, {2, 2});
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
-                                   common_config_));
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
+                                   random_, subset_info_, ring_hash_lb_config_,
+                                   least_request_lb_config_, common_config_));
   TestLoadBalancerContext context({{"version", "1.0"}});
 
   // We expect to see a 33/66 split because 2 * 1 / 2 = 1 and 2 * 3 / 4 = 1.5 -> 2
@@ -1540,9 +1560,9 @@ TEST_F(SubsetLoadBalancerTest, ScaleLocalityWeightsWithNoLocalityWeights) {
       },
       host_set_);
 
-  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
-                                   common_config_));
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
+                                   random_, subset_info_, ring_hash_lb_config_,
+                                   least_request_lb_config_, common_config_));
 }
 
 TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
