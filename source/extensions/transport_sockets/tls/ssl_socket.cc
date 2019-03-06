@@ -378,8 +378,8 @@ absl::optional<SystemTime> SslSocket::expirationPeerCertificate() const {
 }
 
 bool SslSocket::peerCertificateChainPresented() const {
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain(SSL_get_peer_cert_chain(ssl_.get()));
-  return cert_chain != nullptr && sk_X509_num(cert_chain.get()) > 0;
+  STACK_OF(X509)* cert_chain = SSL_get_peer_cert_chain(ssl_.get());
+  return cert_chain != nullptr && sk_X509_num(cert_chain) > 0;
 }
 
 const std::string& SslSocket::pemEncodedPeerCertificateChain() const {
@@ -392,15 +392,13 @@ const std::string& SslSocket::pemEncodedPeerCertificateChain() const {
     return cached_pem_encoded_peer_cert_chain_;
   }
 
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain(
-      X509_chain_up_ref(SSL_get_peer_cert_chain(ssl_.get())));
-  for (uint64_t i = 0; i < sk_X509_num(cert_chain.get()); i++) {
-    bssl::UniquePtr<X509> cert(sk_X509_value(cert_chain.get(), i));
-    X509_up_ref(cert.get());
+  STACK_OF(X509)* cert_chain = SSL_get_peer_cert_chain(ssl_.get());
+  for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
+    X509* cert = sk_X509_value(cert_chain, i);
 
     bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
     RELEASE_ASSERT(buf != nullptr, "");
-    RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1, "");
+    RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert) == 1, "");
     const uint8_t* output;
     size_t length;
     RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
