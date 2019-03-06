@@ -62,7 +62,8 @@ void AutonomousStream::sendResponse() {
 AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shared_connection,
                                                    Stats::Store& store, Type type,
                                                    AutonomousUpstream& upstream)
-    : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem()),
+    : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem(),
+                         Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
       upstream_(upstream) {}
 
 Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder,
