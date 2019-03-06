@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Config {
 
-// Oversees communication for gRPC xDS implementations (parent to both regular xDS and incremental
+// Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
 template <class RequestProto, class ResponseProto, class RequestQueueItem>
@@ -47,6 +47,14 @@ public:
   void queueDiscoveryRequest(const RequestQueueItem& queue_item) {
     request_queue_.push(queue_item);
     drainRequests();
+  }
+
+  void clearRequestQueue() {
+    control_plane_stats_.pending_requests_.sub(request_queue_.size());
+    // TODO(fredlas) when we have C++17: request_queue_ = {};
+    while (!request_queue_.empty()) {
+      request_queue_.pop();
+    }
   }
 
   void establishNewStream() {

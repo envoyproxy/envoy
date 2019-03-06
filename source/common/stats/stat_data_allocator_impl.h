@@ -138,7 +138,7 @@ public:
   }
   virtual void sub(uint64_t amount) override {
     ASSERT(data_.value_ >= amount);
-    ASSERT(used());
+    ASSERT(used() || amount == 0);
     data_.value_ -= amount;
   }
   virtual uint64_t value() const override { return data_.value_; }
