@@ -2,6 +2,8 @@
 
 #include "common/http/utility.h"
 
+#include "source/common/http/headers.h"
+
 #include "extensions/filters/http/well_known_names.h"
 
 using ::google::jwt_verify::Status;
@@ -25,6 +27,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
 
   state_ = Calling;
   stopped_ = false;
+
+  // Per the spec
+  // http://www.w3.org/TR/cors/#cross-origin-request-with-preflight-0, CORS
+  // pre-flight requests shouldn't include user credentials.
+  if (headers.Method() &&
+      Http::Headers::get().MethodValues.Options == headers.Method()->value().c_str()) {
+    ENVOY_LOG(debug, "CORS preflight request is passed through.");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   // Verify the JWT token, onComplete() will be called when completed.
   const auto* verifier = config_->findVerifier(headers);
   if (!verifier) {

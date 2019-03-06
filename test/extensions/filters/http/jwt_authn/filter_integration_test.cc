@@ -128,6 +128,28 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
+// This test verifies that a CORS preflight request without a JWT token is passed through.
+TEST_P(LocalJwksIntegrationTest, CorsPreflightRequestIsPassedThrough) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "OPTIONS"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
 // The test case with a fake upstream for remote Jwks server.
 class RemoteJwksIntegrationTest : public HttpProtocolIntegrationTest {
 public:
