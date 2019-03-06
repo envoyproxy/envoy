@@ -25,6 +25,7 @@ envoy_cc_library(
     hdrs = ["conn_pool.h"],
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
     ],
 )
