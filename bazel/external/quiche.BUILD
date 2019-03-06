@@ -29,6 +29,7 @@ load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_select_quiche",
 )
 
 src_files = glob([
@@ -86,10 +87,14 @@ cc_library(
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
         "quiche/spdy/platform/api/spdy_string_piece.h",
-        "quiche/spdy/platform/api/spdy_string_utils.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/spdy/platform/api/spdy_flags.h",
-    ],
+    ] + envoy_select_quiche(
+        [
+            "quiche/spdy/platform/api/spdy_string_utils.h",
+        ],
+        "@envoy",
+    ),
     visibility = ["//visibility:public"],
     deps = [
         "@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib",
@@ -218,9 +223,12 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "spdy_platform_test",
-    srcs = [
-        "quiche/spdy/platform/api/spdy_string_utils_test.cc",
-    ],
+    srcs = envoy_select_quiche(
+        [
+            "quiche/spdy/platform/api/spdy_string_utils_test.cc",
+        ],
+        "@envoy",
+    ),
     repository = "@envoy",
     deps = [
         ":spdy_platform",

@@ -135,9 +135,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "spdy_platform_impl_lib",
-    srcs = [
+    srcs = envoy_select_quiche([
         "spdy_string_utils_impl.cc",
-    ],
+    ]),
     hdrs = [
         "spdy_arraysize_impl.h",
         "spdy_containers_impl.h",
@@ -149,11 +149,12 @@ envoy_cc_library(
         "spdy_ptr_util_impl.h",
         "spdy_string_impl.h",
         "spdy_string_piece_impl.h",
-        "spdy_string_utils_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
         "spdy_unsafe_arena_impl.h",
-    ],
+    ] + envoy_select_quiche([
+        "spdy_string_utils_impl.h",
+    ]),
     external_deps = [
         "abseil_base",
         "abseil_hash",
@@ -162,7 +163,7 @@ envoy_cc_library(
         "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
-    deps = [
+    deps = envoy_select_quiche([
         "//source/common/common:assert_lib",
-    ],
+    ]),
 )
