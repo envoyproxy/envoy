@@ -27,7 +27,7 @@ public:
                       Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority,
                       std::string address, uint32_t port)
       : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
-        priority_(priority), address_(std::move(address)), port_(port) { }
+        priority_(priority), address_(std::move(address)), port_(port) {}
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
