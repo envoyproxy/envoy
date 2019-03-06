@@ -229,8 +229,6 @@ void Router::UpstreamRequest::encodeData(Buffer::Instance& data) {
 
 void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {
-  ENVOY_LOG(warn, "dubbo upstream request: connection failure '{}'", host->address()->asString());
-
   conn_pool_handle_ = nullptr;
 
   // Mimic an upstream reset.
@@ -302,8 +300,7 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   case Tcp::ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(
         AppException(ResponseStatus::ServerError,
-                     fmt::format("dubbo upstream request: too many connections to '{}'",
-                                 upstream_host_->address()->asString())),
+                     fmt::format("dubbo upstream request: too many connections")),
         false);
     break;
   case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:

@@ -90,7 +90,7 @@ size_t HessianDeserializerImpl::serializeRpcResult(Buffer::Instance& output_buff
   // Serialized response content.
   serialized_size += HessianUtils::writeString(output_buffer, content);
 
-  ASSERT(output_buffer.length() - origin_length == serialized_size);
+  ASSERT((output_buffer.length() - origin_length) == serialized_size);
 
   return serialized_size;
 }
