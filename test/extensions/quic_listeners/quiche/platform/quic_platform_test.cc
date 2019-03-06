@@ -11,6 +11,7 @@
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
+#include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
@@ -66,6 +67,15 @@ TEST(QuicPlatformTest, QuicExportedStats) {
                        quic::QuicTime::Delta::FromSeconds(1),
                        quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
   QUIC_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
+}
+
+TEST(QuicPlatformTest, QuicHostnameUtils) {
+  EXPECT_FALSE(quic::QuicHostnameUtils::IsValidSNI("!!"));
+  EXPECT_FALSE(quic::QuicHostnameUtils::IsValidSNI("envoyproxy"));
+  EXPECT_TRUE(quic::QuicHostnameUtils::IsValidSNI("www.envoyproxy.io"));
+  EXPECT_EQ("lyft.com", quic::QuicHostnameUtils::NormalizeHostname("lyft.com"));
+  EXPECT_EQ("google.com", quic::QuicHostnameUtils::NormalizeHostname("google.com..."));
+  EXPECT_EQ("quicwg.org", quic::QuicHostnameUtils::NormalizeHostname("QUICWG.ORG"));
 }
 
 TEST(QuicPlatformTest, QuicUnorderedMap) {
