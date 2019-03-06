@@ -49,7 +49,15 @@ public:
   }
 
 protected:
-  virtual void Run() = 0;
+  virtual void Run() {
+    // We don't want this function to be pure virtual, because it will be called if:
+    // 1. An object of a derived class calls Start(), which starts the child thread
+    // but has not called Run() yet.
+    // 2. The destructor of the derived class is called, but not the destructor
+    // of this base class.
+    // 3. The child thread calls QuicThreadImpl::Run()(this function), since the destructor of the
+    // derived class has been called.
+  }
 
 private:
   Envoy::Thread::ThreadPtr thread_;
