@@ -31,7 +31,7 @@
 #include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 #include "tclap/CmdLine.h"

@@ -16,8 +16,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 namespace Aws {
+namespace {
 
-class SignerImplTest : public TestBase {
+class SignerImplTest : public testing::Test {
 public:
   SignerImplTest()
       : credentials_provider_(new NiceMock<MockCredentialsProvider>()),
@@ -160,6 +161,7 @@ TEST_F(SignerImplTest, SignHostHeader) {
                message_->headers().Authorization()->value().c_str());
 }
 
+} // namespace
 } // namespace Aws
 } // namespace Common
 } // namespace HttpFilters

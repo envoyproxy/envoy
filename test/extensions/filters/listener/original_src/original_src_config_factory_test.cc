@@ -6,9 +6,9 @@
 #include "extensions/filters/listener/original_src/original_src_config_factory.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::Invoke;
 

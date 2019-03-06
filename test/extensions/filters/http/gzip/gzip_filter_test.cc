@@ -9,8 +9,9 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::Return;
 
@@ -19,7 +20,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Gzip {
 
-class GzipFilterTest : public TestBase {
+class GzipFilterTest : public testing::Test {
 protected:
   GzipFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("gzip.filter_enabled", 100))

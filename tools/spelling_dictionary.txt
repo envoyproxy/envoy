@@ -4,6 +4,7 @@
 AAAA
 ACK
 AES
+AFAICT
 ALPN
 ALS
 AMZ
@@ -29,6 +30,7 @@ CPU
 CQ
 CR
 CRC
+CREAT
 CRL
 CRLFs
 CRT
@@ -106,6 +108,7 @@ HV
 IAM
 IANA
 IDL
+INADDR
 INET
 IO
 IOS
@@ -137,6 +140,7 @@ MB
 MD
 MGET
 MSET
+MSVC
 MTLS
 MiB
 NACK
@@ -151,6 +155,7 @@ Nilsson
 OCSP
 OK
 OOM
+OOMs
 OS
 OSI
 OSS
@@ -177,6 +182,7 @@ RBAC
 RCU
 RDN
 RDS
+RDWR
 REQ
 RFC
 RHS
@@ -354,9 +360,11 @@ dedupe
 deduplicate
 deflateInit
 deletable
+deleter
 delim
 dereference
 dereferences
+dereferencing
 deregistered
 deserialization
 deserialize
@@ -432,6 +440,7 @@ gregs
 gzip
 hacky
 handshaker
+hd
 hdr
 healths
 healthz
@@ -446,6 +455,7 @@ ie
 ifdef
 iff
 impl
+implementors
 impls
 incrementing
 ing
@@ -624,6 +634,7 @@ sanitization
 sanitizer
 scala
 scalability
+sched
 schemas
 serializable
 serializer
@@ -677,12 +688,15 @@ tmp
 tokenizing
 traceid
 trie
+tuple
+tuples
 typeid
 ucontext
 uint
 un
 unary
 unconfigurable
+unconfigured
 uncontended
 undef
 undegraded

@@ -2,10 +2,10 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
+namespace {
 
 TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   NiceMock<Server::MockInstance> server;
@@ -41,6 +42,7 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   EXPECT_NE(nullptr, tracer);
 }
 
+} // namespace
 } // namespace DynamicOt
 } // namespace Tracers
 } // namespace Extensions

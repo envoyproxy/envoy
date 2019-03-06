@@ -25,12 +25,12 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -42,6 +42,7 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class ListenerHandle {
 public:
@@ -55,7 +56,7 @@ public:
   Configuration::FactoryContext* context_{};
 };
 
-class ListenerManagerImplTest : public TestBase {
+class ListenerManagerImplTest : public testing::Test {
 protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest()) {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
@@ -84,7 +85,7 @@ protected:
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &context;
               if (need_init) {
-                context.initManager().registerTarget(notifier->target_);
+                context.initManager().registerTarget(notifier->target_, "");
               }
               return {[notifier](Network::FilterManager&) -> void {}};
             }));
@@ -489,20 +490,6 @@ TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
   EXPECT_EQ(std::chrono::milliseconds(),
             manager_->listeners().front().get().listenerFiltersTimeout());
-}
-
-TEST_F(ListenerManagerImplTest, ReversedWriteFilterOrder) {
-  const std::string json = R"EOF(
-    name: "foo"
-    address:
-      socket_address: { address: 127.0.0.1, port_value: 10000 }
-    filter_chains:
-    - filters:
-  )EOF";
-
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(json), "", true));
-  EXPECT_TRUE(manager_->listeners().front().get().reverseWriteFilterOrder());
 }
 
 TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
@@ -2147,6 +2134,28 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch
                             "the same matching rules are defined");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithEffectiveEquivalentMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        transport_protocol: "tls"
+    - filter_chain_match:
+        transport_protocol: "tls"
+        source_prefix_ranges: { address_prefix: 127.0.0.0, prefix_len: 8 }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': multiple filter chains with "
+                            "effectively equivalent matching rules are defined");
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsFilterChainWithoutTlsInspector) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
@@ -2451,7 +2460,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   Network::MockListenerFilterManager manager;
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
-  Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandle>(),
+  Network::AcceptedSocketImpl socket(std::make_unique<Network::IoSocketHandleImpl>(),
                                      Network::Address::InstanceConstSharedPtr{
                                          new Network::Address::Ipv4Instance("127.0.0.1", 1234)},
                                      Network::Address::InstanceConstSharedPtr{
@@ -2482,7 +2491,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   static int fd;
   fd = -1;
   // temporary io_handle to test result of socket creation
-  Network::IoHandlePtr io_handle_tmp = std::make_unique<Network::IoSocketHandle>(0);
+  Network::IoHandlePtr io_handle_tmp = std::make_unique<Network::IoSocketHandleImpl>(0);
   EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(ReturnRef(*io_handle_tmp));
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
@@ -2542,7 +2551,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(
-      std::make_unique<Network::IoSocketHandle>(),
+      std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678));
 
@@ -2625,7 +2634,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   static int fd;
   fd = -1;
   // temporary io_handle to test result of socket creation
-  Network::IoHandlePtr io_handle_tmp = std::make_unique<Network::IoSocketHandle>(0);
+  Network::IoHandlePtr io_handle_tmp = std::make_unique<Network::IoSocketHandleImpl>(0);
   EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(ReturnRef(*io_handle_tmp));
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
@@ -2685,7 +2694,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
 
   NiceMock<Network::MockListenerFilterCallbacks> callbacks;
   Network::AcceptedSocketImpl socket(
-      std::make_unique<Network::IoSocketHandle>(),
+      std::make_unique<Network::IoSocketHandleImpl>(),
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 1234),
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 5678));
 
@@ -3024,5 +3033,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
   EXPECT_NO_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

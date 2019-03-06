@@ -58,7 +58,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
   }
 }
 actions {
@@ -463,7 +463,7 @@ actions {
 }
 actions {
   stream_action {
-    stream_id: 2
+    stream_id: 1
     request {
     }
   }

@@ -22,10 +22,10 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -41,6 +41,7 @@ using testing::StrictMock;
 
 namespace Envoy {
 namespace Network {
+namespace {
 
 TEST(RawBufferSocket, TestBasics) {
   TransportSocketPtr raw_buffer_socket(Network::Test::createRawBufferSocket());
@@ -72,7 +73,7 @@ TEST(ConnectionImplUtility, updateBufferStats) {
   ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge);
 }
 
-class ConnectionImplDeathTest : public TestBaseWithParam<Address::IpVersion> {};
+class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -80,7 +81,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ConnectionImplDeathTest,
 TEST_P(ConnectionImplDeathTest, BadFd) {
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher(api->allocateDispatcher());
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>();
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>();
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(*dispatcher,
                      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -88,7 +89,7 @@ TEST_P(ConnectionImplDeathTest, BadFd) {
       ".*assert failure: ioHandle\\(\\).fd\\(\\) != -1.*");
 }
 
-class ConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
+class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   ConnectionImplTest() : api_(Api::createApiForTest(time_system_)) {}
 
@@ -428,8 +429,8 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 
   std::shared_ptr<MockWriteFilter> write_filter(new MockWriteFilter());
   std::shared_ptr<MockFilter> filter(new MockFilter());
-  client_connection_->addWriteFilter(write_filter);
   client_connection_->addFilter(filter);
+  client_connection_->addWriteFilter(write_filter);
 
   Sequence s1;
   EXPECT_CALL(*write_filter, onWrite(_, _))
@@ -988,7 +989,7 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
 // triggered.
 TEST_P(ConnectionImplTest, FlushWriteCloseTimeoutTest) {
   ConnectionMocks mocks = createConnectionMocks();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1115,7 +1116,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
                                 std::function<void()> above_high) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high);
       }));
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   std::unique_ptr<Network::ConnectionImpl> server_connection(new Network::ConnectionImpl(
       dispatcher, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
       std::make_unique<NiceMock<MockTransportSocket>>(), true));
@@ -1144,7 +1145,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
 // Test that tearing down the connection will disable the delayed close timer.
 TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
   ConnectionMocks mocks = createConnectionMocks();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1170,7 +1171,7 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
 // Test that the delayed close timeout callback is resilient to connection teardown edge cases.
 TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   ConnectionMocks mocks = createConnectionMocks();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
       *mocks.dispatcher,
       std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
@@ -1225,7 +1226,7 @@ public:
 private:
   ReadFilterCallbacks* callbacks_{nullptr};
 };
-class MockTransportConnectionImplTest : public TestBase {
+class MockTransportConnectionImplTest : public testing::Test {
 public:
   MockTransportConnectionImplTest() {
     EXPECT_CALL(dispatcher_.buffer_factory_, create_(_, _))
@@ -1242,7 +1243,7 @@ public:
         .WillOnce(Invoke([this](TransportSocketCallbacks& callbacks) {
           transport_socket_callbacks_ = &callbacks;
         }));
-    IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(0);
+    IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
     connection_ = std::make_unique<ConnectionImpl>(
         dispatcher_, std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
         TransportSocketPtr(transport_socket_), true);
@@ -1523,8 +1524,8 @@ TEST_F(MockTransportConnectionImplTest, WriteEndStreamStopIteration) {
   std::shared_ptr<MockWriteFilter> write_filter1(new StrictMock<MockWriteFilter>());
   std::shared_ptr<MockWriteFilter> write_filter2(new StrictMock<MockWriteFilter>());
   connection_->enableHalfClose(true);
-  connection_->addWriteFilter(write_filter1);
   connection_->addWriteFilter(write_filter2);
+  connection_->addWriteFilter(write_filter1);
 
   EXPECT_CALL(*write_filter1, onWrite(BufferStringEqual(val), true))
       .WillOnce(Return(FilterStatus::StopIteration));
@@ -1639,7 +1640,7 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
   readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + 16384);
 }
 
-class TcpClientConnectionImplTest : public TestBaseWithParam<Address::IpVersion> {
+class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   TcpClientConnectionImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
@@ -1682,7 +1683,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-class PipeClientConnectionImplTest : public TestBase {
+class PipeClientConnectionImplTest : public testing::Test {
 protected:
   PipeClientConnectionImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
@@ -1712,5 +1713,6 @@ TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
   connection->close(ConnectionCloseType::NoFlush);
 }
 
+} // namespace
 } // namespace Network
 } // namespace Envoy

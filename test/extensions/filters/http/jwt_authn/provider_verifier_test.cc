@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
 ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
   ProtobufWkt::Struct expected_payload;
@@ -27,7 +28,7 @@ ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
   return struct_obj;
 }
 
-class ProviderVerifierTest : public TestBase {
+class ProviderVerifierTest : public testing::Test {
 public:
   void createVerifier() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
@@ -147,6 +148,7 @@ TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
                EnvoyException);
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

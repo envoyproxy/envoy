@@ -35,6 +35,7 @@ for how to update or override dependencies.
        cmake \
        clang-format-7 \
        automake \
+       autoconf \
        make \
        ninja-build \
        curl \
@@ -49,7 +50,7 @@ for how to update or override dependencies.
 
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
-    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
+    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7 autoconf
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
 
@@ -66,6 +67,10 @@ for how to update or override dependencies.
 
     Alternatively, you can pass `--action_env` on the command line when running
     `bazel build`/`bazel test`.
+
+    Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
+    version of `ar` on the PATH, so if you run into issues building third party code like luajit
+    consider uninstalling binutils.
 
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
@@ -93,8 +98,8 @@ export CXX=clang++
 bazel build --config=libc++ //source/exe:envoy-static
 ```
 Note: this assumes that both: clang compiler and libc++ library are installed in the system,
-and that `clang` and `clang++` are available in `$PATH`. On some systems, exports might need
-to be changed to versioned binaries, e.g. `CC=clang-7` and `CXX=clang++-7`.
+and that `clang` and `clang++` are available in `$PATH`. On some systems, you might need to
+include them in the search path, e.g. `export PATH=/usr/lib/llvm-7/bin:$PATH`.
 
 You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
 might look like `sudo apt-get install libc++abi-7-dev libc++-7-dev`.
@@ -264,7 +269,7 @@ will need to override a few environment variables to set up the remote docker. T
 can be found in the [Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
 
 Use `LOCAL_MOUNT=yes` when you are not building with the envoy build container. This will ensure
-that the libraries against which the tests dynmically link will be available and of the correct
+that the libraries against which the tests dynamically link will be available and of the correct
 version.
 
 ## Examples
@@ -326,6 +331,12 @@ Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wi
 bazel test -c dbg --config=clang-tsan //test/...
 ```
 
+To run the sanitizers on OS X, prefix `macos-` to the config option, e.g.:
+
+```
+bazel test -c dbg --config=macos-asan //test/...
+```
+
 ## Log Verbosity
 
 Log verbosity is controlled at runtime in all builds.
@@ -354,7 +365,7 @@ The following optional features can be enabled on the Bazel build command-line:
   `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
-  `--define tcmalloc=debug`.
+  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
 
 ## Disabling extensions
 
@@ -524,7 +535,7 @@ to run clang-format scripts on your workstation directly:
  * Type-ahead doesn't always work when waiting running a command through docker
 To run the tools directly, you must install the correct version of clang. This
 may change over time but as of January 2019,
-[clang+llvm-7.0.0](http://releases.llvm.org/download.html) works well. You must
+[clang+llvm-7.0.0](https://releases.llvm.org/download.html) works well. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:

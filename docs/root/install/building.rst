@@ -20,7 +20,7 @@ recent Linux including Ubuntu 16 LTS.
 
 Building Envoy has the following requirements:
 
-* GCC 5+ (for C++14 support).
+* GCC 7+ or Clang/LLVM 7+ (for C++14 support).
 * These :repo:`pre-built </ci/build_container/build_recipes>` third party dependencies.
 * These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
 

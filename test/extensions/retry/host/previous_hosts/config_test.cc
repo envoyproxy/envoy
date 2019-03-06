@@ -5,9 +5,9 @@
 #include "extensions/retry/host/well_known_names.h"
 
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using namespace testing;
 
@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Retry {
 namespace Host {
+namespace {
 
 TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
   auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
@@ -47,6 +48,7 @@ TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
   ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host2));
 }
 
+} // namespace
 } // namespace Host
 } // namespace Retry
 } // namespace Extensions

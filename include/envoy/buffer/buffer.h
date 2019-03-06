@@ -22,6 +22,8 @@ namespace Buffer {
 struct RawSlice {
   void* mem_ = nullptr;
   size_t len_ = 0;
+
+  bool operator==(const RawSlice& rhs) const { return mem_ == rhs.mem_ && len_ == rhs.len_; }
 };
 
 /**
@@ -98,8 +100,10 @@ public:
   virtual void prepend(Instance& data) PURE;
 
   /**
-   * Commit a set of slices originally obtained from reserve(). The number of slices can be
-   * different from the number obtained from reserve(). The size of each slice can also be altered.
+   * Commit a set of slices originally obtained from reserve(). The number of slices should match
+   * the number obtained from reserve(). The size of each slice can also be altered. Commit must
+   * occur following a reserve() without any mutating operations in between other than to the iovecs
+   * len_ fields.
    * @param iovecs supplies the array of slices to commit.
    * @param num_iovecs supplies the size of the slices array.
    */

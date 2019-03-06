@@ -1,7 +1,8 @@
 #pragma once
 
 #include "test/integration/http_integration.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 
@@ -17,7 +18,7 @@ struct HttpProtocolTestParams {
 //
 // typedef HttpProtocolIntegrationTest MyTest
 //
-// INSTANTIATE_TEST_SUITE_P(Protocols, BufferIntegrationTest,
+// INSTANTIATE_TEST_SUITE_P(Protocols, MyTest,
 //                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
 //                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 //
@@ -25,7 +26,7 @@ struct HttpProtocolTestParams {
 // TEST_P(MyTest, TestInstance) {
 // ....
 // }
-class HttpProtocolIntegrationTest : public TestBaseWithParam<HttpProtocolTestParams>,
+class HttpProtocolIntegrationTest : public testing::TestWithParam<HttpProtocolTestParams>,
                                     public HttpIntegrationTest {
 public:
   // By default returns 8 combinations of

@@ -227,23 +227,27 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
                                   const envoy::type::FractionalPercent& default_value,
                                   uint64_t random_value) const {
   const auto& entry = values_.find(key);
-  uint64_t numerator, denominator;
+  envoy::type::FractionalPercent percent;
   if (entry != values_.end() && entry->second.fractional_percent_value_.has_value()) {
-    numerator = entry->second.fractional_percent_value_->numerator();
-    denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-        entry->second.fractional_percent_value_->denominator());
+    percent = entry->second.fractional_percent_value_.value();
   } else if (entry != values_.end() && entry->second.uint_value_.has_value()) {
-    // The runtime value must have been specified as an integer rather than a fractional percent
-    // proto. To preserve legacy semantics, we'll assume this represents a percentage.
-    numerator = entry->second.uint_value_.value();
-    denominator = 100;
+    // Check for > 100 because the runtime value is assumed to be specified as
+    // an integer, and it also ensures that truncating the uint64_t runtime
+    // value into a uint32_t percent numerator later is safe
+    if (entry->second.uint_value_.value() > 100) {
+      return true;
+    }
+
+    // The runtime value was specified as an integer rather than a fractional
+    // percent proto. To preserve legacy semantics, we treat it as a percentage
+    // (i.e. denominator of 100).
+    percent.set_numerator(entry->second.uint_value_.value());
+    percent.set_denominator(envoy::type::FractionalPercent::HUNDRED);
   } else {
-    numerator = default_value.numerator();
-    denominator =
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
+    percent = default_value;
   }
 
-  return random_value % denominator < numerator;
+  return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
 }
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
@@ -337,7 +341,7 @@ void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>&
       values_.emplace(kv.first, SnapshotImpl::createEntry(kv.second));
     }
   }
-  stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
+  stats_.admin_overrides_active_.set(!values_.empty());
 }
 
 DiskLayer::DiskLayer(const std::string& name, const std::string& path, Api::Api& api)
@@ -349,7 +353,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
                               Api::Api& api) {
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throw EnvoyException(fmt::format("Walk recursion depth exceded {}", MaxWalkDepth));
+    throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {
@@ -447,8 +451,9 @@ DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";
-  RuntimeStats stats{
-      ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
+  RuntimeStats stats{ALL_RUNTIME_STATS(POOL_BOOL_INDICATOR_PREFIX(store, prefix),
+                                       POOL_COUNTER_PREFIX(store, prefix),
+                                       POOL_GAUGE_PREFIX(store, prefix))};
   return stats;
 }
 

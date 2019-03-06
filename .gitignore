@@ -2,7 +2,9 @@
 BROWSE
 /build
 /build_*
+*.bzlc
 .cache
+.classpath
 /ci/bazel-*
 /ci/prebuilt/thirdparty
 /ci/prebuilt/thirdparty_build
@@ -11,9 +13,12 @@ cscope.*
 .deps
 /docs/landing_source/.bundle
 /generated
+.idea/
+.project
 *.pyc
 **/pyformat
 SOURCE_VERSION
+.settings/
 *.sw*
 tags
 TAGS

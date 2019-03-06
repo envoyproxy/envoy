@@ -7,6 +7,7 @@
 
 namespace Envoy {
 namespace Fuzz {
+namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::router::TestCase& input) {
   try {
@@ -21,5 +22,6 @@ DEFINE_PROTO_FUZZER(const test::common::router::TestCase& input) {
   }
 }
 
+} // namespace
 } // namespace Fuzz
 } // namespace Envoy

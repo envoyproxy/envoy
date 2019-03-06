@@ -6,15 +6,15 @@
 #include "common/filesystem/watcher_impl.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Filesystem {
 
-class WatcherImplTest : public TestBase {
+class WatcherImplTest : public testing::Test {
 protected:
   WatcherImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 

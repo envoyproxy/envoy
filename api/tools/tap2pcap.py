@@ -44,7 +44,7 @@ def DumpEvent(direction, timestamp, data):
 
 
 def Tap2Pcap(tap_path, pcap_path):
-  wrapper = wrapper_pb2.BufferedTraceWrapper()
+  wrapper = wrapper_pb2.TraceWrapper()
   if tap_path.endswith('.pb_text'):
     with open(tap_path, 'r') as f:
       text_format.Merge(f.read(), wrapper)

@@ -21,8 +21,8 @@ void ListenerImpl::listenCallback(evconnlistener*, evutil_socket_t fd, sockaddr*
                                   int remote_addr_len, void* arg) {
   ListenerImpl* listener = static_cast<ListenerImpl*>(arg);
 
-  // Create the IoSocketHandle for the fd here.
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandle>(fd);
+  // Create the IoSocketHandleImpl for the fd here.
+  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(fd);
 
   // Get the local address from the new socket if the listener is listening on IP ANY
   // (e.g., 0.0.0.0 for IPv4) (local_address_ is nullptr in this case).

@@ -13,7 +13,7 @@ connection will be different from that of any proxied connections.
 Sometimes the upstream server or network may need to know the original IP address of the connection,
 called the *downstream remote address*, for many reasons. Some examples include:
 
-* the the IP address being used to form part of an identity,
+* the IP address being used to form part of an identity,
 * the IP address being used to enforce network policy, or
 * the IP address being included in an audit.
 

@@ -3,18 +3,21 @@
 #include "extensions/tracers/zipkin/span_context.h"
 #include "extensions/tracers/zipkin/span_context_extractor.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 namespace {
+
 const std::string trace_id{"0000000000000001"};
 const std::string trace_id_high{"0000000000000009"};
 const std::string span_id{"0000000000000003"};
 const std::string parent_id{"0000000000000002"};
+
 } // namespace
 
 TEST(ZipkinSpanContextExtractorTest, Largest) {

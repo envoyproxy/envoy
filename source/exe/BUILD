@@ -68,6 +68,7 @@ envoy_cc_library(
         ":envoy_common_lib",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
+        "//source/common/http/http2:codec_lib",
         "//source/common/common:perf_annotation_lib",
         "//source/common/thread:thread_factory_singleton_lib",
         "//source/server:hot_restart_lib",

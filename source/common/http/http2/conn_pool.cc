@@ -45,6 +45,18 @@ void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
   checkForDrained();
 }
 
+bool ConnPoolImpl::hasActiveConnections() const {
+  if (primary_client_ && primary_client_->client_->numActiveRequests() > 0) {
+    return true;
+  }
+
+  if (draining_client_ && draining_client_->client_->numActiveRequests() > 0) {
+    return true;
+  }
+
+  return !pending_requests_.empty();
+}
+
 void ConnPoolImpl::checkForDrained() {
   if (drained_callbacks_.empty()) {
     return;

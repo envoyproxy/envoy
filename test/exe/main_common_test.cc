@@ -11,8 +11,9 @@
 
 #include "test/test_common/contention.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
@@ -31,7 +32,7 @@ namespace Envoy {
  * an argv array that is terminated with nullptr. Identifies the config
  * file relative to $TEST_RUNDIR.
  */
-class MainCommonTest : public TestBaseWithParam<Network::Address::IpVersion> {
+class MainCommonTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   MainCommonTest()
       : config_file_(TestEnvironment::temporaryFileSubstitute(
@@ -62,7 +63,7 @@ protected:
    * The PID is needed to isolate namespaces between concurrent
    * processes in CI. The random number generator is needed
    * sequentially executed test methods fail with an error in
-   * bindDomainSocket if the the same base-id is re-used.
+   * bindDomainSocket if the same base-id is re-used.
    *
    * @return uint32_t a unique numeric ID based on the PID and a random number.
    */
@@ -234,7 +235,7 @@ protected:
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();
   started_.WaitForNotification();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -244,7 +245,7 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   startEnvoy();
   started_.WaitForNotification();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -254,7 +255,7 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
   startEnvoy();
   started_.WaitForNotification();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
   kill(getpid(), SIGINT);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -317,7 +318,7 @@ TEST_P(AdminRequestTest, AdminRequestBeforeRun) {
   EXPECT_TRUE(admin_handler_was_called);
 
   // This just checks that some stat output was reported. We could pick any stat.
-  EXPECT_THAT(out, HasSubstr("filesystem.reopen_failed"));
+  EXPECT_THAT(out, HasSubstr("access_log_file.reopen_failed"));
 }
 
 // Class to track whether an object has been destroyed, which it does by bumping an atomic.

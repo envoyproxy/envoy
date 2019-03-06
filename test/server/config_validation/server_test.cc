@@ -9,9 +9,10 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 // Test param is the path to the config file to validate.
-class ValidationServerTest : public TestBaseWithParam<std::string> {
+class ValidationServerTest : public testing::TestWithParam<std::string> {
 public:
   static void SetupTestDirectory() {
     TestEnvironment::exec(
@@ -73,5 +74,7 @@ TEST_P(ValidationServerTest_1, RunWithoutCrash) {
 
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest_1,
                          ::testing::ValuesIn(ValidationServerTest_1::GetAllConfigFiles()));
+
+} // namespace
 } // namespace Server
 } // namespace Envoy

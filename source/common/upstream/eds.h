@@ -18,6 +18,7 @@ namespace Upstream {
  */
 class EdsClusterImpl : public BaseDynamicClusterImpl,
                        Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
+
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
@@ -44,6 +45,20 @@ private:
 
   // ClusterImplBase
   void startPreInit() override;
+
+  class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
+  public:
+    BatchUpdateHelper(EdsClusterImpl& parent,
+                      const envoy::api::v2::ClusterLoadAssignment& cluster_load_assignment)
+        : parent_(parent), cluster_load_assignment_(cluster_load_assignment) {}
+
+    // Upstream::PrioritySet::BatchUpdateCb
+    void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override;
+
+  private:
+    EdsClusterImpl& parent_;
+    const envoy::api::v2::ClusterLoadAssignment& cluster_load_assignment_;
+  };
 
   const ClusterManager& cm_;
   std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;

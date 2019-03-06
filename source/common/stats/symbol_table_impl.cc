@@ -203,7 +203,7 @@ void SymbolTableImpl::free(const StatName& stat_name) {
     auto encode_search = encode_map_.find(*decode_search->second);
     ASSERT(encode_search != encode_map_.end());
 
-    // If that was the last remaining client usage of the symbol, erase the the
+    // If that was the last remaining client usage of the symbol, erase the
     // current mappings and add the now-unused symbol to the reuse pool.
     //
     // The "if (--EXPR.ref_count_)" pattern speeds up BM_CreateRace by 20% in

@@ -45,13 +45,18 @@ using PerSocketTapperPtr = std::unique_ptr<PerSocketTapper>;
 /**
  * Abstract socket tap configuration.
  */
-class SocketTapConfig : public Extensions::Common::Tap::TapConfig {
+class SocketTapConfig : public virtual Extensions::Common::Tap::TapConfig {
 public:
   /**
    * @return a new per-socket tapper which is used to handle tapping of a discrete socket.
    * @param connection supplies the underlying network connection.
    */
   virtual PerSocketTapperPtr createPerSocketTapper(const Network::Connection& connection) PURE;
+
+  /**
+   * @return time source to use for stamping events.
+   */
+  virtual TimeSource& timeSource() const PURE;
 };
 
 using SocketTapConfigSharedPtr = std::shared_ptr<SocketTapConfig>;

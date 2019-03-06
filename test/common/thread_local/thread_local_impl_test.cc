@@ -14,6 +14,7 @@ using testing::ReturnPointee;
 
 namespace Envoy {
 namespace ThreadLocal {
+namespace {
 
 class TestThreadLocalObject : public ThreadLocalObject {
 public:
@@ -22,7 +23,7 @@ public:
   MOCK_METHOD0(onDestroy, void());
 };
 
-class ThreadLocalInstanceImplTest : public TestBase {
+class ThreadLocalInstanceImplTest : public testing::Test {
 public:
   ThreadLocalInstanceImplTest() {
     tls_.registerThread(main_dispatcher_, true);
@@ -144,5 +145,6 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   tls.shutdownThread();
 }
 
+} // namespace
 } // namespace ThreadLocal
 } // namespace Envoy

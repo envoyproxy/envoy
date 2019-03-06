@@ -36,6 +36,10 @@ namespace Http {
 // debugging.
 constexpr bool DebugMode = false;
 
+Http::TestHeaderMapImpl fromSanitizedHeaders(const test::fuzz::Headers& headers) {
+  return Fuzz::fromHeaders(headers, {"transfer-encoding"});
+}
+
 // Convert from test proto Http1ServerSettings to Http1Settings.
 Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& settings) {
   Http1Settings h1_settings;
@@ -80,9 +84,11 @@ public:
   // course, it's the codecs must be robust to wire-level violations. We
   // explore these violations via MutateAction and SwapAction at the connection
   // buffer level.
-  enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
+  enum class StreamState : int { PendingHeaders, PendingDataOrTrailers, Closed };
 
   struct DirectionalState {
+    // The request encode and response decoder belong to the client, the
+    // response encoder and request decoder belong to the server.
     StreamEncoder* encoder_;
     NiceMock<MockStreamDecoder> decoder_;
     NiceMock<MockStreamCallbacks> stream_callbacks_;
@@ -119,27 +125,27 @@ public:
       resetStream();
     }));
     ON_CALL(request_.decoder_, decodeHeaders_(_, true)).WillByDefault(InvokeWithoutArgs([this] {
+      // The HTTP/1 codec needs this to cleanup any latent stream resources.
+      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
     }));
     ON_CALL(request_.decoder_, decodeData(_, true)).WillByDefault(InvokeWithoutArgs([this] {
+      // The HTTP/1 codec needs this to cleanup any latent stream resources.
+      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
     }));
     ON_CALL(request_.decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
+      // The HTTP/1 codec needs this to cleanup any latent stream resources.
+      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
     }));
     ON_CALL(response_.decoder_, decodeHeaders_(_, true)).WillByDefault(InvokeWithoutArgs([this] {
-      // The HTTP/1 codec needs this to cleanup any latent stream resources.
-      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       response_.closeRemote();
     }));
     ON_CALL(response_.decoder_, decodeData(_, true)).WillByDefault(InvokeWithoutArgs([this] {
-      // The HTTP/1 codec needs this to cleanup any latent stream resources.
-      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       response_.closeRemote();
     }));
     ON_CALL(response_.decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
-      // The HTTP/1 codec needs this to cleanup any latent stream resources.
-      response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       response_.closeRemote();
     }));
     request_.encoder_->encodeHeaders(request_headers, end_stream);
@@ -165,7 +171,8 @@ public:
     switch (directional_action.directional_action_selector_case()) {
     case test::common::http::DirectionalAction::kContinueHeaders: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingHeaders) {
-        Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(directional_action.continue_headers());
+        Http::TestHeaderMapImpl headers =
+            fromSanitizedHeaders(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
         state.encoder_->encode100ContinueHeaders(headers);
       }
@@ -173,7 +180,7 @@ public:
     }
     case test::common::http::DirectionalAction::kHeaders: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingHeaders) {
-        auto headers = Fuzz::fromHeaders(directional_action.headers());
+        auto headers = fromSanitizedHeaders(directional_action.headers());
         if (response && headers.Status() == nullptr) {
           headers.setReferenceKey(Headers::get().Status, "200");
         }
@@ -208,7 +215,7 @@ public:
     }
     case test::common::http::DirectionalAction::kTrailers: {
       if (state.isLocalOpen() && state.stream_state_ == StreamState::PendingDataOrTrailers) {
-        state.encoder_->encodeTrailers(Fuzz::fromHeaders(directional_action.trailers()));
+        state.encoder_->encodeTrailers(fromSanitizedHeaders(directional_action.trailers()));
         state.stream_state_ = StreamState::Closed;
         state.closeLocal();
       }
@@ -246,10 +253,16 @@ public:
   void streamAction(const test::common::http::StreamAction& stream_action) {
     switch (stream_action.stream_action_selector_case()) {
     case test::common::http::StreamAction::kRequest: {
+      ENVOY_LOG_MISC(debug, "Request stream action on {} in state {} {}", stream_index_,
+                     static_cast<int>(request_.stream_state_),
+                     static_cast<int>(response_.stream_state_));
       directionalAction(request_, stream_action.request());
       break;
     }
     case test::common::http::StreamAction::kResponse: {
+      ENVOY_LOG_MISC(debug, "Response stream action on {} in state {} {}", stream_index_,
+                     static_cast<int>(request_.stream_state_),
+                     static_cast<int>(response_.stream_state_));
       directionalAction(response_, stream_action.response());
       break;
     }
@@ -257,6 +270,7 @@ public:
       // Maybe nothing is set?
       break;
     }
+    ENVOY_LOG_MISC(debug, "Stream action complete");
   }
 
   bool active() const {
@@ -355,8 +369,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
                                                                 max_request_headers_kb);
   } else {
     const Http1Settings server_http1settings{fromHttp1Settings(input.h1_settings().server())};
-    server = absl::make_unique<Http1::ServerConnectionImpl>(server_connection, server_callbacks,
-                                                            server_http1settings);
+    server = absl::make_unique<Http1::ServerConnectionImpl>(
+        server_connection, server_callbacks, server_http1settings, max_request_headers_kb);
   }
 
   ReorderBuffer client_write_buf{*server};
@@ -418,7 +432,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
           }
         }
         HttpStreamPtr stream = std::make_unique<HttpStream>(
-            *client, Fuzz::fromHeaders(action.new_stream().request_headers()),
+            *client, fromSanitizedHeaders(action.new_stream().request_headers()),
             action.new_stream().end_stream());
         stream->moveIntoListBack(std::move(stream), pending_streams);
         break;
@@ -428,6 +442,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         if (streams.empty()) {
           break;
         }
+        // Index into list of created streams (not HTTP/2 level stream ID).
         const uint32_t stream_id = stream_action.stream_id() % streams.size();
         ENVOY_LOG_MISC(trace, "action for stream index {}", stream_id);
         (*std::next(streams.begin(), stream_id))->streamAction(stream_action);
@@ -474,6 +489,8 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     ENVOY_LOG_MISC(debug, "CodecProtocolException {}", e.what());
   } catch (CodecClientException& e) {
     ENVOY_LOG_MISC(debug, "CodecClientException {}", e.what());
+  } catch (PrematureResponseException& e) {
+    ENVOY_LOG_MISC(debug, "PrematureResponseException {}", e.what());
   }
 }
 
