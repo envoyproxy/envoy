@@ -1,44 +1,18 @@
 #pragma once
 
-#include <functional>
-#include <list>
-
 #include "envoy/init/init.h"
 
-#include "test/mocks/common.h"
-
 #include "gmock/gmock.h"
+#include "init/callback.h"
 
 namespace Envoy {
 namespace Init {
 
-class MockTarget : public Target {
-public:
-  MockTarget();
-  ~MockTarget();
-
-  MOCK_METHOD1(initialize, void(std::function<void()> callback));
-
-  std::function<void()> callback_;
-};
-
 class MockManager : public Manager {
 public:
-  MockManager();
-  ~MockManager();
-
-  void initialize() {
-    for (auto target : targets_) {
-      target->initialize([this]() -> void { initialized_.ready(); });
-    }
-  }
-
-  // Init::Manager
-  MOCK_METHOD2(registerTarget, void(Target& target, absl::string_view description));
-  MOCK_CONST_METHOD0(state, State());
-
-  std::list<Target*> targets_;
-  ReadyWatcher initialized_;
+  MOCK_CONST_METHOD0(state, Manager::State());
+  MOCK_METHOD1(add, void(const TargetReceiver&));
+  MOCK_METHOD0(initialize, void());
 };
 
 } // namespace Init

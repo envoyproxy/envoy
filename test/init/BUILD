@@ -2,16 +2,16 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_mock",
+    "envoy_cc_test",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_mock(
-    name = "init_mocks",
-    hdrs = ["mocks.h"],
+envoy_cc_test(
+    name = "init_impl_test",
+    srcs = ["init_impl_test.cc"],
     deps = [
-        "//include/envoy/init:init_interface",
+        "//source/init:init_lib",
     ],
 )

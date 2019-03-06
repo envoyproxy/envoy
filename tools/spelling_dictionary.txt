@@ -154,6 +154,7 @@ NUL
 Nilsson
 OCSP
 OK
+OO
 OOM
 OOMs
 OS
@@ -365,6 +366,7 @@ deletable
 deleter
 delim
 dereference
+dereferenced
 dereferences
 dereferencing
 deregistered

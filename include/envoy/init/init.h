@@ -1,49 +1,32 @@
 #pragma once
 
-#include <functional>
-
 #include "envoy/common/pure.h"
-
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Init {
 
 /**
- * A single initialization target.
+ * Implementation-defined representation of an initialization target
+ * (see e.g. /source/init/callback.h).
  */
-class Target {
-public:
-  virtual ~Target() {}
-
-  /**
-   * Called when the target should begin its own initialization.
-   * @param callback supplies the callback to invoke when the target has completed its
-   *        initialization.
-   */
-  virtual void initialize(std::function<void()> callback) PURE;
-};
+class TargetReceiver;
 
 /**
- * A manager that initializes multiple targets.
+ * Init::Manager coordinates initialization of one or more "targets." A target registers its need
+ * for initialization by passing a TargetReceiver to `add`. When `initialize` is called on the
+ * manager, it notifies all targets to initialize.
  */
-class Manager {
-public:
-  virtual ~Manager() {}
+struct Manager {
+  virtual ~Manager() = default;
 
   /**
-   * Register a target to be initialized in the future. The manager will call initialize() on each
-   * target at some point in the future. It is an error to register the same target more than once.
-   * @param target the Target to initialize.
-   * @param description a human-readable description of target used for logging and debugging.
+   * The manager's state, used e.g. for reporting in the admin server.
    */
-  virtual void registerTarget(Target& target, absl::string_view description) PURE;
-
   enum class State {
     /**
      * Targets have not been initialized.
      */
-    NotInitialized,
+    Uninitialized,
     /**
      * Targets are currently being initialized.
      */
@@ -55,9 +38,24 @@ public:
   };
 
   /**
-   * Returns the current state of the init manager.
+   * @return the current state of the manager.
    */
   virtual State state() const PURE;
+
+  /**
+   * Register an initialization target. If the manager's current state is uninitialized, the target
+   * will be saved for invocation later, when `initialize` is called. If the current state is
+   * initializing, the target will be invoked immediately. It is an error to register a target with
+   * a manager that is already in initialized state.
+   * @param target_receiver the target to be invoked when initialization begins.
+   */
+  virtual void add(const TargetReceiver& target_receiver) PURE;
+
+  /**
+   * Start initialization of all previously registered targets. It is an error to call initialize
+   * on a manager that is already in initializing or initialized state.
+   */
+  virtual void initialize() PURE;
 };
 
 } // namespace Init

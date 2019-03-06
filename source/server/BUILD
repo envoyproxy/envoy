@@ -139,17 +139,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "init_manager_lib",
-    srcs = ["init_manager_impl.cc"],
-    hdrs = ["init_manager_impl.h"],
-    deps = [
-        "//include/envoy/init:init_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "options_lib",
     srcs = ["options_impl.cc"] + select({
         "@bazel_tools//src/conditions:linux_x86_64": ["options_impl_platform_linux.cc"],
