@@ -163,9 +163,9 @@ void HdsDelegate::processMessage(
     ENVOY_LOG(debug, "New HdsCluster with config {} ", cluster_config.DebugString());
 
     // Create HdsCluster
-    hds_clusters_[cluster_name] = HdsClusterPtr{new HdsCluster(
+    hds_clusters_[cluster_name] = std::make_shared<HdsCluster>(
         admin_, runtime_, cluster_config, bind_config, store_stats, ssl_context_manager_, false,
-        info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_, api_)};
+        info_factory_, cm_, local_info_, dispatcher_, random_, singleton_manager_, tls_, api_);
 
     hds_clusters_[cluster_name]->startHealthchecks(access_log_manager_, runtime_, random_,
                                                    dispatcher_);

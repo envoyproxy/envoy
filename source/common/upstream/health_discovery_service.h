@@ -84,8 +84,8 @@ private:
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
 };
 
-typedef std::shared_ptr<HdsCluster> HdsClusterPtr;
-typedef std::unordered_map<std::string, HdsClusterPtr> HdsClusterMap;
+using HdsClusterPtr = std::shared_ptr<HdsCluster>;
+using HdsClusterMap = std::unordered_map<std::string, HdsClusterPtr>;
 
 /**
  * All hds stats. @see stats_macros.h
