@@ -15,7 +15,6 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/integration/clusters/cluster_factory_config.pb.h"
 #include "test/integration/clusters/cluster_factory_config.pb.validate.h"
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/common.h"
@@ -23,9 +22,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/test_common/registry.h"
-
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -133,9 +129,6 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
               port_value: 80
     )EOF";
 
-  CustomStaticClusterFactory factory;
-  Registry::InjectFactory<ClusterFactory> registered_factory(factory);
-
   const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   auto cluster = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
@@ -173,9 +166,6 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
             address: 127.0.0.1
             port_value: 80
     )EOF";
-
-  CustomStaticClusterFactory factory;
-  Registry::InjectFactory<ClusterFactory> registered_factory(factory);
 
   const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   auto cluster = ClusterFactoryImplBase::create(
