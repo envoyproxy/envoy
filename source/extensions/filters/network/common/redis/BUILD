@@ -43,3 +43,22 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "client_lib",
+    srcs = ["client_impl.cc"],
+    hdrs = ["client_impl.h"],
+    deps = [
+        ":codec_lib",
+        ":client_interface",
+        "//include/envoy/router:router_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/network:filter_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:load_balancer_lib",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
+    ],
+)

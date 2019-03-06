@@ -4,6 +4,7 @@
 
 #include "common/upstream/health_checker_base_impl.h"
 
+#include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 
 namespace Envoy {
@@ -22,7 +23,7 @@ public:
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random,
                      Upstream::HealthCheckEventLoggerPtr&& event_logger,
-                     Extensions::NetworkFilters::Common::Redis::ClientFactory& client_factory);
+                     Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
   static const NetworkFilters::Common::Redis::RespValue& pingHealthCheckRequest() {
     static HealthCheckRequest* request = new HealthCheckRequest();
@@ -43,8 +44,8 @@ protected:
 private:
   struct RedisActiveHealthCheckSession
       : public ActiveHealthCheckSession,
-        public Extensions::NetworkFilters::Common::Redis::Config,
-        public Extensions::NetworkFilters::Common::Redis::PoolCallbacks,
+        public Extensions::NetworkFilters::Common::Redis::Client::Config,
+        public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks,
         public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
     ~RedisActiveHealthCheckSession();
@@ -52,7 +53,7 @@ private:
     void onInterval() override;
     void onTimeout() override;
 
-    // Extensions::NetworkFilters::Common::Redis::Config
+    // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }
     std::chrono::milliseconds opTimeout() const override {
       // Allow the main Health Check infra to control timeout.
@@ -60,7 +61,7 @@ private:
     }
     bool enableHashtagging() const override { return false; }
 
-    // Extensions::NetworkFilters::Common::Redis::PoolCallbacks
+    // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
 
@@ -70,8 +71,8 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     RedisHealthChecker& parent_;
-    Extensions::NetworkFilters::Common::Redis::ClientPtr client_;
-    Extensions::NetworkFilters::Common::Redis::PoolRequest* current_request_{};
+    Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
+    Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
   };
 
   enum class Type { Ping, Exists };
@@ -90,7 +91,7 @@ private:
     return std::make_unique<RedisActiveHealthCheckSession>(*this, host);
   }
 
-  Extensions::NetworkFilters::Common::Redis::ClientFactory& client_factory_;
+  Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
   Type type_;
   const std::string key_;
 };

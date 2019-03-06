@@ -9,6 +9,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
+namespace Client {
 
 /**
  * A handle to an outbound request.
@@ -116,6 +117,7 @@ public:
                            const Config& config) PURE;
 };
 
+} // namespace Client 
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters
