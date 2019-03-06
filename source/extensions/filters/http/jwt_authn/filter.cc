@@ -32,7 +32,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   // http://www.w3.org/TR/cors/#cross-origin-request-with-preflight-0, CORS
   // pre-flight requests shouldn't include user credentials.
   if (headers.Method() &&
-      Http::Headers::get().MethodValues.Options == headers.Method()->value().c_str()) {
+      Http::Headers::get().MethodValues.Options == headers.Method()->value().getStringView()) {
     ENVOY_LOG(debug, "CORS preflight request is passed through.");
     return Http::FilterHeadersStatus::Continue;
   }
