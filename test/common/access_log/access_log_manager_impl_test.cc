@@ -22,6 +22,7 @@ using testing::Sequence;
 
 namespace Envoy {
 namespace AccessLog {
+namespace {
 
 class AccessLogManagerImplTest : public testing::Test {
 protected:
@@ -375,5 +376,6 @@ TEST_F(AccessLogManagerImplTest, reopenAllFiles) {
       .WillOnce(Return(ByMove(Filesystem::resultSuccess<bool>(true))));
 }
 
+} // namespace
 } // namespace AccessLog
 } // namespace Envoy

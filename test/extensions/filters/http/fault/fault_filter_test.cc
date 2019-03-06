@@ -35,6 +35,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
+namespace {
 
 class FaultFilterTest : public testing::Test {
 public:
@@ -852,6 +853,7 @@ TEST_F(FaultFilterTest, RouteFaultOverridesListenerFault) {
   }
 }
 
+} // namespace
 } // namespace Fault
 } // namespace HttpFilters
 } // namespace Extensions

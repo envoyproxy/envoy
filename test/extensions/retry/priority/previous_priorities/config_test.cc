@@ -16,6 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Retry {
 namespace Priority {
+namespace {
 
 class RetryPriorityTest : public testing::Test {
 public:
@@ -281,6 +282,7 @@ TEST_F(RetryPriorityTest, OverridenFrequency) {
   verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load);
 }
 
+} // namespace
 } // namespace Priority
 } // namespace Retry
 } // namespace Extensions

@@ -1,7 +1,6 @@
 #include "test/integration/autonomous_upstream.h"
 
 namespace Envoy {
-
 namespace {
 
 void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeaderMapImpl& headers) {
