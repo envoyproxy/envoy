@@ -8,6 +8,11 @@
 
 #include <string>
 
+#include "common/http/utility.h"
+
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
+
 // TODO(wub): Implement both functions on top of GoogleUrl, then enable
 // quiche/quic/platform/api/quic_hostname_utils_test.cc.
 
@@ -16,13 +21,15 @@ namespace quic {
 // static
 bool QuicHostnameUtilsImpl::IsValidSNI(QuicStringPiece sni) {
   // TODO(wub): Implement it on top of GoogleUrl, once it is available.
-  return sni.find_last_of('.') != std::string::npos;
+
+  return sni.find_last_of('.') != std::string::npos &&
+         Envoy::Http::Utility::Url().initialize(absl::StrCat("http://", sni));
 }
 
 // static
 QuicString QuicHostnameUtilsImpl::NormalizeHostname(QuicStringPiece hostname) {
   // TODO(wub): Implement it on top of GoogleUrl, once it is available.
-  QuicString host(hostname);
+  QuicString host = absl::AsciiStrToLower(hostname);
 
   // Walk backwards over the string, stopping at the first trailing dot.
   size_t host_end = host.length();

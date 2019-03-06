@@ -23,7 +23,7 @@ public:
 
   // Convert hostname to lowercase and remove the trailing '.'.
   // WARNING: mutates |hostname| in place and returns |hostname|.
-  // NOTE(wub): This only removes trailing dots for now.
+  // NOTE(wub): This only does lowercasing and removes trailing dots for now.
   static QuicString NormalizeHostname(QuicStringPiece hostname);
 
 private:
