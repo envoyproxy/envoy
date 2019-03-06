@@ -25,9 +25,9 @@ namespace {
 
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
-StreamInfoFormatter::FieldExtractor sslConnectionStringInfoExtractor(
+StreamInfoFormatter::FieldExtractor sslConnectionInfoStringExtractor(
     std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
-  return [=](const StreamInfo::StreamInfo& stream_info) {
+  return [string_extractor](const StreamInfo::StreamInfo& stream_info) {
     if (stream_info.downstreamSslConnection() == nullptr) {
       return UnspecifiedValueString;
     }
@@ -373,22 +373,22 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
     field_extractor_ =
-        sslConnectionStringInfoExtractor([](const Ssl::ConnectionInfo& connection_info) {
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.uriSanPeerCertificate();
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_URI_SAN") {
     field_extractor_ =
-        sslConnectionStringInfoExtractor([](const Ssl::ConnectionInfo& connection_info) {
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.uriSanLocalCertificate();
         });
   } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
     field_extractor_ =
-        sslConnectionStringInfoExtractor([](const Ssl::ConnectionInfo& connection_info) {
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.subjectPeerCertificate();
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_SUBJECT") {
     field_extractor_ =
-        sslConnectionStringInfoExtractor([](const Ssl::ConnectionInfo& connection_info) {
+        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.subjectLocalCertificate();
         });
   } else {
