@@ -29,6 +29,7 @@ load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_select_quiche",
 )
 
 src_files = glob([
@@ -98,12 +99,24 @@ cc_library(
 
 cc_library(
     name = "quic_platform",
-    srcs = ["quiche/quic/platform/api/quic_mutex.cc"],
+    srcs = [
+        "quiche/quic/platform/api/quic_mutex.cc",
+    ] + envoy_select_quiche(
+        [
+            "quiche/quic/platform/api/quic_hostname_utils.cc",
+        ],
+        "@envoy",
+    ),
     hdrs = [
         "quiche/quic/platform/api/quic_cert_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
         "quiche/quic/platform/api/quic_str_cat.h",
-    ],
+    ] + envoy_select_quiche(
+        [
+            "quiche/quic/platform/api/quic_hostname_utils.h",
+        ],
+        "@envoy",
+    ),
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
@@ -150,6 +163,7 @@ cc_library(
         "quiche/quic/platform/api/quic_test.h",
         "quiche/quic/platform/api/quic_text_utils.h",
         "quiche/quic/platform/api/quic_uint128.h",
+        "quiche/quic/platform/api/quic_thread.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_bug_tracker.h",
         # "quiche/quic/platform/api/quic_clock.h",
@@ -158,7 +172,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_flags.h",
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
         # "quiche/quic/platform/api/quic_goog_cc_sender.h",
-        # "quiche/quic/platform/api/quic_hostname_utils.h",
         # "quiche/quic/platform/api/quic_interval.h",
         # "quiche/quic/platform/api/quic_ip_address_family.h",
         # "quiche/quic/platform/api/quic_ip_address.h",
@@ -173,7 +186,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
         # "quiche/quic/platform/api/quic_test_output.h",
-        # "quiche/quic/platform/api/quic_thread.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
