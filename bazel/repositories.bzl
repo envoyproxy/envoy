@@ -27,46 +27,6 @@ def _repository_impl(name, **kwargs):
         **kwargs
     )
 
-def _build_recipe_repository_impl(ctxt):
-    # on Windows, all deps use rules_foreign_cc
-    if ctxt.os.name.upper().startswith("WINDOWS"):
-        return
-
-    # modify the recipes list based on the build context
-    recipes = _apply_dep_blacklist(ctxt, ctxt.attr.recipes)
-
-    # Setup the build directory with links to the relevant files.
-    ctxt.symlink(Label("//bazel:repositories.sh"), "repositories.sh")
-    ctxt.symlink(
-        Label("//ci/build_container:build_and_install_deps.sh"),
-        "build_and_install_deps.sh",
-    )
-    ctxt.symlink(Label("//ci/build_container:recipe_wrapper.sh"), "recipe_wrapper.sh")
-    ctxt.symlink(Label("//ci/build_container:Makefile"), "Makefile")
-    for r in recipes:
-        ctxt.symlink(
-            Label("//ci/build_container/build_recipes:" + r + ".sh"),
-            "build_recipes/" + r + ".sh",
-        )
-    ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
-
-    # Run the build script.
-    print("Fetching external dependencies...")
-    result = ctxt.execute(
-        ["./repositories.sh"] + recipes,
-        quiet = False,
-    )
-    print(result.stdout)
-    print(result.stderr)
-    print("External dep build exited with return code: %d" % result.return_code)
-    if result.return_code != 0:
-        print("\033[31;1m\033[48;5;226m External dependency build failed, check above log " +
-              "for errors and ensure all prerequisites at " +
-              "https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers are met.")
-
-        # This error message doesn't appear to the user :( https://github.com/bazelbuild/bazel/issues/3683
-        fail("External dep build failed")
-
 def _default_envoy_build_config_impl(ctx):
     ctx.file("WORKSPACE", "")
     ctx.file("BUILD.bazel", "")
@@ -191,43 +151,7 @@ def _envoy_api_deps():
         actual = "@six_archive//:six",
     )
 
-def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
-    envoy_repository = repository_rule(
-        implementation = _build_recipe_repository_impl,
-        environ = [
-            "CC",
-            "CXX",
-            "CFLAGS",
-            "CXXFLAGS",
-            "LD_LIBRARY_PATH",
-        ],
-        # Don't pretend we're in the sandbox, we do some evil stuff with envoy_dep_cache.
-        local = True,
-        attrs = {
-            "recipes": attr.string_list(),
-        },
-    )
-
-    # Ideally, we wouldn't have a single repository target for all dependencies, but instead one per
-    # dependency, as suggested in #747. However, it's much faster to build all deps under a single
-    # recursive make job and single make jobserver.
-    recipes = depset()
-    for t in TARGET_RECIPES:
-        if t not in skip_targets:
-            recipes += depset([TARGET_RECIPES[t]])
-
-    envoy_repository(
-        name = "envoy_deps",
-        recipes = recipes.to_list(),
-    )
-
-    for t in TARGET_RECIPES:
-        if t not in skip_targets:
-            native.bind(
-                name = t,
-                actual = path + ":" + t,
-            )
-
+def envoy_dependencies(skip_targets = []):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
@@ -267,6 +191,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_github_gperftools_gperftools()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
+    _com_github_luajit_luajit()
     _com_github_madler_zlib()
     _com_github_nanopb_nanopb()
     _com_github_nghttp2_nghttp2()
@@ -697,6 +622,22 @@ def _com_github_google_jwt_verify():
         actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )
 
+def _com_github_luajit_luajit():
+    location = REPOSITORY_LOCATIONS["com_github_luajit_luajit"]
+    http_archive(
+        name = "com_github_luajit_luajit",
+        build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:luajit.patch"],
+        patch_args = ["-p1"],
+        patch_cmds = ["chmod u+x build.py"],
+        **location
+    )
+
+    native.bind(
+        name = "luajit",
+        actual = "@envoy//bazel/foreign_cc:luajit",
+    )
+
 def _com_github_gperftools_gperftools():
     location = REPOSITORY_LOCATIONS["com_github_gperftools_gperftools"]
     http_archive(
@@ -713,16 +654,6 @@ def _com_github_gperftools_gperftools():
 
 def _foreign_cc_dependencies():
     _repository_impl("rules_foreign_cc")
-
-def _apply_dep_blacklist(ctxt, recipes):
-    newlist = []
-    skip_list = []
-    if _is_linux_ppc(ctxt):
-        skip_list += PPC_SKIP_TARGETS.keys()
-    for t in recipes:
-        if t not in skip_list:
-            newlist.append(t)
-    return newlist
 
 def _is_linux(ctxt):
     return ctxt.os.name == "linux"

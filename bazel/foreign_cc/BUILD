@@ -29,6 +29,16 @@ cc_library(
     ],
 )
 
+configure_make(
+    name = "luajit",
+    configure_command = "build.py",
+    lib_source = "@com_github_luajit_luajit//:all",
+    make_commands = [],
+    static_libraries = [
+        "libluajit-5.1.a",
+    ],
+)
+
 envoy_cmake_external(
     name = "ares",
     cache_entries = {
