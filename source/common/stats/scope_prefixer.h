@@ -21,22 +21,22 @@ public:
 
   // Scope
   ScopePtr createScope(const std::string& name) override;
-  Counter& counterx(StatName name) override;
-  Gauge& gaugex(StatName name) override;
-  Histogram& histogramx(StatName name) override;
+  Counter& counterFromStatName(StatName name) override;
+  Gauge& gaugeFromStatName(StatName name) override;
+  Histogram& histogramFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
   Counter& counter(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
-    return counterx(storage.statName());
+    return counterFromStatName(storage.statName());
   }
   Gauge& gauge(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
-    return gaugex(storage.statName());
+    return gaugeFromStatName(storage.statName());
   }
   Histogram& histogram(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
-    return histogramx(storage.statName());
+    return histogramFromStatName(storage.statName());
   }
 
   const Stats::StatsOptions& statsOptions() const override { return scope_->statsOptions(); }

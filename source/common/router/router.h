@@ -105,7 +105,8 @@ public:
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers), http_context_(http_context),
-        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {}
+        retry_("retry", scope_.symbolTable()), shadow_writer_(std::move(shadow_writer)),
+        time_source_(time_source) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -118,6 +119,10 @@ public:
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
+  }
+
+  ~FilterConfig() {
+    retry_.free(scope_.symbolTable());
   }
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
@@ -134,6 +139,7 @@ public:
   const bool suppress_envoy_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
+  Stats::StatNameStorage retry_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -405,7 +411,6 @@ private:
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
   MetadataMatchCriteriaConstPtr metadata_match_;
-  Stats::StatNameStorage retry_;
 
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;

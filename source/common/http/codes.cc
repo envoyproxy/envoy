@@ -54,13 +54,18 @@ Stats::StatName CodeStatsImpl::makeStatName(absl::string_view name) {
 void CodeStatsImpl::incCounter(Stats::Scope& scope,
                                const std::vector<Stats::StatName>& names) const {
   Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-  scope.counterx(Stats::StatName(stat_name_storage.get())).inc();
+  scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+}
+
+void CodeStatsImpl::incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const {
+  Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(a, b);
+  scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 
 void CodeStatsImpl::recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
                                     uint64_t count) const {
   Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-  scope.histogramx(Stats::StatName(stat_name_storage.get())).recordValue(count);
+  scope.histogramFromStatName(Stats::StatName(stat_name_storage.get())).recordValue(count);
 }
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
@@ -68,9 +73,12 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
   // Build a dynamic stat for the response code and increment it.
-  incCounter(scope, {prefix, upstream_rq_completed_});
-  incCounter(scope, {prefix, upstreamRqGroup(response_code)});
-  incCounter(scope, {prefix, upstream_rq_.statName(response_code)});
+  //incCounter(scope, {prefix, upstream_rq_completed_});
+  //incCounter(scope, {prefix, upstreamRqGroup(response_code)});
+  //incCounter(scope, {prefix, upstream_rq_.statName(response_code)});
+  incCounter(scope, prefix, upstream_rq_completed_);
+  incCounter(scope, prefix, upstreamRqGroup(response_code));
+  incCounter(scope, prefix, upstream_rq_.statName(response_code));
 }
 
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {

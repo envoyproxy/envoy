@@ -28,7 +28,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       stats_overflow_("stats.overflow", alloc.symbolTable()),
-      num_last_resort_stats_(default_scope_->counterx(stats_overflow_.statName())),
+      num_last_resort_stats_(default_scope_->counterFromStatName(stats_overflow_.statName())),
       heap_allocator_(alloc.symbolTable()), source_(*this), null_counter_(alloc.symbolTable()),
       null_gauge_(alloc.symbolTable()), null_histogram_(alloc.symbolTable()) {}
 
@@ -330,7 +330,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   return **central_ref;
 }
 
-Counter& ThreadLocalStoreImpl::ScopeImpl::counterx(StatName name) {
+Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
   // Determine the final name based on the prefix and the passed name.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -379,8 +379,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
   }
 }
 
-Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugex(StatName name) {
-  // See comments in counterx(). There is no super clean way (via templates or otherwise) to
+Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name) {
+  // See comments in counterFromStatName(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -409,8 +409,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugex(StatName name) {
                              tls_cache);
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramx(StatName name) {
-  // See comments in counterx(). There is no super clean way (via templates or otherwise) to
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name) {
+  // See comments in counterFromStatName(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -460,7 +460,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
     return parent_.null_histogram_;
   }
 
-  // See comments in counterx() which explains the logic here.
+  // See comments in counterFromStatName() which explains the logic here.
 
   StatMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {

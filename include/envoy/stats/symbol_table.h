@@ -129,6 +129,7 @@ public:
    * @return Storage allocated for the joined name.
    */
   virtual StoragePtr join(const std::vector<StatName>& stat_names) const PURE;
+  virtual StoragePtr join(StatName a, StatName b) const PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;

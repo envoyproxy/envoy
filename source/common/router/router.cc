@@ -180,15 +180,14 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
 }
 
 Filter::Filter(FilterConfig& config)
-    : config_(config), retry_("retry", config.scope_.symbolTable()),
-      downstream_response_started_(false), downstream_end_stream_(false), do_shadowing_(false),
-      is_retry_(false), attempting_internal_redirect_with_complete_stream_(false) {}
+    : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
+      do_shadowing_(false), is_retry_(false),
+      attempting_internal_redirect_with_complete_stream_(false) {}
 
 Filter::~Filter() {
   // Upstream resources should already have been cleaned.
   ASSERT(!upstream_request_);
   ASSERT(!retry_state_);
-  retry_.free(config_.scope_.symbolTable());
 }
 
 const std::string Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
@@ -709,7 +708,7 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
     const auto upstream_host = upstream_request_->upstream_host_;
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
       Http::CodeStats& code_stats = httpContext().codeStats();
-      code_stats.chargeBasicResponseStat(cluster_->statsScope(), retry_.statName(),
+      code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_.statName(),
                                          static_cast<Http::Code>(response_code));
       upstream_host->stats().rq_error_.inc();
       return;

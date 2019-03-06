@@ -96,7 +96,7 @@ MockStore::MockStore() {
 MockStore::~MockStore() {}
 
 MockIsolatedStatsStore::MockIsolatedStatsStore()
-    : IsolatedStoreImpl(Test::Global<Stats::FakeSymbolTableImpl>::get()) {}
+    : IsolatedStoreImpl(Test::Global<Stats::SymbolTableImpl>::get()) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() { IsolatedStoreImpl::clear(); }
 
 } // namespace Stats

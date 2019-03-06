@@ -283,6 +283,10 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
 #ifndef ENVOY_CONFIG_COVERAGE
 void SymbolTableImpl::debugPrint() const {
   Thread::LockGuard lock(lock_);
+  debugPrintLockHeld();
+}
+
+void SymbolTableImpl::debugPrintLockHeld() const {
   std::vector<Symbol> symbols;
   for (const auto& p : decode_map_) {
     symbols.push_back(p.first);
@@ -334,6 +338,17 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
     memcpy(p, stat_name.data(), num_bytes);
     p += num_bytes;
   }
+  return bytes;
+}
+
+SymbolTable::StoragePtr SymbolTableImpl::join(StatName a, StatName b) const {
+  uint64_t a_size = a.dataSize();
+  uint64_t b_size = b.dataSize();
+  uint64_t num_bytes = a_size + b_size;
+  auto bytes = std::make_unique<uint8_t[]>(num_bytes + StatNameSizeEncodingBytes);
+  uint8_t* p = saveLengthToBytesReturningNext(num_bytes, bytes.get());
+  memcpy(p, a.data(), a_size);
+  memcpy(p + a_size, b.data(), b_size);
   return bytes;
 }
 

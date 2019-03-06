@@ -28,6 +28,7 @@ private:
   friend class CodeStatsTest;
 
   void incCounter(Stats::Scope& scope, const std::vector<Stats::StatName>& names) const;
+  void incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const;
   void recordHistogram(Stats::Scope& scope, const std::vector<Stats::StatName>& names,
                        uint64_t count) const;
 
@@ -37,18 +38,6 @@ private:
     ~RequestCodeGroup();
 
     Stats::StatName statName(Code response_code);
-
-    /*
-    using LockedStatName = std::pair<absl::Mutex, std::unique_ptr<Stats::StatNameStorage>>;
-
-    // We'll cover known HTTP status codes in a mapped array, which we'll
-    // discover by calling CodeUtility::toString(). Of course the response-code
-    // can be any 64-bit integer as far as we can tell from this class, so
-    // we'll have a fallback flast hash map for those.
-
-    constexpr MaxResponseCode = 600;
-    LockStatName[MaxResponseCode] locked_stat_names_;
-    */
 
   private:
     // Use an array of atomic pointers to hold StatNameStorage objects for

@@ -63,7 +63,7 @@ public:
   }
   StatName tagExtractedStatName() const override { return tag_extracted_stat_name_->statName(); }
 
-  Test::Global<FakeSymbolTableImpl> symbol_table_; // Must outlive name_.
+  Test::Global<SymbolTableImpl> symbol_table_; // Must outlive name_.
   MetricName name_;
   std::vector<Tag> tags_;
 
@@ -178,14 +178,14 @@ public:
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 
-  Counter& counterx(StatName name) override { return counter(symbol_table_->toString(name)); }
-  Gauge& gaugex(StatName name) override { return gauge(symbol_table_->toString(name)); }
-  Histogram& histogramx(StatName name) override { return histogram(symbol_table_->toString(name)); }
+  Counter& counterFromStatName(StatName name) override { return counter(symbol_table_->toString(name)); }
+  Gauge& gaugeFromStatName(StatName name) override { return gauge(symbol_table_->toString(name)); }
+  Histogram& histogramFromStatName(StatName name) override { return histogram(symbol_table_->toString(name)); }
 
   SymbolTable& symbolTable() override { return symbol_table_.get(); }
   const SymbolTable& symbolTable() const override { return symbol_table_.get(); }
 
-  Test::Global<FakeSymbolTableImpl> symbol_table_;
+  Test::Global<SymbolTableImpl> symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
   StatsOptionsImpl stats_options_;
@@ -195,7 +195,7 @@ public:
  * With IsolatedStoreImpl it's hard to test timing stats.
  * MockIsolatedStatsStore mocks only deliverHistogramToSinks for better testing.
  */
-class MockIsolatedStatsStore : private Test::Global<Stats::FakeSymbolTableImpl>,
+class MockIsolatedStatsStore : private Test::Global<Stats::SymbolTableImpl>,
                                public IsolatedStoreImpl {
 public:
   MockIsolatedStatsStore();

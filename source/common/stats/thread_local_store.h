@@ -143,15 +143,15 @@ public:
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
-  Counter& counterx(StatName name) override { return default_scope_->counterx(name); }
+  Counter& counterFromStatName(StatName name) override { return default_scope_->counterFromStatName(name); }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugex(StatName name) override { return default_scope_->gaugex(name); }
+  Gauge& gaugeFromStatName(StatName name) override { return default_scope_->gaugeFromStatName(name); }
   Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
-  Histogram& histogramx(StatName name) override { return default_scope_->histogramx(name); }
+  Histogram& histogramFromStatName(StatName name) override { return default_scope_->histogramFromStatName(name); }
   Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
   const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
@@ -200,10 +200,10 @@ private:
     ~ScopeImpl() override;
 
     // Stats::Scope
-    Counter& counterx(StatName name) override;
+    Counter& counterFromStatName(StatName name) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    Gauge& gaugex(StatName name) override;
-    Histogram& histogramx(StatName name) override;
+    Gauge& gaugeFromStatName(StatName name) override;
+    Histogram& histogramFromStatName(StatName name) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
     ScopePtr createScope(const std::string& name) override {
@@ -215,15 +215,15 @@ private:
     Counter& counter(const std::string& name) override {
       // std::cerr << "counter(" << name << ")" << std::endl;
       StatNameTempStorage storage(name, symbolTable());
-      return counterx(storage.statName());
+      return counterFromStatName(storage.statName());
     }
     Gauge& gauge(const std::string& name) override {
       StatNameTempStorage storage(name, symbolTable());
-      return gaugex(storage.statName());
+      return gaugeFromStatName(storage.statName());
     }
     Histogram& histogram(const std::string& name) override {
       StatNameTempStorage storage(name, symbolTable());
-      return histogramx(storage.statName());
+      return histogramFromStatName(storage.statName());
     }
 
     template <class StatType>

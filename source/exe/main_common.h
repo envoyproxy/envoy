@@ -65,7 +65,7 @@ public:
 
 protected:
   const Envoy::OptionsImpl& options_;
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
 

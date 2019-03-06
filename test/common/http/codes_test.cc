@@ -25,7 +25,7 @@ namespace Http {
 class CodeUtilityTest : public testing::Test {
 public:
   CodeUtilityTest()
-      : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_) {}
+      : global_store_(*symbol_table_), cluster_scope_(*symbol_table_), code_stats_(*symbol_table_) {}
 
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
@@ -39,7 +39,7 @@ public:
     code_stats_.chargeResponseStat(info);
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Envoy::Test::Global<Stats::SymbolTableImpl> symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
@@ -236,7 +236,7 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "prefix.zone.from_az.to_az.upstream_rq_time"), 5));
-  Http::CodeStatsImpl code_stats(symbol_table_);
+  Http::CodeStatsImpl code_stats(*symbol_table_);
   code_stats.chargeResponseTiming(info);
 }
 
