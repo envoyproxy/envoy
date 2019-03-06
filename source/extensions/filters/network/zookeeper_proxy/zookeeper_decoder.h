@@ -50,6 +50,7 @@ public:
   virtual ~DecoderCallbacks() {}
 
   virtual void onDecodeError() PURE;
+  virtual void onRequestBytes(const uint64_t bytes) PURE;
   virtual void onConnect(const bool readonly) PURE;
   virtual void onPing() PURE;
   virtual void onAuthRequest(const std::string& scheme) PURE;

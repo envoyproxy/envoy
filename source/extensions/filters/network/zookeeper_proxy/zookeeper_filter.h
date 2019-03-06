@@ -22,6 +22,7 @@ namespace ZooKeeperProxy {
 // clang-format off
 #define ALL_ZOOKEEPER_PROXY_STATS(COUNTER)                              \
   COUNTER(decoder_error)                                                \
+  COUNTER(request_bytes)                                                \
   COUNTER(connect_rq)                                                   \
   COUNTER(connect_readonly_rq)                                          \
   COUNTER(getdata_rq)                                                   \
@@ -91,6 +92,7 @@ public:
 
   // ZooKeeperProxy::DecoderCallback
   void onDecodeError() override;
+  void onRequestBytes(const uint64_t bytes) override;
   void onConnect(const bool readonly) override;
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;

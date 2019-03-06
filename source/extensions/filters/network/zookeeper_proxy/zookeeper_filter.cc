@@ -94,6 +94,11 @@ void ZooKeeperFilter::onDecodeError() {
   setDynamicMetadata("opname", "error");
 }
 
+void ZooKeeperFilter::onRequestBytes(const uint64_t bytes) {
+  config_->stats_.request_bytes_.add(bytes);
+  setDynamicMetadata("bytes", std::to_string(bytes));
+}
+
 void ZooKeeperFilter::onPing() {
   config_->stats_.ping_rq_.inc();
   setDynamicMetadata("opname", "ping");

@@ -12,10 +12,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 
   // Check message length.
   int32_t len = BufferHelper::peekInt32(data, offset);
-  if (len < 8) {
-    callbacks_.onDecodeError();
-    return;
-  }
+  checkLength(len, 8);
 
   // "Special" requests.
   int32_t xid = BufferHelper::peekInt32(data, offset);
@@ -313,7 +310,9 @@ void DecoderImpl::onData(Buffer::Instance& data) {
   uint64_t offset = 0;
   try {
     while (offset < data.length()) {
+      uint64_t current = offset;
       decode(data, offset);
+      callbacks_.onRequestBytes(offset - current);
     }
   } catch (EnvoyException& e) {
     callbacks_.onDecodeError();

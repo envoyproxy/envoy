@@ -49,6 +49,7 @@ following statistics:
   :widths: 1, 1, 2
 
   decoder_error, Counter, Number of times a message wasn't decoded
+  request_bytes, Counter, Number of bytes in decoded request messages
   connect_rq, Counter, Number of regular connect (non-readonly) requests
   connect_readonly_rq, Counter, Number of connect requests with the readonly flag set
   ping_rq, Counter, Number of ping requests
@@ -83,6 +84,7 @@ The ZooKeeper filter emits the following dynamic metadata for each message parse
 
   <path>, string, "The path associated with the request, response or event"
   <opname>, string, "The opname for the request, response or event"
+  <bytes>, string, "The size of the request message in bytes"
   <watch>, string, "True if a watch is being set, false otherwise"
   <ephemeral>, string, "True if the create znode will be ephemeral, false otherwise"
   <sequence>, string, "True if the create znode will be sequential, false otherwise"
