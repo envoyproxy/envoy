@@ -227,8 +227,16 @@ message TLSProperties {
   string tls_sni_hostname = 3;
 
   message CertificateProperties {
-    // The URI in the SAN field of the certificate.
-    string uri_san = 1;
+    message SubjectAltName {
+      oneof san {
+        string uri = 1;
+        string dns = 2;
+      }
+    }
+
+    // SANs present in the certificate.
+    repeated SubjectAltName subject_alt_name = 1;
+
     // The subject field of the certificate.
     string subject = 2;
   }

@@ -367,11 +367,13 @@ http_logs:
       tls_properties:
         tls_sni_hostname: sni
         local_certificate_properties:
+          subject_alt_name:
+          - uri: localUriSan
           subject: localSubject
-          uri_san: localUriSan
         peer_certificate_properties:
+          subject_alt_name:
+          - uri: peerUriSan
           subject: peerSubject
-          uri_san: peerUriSan
     request:
       request_method: "METHOD_UNSPECIFIED"
     response: {}

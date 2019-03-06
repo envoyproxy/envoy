@@ -205,12 +205,14 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
 
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
+    auto* local_san = local_properties->add_subject_alt_name();
+    local_san->set_uri(stream_info.downstreamSslConnection()->uriSanLocalCertificate());
     local_properties->set_subject(stream_info.downstreamSslConnection()->subjectLocalCertificate());
-    local_properties->set_uri_san(stream_info.downstreamSslConnection()->uriSanLocalCertificate());
 
     auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
+    auto* peer_san = peer_properties->add_subject_alt_name();
+    peer_san->set_uri(stream_info.downstreamSslConnection()->uriSanPeerCertificate());
     peer_properties->set_subject(stream_info.downstreamSslConnection()->subjectPeerCertificate());
-    peer_properties->set_uri_san(stream_info.downstreamSslConnection()->uriSanPeerCertificate());
 
     // TODO(snowp): Populate remaining tls_properties fields.
   }
