@@ -88,6 +88,17 @@ public:
    *         considered valid after. Returns empty absl::optional if there is no peer certificate.
    **/
   virtual absl::optional<SystemTime> expirationPeerCertificate() const PURE;
+
+  /**
+   * @return bool whether the peer certificate chain is presented.
+   **/
+  virtual bool peerCertificateChainPresented() const PURE;
+
+  /**
+   * @return std::string the PEM-encoded representation of the peer certificate chain. Returns ""
+   *         if there is no peer certificate chain or encoding fails.
+   **/
+  virtual const std::string& pemEncodedPeerCertificateChain() const PURE;
 };
 
 } // namespace Ssl

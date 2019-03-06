@@ -59,6 +59,8 @@ public:
   std::vector<std::string> dnsSansLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
+  bool peerCertificateChainPresented() const override;
+  const std::string& pemEncodedPeerCertificateChain() const override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -85,6 +87,7 @@ private:
   uint64_t bytes_to_retry_{};
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
+  mutable std::string cached_pem_encoded_peer_cert_chain_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,
