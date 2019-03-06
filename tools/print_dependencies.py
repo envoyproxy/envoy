@@ -12,6 +12,7 @@ import sys
 API_DEPS = imp.load_source('api', 'api/bazel/repository_locations.bzl')
 DEPS = imp.load_source('deps', 'bazel/repository_locations.bzl')
 
+
 def print_deps(deps):
   print(json.dumps(deps, sort_keys=True, indent=2))
 
