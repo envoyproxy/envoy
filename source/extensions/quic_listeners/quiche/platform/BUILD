@@ -19,6 +19,9 @@ envoy_package()
 
 envoy_cc_library(
     name = "http2_platform_impl_lib",
+    srcs = [
+        "http2_string_utils_impl.cc",
+    ],
     hdrs = [
         "http2_arraysize_impl.h",
         "http2_containers_impl.h",
@@ -30,10 +33,12 @@ envoy_cc_library(
         "http2_ptr_util_impl.h",
         "http2_string_impl.h",
         "http2_string_piece_impl.h",
+        "http2_string_utils_impl.h",
     ],
     external_deps = [
         "abseil_base",
         "abseil_optional",
+        "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
 )
@@ -128,6 +133,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "spdy_platform_impl_lib",
+    srcs = [
+        "spdy_string_utils_impl.cc",
+    ],
     hdrs = [
         "spdy_arraysize_impl.h",
         "spdy_containers_impl.h",
@@ -135,9 +143,11 @@ envoy_cc_library(
         "spdy_estimate_memory_usage_impl.h",
         "spdy_export_impl.h",
         "spdy_macros_impl.h",
+        "spdy_mem_slice_impl.h",
         "spdy_ptr_util_impl.h",
         "spdy_string_impl.h",
         "spdy_string_piece_impl.h",
+        "spdy_string_utils_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
         "spdy_unsafe_arena_impl.h",
@@ -147,6 +157,10 @@ envoy_cc_library(
         "abseil_hash",
         "abseil_inlined_vector",
         "abseil_memory",
+        "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
 )

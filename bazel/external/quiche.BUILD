@@ -60,12 +60,12 @@ cc_library(
         "quiche/http2/platform/api/http2_ptr_util.h",
         "quiche/http2/platform/api/http2_string.h",
         "quiche/http2/platform/api/http2_string_piece.h",
+        "quiche/http2/platform/api/http2_string_utils.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/http2/platform/api/http2_bug_tracker.h",
         # "quiche/http2/platform/api/http2_flags.h",
         # "quiche/http2/platform/api/http2_mock_log.h",
         # "quiche/http2/platform/api/http2_reconstruct_object.h",
-        # "quiche/http2/platform/api/http2_string_utils.h",
         # "quiche/http2/platform/api/http2_test_helpers.h",
     ],
     visibility = ["//visibility:public"],
@@ -82,13 +82,13 @@ cc_library(
         "quiche/spdy/platform/api/spdy_endianness_util.h",
         "quiche/spdy/platform/api/spdy_estimate_memory_usage.h",
         "quiche/spdy/platform/api/spdy_export.h",
+        "quiche/spdy/platform/api/spdy_mem_slice.h",
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
         "quiche/spdy/platform/api/spdy_string_piece.h",
+        "quiche/spdy/platform/api/spdy_string_utils.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/spdy/platform/api/spdy_flags.h",
-        # "quiche/spdy/platform/api/spdy_mem_slice.h",
-        # "quiche/spdy/platform/api/spdy_string_utils.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -202,6 +202,28 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform",
+    ],
+)
+
+envoy_cc_test(
+    name = "http2_platform_test",
+    srcs = [
+        "quiche/http2/platform/api/http2_string_utils_test.cc",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":http2_platform",
+    ],
+)
+
+envoy_cc_test(
+    name = "spdy_platform_test",
+    srcs = [
+        "quiche/spdy/platform/api/spdy_string_utils_test.cc",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":spdy_platform",
     ],
 )
 
