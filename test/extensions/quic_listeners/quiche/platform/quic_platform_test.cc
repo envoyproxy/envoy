@@ -426,8 +426,12 @@ TEST(QuicPlatformTest, QuicTestOutput) {
   // Set log level to INFO to see the test output path in log.
   quic::GetLogger().set_level(quic::INFO);
 
-  quic::QuicRecordTestOutput("quic_test_output.1", "output 1 content\n");
-  quic::QuicRecordTestOutput("quic_test_output.2", "output 2 content\n");
+  EXPECT_LOG_NOT_CONTAINS("warn", "",
+                          quic::QuicRecordTestOutput("quic_test_output.1", "output 1 content\n"));
+  EXPECT_LOG_NOT_CONTAINS("error", "",
+                          quic::QuicRecordTestOutput("quic_test_output.2", "output 2 content\n"));
+  EXPECT_LOG_CONTAINS("info", "Recorded test output into",
+                      quic::QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
 
 } // namespace
