@@ -9,8 +9,10 @@
 #include "common/common/utility.h"
 
 #include "server/options_impl.h"
-#include "server/options_impl_platform_linux.h"
 
+#if defined(__linux__)
+#include "server/options_impl_platform_linux.h"
+#endif
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
