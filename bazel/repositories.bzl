@@ -11,7 +11,6 @@ load(
 load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
 
-
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
 
