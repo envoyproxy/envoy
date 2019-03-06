@@ -83,7 +83,9 @@ public:
     downstream_connection_info_ = connection_info;
   }
 
-  const Ssl::ConnectionInfo * downstreamSslConnection() const override { return downstream_connection_info_; }
+  const Ssl::ConnectionInfo* downstreamSslConnection() const override {
+    return downstream_connection_info_;
+  }
 
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
