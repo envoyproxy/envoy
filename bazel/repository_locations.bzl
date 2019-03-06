@@ -60,7 +60,7 @@ REPOSITORY_LOCATIONS = dict(
     com_github_gabime_spdlog = dict(
         sha256 = "160845266e94db1d4922ef755637f6901266731c4cb3b30b45bf41efa0e6ab70",
         strip_prefix = "spdlog-1.3.1",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.3.0.tar.gz"],
+        urls = ["https://github.com/gabime/spdlog/archive/v1.3.1.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
         sha256 = "8a60ba6242d67a58320e9e16630d80448ef6d5284fda5fb3eff927b63c8b04a2",
