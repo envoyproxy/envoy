@@ -27,37 +27,15 @@ public:
                       Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority,
                       std::string address, uint32_t port)
       : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
-        priority_(priority), address_(std::move(address)), port_(port) {
-    printf("CustomStaticCluster created");
-  }
+        priority_(priority), address_(std::move(address)), port_(port) { }
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
   // ClusterImplBase
-  void startPreInit() override {
-    printf("startPreInit");
-    Upstream::HostSharedPtr host = makeHost();
-    Upstream::HostVector hosts{host};
-    auto hosts_ptr = std::make_shared<Upstream::HostVector>(hosts);
+  void startPreInit() override;
 
-    this->priority_set_.updateHosts(
-        priority_,
-        Upstream::HostSetImpl::partitionHosts(hosts_ptr, Upstream::HostsPerLocalityImpl::empty()),
-        {}, hosts, {}, absl::nullopt);
-
-    onPreInitComplete();
-  }
-
-  inline Upstream::HostSharedPtr makeHost() {
-    Network::Address::InstanceConstSharedPtr address =
-        Network::Utility::parseInternetAddress(address_, port_, false);
-    return Upstream::HostSharedPtr{new Upstream::HostImpl(
-        this->info(), "", address, this->info()->metadata(), 1,
-        envoy::api::v2::core::Locality::default_instance(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), priority_,
-        envoy::api::v2::core::HealthStatus::UNKNOWN)};
-  }
+  inline Upstream::HostSharedPtr makeHost();
 
   const uint32_t priority_;
   const std::string address_;
@@ -82,7 +60,5 @@ private:
                                                  proto_config.port_value());
   }
 };
-
-REGISTER_FACTORY(CustomStaticClusterFactory, Upstream::ClusterFactory);
 
 } // namespace Envoy

@@ -11,7 +11,10 @@ envoy_package()
 
 envoy_cc_test_library(
     name = "custom_static_cluster",
-    srcs = ["custom_static_cluster.h"],
+    srcs = [
+        "custom_static_cluster.cc",
+        "custom_static_cluster.h",
+    ],
     deps = [
         ":cluster_factory_config_proto_cc",
         "//include/envoy/api:api_interface",
