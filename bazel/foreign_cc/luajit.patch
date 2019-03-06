@@ -1,25 +1,3 @@
-#!/bin/bash
-
-set -e
-
-if [[ "${OS}" == "Windows_NT" ]]; then
-  exit 0
-fi
-
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
-
-$($SCRIPT_DIR/versions.py luajit)
-
-FILE_NAME=$(basename "$FILE_URL")
-
-curl "$FILE_URL" -sLo "$FILE_NAME" \
-  && echo "$FILE_SHA256" "$FILE_NAME" | sha256sum --check
-tar xf "$FILE_NAME"
-
-cd "$FILE_PREFIX"
-
-# Fixup Makefile with things that cannot be set via env var.
-cat > luajit_make.diff << 'EOF'
 diff --git a/src/Makefile b/src/Makefile
 index f56465d..3f4f2fa 100644
 --- a/src/Makefile
@@ -65,11 +43,34 @@ index f56465d..3f4f2fa 100644
 
  ##############################################################################
 EOF
-
-patch -p1 < luajit_make.diff
-
-# Default MACOSX_DEPLOYMENT_TARGET is 10.4, which will fail the build at link time on macOS 10.14:
-# ld: library not found for -lgcc_s.10.4
-# This doesn't affect other platforms
-MACOSX_DEPLOYMENT_TARGET=10.6 DEFAULT_CC=${CC} TARGET_CFLAGS=${CFLAGS} TARGET_LDFLAGS=${CFLAGS} \
-  CFLAGS="" make V=1 PREFIX="$THIRDPARTY_BUILD" install
+diff --git a/build.py b/build.py
+new file mode 100755
+index 0000000..9c71271
+--- /dev/null
++++ b/build.py
+@@ -0,0 +1,25 @@
++#!/usr/bin/env python
++
++import argparse
++import os
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--prefix")
++    args = parser.parse_args()
++    os.chdir(os.path.dirname(os.path.realpath(__file__)))
++
++    os.environ["MACOSX_DEPLOYMENT_TARGET"] = "10.6"
++    os.environ["DEFAULT_CC"] = os.environ.get("CC", "")
++    os.environ["TARGET_CFLAGS"] = os.environ.get("CFLAGS", "")
++    os.environ["TARGET_LDFLAGS"] = os.environ.get("CFLAGS", "")
++    os.environ["CFLAGS"] = ""
++    # LuaJIT compile process build a tool `buildvm` and use it, building `buildvm` with ASAN
++    # will cause LSAN detect its leak and fail the build, set exitcode to 0 to make LSAN doesn't
++    # fail on it.
++    os.environ["LSAN_OPTIONS"] = "exitcode=0"
++
++    os.system('make V=1 PREFIX="{}" install'.format(args.prefix))
++
++main()
++

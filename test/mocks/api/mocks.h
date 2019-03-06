@@ -10,6 +10,10 @@
 
 #include "common/api/os_sys_calls_impl.h"
 
+#if defined(__linux__)
+#include "common/api/os_sys_calls_impl_linux.h"
+#endif
+
 #include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/test_time.h"
 
@@ -56,6 +60,8 @@ public:
   MOCK_METHOD3(writev, SysCallSizeResult(int, const iovec*, int));
   MOCK_METHOD3(readv, SysCallSizeResult(int, const iovec*, int));
   MOCK_METHOD4(recv, SysCallSizeResult(int socket, void* buffer, size_t length, int flags));
+  MOCK_METHOD6(recvfrom, SysCallSizeResult(int sockfd, void* buffer, size_t length, int flags,
+                                           struct sockaddr* addr, socklen_t* addrlen));
 
   MOCK_METHOD3(shmOpen, SysCallIntResult(const char*, int, mode_t));
   MOCK_METHOD1(shmUnlink, SysCallIntResult(const char*));
@@ -73,6 +79,14 @@ public:
   using SockOptKey = std::tuple<int, int, int>;
   std::map<SockOptKey, bool> boolsockopts_;
 };
+
+#if defined(__linux__)
+class MockLinuxOsSysCalls : public LinuxOsSysCallsImpl {
+public:
+  // Api::LinuxOsSysCalls
+  MOCK_METHOD3(sched_getaffinity, SysCallIntResult(pid_t pid, size_t cpusetsize, cpu_set_t* mask));
+};
+#endif
 
 } // namespace Api
 } // namespace Envoy

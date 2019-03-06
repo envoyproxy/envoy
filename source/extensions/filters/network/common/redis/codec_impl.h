@@ -7,12 +7,13 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/redis_proxy/codec.h"
+#include "extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Redis {
 
 /**
  * Decoder implementation of https://redis.io/topics/protocol
@@ -91,7 +92,8 @@ private:
   void encodeSimpleString(const std::string& string, Buffer::Instance& out);
 };
 
-} // namespace RedisProxy
+} // namespace Redis
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

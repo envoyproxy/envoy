@@ -8,7 +8,7 @@
 
 #include "common/config/filter_json.h"
 
-#include "extensions/filters/network/redis_proxy/codec_impl.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
@@ -34,9 +34,10 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   std::shared_ptr<CommandSplitter::Instance> splitter(new CommandSplitter::InstanceImpl(
       std::move(conn_pool), context.scope(), filter_config->stat_prefix_, context.timeSource()));
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
-    DecoderFactoryImpl factory;
+    Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
-        factory, EncoderPtr{new EncoderImpl()}, *splitter, filter_config));
+        factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
+        filter_config));
   };
 }
 
