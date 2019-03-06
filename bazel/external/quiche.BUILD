@@ -29,6 +29,7 @@ load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_select_quiche",
 )
 
 src_files = glob([
@@ -99,15 +100,23 @@ cc_library(
 cc_library(
     name = "quic_platform",
     srcs = [
-        "quiche/quic/platform/api/quic_hostname_utils.cc",
         "quiche/quic/platform/api/quic_mutex.cc",
-    ],
+    ] + envoy_select_quiche(
+        [
+            "quiche/quic/platform/api/quic_hostname_utils.cc",
+        ],
+        "@envoy",
+    ),
     hdrs = [
         "quiche/quic/platform/api/quic_cert_utils.h",
-        "quiche/quic/platform/api/quic_hostname_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
         "quiche/quic/platform/api/quic_str_cat.h",
-    ],
+    ] + envoy_select_quiche(
+        [
+            "quiche/quic/platform/api/quic_hostname_utils.h",
+        ],
+        "@envoy",
+    ),
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",

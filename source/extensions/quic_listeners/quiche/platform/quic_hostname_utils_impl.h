@@ -21,9 +21,13 @@ public:
   // NOTE(wub): Only (3) is implemented for now.
   static bool IsValidSNI(QuicStringPiece sni);
 
-  // Convert hostname to lowercase and remove the trailing '.'.
-  // WARNING: mutates |hostname| in place and returns |hostname|.
-  // NOTE(wub): This only does lowercasing and removes trailing dots for now.
+  // Normalize a hostname:
+  //  (1) Canonicalize it, similar to what Chromium does in
+  //  https://cs.chromium.org/chromium/src/net/base/url_util.h?q=net::CanonicalizeHost
+  //  (2) Convert it to lower case.
+  //  (3) Remove the trailing '.'.
+  // WARNING: May mutate |hostname| in place.
+  // NOTE(wub): Only (2) and (3) are implemented for now.
   static QuicString NormalizeHostname(QuicStringPiece hostname);
 
 private:
