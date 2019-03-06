@@ -45,10 +45,10 @@ index f56465d..3f4f2fa 100644
 EOF
 diff --git a/build.py b/build.py
 new file mode 100755
-index 0000000..b069ef6
+index 0000000..9c71271
 --- /dev/null
 +++ b/build.py
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,25 @@
 +#!/usr/bin/env python
 +
 +import argparse
