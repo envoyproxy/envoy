@@ -8,9 +8,8 @@ local_repository(
 load("@envoy//bazel:repositories.bzl", "envoy_dependencies", "GO_VERSION")
 load("@envoy//bazel:cc_configure.bzl", "cc_configure")
 
-envoy_dependencies(
-    path = "@envoy//ci/prebuilt",
-)
+envoy_dependencies()
+
 # TODO(htuch): Roll this into envoy_dependencies()
 load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
 rules_foreign_cc_dependencies()
