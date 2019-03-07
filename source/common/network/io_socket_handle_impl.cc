@@ -22,17 +22,17 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
   }
 }
 
-Api::IoCallUintResult IoSocketHandleImpl::close() {
+Api::IoCallUint64Result IoSocketHandleImpl::close() {
   ASSERT(fd_ != -1);
   const int rc = ::close(fd_);
   fd_ = -1;
-  return Api::IoCallResult<uint64_t>(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+  return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
 }
 
 bool IoSocketHandleImpl::isOpen() const { return fd_ != -1; }
 
-Api::IoCallUintResult IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
-                                                uint64_t num_slice) {
+Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
+                                                  uint64_t num_slice) {
   STACK_ARRAY(iov, iovec, num_slice);
   uint64_t num_slices_to_read = 0;
   uint64_t num_bytes_to_read = 0;
@@ -50,8 +50,8 @@ Api::IoCallUintResult IoSocketHandleImpl::readv(uint64_t max_length, Buffer::Raw
   return sysCallResultToIoCallResult(result);
 }
 
-Api::IoCallUintResult IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
-                                                 uint64_t num_slice) {
+Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
+                                                   uint64_t num_slice) {
   STACK_ARRAY(iov, iovec, num_slice);
   uint64_t num_slices_to_write = 0;
   for (uint64_t i = 0; i < num_slice; i++) {
@@ -62,21 +62,21 @@ Api::IoCallUintResult IoSocketHandleImpl::writev(const Buffer::RawSlice* slices,
     }
   }
   if (num_slices_to_write == 0) {
-    return Api::ioCallUintResultNoError();
+    return Api::ioCallUint64ResultNoError();
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const Api::SysCallSizeResult result = os_syscalls.writev(fd_, iov.begin(), num_slices_to_write);
   return sysCallResultToIoCallResult(result);
 }
 
-Api::IoCallUintResult
+Api::IoCallUint64Result
 IoSocketHandleImpl::sysCallResultToIoCallResult(const Api::SysCallSizeResult& result) {
   if (result.rc_ >= 0) {
     // Return nullptr as IoError upon success.
-    return Api::IoCallUintResult(result.rc_,
-                                 Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+    return Api::IoCallUint64Result(result.rc_,
+                                   Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
   }
-  return Api::IoCallUintResult(
+  return Api::IoCallUint64Result(
       /*rc=*/0,
       (result.errno_ == EAGAIN
            // EAGAIN is frequent enough that its memory allocation should be avoided.

@@ -734,7 +734,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
   EXPECT_CALL(*client_write_buffer_, write(_))
-      .WillOnce(Invoke([&](IoHandle& io_handle) -> Api::IoCallUintResult {
+      .WillOnce(Invoke([&](IoHandle& io_handle) -> Api::IoCallUint64Result {
         dispatcher_->exit();
         return client_write_buffer_->failWrite(io_handle);
       }));
@@ -821,7 +821,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     EXPECT_CALL(*client_write_buffer_, write(_))
         .WillOnce(
             DoAll(Invoke([&](IoHandle&) -> void { client_write_buffer_->drain(bytes_to_flush); }),
-                  Return(testing::ByMove(Api::IoCallUintResult(
+                  Return(testing::ByMove(Api::IoCallUint64Result(
                       bytes_to_flush, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}))))))
         .WillRepeatedly(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
     client_connection_->write(buffer_to_write, false);

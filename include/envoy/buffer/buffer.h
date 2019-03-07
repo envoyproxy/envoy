@@ -168,10 +168,10 @@ public:
    * Read from a file descriptor directly into the buffer.
    * @param io_handle supplies the io handle to read from.
    * @param max_length supplies the maximum length to read.
-   * @return a IoCallUintResult with err_ = nullptr and rc_ = the number of bytes
+   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
    * read if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be used.
    */
-  virtual Api::IoCallUintResult read(Network::IoHandle& io_handle, uint64_t max_length) PURE;
+  virtual Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) PURE;
 
   /**
    * Reserve space in the buffer.
@@ -200,11 +200,11 @@ public:
   /**
    * Write the buffer out to a file descriptor.
    * @param io_handle supplies the io_handle to write to.
-   * @return a IoCallUintResult with err_ = nullptr and rc_ = the number of bytes
+   * @return a IoCallUint64Result with err_ = nullptr and rc_ = the number of bytes
    * written if successful, or err_ = some IoError for failure. If call failed, rc_ shouldn't be
    * used.
    */
-  virtual Api::IoCallUintResult write(Network::IoHandle& io_handle) PURE;
+  virtual Api::IoCallUint64Result write(Network::IoHandle& io_handle) PURE;
 
   /**
    * Copy an integer out of the buffer.

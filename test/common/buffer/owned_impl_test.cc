@@ -122,21 +122,21 @@ TEST_F(OwnedImplTest, Write) {
   Network::IoSocketHandleImpl io_handle;
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
-  Api::IoCallUintResult result = buffer.write(io_handle);
-  EXPECT_EQ(nullptr, result.err_);
+  Api::IoCallUint64Result result = buffer.write(io_handle);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(7, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{6, 0}));
   result = buffer.write(io_handle);
-  EXPECT_EQ(nullptr, result.err_);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(6, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
   result = buffer.write(io_handle);
-  EXPECT_EQ(nullptr, result.err_);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
@@ -154,7 +154,7 @@ TEST_F(OwnedImplTest, Write) {
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{1, 0}));
   result = buffer.write(io_handle);
-  EXPECT_EQ(nullptr, result.err_);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(1, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
@@ -171,8 +171,8 @@ TEST_F(OwnedImplTest, Read) {
   Buffer::OwnedImpl buffer;
   Network::IoSocketHandleImpl io_handle;
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
-  Api::IoCallUintResult result = buffer.read(io_handle, 100);
-  EXPECT_EQ(nullptr, result.err_);
+  Api::IoCallUint64Result result = buffer.read(io_handle, 100);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 

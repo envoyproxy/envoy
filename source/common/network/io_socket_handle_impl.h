@@ -20,18 +20,18 @@ public:
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   int fd() const override { return fd_; }
 
-  Api::IoCallUintResult close() override;
+  Api::IoCallUint64Result close() override;
 
   bool isOpen() const override;
 
-  Api::IoCallUintResult readv(uint64_t max_length, Buffer::RawSlice* slices,
-                              uint64_t num_slice) override;
+  Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
+                                uint64_t num_slice) override;
 
-  Api::IoCallUintResult writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
 
 private:
-  // Converts a SysCallSizeResult to IoCallUintResult.
-  Api::IoCallUintResult sysCallResultToIoCallResult(const Api::SysCallSizeResult& result);
+  // Converts a SysCallSizeResult to IoCallUint64Result.
+  Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallSizeResult& result);
 
   int fd_;
 };
