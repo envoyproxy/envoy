@@ -8,7 +8,8 @@ The ZooKeeper proxy filter decodes the client protocol for
 responses and events in the payload. The decoded info is emitted as dynamic
 metadata that can be combined with access log filters to get detailed
 information on paths that are accessed as well as the requests that are
-performed on each path.
+performed on each path. Most opcodes known in ZooKeeper version 3.5.4 are
+supported, while unknown ones will be treated as decoding errors.
 
 .. attention::
 
