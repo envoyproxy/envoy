@@ -547,7 +547,7 @@ void Filter::onPerTryTimeout() {
     return;
   }
 
-  const std::string body =
+  const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
   onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body,
                   false);
@@ -648,7 +648,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason) {
   }
 
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
-  const std::string body =
+  const absl::string_view body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
                    Http::Utility::resetReasonToString(reset_reason));
 
