@@ -1,4 +1,5 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
@@ -22,6 +23,7 @@
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
 
@@ -424,6 +426,22 @@ TEST(QuicPlatformTest, QuicCertUtils) {
             "0\x12\x6\x3U\x4\x3\f\vTest Server",
             out);
   OPENSSL_free(static_cast<void*>(der));
+}
+
+TEST(QuicPlatformTest, QuicTestOutput) {
+  QuicLogThresholdSaver saver;
+
+  Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
+
+  // Set log level to INFO to see the test output path in log.
+  quic::GetLogger().set_level(quic::INFO);
+
+  EXPECT_LOG_NOT_CONTAINS("warn", "",
+                          quic::QuicRecordTestOutput("quic_test_output.1", "output 1 content\n"));
+  EXPECT_LOG_NOT_CONTAINS("error", "",
+                          quic::QuicRecordTestOutput("quic_test_output.2", "output 2 content\n"));
+  EXPECT_LOG_CONTAINS("info", "Recorded test output into",
+                      quic::QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
 
 } // namespace
