@@ -91,19 +91,22 @@ do
   # string, compare it against a hard-coded string.
   start_test Checking for consistency of /hot_restart_version
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1)
-  EXPECTED_CLI_HOT_RESTART_VERSION="11.200.16384.127.options=capacity=16384, num_slots=8209 hash=228984379728933363 size=2654312"
+  EXPECTED_CLI_HOT_RESTART_VERSION="11.112.16384.127"
+  echo "The Envoy's hot restart version is ${CLI_HOT_RESTART_VERSION}"
+  echo "Now checking that the above version is what we expected."
   check [ "${CLI_HOT_RESTART_VERSION}" = "${EXPECTED_CLI_HOT_RESTART_VERSION}" ]
 
   start_test Checking for consistency of /hot_restart_version with --max-obj-name-len 500
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
     --max-obj-name-len 500 2>&1)
-  EXPECTED_CLI_HOT_RESTART_VERSION="11.200.16384.567.options=capacity=16384, num_slots=8209 hash=228984379728933363 size=9863272"
+  EXPECTED_CLI_HOT_RESTART_VERSION="11.112.16384.567"
   check [ "${CLI_HOT_RESTART_VERSION}" = "${EXPECTED_CLI_HOT_RESTART_VERSION}" ]
 
   start_test Checking for match of --hot-restart-version and admin /hot_restart_version
   ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
   echo fetching hot restart version from http://${ADMIN_ADDRESS_0}/hot_restart_version ...
   ADMIN_HOT_RESTART_VERSION=$(curl -sg http://${ADMIN_ADDRESS_0}/hot_restart_version)
+  echo "Fetched ADMIN_HOT_RESTART_VERSION is ${ADMIN_HOT_RESTART_VERSION}"
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
     --max-obj-name-len 500 2>&1)
   check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]

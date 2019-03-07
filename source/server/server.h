@@ -162,7 +162,6 @@ public:
   DrainManager& drainManager() override { return *drain_manager_; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
   void failHealthcheck(bool fail) override;
-  void  exportStatsToChild(envoy::api::v2::core::HotRestartMessage::Reply::Stats* stats) override;
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
@@ -190,13 +189,7 @@ public:
   }
 
 private:
-  enum class CombineLogic { Accumulate, Maximum, OnlyImportWhenUnused };
-  std::unordered_map<std::string, CombineLogic> combine_logic_exceptions_;
-  std::unordered_map<std::string, uint64_t> parent_counter_values_;
-  std::unordered_map<std::string, uint64_t> parent_gauge_values_;
-  
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
-  void mergeParentStats(const envoy::api::v2::core::HotRestartMessage::Reply::Stats& stats_proto);
   void flushStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);

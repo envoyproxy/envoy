@@ -199,6 +199,9 @@ public:
   MOCK_METHOD2(initialize, void(Event::Dispatcher& dispatcher, Server::Instance& server));
   MOCK_METHOD1(shutdownParentAdmin, void(ShutdownParentAdminInfo& info));
   MOCK_METHOD0(terminateParent, void());
+  MOCK_METHOD2(mergeParentStats,
+               void(Stats::StoreRoot& stats_store,
+                    const envoy::api::v2::core::HotRestartMessage::Reply::Stats& stats_proto));
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());

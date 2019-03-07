@@ -16,6 +16,8 @@ public:
 
 private:
   void onSocketEvent();
+  // Export all stats, to be given to our hot restart child.
+  void exportStatsToChild(envoy::api::v2::core::HotRestartMessage::Reply::Stats* stats);
 
   const int restart_epoch_;
   sockaddr_un child_address_;

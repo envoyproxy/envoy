@@ -2,12 +2,14 @@
 
 #include "envoy/server/instance.h"
 
+#include "common/memory/stats.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
 namespace Server {
 
 using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
+using SimpleMetric = envoy::admin::v2alpha::SimpleMetric;
 
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
@@ -64,7 +66,7 @@ void HotRestartingParent::onSocketEvent() {
 
     case HotRestartMessage::Request::kStats: {
       HotRestartMessage wrapped_reply;
-      server_->exportStatsToChild(wrapped_reply.mutable_reply()->mutable_stats());
+      exportStatsToChild(wrapped_reply.mutable_reply()->mutable_stats());
       sendHotRestartMessage(child_address_, wrapped_reply);
       break;
     }
@@ -88,6 +90,23 @@ void HotRestartingParent::onSocketEvent() {
     }
     }
   }
+}
+
+void HotRestartingParent::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
+  for (const auto& gauge : server_->stats().gauges()) {
+    auto* gauge_proto = stats->mutable_gauges()->Add();
+    gauge_proto->set_name(gauge->name());
+    gauge_proto->set_type(SimpleMetric::GAUGE);
+    gauge_proto->set_value(gauge->value());
+  }
+  for (const auto& counter : server_->stats().counters()) {
+    auto* counter_proto = stats->mutable_counters()->Add();
+    counter_proto->set_name(counter->name());
+    counter_proto->set_type(SimpleMetric::COUNTER);
+    counter_proto->set_value(counter->value());
+  }
+  stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
+  stats->set_num_connections(server_->listenerManager().numConnections());
 }
 
 void HotRestartingParent::shutdown() { socket_event_.reset(); }

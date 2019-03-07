@@ -88,12 +88,6 @@ public:
   virtual void failHealthcheck(bool fail) PURE;
 
   /**
-   * Export all stats, including stats specific to this process, for a hot restart.
-   * @return envoy::api::v2::core::HotRestartMessage::Reply::Stats
-   */
-  virtual void exportStatsToChild(envoy::api::v2::core::HotRestartMessage::Reply::Stats* stats) PURE;
-
-  /**
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() PURE;

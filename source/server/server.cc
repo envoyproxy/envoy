@@ -46,7 +46,6 @@ namespace Envoy {
 namespace Server {
 
 using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
-using SimpleMetric = envoy::admin::v2alpha::SimpleMetric;
 
 InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                            Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
@@ -142,52 +141,6 @@ void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
   source.clearCache();
 }
 
-void InstanceImpl::mergeParentStats(const HotRestartMessage::Reply::Stats& stats_proto)
-{
-  for (const auto& counter_proto : stats_proto.counters())
-  {
-    uint64_t new_parent_value = counter_proto.value();
-    auto found_value = parent_counter_values_.find(counter_proto.name());
-    uint64_t old_parent_value = found_value == parent_counter_values_.end() ? 0 : found_value->second;
-    parent_counter_values_[counter_proto.name()] = new_parent_value;
-    stats_store_.counter(counter_proto.name()).add(new_parent_value - old_parent_value);
-  }
-  for (const auto& gauge_proto : stats_proto.gauges())
-  {
-    uint64_t new_parent_value = gauge_proto.value();
-    auto found_value = parent_gauge_values_.find(gauge_proto.name());
-    uint64_t old_parent_value = found_value == parent_gauge_values_.end() ? 0 : found_value->second;
-    parent_gauge_values_[gauge_proto.name()] = new_parent_value;
-    
-    auto found_exception = combine_logic_exceptions_.find(gauge_proto.name());
-    // "accumulate" is the default logic
-    CombineLogic combine_logic = found_exception == combine_logic_exceptions_.end()
-        ? CombineLogic::Accumulate
-        : found_exception->second;
-    auto& gauge_ref = stats_store_.gauge(gauge_proto.name());
-    uint64_t our_cur_value = gauge_ref.value();
-    switch (combine_logic) {
-    case CombineLogic::Accumulate:
-      if (new_parent_value > old_parent_value) {
-        gauge_ref.add(new_parent_value - old_parent_value);
-      } else {
-        gauge_ref.sub(old_parent_value - new_parent_value);
-      }
-    break;
-    case CombineLogic::Maximum:
-      if (new_parent_value > our_cur_value) {
-        gauge_ref.set(new_parent_value);
-      }
-    break;
-    case CombineLogic::OnlyImportWhenUnused:
-      if (!gauge_ref.used()) {
-        gauge_ref.set(new_parent_value);
-      }
-    break;
-    }
-  }
-}
-
 void InstanceImpl::flushStats() {
   ENVOY_LOG(debug, "flushing stats");
   // A shutdown initiated before this callback may prevent this from being called as per
@@ -197,17 +150,17 @@ void InstanceImpl::flushStats() {
     uint64_t parent_connections = 0;
     std::unique_ptr<HotRestartMessage> wrapper_msg = restarter_.getParentStats();
     if (wrapper_msg) {
-      mergeParentStats(wrapper_msg->reply().stats());
+      restarter_.mergeParentStats(stats_store_, wrapper_msg->reply().stats());
       parent_memory_allocated = wrapper_msg->reply().stats().memory_allocated();
       parent_connections = wrapper_msg->reply().stats().num_connections();
     }
-    
+
     server_stats_->uptime_.set(time(nullptr) - original_start_time_);
     server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
                                          parent_memory_allocated);
     server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
     server_stats_->parent_connections_.set(parent_connections);
-    server_stats_->total_connections_.set(numConnections() + parent_connections);
+    server_stats_->total_connections_.set(listener_manager_->numConnections() + parent_connections);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
     InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_.source());
@@ -216,23 +169,6 @@ void InstanceImpl::flushStats() {
       stat_flush_timer_->enableTimer(config_.statsFlushInterval());
     }
   });
-}
-
-void InstanceImpl::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
-  for (const auto& gauge : stats_store_.gauges()) {
-    auto* gauge_proto = stats->mutable_gauges()->Add();
-    gauge_proto->set_name(gauge->name());
-    gauge_proto->set_type(SimpleMetric::GAUGE);
-    gauge_proto->set_value(gauge->value());
-  }
-  for (const auto& counter : stats_store_.counters()) {
-    auto* counter_proto = stats->mutable_counters()->Add();
-    counter_proto->set_name(counter->name());
-    counter_proto->set_type(SimpleMetric::COUNTER);
-    counter_proto->set_value(counter->value());
-  }
-  stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
-  stats->set_num_connections(numConnections());
 }
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
@@ -460,8 +396,6 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
     failHealthcheck(true);
   }
 }
-
-uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,

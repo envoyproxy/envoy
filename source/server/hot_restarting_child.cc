@@ -43,23 +43,25 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
 
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
   if (!replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats)) {
-    ENVOY_LOG(error, "Did not get a StatsReply for our StatsRequest. Will not merge stats from hot restart parent.");
+    ENVOY_LOG(error, "Did not get a StatsReply for our StatsRequest. Will not merge stats from hot "
+                     "restart parent.");
     return nullptr;
   }
   return wrapped_reply;
 }
 
 void HotRestartingChild::drainParentListeners() {
-  if (restart_epoch_ > 0) {
-    // No reply expected.
-    HotRestartMessage wrapped_request;
-    wrapped_request.mutable_request()->mutable_drain_listeners();
-    sendHotRestartMessage(parent_address_, wrapped_request);
+  if (restart_epoch_ == 0 || parent_terminated_) {
+    return;
   }
+  // No reply expected.
+  HotRestartMessage wrapped_request;
+  wrapped_request.mutable_request()->mutable_drain_listeners();
+  sendHotRestartMessage(parent_address_, wrapped_request);
 }
 
 void HotRestartingChild::shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo& info) {
-  if (restart_epoch_ == 0) {
+  if (restart_epoch_ == 0 || parent_terminated_) {
     return;
   }
 
@@ -81,7 +83,70 @@ void HotRestartingChild::terminateParent() {
   wrapped_request.mutable_request()->mutable_terminate();
   sendHotRestartMessage(parent_address_, wrapped_request);
   parent_terminated_ = true;
-  // TODO TODO is it safe to assume that at this point we will receive no more stat updates from the parent? if so, here would be a good place to empty out the "cur parent stats values" map
+  // Once setting parent_terminated_ == true, we can send no more hot restart RPCs, and therefore
+  // receive no more responses, including stats. So, now safe to forget our stat transferral state.
+  parent_counter_values_.clear();
+  parent_gauge_values_.clear();
+}
+
+void HotRestartingChild::mergeParentStats(Stats::StoreRoot& stats_store,
+                                          const HotRestartMessage::Reply::Stats& stats_proto) {
+  const std::unordered_map<std::string, CombineLogic> combine_logic_exceptions{
+      {".version", CombineLogic::NoImport},
+      {"connected_state", CombineLogic::NoImport},
+  };
+  for (const auto& counter_proto : stats_proto.counters()) {
+    uint64_t new_parent_value = counter_proto.value();
+    auto found_value = parent_counter_values_.find(counter_proto.name());
+    uint64_t old_parent_value =
+        found_value == parent_counter_values_.end() ? 0 : found_value->second;
+    parent_counter_values_[counter_proto.name()] = new_parent_value;
+    stats_store.counter(counter_proto.name()).add(new_parent_value - old_parent_value);
+  }
+  for (const auto& gauge_proto : stats_proto.gauges()) {
+    uint64_t new_parent_value = gauge_proto.value();
+    auto found_value = parent_gauge_values_.find(gauge_proto.name());
+    uint64_t old_parent_value = found_value == parent_gauge_values_.end() ? 0 : found_value->second;
+    parent_gauge_values_[gauge_proto.name()] = new_parent_value;
+
+    CombineLogic combine_logic = CombineLogic::Accumulate;
+    for (auto exception : combine_logic_exceptions) {
+      if (gauge_proto.name().find(exception.first) != std::string::npos) {
+        combine_logic = exception.second;
+        break;
+      }
+    }
+
+    auto& gauge_ref = stats_store.gauge(gauge_proto.name());
+    uint64_t our_cur_value = gauge_ref.value();
+
+    if (combine_logic == CombineLogic::NoImport) {
+      continue;
+    }
+    // If gauge undefined, take parent's value unless explicitly told NoImport.
+    if (!gauge_ref.used()) {
+      gauge_ref.set(new_parent_value);
+    }
+    switch (combine_logic) {
+    case CombineLogic::OnlyImportWhenUnused:
+      // Already set above; nothing left to do.
+      break;
+    case CombineLogic::NoImport:
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    case CombineLogic::Accumulate:
+      if (new_parent_value > old_parent_value) {
+        gauge_ref.add(new_parent_value - old_parent_value);
+      } else {
+        gauge_ref.sub(old_parent_value - new_parent_value);
+      }
+      break;
+    case CombineLogic::Maximum:
+      if (new_parent_value > our_cur_value) {
+        gauge_ref.set(new_parent_value);
+      }
+      break;
+    }
+  }
 }
 
 } // namespace Server
