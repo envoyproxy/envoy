@@ -215,8 +215,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/golang/protobuf/archive/v1.3.0.tar.gz"],
     ),
     io_bazel_rules_go = dict(
-        sha256 = "7be7dc01f1e0afdba6c8eb2b43d2fa01c743be1b9273ab1eaf6c233df078d705",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.16.5/rules_go-0.16.5.tar.gz"],
+        sha256 = "6776d68ebb897625dead17ae510eac3d5f6342367327875210df44dbe2aeeb19",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.17.1/rules_go-0.17.1.tar.gz"],
     ),
     rules_foreign_cc = dict(
         sha256 = "e1b67e1fda647c7713baac11752573bfd4c2d45ef09afb4d4de9eb9bd4e5ac76",
