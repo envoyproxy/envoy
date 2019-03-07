@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
+namespace {
 
 TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   NiceMock<Server::MockInstance> server;
@@ -41,6 +42,7 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   EXPECT_NE(nullptr, tracer);
 }
 
+} // namespace
 } // namespace DynamicOt
 } // namespace Tracers
 } // namespace Extensions

@@ -325,7 +325,8 @@ private:
                                         PrioritySet::UpdateHostsParams&& update_hosts_params,
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
-                                        const HostVector& hosts_removed, ThreadLocal::Slot& tls);
+                                        const HostVector& hosts_removed, ThreadLocal::Slot& tls,
+                                        uint64_t overprovisioning_factor);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,

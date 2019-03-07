@@ -75,7 +75,8 @@ A minimal fully static bootstrap config is provided below:
       filter_chains:
       - filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -126,7 +127,8 @@ on 127.0.0.3:5678 is provided below:
       filter_chains:
       - filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -253,7 +255,8 @@ The management server could respond to LDS requests with:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: AUTO
           rds:
@@ -587,7 +590,7 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
+   connected_state, BoolIndicator, Current connection state with management server
    rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
    pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
    

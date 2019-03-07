@@ -4,6 +4,7 @@
 AAAA
 ACK
 AES
+AFAICT
 ALPN
 ALS
 AMZ
@@ -439,6 +440,7 @@ gregs
 gzip
 hacky
 handshaker
+hd
 hdr
 healths
 healthz
@@ -632,6 +634,7 @@ sanitization
 sanitizer
 scala
 scalability
+sched
 schemas
 serializable
 serializer
@@ -685,12 +688,15 @@ tmp
 tokenizing
 traceid
 trie
+tuple
+tuples
 typeid
 ucontext
 uint
 un
 unary
 unconfigurable
+unconfigured
 uncontended
 undef
 undegraded

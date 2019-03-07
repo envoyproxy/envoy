@@ -18,7 +18,7 @@
 #include "common/protobuf/utility.h"
 #include "common/upstream/load_balancer_impl.h"
 
-#include "extensions/filters/network/redis_proxy/codec_impl.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 namespace Envoy {
@@ -44,11 +44,13 @@ private:
   const bool enable_hashtagging_;
 };
 
-class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
+class ClientImpl : public Client,
+                   public Common::Redis::DecoderCallbacks,
+                   public Network::ConnectionCallbacks {
 public:
   static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                          EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                          const Config& config);
+                          Common::Redis::EncoderPtr&& encoder,
+                          Common::Redis::DecoderFactory& decoder_factory, const Config& config);
 
   ~ClientImpl();
 
@@ -57,7 +59,8 @@ public:
     connection_->addConnectionCallbacks(callbacks);
   }
   void close() override;
-  PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
+  PoolRequest* makeRequest(const Common::Redis::RespValue& request,
+                           PoolCallbacks& callbacks) override;
 
 private:
   struct UpstreamReadFilter : public Network::ReadFilterBaseImpl {
@@ -84,14 +87,15 @@ private:
     bool canceled_{};
   };
 
-  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-             DecoderFactory& decoder_factory, const Config& config);
+  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+             Common::Redis::EncoderPtr&& encoder, Common::Redis::DecoderFactory& decoder_factory,
+             const Config& config);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
   void putOutlierEvent(Upstream::Outlier::Result result);
 
-  // RedisProxy::DecoderCallbacks
-  void onRespValue(RespValuePtr&& value) override;
+  // Common::Redis::DecoderCallbacks
+  void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -100,9 +104,9 @@ private:
 
   Upstream::HostConstSharedPtr host_;
   Network::ClientConnectionPtr connection_;
-  EncoderPtr encoder_;
+  Common::Redis::EncoderPtr encoder_;
   Buffer::OwnedImpl encoder_buffer_;
-  DecoderPtr decoder_;
+  Common::Redis::DecoderPtr decoder_;
   const Config& config_;
   std::list<PendingRequest> pending_requests_;
   Event::TimerPtr connect_or_op_timer_;
@@ -118,7 +122,7 @@ public:
   static ClientFactoryImpl instance_;
 
 private:
-  DecoderFactoryImpl decoder_factory_;
+  Common::Redis::DecoderFactoryImpl decoder_factory_;
 };
 
 class InstanceImpl : public Instance {
@@ -129,7 +133,7 @@ public:
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
 
   // RedisProxy::ConnPool::Instance
-  PoolRequest* makeRequest(const std::string& key, const RespValue& request,
+  PoolRequest* makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                            PoolCallbacks& callbacks) override;
 
 private:
@@ -154,7 +158,7 @@ private:
                            public Upstream::ClusterUpdateCallbacks {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
-    PoolRequest* makeRequest(const std::string& key, const RespValue& request,
+    PoolRequest* makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                              PoolCallbacks& callbacks);
     void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);

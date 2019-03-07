@@ -18,8 +18,7 @@ namespace {
 class LoadStatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public HttpIntegrationTest {
 public:
-  LoadStatsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {
+  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
     // We rely on some fairly specific load balancing picks in this test, so
     // determinize the schedule.
     setDeterministic();

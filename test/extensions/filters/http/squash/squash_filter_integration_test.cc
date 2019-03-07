@@ -19,8 +19,7 @@ namespace Envoy {
 class SquashFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public HttpIntegrationTest {
 public:
-  SquashFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  SquashFilterIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   ~SquashFilterIntegrationTest() {
     if (fake_squash_connection_) {

@@ -14,6 +14,7 @@
 using Envoy::Http::HeaderValueOf;
 
 namespace Envoy {
+namespace {
 
 // Tests a downstream HTTP2 client sending gRPC requests that are converted into HTTP/1.1 for a
 // HTTP1 upstream.
@@ -21,7 +22,7 @@ class ReverseBridgeIntegrationTest : public testing::TestWithParam<Network::Addr
                                      public HttpIntegrationTest {
 public:
   ReverseBridgeIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void SetUp() override {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
@@ -113,4 +114,6 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
+
+} // namespace
 } // namespace Envoy

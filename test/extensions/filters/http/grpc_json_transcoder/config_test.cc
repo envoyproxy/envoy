@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
+namespace {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -20,6 +21,7 @@ TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
       ProtoValidationException);
 }
 
+} // namespace
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters
 } // namespace Extensions

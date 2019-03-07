@@ -26,6 +26,7 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
@@ -544,5 +545,6 @@ resources:
   EXPECT_EQ(0UL, store_.gauge("cluster_manager.cds.version").value());
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

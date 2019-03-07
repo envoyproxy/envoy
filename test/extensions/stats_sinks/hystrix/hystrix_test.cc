@@ -28,6 +28,7 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
+namespace {
 
 class ClusterTestInfo {
 
@@ -544,6 +545,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   EXPECT_THAT(access_control_allow_headers, HasSubstr("Accept"));
 }
 
+} // namespace
 } // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions

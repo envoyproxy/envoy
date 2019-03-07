@@ -22,6 +22,7 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+namespace {
 
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
@@ -497,6 +498,7 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
 
+} // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
 } // namespace Extensions

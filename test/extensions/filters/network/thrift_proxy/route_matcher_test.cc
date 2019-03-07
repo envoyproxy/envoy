@@ -16,7 +16,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
-
 namespace {
 
 envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration
@@ -849,6 +848,7 @@ routes:
     EXPECT_EQ(hv3, mmc[1]->value());
   }
 }
+
 } // namespace
 } // namespace Router
 } // namespace ThriftProxy
