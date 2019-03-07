@@ -5,14 +5,14 @@ namespace Runtime {
 
 // Add additional features here to enable the new code paths by default.
 //
-// These features should not be overridden with run-time guards without a bug
-// being filed on github as once high risk features are true by default, the
-// old code path will be removed with the next release.
+//
+// If issues are found that that require a feature to be disabled, it should be reported ASAP by
+// filing a bug on github. Overriding non-buggy code is strongly discouraged as once high risk
+// features are try by default the old code path will be removed with the next release (and better
+// to find and fix bugs while the old code path is still available!)
 constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
-    // Disabled
-    // "envoy.reloadable_features.test_feature_false",
 };
 
 // TODO(alyssawilk) handle deprecation of reloadable_features. Ideally runtime

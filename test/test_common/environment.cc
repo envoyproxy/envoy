@@ -77,7 +77,7 @@ public:
   // As each test ends, clean up the RuntimeFeaturesDefaults state.
   void OnTestEnd(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      Runtime::RuntimeFeaturesPeer::addFeature(runtime_override_);
+      Runtime::RuntimeFeaturesPeer::removeFeature(runtime_override_);
     }
   }
   std::string runtime_override_;

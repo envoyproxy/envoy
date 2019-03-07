@@ -158,10 +158,9 @@ std::string RandomGeneratorImpl::uuid() {
 
 bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
   bool allowed = false;
-  // See if this value is explicitly set as a runtime boolean.
-  bool stored = getBoolean(key, allowed);
-  // If not, the default value is based on disallowedByDefault.
-  if (!stored) {
+  // If the value is not explicitly set as a runtime boolean, the default value is based on
+  // disallowedByDefault.
+  if (!getBoolean(key, allowed)) {
     allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
   }
 
@@ -177,10 +176,9 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
 
 bool SnapshotImpl::runtimeFeatureEnabled(const std::string& key) const {
   bool enabled = false;
-  // See if this value is explicitly set as a runtime boolean.
-  bool stored = getBoolean(key, enabled);
-  // If not, the default value is based on runtime_features.
-  if (!stored) {
+  // If the value is not explicitly set as a runtime boolean, the default value is based on
+  // disallowedByDefault.
+  if (!getBoolean(key, enabled)) {
     enabled = RuntimeFeaturesDefaults::get().enabledByDefault(key);
   }
 
