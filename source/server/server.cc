@@ -67,7 +67,6 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr) {
-
   try {
     if (!options.logPath().empty()) {
       try {
