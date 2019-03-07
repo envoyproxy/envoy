@@ -13,7 +13,6 @@ namespace Envoy {
                 public:
                     const std::string HTTP_HOST = "http.host";
                     const std::string HTTP_METHOD = "http.method";
-                    const std::string HTTP_PATH = "http.path";
                     const std::string HTTP_URL = "http.url";
                     const std::string HTTP_STATUS_CODE = "http.status_code";
                     const std::string HTTP_REQUEST_SIZE = "request_size";

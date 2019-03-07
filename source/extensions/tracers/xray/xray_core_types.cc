@@ -22,19 +22,19 @@ namespace Envoy {
                 const std::string Span::VERSION_ = "1";
                 const std::string Span::FORMAT_ = "json";
 
-                BinaryAnnotation::BinaryAnnotation(const BinaryAnnotation& ann) {
+                Annotation::Annotation(const Annotation& ann) {
                     key_ = ann.key();
                     value_ = ann.value();
                 }
 
-                BinaryAnnotation& BinaryAnnotation::operator=(const BinaryAnnotation& ann) {
+                Annotation& Annotation::operator=(const Annotation& ann) {
                     key_ = ann.key();
                     value_ = ann.value();
 
                     return *this;
                 }
 
-                const std::string BinaryAnnotation::toJson() {
+                const std::string Annotation::toJson() {
                     rapidjson::StringBuffer s;
                     rapidjson::Writer<rapidjson::StringBuffer> writer(s);
                     writer.StartObject();
@@ -50,7 +50,7 @@ namespace Envoy {
                 ChildSpan::ChildSpan(const ChildSpan &child) {
                     name_ = child.name();
                     id_ = child.id();
-                    binary_annotations_ = child.binaryAnnotations();
+                    annotations_ = child.annotations();
                     start_time_ = child.startTime();
                 }
 
@@ -68,13 +68,14 @@ namespace Envoy {
                     writer.Key(XRayJsonFieldNames::get().SPAN_NAMESPACE.c_str());
                     writer.String(XRayJsonFieldNames::get().SPAN_REMOTE.c_str());
 
-                    std::vector<BinaryAnnotation> http_request_annotation_json_vector;
-                    std::vector<BinaryAnnotation> http_response_annotation_json_vector;
+                    std::vector<Annotation> http_request_annotation_json_vector;
+                    std::vector<Annotation> http_response_annotation_json_vector;
 
                     writer.Key(XRayJsonFieldNames::get().SPAN_NAME.c_str());
                     std::string span_name;
+                    writer.String(name_.c_str());
 
-                    for (auto it = binary_annotations_.begin(); it != binary_annotations_.end(); it++) {
+                    for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
                         if (it->key() == XRayJsonFieldNames::get().SPAN_URL) {
                             http_request_annotation_json_vector.push_back(*it);
                         } else if (it->key() == XRayJsonFieldNames::get().SPAN_METHOD) {
@@ -83,14 +84,10 @@ namespace Envoy {
                             http_request_annotation_json_vector.push_back(*it);
                         } else if (it->key() == XRayJsonFieldNames::get().SPAN_STATUS) {
                             http_response_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayCoreConstants::get().UPSTREAM_CLUSTER) {
-                            span_name = it->value();
                         } else if (it->key() == XRayJsonFieldNames::get().SPAN_CONTENT_LENGTH) {
                             http_response_annotation_json_vector.push_back(*it);
                         }
                     }
-
-                    writer.String(name_.c_str());
 
                     if (http_request_annotation_json_vector.size() != 0 || http_response_annotation_json_vector.size() != 0) {
                         writer.Key(XRayJsonFieldNames::get().SPAN_HTTP_ANNOTATIONS.c_str());
@@ -137,10 +134,7 @@ namespace Envoy {
                         parent_id_ = span.parentId();
                     }
                     sampled_ = span.sampled();
-                    binary_annotations_ = span.binaryAnnotations();
-                    if (span.isSetTimestamp()) {
-                        timestamp_ = span.timestamp();
-                    }
+                    annotations_ = span.annotations();
                     start_time_ = span.startTime();
                     tracer_ = span.tracer();
                     child_span_ = span.childSpans();
@@ -181,13 +175,13 @@ namespace Envoy {
                     writer.Key(XRayJsonFieldNames::get().SPAN_ORIGIN.c_str());
                     writer.String(XRayJsonFieldNames::get().SPAN_ORIGIN_VALUE.c_str());
 
-                    std::vector<BinaryAnnotation> http_request_annotation_json_vector;
-                    std::vector<BinaryAnnotation> http_response_annotation_json_vector;
+                    std::vector<Annotation> http_request_annotation_json_vector;
+                    std::vector<Annotation> http_response_annotation_json_vector;
 
                     writer.Key(XRayJsonFieldNames::get().SPAN_NAME.c_str());
-                    std::string span_name;
+                    writer.String(name_.c_str());
 
-                    for (auto it = binary_annotations_.begin(); it != binary_annotations_.end(); it++) {
+                    for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
                         if (it->key() == XRayCoreConstants::get().HTTP_URL) {
                             it->setKey(XRayJsonFieldNames::get().SPAN_URL);
                             http_request_annotation_json_vector.push_back(*it);
@@ -200,19 +194,10 @@ namespace Envoy {
                         } else if (it->key() == XRayCoreConstants::get().HTTP_STATUS_CODE) {
                             it->setKey(XRayJsonFieldNames::get().SPAN_STATUS);
                             http_response_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayCoreConstants::get().UPSTREAM_CLUSTER) {
-                            span_name = it->value();
                         } else if (it->key() == XRayCoreConstants::get().HTTP_RESPONSE_SIZE) {
                             it->setKey(XRayJsonFieldNames::get().SPAN_CONTENT_LENGTH);
                             http_response_annotation_json_vector.push_back(*it);
                         }
-                    }
-
-                    if (span_name != "-" && !span_name.empty()) {
-                        std::replace(span_name.begin(), span_name.end(), '|', '.');
-                        writer.String(span_name.c_str());
-                    } else {
-                        writer.String(name_.c_str());
                     }
 
                     int status_code = 0;
@@ -271,7 +256,7 @@ namespace Envoy {
 
                     std::vector<std::string> child_json_vector;
 
-                    child_span_[0].setBinaryAnnotations(binary_annotations_);
+                    child_span_[0].setAnnotations(annotations_);
 
                     for (auto it = child_span_.begin(); it != child_span_.end(); it++) {
                         child_json_vector.push_back(it->toJson());
@@ -292,10 +277,10 @@ namespace Envoy {
 
                 void Span::setTag(const std::string& name, const std::string& value) {
                     if (name.size() > 0 && value.size() > 0) {
-                        addBinaryAnnotation(BinaryAnnotation(name, value));
+                        addAnnotation(Annotation(name, value));
                     }
                 }
-            }
-        }
-    }
-}
+            } // namespace XRay
+        } // namespace Tracers
+    } // namespace Extensions
+} // namespace Envoy

@@ -11,14 +11,10 @@ namespace Envoy {
             namespace XRay {
 
                 /**
-                 * Utility class with a few convenient methods
+                 * Utility class with a few convenient methods.
                 */
                 class Util {
                 public:
-                    // ====
-                    // Stringified-JSON manipulation
-                    // ====
-
                     /**
                      * Merges the stringified JSONs given in target and source.
                      *
@@ -43,8 +39,39 @@ namespace Envoy {
                      */
                     static uint64_t generateRandom64(TimeSource& time_source);
 
-                };
+                    /**
+                     * Generate Random double value.
+                     * @return a randomly-generated double number from 0-1.
+                     */
+                    static double generateRandomDouble();
 
+                    /**
+                     * Performs a case-insensitive wildcard match against two strings. This method works with pseduo-regex chars; specifically ? and * are supported.
+                     *
+                     * An asterisk (*) represents any combination of characters.
+                     * A question mark (?) represents any single character.
+                     *
+                     * @param pattern The regex-like pattern to be compared against.
+                     * @param text The string to compare against the pattern.
+                     * @return whether the text matches the pattern.
+                     */
+                    static bool wildcardMatch(std::string& pattern, std::string& text);
+
+                    /**
+                     * Performs simple wildcard match.
+                     * @param pattern The regex-like pattern to be compared against
+                     * @param text The string to compare against the pattern.
+                     * @return whether the text matches the pattern.
+                     */
+                    static bool simpleWildcardMatch(std::string& pattern, std::string& text);
+
+                    /**
+                     * Indicates whether the passed pattern is a single wildcard glob
+                     * (i.e., "*")
+                     */
+                    static bool isWildcardGlob(std::string& pattern);
+
+                };
             } // namespace XRay
         } // namespace Tracers
     } // namespace Extensions

@@ -9,6 +9,7 @@
 #include "extensions/tracers/xray/tracer_interface.h"
 #include "extensions/tracers/xray/xray_core_constants.h"
 #include "extensions/tracers/xray/xray_core_types.h"
+#include "extensions/tracers/xray/sampling.h"
 
 namespace Envoy {
     namespace Extensions {
@@ -35,19 +36,19 @@ namespace Envoy {
 
                 typedef std::unique_ptr<Reporter> ReporterPtr;
 
+                /**
+                 * This class implements the XRay tracer.
+                 */
                 class Tracer : public TracerInterface {
                 public:
                     /**
                      * Constructor.
                      *
-                     * @param service_name The name of the service where the Tracer is running. This name is
-                     * used in all annotations' endpoints of the spans created by the Tracer.
-                     * @param address Pointer to a network-address object. The IP address and port are used
-                     * in all annotations' endpoints of the spans created by the Tracer.
+                     * @param segment_name The name of the X-Ray segment.
                      * @param random_generator Reference to the random-number generator to be used by the Tracer.
                      */
-                    Tracer(const std::string &service_name, Runtime::RandomGenerator& random_generator) : service_name_(
-                            service_name), reporter_(nullptr), random_generator_(random_generator){}
+                    Tracer(const std::string& segment_name, Runtime::RandomGenerator& random_generator, LocalizedSamplingStrategy& localized_sampling_strategy) : segment_name_(
+                            segment_name), reporter_(nullptr), random_generator_(random_generator), localized_sampling_strategy_(localized_sampling_strategy) {}
 
                     /**
                      * Creates a "root" XRay span.
@@ -56,7 +57,7 @@ namespace Envoy {
                      * @param span_name Name of the new span.
                      * @param start_time The time indicating the beginning of the span.
                      */
-                    SpanPtr startSpan(const Tracing::Config &, const std::string &span_name, SystemTime timestamp);
+                    SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp);
 
                     /**
                      * Depending on the given context, creates either a "child" or a "shared-context" XRay span.
@@ -66,8 +67,8 @@ namespace Envoy {
                      * @param start_time The time indicating the beginning of the span.
                      * @param previous_context The context of the span preceding the one to be created.
                      */
-                    SpanPtr startSpan(const Tracing::Config &, const std::string &span_name, SystemTime timestamp,
-                                      SpanContext &previous_context);
+                    SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
+                                      SpanContext& previous_context);
 
                     /**
                      * TracerInterface::reportSpan.
@@ -80,18 +81,29 @@ namespace Envoy {
                     void setReporter(ReporterPtr reporter);
 
                     /**
-                     * @return the service-name attribute associated with the Tracer.
+                     * @return the segment name associated with the Tracer.
                      */
-                    const std::string &serviceName() const { return service_name_; }
-
+                    const std::string& segmentName() const { return segment_name_; }
 
                     /**
                      * @return the random-number generator associated with the Tracer.
                      */
-                    Runtime::RandomGenerator &randomGenerator() { return random_generator_; }
+                    Runtime::RandomGenerator& randomGenerator() { return random_generator_; }
 
-                    std::string random_24bits_string();
+                    /**
+                     *
+                     * @return the instance of localized sampling strategy.
+                     */
+                    LocalizedSamplingStrategy& localizedSamplingStrategy() { return localized_sampling_strategy_; }
 
+                    /**
+                     * Generates A 96-bit identifier for the trace, globally unique, in 24 hexadecimal digits.
+                     */
+                    std::string generateRandom96BitString();
+
+                    /**
+                     * Generates A unique identifier that connects all segments and subsegments originating from a single client request.
+                     */
                     std::string generateTraceId();
 
                 private:
@@ -99,9 +111,10 @@ namespace Envoy {
                     static const std::string DELIMITER_;
                     const char *hex_digits = "0123456789abcdef";
 
-                    const std::string service_name_;
+                    const std::string segment_name_;
                     ReporterPtr reporter_;
-                    Runtime::RandomGenerator &random_generator_;
+                    Runtime::RandomGenerator& random_generator_;
+                    LocalizedSamplingStrategy localized_sampling_strategy_;
                 };
 
                 typedef std::unique_ptr<Tracer> TracerPtr;

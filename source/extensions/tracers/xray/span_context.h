@@ -10,6 +10,11 @@ namespace Envoy {
     namespace Extensions {
         namespace Tracers {
             namespace XRay {
+
+                /**
+                 * This class represents the context of a XRay span. It embodies the following
+                 * span characteristics: trace id, id, parent id, and sampling decision.
+                 */
                 class SpanContext {
                 public:
                     /**
@@ -22,12 +27,12 @@ namespace Envoy {
                      * parent ids, and sampled flag.
                      *
 
-                     * @param trace_id The low 64 bits of the trace id.
+                     * @param trace_id The trace id.
                      * @param id The span id.
                      * @param parent_id The parent id.
                      * @param sampled The sampled flag.
                      */
-                    SpanContext(const std::string trace_id, const uint64_t id, const uint64_t parent_id, bool sampled)
+                    SpanContext(const std::string& trace_id, const uint64_t id, const uint64_t parent_id, bool sampled)
                             : trace_id_(trace_id), id_(id), parent_id_(parent_id),
                               sampled_(sampled) {}
 
@@ -49,7 +54,7 @@ namespace Envoy {
                     uint64_t parent_id() const { return parent_id_; }
 
                     /**
-                     * @return the low 64 bits of the trace id as an integer.
+                     * @return the string format of trace id.
                      */
                     std::string trace_id() const { return trace_id_; }
 

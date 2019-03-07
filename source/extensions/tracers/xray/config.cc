@@ -26,8 +26,7 @@ namespace Envoy {
                     const auto& xray_config =
                             dynamic_cast<const envoy::config::trace::v2::XRayConfig&>(*config_ptr);
 
-                    Tracing::DriverPtr xray_driver{std::make_unique<XRay::Driver>(xray_config, server.clusterManager(),
-                                                                        server.stats(), server.threadLocal(),
+                    Tracing::DriverPtr xray_driver{std::make_unique<XRay::Driver>(xray_config, server.threadLocal(),
                                                                         server.runtime(), server.localInfo(), rand)};
 
                     return Tracing::HttpTracerPtr(new Tracing::HttpTracerImpl(std::move(xray_driver), server.localInfo()));

@@ -18,7 +18,7 @@ namespace Envoy {
 
                 /**
                  * Base class to be inherited by all classes that represent XRay-related concepts, namely:
-                 * endpoint, annotation, binary annotation, and span.
+                 * annotation, and span.
                  */
                 class XRayBase {
                 public:
@@ -34,30 +34,33 @@ namespace Envoy {
                     virtual const std::string toJson() PURE;
                 };
 
-                class BinaryAnnotation : public XRayBase {
+                /**
+                 * Represents an Annotation. This class stores "string" type key-value pair.
+                 */
+                class Annotation : public XRayBase {
                 public:
                     /**
                      * Copy constructor.
                      */
-                    BinaryAnnotation(const BinaryAnnotation&);
+                    Annotation(const Annotation&);
 
                     /**
                      * Assignment operator.
                      */
-                    BinaryAnnotation& operator=(const BinaryAnnotation&);
+                    Annotation& operator=(const Annotation&);
 
                     /**
                      * Default constructor. Creates an empty binary annotation.
                      */
-                    BinaryAnnotation() : key_(), value_() {}
+                    Annotation() : key_(), value_() {}
 
                     /**
-                     * Constructor that creates a binary annotation based on the given parameters.
+                     * Constructor that creates an annotation based on the given parameters.
                      *
                      * @param key The key name of the annotation.
                      * @param value The value associated with the key.
                      */
-                    BinaryAnnotation(const std::string& key, const std::string& value) : key_(key), value_(value) {}
+                    Annotation(const std::string& key, const std::string& value) : key_(key), value_(value) {}
 
                     /**
                      * @return the key attribute.
@@ -91,45 +94,92 @@ namespace Envoy {
                     std::string value_;
                 };
 
+                /**
+                 * Represents a XRay child span.
+                 */
                 class ChildSpan : public XRayBase {
                 public:
+                    /**
+                     * Copy constructor.
+                     */
                     ChildSpan(const ChildSpan&);
 
+                    /**
+                     * Default constructor. Creates an empty child span.
+                     */
                     ChildSpan() : name_(), id_(0), start_time_(0) {}
 
+                    /**
+                     * Sets the child span's name attribute.
+                     */
                     void setName(const std::string& val) { name_ = val; }
 
+                    /**
+                     * Sets the child span's id attribute.
+                     */
                     void setId(const uint64_t val) { id_ = val; }
 
-                    void setBinaryAnnotations(const std::vector<BinaryAnnotation>& val) { binary_annotations_ = val; }
-
-                    void addBinaryAnnotation(const BinaryAnnotation& bann) { binary_annotations_.push_back(bann); }
-
-                    void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
-
-                    const std::vector<BinaryAnnotation>& binaryAnnotations() const { return binary_annotations_; }
-
+                    /**
+                    * Sets the child span's start time attribute.
+                    */
                     void setStartTime(const double time) { start_time_ = time; }
 
+                    /**
+                     * Sets the child span's annotation attribute at once.
+                     */
+                    void setAnnotations(const std::vector<Annotation>& val) { annotations_ = val; }
+
+                    /**
+                     * Adds the child span's annotation attribute.
+                     */
+                    void addAnnotation(const Annotation& bann) { annotations_.push_back(bann); }
+
+                    void addAnnotation(const Annotation&& bann) { annotations_.push_back(bann); }
+
+                    /**
+                     * @return the child span's annotations attribute.
+                     */
+                    const std::vector<Annotation>& annotations() const { return annotations_; }
+
+                    /**
+                     * @return the child span's id attribute.
+                     */
                     uint64_t id() const { return id_; }
 
+                    /**
+                     * @return the child span's id hex string represent.
+                     */
                     const std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
 
+                    /**
+                     * @return the child span's name attribute.
+                     */
                     const std::string& name() const { return name_; }
 
+                    /**
+                     * @return the child span's start time attribute.
+                     */
                     double startTime() const { return start_time_; }
 
+                    /**
+                     * Serializes the child span as a JSON representation as a string.
+                     *
+                     * @return a stringified JSON.
+                     */
                     const std::string toJson() override;
 
                 private:
                     std::string name_;
                     uint64_t id_;
-                    std::vector<BinaryAnnotation> binary_annotations_;
+                    std::vector<Annotation> annotations_;
                     double start_time_;
                 };
 
                 typedef std::unique_ptr<Span> SpanPtr;
 
+                /**
+                 * Represents a XRay span.
+                 */
                 class Span : public XRayBase, Logger::Loggable<Logger::Id::tracing> {
                 public:
                     /**
@@ -173,50 +223,58 @@ namespace Envoy {
                     void setSampled(bool val) { sampled_ = val; }
 
                     /**
-                     * Sets the span's binary annotations all at once.
+                     * Sets the span's annotations all at once.
                      */
-                    void setBinaryAnnotations(const std::vector<BinaryAnnotation>& val) { binary_annotations_ = val; }
+                    void setAnnotations(const std::vector<Annotation>& val) { annotations_ = val; }
 
                     /**
-                     * Adds a binary annotation to the span (copy semantics).
+                     * Adds a annotation to the span (copy semantics).
                      */
-                    void addBinaryAnnotation(const BinaryAnnotation& bann) { binary_annotations_.push_back(bann); }
+                    void addAnnotation(const Annotation& bann) { annotations_.push_back(bann); }
 
                     /**
-                     * Adds a binary annotation to the span (move semantics).
+                     * Adds a annotation to the span (move semantics).
                      */
-                    void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
+                    void addAnnotation(const Annotation&& bann) { annotations_.push_back(bann); }
 
-                    const std::vector<BinaryAnnotation>& binaryAnnotations() const { return binary_annotations_; }
+                    /**
+                     * @return the span's annotations attribute.
+                     */
+                    const std::vector<Annotation>& annotations() const { return annotations_; }
 
+                    /**
+                     * Sets the span's child spans all at once.
+                     */
                     void setChildSpans(const std::vector<ChildSpan>& val) { child_span_ = val; }
 
+                    /**
+                     * Adds the span's child span.
+                     */
                     void addChildSpan(const ChildSpan& child) {
                         child_span_.push_back(child);
                     }
 
+                    /**
+                     * Adds the span's child span.
+                     */
                     void addChildSpan(const ChildSpan&& child) {
                         child_span_.push_back(child);
                     }
 
+                    /**
+                     * @return the span's child spans.
+                     */
                     const std::vector<ChildSpan>& childSpans() const { return child_span_; }
 
                     /**
-                     * Sets the span's timestamp attribute.
+                     * Sets the span's operation name attribute.
                      */
-                    void setTimestamp(const int64_t val) { timestamp_ = val; }
+                    void setOperationName(const std::string& operation) { operation_name_ = operation; }
 
                     /**
-                     * @return Whether or not the timestamp attribute is set.
-                     */
-                    bool isSetTimestamp() const { return timestamp_.has_value(); }
-
-                    /**
-                     * Sets the span start-time attribute (monotonic, used to calculate duration).
+                     * Sets the span's start time attribute.
                      */
                     void setStartTime(const double time) { start_time_ = time; }
-
-                    void setServiceName(const std::string& service_name);
 
                     /**
                      * @return the span's id as an integer.
@@ -228,6 +286,14 @@ namespace Envoy {
                      */
                     const std::string idAsHexString() const { return Hex::uint64ToHex(id_); }
 
+                    /**
+                    * @return the span's parent id as an integer.
+                    */
+                    uint64_t parentId() const { return parent_id_.value(); }
+
+                    /**
+                     * @return the span's parent id as a hexadecimal string.
+                     */
                     const std::string parentIdAsHexString() const {
                         return parent_id_ ? Hex::uint64ToHex(parent_id_.value()) : EMPTY_HEX_STRING_;
                     }
@@ -238,9 +304,9 @@ namespace Envoy {
                     const std::string& name() const { return name_; }
 
                     /**
-                     * @return the span's parent id as an integer.
-                     */
-                    uint64_t parentId() const { return parent_id_.value(); }
+                    * @return the span's operation name.
+                    */
+                    const std::string& operationName() const { return operation_name_; }
 
                     /**
                      * @return whether or not the sampled attribute is set
@@ -248,17 +314,12 @@ namespace Envoy {
                     bool sampled() const { return sampled_; }
 
                     /**
-                     * @return the span's timestamp (clock time for user presentation: microseconds since epoch).
-                     */
-                    int64_t timestamp() const { return timestamp_.value(); }
-
-                    /**
                      * @return the span's trace id as a string.
                      */
                     const std::string traceId() const { return trace_id_; }
 
                     /**
-                     * @return the span's start time (monotonic, used to calculate duration).
+                     * @return the span's start time.
                      */
                     double startTime() const { return start_time_; }
 
@@ -271,8 +332,7 @@ namespace Envoy {
 
                     /**
                      * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked
-                     * by the span's finish() method so that the tracer can decide what to do with the span
-                     * when it is finished.
+                     * by the span's finish() method so that the tracer can send span when it is finished.
                      *
                      * @param tracer Represents the Tracer object to be associated with the span.
                      */
@@ -288,6 +348,12 @@ namespace Envoy {
                      */
                     void finish();
 
+                    /**
+                     * Adds an annotation to the span.
+                     *
+                     * @param name The annotation's key.
+                     * @param value The annotation's value.
+                     */
                     void setTag(const std::string& name, const std::string& value);
 
                 private:
@@ -300,13 +366,13 @@ namespace Envoy {
                     uint64_t id_;
                     absl::optional<uint64_t> parent_id_;
                     bool sampled_;
-                    std::vector<BinaryAnnotation> binary_annotations_;
-                    absl::optional<int64_t> timestamp_;
+                    std::vector<Annotation> annotations_;
                     double start_time_;
                     TracerInterface* tracer_;
                     std::vector<ChildSpan> child_span_;
+                    std::string operation_name_;
                 };
-            }
-        }
-    }
-}
+            } // namespace XRay
+        } // namespace Tracers
+    } // namespace Extensions
+} // namespace Envoy

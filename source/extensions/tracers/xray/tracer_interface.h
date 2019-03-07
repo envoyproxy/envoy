@@ -21,8 +21,7 @@ namespace Envoy {
 
                     /**
                      * A XRay tracer must implement this method. Its implementation must perform whatever
-                     * actions are required when the given span is considered finished. An implementation
-                     * will typically buffer the given span so that it can be flushed later.
+                     * actions are required when the given span is considered finished.
                      *
                      * This method is invoked by the Span object when its finish() method is called.
                      *

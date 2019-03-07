@@ -1240,10 +1240,10 @@ const std::string Json::Schema::TOP_LEVEL_CONFIG_SCHEMA(R"EOF(
           "config" : {
             "type" : "object",
             "properties" : {
-              "collector_cluster" : {"type" : "string"},
-              "collector_endpoint": {"type": "string"}
+              "segment_name": {"type": "string"},
+              "daemon_endpoint": {"type": "string"}
             },
-            "required": ["collector_cluster", "collector_endpoint"],
+            "required": ["daemon_endpoint"],
             "additionalProperties" : false
           }
         },

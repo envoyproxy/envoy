@@ -12,6 +12,8 @@ envoy_package()
 envoy_cc_library(
     name = "xray_lib",
     srcs = [
+        "reservoir.cc",
+        "sampling.cc",
         "span_context.cc",
         "tracer.cc",
         "util.cc",
@@ -19,6 +21,8 @@ envoy_cc_library(
         "xray_core_types.cc",
     ],
     hdrs = [
+        "reservoir.h",
+        "sampling.h",
         "span_context.h",
         "tracer.h",
         "tracer_interface.h",

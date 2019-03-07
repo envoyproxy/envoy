@@ -14,8 +14,8 @@ namespace Envoy {
     namespace Extensions {
         namespace Tracers {
             namespace XRay {
-                TEST(XRayCoreTypesBinaryAnnotationTest, defaultConstructor) {
-                    BinaryAnnotation ann;
+                TEST(XRayCoreTypesAnnotationTest, defaultConstructor) {
+                    Annotation ann;
                     EXPECT_EQ("", ann.key());
                     EXPECT_EQ("", ann.value());
 
@@ -29,8 +29,8 @@ namespace Envoy {
                     EXPECT_EQ(expected_json, ann.toJson());
                 }
 
-                TEST(XRayCoreTypesBinaryAnnotationTest, customConstructor) {
-                    BinaryAnnotation ann("key", "value");
+                TEST(XRayCoreTypesAnnotationTest, customConstructor) {
+                    Annotation ann("key", "value");
 
                     EXPECT_EQ("key", ann.key());
                     EXPECT_EQ("value", ann.value());
@@ -38,18 +38,18 @@ namespace Envoy {
                     EXPECT_EQ(expected_json, ann.toJson());
                 }
 
-                TEST(XRayCoreTypesBinaryAnnotationTest, copyConstructor) {
-                    BinaryAnnotation ann("key", "value");
-                    BinaryAnnotation ann2(ann);
+                TEST(XRayCoreTypesAnnotationTest, copyConstructor) {
+                    Annotation ann("key", "value");
+                    Annotation ann2(ann);
 
                     EXPECT_EQ(ann.value(), ann2.value());
                     EXPECT_EQ(ann.key(), ann2.key());
                     EXPECT_EQ(ann.toJson(), ann2.toJson());
                 }
 
-                TEST(XRayCoreTypesBinaryAnnotationTest, assignmentOperator) {
-                    BinaryAnnotation ann("key", "value");
-                    BinaryAnnotation ann2 = ann;
+                TEST(XRayCoreTypesAnnotationTest, assignmentOperator) {
+                    Annotation ann("key", "value");
+                    Annotation ann2 = ann;
 
                     EXPECT_EQ(ann.value(), ann2.value());
                     EXPECT_EQ(ann.key(), ann2.key());
@@ -63,7 +63,7 @@ namespace Envoy {
                     EXPECT_EQ(0ULL, span.id());
                     EXPECT_EQ("", span.traceId());
                     EXPECT_EQ("", span.name());
-                    EXPECT_EQ(0ULL, span.binaryAnnotations().size());
+                    EXPECT_EQ(0ULL, span.annotations().size());
                     EXPECT_EQ("0000000000000000", span.idAsHexString());
                     EXPECT_EQ("0000000000000000", span.parentIdAsHexString());
                     EXPECT_EQ(0LL, span.startTime());
@@ -94,27 +94,27 @@ namespace Envoy {
                     span.setName("segment_name");
                     EXPECT_EQ("segment_name", span.name());
 
-                    BinaryAnnotation bann;
-                    std::vector<XRay::BinaryAnnotation> binary_annotations;
+                    Annotation bann;
+                    std::vector<XRay::Annotation> annotations_;
 
                     bann.setKey(XRay::XRayCoreConstants::get().UPSTREAM_CLUSTER);
                     bann.setValue("test_upstream");
 
-                    binary_annotations.push_back(bann);
-                    span.setBinaryAnnotations(binary_annotations);
-                    EXPECT_EQ(1ULL, span.binaryAnnotations().size());
+                    annotations_.push_back(bann);
+                    span.setAnnotations(annotations_);
+                    EXPECT_EQ(1ULL, span.annotations().size());
 
-                    // Test the copy-semantics flavor of addBinaryAnnotation
+                    // Test the copy-semantics flavor of addAnnotation
                     bann.setKey(XRay::XRayCoreConstants::get().HTTP_STATUS_CODE);
                     bann.setValue("200");
-                    span.addBinaryAnnotation(bann);
-                    EXPECT_EQ(2ULL, span.binaryAnnotations().size());
+                    span.addAnnotation(bann);
+                    EXPECT_EQ(2ULL, span.annotations().size());
 
-                    // Test the move-semantics flavor of addAnnotation and addBinaryAnnotation
+                    // Test the move-semantics flavor of addAnnotation and addAnnotation
                     bann.setKey(XRay::XRayCoreConstants::get().HTTP_STATUS_CODE);
                     bann.setValue("400");
-                    span.addBinaryAnnotation(std::move(bann));
-                    EXPECT_EQ(3ULL, span.binaryAnnotations().size());
+                    span.addAnnotation(std::move(bann));
+                    EXPECT_EQ(3ULL, span.annotations().size());
                 }
 
                 TEST(XRayCoreTypesSpanTest, copyConstructor) {
@@ -138,7 +138,7 @@ namespace Envoy {
                     EXPECT_EQ(span.parentId(), span2.parentId());
                     EXPECT_EQ(span.traceId(), span2.traceId());
                     EXPECT_EQ(span.name(), span2.name());
-                    EXPECT_EQ(span.binaryAnnotations().size(), span2.binaryAnnotations().size());
+                    EXPECT_EQ(span.annotations().size(), span2.annotations().size());
                     EXPECT_EQ(span.idAsHexString(), span2.idAsHexString());
                     EXPECT_EQ(span.parentIdAsHexString(), span2.parentIdAsHexString());
                     EXPECT_EQ(span.startTime(), span2.startTime());
@@ -166,7 +166,7 @@ namespace Envoy {
                     EXPECT_EQ(span.parentId(), span2.parentId());
                     EXPECT_EQ(span.traceId(), span2.traceId());
                     EXPECT_EQ(span.name(), span2.name());
-                    EXPECT_EQ(span.binaryAnnotations().size(), span2.binaryAnnotations().size());
+                    EXPECT_EQ(span.annotations().size(), span2.annotations().size());
                     EXPECT_EQ(span.idAsHexString(), span2.idAsHexString());
                     EXPECT_EQ(span.parentIdAsHexString(), span2.parentIdAsHexString());
                     EXPECT_EQ(span.startTime(), span2.startTime());
@@ -179,13 +179,13 @@ namespace Envoy {
                     span.setTag("key1", "value1");
                     span.setTag("key2", "value2");
 
-                    EXPECT_EQ(2ULL, span.binaryAnnotations().size());
+                    EXPECT_EQ(2ULL, span.annotations().size());
 
-                    BinaryAnnotation bann = span.binaryAnnotations()[0];
+                    Annotation bann = span.annotations()[0];
                     EXPECT_EQ("key1", bann.key());
                     EXPECT_EQ("value1", bann.value());
 
-                    bann = span.binaryAnnotations()[1];
+                    bann = span.annotations()[1];
                     EXPECT_EQ("key2", bann.key());
                     EXPECT_EQ("value2", bann.value());
                 }
