@@ -220,7 +220,7 @@ protected:
   // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is fixed.
   void waitForEnvoyRun() {
     absl::Notification done;
-    main_common_->dispatcher().post([this, &done] {
+    main_common_->dispatcherForTest().post([this, &done] {
       struct Sacrifice : Event::DeferredDeletable {
         Sacrifice(absl::Notification& notify) : notify_(notify) {}
         ~Sacrifice() { notify_.Notify(); }
@@ -228,7 +228,7 @@ protected:
       };
       auto sacrifice = std::make_unique<Sacrifice>(done);
       // Wait for a deferred delete cleanup, this only happens in the main server run loop.
-      main_common_->dispatcher().deferredDelete(std::move(sacrifice));
+      main_common_->dispatcherForTest().deferredDelete(std::move(sacrifice));
     });
     done.WaitForNotification();
   }
