@@ -211,6 +211,28 @@ protected:
     }
   }
 
+  // Wait until Envoy is inside the main server run loop proper. Before entering, Envoy runs any
+  // pending post callbacks, so it's not reliable to use adminRequest() or post() to do this.
+  // Generally, tests should not depend on this for correctness, but as a result of
+  // https://github.com/libevent/libevent/issues/779 we need to for TSAN. This is because the entry
+  // to event_base_loop() is where the signal base race occurs, but once we're in that loop in
+  // blocking mode, we're safe to take signals.
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is fixed.
+  void waitForEnvoyRun() {
+    absl::Notification done;
+    main_common_->dispatcherForTest().post([this, &done] {
+      struct Sacrifice : Event::DeferredDeletable {
+        Sacrifice(absl::Notification& notify) : notify_(notify) {}
+        ~Sacrifice() { notify_.Notify(); }
+        absl::Notification& notify_;
+      };
+      auto sacrifice = std::make_unique<Sacrifice>(done);
+      // Wait for a deferred delete cleanup, this only happens in the main server run loop.
+      main_common_->dispatcherForTest().deferredDelete(std::move(sacrifice));
+    });
+    done.WaitForNotification();
+  }
+
   // Having triggered Envoy to quit (via signal or /quitquitquit), this blocks until Envoy exits.
   bool waitForEnvoyToExit() {
     finished_.WaitForNotification();
@@ -245,6 +267,9 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   startEnvoy();
   started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
+  waitForEnvoyRun();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
@@ -255,6 +280,9 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
   startEnvoy();
   started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
+  waitForEnvoyRun();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
   kill(getpid(), SIGINT);
   EXPECT_TRUE(waitForEnvoyToExit());
@@ -263,6 +291,9 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
 TEST_P(AdminRequestTest, AdminRequestContentionDisabled) {
   startEnvoy();
   started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
+  waitForEnvoyRun();
   EXPECT_THAT(adminRequest("/contention", "GET"), HasSubstr("not enabled"));
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
@@ -272,6 +303,9 @@ TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
   addArg("--enable-mutex-tracing");
   startEnvoy();
   started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
+  waitForEnvoyRun();
 
   // Induce contention to guarantee a non-zero num_contentions count.
   Thread::TestUtil::ContentionGenerator contention_generator;
