@@ -60,7 +60,6 @@ SharedMemory* attachSharedMemory(const Options& options) {
   if (options.restartEpoch() == 0) {
     shmem->size_ = sizeof(SharedMemory);
     shmem->version_ = HOT_RESTART_VERSION;
-    shmem->max_stats_ = options.maxStats();
     initializeMutex(shmem->log_lock_);
     initializeMutex(shmem->access_log_lock_);
   } else {
@@ -69,9 +68,6 @@ SharedMemory* attachSharedMemory(const Options& options) {
                    "not-hot-restart-compatible new version of Envoy.");
     RELEASE_ASSERT(shmem->version_ == HOT_RESTART_VERSION,
                    "Hot restart version mismatch! You must have hot restarted into a "
-                   "not-hot-restart-compatible new version of Envoy.");
-    RELEASE_ASSERT(shmem->max_stats_ == options.maxStats(),
-                   "Hot restart max stats mismatch! You must have hot restarted into a "
                    "not-hot-restart-compatible new version of Envoy.");
   }
 
@@ -139,12 +135,11 @@ void HotRestartImpl::mergeParentStats(
 void HotRestartImpl::shutdown() { as_parent_.shutdown(); }
 
 std::string HotRestartImpl::version() {
-  return hotRestartVersion(shmem_->max_stats_, options_.statsOptions().maxNameLength());
+  return hotRestartVersion(options_.statsOptions().maxNameLength());
 }
 
-std::string HotRestartImpl::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len) {
-  return fmt::format("{}.{}.{}.{}", HOT_RESTART_VERSION, sizeof(SharedMemory), max_num_stats,
-                     max_stat_name_len);
+std::string HotRestartImpl::hotRestartVersion(uint64_t max_stat_name_len) {
+  return fmt::format("{}.{}.{}", HOT_RESTART_VERSION, sizeof(SharedMemory), max_stat_name_len);
 }
 
 } // namespace Server

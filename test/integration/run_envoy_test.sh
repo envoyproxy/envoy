@@ -40,6 +40,3 @@ expect_fail_with_error "error: invalid component specified" --component-log-leve
 
 start_test Launching envoy with max-obj-name-len value less than minimum value of 60.
 expect_fail_with_error "error: the 'max-obj-name-len' value specified .* is less than the minimum" --max-obj-name-len 1
-
-start_test Launching envoy with max-stats value more than maximum value of 100M.
-expect_fail_with_error "error: the 'max-stats' value specified .* is more than the maximum value" --max-stats 1000000000

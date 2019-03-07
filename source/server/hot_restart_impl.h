@@ -33,7 +33,6 @@ const uint64_t HOT_RESTART_VERSION = 11;
 struct SharedMemory {
   uint64_t size_;
   uint64_t version_;
-  uint64_t max_stats_;
   pthread_mutex_t log_lock_;
   pthread_mutex_t access_log_lock_;
   std::atomic<uint64_t> flags_;
@@ -120,7 +119,7 @@ public:
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string
    * based on the configured options.
    */
-  static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len);
+  static std::string hotRestartVersion(uint64_t max_stat_name_len);
 
 private:
   HotRestartingChild as_child_;

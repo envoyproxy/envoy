@@ -43,7 +43,6 @@
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -74,7 +73,6 @@ public:
   MOCK_CONST_METHOD0(serviceClusterName, const std::string&());
   MOCK_CONST_METHOD0(serviceNodeName, const std::string&());
   MOCK_CONST_METHOD0(serviceZone, const std::string&());
-  MOCK_CONST_METHOD0(maxStats, uint64_t());
   MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());

@@ -114,9 +114,6 @@ message CommandLineOptions {
   // See :option:`--mode` for details.
   Mode mode = 19;
 
-  // See :option:`--max-stats` for details.
-  uint64 max_stats = 20;
-
   // See :option:`--max-obj-name-len` for details.
   uint64 max_obj_name_len = 21;
 
@@ -131,4 +128,6 @@ message CommandLineOptions {
 
   // See :option:`--cpuset-threads` for details.
   bool cpuset_threads = 25;
+
+  reserved 20;
 }

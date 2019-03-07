@@ -226,12 +226,6 @@ following are the command line options that Envoy supports.
     option set to a non default value, you should use the same option (and same value) for subsequent hot
     restarts.
 
-.. option:: --max-stats <uint64_t>
-
-  *(optional)* The maximum number of stats that can be shared between hot-restarts. This setting
-  affects the output of :option:`--hot-restart-version`; the same value must be used to hot
-  restart. Defaults to 16384. It's not valid to set this larger than 100 million.
-
 .. option:: --disable-hot-restart
 
   *(optional)* This flag disables Envoy hot restart for builds that have it enabled. By default, hot

@@ -149,11 +149,6 @@ public:
   virtual const std::string& serviceZone() const PURE;
 
   /**
-   * @return uint64_t the maximum number of stats gauges and counters.
-   */
-  virtual uint64_t maxStats() const PURE;
-
-  /**
    * @return StatsOptions& the max stat name / suffix lengths for stats.
    * router/cluster/listener.
    */

@@ -40,8 +40,7 @@ public:
       argv.push_back(s.c_str());
     }
     return std::make_unique<OptionsImpl>(argv.size(), argv.data(),
-                                         [](uint64_t, uint64_t, bool) { return "1"; },
-                                         spdlog::level::warn);
+                                         [](uint64_t, bool) { return "1"; }, spdlog::level::warn);
   }
 };
 
@@ -125,7 +124,6 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setServiceClusterName("cluster_foo");
   options->setServiceNodeName("node_foo");
   options->setServiceZone("zone_foo");
-  options->setMaxStats(12345);
   options->setStatsOptions(stats_options);
   options->setHotRestartDisabled(!options->hotRestartDisabled());
   options->setSignalHandling(!options->signalHandlingEnabled());
@@ -148,7 +146,6 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ("cluster_foo", options->serviceClusterName());
   EXPECT_EQ("node_foo", options->serviceNodeName());
   EXPECT_EQ("zone_foo", options->serviceZone());
-  EXPECT_EQ(12345U, options->maxStats());
   EXPECT_EQ(stats_options.max_obj_name_length_, options->statsOptions().maxObjNameLength());
   EXPECT_EQ(stats_options.max_stat_suffix_length_, options->statsOptions().maxStatSuffixLength());
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
@@ -180,7 +177,6 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->serviceClusterName(), command_line_options->service_cluster());
   EXPECT_EQ(options->serviceNodeName(), command_line_options->service_node());
   EXPECT_EQ(options->serviceZone(), command_line_options->service_zone());
-  EXPECT_EQ(options->maxStats(), command_line_options->max_stats());
   EXPECT_EQ(options->statsOptions().maxObjNameLength(), command_line_options->max_obj_name_len());
   EXPECT_EQ(options->hotRestartDisabled(), command_line_options->disable_hot_restart());
   EXPECT_EQ(options->mutexTracingEnabled(), command_line_options->enable_mutex_tracing());
@@ -231,11 +227,6 @@ TEST_F(OptionsImplTest, BadCliOption) {
 TEST_F(OptionsImplTest, BadObjNameLenOption) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-obj-name-len 1"), MalformedArgvException,
                           "'max-obj-name-len' value specified");
-}
-
-TEST_F(OptionsImplTest, BadMaxStatsOption) {
-  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-stats 1000000000"), MalformedArgvException,
-                          "'max-stats' value specified");
 }
 
 TEST_F(OptionsImplTest, ParseComponentLogLevels) {
@@ -311,7 +302,6 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
   EXPECT_EQ(regular_options_impl->mode(), test_options_impl.mode());
   EXPECT_EQ(regular_options_impl->fileFlushIntervalMsec(),
             test_options_impl.fileFlushIntervalMsec());
-  EXPECT_EQ(regular_options_impl->maxStats(), test_options_impl.maxStats());
   EXPECT_EQ(regular_options_impl->statsOptions().maxNameLength(),
             test_options_impl.statsOptions().maxNameLength());
   EXPECT_EQ(regular_options_impl->statsOptions().maxObjNameLength(),

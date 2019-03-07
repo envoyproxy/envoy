@@ -5,35 +5,14 @@ binary program restarts. The metrics are tracked as:
 
  * Counters: strictly increasing 64-bit integers.
  * Gauges: 64-bit integers that can rise and fall.
+ * BoolIndicators: booleans.
  * Histograms: mapping ranges of values to frequency. The ranges are auto-adjusted as
    data accumulates. Unliked counters and gauges, histogram data is not retained across
    binary program restarts.
 
-## Hot-restart: `RawStatData` vs `HeapStatData`
-
-In order to support restarting the Envoy binary program without losing counter and gauge
-values, they are stored in a shared-memory block, including stats that are
-created dynamically at runtime in response to discovery of new clusters at
-runtime. To simplify memory management, each stat is allocated a fixed amount
-of storage, controlled via [command-line
-flags](https://www.envoyproxy.io/docs/envoy/latest/operations/cli):
-`--max-stats` and `--max-obj-name-len`, which determine the size of the pre-allocated
-shared-memory block. See
-[RawStatData](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/raw_stat_data.h).
-
-Note in particular that the full stat name is retained in shared-memory, making
-it easy to correlate stats across restarts even as the dynamic cluster
-configuration changes.
-
-One challenge with this fixed memory allocation strategy is that it limits
-cluster scalability. A deployment wishing to use a single Envoy instance to
-manage tens of thousands of clusters, each with its own set of scoped stats,
-will use more memory than is ideal.
-
-A flag `--disable-hot-restart` pivots the system toward an alternate heap-based
-stat allocator that allocates stats on demand in the heap, with no preset limits
-on the number of stats or their length. See
-[HeapStatData](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/heap_stat_data.h).
+In order to support restarting the Envoy binary program without losing counter, gauge,
+and indicator values, they are passed from parent to child in an RPC protocol.
+They were previously held in shared memory, which imposed various restrictions.
 
 ## Performance and Thread Local Storage
 
@@ -67,10 +46,8 @@ This implementation is complicated so here is a rough overview of the threading 
    reference the old scope which may be about to be cache flushed.
  * Since it's possible to have overlapping scopes, we de-dup stats when counters() or gauges() is
    called since these are very uncommon operations.
- * Though this implementation is designed to work with a fixed shared memory space, it will fall
-   back to heap allocated stats if needed. NOTE: In this case, overlapping scopes will not share
-   the same backing store. This is to keep things simple, it could be done in the future if
-   needed.
+ * Overlapping scopes will not share the same backing store. This is to keep things simple,
+   it could be done in the future if needed.
 
 ### Histogram threading model
 
