@@ -115,5 +115,6 @@ TEST_F(HotRestartImplTest, Consistency) {
   hot_restart_->statsAllocator().free(*stat_1);
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy
