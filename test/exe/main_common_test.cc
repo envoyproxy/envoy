@@ -267,6 +267,8 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   startEnvoy();
   started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
   waitForEnvoyRun();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
   kill(getpid(), SIGTERM);
@@ -278,6 +280,8 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
   startEnvoy();
   started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
   waitForEnvoyRun();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
   kill(getpid(), SIGINT);
@@ -287,6 +291,8 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
 TEST_P(AdminRequestTest, AdminRequestContentionDisabled) {
   startEnvoy();
   started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
   waitForEnvoyRun();
   EXPECT_THAT(adminRequest("/contention", "GET"), HasSubstr("not enabled"));
   kill(getpid(), SIGTERM);
@@ -297,6 +303,8 @@ TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
   addArg("--enable-mutex-tracing");
   startEnvoy();
   started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
   waitForEnvoyRun();
 
   // Induce contention to guarantee a non-zero num_contentions count.
