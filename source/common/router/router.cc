@@ -244,7 +244,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
   }
 }
 
-void Filter::chargeUpstreamCode(const Http::Code code,
+void Filter::chargeUpstreamCode(Http::Code code,
                                 Upstream::HostDescriptionConstSharedPtr upstream_host,
                                 bool dropped) {
   const uint64_t response_status_code = enumToInt(code);
@@ -534,7 +534,7 @@ void Filter::onResponseTimeout() {
   }
 
   updateOutlierDetection(timeout_response_code_);
-  const std::string body =
+  const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
   onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body,
                   false);
@@ -553,7 +553,7 @@ void Filter::onPerTryTimeout() {
                   false);
 }
 
-void Filter::updateOutlierDetection(const Http::Code code) {
+void Filter::updateOutlierDetection(Http::Code code) {
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   if (upstream_request_) {
     upstream_host = upstream_request_->upstream_host_;
@@ -564,7 +564,7 @@ void Filter::updateOutlierDetection(const Http::Code code) {
 }
 
 void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flags,
-                             const std::string& body, bool dropped) {
+                             absl::string_view body, bool dropped) {
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
@@ -594,7 +594,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
     if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
-    callbacks_->sendLocalReply(code, body.c_str(),
+    callbacks_->sendLocalReply(code, body,
                                [dropped, this](Http::HeaderMap& headers) {
                                  if (dropped && !config_.suppress_envoy_headers_) {
                                    headers.insertEnvoyOverloaded().value(
@@ -709,7 +709,7 @@ void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers) {
   callbacks_->encode100ContinueHeaders(std::move(headers));
 }
 
-void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&& headers,
+void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
                                bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
