@@ -78,6 +78,16 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodeUnknownOpcode() const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<uint32_t>(8);
+    buffer.writeBEInt<int32_t>(1000);
+    buffer.writeBEInt<uint32_t>(200);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodeCloseRequest() const {
     Buffer::OwnedImpl buffer;
 
@@ -352,7 +362,6 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
-// Test Connect counter increment.
 TEST_F(ZooKeeperFilterTest, Connect) {
   initialize();
 
@@ -366,7 +375,6 @@ TEST_F(ZooKeeperFilterTest, Connect) {
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
-// Test Connect readonly counter increment.
 TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
   initialize();
 
@@ -381,7 +389,6 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
-// Test fallback.
 TEST_F(ZooKeeperFilterTest, Fallback) {
   initialize();
 
@@ -390,6 +397,15 @@ TEST_F(ZooKeeperFilterTest, Fallback) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(0UL, config_->stats().connect_rq_.value());
   EXPECT_EQ(0UL, config_->stats().connect_readonly_rq_.value());
+  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, UnknownOpcode) {
+  initialize();
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeUnknownOpcode()));
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 

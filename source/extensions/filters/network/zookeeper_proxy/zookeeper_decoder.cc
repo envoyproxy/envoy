@@ -28,8 +28,6 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   case enumToIntSigned(XidCodes::AUTH_XID):
     parseAuthRequest(data, offset, len);
     return;
-  default:
-    break;
   }
 
   // "Regular" requests.
@@ -84,7 +82,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     callbacks_.onCloseRequest();
     break;
   default:
-    break;
+    throw EnvoyException(fmt::format("Unknown opcode: {}", opcode));
   }
 }
 
@@ -315,6 +313,7 @@ void DecoderImpl::onData(Buffer::Instance& data) {
       callbacks_.onRequestBytes(offset - current);
     }
   } catch (EnvoyException& e) {
+    ENVOY_LOG(debug, "zookeeper_proxy: decoding exception {}", e.what());
     callbacks_.onDecodeError();
   }
 }
