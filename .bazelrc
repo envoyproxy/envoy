@@ -29,6 +29,9 @@ build:asan --action_env=CC
 build:asan --action_env=CXX
 build:asan --action_env=CFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
 build:asan --action_env=CXXFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
+# This is needed for host protoc. TODO(htuch): Figure out why..
+build:asan --action_env=LSAN_OPTIONS=exitcode=0
+build:asan --test_env=LSAN_OPTIONS=
 
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
