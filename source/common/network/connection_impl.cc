@@ -625,6 +625,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     if (source_to_use != nullptr) {
       const Api::SysCallIntResult result = source_to_use->bind(ioHandle().fd());
       if (result.rc_ < 0) {
+        // TODO(lizan): consider add this error into transportFailureReason.
         ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_to_use->asString(),
                        strerror(result.errno_));
         bind_error_ = true;

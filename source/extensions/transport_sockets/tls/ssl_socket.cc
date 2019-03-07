@@ -22,7 +22,7 @@ namespace Tls {
 
 namespace {
 
-constexpr absl::string_view NotReadyReason{"SSL error: secret is not ready"};
+constexpr absl::string_view NotReadyReason{"TLS error: secret is not delivered via SDS"};
 
 // This SslSocket will be used when SSL secret is not fetched from SDS server.
 class NotReadySslSocket : public Network::TransportSocket {
@@ -166,7 +166,7 @@ void SslSocket::drainErrorQueue() {
     saw_error = true;
 
     if (failure_reason_.empty()) {
-      failure_reason_ = "SSL error:";
+      failure_reason_ = "TLS error:";
     }
     failure_reason_.append(absl::StrCat(" ", err, ":", ERR_lib_error_string(err), ":",
                                         ERR_func_error_string(err), ":",

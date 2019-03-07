@@ -539,7 +539,7 @@ void Filter::onResponseTimeout() {
 }
 
 void Filter::onUpstreamReset(UpstreamResetType type,
-                             const absl::optional<Http::StreamResetReason>& reset_reason,
+                             const absl::optional<Http::StreamResetReason> reset_reason,
                              absl::string_view transport_failure) {
   ASSERT(type == UpstreamResetType::GlobalTimeout || upstream_request_);
   if (type == UpstreamResetType::Reset) {

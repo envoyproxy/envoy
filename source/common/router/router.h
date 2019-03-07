@@ -381,8 +381,8 @@ private:
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
   void onUpstreamComplete();
   void onUpstreamReset(UpstreamResetType type,
-                         const absl::optional<Http::StreamResetReason> &reset_reason,
-                         absl::string_view transport_failure);
+                       const absl::optional<Http::StreamResetReason> reset_reason,
+                       absl::string_view transport_failure);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
   bool setupRedirect(const Http::HeaderMap& headers);
