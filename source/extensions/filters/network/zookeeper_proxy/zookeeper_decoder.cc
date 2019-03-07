@@ -78,6 +78,12 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   case enumToInt(OpCodes::SETWATCHES):
     parseSetWatchesRequest(data, offset, len);
     break;
+  case enumToInt(OpCodes::CHECKWATCHES):
+    parseXWatchesRequest(data, offset, len, OpCodes::CHECKWATCHES);
+    break;
+  case enumToInt(OpCodes::REMOVEWATCHES):
+    parseXWatchesRequest(data, offset, len, OpCodes::REMOVEWATCHES);
+    break;
   case enumToIntSigned(OpCodes::CLOSE):
     callbacks_.onCloseRequest();
     break;
@@ -293,6 +299,20 @@ void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offse
   skipStrings(data, offset);
 
   callbacks_.onSetWatchesRequest();
+}
+
+void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
+                                       OpCodes opcode) {
+  checkLength(len, 8);
+
+  std::string path = BufferHelper::peekString(data, offset);
+  int32_t type = BufferHelper::peekInt32(data, offset);
+
+  if (opcode == OpCodes::CHECKWATCHES) {
+    callbacks_.onCheckWatchesRequest(path, type);
+  } else {
+    callbacks_.onRemoveWatchesRequest(path, type);
+  }
 }
 
 void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) const {

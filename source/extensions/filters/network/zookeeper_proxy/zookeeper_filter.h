@@ -42,6 +42,8 @@ namespace ZooKeeperProxy {
   COUNTER(close_rq)                                                     \
   COUNTER(setauth_rq)                                                   \
   COUNTER(setwatches_rq)                                                \
+  COUNTER(checkwatches_rq)                                              \
+  COUNTER(removewatches_rq)                                             \
   COUNTER(check_rq)                                                     \
 // clang-format on
 
@@ -109,6 +111,8 @@ public:
   void onMultiRequest() override;
   void onReconfigRequest() override;
   void onSetWatchesRequest() override;
+  void onCheckWatchesRequest(const std::string& path, const int32_t type) override;
+  void onRemoveWatchesRequest(const std::string& path, const int32_t type) override;
   void onCloseRequest() override;
 
   void doDecode(Buffer::Instance& buffer);

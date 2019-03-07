@@ -178,6 +178,16 @@ void ZooKeeperFilter::onCheckRequest(const std::string&, const int32_t) {
   config_->stats_.check_rq_.inc();
 }
 
+void ZooKeeperFilter::onCheckWatchesRequest(const std::string& path, const int32_t) {
+  config_->stats_.checkwatches_rq_.inc();
+  setDynamicMetadata({{"opname", "checkwatches"}, {"path", path}});
+}
+
+void ZooKeeperFilter::onRemoveWatchesRequest(const std::string& path, const int32_t) {
+  config_->stats_.removewatches_rq_.inc();
+  setDynamicMetadata({{"opname", "removewatches"}, {"path", path}});
+}
+
 void ZooKeeperFilter::onMultiRequest() {
   config_->stats_.multi_rq_.inc();
   setDynamicMetadata("opname", "multi");

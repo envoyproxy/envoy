@@ -71,6 +71,8 @@ following statistics:
   reconfig_rq, Counter, Number of reconfig requests
   close_rq, Counter, Number of close requests
   setwatches_rq, Counter, Number of setwatches requests
+  checkwatches_rq, Counter, Number of checkwatches requests
+  removewatches_rq, Counter, Number of removewatches requests
   check_rq, Counter, Number of check requests
 
 .. _config_network_filters_zookeeper_proxy_dynamic_metadata:

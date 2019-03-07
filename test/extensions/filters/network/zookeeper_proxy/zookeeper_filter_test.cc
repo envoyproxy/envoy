@@ -662,6 +662,34 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
+TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodePathVersion(
+      "/foo", enumToInt(WatcherType::CHILDREN), enumToInt(OpCodes::CHECKWATCHES))));
+
+  expectSetDynamicMetadata({{"opname", "checkwatches"}, {"path", "/foo"}}, {{"bytes", "24"}});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().checkwatches_rq_.value());
+  EXPECT_EQ(24UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, RemoveWatchesRequest) {
+  initialize();
+
+  Buffer::InstancePtr data(new Buffer::OwnedImpl(
+      encodePathVersion("/foo", enumToInt(WatcherType::DATA), enumToInt(OpCodes::REMOVEWATCHES))));
+
+  expectSetDynamicMetadata({{"opname", "removewatches"}, {"path", "/foo"}}, {{"bytes", "24"}});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(1UL, config_->stats().removewatches_rq_.value());
+  EXPECT_EQ(24UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
 TEST_F(ZooKeeperFilterTest, CloseRequest) {
   initialize();
 

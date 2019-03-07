@@ -37,10 +37,14 @@ enum class OpCodes {
   MULTI = 14,
   CREATE2 = 15,
   RECONFIG = 16,
+  CHECKWATCHES = 17,
+  REMOVEWATCHES = 18,
   CLOSE = -11,
   SETAUTH = 100,
   SETWATCHES = 101
 };
+
+enum class WatcherType { CHILDREN = 1, DATA = 2, ANY = 3 };
 
 /**
  * General callbacks for dispatching decoded ZooKeeper messages to a sink.
@@ -68,6 +72,8 @@ public:
   virtual void onMultiRequest() PURE;
   virtual void onReconfigRequest() PURE;
   virtual void onSetWatchesRequest() PURE;
+  virtual void onCheckWatchesRequest(const std::string& path, const int32_t type) PURE;
+  virtual void onRemoveWatchesRequest(const std::string& path, const int32_t type) PURE;
   virtual void onCloseRequest() PURE;
 };
 
@@ -109,6 +115,7 @@ private:
   void parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
+  void parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
   void skipStrings(Buffer::Instance& data, uint64_t& offset) const;
   void checkLength(const int32_t len, const int32_t minlen) const;
 
