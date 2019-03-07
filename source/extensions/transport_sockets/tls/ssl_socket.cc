@@ -377,18 +377,8 @@ absl::optional<SystemTime> SslSocket::expirationPeerCertificate() const {
   return Utility::getExpirationTime(*cert);
 }
 
-bool SslSocket::peerCertificateChainPresented() const {
-  STACK_OF(X509)* cert_chain = SSL_get_peer_cert_chain(ssl_.get());
-  return cert_chain != nullptr && sk_X509_num(cert_chain) > 0;
-}
-
-const std::string& SslSocket::pemEncodedPeerCertificateChain() const {
+const std::string& SslSocket::urlEncodedPemEncodedPeerCertificateChain() const {
   if (!cached_pem_encoded_peer_cert_chain_.empty()) {
-    return cached_pem_encoded_peer_cert_chain_;
-  }
-
-  if (!peerCertificateChainPresented()) {
-    ASSERT(cached_pem_encoded_peer_cert_chain_.empty());
     return cached_pem_encoded_peer_cert_chain_;
   }
 
@@ -404,7 +394,10 @@ const std::string& SslSocket::pemEncodedPeerCertificateChain() const {
     RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
 
     absl::string_view pem(reinterpret_cast<const char*>(output), length);
-    cached_pem_encoded_peer_cert_chain_ = absl::StrCat(cached_pem_encoded_peer_cert_chain_, pem);
+    cached_pem_encoded_peer_cert_chain_ = absl::StrCat(
+        cached_pem_encoded_peer_cert_chain_,
+        absl::StrReplaceAll(
+            pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}}));
   }
   return cached_pem_encoded_peer_cert_chain_;
 }

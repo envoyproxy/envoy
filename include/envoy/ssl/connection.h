@@ -90,15 +90,10 @@ public:
   virtual absl::optional<SystemTime> expirationPeerCertificate() const PURE;
 
   /**
-   * @return bool whether the peer certificate chain is presented.
+   * @return std::string the URL-encoded PEM-encoded representation of the peer certificate chain.
+   *         Returns "" if there is no peer certificate or encoding fails.
    **/
-  virtual bool peerCertificateChainPresented() const PURE;
-
-  /**
-   * @return std::string the PEM-encoded representation of the peer certificate chain. Returns ""
-   *         if there is no peer certificate chain or encoding fails.
-   **/
-  virtual const std::string& pemEncodedPeerCertificateChain() const PURE;
+  virtual const std::string& urlEncodedPemEncodedPeerCertificateChain() const PURE;
 };
 
 } // namespace Ssl

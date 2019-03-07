@@ -59,8 +59,7 @@ public:
   std::vector<std::string> dnsSansLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
-  bool peerCertificateChainPresented() const override;
-  const std::string& pemEncodedPeerCertificateChain() const override;
+  const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
