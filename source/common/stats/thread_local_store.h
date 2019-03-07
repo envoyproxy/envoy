@@ -186,7 +186,7 @@ private:
     StatMap<BoolIndicatorSharedPtr> bool_indicators_;
     StatMap<TlsHistogramSharedPtr> histograms_;
     StatMap<ParentHistogramSharedPtr> parent_histograms_;
-    CharStarHashSet rejected_stats_; // References string from CentralCacheEntry.
+    CharStarHashSet rejected_stats_; // References set entries from CentralCacheEntry.
   };
 
   struct CentralCacheEntry {
@@ -194,7 +194,6 @@ private:
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<BoolIndicatorSharedPtr> bool_indicators_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
-    StringSet rejected_stats_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -238,9 +237,6 @@ private:
                  MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache,
                  CharStarHashSet* tls_rejected_stats, StatType& null_stat);
 
-    bool checkAndRememberRejection(const std::string& name, CharStarHashSet* tls_rejected_stats)
-        EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_);
-
     static std::atomic<uint64_t> next_scope_id_;
 
     const uint64_t scope_id_;
@@ -271,9 +267,12 @@ private:
   void mergeInternal(PostMergeCb mergeCb);
   absl::string_view truncateStatNameIfNeeded(absl::string_view name);
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
+  StringSet rejected_stats_ GUARDED_BY(lock_);
   bool rejects(const std::string& name) const;
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
+  bool checkAndRememberRejection(const std::string& name, CharStarHashSet* tls_rejected_stats)
+      EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;

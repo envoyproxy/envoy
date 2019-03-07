@@ -234,16 +234,16 @@ std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
 
-bool ThreadLocalStoreImpl::ScopeImpl::checkAndRememberRejection(
-    const std::string& name, CharStarHashSet* tls_rejected_stats) {
-  auto reject_iter = central_cache_.rejected_stats_.find(name);
-  if (reject_iter == central_cache_.rejected_stats_.end()) {
-    if (parent_.rejects(name)) {
-      auto insertion = central_cache_.rejected_stats_.insert(name);
+bool ThreadLocalStoreImpl::checkAndRememberRejection(const std::string& name,
+                                                     CharStarHashSet* tls_rejected_stats) {
+  auto reject_iter = rejected_stats_.find(name);
+  if (reject_iter == rejected_stats_.end()) {
+    if (rejects(name)) {
+      auto insertion = rejected_stats_.insert(name);
       reject_iter = insertion.first;
     }
   }
-  if (reject_iter != central_cache_.rejected_stats_.end()) {
+  if (reject_iter != rejected_stats_.end()) {
     if (tls_rejected_stats != nullptr) {
       tls_rejected_stats->insert(reject_iter->c_str());
     }
@@ -288,7 +288,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   std::shared_ptr<StatType>* central_ref = nullptr;
   if (p != central_cache_map.end()) {
     central_ref = &(p->second);
-  } else if (checkAndRememberRejection(name, tls_rejected_stats)) {
+  } else if (parent_.checkAndRememberRejection(name, tls_rejected_stats)) {
     // Note that again we do the name-rejection lookup on the untruncated name.
     return null_stat;
   } else {
@@ -480,7 +480,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   ParentHistogramImplSharedPtr* central_ref = nullptr;
   if (p != central_cache_.histograms_.end()) {
     central_ref = &p->second;
-  } else if (checkAndRememberRejection(final_name, tls_rejected_stats)) {
+  } else if (parent_.checkAndRememberRejection(final_name, tls_rejected_stats)) {
     return null_histogram_;
   } else {
     std::vector<Tag> tags;
@@ -499,12 +499,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name,
                                                          ParentHistogramImpl& parent) {
-  if (parent_.rejects(name)) {
-    return null_histogram_;
-  }
+  // tlsHistogram() is generally not called for a histogram that is rejected by
+  // the matcher, so no further rejection-checking is needed at this level.
+  // TlsHistogram inherits its reject/accept status from ParentHistogram.
 
   // See comments in counter() which explains the logic here.
-
   StatMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_;

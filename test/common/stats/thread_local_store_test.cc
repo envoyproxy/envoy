@@ -546,28 +546,13 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   EXPECT_CALL(*alloc_, free(_)).Times(2);
 }
 
-/*
-TEST_F(StatsThreadLocalStoreTest, RememberRejectionUnderTls) {
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-
-  // Will block all stats containing any capital alphanumeric letter.
-  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
-      ".*[A-Z].*");
-  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
-
-  // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
-  Counter& lowercase_counter = store_->counter("lowercase_counter");
-  EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
-
-  Counter& uppercase_counter = store_->counter("UPPERCASE_counter");
-  EXPECT_EQ(uppercase_counter.name(), "");
-}
-*/
-
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
   using LookupStatFn = std::function<std::string(Scope&, const std::string&)>;
 
+  // Helper function to test the rejection cache. The goal here is to use
+  // mocks to ensure that we don't call rejects() more than once on any of the
+  // stats, even with 5 name-based lookups.
   void testRememberMatcher(const LookupStatFn lookup_stat, bool is_allocated) {
     InSequence s;
 
@@ -773,50 +758,87 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   store_->shutdownThreading();
 }
 
+// Tests the logic for caching the stats-matcher results, and in particular the
+// private impl method checkAndRememberRejection(). That method behaves
+// differently depending on whether TLS is enabled or not, so we parameterize
+// the test accordingly; GetParam()==true means we want a TLS cache. In either
+// case, we should never be calling the stats-matcher rejection logic more than
+// once on given stat name.
+class RememberStatsMatcherTest : public testing::TestWithParam<bool> {
+public:
+  RememberStatsMatcherTest() : store_(options_, heap_alloc_) {
+    if (GetParam()) {
+      store_.initializeThreading(main_thread_dispatcher_, tls_);
+    }
+  }
+
+  ~RememberStatsMatcherTest() override {
+    store_.shutdownThreading();
+    tls_.shutdownThread();
+  }
+
+  using LookupStatFn = std::function<std::string(Scope&, const std::string&)>;
+
+  // Helper function to test the rejection cache. The goal here is to use
+  // mocks to ensure that we don't call rejects() more than once on any of the
+  // stats, even with 5 name-based lookups.
+  void testRememberMatcher(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    EXPECT_CALL(*matcher, rejects("stats.overflow")).WillRepeatedly(Return(false));
+
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    EXPECT_CALL(*matcher, rejects("scope.reject")).WillOnce(Return(true));
+    EXPECT_CALL(*matcher, rejects("scope.ok")).WillOnce(Return(false));
+    ScopePtr scope = store_.createScope("scope.");
+
+    for (int j = 0; j < 5; ++j) {
+      EXPECT_EQ("", lookup_stat(*scope, "reject"));
+      EXPECT_EQ("scope.ok", lookup_stat(*scope, "ok"));
+    }
+  }
+
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  StatsOptionsImpl options_;
+  HeapStatDataAllocator heap_alloc_;
+  ThreadLocalStoreImpl store_;
+};
+
+INSTANTIATE_TEST_CASE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
+                        testing::ValuesIn({false, true}));
+
 // Tests that the logic for remembering rejected stats works properly, both
 // with and without threading.
-TEST_F(StatsMatcherTLSTest, TestRememberRejectionCounter) {
+TEST_P(RememberStatsMatcherTest, Counter) {
   auto make_counter = [](Scope& scope, const std::string& stat_name) -> std::string {
     return scope.counter(stat_name).name();
   };
-  testRememberMatcher(make_counter, true);
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-  testRememberMatcher(make_counter, true);
-  store_->shutdownThreading();
-  EXPECT_CALL(*alloc_, free(_)).Times(1);
+  testRememberMatcher(make_counter);
 }
 
-TEST_F(StatsMatcherTLSTest, TestRememberRejectionGauge) {
+TEST_P(RememberStatsMatcherTest, Gauge) {
   auto make_gauge = [](Scope& scope, const std::string& stat_name) -> std::string {
     return scope.gauge(stat_name).name();
   };
-  testRememberMatcher(make_gauge, true);
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-  testRememberMatcher(make_gauge, true);
-  store_->shutdownThreading();
-  EXPECT_CALL(*alloc_, free(_)).Times(1);
+  testRememberMatcher(make_gauge);
 }
 
-TEST_F(StatsMatcherTLSTest, TestRememberRejectionBoolIndicator) {
+TEST_P(RememberStatsMatcherTest, BoolIndicator) {
   auto make_bool_indicator = [](Scope& scope, const std::string& stat_name) -> std::string {
     return scope.boolIndicator(stat_name).name();
   };
-  testRememberMatcher(make_bool_indicator, true);
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-  testRememberMatcher(make_bool_indicator, true);
-  store_->shutdownThreading();
-  EXPECT_CALL(*alloc_, free(_)).Times(1);
+  testRememberMatcher(make_bool_indicator);
 }
 
-TEST_F(StatsMatcherTLSTest, TestRememberRejectionHistogram) {
+TEST_P(RememberStatsMatcherTest, Histogram) {
   auto make_histogram = [](Scope& scope, const std::string& stat_name) -> std::string {
     return scope.histogram(stat_name).name();
   };
-  testRememberMatcher(make_histogram, false);
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-  testRememberMatcher(make_histogram, false);
-  store_->shutdownThreading();
-  EXPECT_CALL(*alloc_, free(_)).Times(1);
+  testRememberMatcher(make_histogram);
 }
 
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
