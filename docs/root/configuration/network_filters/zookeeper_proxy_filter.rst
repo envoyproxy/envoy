@@ -3,11 +3,12 @@
 ZooKeeper proxy
 ===============
 
-The ZooKeeper proxy filter decodes the wire protocol between the ZooKeeper client
-and server. It decodes the requests, responses and events in the payload.
-The decoded info is emitted as dynamic metadata that can be combined with
-access log filters to get detailed information on paths that are accessed
-as well as the requests that are performed on each path.
+The ZooKeeper proxy filter decodes the client protocol for
+`Apache ZooKeeper <https://zookeeper.apache.org/>`_. It decodes the requests,
+responses and events in the payload. The decoded info is emitted as dynamic
+metadata that can be combined with access log filters to get detailed
+information on paths that are accessed as well as the requests that are
+performed on each path.
 
 .. attention::
 
