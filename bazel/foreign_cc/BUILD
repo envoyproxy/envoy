@@ -32,6 +32,13 @@ cc_library(
 configure_make(
     name = "luajit",
     configure_command = "build.py",
+    configure_env_vars = select({
+        # This shouldn't be needed! See
+        # https://github.com/bazelbuild/rules_foreign_cc/issues/154#issuecomment-470704365
+        # TODO(htuch): Remove when the rules_foreign_cc issue is fixed
+        "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//conditions:default": {},
+    }),
     lib_source = "@com_github_luajit_luajit//:all",
     make_commands = [],
     static_libraries = [

@@ -86,6 +86,11 @@ config_setting(
 )
 
 config_setting(
+    name = "asan_build",
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
 )
