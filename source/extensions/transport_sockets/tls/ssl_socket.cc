@@ -22,7 +22,7 @@ namespace Tls {
 
 namespace {
 
-constexpr absl::string_view NotReadyReason{"TLS error: secret is not delivered via SDS"};
+constexpr absl::string_view NotReadyReason{"TLS error: Secret is not delivered via SDS"};
 
 // This SslSocket will be used when SSL secret is not fetched from SDS server.
 class NotReadySslSocket : public Network::TransportSocket {
