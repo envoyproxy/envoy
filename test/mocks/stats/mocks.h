@@ -9,6 +9,7 @@
 #include "envoy/stats/sink.h"
 #include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/store.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/thread_local/thread_local.h"
@@ -203,6 +204,15 @@ public:
   ~MockIsolatedStatsStore();
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
+};
+
+class MockStatsMatcher : public StatsMatcher {
+public:
+  MockStatsMatcher();
+  ~MockStatsMatcher();
+  MOCK_CONST_METHOD1(rejects, bool(const std::string& name));
+  bool acceptsAll() const override { return false; }
+  bool rejectsAll() const override { return false; }
 };
 
 } // namespace Stats

@@ -175,7 +175,10 @@ public:
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
+  friend class ThreadLocalStoreTestScope;
+
   template <class Stat> using StatMap = CharStarHashMap<Stat>;
+  using StringSet = absl::flat_hash_set<std::string>;
 
   struct TlsCacheEntry {
     StatMap<CounterSharedPtr> counters_;
@@ -183,6 +186,7 @@ private:
     StatMap<BoolIndicatorSharedPtr> bool_indicators_;
     StatMap<TlsHistogramSharedPtr> histograms_;
     StatMap<ParentHistogramSharedPtr> parent_histograms_;
+    CharStarHashSet rejected_stats_; // References string from CentralCacheEntry.
   };
 
   struct CentralCacheEntry {
@@ -190,6 +194,7 @@ private:
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<BoolIndicatorSharedPtr> bool_indicators_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
+    StringSet rejected_stats_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -230,7 +235,11 @@ private:
     template <class StatType>
     StatType&
     safeMakeStat(const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                 MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache);
+                 MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache,
+                 CharStarHashSet* tls_rejected_stats, StatType& null_stat);
+
+    bool checkAndRememberRejection(const std::string& name, CharStarHashSet* tls_rejected_stats)
+        EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_);
 
     static std::atomic<uint64_t> next_scope_id_;
 
@@ -261,6 +270,7 @@ private:
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
   absl::string_view truncateStatNameIfNeeded(absl::string_view name);
+  bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   bool rejects(const std::string& name) const;
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);

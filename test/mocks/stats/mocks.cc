@@ -92,5 +92,8 @@ MockStore::~MockStore() {}
 MockIsolatedStatsStore::MockIsolatedStatsStore() {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
 
+MockStatsMatcher::MockStatsMatcher() {}
+MockStatsMatcher::~MockStatsMatcher() {}
+
 } // namespace Stats
 } // namespace Envoy

@@ -546,9 +546,51 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   EXPECT_CALL(*alloc_, free(_)).Times(2);
 }
 
+/*
+TEST_F(StatsThreadLocalStoreTest, RememberRejectionUnderTls) {
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  // Will block all stats containing any capital alphanumeric letter.
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
+      ".*[A-Z].*");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
+  Counter& lowercase_counter = store_->counter("lowercase_counter");
+  EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
+
+  Counter& uppercase_counter = store_->counter("UPPERCASE_counter");
+  EXPECT_EQ(uppercase_counter.name(), "");
+}
+*/
+
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  StatsMatcherTLSTest() : StatsThreadLocalStoreTest() {}
+  using LookupStatFn = std::function<std::string(Scope&, const std::string&)>;
+
+  void testRememberMatcher(const LookupStatFn lookup_stat, bool is_allocated) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    EXPECT_CALL(*matcher, rejects("stats.overflow")).WillRepeatedly(Return(false));
+
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_->setStatsMatcher(std::move(matcher_ptr));
+
+    EXPECT_CALL(*matcher, rejects("scope.reject")).WillOnce(Return(true));
+    EXPECT_CALL(*matcher, rejects("scope.ok")).WillOnce(Return(false));
+    if (is_allocated) {
+      EXPECT_CALL(*alloc_, alloc(_)).Times(1);
+      EXPECT_CALL(*alloc_, free(_)).Times(1);
+    }
+    ScopePtr scope = store_->createScope("scope.");
+
+    for (int j = 0; j < 5; ++j) {
+      EXPECT_EQ("", lookup_stat(*scope, "reject"));
+      EXPECT_EQ("scope.ok", lookup_stat(*scope, "ok"));
+    }
+  }
+
   envoy::config::metrics::v2::StatsConfig stats_config_;
 };
 
@@ -624,6 +666,8 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
 // test/common/stats:stats_matcher_test.
 TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   InSequence s;
+
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   // Expected to alloc lowercase_counter, lowercase_gauge, lowercase_bool,
   //                   valid_counter, valid_gauge, valid_bool
@@ -727,6 +771,52 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   EXPECT_CALL(*alloc_, free(_)).Times(7);
 
   store_->shutdownThreading();
+}
+
+// Tests that the logic for remembering rejected stats works properly, both
+// with and without threading.
+TEST_F(StatsMatcherTLSTest, TestRememberRejectionCounter) {
+  auto make_counter = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.counter(stat_name).name();
+  };
+  testRememberMatcher(make_counter, true);
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  testRememberMatcher(make_counter, true);
+  store_->shutdownThreading();
+  EXPECT_CALL(*alloc_, free(_)).Times(1);
+}
+
+TEST_F(StatsMatcherTLSTest, TestRememberRejectionGauge) {
+  auto make_gauge = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.gauge(stat_name).name();
+  };
+  testRememberMatcher(make_gauge, true);
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  testRememberMatcher(make_gauge, true);
+  store_->shutdownThreading();
+  EXPECT_CALL(*alloc_, free(_)).Times(1);
+}
+
+TEST_F(StatsMatcherTLSTest, TestRememberRejectionBoolIndicator) {
+  auto make_bool_indicator = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.boolIndicator(stat_name).name();
+  };
+  testRememberMatcher(make_bool_indicator, true);
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  testRememberMatcher(make_bool_indicator, true);
+  store_->shutdownThreading();
+  EXPECT_CALL(*alloc_, free(_)).Times(1);
+}
+
+TEST_F(StatsMatcherTLSTest, TestRememberRejectionHistogram) {
+  auto make_histogram = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.histogram(stat_name).name();
+  };
+  testRememberMatcher(make_histogram, false);
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  testRememberMatcher(make_histogram, false);
+  store_->shutdownThreading();
+  EXPECT_CALL(*alloc_, free(_)).Times(1);
 }
 
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
