@@ -236,6 +236,10 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(
 
 bool ThreadLocalStoreImpl::checkAndRememberRejection(const std::string& name,
                                                      ConstCharStarHashSet* tls_rejected_stats) {
+  if (stats_matcher_->acceptsAll()) {
+    return false;
+  }
+
   const char* rejected_name = rejected_stats_.find(name);
   if (rejected_name == nullptr) {
     if (rejects(name)) {

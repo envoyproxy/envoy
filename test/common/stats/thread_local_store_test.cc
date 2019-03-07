@@ -801,6 +801,40 @@ public:
     }
   }
 
+  void testRejectsAll(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    EXPECT_CALL(*matcher, rejects("stats.overflow")).WillRepeatedly(Return(false));
+    matcher->rejects_all_ = true;
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    ScopePtr scope = store_.createScope("scope.");
+
+    for (int j = 0; j < 5; ++j) {
+      // Note: zero calls to reject() are made, as reject-all should short-circuit.
+      EXPECT_EQ("", lookup_stat(*scope, "reject"));
+    }
+  }
+
+  void testAcceptsAll(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    EXPECT_CALL(*matcher, rejects("stats.overflow")).WillRepeatedly(Return(false));
+    matcher->accepts_all_ = true;
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    ScopePtr scope = store_.createScope("scope.");
+
+    for (int j = 0; j < 5; ++j) {
+      // Note: zero calls to reject() are made, as accept-all should short-circuit.
+      EXPECT_EQ("scope.ok", lookup_stat(*scope, "ok"));
+    }
+  }
+
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -813,32 +847,88 @@ INSTANTIATE_TEST_CASE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
 
 // Tests that the logic for remembering rejected stats works properly, both
 // with and without threading.
-TEST_P(RememberStatsMatcherTest, Counter) {
+TEST_P(RememberStatsMatcherTest, CounterRejectOne) {
   auto make_counter = [](Scope& scope, const std::string& stat_name) -> std::string {
     return scope.counter(stat_name).name();
   };
   testRememberMatcher(make_counter);
 }
 
-TEST_P(RememberStatsMatcherTest, Gauge) {
+TEST_P(RememberStatsMatcherTest, CounterRejectsAll) {
+  auto make_counter = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.counter(stat_name).name();
+  };
+  testRejectsAll(make_counter);
+}
+
+TEST_P(RememberStatsMatcherTest, CounterAcceptsAll) {
+  auto make_counter = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.counter(stat_name).name();
+  };
+  testAcceptsAll(make_counter);
+}
+
+TEST_P(RememberStatsMatcherTest, GaugeRejectOne) {
   auto make_gauge = [](Scope& scope, const std::string& stat_name) -> std::string {
     return scope.gauge(stat_name).name();
   };
   testRememberMatcher(make_gauge);
 }
 
-TEST_P(RememberStatsMatcherTest, BoolIndicator) {
+TEST_P(RememberStatsMatcherTest, GaugeRejectsAll) {
+  auto make_gauge = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.gauge(stat_name).name();
+  };
+  testRejectsAll(make_gauge);
+}
+
+TEST_P(RememberStatsMatcherTest, GaugeAcceptsAll) {
+  auto make_gauge = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.gauge(stat_name).name();
+  };
+  testAcceptsAll(make_gauge);
+}
+
+TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectOne) {
   auto make_bool_indicator = [](Scope& scope, const std::string& stat_name) -> std::string {
     return scope.boolIndicator(stat_name).name();
   };
   testRememberMatcher(make_bool_indicator);
 }
 
-TEST_P(RememberStatsMatcherTest, Histogram) {
+TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectsAll) {
+  auto make_bool_indicator = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.boolIndicator(stat_name).name();
+  };
+  testRejectsAll(make_bool_indicator);
+}
+
+TEST_P(RememberStatsMatcherTest, BoolIndicatorAcceptsAll) {
+  auto make_bool_indicator = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.boolIndicator(stat_name).name();
+  };
+  testAcceptsAll(make_bool_indicator);
+}
+
+TEST_P(RememberStatsMatcherTest, HistogramRejectOne) {
   auto make_histogram = [](Scope& scope, const std::string& stat_name) -> std::string {
     return scope.histogram(stat_name).name();
   };
   testRememberMatcher(make_histogram);
+}
+
+TEST_P(RememberStatsMatcherTest, HistogramRejectsAll) {
+  auto make_histogram = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.histogram(stat_name).name();
+  };
+  testRejectsAll(make_histogram);
+}
+
+TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) {
+  auto make_histogram = [](Scope& scope, const std::string& stat_name) -> std::string {
+    return scope.histogram(stat_name).name();
+  };
+  testAcceptsAll(make_histogram);
 }
 
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {

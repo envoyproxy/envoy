@@ -277,9 +277,8 @@ private:
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
   absl::string_view truncateStatNameIfNeeded(absl::string_view name);
-  bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
-  StringSet rejected_stats_ GUARDED_BY(lock_);
   bool rejects(const std::string& name) const;
+  bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
   bool checkAndRememberRejection(const std::string& name, ConstCharStarHashSet* tls_rejected_stats)
@@ -295,6 +294,7 @@ private:
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
+  StringSet rejected_stats_ GUARDED_BY(lock_);
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
