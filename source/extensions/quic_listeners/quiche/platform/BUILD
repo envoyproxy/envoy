@@ -75,6 +75,7 @@ envoy_cc_library(
         "quic_mock_log_impl.h",
         "quic_singleton_impl.h",
         "quic_stack_trace_impl.h",
+        "quic_thread_impl.h",
     ]),
     external_deps = [
         "abseil_base",
@@ -89,6 +90,7 @@ envoy_cc_library(
     deps = [
         "@com_googlesource_quiche//:quic_platform_export",
     ] + envoy_select_quiche([
+        "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
         "//source/common/singleton:threadsafe_singleton",
@@ -100,14 +102,18 @@ envoy_cc_library(
     srcs = [
         "quic_cert_utils_impl.cc",
         "quic_text_utils_impl.cc",
-    ],
+    ] + envoy_select_quiche([
+        "quic_hostname_utils_impl.cc",
+    ]),
     hdrs = [
         "quic_cert_utils_impl.h",
         "quic_mutex_impl.h",
         "quic_str_cat_impl.h",
         "quic_string_utils_impl.h",
         "quic_text_utils_impl.h",
-    ],
+    ] + envoy_select_quiche([
+        "quic_hostname_utils_impl.h",
+    ]),
     external_deps = [
         "quiche_quic_platform_base",
         "abseil_str_format",
@@ -115,6 +121,9 @@ envoy_cc_library(
         "ssl",
     ],
     visibility = ["//visibility:public"],
+    deps = envoy_select_quiche([
+        "//source/common/http:utility_lib",
+    ]),
 )
 
 envoy_cc_library(
