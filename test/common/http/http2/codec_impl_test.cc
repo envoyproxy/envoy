@@ -925,7 +925,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersOverDefaultCodecLibraryLimit) 
   request_headers.addCopy("big", long_string);
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
@@ -961,7 +961,7 @@ TEST_P(Http2CodecImplTest, TestManyLargeRequestHeadersUnderPerHeaderLimit) {
   }
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
@@ -979,7 +979,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtMaxConfigurable) {
   }
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
