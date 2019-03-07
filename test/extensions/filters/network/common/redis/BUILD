@@ -25,13 +25,8 @@ envoy_cc_test_library(
     name = "test_utils_lib",
     hdrs = ["test_utils.h"],
     deps = [
-        "//source/common/event:dispatcher_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:upstream_includes",
-        "//source/common/upstream:upstream_lib",
-        "//source/extensions/filters/network/common/redis:client_lib",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )
 

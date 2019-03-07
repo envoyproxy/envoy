@@ -4,9 +4,9 @@
 #include <list>
 #include <string>
 
-#include "test/test_common/printers.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 
-#include "gmock/gmock.h"
+#include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
