@@ -1837,9 +1837,7 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
   envoy::api::v2::Listener listener;
   envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
   envoy::api::v2::auth::TlsCertificate* server_cert =
-      SSLV3_ALERT_CERTIFICATE_UNKNOWN filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->add_tls_certificates();
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
