@@ -345,7 +345,7 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
 
 IntegrationStreamDecoderPtr
 HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
-                                           int upstream_index) {
+                                           int upstream_index, const std::string& path) {
   // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
   if (!initialized()) {
@@ -354,7 +354,7 @@ HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_co
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
+                                          {":path", path},
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"x-lyft-user-id", "123"}};
@@ -363,8 +363,8 @@ HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_co
 }
 
 void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    ConnectionCreationFunction* create_connection, int upstream_index) {
-  auto response = makeHeaderOnlyRequest(create_connection, upstream_index);
+    ConnectionCreationFunction* create_connection, int upstream_index, const std::string& path) {
+  auto response = makeHeaderOnlyRequest(create_connection, upstream_index, path);
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
