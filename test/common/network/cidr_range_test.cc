@@ -11,7 +11,7 @@
 #include "common/network/cidr_range.h"
 #include "common/network/utility.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 // We are adding things into the std namespace.
 // Note that this is technically undefined behavior!
@@ -29,6 +29,7 @@ namespace Envoy {
 
 namespace Network {
 namespace Address {
+namespace {
 
 TEST(TruncateIpAddressAndLength, Various) {
   std::map<std::pair<std::string, int>, std::pair<std::string, int>> test_cases = {
@@ -571,6 +572,7 @@ TEST(IpListTest, MatchAnyAll) {
   EXPECT_FALSE(wl.contains(Address::PipeInstance("foo")));
 }
 
+} // namespace
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

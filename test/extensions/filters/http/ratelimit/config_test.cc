@@ -6,9 +6,9 @@
 #include "extensions/filters/http/ratelimit/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ReturnRef;
@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
+namespace {
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -197,6 +198,7 @@ TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
   EXPECT_THROW(MessageUtil::loadFromYaml(yaml, proto_config), EnvoyException);
 }
 
+} // namespace
 } // namespace RateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions

@@ -11,9 +11,9 @@
 #include "test/integration/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "mysql_test_utils.h"
 #include "rapidjson/document.h"
 
@@ -26,7 +26,7 @@ namespace MySQLProxy {
 
 constexpr int SESSIONS = 5;
 
-class MySQLIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                              public MySQLTestUtils,
                              public BaseIntegrationTest {
   std::string mysqlConfig() {
@@ -35,7 +35,7 @@ class MySQLIntegrationTest : public TestBaseWithParam<Network::Address::IpVersio
   }
 
 public:
-  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), realTime(), mysqlConfig()){};
+  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
 
   // Initializer for an individual integration test.
   void SetUp() override { BaseIntegrationTest::initialize(); }
@@ -46,19 +46,6 @@ public:
     fake_upstreams_.clear();
   }
 };
-
-int mysqlGetCounterValueFromStats(const std::string& msg, const std::string& mysql_stat,
-                                  int& counter) {
-  Json::ObjectSharedPtr stats = Json::Factory::loadFromString(msg);
-  for (const Json::ObjectSharedPtr& stat : stats->getObjectArray("stats")) {
-    std::string entry = stat->getString("name");
-    if (!entry.compare(mysql_stat)) {
-      counter = stat->getInteger("value");
-      return 0;
-    }
-  }
-  return -1;
-}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MySQLIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
@@ -77,16 +64,7 @@ TEST_P(MySQLIntegrationTest, MySQLStatsNewSessionTest) {
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
 
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
-                                         Http::CodecClient::Type::HTTP1, version_);
-
-  int ret = 0;
-  int counter = 0;
-  std::string mysql_stat = "mysql.mysql_stats.sessions";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, SESSIONS);
+  test_server_->waitForCounterGe("mysql.mysql_stats.sessions", SESSIONS);
 }
 
 /**
@@ -124,20 +102,8 @@ TEST_P(MySQLIntegrationTest, MysqLoginTest) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  // Verify counters
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
-                                         Http::CodecClient::Type::HTTP1, version_);
-  int ret = 0;
-  int counter = 0;
-  std::string mysql_stat = "mysql.mysql_stats.login_attempts";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, 1);
-  mysql_stat = "mysql.mysql_stats.login_failures";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, 0);
+  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
 /**
@@ -181,19 +147,9 @@ TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
   }
 
   // Verify counters: CLIENT_NUM login attempts, no failures
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
-                                         Http::CodecClient::Type::HTTP1, version_);
-  int ret = 0;
-  int counter = 0;
-  std::string mysql_stat = "mysql.mysql_stats.login_attempts";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, CLIENT_NUM);
-  mysql_stat = "mysql.mysql_stats.login_failures";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, 0);
+  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", CLIENT_NUM);
+  EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_attempts")->value(), CLIENT_NUM);
+  EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
 } // namespace MySQLProxy

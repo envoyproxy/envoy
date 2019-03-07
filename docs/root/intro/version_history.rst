@@ -14,6 +14,8 @@ Version history
 * config: removed deprecated --v2-config-only from command line config.
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
+* config: finish cluster warming only when a named response i.e. ClusterLoadAssignment associated to the cluster being warmed comes in the EDS response. This is a behavioural change from the current implementation where warming of cluster completes on missing load assignments also.
+* config: use Envoy cpuset size to set the default number or worker threads if :option:`--cpuset-threads` is enabled.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
 * ext_authz: added an configurable option to make the gRPC service cross-compatible with V2Alpha. Note that this feature is already deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version. 
 * ext_authz: migrated from V2alpha to V2 and improved the documentation.
@@ -24,11 +26,14 @@ Version history
   <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_upstream_headers>` replaces the previous *allowed_authorization_headers* object.
   All the control header lists now support :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>` instead of standard string.
 * governance: extending Envoy deprecation policy from 1 release (0-3 months) to 2 releases (3-6 months).
+* health check: expected response codes in http health checks are now :ref:`configurable <envoy_api_msg_core.HealthCheck.HttpHealthCheck>`.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
 * http: fixed a bug where Content-Length:0 was added to HTTP/1 204 responses.
 * outlier_detection: added support for :ref:`outlier detection event protobuf-based logging <arch_overview_outlier_detection_logging>`.
 * mysql: added a MySQL proxy filter that is capable of parsing SQL queries over MySQL wire protocol. Refer to ::ref:`MySQL proxy<config_network_filters_mysql_proxy>` for more details.
 * http: added :ref:`max request headers size <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.max_request_headers_kb>`. The default behaviour is unchanged.
+* http: added modifyDecodingBuffer/modifyEncodingBuffer to allow modifying the buffered request/response data.
+* http: added encodeComplete/decodeComplete. These are invoked at the end of the stream, after all data has been encoded/decoded respectively. Default implementation is a no-op.
 * redis: added :ref:`hashtagging <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_hashtagging>` to guarantee a given key's upstream.
 * redis: added :ref:`latency stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
@@ -45,11 +50,15 @@ Version history
 * stats: added support for histograms in prometheus
 * stats: added usedonly flag to prometheus stats to only output metrics which have been
   updated at least once.
+* stats: added BoolIndicator stat type, converted the following 1-or-0 Gauges: control_plane.connected_state, cx_open, rq_pending_open, rq_open, rq_retry_open, runtime.admin_overrides_active, open_gauge, config.active, server.live.
 * tap: added new alpha :ref:`HTTP tap filter <config_http_filters_tap>`.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 * upstream: add hash_function to specify the hash function for :ref:`ring hash<envoy_api_msg_Cluster.RingHashLbConfig>` as either xxHash or `murmurHash2 <https://sites.google.com/site/murmurhash>`_. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 * upstream: added :ref:`degraded health value<arch_overview_load_balancing_degraded>` which allows
   routing to certain hosts only when there are insufficient healthy hosts available.
+* tracing: added :ref:`verbose <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` to support logging annotations on spans.
+* upstream: added support for host weighting and :ref:`locality weighting <arch_overview_load_balancing_locality_weighted_lb>` in the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`, and added a :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` config parameter to strictly bound the ring size.
+* upstream: added configuration option to select any host when the fallback policy fails.
 
 1.9.0 (Dec 20, 2018)
 ====================
@@ -240,7 +249,7 @@ Version history
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
-* upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
+* upstream: require opt-in to use the :ref:`x-envoy-original-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
   for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   load balancing policy.
 

@@ -15,9 +15,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -53,7 +53,7 @@ public:
 
 class ActiveTestRequest;
 
-class Http2ConnPoolImplTest : public TestBase {
+class Http2ConnPoolImplTest : public testing::Test {
 public:
   struct TestCodecClient {
     Http::MockClientConnection* codec_;
@@ -440,7 +440,7 @@ TEST_F(Http2ConnPoolImplTest, LocalReset) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_tx_reset_.value());
-  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_FALSE(cluster_->circuit_breakers_stats_.rq_open_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, RemoteReset) {
@@ -581,7 +581,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
 TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   InSequence s;
 
-  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_FALSE(cluster_->circuit_breakers_stats_.rq_open_.value());
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -591,7 +591,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_FALSE(cluster_->circuit_breakers_stats_.rq_open_.value());
 
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);

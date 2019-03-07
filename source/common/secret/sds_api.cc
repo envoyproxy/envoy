@@ -25,7 +25,7 @@ SdsApi::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispat
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
   // each init manager has a chance to initialize its targets.
-  init_manager.registerTarget(*this);
+  init_manager.registerTarget(*this, fmt::format("SdsApi {}", sds_config_name));
 }
 
 void SdsApi::initialize(std::function<void()> callback) {

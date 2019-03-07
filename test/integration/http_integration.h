@@ -79,11 +79,19 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
  */
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
+  // TODO(jmarantz): Remove this once
+  // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                       Network::Address::IpVersion version, TestTimeSystemPtr,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
       : HttpIntegrationTest(downstream_protocol, version, config) {}
+
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                      Network::Address::IpVersion version,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+
+  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                      const InstanceConstSharedPtrFn& upstream_address_fn,
                       Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();
@@ -188,5 +196,6 @@ protected:
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 } // namespace Envoy

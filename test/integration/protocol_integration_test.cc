@@ -130,6 +130,26 @@ config:
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 }
 
+// Add a health check filter and verify correct computation of health based on upstream status.
+TEST_P(ProtocolIntegrationTest, ModifyBuffer) {
+  config_helper_.addFilter(R"EOF(
+name: envoy.health_check
+config:
+    pass_through_mode: false
+    cluster_min_healthy_percentages:
+        example_cluster_name: { value: 75 }
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}});
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+}
+
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
   config_helper_.addFilter(R"EOF(
 name: add-trailers-filter
@@ -717,6 +737,14 @@ name: decode-headers-only
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
   EXPECT_EQ(0, upstream_request_->body().length());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
+  testLargeRequestHeaders(95, 60);
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
+  testLargeRequestHeaders(95, 96);
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

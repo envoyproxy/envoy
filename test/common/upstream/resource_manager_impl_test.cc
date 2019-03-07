@@ -5,9 +5,9 @@
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -15,17 +15,18 @@ using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Stats::MockGauge> gauge;
+  NiceMock<Stats::MockBoolIndicator> bool_indicator;
   NiceMock<Stats::MockStore> store;
 
-  ON_CALL(store, gauge(_)).WillByDefault(ReturnRef(gauge));
+  ON_CALL(store, boolIndicator(_)).WillByDefault(ReturnRef(bool_indicator));
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1,
-      ClusterCircuitBreakersStats{ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store))});
+      ClusterCircuitBreakersStats{ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_BOOL_INDICATOR(store))});
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -58,5 +59,6 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   EXPECT_FALSE(resource_manager.retries().canCreate());
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

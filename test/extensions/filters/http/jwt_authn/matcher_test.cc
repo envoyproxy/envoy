@@ -23,7 +23,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-class MatcherTest : public TestBase {
+class MatcherTest : public testing::Test {
 public:
 };
 

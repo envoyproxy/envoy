@@ -3,14 +3,15 @@
 #include "extensions/tracers/zipkin/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+namespace {
 
 TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   NiceMock<Server::MockInstance> server;
@@ -63,6 +64,7 @@ TEST(ZipkinTracerConfigTest, DoubleRegistrationTest) {
       EnvoyException, "Double registration for name: 'envoy.zipkin'");
 }
 
+} // namespace
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

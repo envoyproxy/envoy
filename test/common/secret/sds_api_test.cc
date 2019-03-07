@@ -13,10 +13,10 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using ::testing::_;
 using ::testing::Invoke;
@@ -26,7 +26,7 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SdsApiTest : public TestBase {
+class SdsApiTest : public testing::Test {
 protected:
   SdsApiTest() : api_(Api::createApiForTest()) {}
 
@@ -39,7 +39,7 @@ TEST_F(SdsApiTest, BasicTest) {
   const envoy::service::discovery::v2::SdsDummy dummy;
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
-  EXPECT_CALL(init_manager, registerTarget(_));
+  EXPECT_CALL(init_manager, registerTarget(_, _));
 
   envoy::api::v2::core::ConfigSource config_source;
   config_source.mutable_api_config_source()->set_api_type(

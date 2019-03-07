@@ -10,9 +10,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ByRef;
@@ -24,8 +24,9 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
-class ConnectionHandlerTest : public TestBase, protected Logger::Loggable<Logger::Id::main> {
+class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ConnectionHandlerTest()
       : handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
@@ -675,5 +676,6 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   EXPECT_CALL(*listener, onDestroy());
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

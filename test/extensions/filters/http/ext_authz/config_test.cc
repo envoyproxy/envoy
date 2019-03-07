@@ -4,9 +4,9 @@
 #include "extensions/filters/http/ext_authz/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
+namespace {
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
   std::string yaml = R"EOF(
@@ -92,6 +93,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters
 } // namespace Extensions

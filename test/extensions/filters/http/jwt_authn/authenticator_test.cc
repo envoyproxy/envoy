@@ -9,8 +9,9 @@
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
@@ -26,8 +27,9 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
-class AuthenticatorTest : public TestBase {
+class AuthenticatorTest : public testing::Test {
 public:
   void SetUp() override {
     MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
@@ -409,6 +411,7 @@ TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
   expectVerifyStatus(Status::JwksPemBadBase64, headers);
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

@@ -4,7 +4,7 @@ Zipkin Tracing
 ==============
 
 The Zipkin tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
-capabilities using `Zipkin <http://zipkin.io/>`_ as the tracing provider. This sandbox
+capabilities using `Zipkin <https://zipkin.io/>`_ as the tracing provider. This sandbox
 is very similar to the front proxy architecture described above, with one difference:
 service1 makes an API call to service2 before returning a response.
 The three containers will be deployed inside a virtual network called ``envoymesh``.

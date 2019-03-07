@@ -211,7 +211,9 @@ protected:
   void runInitializeCallbackIfAny();
 
 private:
-  void registerInitTarget(Init::Manager& init_manager) { init_manager.registerTarget(*this); }
+  void registerInitTarget(Init::Manager& init_manager) {
+    init_manager.registerTarget(*this, fmt::format("ConfigSubscriptionInstanceBase {}", name_));
+  }
 
   void bindConfigProvider(MutableConfigProviderImplBase* provider);
 

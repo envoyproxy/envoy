@@ -21,8 +21,9 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
-class LdsApiTest : public TestBase {
+class LdsApiTest : public testing::Test {
 public:
   LdsApiTest() : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)) {}
 
@@ -49,7 +50,7 @@ public:
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(init_, registerTarget(_));
+    EXPECT_CALL(init_, registerTarget(_, _));
     lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                         local_info_, store_, listener_manager_, *api_);
 
@@ -105,6 +106,16 @@ public:
       refs.push_back(listeners_.back());
     }
     EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
+  }
+
+  void addListener(Protobuf::RepeatedPtrField<envoy::api::v2::Listener>& listeners,
+                   const std::string& listener_name) {
+    auto listener = listeners.Add();
+    listener->set_name(listener_name);
+    auto socket_address = listener->mutable_address()->mutable_socket_address();
+    socket_address->set_address(listener_name);
+    socket_address->set_port_value(1);
+    listener->add_filter_chains();
   }
 
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -180,9 +191,57 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
 
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
       .WillOnce(Throw(EnvoyException("something is wrong")));
+  EXPECT_CALL(init_.initialized_, ready());
+
+  EXPECT_THROW_WITH_MESSAGE(
+      lds_->onConfigUpdate(listeners, ""), EnvoyException,
+      "Error adding/updating listener(s) invalid-listener: something is wrong");
+  EXPECT_CALL(request_, cancel());
+}
+
+TEST_F(LdsApiTest, EmptyListenersUpdate) {
+  InSequence s;
+
+  setup();
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
+
+  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+
+  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(request_, cancel());
+
+  lds_->onConfigUpdate(listeners, "");
+}
+
+TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
+  InSequence s;
+
+  setup();
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
+
+  // Add 4 listeners - 2 valid and 2 invalid.
+  addListener(listeners, "valid-listener-1");
+  addListener(listeners, "invalid-listener-1");
+  addListener(listeners, "valid-listener-2");
+  addListener(listeners, "invalid-listener-2");
+
+  EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
+
+  EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
+      .WillOnce(Return(true))
+      .WillOnce(Throw(EnvoyException("something is wrong")))
+      .WillOnce(Return(true))
+      .WillOnce(Throw(EnvoyException("something else is wrong")));
+
+  EXPECT_CALL(init_.initialized_, ready());
 
   EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
-                            "Error adding/updating listener invalid-listener: something is wrong");
+                            "Error adding/updating listener(s) invalid-listener-1: something is "
+                            "wrong, invalid-listener-2: something else is wrong");
   EXPECT_CALL(request_, cancel());
 }
 
@@ -511,5 +570,6 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   EXPECT_EQ(13237225503670494420U, store_.gauge("listener_manager.lds.version").value());
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

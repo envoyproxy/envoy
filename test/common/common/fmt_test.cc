@@ -1,9 +1,8 @@
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 
-#include "test/test_common/test_base.h"
-
 #include "absl/strings/string_view.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 

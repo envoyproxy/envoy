@@ -22,11 +22,11 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -40,10 +40,11 @@ namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
+namespace {
 
 // Build again on the basis of the connection_handler_test.cc
 
-class ProxyProtocolTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                           public Network::ListenerConfig,
                           public Network::FilterChainManager,
                           protected Logger::Loggable<Logger::Id::main> {
@@ -862,7 +863,7 @@ TEST_P(ProxyProtocolTest, ClosedEmpty) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
-class WildcardProxyProtocolTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Network::ListenerConfig,
                                   public Network::FilterChainManager,
                                   protected Logger::Loggable<Logger::Id::main> {
@@ -999,6 +1000,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   disconnect();
 }
 
+} // namespace
 } // namespace ProxyProtocol
 } // namespace ListenerFilters
 } // namespace Extensions

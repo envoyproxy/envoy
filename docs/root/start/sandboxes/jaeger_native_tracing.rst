@@ -4,7 +4,7 @@ Jaeger Native Tracing
 =====================
 
 The Jaeger tracing sandbox demonstrates Envoy's :ref:`request tracing <arch_overview_tracing>`
-capabilities using `Jaeger <http://jaegertracing.io/>`_ as the tracing provider and Jaeger's native
+capabilities using `Jaeger <https://jaegertracing.io/>`_ as the tracing provider and Jaeger's native
 `C++ client <https://github.com/jaegertracing/jaeger-client-cpp>`_ as a plugin. Using Jaeger with its
 native client instead of with Envoy's builtin Zipkin client has the following advantages:
 

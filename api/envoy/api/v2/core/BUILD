@@ -49,6 +49,27 @@ api_go_proto_library(
 )
 
 api_proto_library_internal(
+    name = "health_check",
+    srcs = ["health_check.proto"],
+    visibility = [
+        ":friends",
+    ],
+    deps = [
+        ":base",
+        "//envoy/type:range",
+    ],
+)
+
+api_go_proto_library(
+    name = "health_check",
+    proto = ":health_check",
+    deps = [
+        ":base_go_proto",
+        "//envoy/type:range_go_proto",
+    ],
+)
+
+api_proto_library_internal(
     name = "config_source",
     srcs = ["config_source.proto"],
     visibility = [

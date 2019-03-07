@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/api/io_error.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -12,22 +13,27 @@ namespace Network {
  */
 class IoHandle {
 public:
-  IoHandle() {}
-
   virtual ~IoHandle() {}
 
   /**
    * Return data associated with IoHandle.
    *
-   * TODO(sbelair2) remove fd() method
+   * TODO(danzh) move it to IoSocketHandle after replacing the calls to it with
+   * calls to IoHandle API's everywhere.
    */
   virtual int fd() const PURE;
 
   /**
    * Clean up IoHandle resources
    */
-  virtual void close() PURE;
+  virtual Api::IoCallUintResult close() PURE;
+
+  /**
+   * Return true if close() hasn't been called.
+   */
+  virtual bool isOpen() const PURE;
 };
+
 typedef std::unique_ptr<IoHandle> IoHandlePtr;
 
 } // namespace Network

@@ -20,9 +20,9 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -33,8 +33,9 @@ using testing::WithArgs;
 
 namespace Envoy {
 namespace Network {
+namespace {
 
-class NetworkFilterManagerTest : public TestBase, public BufferSource {
+class NetworkFilterManagerTest : public testing::Test, public BufferSource {
 public:
   StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
   StreamBuffer getWriteBuffer() override { return {write_buffer_, write_end_stream_}; }
@@ -222,5 +223,6 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   connection.raiseEvent(ConnectionEvent::RemoteClose);
 }
 
+} // namespace
 } // namespace Network
 } // namespace Envoy

@@ -1,9 +1,9 @@
 #include "extensions/filters/http/grpc_http1_bridge/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 
@@ -11,6 +11,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
+namespace {
 
 TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
   std::string json_string = R"EOF(
@@ -27,6 +28,7 @@ TEST(GrpcHttp1BridgeFilterConfigTest, GrpcHttp1BridgeFilter) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters
 } // namespace Extensions

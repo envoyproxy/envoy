@@ -8,8 +8,9 @@
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
@@ -149,11 +150,11 @@ route_config:
 } // namespace
 
 class HeaderIntegrationTest
-    : public TestBaseWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
   HeaderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
 
   bool routerSuppressEnvoyHeaders() const { return std::get<1>(GetParam()); }
 

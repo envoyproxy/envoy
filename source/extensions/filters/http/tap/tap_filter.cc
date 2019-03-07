@@ -40,8 +40,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool) {
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
-  // TODO(mattklein123): Why is this not provided in the log callback? Do a follow-up to make it so.
-  request_trailers_ = &trailers;
   if (tapper_ != nullptr) {
     tapper_->onRequestTrailers(trailers);
   }
@@ -69,10 +67,9 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap& trailers) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-void Filter::log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-                 const Http::HeaderMap* response_trailers, const StreamInfo::StreamInfo&) {
-  if (tapper_ != nullptr && tapper_->onDestroyLog(request_headers, request_trailers_,
-                                                  response_headers, response_trailers)) {
+void Filter::log(const Http::HeaderMap*, const Http::HeaderMap*, const Http::HeaderMap*,
+                 const StreamInfo::StreamInfo&) {
+  if (tapper_ != nullptr && tapper_->onDestroyLog()) {
     config_->stats().rq_tapped_.inc();
   }
 }

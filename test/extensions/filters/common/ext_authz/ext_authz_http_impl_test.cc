@@ -10,9 +10,9 @@
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AllOf;
@@ -29,8 +29,9 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
+namespace {
 
-class ExtAuthzHttpClientTest : public TestBase {
+class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest()
       : async_request_{&async_client_}, config_{createConfig()}, client_{cm_, config_} {
@@ -376,6 +377,7 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   client_.cancel();
 }
 
+} // namespace
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

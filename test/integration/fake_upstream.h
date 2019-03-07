@@ -401,7 +401,7 @@ public:
   enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
-                     Event::TestTimeSystem& time_system);
+                     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFailure if an unexpected event occurs. If a caller truly
@@ -508,8 +508,14 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
                      public Network::FilterChainManager,
                      public Network::FilterChainFactory {
 public:
+  // Creates a fake upstream bound to the specified unix domain socket path.
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
                Event::TestTimeSystem& time_system);
+  // Creates a fake upstream bound to the specified |address|.
+  FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
+               FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
+               bool enable_half_close = false);
+  // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
                Event::TestTimeSystem& time_system, bool enable_half_close = false);
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
@@ -523,7 +529,8 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult

@@ -13,10 +13,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -81,12 +81,12 @@ public:
       std::make_unique<DefaultInternalAddressConfig>();
 };
 
-class ConnectionManagerUtilityTest : public TestBase {
+class ConnectionManagerUtilityTest : public testing::Test {
 public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
-    tracing_config_ = {Tracing::OperationName::Ingress, {}, 100, 10000, 100};
+    tracing_config_ = {Tracing::OperationName::Ingress, {}, 100, 10000, 100, false};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));

@@ -13,9 +13,9 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -28,8 +28,9 @@ namespace Extensions {
 namespace StatSinks {
 namespace Common {
 namespace Statsd {
+namespace {
 
-class TcpStatsdSinkTest : public TestBase {
+class TcpStatsdSinkTest : public testing::Test {
 public:
   TcpStatsdSinkTest() {
     sink_ = std::make_unique<TcpStatsdSink>(
@@ -193,6 +194,7 @@ TEST_F(TcpStatsdSinkTest, Overflow) {
   tls_.shutdownThread();
 }
 
+} // namespace
 } // namespace Statsd
 } // namespace Common
 } // namespace StatSinks

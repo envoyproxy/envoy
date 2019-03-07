@@ -13,8 +13,9 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
@@ -25,7 +26,6 @@ using testing::MatchesRegex;
 using testing::Not;
 
 namespace Envoy {
-
 namespace {
 
 std::string normalizeDate(const std::string& s) {
@@ -468,10 +468,6 @@ TEST_P(IntegrationTest, Connect) {
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
-TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(62, 60); }
-
-TEST_P(IntegrationTest, LargeHeadersAccepted) { testLargeRequestHeaders(62, 63); }
-
 TEST_P(IntegrationTest, UpstreamProtocolError) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -751,6 +747,16 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
+  initialize();
+  EXPECT_STREQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
+               Network::Test::getLoopbackAddressString(GetParam()).c_str());
 }
 
 } // namespace Envoy

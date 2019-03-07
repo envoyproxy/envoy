@@ -239,6 +239,7 @@ envoy_cc_test_library(
         "//test/common/upstream:utility_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
         "//test/integration/filters:headers_only_filter_config_lib",
+        "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",

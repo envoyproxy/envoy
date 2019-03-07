@@ -11,10 +11,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -23,6 +23,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+namespace {
 
 class TestReporterImpl : public Reporter {
 public:
@@ -36,7 +37,7 @@ private:
   std::vector<Span> reported_spans_;
 };
 
-class ZipkinTracerTest : public TestBase {
+class ZipkinTracerTest : public testing::Test {
 protected:
   Event::SimulatedTimeSystem time_system_;
 };
@@ -429,6 +430,7 @@ TEST_F(ZipkinTracerTest, NotSharedSpanContext) {
   EXPECT_EQ(parent_span->id(), child_span->parentId());
 }
 
+} // namespace
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

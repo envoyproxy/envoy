@@ -2,9 +2,8 @@
 
 #include "common/network/address_impl.h"
 
-#include "test/test_common/test_base.h"
-
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Const;

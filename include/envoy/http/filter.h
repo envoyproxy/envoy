@@ -190,6 +190,12 @@ public:
   virtual const Buffer::Instance* decodingBuffer() PURE;
 
   /**
+   * Allows modifying the decoding buffer. May only be called before any data has been continued
+   * past the calling filter.
+   */
+  virtual void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
+
+  /**
    * Add buffered body data. This method is used in advanced cases where returning
    * StopIterationAndBuffer from decodeData() is not sufficient.
    *
@@ -401,6 +407,11 @@ public:
    * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Called at the end of the stream, when all data has been decoded.
+   */
+  virtual void decodeComplete() {}
 };
 
 typedef std::shared_ptr<StreamDecoderFilter> StreamDecoderFilterSharedPtr;
@@ -429,6 +440,12 @@ public:
    *         previous ones in the filter chain. May be nullptr if nothing has been buffered yet.
    */
   virtual const Buffer::Instance* encodingBuffer() PURE;
+
+  /**
+   * Allows modifying the encoding buffer. May only be called before any data has been continued
+   * past the calling filter.
+   */
+  virtual void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
 
   /**
    * Add buffered body data. This method is used in advanced cases where returning
@@ -549,6 +566,11 @@ public:
    * use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Called at the end of the stream, when all data has been encoded.
+   */
+  virtual void encodeComplete() {}
 };
 
 typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;

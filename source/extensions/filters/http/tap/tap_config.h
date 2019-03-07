@@ -54,10 +54,7 @@ public:
    * Called when the request is being destroyed and is being logged.
    * @return whether the request was tapped or not.
    */
-  virtual bool onDestroyLog(const Http::HeaderMap* request_headers,
-                            const Http::HeaderMap* request_trailers,
-                            const Http::HeaderMap* response_headers,
-                            const Http::HeaderMap* response_trailers) PURE;
+  virtual bool onDestroyLog() PURE;
 };
 
 using HttpPerRequestTapperPtr = std::unique_ptr<HttpPerRequestTapper>;
@@ -65,7 +62,7 @@ using HttpPerRequestTapperPtr = std::unique_ptr<HttpPerRequestTapper>;
 /**
  * Abstract HTTP tap configuration.
  */
-class HttpTapConfig : public Extensions::Common::Tap::TapConfig {
+class HttpTapConfig : public virtual Extensions::Common::Tap::TapConfig {
 public:
   /**
    * @return a new per-request HTTP tapper which is used to handle tapping of a discrete request.

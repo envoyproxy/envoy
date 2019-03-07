@@ -13,7 +13,7 @@ sources of latency. Envoy supports three features related to system wide tracing
   :ref:`config_http_conn_man_headers_x-request-id` HTTP header. Applications can forward the
   x-request-id header for unified logging as well as tracing.
 * **External trace service integration**: Envoy supports pluggable external trace visualization
-  providers. Currently Envoy supports `LightStep <http://lightstep.com/>`_, `Zipkin <http://zipkin.io/>`_
+  providers. Currently Envoy supports `LightStep <https://lightstep.com/>`_, `Zipkin <https://zipkin.io/>`_
   or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_), and
   `Datadog <https://datadoghq.com>`_.
   However, support for other tracing providers would not be difficult to add.

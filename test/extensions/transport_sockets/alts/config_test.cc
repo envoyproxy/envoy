@@ -5,9 +5,9 @@
 #include "extensions/transport_sockets/alts/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using Envoy::Server::Configuration::MockTransportSocketFactoryContext;
 using testing::_;
@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
+namespace {
 
 TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   MockTransportSocketFactoryContext factory_context;
@@ -55,6 +56,7 @@ TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   EXPECT_TRUE(socket_factory->implementsSecureTransport());
 }
 
+} // namespace
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

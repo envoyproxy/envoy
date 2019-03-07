@@ -114,7 +114,7 @@ The METADATA frame uses a standard frame header, as described in the
 [HTTP/2 spec](https://httpwg.github.io/specs/rfc7540.html#FrameHeader.)
 The payload of the METADATA frame is a block of key-value pairs encoded using the [HPACK Literal
 Header Field Never Indexed representation](
-http://httpwg.org/specs/rfc7541.html#literal.header.never.indexed). Each
+https://httpwg.org/specs/rfc7541.html#literal.header.never.indexed). Each
 key-value pair represents one piece of metadata.
 
 The METADATA frame defines the following flags:

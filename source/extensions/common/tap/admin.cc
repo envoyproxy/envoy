@@ -99,12 +99,13 @@ void AdminHandler::unregisterConfig(ExtensionConfig& config) {
   }
 }
 
-void AdminHandler::submitBufferedTrace(
-    const std::shared_ptr<envoy::data::tap::v2alpha::BufferedTraceWrapper>& trace,
-    envoy::service::tap::v2alpha::OutputSink::Format format, uint64_t) {
+void AdminHandler::AdminPerTapSinkHandle::submitTrace(
+    const TraceWrapperSharedPtr& trace, envoy::service::tap::v2alpha::OutputSink::Format format) {
   ENVOY_LOG(debug, "admin submitting buffered trace to main thread");
-  main_thread_dispatcher_.post([this, trace, format]() {
-    if (!attached_request_.has_value()) {
+  // The handle can be destroyed before the cross thread post is complete. Thus, we capture a
+  // reference to our parent.
+  parent_.main_thread_dispatcher_.post([& parent = parent_, trace, format]() {
+    if (!parent.attached_request_.has_value()) {
       return;
     }
 
@@ -120,8 +121,8 @@ void AdminHandler::submitBufferedTrace(
 
     ENVOY_LOG(debug, "admin writing buffered trace to response");
     Buffer::OwnedImpl output_buffer{output_string};
-    attached_request_.value().admin_stream_->getDecoderFilterCallbacks().encodeData(output_buffer,
-                                                                                    false);
+    parent.attached_request_.value().admin_stream_->getDecoderFilterCallbacks().encodeData(
+        output_buffer, false);
   });
 }
 

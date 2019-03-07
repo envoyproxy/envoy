@@ -37,6 +37,37 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
+
+template <class T> using FilterList = std::list<std::unique_ptr<T>>;
+
+// Shared helper for recording the latest filter used.
+template <class T>
+void recordLatestDataFilter(const typename FilterList<T>::iterator current_filter,
+                            T*& latest_filter, const FilterList<T>& filters) {
+  // If this is the first time we're calling onData, just record the current filter.
+  if (latest_filter == nullptr) {
+    latest_filter = current_filter->get();
+    return;
+  }
+
+  // We want to keep this pointing at the latest filter in the filter list that has received the
+  // onData callback. To do so, we compare the current latest with the *previous* filter. If they
+  // match, then we must be processing a new filter for the first time. We omit this check if we're
+  // the first filter, since the above check handles that case.
+  //
+  // We compare against the previous filter to avoid multiple filter iterations from reseting the
+  // pointer: If we just set latest to current, then the first onData filter iteration would
+  // correctly iterate over the filters and set latest, but on subsequent onData iterations
+  // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
+  // though filter M > N was the filter that inserted data into the buffer.
+  if (current_filter != filters.begin() && latest_filter == std::prev(current_filter)->get()) {
+    latest_filter = current_filter->get();
+  }
+}
+
+} // namespace
+
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
   return {
@@ -871,9 +902,15 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
+
+    recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
+
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     (*entry)->end_stream_ = end_stream && !request_trailers_;
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
+    if ((*entry)->end_stream_) {
+      (*entry)->handle_->decodeComplete();
+    }
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
@@ -968,6 +1005,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
+    (*entry)->handle_->decodeComplete();
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
@@ -1112,6 +1150,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     (*entry)->end_stream_ =
         encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
+    if ((*entry)->end_stream_) {
+      (*entry)->handle_->encodeComplete();
+    }
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1322,8 +1363,14 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
+
+    recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
+
     (*entry)->end_stream_ = end_stream && !response_trailers_;
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
+    if ((*entry)->end_stream_) {
+      (*entry)->handle_->encodeComplete();
+    }
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
@@ -1371,6 +1418,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
+    (*entry)->handle_->encodeComplete();
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
     ENVOY_STREAM_LOG(trace, "encode trailers called: filter={} status={}", *this,
@@ -1421,6 +1469,10 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
 const std::vector<Http::LowerCaseString>&
 ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
   return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
+}
+
+bool ConnectionManagerImpl::ActiveStream::verbose() const {
+  return connection_manager_.config_.tracingConfig()->verbose_;
 }
 
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
