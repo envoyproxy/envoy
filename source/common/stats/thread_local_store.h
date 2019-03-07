@@ -177,8 +177,7 @@ public:
 private:
   friend class ThreadLocalStoreTestScope;
 
-  template <class Stat> using StatMap = CharStarHashMap<Stat>;
-  using StringSet = absl::flat_hash_set<std::string>;
+  template <class Stat> using StatMap = ConstCharStarHashMap<Stat>;
 
   struct TlsCacheEntry {
     StatMap<CounterSharedPtr> counters_;
@@ -186,7 +185,19 @@ private:
     StatMap<BoolIndicatorSharedPtr> bool_indicators_;
     StatMap<TlsHistogramSharedPtr> histograms_;
     StatMap<ParentHistogramSharedPtr> parent_histograms_;
-    CharStarHashSet rejected_stats_; // References set entries from CentralCacheEntry.
+
+    // We keep a TLS cache of rejected stat names. This costs memory, but
+    // reduces runtime overhead running the matcher. Moreover, once symbol
+    // tables are integrated, rejection will need the fully elaborated string,
+    // and it we need to take a global symbol-table lock to run. We keep
+    // this char* map here in the TLS cache to avoid taking a lock to compute
+    // rejection.
+    //
+    // To avoid duplicate copies of stats, this map references const char*
+    // values from ThreadLocalStore::rejected_stats_, which is implemented
+    // as a absl::flat_hash_map<char*>, so the keys will be stable and safe
+    // to reference from other threads even as the hash-map resizes.
+    ConstCharStarHashSet rejected_stats_;
   };
 
   struct CentralCacheEntry {
@@ -235,7 +246,7 @@ private:
     StatType&
     safeMakeStat(const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
                  MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache,
-                 CharStarHashSet* tls_rejected_stats, StatType& null_stat);
+                 ConstCharStarHashSet* tls_rejected_stats, StatType& null_stat);
 
     static std::atomic<uint64_t> next_scope_id_;
 
@@ -271,7 +282,7 @@ private:
   bool rejects(const std::string& name) const;
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
-  bool checkAndRememberRejection(const std::string& name, CharStarHashSet* tls_rejected_stats)
+  bool checkAndRememberRejection(const std::string& name, ConstCharStarHashSet* tls_rejected_stats)
       EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   const Stats::StatsOptions& stats_options_;

@@ -76,7 +76,7 @@ bool ThreadLocalStoreImpl::rejects(const std::string& name) const {
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  CharStarHashSet names;
+  ConstCharStarHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& counter : scope->central_cache_.counters_) {
@@ -99,7 +99,7 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  CharStarHashSet names;
+  ConstCharStarHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& gauge : scope->central_cache_.gauges_) {
@@ -115,7 +115,7 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
 std::vector<BoolIndicatorSharedPtr> ThreadLocalStoreImpl::boolIndicators() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<BoolIndicatorSharedPtr> ret;
-  CharStarHashSet names;
+  ConstCharStarHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& bool_indicator : scope->central_cache_.bool_indicators_) {
@@ -235,17 +235,16 @@ std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
 
 bool ThreadLocalStoreImpl::checkAndRememberRejection(const std::string& name,
-                                                     CharStarHashSet* tls_rejected_stats) {
-  auto reject_iter = rejected_stats_.find(name);
-  if (reject_iter == rejected_stats_.end()) {
+                                                     ConstCharStarHashSet* tls_rejected_stats) {
+  const char* rejected_name = rejected_stats_.find(name);
+  if (rejected_name == nullptr) {
     if (rejects(name)) {
-      auto insertion = rejected_stats_.insert(name);
-      reject_iter = insertion.first;
+      rejected_name = rejected_stats_.insert(name);
     }
   }
-  if (reject_iter != rejected_stats_.end()) {
+  if (rejected_name != nullptr) {
     if (tls_rejected_stats != nullptr) {
-      tls_rejected_stats->insert(reject_iter->c_str());
+      tls_rejected_stats->insert(rejected_name);
     }
     return true;
   }
@@ -256,7 +255,7 @@ template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
     MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache,
-    CharStarHashSet* tls_rejected_stats, StatType& null_stat) {
+    ConstCharStarHashSet* tls_rejected_stats, StatType& null_stat) {
 
   const char* stat_key = name.c_str();
 
@@ -349,7 +348,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
   StatMap<CounterSharedPtr>* tls_cache = nullptr;
-  CharStarHashSet* tls_rejected_stats = nullptr;
+  ConstCharStarHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.counters_;
@@ -397,7 +396,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   std::string final_name = prefix_ + name;
 
   StatMap<GaugeSharedPtr>* tls_cache = nullptr;
-  CharStarHashSet* tls_rejected_stats = nullptr;
+  ConstCharStarHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.gauges_;
@@ -429,7 +428,7 @@ BoolIndicator& ThreadLocalStoreImpl::ScopeImpl::boolIndicator(const std::string&
   std::string final_name = prefix_ + name;
 
   StatMap<BoolIndicatorSharedPtr>* tls_cache = nullptr;
-  CharStarHashSet* tls_rejected_stats = nullptr;
+  ConstCharStarHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.bool_indicators_;
@@ -461,7 +460,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   std::string final_name = prefix_ + name;
 
   StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
-  CharStarHashSet* tls_rejected_stats = nullptr;
+  ConstCharStarHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.parent_histograms_;

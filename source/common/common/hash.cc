@@ -34,4 +34,36 @@ uint64_t MurmurHash::murmurHash2_64(absl::string_view key, uint64_t seed) {
   return hash;
 }
 
+StringSet::~StringSet() {
+  std::vector<char*> keys;
+  keys.reserve(hash_set_.size());
+  for (char* p : hash_set_) {
+    keys.push_back(p);
+  }
+  hash_set_.clear();
+  for (char* p : keys) {
+    delete[] p;
+  }
+}
+
+const char* StringSet::insert(absl::string_view str) {
+  char* p = new char[str.size() + 1];
+  memcpy(p, str.data(), str.size());
+  p[str.size()] = '\0';
+  auto insertion = hash_set_.insert(p);
+  if (!insertion.second) {
+    delete[] p;
+    return *insertion.first;
+  }
+  return p;
+}
+
+const char* StringSet::find(const char* str) const {
+  auto iter = hash_set_.find(const_cast<char*>(str));
+  if (iter == hash_set_.end()) {
+    return nullptr;
+  }
+  return *iter;
+}
+
 } // namespace Envoy

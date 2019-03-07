@@ -211,8 +211,11 @@ public:
   MockStatsMatcher();
   ~MockStatsMatcher();
   MOCK_CONST_METHOD1(rejects, bool(const std::string& name));
-  bool acceptsAll() const override { return false; }
-  bool rejectsAll() const override { return false; }
+  bool acceptsAll() const override { return accepts_all_; }
+  bool rejectsAll() const override { return rejects_all_; }
+
+  bool accepts_all_{false};
+  bool rejects_all_{false};
 };
 
 } // namespace Stats
