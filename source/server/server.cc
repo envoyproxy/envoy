@@ -147,6 +147,7 @@ void InstanceImpl::flushStats() {
     uint64_t parent_memory_allocated = 0;
     uint64_t parent_connections = 0;
     std::unique_ptr<HotRestartMessage> wrapper_msg = restarter_.getParentStats();
+    // getParentStats() will happily and cleanly return nullptr if we have no parent.
     if (wrapper_msg) {
       restarter_.mergeParentStats(stats_store_, wrapper_msg->reply().stats());
       parent_memory_allocated = wrapper_msg->reply().stats().memory_allocated();

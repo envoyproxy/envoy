@@ -17,7 +17,7 @@ public:
   void drainParentListeners();
   void shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo& info);
   void terminateParent();
-  void mergeParentStats(Stats::StoreRoot& stats_store,
+  void mergeParentStats(Stats::Store& stats_store,
                         const envoy::api::v2::core::HotRestartMessage::Reply::Stats& stats_proto);
 
 private:

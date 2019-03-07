@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "common/api/os_sys_calls_impl.h"
+
 #include "server/hot_restarting_child.h"
 
 #include "test/mocks/server/mocks.h"
@@ -28,14 +29,12 @@ using SimpleMetric = envoy::admin::v2alpha::SimpleMetric;
 
 class HotRestartingChildTest : public testing::Test {
 public:
-  HotRestartingChildTest() :
-  os_calls_injector_(InitOsCalls()),
-  hot_restarting_child_(123, 456) {
+  HotRestartingChildTest() : os_calls_injector_(InitOsCalls()), hot_restarting_child_(123, 456) {
     store_.counter("draculaer").inc();
     store_.gauge("whywassixafraidofseven").set(678);
     store_.gauge("some.sort.of.version").set(12345);
   }
-  
+
   Api::MockOsSysCalls* InitOsCalls() {
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(AnyNumber());
     return &os_sys_calls_;
@@ -58,9 +57,9 @@ TEST_F(HotRestartingChildTest, basicDefaultImport) {
   counter_proto->set_name("draculaer");
   counter_proto->set_type(SimpleMetric::COUNTER);
   counter_proto->set_value(3);
-  
+
   hot_restarting_child_.mergeParentStats(store_, stats_);
-  
+
   EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
   EXPECT_EQ(4, store_.counter("draculaer").value());
 }
@@ -70,9 +69,9 @@ TEST_F(HotRestartingChildTest, versionNotImported) {
   gauge_proto->set_name("some.sort.of.version");
   gauge_proto->set_type(SimpleMetric::GAUGE);
   gauge_proto->set_value(2345678);
-  
+
   hot_restarting_child_.mergeParentStats(store_, stats_);
-  
+
   EXPECT_EQ(12345, store_.gauge("some.sort.of.version").value());
 }
 

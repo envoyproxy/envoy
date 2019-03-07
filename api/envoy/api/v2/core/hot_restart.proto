@@ -40,7 +40,7 @@ message HotRestartMessage {
       uint64 original_start_time = 1;
     }
     message Stats {
-      // Values for special server_stats, which are separate from the ordinary stats store.
+      // Values for server_stats, which don't fit with the "combination logic" approach.
       uint64 memory_allocated = 1;
       uint64 num_connections = 2;
 

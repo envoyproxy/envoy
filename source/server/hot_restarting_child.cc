@@ -89,7 +89,7 @@ void HotRestartingChild::terminateParent() {
   parent_gauge_values_.clear();
 }
 
-void HotRestartingChild::mergeParentStats(Stats::StoreRoot& stats_store,
+void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
                                           const HotRestartMessage::Reply::Stats& stats_proto) {
   const std::unordered_map<std::string, CombineLogic> combine_logic_exceptions{
       {".version", CombineLogic::NoImport},
