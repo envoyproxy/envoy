@@ -56,11 +56,9 @@ to binaries, libraries, headers, etc.
 
 # Updating an external dependency version
 
-1. If the dependency is a build recipe, update the build recipe in
-[`ci/build_container/build_recipes`](../ci/build_container/build_recipes).
-2. If not, update the corresponding entry in
+1. Update the corresponding entry in
 [the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
-3. `bazel test //test/...`
+2. `bazel test //test/...`
 
 # Overriding an external dependency temporarily
 
