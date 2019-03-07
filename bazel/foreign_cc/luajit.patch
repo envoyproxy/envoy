@@ -48,7 +48,7 @@ new file mode 100755
 index 0000000..9c71271
 --- /dev/null
 +++ b/build.py
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,34 @@
 +#!/usr/bin/env python
 +
 +import argparse
@@ -75,7 +75,6 @@ index 0000000..9c71271
 +
 +    # Blacklist LuaJIT from ASAN for now.
 +    # TODO(htuch): Remove this when https://github.com/envoyproxy/envoy/issues/6084 is resolved.
-+    print("foo")
 +    with open("clang-asan-blacklist.txt", "w") as f:
 +      f.write("fun:lj_*\n")
 +    os.environ["TARGET_CFLAGS"] += " -fsanitize-blacklist=%s/com_github_luajit_luajit/clang-asan-blacklist.txt" % os.environ["PWD"]
