@@ -14,7 +14,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 namespace Router {
-
 namespace {
 
 envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration

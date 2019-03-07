@@ -281,6 +281,18 @@ public:
   static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest);
 
   /**
+   * Extract YAML as string from a google.protobuf.Message.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @param block_print whether the returned JSON should be in block style rather than flow style.
+   * @param always_print_primitive_fields whether to include primitive fields set to their default
+   * values, e.g. an int32 set to 0 or a bool set to false.
+   * @return std::string of formatted YAML object.
+   */
+  static std::string getYamlStringFromMessage(const Protobuf::Message& message,
+                                              const bool block_print = true,
+                                              const bool always_print_primitive_fields = false);
+
+  /**
    * Extract JSON as string from a google.protobuf.Message.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
    * @param pretty_print whether the returned JSON should be formatted.

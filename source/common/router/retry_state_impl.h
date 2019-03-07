@@ -36,9 +36,10 @@ public:
 
   // Router::RetryState
   bool enabled() override { return retry_on_ != 0; }
-  RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
-                          const absl::optional<Http::StreamResetReason>& reset_reason,
-                          DoRetryCallback callback) override;
+  RetryStatus shouldRetryHeaders(const Http::HeaderMap& response_headers,
+                                 DoRetryCallback callback) override;
+  RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
+                               DoRetryCallback callback) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
     std::for_each(retry_host_predicates_.begin(), retry_host_predicates_.end(),
@@ -73,10 +74,9 @@ private:
 
   void enableBackoffTimer();
   void resetRetry();
-  bool wouldRetry(const Http::HeaderMap* response_headers,
-                  const absl::optional<Http::StreamResetReason>& reset_reason);
-  bool wouldRetryFromReset(const Http::StreamResetReason& reset_reason);
+  bool wouldRetryFromReset(const Http::StreamResetReason reset_reason);
   bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers);
+  RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;

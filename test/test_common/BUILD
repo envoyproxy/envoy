@@ -158,19 +158,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_infrastructure_library(
-    name = "test_base",
-    hdrs = ["test_base.h"],
-    deps = [
-        "//test/test_common:global_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "test_base_test",
-    srcs = ["test_base_test.cc"],
-)
-
 envoy_cc_test_library(
     name = "test_time_lib",
     srcs = ["test_time.cc"],

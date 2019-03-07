@@ -12,6 +12,7 @@
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
+#include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
@@ -22,6 +23,7 @@
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
 
 using testing::HasSubstr;
@@ -36,6 +38,7 @@ namespace Envoy {
 namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
+namespace {
 
 TEST(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
 
@@ -72,6 +75,15 @@ TEST(QuicPlatformTest, QuicExportedStats) {
                        quic::QuicTime::Delta::FromSeconds(1),
                        quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
   QUIC_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
+}
+
+TEST(QuicPlatformTest, QuicHostnameUtils) {
+  EXPECT_FALSE(quic::QuicHostnameUtils::IsValidSNI("!!"));
+  EXPECT_FALSE(quic::QuicHostnameUtils::IsValidSNI("envoyproxy"));
+  EXPECT_TRUE(quic::QuicHostnameUtils::IsValidSNI("www.envoyproxy.io"));
+  EXPECT_EQ("lyft.com", quic::QuicHostnameUtils::NormalizeHostname("lyft.com"));
+  EXPECT_EQ("google.com", quic::QuicHostnameUtils::NormalizeHostname("google.com..."));
+  EXPECT_EQ("quicwg.org", quic::QuicHostnameUtils::NormalizeHostname("QUICWG.ORG"));
 }
 
 TEST(QuicPlatformTest, QuicUnorderedMap) {
@@ -189,6 +201,41 @@ TEST(QuicPlatformTest, QuicStringPiece) {
   EXPECT_EQ('b', sp[0]);
 }
 
+TEST(QuicPlatformTest, QuicThread) {
+  class AdderThread : public quic::QuicThread {
+  public:
+    AdderThread(int* value, int increment)
+        : quic::QuicThread("adder_thread"), value_(value), increment_(increment) {}
+
+    ~AdderThread() override = default;
+
+  protected:
+    void Run() override { *value_ += increment_; }
+
+  private:
+    int* value_;
+    int increment_;
+  };
+
+  int value = 0;
+
+  // A QuicThread that is never started, which is ok.
+  { AdderThread t0(&value, 1); }
+  EXPECT_EQ(0, value);
+
+  // A QuicThread that is started and joined as usual.
+  {
+    AdderThread t1(&value, 1);
+    t1.Start();
+    t1.Join();
+  }
+  EXPECT_EQ(1, value);
+
+  // QuicThread will panic if it's started but not joined.
+  EXPECT_DEATH({ AdderThread(&value, 2).Start(); },
+               "QuicThread should be joined before destruction");
+}
+
 TEST(QuicPlatformTest, QuicUint128) {
   quic::QuicUint128 i = MakeQuicUint128(16777216, 315);
   EXPECT_EQ(315, QuicUint128Low64(i));
@@ -204,6 +251,7 @@ TEST(QuicPlatformTest, QuicPtrUtil) {
 }
 
 namespace {
+
 class QuicLogThresholdSaver {
 public:
   QuicLogThresholdSaver()
@@ -218,6 +266,7 @@ private:
   const quic::QuicLogLevel level_;
   const int verbosity_threshold_;
 };
+
 } // namespace
 
 TEST(QuicPlatformTest, QuicLog) {
@@ -385,6 +434,7 @@ TEST(QuicPlatformTest, QuicCertUtils) {
   OPENSSL_free(static_cast<void*>(der));
 }
 
+} // namespace
 } // namespace Quiche
 } // namespace QuicListeners
 } // namespace Extensions

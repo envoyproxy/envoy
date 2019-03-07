@@ -8,6 +8,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+namespace {
 
 TEST(ZipkinUtilTest, utilTests) {
   DangerousDeprecatedTestTime time;
@@ -44,6 +45,7 @@ TEST(ZipkinUtilTest, utilTests) {
   EXPECT_EQ(expected_json, merged_json);
 }
 
+} // namespace
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

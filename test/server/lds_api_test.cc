@@ -21,6 +21,7 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class LdsApiTest : public testing::Test {
 public:
@@ -569,5 +570,6 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   EXPECT_EQ(13237225503670494420U, store_.gauge("listener_manager.lds.version").value());
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

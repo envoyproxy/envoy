@@ -35,7 +35,7 @@ class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpV
   }
 
 public:
-  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), realTime(), mysqlConfig()){};
+  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
 
   // Initializer for an individual integration test.
   void SetUp() override { BaseIntegrationTest::initialize(); }

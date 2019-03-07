@@ -17,6 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
+namespace {
 
 class DynamicOpenTracingDriverTest : public testing::Test {
 public:
@@ -84,6 +85,7 @@ TEST_F(DynamicOpenTracingDriverTest, FlushSpans) {
   EXPECT_EQ(spans_json->asObjectArray().size(), 1);
 }
 
+} // namespace
 } // namespace DynamicOt
 } // namespace Tracers
 } // namespace Extensions
