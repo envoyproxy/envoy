@@ -16,6 +16,7 @@ envoy_cc_mock(
     deps = [
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:client_lib",
     ],
 )
 
@@ -30,3 +31,20 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "client_impl_test",
+    srcs = ["client_impl_test.cc"],
+    deps = [
+        ":redis_mocks",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/filters/network/common/redis:client_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
