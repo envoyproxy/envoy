@@ -197,6 +197,13 @@ private:
     // values from ThreadLocalStore::rejected_stats_, which is implemented
     // as a absl::flat_hash_map<char*>, so the keys will be stable and safe
     // to reference from other threads even as the hash-map resizes.
+    //
+    // Note that once a stat or rejected name enters into the TLS Cache, it
+    // remains in memory forever. This will effectively leak memory as scopes
+    // are dynamically removed from the configuration. This could be resolved by
+    // (a) using weak_ptr in the TLS cache and (b) proactively cleaning up
+    // expired items in each thread periodically. Alternatively, when a scope
+    // is removed, we could post() a cleanup request to each thread's TLS cache.
     ConstCharStarHashSet rejected_stats_;
   };
 
@@ -294,7 +301,7 @@ private:
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
-  StringSet rejected_stats_ GUARDED_BY(lock_);
+  StringSet rejected_stats_ GUARDED_BY(lock_); // See comment in TLSCacheEntry above.
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
