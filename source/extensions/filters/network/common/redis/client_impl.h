@@ -38,15 +38,11 @@ private:
   const bool enable_hashtagging_;
 };
 
-class ClientImpl : public Client,
-                   public DecoderCallbacks,
-                   public Network::ConnectionCallbacks {
+class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
 public:
-  static ClientPtr create(Upstream::HostConstSharedPtr host,
-                                         Event::Dispatcher& dispatcher,
-                                         EncoderPtr&& encoder,
-                                         DecoderFactory& decoder_factory,
-                                         const Config& config);
+  static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                          EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+                          const Config& config);
 
   ~ClientImpl();
 
@@ -55,8 +51,7 @@ public:
     connection_->addConnectionCallbacks(callbacks);
   }
   void close() override;
-  PoolRequest* makeRequest(const RespValue& request,
-                                          PoolCallbacks& callbacks) override;
+  PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
 
 private:
   struct UpstreamReadFilter : public Network::ReadFilterBaseImpl {
@@ -83,9 +78,8 @@ private:
     bool canceled_{};
   };
 
-  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-             EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-             const Config& config);
+  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+             DecoderFactory& decoder_factory, const Config& config);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
   void putOutlierEvent(Upstream::Outlier::Result result);
@@ -113,7 +107,7 @@ class ClientFactoryImpl : public ClientFactory {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
   ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                                  const Config& config) override;
+                   const Config& config) override;
 
   static ClientFactoryImpl instance_;
 
@@ -121,7 +115,7 @@ private:
   DecoderFactoryImpl decoder_factory_;
 };
 
-} // namespace Client 
+} // namespace Client
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

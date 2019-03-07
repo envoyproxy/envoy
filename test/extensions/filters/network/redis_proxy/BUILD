@@ -41,6 +41,7 @@ envoy_extension_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
+        "//test/extensions/filters/network/common/redis:test_utils_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",

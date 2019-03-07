@@ -4,6 +4,7 @@
 #include "extensions/health_checkers/redis/utility.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -25,8 +26,9 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 namespace {
 
-class RedisHealthCheckerTest : public testing::Test,
-                               public Extensions::NetworkFilters::Common::Redis::ClientFactory {
+class RedisHealthCheckerTest
+    : public testing::Test,
+      public Extensions::NetworkFilters::Common::Redis::Client::ClientFactory {
 public:
   RedisHealthCheckerTest()
       : cluster_(new NiceMock<Upstream::MockClusterMockPrioritySet>()),
@@ -119,13 +121,13 @@ public:
                                random_, Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
-  Extensions::NetworkFilters::Common::Redis::ClientPtr
+  Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Config&) override {
-    return Extensions::NetworkFilters::Common::Redis::ClientPtr{create_()};
+         const Extensions::NetworkFilters::Common::Redis::Client::Config&) override {
+    return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
   }
 
-  MOCK_METHOD0(create_, Extensions::NetworkFilters::Common::Redis::Client*());
+  MOCK_METHOD0(create_, Extensions::NetworkFilters::Common::Redis::Client::Client*());
 
   void expectSessionCreate() {
     interval_timer_ = new Event::MockTimer(&dispatcher_);
@@ -133,7 +135,7 @@ public:
   }
 
   void expectClientCreate() {
-    client_ = new Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient();
+    client_ = new Extensions::NetworkFilters::Common::Redis::Client::MockClient();
     EXPECT_CALL(*this, create_()).WillOnce(Return(client_));
     EXPECT_CALL(*client_, addConnectionCallbacks(_));
   }
@@ -157,9 +159,9 @@ public:
   Upstream::MockHealthCheckEventLogger* event_logger_{};
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
-  Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient* client_{};
-  Extensions::NetworkFilters::RedisProxy::ConnPool::MockPoolRequest pool_request_;
-  Extensions::NetworkFilters::Common::Redis::PoolCallbacks* pool_callbacks_{};
+  Extensions::NetworkFilters::Common::Redis::Client::MockClient* client_{};
+  Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
+  Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisHealthChecker> health_checker_;
 };
 

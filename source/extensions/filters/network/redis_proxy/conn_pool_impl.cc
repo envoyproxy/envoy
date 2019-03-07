@@ -24,9 +24,9 @@ InstanceImpl::InstanceImpl(
   });
 }
 
-Common::Redis::Client::PoolRequest* InstanceImpl::makeRequest(const std::string& key,
-                                                      const Common::Redis::RespValue& value,
-                                                      Common::Redis::Client::PoolCallbacks& callbacks) {
+Common::Redis::Client::PoolRequest*
+InstanceImpl::makeRequest(const std::string& key, const Common::Redis::RespValue& value,
+                          Common::Redis::Client::PoolCallbacks& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().makeRequest(key, value, callbacks);
 }
 

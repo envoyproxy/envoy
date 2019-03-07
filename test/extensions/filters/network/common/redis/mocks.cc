@@ -87,7 +87,7 @@ MockPoolRequest::~MockPoolRequest() {}
 MockPoolCallbacks::MockPoolCallbacks() {}
 MockPoolCallbacks::~MockPoolCallbacks() {}
 
-} // namespace Client 
+} // namespace Client
 
 } // namespace Redis
 } // namespace Common

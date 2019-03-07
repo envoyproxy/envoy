@@ -29,9 +29,10 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
       proto_config, context.scope(), context.drainDecision(), context.runtime()));
-  ConnPool::InstancePtr conn_pool(new ConnPool::InstanceImpl(
-      filter_config->cluster_name_, context.clusterManager(),
-      Common::Redis::Client::ClientFactoryImpl::instance_, context.threadLocal(), proto_config.settings()));
+  ConnPool::InstancePtr conn_pool(
+      new ConnPool::InstanceImpl(filter_config->cluster_name_, context.clusterManager(),
+                                 Common::Redis::Client::ClientFactoryImpl::instance_,
+                                 context.threadLocal(), proto_config.settings()));
   std::shared_ptr<CommandSplitter::Instance> splitter(new CommandSplitter::InstanceImpl(
       std::move(conn_pool), context.scope(), filter_config->stat_prefix_, context.timeSource()));
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {

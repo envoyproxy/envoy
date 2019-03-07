@@ -25,9 +25,10 @@ public:
   MockInstance();
   ~MockInstance();
 
-  MOCK_METHOD3(makeRequest, Common::Redis::Client::PoolRequest*(const std::string& hash_key,
-                                                        const Common::Redis::RespValue& request,
-                                                        Common::Redis::Client::PoolCallbacks& callbacks));
+  MOCK_METHOD3(makeRequest,
+               Common::Redis::Client::PoolRequest*(
+                   const std::string& hash_key, const Common::Redis::RespValue& request,
+                   Common::Redis::Client::PoolCallbacks& callbacks));
 };
 
 } // namespace ConnPool

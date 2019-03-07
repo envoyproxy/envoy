@@ -12,11 +12,9 @@ ConfigImpl::ConfigImpl(
     : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
       enable_hashtagging_(config.enable_hashtagging()) {}
 
-ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host,
-                                            Event::Dispatcher& dispatcher,
-                                            EncoderPtr&& encoder,
-                                            DecoderFactory& decoder_factory,
-                                            const Config& config) {
+ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                             EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+                             const Config& config) {
 
   std::unique_ptr<ClientImpl> client(
       new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory, config));
@@ -29,9 +27,7 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host,
 }
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder,
-                       DecoderFactory& decoder_factory,
-                       const Config& config)
+                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })) {
@@ -51,8 +47,7 @@ ClientImpl::~ClientImpl() {
 
 void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
-PoolRequest* ClientImpl::makeRequest(const RespValue& request,
-                                                    PoolCallbacks& callbacks) {
+PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
   pending_requests_.emplace_back(*this, callbacks);
@@ -160,8 +155,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   putOutlierEvent(Upstream::Outlier::Result::SUCCESS);
 }
 
-ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent,
-                                           PoolCallbacks& callbacks)
+ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks)
     : parent_(parent), callbacks_(callbacks) {
   parent.host_->cluster().stats().upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
@@ -184,14 +178,12 @@ void ClientImpl::PendingRequest::cancel() {
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                                   Event::Dispatcher& dispatcher,
-                                                   const Config& config) {
-  return ClientImpl::create(host, dispatcher,
-                            EncoderPtr{new EncoderImpl()},
-                            decoder_factory_, config);
+                                    Event::Dispatcher& dispatcher, const Config& config) {
+  return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
+                            config);
 }
 
-} // namespace Client 
+} // namespace Client
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

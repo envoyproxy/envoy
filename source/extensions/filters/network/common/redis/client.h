@@ -117,7 +117,7 @@ public:
                            const Config& config) PURE;
 };
 
-} // namespace Client 
+} // namespace Client
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

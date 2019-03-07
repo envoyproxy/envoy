@@ -39,9 +39,9 @@ public:
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
 
   // RedisProxy::ConnPool::Instance
-  Common::Redis::Client::PoolRequest* makeRequest(const std::string& key,
-                                          const Common::Redis::RespValue& request,
-                                          Common::Redis::Client::PoolCallbacks& callbacks) override;
+  Common::Redis::Client::PoolRequest*
+  makeRequest(const std::string& key, const Common::Redis::RespValue& request,
+              Common::Redis::Client::PoolCallbacks& callbacks) override;
 
 private:
   struct ThreadLocalPool;
@@ -65,9 +65,9 @@ private:
                            public Upstream::ClusterUpdateCallbacks {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
-    Common::Redis::Client::PoolRequest* makeRequest(const std::string& key,
-                                            const Common::Redis::RespValue& request,
-                                            Common::Redis::Client::PoolCallbacks& callbacks);
+    Common::Redis::Client::PoolRequest*
+    makeRequest(const std::string& key, const Common::Redis::RespValue& request,
+                Common::Redis::Client::PoolCallbacks& callbacks);
     void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
 

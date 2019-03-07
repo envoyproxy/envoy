@@ -2,13 +2,13 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
-
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
+#include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -34,14 +34,6 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 namespace Client {
-
-envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings
-createConnPoolSettings() {
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings setting{};
-  setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
-  setting.set_enable_hashtagging(true);
-  return setting;
-}
 
 class RedisClientImplTest : public testing::Test, public Common::Redis::DecoderFactory {
 public:
@@ -111,7 +103,6 @@ public:
   std::unique_ptr<Config> config_;
   ClientPtr client_;
 };
-
 
 TEST_F(RedisClientImplTest, Basic) {
   InSequence s;
@@ -387,7 +378,7 @@ TEST(RedisClientFactoryImplTest, Basic) {
   client->close();
 }
 
-} // namespace Client 
+} // namespace Client
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

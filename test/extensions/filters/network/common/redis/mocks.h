@@ -4,8 +4,8 @@
 #include <list>
 #include <string>
 
-#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -71,8 +71,8 @@ public:
 
   MOCK_METHOD1(addConnectionCallbacks, void(Network::ConnectionCallbacks& callbacks));
   MOCK_METHOD0(close, void());
-  MOCK_METHOD2(makeRequest, PoolRequest*(const Common::Redis::RespValue& request,
-                                                        PoolCallbacks& callbacks));
+  MOCK_METHOD2(makeRequest,
+               PoolRequest*(const Common::Redis::RespValue& request, PoolCallbacks& callbacks));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
 };
@@ -95,7 +95,6 @@ public:
   MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
   MOCK_METHOD0(onFailure, void());
 };
-
 
 } // namespace Client
 
