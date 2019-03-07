@@ -55,7 +55,7 @@ public:
   /**
    * Called when an ASK redirection error is received, and the request must be retried.
    * @param value supplies the ASK error response
-   * @return bool true if the request is succesfully redirected, false otherwise
+   * @return bool true if the request is successfully redirected, false otherwise
    */
   virtual bool onAskRedirection(Common::Redis::RespValue& value) PURE;
 };
