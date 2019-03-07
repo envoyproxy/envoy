@@ -94,27 +94,6 @@ TEST_F(HotRestartImplTest, versionString) {
   }
 }
 
-// Check consistency of internal raw stat representation by comparing hash of
-// memory contents against a previously recorded value.
-TEST_F(HotRestartImplTest, Consistency) {
-  setup();
-
-  // Generate a stat, encode it to hex, and take the hash of that hex string. We
-  // expect the hash to vary only when the internal representation of a stat has
-  // been intentionally changed, in which case HOT_RESTART_VERSION should be
-  // incremented as well.
-  const uint64_t expected_hash = 428480280747063249;
-  const uint64_t max_name_length = stats_options_.maxNameLength();
-
-  const std::string name_1(max_name_length, 'A');
-  Stats::HeapStatData* stat_1 = hot_restart_->statsAllocator().alloc(name_1);
-  const uint64_t stat_size = sizeof(Stats::HeapStatData) + max_name_length;
-  const std::string stat_hex_dump_1 = Hex::encode(reinterpret_cast<uint8_t*>(stat_1), stat_size);
-  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
-  EXPECT_EQ(name_1, stat_1->key());
-  hot_restart_->statsAllocator().free(*stat_1);
-}
-
 } // namespace
 } // namespace Server
 } // namespace Envoy

@@ -93,7 +93,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
                                           const HotRestartMessage::Reply::Stats& stats_proto) {
   const std::unordered_map<std::string, CombineLogic> combine_logic_exceptions{
       {".version", CombineLogic::NoImport},
-      {"connected_state", CombineLogic::NoImport},
+      // implied by default: {"connected_state", CombineLogic::NoImport},
   };
   for (const auto& counter_proto : stats_proto.counters()) {
     uint64_t new_parent_value = counter_proto.value();
@@ -103,12 +103,46 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
     parent_counter_values_[counter_proto.name()] = new_parent_value;
     stats_store.counter(counter_proto.name()).add(new_parent_value - old_parent_value);
   }
+
+  for (const auto& indicator_proto : stats_proto.indicators()) {
+    CombineLogic combine_logic = CombineLogic::NoImport;
+    for (auto exception : combine_logic_exceptions) {
+      if (indicator_proto.name().find(exception.first) != std::string::npos) {
+        combine_logic = exception.second;
+        break;
+      }
+    }
+    auto& indicator_ref = stats_store.boolIndicator(indicator_proto.name());
+    if (combine_logic == CombineLogic::NoImport) {
+      continue;
+    }
+    // If undefined, take parent's value unless explicitly told NoImport.
+    if (!indicator_ref.used()) {
+      indicator_ref.set(indicator_proto.value());
+      continue;
+    }
+    switch (combine_logic) {
+    case CombineLogic::OnlyImportWhenUnused:
+      // Already set above; nothing left to do.
+      break;
+    case CombineLogic::NoImport:
+    case CombineLogic::Maximum:
+    case CombineLogic::Accumulate:
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    case CombineLogic::BooleanAnd:
+      indicator_ref.set(indicator_ref.value() && indicator_proto.value());
+      break;
+    case CombineLogic::BooleanOr:
+      indicator_ref.set(indicator_ref.value() || indicator_proto.value());
+      break;
+    }
+  }
+
   for (const auto& gauge_proto : stats_proto.gauges()) {
     uint64_t new_parent_value = gauge_proto.value();
     auto found_value = parent_gauge_values_.find(gauge_proto.name());
     uint64_t old_parent_value = found_value == parent_gauge_values_.end() ? 0 : found_value->second;
     parent_gauge_values_[gauge_proto.name()] = new_parent_value;
-
     CombineLogic combine_logic = CombineLogic::Accumulate;
     for (auto exception : combine_logic_exceptions) {
       if (gauge_proto.name().find(exception.first) != std::string::npos) {
@@ -116,22 +150,22 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
         break;
       }
     }
-
-    auto& gauge_ref = stats_store.gauge(gauge_proto.name());
-    uint64_t our_cur_value = gauge_ref.value();
-
     if (combine_logic == CombineLogic::NoImport) {
       continue;
     }
-    // If gauge undefined, take parent's value unless explicitly told NoImport.
+    auto& gauge_ref = stats_store.gauge(gauge_proto.name());
+    // If undefined, take parent's value unless explicitly told NoImport.
     if (!gauge_ref.used()) {
       gauge_ref.set(new_parent_value);
+      continue;
     }
     switch (combine_logic) {
     case CombineLogic::OnlyImportWhenUnused:
       // Already set above; nothing left to do.
       break;
     case CombineLogic::NoImport:
+    case CombineLogic::BooleanAnd:
+    case CombineLogic::BooleanOr:
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     case CombineLogic::Accumulate:
       if (new_parent_value > old_parent_value) {
@@ -141,7 +175,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
       }
       break;
     case CombineLogic::Maximum:
-      if (new_parent_value > our_cur_value) {
+      if (new_parent_value > gauge_ref.value()) {
         gauge_ref.set(new_parent_value);
       }
       break;

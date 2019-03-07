@@ -64,9 +64,15 @@ SharedMemory* attachSharedMemory(const Options& options) {
     initializeMutex(shmem->log_lock_);
     initializeMutex(shmem->access_log_lock_);
   } else {
-    RELEASE_ASSERT(shmem->size_ == sizeof(SharedMemory), "");
-    RELEASE_ASSERT(shmem->version_ == HOT_RESTART_VERSION, "");
-    RELEASE_ASSERT(shmem->max_stats_ == options.maxStats(), "");
+    RELEASE_ASSERT(shmem->size_ == sizeof(SharedMemory),
+                   "Hot restart SharedMemory size mismatch! You must have hot restarted into a "
+                   "not-hot-restart-compatible new version of Envoy.");
+    RELEASE_ASSERT(shmem->version_ == HOT_RESTART_VERSION,
+                   "Hot restart version mismatch! You must have hot restarted into a "
+                   "not-hot-restart-compatible new version of Envoy.");
+    RELEASE_ASSERT(shmem->max_stats_ == options.maxStats(),
+                   "Hot restart max stats mismatch! You must have hot restarted into a "
+                   "not-hot-restart-compatible new version of Envoy.");
   }
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully

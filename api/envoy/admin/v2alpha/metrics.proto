@@ -13,6 +13,7 @@ message SimpleMetric {
   enum Type {
     COUNTER = 0;
     GAUGE = 1;
+    BOOL_INDICATOR = 2;
   }
 
   // Type of the metric represented.

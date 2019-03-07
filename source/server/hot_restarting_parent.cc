@@ -105,6 +105,12 @@ void HotRestartingParent::exportStatsToChild(HotRestartMessage::Reply::Stats* st
     counter_proto->set_type(SimpleMetric::COUNTER);
     counter_proto->set_value(counter->value());
   }
+  for (const auto& indicator : server_->stats().boolIndicators()) {
+    auto* indicator_proto = stats->mutable_indicators()->Add();
+    indicator_proto->set_name(indicator->name());
+    indicator_proto->set_type(SimpleMetric::BOOL_INDICATOR);
+    indicator_proto->set_value(indicator->value());
+  }
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
   stats->set_num_connections(server_->listenerManager().numConnections());
 }
