@@ -615,7 +615,7 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
     EXPECT_EQ("", client_connection->transportFailureReason());
     EXPECT_EQ("", server_connection->transportFailureReason());
   } else {
-    EXPECT_THAT(client_connection->transportFailureReason(),
+    EXPECT_THAT(std::string(client_connection->transportFailureReason()),
                 ContainsRegex(options.expectedTransportFailureReasonContains()));
     EXPECT_NE("", server_connection->transportFailureReason());
   }
