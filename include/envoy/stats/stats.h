@@ -94,5 +94,18 @@ public:
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;
 
+/**
+ * A Boolean.
+ */
+class BoolIndicator : public virtual Metric {
+public:
+  virtual ~BoolIndicator() {}
+
+  virtual void set(bool value) PURE;
+  virtual bool value() const PURE;
+};
+
+typedef std::shared_ptr<BoolIndicator> BoolIndicatorSharedPtr;
+
 } // namespace Stats
 } // namespace Envoy

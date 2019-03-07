@@ -442,6 +442,7 @@ gregs
 gzip
 hacky
 handshaker
+hd
 hdr
 healths
 healthz
@@ -636,6 +637,7 @@ sanitization
 sanitizer
 scala
 scalability
+sched
 schemas
 serializable
 serializer
@@ -697,6 +699,7 @@ uint
 un
 unary
 unconfigurable
+unconfigured
 uncontended
 undef
 undegraded

@@ -160,16 +160,18 @@ void OriginalDstCluster::cleanup() {
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
   const auto& host_set = priority_set_.getOrCreateHostSet(0);
-
-  ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
-  for (const HostSharedPtr& host : host_set.hosts()) {
-    if (host->used()) {
-      ENVOY_LOG(debug, "Keeping active host {}.", host->address()->asString());
-      new_hosts->emplace_back(host);
-      host->used(false); // Mark to be removed during the next round.
-    } else {
-      ENVOY_LOG(debug, "Removing stale host {}.", host->address()->asString());
-      to_be_removed.emplace_back(host);
+  ENVOY_LOG(trace, "Stale original dst hosts cleanup triggered.");
+  if (!host_set.hosts().empty()) {
+    ENVOY_LOG(debug, "Cleaning up stale original dst hosts.");
+    for (const HostSharedPtr& host : host_set.hosts()) {
+      if (host->used()) {
+        ENVOY_LOG(debug, "Keeping active host {}.", host->address()->asString());
+        new_hosts->emplace_back(host);
+        host->used(false); // Mark to be removed during the next round.
+      } else {
+        ENVOY_LOG(debug, "Removing stale host {}.", host->address()->asString());
+        to_be_removed.emplace_back(host);
+      }
     }
   }
 
