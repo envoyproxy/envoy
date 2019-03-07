@@ -648,7 +648,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason) {
   }
 
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
-  const absl::string_view body =
+  const std::string body =
       absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
                    Http::Utility::resetReasonToString(reset_reason));
 
