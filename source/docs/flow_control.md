@@ -33,7 +33,7 @@ Flow control for the upstream path is much the same.
  * The upstream `Network::ConnectionImpl::write_buffer_` buffers too much
    data. It calls
    `Network::ConnectionCallbacks::onAboveWriteBufferHighWatermark()`.
- * The Network::TcpProxy::UpstreamCallbacks receives
+ * The `Network::TcpProxy::UpstreamCallbacks` receives
    `onAboveWriteBufferHighWatermark()` and calls `readDisable(true)` on the downstream
    connection.
  * When the upstream buffer is drained, it calls
