@@ -54,13 +54,12 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
     // is_end indicates if the data in slice is the last data in the current
     // header block.
     bool is_end = i == (num_slices - 1) && end_metadata;
-    size_t offset = 0;
 
     // Feeds data to nghttp2 to decode.
     while (slice.len_ > 0) {
-      ssize_t result = nghttp2_hd_inflate_hd2(inflater_.get(), &nv, &inflate_flags,
-                                              reinterpret_cast<uint8_t*>(slice.mem_) + offset,
-                                              slice.len_, is_end);
+      ssize_t result =
+          nghttp2_hd_inflate_hd2(inflater_.get(), &nv, &inflate_flags,
+                                 reinterpret_cast<uint8_t*>(slice.mem_), slice.len_, is_end);
       if (result < 0 || (result == 0 && slice.len_ > 0)) {
         // If decoding fails, or there is data left in slice, but no data can be consumed by
         // nghttp2, return false.
@@ -68,9 +67,9 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
         return false;
       }
 
+      slice.mem_ = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(slice.mem_) + result);
       slice.len_ -= result;
       payload_size_consumed += result;
-      offset += result;
 
       if (inflate_flags & NGHTTP2_HD_INFLATE_EMIT) {
         // One header key value pair has been successfully decoded.
