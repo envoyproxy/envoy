@@ -13,12 +13,6 @@ build:asan --define ENVOY_CONFIG_ASAN=1
 build:asan --copt -fsanitize=address,undefined
 build:asan --linkopt -fsanitize=address,undefined
 build:asan --copt -fno-sanitize=vptr
-# TODO(htuch): these are temporary workarounds, remove when
-# https://github.com/bazelbuild/rules_foreign_cc/issues/154#issuecomment-466504751 is resolved.
-build:asan --action_env=CC
-build:asan --action_env=CXX
-build:asan --action_env=CFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
-build:asan --action_env=CXXFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
 build:asan --linkopt -fno-sanitize=vptr
 build:asan --linkopt -ldl
 build:asan --define tcmalloc=disabled
@@ -29,6 +23,12 @@ build:asan --copt -DADDRESS_SANITIZER=1
 build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true
 build:asan --test_env=ASAN_SYMBOLIZER_PATH
+# TODO(htuch): these are temporary workarounds, remove when
+# https://github.com/bazelbuild/rules_foreign_cc/issues/154#issuecomment-466504751 is resolved.
+build:asan --action_env=CC
+build:asan --action_env=CXX
+build:asan --action_env=CFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
+build:asan --action_env=CXXFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
 
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
@@ -44,14 +44,14 @@ build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 # This is needed because of https://github.com/libevent/libevent/issues/777
 build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
+build:clang-tsan --linkopt -fsanitize=thread
+build:clang-tsan --define tcmalloc=disabled
 # TODO(htuch): these are temporary workarounds, remove when
 # https://github.com/bazelbuild/rules_foreign_cc/issues/154#issuecomment-466504751 is resolved.
 build:clang-tsan --action_env=CC
 build:clang-tsan --action_env=CXX
 build:clang-tsan --action_env=CFLAGS="-fsanitize=thread -DEVENT__DISABLE_DEBUG_MODE"
 build:clang-tsan --action_env=CXXFLAGS="-fsanitize=thread"
-build:clang-tsan --linkopt -fsanitize=thread
-build:clang-tsan --define tcmalloc=disabled
 
 # Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
 # support (see https://github.com/envoyproxy/envoy/issues/443).
