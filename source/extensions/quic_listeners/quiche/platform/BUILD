@@ -103,6 +103,7 @@ envoy_cc_library(
         "quic_cert_utils_impl.cc",
         "quic_text_utils_impl.cc",
     ] + envoy_select_quiche([
+        "quic_hostname_utils_impl.cc",
         "quic_test_output_impl.cc",
     ]),
     hdrs = [
@@ -112,6 +113,7 @@ envoy_cc_library(
         "quic_string_utils_impl.h",
         "quic_text_utils_impl.h",
     ] + envoy_select_quiche([
+        "quic_hostname_utils_impl.h",
         "quic_test_output_impl.h",
     ]),
     external_deps = [
@@ -124,6 +126,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = envoy_select_quiche([
         "//source/common/filesystem:filesystem_lib",
+        "//source/common/http:utility_lib",
     ]),
 )
 
