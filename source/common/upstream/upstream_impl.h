@@ -69,7 +69,8 @@ public:
       const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
-        health_check_address_(health_check_config.port_value() == 0
+        health_check_address_(health_check_config.port_value() == 0 ||
+                                      dest_address->type() != Network::Address::Type::Ip
                                   ? dest_address
                                   : Network::Utility::getAddressWithPort(
                                         *dest_address, health_check_config.port_value())),
