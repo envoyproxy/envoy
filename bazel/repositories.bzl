@@ -2,7 +2,6 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
 load("//api/bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
-load(":target_recipes.bzl", "TARGET_RECIPES")
 load(
     "@bazel_tools//tools/cpp:windows_cc_configure.bzl",
     "find_vc_path",

@@ -164,3 +164,64 @@ alias(
         "//conditions:default": "@boringssl//:ssl",
     }),
 )
+
+# Configuration settings to make doing selects for Apple vs non-Apple platforms
+# easier. More details: https://docs.bazel.build/versions/master/configurable-attributes.html#config_settingaliasing
+config_setting(
+    name = "darwin",
+    values = {"cpu": "darwin"},
+)
+
+config_setting(
+    name = "darwin_x86_64",
+    values = {"cpu": "darwin_x86_64"},
+)
+
+config_setting(
+    name = "ios_i386",
+    values = {"cpu": "ios_i386"},
+)
+
+config_setting(
+    name = "ios_x86_64",
+    values = {"cpu": "ios_x86_64"},
+)
+
+config_setting(
+    name = "ios_armv7",
+    values = {"cpu": "ios_armv7"},
+)
+
+config_setting(
+    name = "ios_armv7s",
+    values = {"cpu": "ios_armv7s"},
+)
+
+config_setting(
+    name = "ios_arm64",
+    values = {"cpu": "ios_arm64"},
+)
+
+config_setting(
+    name = "ios_arm64e",
+    values = {"cpu": "ios_arm64e"},
+)
+
+alias(
+    name = "apple",
+    actual = select(
+        {
+            ":darwin": ":darwin",
+            ":darwin_x86_64": ":darwin_x86_64",
+            ":ios_arm64": ":ios_arm64",
+            ":ios_arm64e": ":ios_arm64e",
+            ":ios_armv7": ":ios_armv7",
+            ":ios_armv7s": ":ios_armv7s",
+            ":ios_i386": ":ios_i386",
+            ":ios_x86_64": ":ios_x86_64",
+            # If we're not on an apple platform return a value that will never match in the select() statement calling this
+            # since it would have already been matched above
+            "//conditions:default": ":darwin",
+        },
+    ),
+)

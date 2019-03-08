@@ -31,8 +31,9 @@ public:
 };
 
 class NullInstanceImpl : public ConnPool::Instance {
-  ConnPool::PoolRequest* makeRequest(const std::string&, const Common::Redis::RespValue&,
-                                     ConnPool::PoolCallbacks&) override {
+  Common::Redis::Client::PoolRequest* makeRequest(const std::string&,
+                                                  const Common::Redis::RespValue&,
+                                                  Common::Redis::Client::PoolCallbacks&) override {
     return nullptr;
   }
 };

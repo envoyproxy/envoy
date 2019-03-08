@@ -10,7 +10,7 @@ RedisHealthChecker::RedisHealthChecker(
     const envoy::config::health_checker::redis::v2::Redis& redis_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     Upstream::HealthCheckEventLoggerPtr&& event_logger,
-    Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory)
+    Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()) {
   if (!key_.empty()) {

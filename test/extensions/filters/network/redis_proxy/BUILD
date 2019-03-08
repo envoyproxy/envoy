@@ -41,6 +41,7 @@ envoy_extension_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
+        "//test/extensions/filters/network/common/redis:test_utils_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -70,6 +71,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",

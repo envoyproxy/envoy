@@ -55,6 +55,7 @@ public:
   std::string subjectLocalCertificate() const override;
   std::string uriSanPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
+  const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
   std::vector<std::string> dnsSansPeerCertificate() const override;
   std::vector<std::string> dnsSansLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
@@ -87,6 +88,7 @@ private:
   std::string failure_reason_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
+  mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,

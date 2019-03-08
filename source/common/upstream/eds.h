@@ -8,7 +8,10 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/locality.h"
 
+#include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/clusters/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -28,7 +31,12 @@ public:
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
 
   // Config::SubscriptionCallbacks
+  // TODO(fredlas) deduplicate
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
@@ -66,6 +74,17 @@ private:
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
   HostMap all_hosts_;
+};
+
+class EdsClusterFactory : public ClusterFactoryImplBase {
+public:
+  EdsClusterFactory() : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Eds) {}
+
+private:
+  ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream
