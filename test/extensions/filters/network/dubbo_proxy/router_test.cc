@@ -182,6 +182,10 @@ public:
         .WillOnce(Return(DubboFilters::UpstreamResponseStatus::MoreData));
     upstream_callbacks_->onUpstreamData(buffer, false);
 
+    // Nothing to do.
+    upstream_callbacks_->onAboveWriteBufferHighWatermark();
+    upstream_callbacks_->onBelowWriteBufferLowWatermark();
+
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(DubboFilters::UpstreamResponseStatus::Complete));
     EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
@@ -369,9 +373,14 @@ TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
   EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   startRequest(MessageType::Request);
 
+  EXPECT_EQ(Network::FilterStatus::Continue, router_->transportBegin());
+
   Buffer::OwnedImpl buffer;
   buffer.add(std::string({'\xda', '\xbb', 0x42, 20}));
   EXPECT_EQ(Network::FilterStatus::Continue, router_->transferHeaderTo(buffer, buffer.length()));
+  buffer.drain(buffer.length());
+  buffer.add("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, router_->transferBodyTo(buffer, buffer.length()));
 
   connectUpstream();
   destroyRouter();

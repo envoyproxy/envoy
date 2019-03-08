@@ -42,7 +42,12 @@ TEST(DubboProtocolImplTest, Normal) {
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
     addInt64(buffer, 1);
     addInt32(buffer, 1);
-    EXPECT_CALL(cb, onRequestMessageRvr);
+    EXPECT_CALL(cb, onRequestMessageRvr).WillOnce(Invoke([&](RequestMessage* res) -> void {
+      EXPECT_EQ(MessageType::Request, res->messageType());
+      EXPECT_EQ(SerializationType::Hessian, res->serializationType());
+      EXPECT_EQ(1, res->bodySize());
+      EXPECT_GE(res->toString().size(), 0);
+    }));
     EXPECT_TRUE(dubbo_protocol.decode(buffer, &context));
     EXPECT_EQ(1, context.body_size_);
     EXPECT_TRUE(context.is_request_);
@@ -55,7 +60,11 @@ TEST(DubboProtocolImplTest, Normal) {
     buffer.add(std::string({'\xda', '\xbb', 0x42, 20}));
     addInt64(buffer, 1);
     addInt32(buffer, 1);
-    EXPECT_CALL(cb, onResponseMessageRvr);
+    EXPECT_CALL(cb, onResponseMessageRvr).WillOnce(Invoke([](ResponseMessage* res) -> void {
+      EXPECT_EQ(ResponseStatus::Ok, res->responseStatus());
+      EXPECT_EQ(MessageType::Response, res->messageType());
+      EXPECT_GE(res->toString().size(), 0);
+    }));
     EXPECT_TRUE(dubbo_protocol.decode(buffer, &context));
     EXPECT_EQ(1, context.body_size_);
     EXPECT_FALSE(context.is_request_);

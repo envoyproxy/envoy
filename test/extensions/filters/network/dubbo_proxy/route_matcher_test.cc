@@ -389,6 +389,7 @@ routes:
 
   test_value = "456";
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0)->routeEntry()->metadataMatchCriteria());
 
   test_value = "123";
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
@@ -527,6 +528,7 @@ routes:
     EXPECT_EQ("cluster3", matcher.route(metadata, 60)->routeEntry()->clusterName());
     EXPECT_EQ("cluster3", matcher.route(metadata, 99)->routeEntry()->clusterName());
     EXPECT_EQ("cluster1", matcher.route(metadata, 100)->routeEntry()->clusterName());
+    EXPECT_EQ(nullptr, matcher.route(metadata, 100)->routeEntry()->metadataMatchCriteria());
   }
 
   {
@@ -538,6 +540,7 @@ routes:
     EXPECT_EQ("cluster3", matcher.route(metadata, 5000)->routeEntry()->clusterName());
     EXPECT_EQ("cluster3", matcher.route(metadata, 9999)->routeEntry()->clusterName());
     EXPECT_EQ("cluster1", matcher.route(metadata, 10000)->routeEntry()->clusterName());
+    EXPECT_EQ(nullptr, matcher.route(metadata, 10000)->routeEntry()->metadataMatchCriteria());
   }
 }
 

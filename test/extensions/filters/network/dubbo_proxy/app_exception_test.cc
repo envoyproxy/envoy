@@ -6,9 +6,14 @@
 #include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
 
+#include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/test_common/test_base.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+using testing::_;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -60,6 +65,14 @@ TEST_F(AppExceptionTest, Encode) {
   auto result = deserializer_.deserializeRpcResult(buffer, context_.body_size_);
   EXPECT_TRUE(result->hasException());
   buffer.drain(buffer.length());
+
+  AppException new_app_exception(app_exception);
+  EXPECT_EQ(new_app_exception.status_, ResponseStatus::ServiceNotFound);
+
+  MockProtocol mock_protocol;
+  EXPECT_CALL(mock_protocol, encode(_, _, _)).WillOnce(Return(false));
+  EXPECT_THROW(app_exception.encode(*(metadata_.get()), mock_protocol, deserializer_, buffer),
+               EnvoyException);
 }
 
 } // namespace DubboProxy
