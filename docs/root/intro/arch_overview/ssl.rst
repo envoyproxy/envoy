@@ -165,7 +165,8 @@ Trouble shooting
 ----------------
 
 When Envoy originates TLS when making connections to upstream clusters, any errors will be logged into
-:ref:`UPSTREAM_TRANSPORT_FAILURE_REASON<config_access_log_format_upstream_transport_failure_reason>` field.
+:ref:`UPSTREAM_TRANSPORT_FAILURE_REASON<config_access_log_format_upstream_transport_failure_reason>` field or
+:ref:`AccessLogCommon.upstream_transport_failure_reason<envoy_api_field_data.accesslog.v2.AccessLogCommon.upstream_transport_failure_reason>` field.
 Common errors are:
 
 * ``Secret is not supplied by SDS``: Envoy is still waiting SDS to deliver key/cert or root CA.
