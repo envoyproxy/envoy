@@ -137,12 +137,14 @@ bool FaultFilter::faultOverflow() {
       RuntimeKeys::get().MaxActiveFaultsKey, fault_settings_->maxActiveFaults().has_value()
                                                  ? fault_settings_->maxActiveFaults().value()
                                                  : std::numeric_limits<uint64_t>::max());
+  // Note: Since we don't compare/swap here this is a fuzzy limit which is similar to how the
+  // other circuit breakers work.
   if (config_->stats().active_faults_.value() >= max_faults) {
     config_->stats().faults_overflow_.inc();
     return true;
-  } else {
-    return false;
   }
+
+  return false;
 }
 
 bool FaultFilter::isDelayEnabled() {

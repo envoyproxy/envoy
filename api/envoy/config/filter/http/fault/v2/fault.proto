@@ -73,5 +73,10 @@ message HTTPFault {
   // `runtime <config_http_filters_fault_injection_runtime>` and any faults that are not injected
   // due to overflow will be indicated via the `faults_overflow
   // <config_http_filters_fault_injection_stats>` stat.
+  //
+  // .. attention::
+  //   Like other :ref:`circuit breakers <arch_overview_circuit_break>` in Envoy, this is a fuzzy
+  //   limit. It's possible for the number of active faults to rise slightly above the configured
+  //   amount due to the implementation details.
   google.protobuf.UInt32Value max_active_faults = 6;
 }
