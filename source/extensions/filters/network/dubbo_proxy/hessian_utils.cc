@@ -44,8 +44,8 @@ size_t doWriteString(Buffer::Instance& instance, const absl::string_view& str_vi
   }
 
   if (length < two_octet_max_lenth) {
-    uint8_t code = length / 256; // 0x30 + length / 0x100 must less than 0x34
-    uint8_t remain = length % 256;
+    uint8_t code = length >> 8; // 0x30 + length / 0x100 must less than 0x34
+    uint8_t remain = length & 0xff;
     std::initializer_list<uint8_t> values{static_cast<uint8_t>(0x30 + code), remain};
     addSeq(instance, values);
     instance.add(str_view.data(), str_view.length());
@@ -53,8 +53,8 @@ size_t doWriteString(Buffer::Instance& instance, const absl::string_view& str_vi
   }
 
   if (length <= str_max_length) {
-    uint8_t code = length / 256;
-    uint8_t remain = length % 256;
+    uint8_t code = length >> 8;
+    uint8_t remain = length & 0xff;
     std::initializer_list<uint8_t> values{'S', code, remain};
     addSeq(instance, values);
     instance.add(str_view.data(), str_view.length());
@@ -67,8 +67,8 @@ size_t doWriteString(Buffer::Instance& instance, const absl::string_view& str_vi
   size_t size = str_max_length + values.size();
   ASSERT(size == (str_max_length + values.size()));
 
-  size_t child_size = doWriteString(
-      instance, absl::string_view(str_view.data() + str_max_length, length - str_max_length));
+  size_t child_size =
+      doWriteString(instance, str_view.substr(str_max_length, length - str_max_length));
   return child_size + size;
 }
 
@@ -564,7 +564,7 @@ std::string HessianUtils::readByte(Buffer::Instance& buffer) {
   return result;
 }
 
-size_t HessianUtils::writeString(Buffer::Instance& buffer, const absl::string_view& str) {
+size_t HessianUtils::writeString(Buffer::Instance& buffer, const absl::string_view str) {
   return doWriteString(buffer, str);
 }
 

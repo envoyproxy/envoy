@@ -11,11 +11,8 @@ namespace DubboProxy {
 namespace Router {
 
 DubboFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::dubbo::router::v2alpha1::Router& proto_config,
-    const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  UNREFERENCED_PARAMETER(proto_config);
-  UNREFERENCED_PARAMETER(stat_prefix);
-
+    const envoy::config::filter::dubbo::router::v2alpha1::Router&, const std::string&,
+    Server::Configuration::FactoryContext& context) {
   return [&context](DubboFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Router>(context.clusterManager()));
   };

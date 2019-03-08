@@ -48,8 +48,6 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
   switch (type) {
   case RpcResponseType::ResponseWithException:
   case RpcResponseType::ResponseWithExceptionWithAttachments:
-    result = std::make_unique<RpcResultImpl>(true);
-    break;
   case RpcResponseType::ResponseWithValue:
     result = std::make_unique<RpcResultImpl>(true);
     break;
