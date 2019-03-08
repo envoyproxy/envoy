@@ -468,10 +468,6 @@ TEST_P(IntegrationTest, Connect) {
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
-TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(62, 60); }
-
-TEST_P(IntegrationTest, LargeHeadersAccepted) { testLargeRequestHeaders(62, 63); }
-
 TEST_P(IntegrationTest, UpstreamProtocolError) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
