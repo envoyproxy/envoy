@@ -27,6 +27,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.rbac",
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
+        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/rbac:rbac_filter",
         "//test/mocks/network:network_mocks",
     ],

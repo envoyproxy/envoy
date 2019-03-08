@@ -26,9 +26,14 @@ public:
   }
   template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
 
+  // TODO(fredlas) deduplicate
   MOCK_METHOD2_T(onConfigUpdate,
                  void(const typename SubscriptionCallbacks<ResourceType>::ResourceVector& resources,
                       const std::string& version_info));
+  MOCK_METHOD3_T(onConfigUpdate,
+                 void(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                      const std::string& system_version_info));
   MOCK_METHOD1_T(onConfigUpdateFailed, void(const EnvoyException* e));
   MOCK_METHOD1_T(resourceName, std::string(const ProtobufWkt::Any& resource));
 };

@@ -7,7 +7,6 @@ Configuration reference
   :maxdepth: 2
   :includehidden:
 
-  overview/v1_overview
   overview/v2_overview
   listeners/listeners
   listener_filters/listener_filters
@@ -24,3 +23,4 @@ Configuration reference
   tools/router_check
   overload_manager/overload_manager
   secret
+  well_known_dynamic_metadata

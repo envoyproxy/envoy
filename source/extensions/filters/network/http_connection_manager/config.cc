@@ -14,6 +14,7 @@
 #include "common/common/fmt.h"
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
+#include "common/http/conn_manager_utility.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
@@ -30,7 +31,18 @@ namespace HttpConnectionManager {
 namespace {
 
 typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
-typedef std::map<std::string, std::unique_ptr<FilterFactoriesList>> FilterFactoryMap;
+typedef std::map<std::string, HttpConnectionManagerConfig::FilterConfig> FilterFactoryMap;
+
+HttpConnectionManagerConfig::UpgradeMap::const_iterator
+findUpgradeBoolCaseInsensitive(const HttpConnectionManagerConfig::UpgradeMap& upgrade_map,
+                               absl::string_view upgrade_type) {
+  for (auto it = upgrade_map.begin(); it != upgrade_map.end(); ++it) {
+    if (StringUtil::CaseInsensitiveCompare()(it->first, upgrade_type)) {
+      return it;
+    }
+  }
+  return upgrade_map.end();
+}
 
 FilterFactoryMap::const_iterator findUpgradeCaseInsensitive(const FilterFactoryMap& upgrade_map,
                                                             absl::string_view upgrade_type) {
@@ -85,9 +97,9 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   return [route_config_provider_manager, filter_config, &context,
           date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-        *filter_config, context.drainDecision(), context.random(), context.httpTracer(),
+        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
-        &context.overloadManager(), context.dispatcher().timeSystem())});
+        &context.overloadManager(), context.dispatcher().timeSource())});
   };
 }
 
@@ -102,27 +114,8 @@ Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterF
 /**
  * Static registration for the HTTP connection manager filter.
  */
-static Registry::RegisterFactory<HttpConnectionManagerFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
-
-std::string
-HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& connection,
-                                                          const Buffer::Instance& data) {
-  if (!connection.nextProtocol().empty()) {
-    return connection.nextProtocol();
-  }
-
-  // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
-  // us the first few bytes of the HTTP/2 prefix since in all public cases we use SSL/ALPN. For
-  // internal cases this should practically never happen.
-  if (-1 != data.search(Http::Http2::CLIENT_MAGIC_PREFIX.c_str(),
-                        Http::Http2::CLIENT_MAGIC_PREFIX.size(), 0)) {
-    return Http::Http2::ALPN_STRING;
-  }
-
-  return "";
-}
+REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 InternalAddressConfig::InternalAddressConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
@@ -145,9 +138,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
+      request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       date_provider_(date_provider),
@@ -231,9 +227,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     uint64_t overall_sampling{
         PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, overall_sampling, 100, 100)};
 
-    tracing_config_.reset(new Http::TracingConnectionManagerConfig(
-        {tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
-         overall_sampling}));
+    tracing_config_ =
+        std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
+            tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
+            overall_sampling, tracing_config.verbose()});
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -269,6 +266,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   for (auto upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
+    const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=
         upgrade_filter_factories_.end()) {
       throw EnvoyException(
@@ -279,10 +277,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       for (int32_t i = 0; i < upgrade_config.filters().size(); i++) {
         processFilter(upgrade_config.filters(i), i, name, *factories);
       }
-      upgrade_filter_factories_.emplace(std::make_pair(name, std::move(factories)));
+      upgrade_filter_factories_.emplace(
+          std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     } else {
       std::unique_ptr<FilterFactoriesList> factories(nullptr);
-      upgrade_filter_factories_.emplace(std::make_pair(name, std::move(factories)));
+      upgrade_filter_factories_.emplace(
+          std::make_pair(name, FilterConfig{std::move(factories), enabled}));
     }
   }
 }
@@ -321,20 +321,15 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1:
-    return Http::ServerConnectionPtr{
-        new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
+    return std::make_unique<Http::Http1::ServerConnectionImpl>(
+        connection, callbacks, http1_settings_, maxRequestHeadersKb());
   case CodecType::HTTP2:
-    return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-        connection, callbacks, context_.scope(), http2_settings_)};
+    return std::make_unique<Http::Http2::ServerConnectionImpl>(
+        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
   case CodecType::AUTO:
-    if (HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data) ==
-        Http::Http2::ALPN_STRING) {
-      return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-          connection, callbacks, context_.scope(), http2_settings_)};
-    } else {
-      return Http::ServerConnectionPtr{
-          new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
-    }
+    return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
+                                                           context_.scope(), http1_settings_,
+                                                           http2_settings_, maxRequestHeadersKb());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -347,21 +342,37 @@ void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCall
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
-    absl::string_view upgrade_type, Http::FilterChainFactoryCallbacks& callbacks) {
-  auto it = findUpgradeCaseInsensitive(upgrade_filter_factories_, upgrade_type);
-  if (it != upgrade_filter_factories_.end()) {
-    FilterFactoriesList* filters_to_use = nullptr;
-    if (it->second != nullptr) {
-      filters_to_use = it->second.get();
-    } else {
-      filters_to_use = &filter_factories_;
+    absl::string_view upgrade_type,
+    const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
+    Http::FilterChainFactoryCallbacks& callbacks) {
+  bool route_enabled = false;
+  if (per_route_upgrade_map) {
+    auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
+    if (route_it != per_route_upgrade_map->end()) {
+      // Upgrades explicitly not allowed on this route.
+      if (route_it->second == false) {
+        return false;
+      }
+      // Upgrades explicitly enabled on this route.
+      route_enabled = true;
     }
-    for (const Http::FilterFactoryCb& factory : *filters_to_use) {
-      factory(callbacks);
-    }
-    return true;
   }
-  return false;
+
+  auto it = findUpgradeCaseInsensitive(upgrade_filter_factories_, upgrade_type);
+  if ((it == upgrade_filter_factories_.end() || !it->second.allow_upgrade) && !route_enabled) {
+    // Either the HCM disables upgrades and the route-config does not override,
+    // or neither is configured for this upgrade.
+    return false;
+  }
+  FilterFactoriesList* filters_to_use = &filter_factories_;
+  if (it != upgrade_filter_factories_.end() && it->second.filter_factories != nullptr) {
+    filters_to_use = it->second.filter_factories.get();
+  }
+
+  for (const Http::FilterFactoryCb& factory : *filters_to_use) {
+    factory(callbacks);
+  }
+  return true;
 }
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {

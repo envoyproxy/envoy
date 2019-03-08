@@ -17,6 +17,7 @@ G. Karlsson.
 Configuration
 -------------
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.ip_tagging.v2.IPTagging>`
+* This filter should be configured with the name *envoy.ip_tagging*.
 
 Statistics
 ----------

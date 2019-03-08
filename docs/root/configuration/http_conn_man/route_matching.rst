@@ -3,11 +3,6 @@
 Route matching
 ==============
 
-.. attention::
-
-  This section is written for the v1 API but the concepts also apply to the v2 API. It will be
-  rewritten to target the v2 API in a future release.
-
 When Envoy matches a route, it uses the following procedure:
 
 #. The HTTP request's *host* or *:authority* header is matched to a :ref:`virtual host

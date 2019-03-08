@@ -12,6 +12,18 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.transport_sockets.alts",
+    deps = [
+        "//source/extensions/transport_sockets/alts:config",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "tsi_frame_protector_test",
     srcs = ["tsi_frame_protector_test.cc"],
     extension_name = "envoy.transport_sockets.alts",
@@ -53,5 +65,29 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/transport_sockets/alts:noop_transport_socket_callbacks_lib",
         "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "alts_integration_test",
+    srcs = [
+        "alts_integration_test.cc",
+    ],
+    extension_name = "envoy.transport_sockets.alts",
+    external_deps = [
+        "grpc_alts_fake_handshaker_server",
+    ],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
+        "//source/common/network:utility_lib",
+        "//source/extensions/transport_sockets/alts:config",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:alts_cc",
     ],
 )

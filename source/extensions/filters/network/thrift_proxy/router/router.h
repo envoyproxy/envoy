@@ -13,6 +13,8 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
 
+class RateLimitPolicy;
+
 /**
  * RouteEntry is an individual resolved route entry.
  */
@@ -30,6 +32,11 @@ public:
    * selecting an upstream host
    */
   virtual const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
+
+  /**
+   * @return const RateLimitPolicy& the rate limit policy for the route.
+   */
+  virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
 };
 
 /**

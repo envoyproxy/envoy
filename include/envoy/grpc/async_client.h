@@ -143,7 +143,7 @@ public:
   virtual void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) PURE;
 
   /**
-   * Called when trailing metadata is recevied. This will also be called on non-Ok grpc-status
+   * Called when trailing metadata is received. This will also be called on non-Ok grpc-status
    * stream termination.
    * @param metadata trailing metadata reference.
    */

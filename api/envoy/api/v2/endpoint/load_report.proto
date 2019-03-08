@@ -2,10 +2,15 @@ syntax = "proto3";
 
 package envoy.api.v2.endpoint;
 
+option java_outer_classname = "LoadReportProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2.endpoint";
+
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -56,6 +61,10 @@ message UpstreamLocalityStats {
 message UpstreamEndpointStats {
   // Upstream host address.
   core.Address address = 1;
+
+  // Opaque and implementation dependent metadata of the
+  // endpoint. Envoy will pass this directly to the management server.
+  google.protobuf.Struct metadata = 6;
 
   // The total number of requests successfully completed by the endpoint. A
   // single HTTP or gRPC request or stream is counted as one request. A TCP
@@ -108,9 +117,15 @@ message EndpointLoadMetricStats {
 // Per cluster load stats. Envoy reports these stats a management server in a
 // :ref:`LoadStatsRequest<envoy_api_msg_load_stats.LoadStatsRequest>`
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
+// Next ID: 7
 message ClusterStats {
   // The name of the cluster.
   string cluster_name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The eds_cluster_config service_name of the cluster.
+  // It's possible that two clusters send the same service_name to EDS,
+  // in that case, the management server is supposed to do aggregation on the load reports.
+  string cluster_service_name = 6;
 
   // Need at least one.
   repeated UpstreamLocalityStats upstream_locality_stats = 2

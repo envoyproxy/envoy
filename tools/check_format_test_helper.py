@@ -5,19 +5,23 @@
 # docker. Normally this is run via check_format_test.sh, which
 # executes it in under docker.
 
+from __future__ import print_function
+
 import argparse
+import logging
 import os
 import shutil
-import logging
 import subprocess
+import sys
 
 os.putenv("BUILDIFIER_BIN", "/usr/local/bin/buildifier")
 
 tools = os.path.dirname(os.path.realpath(__file__))
 tmp = os.path.join(os.getenv('TEST_TMPDIR', "/tmp"), "check_format_test")
 src = os.path.join(tools, 'testdata', 'check_format')
-check_format = os.path.join(tools, 'check_format.py')
+check_format = sys.executable + " " + os.path.join(tools, 'check_format.py')
 errors = 0
+
 
 # Echoes and runs an OS command, returning exit status and the captured
 # stdout+stderr as a string array.
@@ -35,6 +39,7 @@ def runCommand(command):
   logging.info("%s" % command)
   return status, stdout
 
+
 # Runs the 'check_format' operation, on the specified file, printing
 # the comamnd run and the status code as well as the stdout, and returning
 # all of that to the caller.
@@ -43,19 +48,29 @@ def runCheckFormat(operation, filename):
   status, stdout = runCommand(command)
   return (command, status, stdout)
 
+
 def getInputFile(filename):
   infile = os.path.join(src, filename)
+  directory = os.path.dirname(filename)
+  if not directory == '' and not os.path.isdir(directory):
+    os.makedirs(directory)
   shutil.copyfile(infile, filename)
   return filename
+
 
 # Attempts to fix file, returning a 4-tuple: the command, input file name,
 # output filename, captured stdout as an array of lines, and the error status
 # code.
 def fixFileHelper(filename):
   infile = os.path.join(src, filename)
+  directory = os.path.dirname(filename)
+  if not directory == '' and not os.path.isdir(directory):
+    os.makedirs(directory)
+
   shutil.copyfile(infile, filename)
   command, status, stdout = runCheckFormat("fix", getInputFile(filename))
   return (command, infile, filename, status, stdout)
+
 
 # Attempts to fix a file, returning the status code and the generated output.
 # If the fix was successful, the diff is returned as a string-array. If the file
@@ -63,15 +78,16 @@ def fixFileHelper(filename):
 def fixFileExpectingSuccess(file):
   command, infile, outfile, status, stdout = fixFileHelper(file)
   if status != 0:
-    print "FAILED:"
+    print("FAILED:")
     emitStdoutAsError(stdout)
     return 1
   status, stdout = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
-    print "FAILED:"
+    print("FAILED:")
     emitStdoutAsError(stdout)
     return 1
   return 0
+
 
 def fixFileExpectingNoChange(file):
   command, infile, outfile, status, stdout = fixFileHelper(file)
@@ -83,8 +99,10 @@ def fixFileExpectingNoChange(file):
     return 1
   return 0
 
+
 def emitStdoutAsError(stdout):
   logging.error("\n".join(stdout))
+
 
 def expectError(status, stdout, expected_substring):
   if status == 0:
@@ -97,31 +115,46 @@ def expectError(status, stdout, expected_substring):
   emitStdoutAsError(stdout)
   return 1
 
+
 def fixFileExpectingFailure(filename, expected_substring):
   command, infile, outfile, status, stdout = fixFileHelper(filename)
   return expectError(status, stdout, expected_substring)
 
+
 def checkFileExpectingError(filename, expected_substring):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
   return expectError(status, stdout, expected_substring)
+
 
 def checkAndFixError(filename, expected_substring):
   errors = checkFileExpectingError(filename, expected_substring)
   errors += fixFileExpectingSuccess(filename)
   return errors
 
+
+def checkToolNotFoundError():
+  # Temporarily change PATH to test the error about lack of external tools.
+  oldPath = os.environ["PATH"]
+  os.environ["PATH"] = "/sbin:/usr/sbin"
+  clang_format = os.getenv("CLANG_FORMAT", "clang-format-7")
+  errors = checkFileExpectingError("no_namespace_envoy.cc", "Command %s not found." % clang_format)
+  os.environ["PATH"] = oldPath
+  return errors
+
+
 def checkUnfixableError(filename, expected_substring):
   errors = checkFileExpectingError(filename, expected_substring)
   errors += fixFileExpectingFailure(filename, expected_substring)
   return errors
 
+
 def checkFileExpectingOK(filename):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
   if status != 0:
-    logging.error("Expected %s to have no errors; status=%d, output:\n" %
-                  (filename, status))
+    logging.error("Expected %s to have no errors; status=%d, output:\n" % (filename, status))
     emitStdoutAsError(stdout)
   return status + fixFileExpectingNoChange(filename)
+
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='tester for check_format.py.')
@@ -137,11 +170,13 @@ if __name__ == "__main__":
   os.makedirs(tmp)
   os.chdir(tmp)
 
+  # The following error is the error about unavailability of external tools.
+  errors += checkToolNotFoundError()
+
   # The following errors can be detected but not fixed automatically.
   errors += checkUnfixableError("no_namespace_envoy.cc",
                                 "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
-  errors += checkUnfixableError("mutex.cc",
-                                "Don't use <mutex> or <condition_variable*>")
+  errors += checkUnfixableError("mutex.cc", "Don't use <mutex> or <condition_variable*>")
   errors += checkUnfixableError("condition_variable.cc",
                                 "Don't use <mutex> or <condition_variable*>")
   errors += checkUnfixableError("condition_variable_any.cc",
@@ -157,12 +192,27 @@ if __name__ == "__main__":
   errors += checkUnfixableError("condvar_wait_for.cc", real_time_inject_error)
   errors += checkUnfixableError("sleep.cc", real_time_inject_error)
   errors += checkUnfixableError("std_atomic_free_functions.cc", "std::atomic_*")
+  errors += checkUnfixableError("std_get_time.cc", "std::get_time")
   errors += checkUnfixableError("no_namespace_envoy.cc",
                                 "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
-  errors += checkUnfixableError("proto.BUILD",
-                                "unexpected direct external dependency on protobuf")
-  errors += checkUnfixableError("proto_deps.cc",
-                                "unexpected direct dependency on google.protobuf")
+  errors += checkUnfixableError("proto.BUILD", "unexpected direct external dependency on protobuf")
+  errors += checkUnfixableError("proto_deps.cc", "unexpected direct dependency on google.protobuf")
+  errors += checkUnfixableError("attribute_packed.cc", "Don't use __attribute__((packed))")
+  errors += checkUnfixableError("designated_initializers.cc", "Don't use designated initializers")
+  errors += checkUnfixableError("elvis_operator.cc", "Don't use the '?:' operator")
+  errors += checkUnfixableError("testing_test.cc",
+                                "Don't use 'using testing::Test;, elaborate the type instead")
+  errors += checkUnfixableError(
+      "serialize_as_string.cc",
+      "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
+  errors += checkUnfixableError(
+      "version_history.rst",
+      "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
+      "check_format.py")
+
+  errors += fixFileExpectingFailure(
+      "api/missing_package.proto",
+      "Unable to find package name for proto file: ./api/missing_package.proto")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
@@ -175,9 +225,9 @@ if __name__ == "__main__":
   errors += checkAndFixError("long_line.cc", "clang-format check failed")
   errors += checkAndFixError("header_order.cc", "header_order.py check failed")
   errors += checkAndFixError("license.BUILD", "envoy_build_fixer check failed")
-  errors += checkAndFixError("bad_envoy_build_sys_ref.BUILD",
-                             "Superfluous '@envoy//' prefix")
+  errors += checkAndFixError("bad_envoy_build_sys_ref.BUILD", "Superfluous '@envoy//' prefix")
   errors += checkAndFixError("proto_format.proto", "clang-format check failed")
+  errors += checkAndFixError("api/java_options.proto", "Java proto option")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")

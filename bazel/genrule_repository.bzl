@@ -91,7 +91,7 @@ def _genrule_environment(ctx):
 
     # Bare minimum cflags to get included test binaries to link.
     #
-    # See //tools:bazel.rc for the full set.
+    # See .bazelrc for the full set.
     asan_flags = ["-fsanitize=address,undefined"]
     tsan_flags = ["-fsanitize=thread"]
 

@@ -16,11 +16,11 @@ namespace Envoy {
 namespace {
 
 std::string ipSuppressEnvoyHeadersTestParamsToString(
-    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
   return fmt::format(
       "{}_{}",
       TestUtility::ipTestParamsToString(
-          testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
+          ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
       std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router");
 }
 
@@ -150,11 +150,11 @@ route_config:
 } // namespace
 
 class HeaderIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   HeaderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
 
   bool routerSuppressEnvoyHeaders() const { return std::get<1>(GetParam()); }
 
@@ -175,7 +175,6 @@ public:
     }
     cleanupUpstreamAndDownstream();
     test_server_.reset();
-    fake_upstream_connection_.reset();
     fake_upstreams_.clear();
   }
 
@@ -340,7 +339,7 @@ public:
 
   void initialize() override {
     if (use_eds_) {
-      pre_worker_start_test_steps_ = [this]() {
+      on_server_init_function_ = [this]() {
         AssertionResult result =
             fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, eds_connection_);
         RELEASE_ASSERT(result, result.message());
@@ -420,10 +419,10 @@ protected:
   FakeStreamPtr eds_stream_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                         testing::Bool()),
-                        ipSuppressEnvoyHeadersTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipSuppressEnvoyHeadersTestParamsToString);
 
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.

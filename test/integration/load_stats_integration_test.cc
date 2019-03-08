@@ -15,13 +15,12 @@
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public HttpIntegrationTest,
-                                 public testing::TestWithParam<Network::Address::IpVersion> {
+class LoadStatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                 public HttpIntegrationTest {
 public:
-  LoadStatsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {
+  LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
     // We rely on some fairly specific load balancing picks in this test, so
-    // determinizie the schedule.
+    // determinize the schedule.
     setDeterministic();
   }
 
@@ -52,7 +51,8 @@ public:
                                    const LocalityAssignment& p1_dragon_upstreams) {
     uint32_t num_endpoints = 0;
     envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
-    cluster_load_assignment.set_cluster_name("cluster_0");
+    // EDS service_name is set in cluster_0
+    cluster_load_assignment.set_cluster_name("service_name_0");
 
     auto* winter = cluster_load_assignment.add_endpoints();
     winter->mutable_locality()->set_region("some_region");
@@ -127,6 +127,7 @@ public:
       cluster_0->set_type(envoy::api::v2::Cluster::EDS);
       auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
       eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
+      eds_cluster_config->set_service_name("service_name_0");
       if (locality_weighted_lb_) {
         cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();
       }
@@ -213,6 +214,8 @@ public:
     if (!expected_locality_stats.empty() || dropped != 0) {
       auto* cluster_stats = expected_cluster_stats.Add();
       cluster_stats->set_cluster_name("cluster_0");
+      // Verify the eds service_name is passed back.
+      cluster_stats->set_cluster_service_name("service_name_0");
       if (dropped > 0) {
         cluster_stats->set_total_dropped_requests(dropped);
       }
@@ -336,9 +339,9 @@ public:
   const uint32_t load_report_interval_ms_ = 500;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, LoadStatsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, LoadStatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Validate the load reports for successful requests as cluster membership
 // changes.

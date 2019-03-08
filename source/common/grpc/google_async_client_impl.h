@@ -2,8 +2,10 @@
 
 #include <queue>
 
+#include "envoy/api/api.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
+#include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -62,7 +64,7 @@ struct GoogleAsyncTag {
 class GoogleAsyncClientThreadLocal : public ThreadLocal::ThreadLocalObject,
                                      Logger::Loggable<Logger::Id::grpc> {
 public:
-  GoogleAsyncClientThreadLocal();
+  GoogleAsyncClientThreadLocal(Api::Api& api);
   ~GoogleAsyncClientThreadLocal();
 
   grpc::CompletionQueue& completionQueue() { return cq_; }
@@ -154,7 +156,7 @@ class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger:
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::api::v2::core::GrpcService& config);
+                        const envoy::api::v2::core::GrpcService& config, Api::Api& api);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -165,7 +167,7 @@ public:
   AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
                      AsyncStreamCallbacks& callbacks) override;
 
-  TimeSource& timeSource() { return dispatcher_.timeSystem(); }
+  TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
 private:
   static std::shared_ptr<grpc::Channel>

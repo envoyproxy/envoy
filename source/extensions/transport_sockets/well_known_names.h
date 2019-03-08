@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -12,7 +14,8 @@ namespace TransportSockets {
  */
 class TransportSocketNameValues {
 public:
-  const std::string Capture = "envoy.transport_sockets.capture";
+  const std::string Alts = "envoy.transport_sockets.alts";
+  const std::string Tap = "envoy.transport_sockets.tap";
   const std::string RawBuffer = "raw_buffer";
   const std::string Tls = "tls";
 };

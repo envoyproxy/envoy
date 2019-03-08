@@ -29,8 +29,8 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& req
       parts.size() == 2 ? absl::StrJoin(parts, "-shadow:")
                         : absl::StrCat(request->headers().Host()->value().c_str(), "-shadow"));
   // This is basically fire and forget. We don't handle cancelling.
-  cm_.httpAsyncClientForCluster(cluster).send(std::move(request), *this,
-                                              absl::optional<std::chrono::milliseconds>(timeout));
+  cm_.httpAsyncClientForCluster(cluster).send(
+      std::move(request), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
 }
 
 } // namespace Router

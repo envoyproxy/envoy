@@ -231,7 +231,7 @@ bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
   if (content_length) {
     uint64_t length;
     const bool is_minimum_content_length =
-        StringUtil::atoul(content_length->value().c_str(), length) &&
+        StringUtil::atoull(content_length->value().c_str(), length) &&
         length >= config_->minimumLength();
     if (!is_minimum_content_length) {
       config_->stats().content_length_too_small_.inc();

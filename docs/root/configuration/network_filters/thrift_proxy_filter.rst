@@ -4,6 +4,7 @@ Thrift proxy
 ============
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.thrift_proxy.v2alpha1.ThriftProxy>`
+* This filter should be configured with the name *envoy.filters.network.thrift_proxy*.
 
 Cluster Protocol Options
 ------------------------

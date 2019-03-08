@@ -18,6 +18,7 @@ envoy_cc_library(
         "source.h",
         "stat_data_allocator.h",
         "stats.h",
+        "stats_matcher.h",
         "stats_options.h",
         "store.h",
         "tag.h",

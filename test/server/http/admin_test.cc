@@ -1,8 +1,10 @@
+#include <algorithm>
 #include <fstream>
 #include <regex>
 #include <unordered_map>
 
 #include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -15,6 +17,8 @@
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -70,7 +74,7 @@ public:
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminFilterTest()
-      : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"), server_),
+      : admin_(TestEnvironment::temporaryPath("envoy.prof"), server_),
         filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
@@ -83,9 +87,9 @@ public:
   Http::TestHeaderMapImpl request_headers_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminStatsTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
@@ -113,7 +117,11 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 
   std::map<std::string, uint64_t> all_stats;
 
-  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false);
+  std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
+  std::sort(histograms.begin(), histograms.end(),
+            [](const Stats::ParentHistogramSharedPtr& a,
+               const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
+  std::string actual_json = statsAsJsonHandler(all_stats, histograms, false);
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -132,51 +140,6 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                     100.0
                 ],
                 "computed_quantiles": [
-                    {
-                        "name": "h2",
-                        "values": [
-                            {
-                                "interval": null,
-                                "cumulative": 100.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 102.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 105.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 107.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.0
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.5
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.9
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.95
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 109.99
-                            },
-                            {
-                                "interval": null,
-                                "cumulative": 110.0
-                            }
-                        ]
-                    },
                     {
                         "name": "h1",
                         "values": [
@@ -219,6 +182,51 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": 110.0,
                                 "cumulative": 210.0
+                            }
+                        ]
+                    },
+                    {
+                        "name": "h2",
+                        "values": [
+                            {
+                                "interval": null,
+                                "cumulative": 100.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 102.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 105.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 107.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.0
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.5
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.9
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.95
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.99
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 110.0
                             }
                         ]
                     }
@@ -545,28 +553,39 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   store_->shutdownThreading();
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminFilterTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminFilterTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminFilterTest, HeaderOnly) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  filter_.decodeHeaders(request_headers_, true);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers_, true));
 }
 
 TEST_P(AdminFilterTest, Body) {
-  filter_.decodeHeaders(request_headers_, false);
+  InSequence s;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers_, false));
   Buffer::OwnedImpl data("hello");
+  EXPECT_CALL(callbacks_, addDecodedData(_, false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  filter_.decodeData(data, true);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(data, true));
 }
 
 TEST_P(AdminFilterTest, Trailers) {
-  filter_.decodeHeaders(request_headers_, false);
+  InSequence s;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers_, false));
   Buffer::OwnedImpl data("hello");
-  filter_.decodeData(data, false);
+  EXPECT_CALL(callbacks_, addDecodedData(_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(data, false));
+  EXPECT_CALL(callbacks_, decodingBuffer());
+  filter_.getRequestBody();
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
-  filter_.decodeTrailers(request_headers_);
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_.decodeTrailers(request_headers_));
 }
 
 class AdminInstanceTest : public testing::TestWithParam<Network::Address::IpVersion> {
@@ -574,9 +593,9 @@ public:
   AdminInstanceTest()
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
-        admin_("/dev/null", cpu_profile_path_, server_), request_headers_{{":path", "/"}},
+        admin_(cpu_profile_path_, server_), request_headers_{{":path", "/"}},
         admin_filter_(admin_) {
-    admin_.startHttpListener(address_out_path_,
+    admin_.startHttpListener("/dev/null", address_out_path_,
                              Network::Test::getCanonicalLoopbackAddress(GetParam()),
                              listener_scope_.createScope("listener.admin."));
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
@@ -612,31 +631,35 @@ public:
   Server::AdminFilter admin_filter_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
-// Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
-// a real profiler linked in (successful call to startProfiler). startProfiler
-// requies tcmalloc.
-#ifdef TCMALLOC
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminInstanceTest, AdminProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
+
+  // Can only get code coverage of AdminImpl::handlerCpuProfiler stopProfiler with
+  // a real profiler linked in (successful call to startProfiler).
+#ifdef PROFILER_AVAILABLE
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=y", header_map, data));
   EXPECT_TRUE(Profiler::Cpu::profilerEnabled());
+#else
+  EXPECT_EQ(Http::Code::InternalServerError,
+            postCallback("/cpuprofiler?enable=y", header_map, data));
+  EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+#endif
+
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=n", header_map, data));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
-
-#endif
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
   const std::string path("/healthcheck/fail");
   // TODO(jmarantz): the call to getCallback should be made to fail, but as an interim we will
-  // just issue a warning, so that scripts using curl GET comamnds to mutate state can be fixed.
+  // just issue a warning, so that scripts using curl GET commands to mutate state can be fixed.
   EXPECT_LOG_CONTAINS("error",
                       "admin path \"" + path + "\" mutates state, method=GET rather than POST",
                       EXPECT_EQ(Http::Code::BadRequest, getCallback(path, header_map, data)));
@@ -644,8 +667,8 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
-  AdminImpl admin_bad_profile_path(
-      "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), server_);
+  AdminImpl admin_bad_profile_path(TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
+                                   server_);
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
@@ -665,12 +688,12 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  AdminImpl admin_bad_address_out_path("/dev/null", cpu_profile_path_, server_);
-  EXPECT_LOG_CONTAINS("critical",
-                      "cannot open admin address output file " + bad_path + " for writing.",
-                      admin_bad_address_out_path.startHttpListener(
-                          bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                          listener_scope_.createScope("listener.admin.")));
+  AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_);
+  EXPECT_LOG_CONTAINS(
+      "critical", "cannot open admin address output file " + bad_path + " for writing.",
+      admin_bad_address_out_path.startHttpListener(
+          "/dev/null", bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()),
+          listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 
@@ -830,8 +853,41 @@ TEST_P(AdminInstanceTest, Memory) {
   const std::string output_json = response.toString();
   envoy::admin::v2alpha::Memory output_proto;
   MessageUtil::loadFromJson(output_json, output_proto);
-  EXPECT_THAT(output_proto, AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
-                                  Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0))));
+  EXPECT_THAT(output_proto,
+              AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::pageheap_unmapped, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::pageheap_free, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::total_thread_cache, Ge(0))));
+}
+
+TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+
+  // Setup a context that returns null cert details.
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
+  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(*loader, factory_context);
+  Stats::IsolatedStoreImpl store;
+  Envoy::Ssl::ClientContextSharedPtr client_ctx(
+      server_.sslContextManager().createSslClientContext(store, cfg));
+
+  const std::string expected_empty_json = R"EOF({
+ "certificates": [
+  {
+   "ca_cert": [],
+   "cert_chain": []
+  }
+ ]
+}
+)EOF";
+
+  // Validate that cert details are null and /certs handles it correctly.
+  EXPECT_EQ(nullptr, client_ctx->getCaCertInformation());
+  EXPECT_TRUE(client_ctx->getCertChainInformation().empty());
+  EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
+  EXPECT_EQ(expected_empty_json, response.toString());
 }
 
 TEST_P(AdminInstanceTest, Runtime) {
@@ -842,10 +898,12 @@ TEST_P(AdminInstanceTest, Runtime) {
   Runtime::MockLoader loader;
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
-  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
-      {"string_key", {"foo", {}}}, {"int_key", {"1", {1}}}, {"other_key", {"bar", {}}}};
   std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
-      {"string_key", {"override", {}}}, {"extra_key", {"bar", {}}}};
+      {"string_key", {"override", {}, {}, {}}}, {"extra_key", {"bar", {}, {}, {}}}};
+  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
+      {"string_key", {"foo", {}, {}, {}}},
+      {"int_key", {"1", 1, {}, {}}},
+      {"other_key", {"bar", {}, {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
@@ -936,7 +994,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
 
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   cluster_map.emplace(cluster.info_->name_, cluster);
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
@@ -975,8 +1033,13 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       .WillByDefault(Return(true));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
       .WillByDefault(Return(false));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
+      .WillByDefault(Return(true));
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
+  ON_CALL(*host, weight()).WillByDefault(Return(5));
 
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1030,13 +1093,15 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       },
      ],
      "health_status": {
-      "eds_health_status": "HEALTHY",
+      "eds_health_status": "DEGRADED",
       "failed_active_health_check": true,
-      "failed_outlier_check": true
+      "failed_outlier_check": true,
+      "failed_active_degraded_check": true
      },
      "success_rate": {
       "value": 43.2
-     }
+     },
+     "weight": 5
     }
    ]
   }
@@ -1058,12 +1123,67 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([] {
+    Server::CommandLineOptionsPtr command_line_options =
+        std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+    command_line_options->set_restart_epoch(2);
+    command_line_options->set_service_cluster("cluster");
+    return command_line_options;
+  }));
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v2alpha::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("application/json"));
+
+    // We only test that it parses as the proto and that some fields are correct, since
+    // values such as timestamps + Envoy version are tricky to test for.
+    MessageUtil::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+    EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+  }
+
+  {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::NotInitialized));
+    EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
+    envoy::admin::v2alpha::ServerInfo server_info_proto;
+    EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+                HasSubstr("application/json"));
+
+    // We only test that it parses as the proto and that some fields are correct, since
+    // values such as timestamps + Envoy version are tricky to test for.
+    MessageUtil::loadFromJson(body, server_info_proto);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING);
+    EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+    EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
+  }
+
   Http::HeaderMapImpl response_headers;
   std::string body;
+
+  ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
-  EXPECT_TRUE(absl::StartsWith(body, "envoy ")) << body;
+  envoy::admin::v2alpha::ServerInfo server_info_proto;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              HasSubstr("text/plain"));
+              HasSubstr("application/json"));
+
+  // We only test that it parses as the proto and that some fields are correct, since
+  // values such as timestamps + Envoy version are tricky to test for.
+  MessageUtil::loadFromJson(body, server_info_proto);
+  EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::INITIALIZING);
+  EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
+  EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
 }
 
 TEST_P(AdminInstanceTest, GetRequestJson) {
@@ -1085,9 +1205,26 @@ TEST_P(AdminInstanceTest, PostRequest) {
               HasSubstr("text/plain"));
 }
 
+class HistogramWrapper {
+public:
+  HistogramWrapper() : histogram_(hist_alloc()) {}
+
+  ~HistogramWrapper() { hist_free(histogram_); }
+
+  const histogram_t* getHistogram() { return histogram_; }
+
+  void setHistogramValues(const std::vector<uint64_t>& values) {
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram_, value, 0, 1);
+    }
+  }
+
+private:
+  histogram_t* histogram_;
+};
+
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
-  PrometheusStatsFormatterTest() /*: alloc_(stats_options_)*/ {}
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     std::string tname = std::string(name);
     counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
@@ -1098,15 +1235,34 @@ protected:
     gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
   }
 
+  void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
+    histograms_.push_back(histogram);
+  }
+
   Stats::StatsOptionsImpl stats_options_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
+  std::vector<Stats::ParentHistogramSharedPtr> histograms_;
 };
 
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST_F(PrometheusStatsFormatterTest, SanitizeMetricName) {
+  std::string raw = "An.artist.plays-violin@019street";
+  std::string expected = "envoy_An_artist_plays_violin_019street";
+  auto actual = PrometheusStatsFormatter::metricName(raw);
+  EXPECT_EQ(expected, actual);
+}
+
+TEST_F(PrometheusStatsFormatterTest, SanitizeMetricNameDigitFirst) {
+  std::string raw = "3.artists.play-violin@019street";
+  std::string expected = "envoy_3_artists_play_violin_019street";
   auto actual = PrometheusStatsFormatter::metricName(raw);
   EXPECT_EQ(expected, actual);
 }
@@ -1137,7 +1293,9 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(2UL, size);
 }
 
 TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
@@ -1155,7 +1313,201 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(4UL, size);
+}
+
+TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram->name_ = "histogram1";
+  histogram->used_ = true;
+  ON_CALL(*histogram, cumulativeStatistics())
+      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+
+  addHistogram(histogram);
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+envoy_histogram1_bucket{le="0.5"} 0
+envoy_histogram1_bucket{le="1"} 0
+envoy_histogram1_bucket{le="5"} 0
+envoy_histogram1_bucket{le="10"} 0
+envoy_histogram1_bucket{le="25"} 0
+envoy_histogram1_bucket{le="50"} 0
+envoy_histogram1_bucket{le="100"} 0
+envoy_histogram1_bucket{le="250"} 0
+envoy_histogram1_bucket{le="500"} 0
+envoy_histogram1_bucket{le="1000"} 0
+envoy_histogram1_bucket{le="2500"} 0
+envoy_histogram1_bucket{le="5000"} 0
+envoy_histogram1_bucket{le="10000"} 0
+envoy_histogram1_bucket{le="30000"} 0
+envoy_histogram1_bucket{le="60000"} 0
+envoy_histogram1_bucket{le="300000"} 0
+envoy_histogram1_bucket{le="600000"} 0
+envoy_histogram1_bucket{le="1800000"} 0
+envoy_histogram1_bucket{le="3600000"} 0
+envoy_histogram1_bucket{le="+Inf"} 0
+envoy_histogram1_sum{} 0
+envoy_histogram1_count{} 0
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
+  addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
+
+  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->used_ = true;
+  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  addHistogram(histogram1);
+  EXPECT_CALL(*histogram1, cumulativeStatistics())
+      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(5UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
+envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
+# TYPE envoy_cluster_test_2_upstream_cx_total counter
+envoy_cluster_test_2_upstream_cx_total{another_tag_name="another_tag-value"} 0
+# TYPE envoy_cluster_test_3_upstream_cx_total gauge
+envoy_cluster_test_3_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+# TYPE envoy_cluster_test_4_upstream_cx_total gauge
+envoy_cluster_test_4_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+# TYPE envoy_cluster_test_1_upstream_rq_time histogram
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="0.5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="25"} 1
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 2
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 4
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="250"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="2500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="30000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="60000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="300000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1800000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="3600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
+envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
+envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
+  addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
+
+  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->used_ = true;
+  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  addHistogram(histogram1);
+  EXPECT_CALL(*histogram1, cumulativeStatistics())
+      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, true);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_rq_time histogram
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="0.5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="25"} 1
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 2
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 4
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="250"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="2500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="30000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="60000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="300000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1800000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="3600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
+envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
+envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
+  const std::vector<uint64_t> h1_values = {};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->used_ = false;
+  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  addHistogram(histogram1);
+
+  {
+    const bool used_only = true;
+    EXPECT_CALL(*histogram1, cumulativeStatistics()).Times(0);
+
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, used_only);
+    EXPECT_EQ(0UL, size);
+  }
+
+  {
+    const bool used_only = false;
+    EXPECT_CALL(*histogram1, cumulativeStatistics())
+        .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, used_only);
+    EXPECT_EQ(1UL, size);
+  }
 }
 
 } // namespace Server

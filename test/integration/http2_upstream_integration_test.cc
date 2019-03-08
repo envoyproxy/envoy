@@ -12,19 +12,9 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(IpVersions, Http2UpstreamIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
-
-TEST_P(Http2UpstreamIntegrationTest, RouterNotFound) { testRouterNotFound(); }
-
-TEST_P(Http2UpstreamIntegrationTest, RouterRedirect) { testRouterRedirect(); }
-
-TEST_P(Http2UpstreamIntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
-
-TEST_P(Http2UpstreamIntegrationTest, AddEncodedTrailers) { testAddEncodedTrailers(); }
-
-TEST_P(Http2UpstreamIntegrationTest, DrainClose) { testDrainClose(); }
+INSTANTIATE_TEST_SUITE_P(IpVersions, Http2UpstreamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
@@ -35,7 +25,7 @@ TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithZeroByteBodyNoB
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
@@ -58,31 +48,9 @@ TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, TwoRequests) { testTwoRequests(); }
-
 TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
-
-TEST_P(Http2UpstreamIntegrationTest, EnvoyHandlingDuplicate100Continue) {
-  testEnvoyHandling100Continue(true);
-}
-
-TEST_P(Http2UpstreamIntegrationTest, EnvoyProxyingEarly100Continue) {
-  testEnvoyProxying100Continue(true);
-}
-
-TEST_P(Http2UpstreamIntegrationTest, EnvoyProxyingLate100Continue) {
-  testEnvoyProxying100Continue(false);
-}
-
-TEST_P(Http2UpstreamIntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
-
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
-
-TEST_P(Http2UpstreamIntegrationTest, DownstreamResetBeforeResponseComplete) {
-  testDownstreamResetBeforeResponseComplete();
-}
 
 TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
@@ -152,7 +120,7 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   upstream_request_->encodeData(1024, false);
   response->waitForBodyData(1024);
 
-  // Finish sending therequest.
+  // Finish sending the request.
   codec_client_->sendTrailers(*request_encoder_, Http::TestHeaderMapImpl{{"trailer", "foo"}});
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
@@ -280,10 +248,18 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimit
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
+TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+  config_helper_.addFilter(R"EOF(
+  name: random-pause-filter
+  config: {}
+  )EOF");
+
+  manySimultaneousRequests(1024 * 20, 1024 * 20);
+}
+
 TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
-  TestRandomGenerator rand;
-  const uint32_t num_requests = rand.random() % 50 + 1;
+  const uint32_t num_requests = 20;
   std::vector<Http::StreamEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeStreamPtr> upstream_requests;
@@ -297,35 +273,43 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
                                                             {":authority", "host"}});
     encoders.push_back(&encoder_decoder.first);
     responses.push_back(std::move(encoder_decoder.second));
-    // Reset a few streams to test how reset and watermark interact.
-    if (i % 15 == 0) {
-      codec_client_->sendReset(*encoders[i]);
-    } else {
+
+    // Ensure that we establish the first request (which will be reset) to avoid
+    // a race where the reset is detected before the upstream stream is
+    // established (#5316)
+    if (i == 0) {
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      upstream_requests.emplace_back();
+      ASSERT_TRUE(
+          fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
+    }
+
+    if (i != 0) {
       codec_client_->sendData(*encoders[i], 0, true);
     }
   }
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  for (uint32_t i = 0; i < num_requests; ++i) {
-    FakeStreamPtr stream;
+
+  // Reset one stream to test how reset and watermarks interact.
+  codec_client_->sendReset(*encoders[0]);
+
+  // Now drain the upstream connection.
+  for (uint32_t i = 1; i < num_requests; ++i) {
     upstream_requests.emplace_back();
     ASSERT_TRUE(
         fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
   }
-  for (uint32_t i = 0; i < num_requests; ++i) {
-    if (i % 15 != 0) {
-      ASSERT_TRUE(upstream_requests[i]->waitForEndStream(*dispatcher_));
-      upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-      upstream_requests[i]->encodeData(100, false);
-    }
+  for (uint32_t i = 1; i < num_requests; ++i) {
+    ASSERT_TRUE(upstream_requests[i]->waitForEndStream(*dispatcher_));
+    upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+    upstream_requests[i]->encodeData(100, false);
   }
   // Close the connection.
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   // Ensure the streams are all reset successfully.
-  for (uint32_t i = 0; i < num_requests; ++i) {
-    if (i % 15 != 0) {
-      responses[i]->waitForReset();
-    }
+  for (uint32_t i = 1; i < num_requests; ++i) {
+    responses[i]->waitForReset();
   }
 }
 

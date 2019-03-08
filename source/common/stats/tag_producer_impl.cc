@@ -36,7 +36,7 @@ TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& 
       }
     } else if (tag_specifier.tag_value_case() ==
                envoy::config::metrics::v2::TagSpecifier::kFixedValue) {
-      default_tags_.emplace_back(Stats::Tag{.name_ = name, .value_ = tag_specifier.fixed_value()});
+      default_tags_.emplace_back(Stats::Tag{name, tag_specifier.fixed_value()});
     }
   }
 }

@@ -7,6 +7,10 @@ import "envoy/type/matcher/metadata.proto";
 import "envoy/type/matcher/string.proto";
 
 package envoy.config.rbac.v2alpha;
+
+option java_outer_classname = "RbacProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.rbac.v2alpha";
 option go_package = "v2alpha";
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
@@ -118,14 +122,34 @@ message Permission {
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32.lte = 65535];
 
-    // Metadata that describes additional information about the action. Only available for HTTP
-    // request.
+    // Metadata that describes additional information about the action.
     envoy.type.matcher.MetadataMatcher metadata = 7;
 
     // Negates matching the provided permission. For instance, if the value of `not_rule` would
     // match, this permission would not match. Conversely, if the value of `not_rule` would not
     // match, this permission would match.
     Permission not_rule = 8;
+
+    // The request server from the client's connection request. This is
+    // typically TLS SNI.
+    //
+    // .. attention::
+    //
+    //   The behavior of this field may be affected by how Envoy is configured
+    //   as explained below.
+    //
+    //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
+    //     filter is not added, and if a `FilterChainMatch` is not defined for
+    //     the :ref:`server name <envoy_api_field_Listener.FilterChainMatch.server_names>`,
+    //     a TLS connection's requested SNI server name will be treated as if it
+    //     wasn't present.
+    //
+    //   * A :ref:`listener filter <arch_overview_listener_filters>` may
+    //     overwrite a connection's requested server name within Envoy.
+    //
+    // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
+    // setup SNI.
+    envoy.type.matcher.StringMatcher requested_server_name = 9;
   }
 }
 
@@ -170,8 +194,7 @@ message Principal {
     // available for HTTP request.
     envoy.api.v2.route.HeaderMatcher header = 6;
 
-    // Metadata that describes additional information about the principal. Only available for HTTP
-    // request.
+    // Metadata that describes additional information about the principal.
     envoy.type.matcher.MetadataMatcher metadata = 7;
 
     // Negates matching the provided principal. For instance, if the value of `not_id` would match,

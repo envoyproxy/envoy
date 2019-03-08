@@ -1,5 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/hex.h"
+#include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"
 
 #include "test/test_common/utility.h"
@@ -14,8 +15,8 @@ class ZlibCompressorImplTest : public testing::Test {
 protected:
   void expectValidFlushedBuffer(const Buffer::OwnedImpl& output_buffer) {
     uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
-    Buffer::RawSlice compressed_slices[num_comp_slices];
-    output_buffer.getRawSlices(compressed_slices, num_comp_slices);
+    STACK_ARRAY(compressed_slices, Buffer::RawSlice, num_comp_slices);
+    output_buffer.getRawSlices(compressed_slices.begin(), num_comp_slices);
 
     const std::string header_hex_str = Hex::encode(
         reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
@@ -35,8 +36,8 @@ protected:
   void expectValidFinishedBuffer(const Buffer::OwnedImpl& output_buffer,
                                  const uint32_t input_size) {
     uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);
-    Buffer::RawSlice compressed_slices[num_comp_slices];
-    output_buffer.getRawSlices(compressed_slices, num_comp_slices);
+    STACK_ARRAY(compressed_slices, Buffer::RawSlice, num_comp_slices);
+    output_buffer.getRawSlices(compressed_slices.begin(), num_comp_slices);
 
     const std::string header_hex_str = Hex::encode(
         reinterpret_cast<unsigned char*>(compressed_slices[0].mem_), compressed_slices[0].len_);
@@ -56,7 +57,7 @@ protected:
   void expectEqualInputSize(const std::string& footer_bytes, const uint32_t input_size) {
     const std::string size_bytes = footer_bytes.substr(footer_bytes.size() - 8, 8);
     uint64_t size;
-    StringUtil::atoul(size_bytes.c_str(), size, 16);
+    StringUtil::atoull(size_bytes.c_str(), size, 16);
     EXPECT_EQ(TestUtility::flipOrder<uint32_t>(size), input_size);
   }
 
@@ -105,7 +106,7 @@ protected:
 
 // Exercises death by passing bad initialization params or by calling
 // compress before init.
-TEST_F(ZlibCompressorImplDeathTest, CompressorTestDeath) {
+TEST_F(ZlibCompressorImplDeathTest, CompressorDeathTest) {
   EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(100, 8), "assert failure: result >= 0");
   EXPECT_DEATH_LOG_TO_STDERR(compressorBadInitTestHelper(31, 10), "assert failure: result >= 0");
   EXPECT_DEATH_LOG_TO_STDERR(uninitializedCompressorTestHelper(), "assert failure: result == Z_OK");

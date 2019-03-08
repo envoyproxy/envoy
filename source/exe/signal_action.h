@@ -83,7 +83,7 @@ private:
   /**
    * Use this many bytes for the alternate signal handling stack.
    *
-   * Initialized as a multiple of page size (although sigaltstack will
+   * Initialized as a multiple of page size (although signalstack will
    * do alignment as needed).
    *
    * Additionally, two guard pages will be allocated to bookend the usable area.

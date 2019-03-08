@@ -67,7 +67,7 @@ public:
 
   /**
    * Extract all JWT tokens from the headers. If set of header_keys or param_keys
-   * is not empty only those in the matching locations wil be returned.
+   * is not empty only those in the matching locations will be returned.
    *
    * @param headers is the HTTP request headers.
    * @return list of extracted Jwt location info.

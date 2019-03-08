@@ -2,9 +2,12 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -15,6 +18,23 @@ envoy_cc_test_library(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:byte_order_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "buffer_fuzz_proto",
+    srcs = ["buffer_fuzz.proto"],
+)
+
+envoy_cc_fuzz_test(
+    name = "buffer_fuzz_test",
+    srcs = ["buffer_fuzz_test.cc"],
+    corpus = "buffer_corpus",
+    deps = [
+        ":buffer_fuzz_proto_cc",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:stack_array",
+        "//source/common/memory:stats_lib",
     ],
 )
 
@@ -53,5 +73,16 @@ envoy_cc_test(
     srcs = ["zero_copy_input_stream_test.cc"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
+    ],
+)
+
+envoy_cc_test_binary(
+    name = "buffer_speed_test",
+    srcs = ["buffer_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/buffer:buffer_lib",
     ],
 )

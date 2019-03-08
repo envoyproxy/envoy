@@ -1,13 +1,16 @@
+#pragma once
+
 #include "common/common/logger.h"
 #include "common/common/logger_delegates.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+#include "common/http/http2/codec_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_listener.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 class TestRunner {
@@ -15,18 +18,27 @@ public:
   static int RunTests(int argc, char** argv) {
     ::testing::InitGoogleMock(&argc, argv);
     Event::Libevent::Global::initialize();
+    Http::Http2::initializeNghttp2Logging();
+
+    // Add a test-listener so we can call a hook where we can do a quiescence
+    // check after each method. See
+    // https://github.com/google/googletest/blob/master/googletest/docs/advanced.md
+    // for details.
+    ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+    listeners.Append(new TestListener);
+
+    // Use the recommended, but not default, "threadsafe" style for the Death Tests.
+    // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
+    ::testing::FLAGS_gtest_death_test_style = "threadsafe";
 
     // Set gtest properties
-    // (https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#logging-additional-information),
+    // (https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#logging-additional-information),
     // they are available in the test XML.
     // TODO(htuch): Log these as well?
-    ::testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
-    ::testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
+    testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
+    testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
-    if (::setenv("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory().c_str(), 1) != 0) {
-      ::perror("Failed to set temporary UDS directory.");
-      ::exit(1);
-    }
+    TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
 
     TestEnvironment::initializeOptions(argc, argv);
     Thread::MutexBasicLockable lock;

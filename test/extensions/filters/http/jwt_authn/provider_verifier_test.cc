@@ -17,8 +17,18 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
-class ProviderVerifierTest : public ::testing::Test {
+ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
+  ProtobufWkt::Struct expected_payload;
+  MessageUtil::loadFromJson(ExpectedPayloadJSON, expected_payload);
+
+  ProtobufWkt::Struct struct_obj;
+  *(*struct_obj.mutable_fields())[name].mutable_struct_value() = expected_payload;
+  return struct_obj;
+}
+
+class ProviderVerifierTest : public testing::Test {
 public:
   void createVerifier() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
@@ -28,7 +38,7 @@ public:
 
   JwtAuthentication proto_config_;
   FilterConfigSharedPtr filter_config_;
-  VerifierPtr verifier_;
+  VerifierConstPtr verifier_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;
   MockVerifierCallbacks mock_cb_;
@@ -36,8 +46,14 @@ public:
 
 TEST_F(ProviderVerifierTest, TestOkJWT) {
   MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
+      "my_payload");
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, setPayload(_)).WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
+  }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
 
@@ -132,6 +148,7 @@ TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
                EnvoyException);
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

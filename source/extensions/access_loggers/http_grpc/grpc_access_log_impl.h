@@ -119,12 +119,12 @@ public:
 
   static void responseFlagsToAccessLogResponseFlags(
       envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
-      const RequestInfo::RequestInfo& request_info);
+      const StreamInfo::StreamInfo& stream_info);
 
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
            const Http::HeaderMap* response_trailers,
-           const RequestInfo::RequestInfo& request_info) override;
+           const StreamInfo::StreamInfo& stream_info) override;
 
 private:
   AccessLog::FilterPtr filter_;

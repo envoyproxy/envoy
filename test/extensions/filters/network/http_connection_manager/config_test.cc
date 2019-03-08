@@ -46,7 +46,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_;
+  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
 };
 
@@ -152,6 +152,50 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(60, config.maxRequestHeadersKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 16
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(16, config.maxRequestHeadersKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 96
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(96, config.maxRequestHeadersKb());
+}
+
 // Validated that an explicit zero stream idle timeout disables.
 TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   const std::string yaml_string = R"EOF(
@@ -166,6 +210,50 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
   EXPECT_EQ(0, config.streamIdleTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 53s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(53 * 1000, config.requestTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DisabledRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  request_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(0, config.requestTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(0, config.requestTimeout().count());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
@@ -200,50 +288,6 @@ TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactory(*json_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactory(*json_config, context_);
-}
-
-TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
-    Buffer::OwnedImpl data("");
-    EXPECT_EQ("hello", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("GET / HTTP/1.1");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
-    EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/2");
-    EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
@@ -448,6 +492,7 @@ TEST_F(FilterChainTest, createFilterChain) {
   config.createFilterChain(callbacks);
 }
 
+// Tests where upgrades are configured on via the HCM.
 TEST_F(FilterChainTest, createUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
@@ -455,17 +500,78 @@ TEST_F(FilterChainTest, createUpgradeFilterChain) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_);
 
-  Http::MockFilterChainFactoryCallbacks callbacks;
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  // Check the case where WebSockets are configured in the HCM, and no router
+  // config is present. We should create an upgrade filter chain for
+  // WebSockets.
   {
     EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
-    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", callbacks));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks));
   }
 
+  // Check the case where WebSockets are configured in the HCM, and no router
+  // config is present. We should not create an upgrade filter chain for Foo
   {
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(0);
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(0);
-    EXPECT_FALSE(config.createUpgradeFilterChain("foo", callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("foo", nullptr, callbacks));
+  }
+
+  // Now override the HCM with a route-specific disabling of WebSocket to
+  // verify route-specific disabling works.
+  {
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("WebSocket", false));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+  }
+
+  // For paranoia's sake make sure route-specific enabling doesn't break
+  // anything.
+  {
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("WebSocket", true));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+  }
+}
+
+// Tests where upgrades are configured off via the HCM.
+TEST_F(FilterChainTest, createUpgradeFilterChainHCMDisabled) {
+  auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
+  hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
+  hcm_config.mutable_upgrade_configs(0)->mutable_enabled()->set_value(false);
+
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_);
+
+  NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
+  // Check the case where WebSockets are off in the HCM, and no router config is present.
+  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks)); }
+
+  // Check the case where WebSockets are off in the HCM and in router config.
+  {
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("WebSocket", false));
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+  }
+
+  // With a route-specific enabling for WebSocket, WebSocket should work.
+  {
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("WebSocket", true));
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
+  }
+
+  // With only a route-config we should do what the route config says.
+  {
+    std::map<std::string, bool> upgrade_map;
+    upgrade_map.emplace(std::make_pair("foo", true));
+    upgrade_map.emplace(std::make_pair("bar", false));
+    EXPECT_TRUE(config.createUpgradeFilterChain("foo", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("bar", &upgrade_map, callbacks));
+    EXPECT_FALSE(config.createUpgradeFilterChain("eep", &upgrade_map, callbacks));
   }
 }
 
@@ -499,14 +605,14 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
-    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", callbacks));
+    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, callbacks));
   }
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_));   // Router
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Dynamo
-    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", callbacks));
+    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }
 }
 

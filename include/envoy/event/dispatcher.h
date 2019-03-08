@@ -10,13 +10,14 @@
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
-#include "envoy/filesystem/filesystem.h"
+#include "envoy/filesystem/watcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Event {
@@ -36,7 +37,7 @@ public:
   /**
    * Returns a time-source to use with this dispatcher.
    */
-  virtual TimeSystem& timeSystem() PURE;
+  virtual TimeSource& timeSource() PURE;
 
   /**
    * Clear any items in the deferred deletion queue.
@@ -109,6 +110,14 @@ public:
                                               Network::ListenerCallbacks& cb, bool bind_to_port,
                                               bool hand_off_restored_destination_connections) PURE;
 
+  /**
+   * Create a logical udp listener on a specific port.
+   * @param socket supplies the socket to listen on.
+   * @param cb supplies the udp listener callbacks to invoke for listener events.
+   * @return Network::ListenerPtr a new listener that is owned by the caller.
+   */
+  virtual Network::ListenerPtr createUdpListener(Network::Socket& socket,
+                                                 Network::UdpListenerCallbacks& cb) PURE;
   /**
    * Allocate a timer. @see Timer for docs on how to use the timer.
    * @param cb supplies the callback to invoke when the timer fires.

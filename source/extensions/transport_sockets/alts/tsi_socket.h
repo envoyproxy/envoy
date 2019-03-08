@@ -98,7 +98,8 @@ public:
   TsiSocketFactory(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator);
 
   bool implementsSecureTransport() const override;
-  Network::TransportSocketPtr createTransportSocket() const override;
+  Network::TransportSocketPtr
+  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
 
 private:
   HandshakerFactory handshaker_factory_;

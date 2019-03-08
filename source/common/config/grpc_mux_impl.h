@@ -3,16 +3,15 @@
 #include <unordered_map>
 
 #include "envoy/common/time.h"
-#include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/grpc/async_client.h"
 #include "envoy/grpc/status.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
+#include "common/config/grpc_stream.h"
+#include "common/config/utility.h"
 
 namespace Envoy {
 namespace Config {
@@ -20,13 +19,16 @@ namespace Config {
 /**
  * ADS API implementation that fetches via gRPC.
  */
-class GrpcMuxImpl : public GrpcMux,
-                    Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
-                    Logger::Loggable<Logger::Id::upstream> {
+class GrpcMuxImpl
+    : public GrpcMux,
+      public GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse,
+                        std::string> // this string is a type URL
+{
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Runtime::RandomGenerator& random, Stats::Scope& scope);
+              Runtime::RandomGenerator& random, Stats::Scope& scope,
+              const RateLimitSettings& rate_limit_settings);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -35,26 +37,15 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
 
-  // Grpc::AsyncStreamCallbacks
-  void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
-  void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
-  void onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
-  void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
-  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
+  void sendDiscoveryRequest(const std::string& type_url) override;
 
-  // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_INITIAL_DELAY_MS = 500;
-  const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
+  // GrpcStream
+  void handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
+  void handleStreamEstablished() override;
+  void handleEstablishmentFailure() override;
 
 private:
   void setRetryTimer();
-  void establishNewStream();
-  void sendDiscoveryRequest(const std::string& type_url);
-  void handleFailure();
-  ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
-    const std::string control_plane_prefix = "control_plane.";
-    return {ALL_CONTROL_PLANE_STATS(POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
-  }
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
@@ -92,24 +83,12 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
-    // Detects when Envoy is making too many requests.
-    TokenBucketPtr limit_request_;
-    // Limits warning messages when too many requests is detected.
-    TokenBucketPtr limit_log_;
   };
 
   const LocalInfo::LocalInfo& local_info_;
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncStream* stream_{};
-  const Protobuf::MethodDescriptor& service_method_;
   std::unordered_map<std::string, ApiState> api_state_;
-  // Envoy's dependendency ordering.
+  // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
-  Event::TimerPtr retry_timer_;
-  Runtime::RandomGenerator& random_;
-  TimeSource& time_source_;
-  BackOffStrategyPtr backoff_strategy_;
-  ControlPlaneStats control_plane_stats_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

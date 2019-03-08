@@ -6,7 +6,6 @@ Administration interface
 Envoy exposes a local administration interface that can be used to query and
 modify different aspects of the server:
 
-* :ref:`v1 API reference <config_admin_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.bootstrap.v2.Admin>`
 
 .. _operations_admin_interface_security:
@@ -43,10 +42,12 @@ modify different aspects of the server:
 
   Print a textual table of all available options.
 
+.. _operations_admin_interface_certs:
+
 .. http:get:: /certs
 
-  List out all loaded TLS certificates, including file name, serial number, and days until
-  expiration.
+  List out all loaded TLS certificates, including file name, serial number, subject alternate names and days until
+  expiration in JSON format conforming to the :ref:`certificate proto definition <envoy_api_msg_admin.v2alpha.Certificates>`.
 
 .. _operations_admin_interface_clusters:
 
@@ -66,8 +67,8 @@ modify different aspects of the server:
     - :ref:`circuit breakers<config_cluster_manager_cluster_circuit_breakers>` settings for all priority settings.
 
     - Information about :ref:`outlier detection<arch_overview_outlier_detection>` if a detector is installed. Currently
-      :ref:`success rate average<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average>`,
-      and :ref:`ejection threshold<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold>`
+      :ref:`average success rate <envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_average_success_rate>`,
+      and :ref:`ejection threshold<envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
       :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`.
 
@@ -111,7 +112,7 @@ modify different aspects of the server:
     */failed_outlier_check*: The host has failed an outlier detection check.
 
 .. http:get:: /clusters?format=json
-  
+
   Dump the */clusters* output in a JSON-serialized proto. See the
   :ref:`definition <envoy_api_msg_admin.v2alpha.Clusters>` for more information.
 
@@ -126,6 +127,11 @@ modify different aspects of the server:
 .. warning::
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
+
+.. http:get:: /contention
+
+  Dump current Envoy mutex contention stats (:ref:`MutexStats <envoy_api_msg_admin.v2alpha.MutexStats>`) in JSON
+  format, if mutex tracing is enabled. See :option:`--enable-mutex-tracing`.
 
 .. http:post:: /cpuprofiler
 
@@ -174,20 +180,48 @@ modify different aspects of the server:
 
 .. http:get:: /server_info
 
-  Outputs information about the running server. Sample output looks like:
+  Outputs a JSON message containing information about the running server.
 
-.. code-block:: none
+  Sample output looks like:
 
-  envoy 267724/RELEASE live 1571 1571 0
+  .. code-block:: json
 
-The fields are:
+    {
+      "version": "b050513e840aa939a01f89b07c162f00ab3150eb/1.9.0-dev/Modified/DEBUG",
+      "state": "LIVE",
+      "command_line_options": {
+        "base_id": "0",
+        "concurrency": 8,
+        "config_path": "config.yaml",
+        "config_yaml": "",
+        "allow_unknown_fields": false,
+        "admin_address_path": "",
+        "local_address_ip_version": "v4",
+        "log_level": "info",
+        "component_log_level": "",
+        "log_format": "[%Y-%m-%d %T.%e][%t][%l][%n] %v",
+        "log_path": "",
+        "hot_restart_version": false,
+        "service_cluster": "",
+        "service_node": "",
+        "service_zone": "",
+        "mode": "Serve",
+        "max_stats": "16384",
+        "max_obj_name_len": "60",
+        "disable_hot_restart": false,
+        "enable_mutex_tracing": false,
+        "restart_epoch": 0,
+        "file_flush_interval": "10s",
+        "drain_time": "600s",
+        "parent_shutdown_time": "900s",
+        "cpuset_threads": false
+      },
+      "uptime_current_epoch": "6s",
+      "uptime_all_epochs": "6s"
+    }
 
-* Process name
-* Compiled SHA and build type
-* Health check state (live or draining)
-* Current hot restart epoch uptime in seconds
-* Total uptime in seconds (across all hot restarts)
-* Current hot restart epoch
+See the :ref:`ServerInfo proto <envoy_api_msg_admin.v2alpha.ServerInfo>` for an
+explanation of the output.
 
 .. _operations_admin_interface_stats:
 
@@ -208,7 +242,11 @@ The fields are:
 
   .. http:get:: /stats?filter=regex
 
-  Filters the returned stats to those with names matching the regular expression `regex`. Compatible with `usedonly`. Performs partial matching by default, so `/stats?filter=server` will return all stats containing the word `server`. Full-string matching can be specified with begin- and end-line anchors. (i.e. `/stats?filter=^server.concurrency$`)
+  Filters the returned stats to those with names matching the regular expression
+  `regex`. Compatible with `usedonly`. Performs partial matching by default, so
+  `/stats?filter=server` will return all stats containing the word `server`.
+  Full-string matching can be specified with begin- and end-line anchors. (i.e.
+  `/stats?filter=^server.concurrency$`)
 
 .. http:get:: /stats?format=json
 
@@ -218,7 +256,7 @@ The fields are:
   that has the computed quantile for each histogram.
 
   If a histogram is not updated during an interval, the output will have null for all the quantiles.
-  
+
   Example histogram output:
 
   .. code-block:: json
@@ -260,10 +298,10 @@ The fields are:
         ]
       }
     }
- 
+
   .. http:get:: /stats?format=json&usedonly
 
-  Outputs statistics that Envoy has updated (counters incremented at least once, 
+  Outputs statistics that Envoy has updated (counters incremented at least once,
   gauges changed at least once, and histograms added to at least once) in JSON format.
 
 .. http:get:: /stats?format=prometheus
@@ -273,8 +311,11 @@ The fields are:
   .. http:get:: /stats/prometheus
 
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
-  v0.0.4 format. This can be used to integrate with a Prometheus server. Currently, only counters and
-  gauges are output. Histograms will be output in a future update.
+  v0.0.4 format. This can be used to integrate with a Prometheus server.
+
+  You can optionally pass the `usedonly` URL query argument to only get statistics that
+  Envoy has updated (counters incremented at least once, gauges changed at least once,
+  and histograms added to at least once)
 
 .. _operations_admin_interface_runtime:
 
@@ -327,40 +368,46 @@ The fields are:
   Use the /runtime_modify endpoint with care. Changes are effectively immediately. It is
   **critical** that the admin interface is :ref:`properly secured
   <operations_admin_interface_security>`.
-  
+
   .. _operations_admin_interface_hystrix_event_stream:
 
 .. http:get:: /hystrix_event_stream
 
   This endpoint is intended to be used as the stream source for
   `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
-  a GET to this endpoint will trriger a stream of statistics from envoy in 
-  `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_ 
-  format, as expected by the Hystrix dashboard. 
-  
-  If invoked from a browser or a terminal, the response will be shown as a continuous stream, 
-  sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` 
+  a GET to this endpoint will trigger a stream of statistics from envoy in
+  `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
+  format, as expected by the Hystrix dashboard.
+
+  If invoked from a browser or a terminal, the response will be shown as a continuous stream,
+  sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
   :ref:`stats_flush_interval <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_flush_interval>`
 
   This handler is enabled only when a Hystrix sink is enabled in the config file as documented
   :ref:`here <envoy_api_msg_config.metrics.v2.HystrixSink>`.
-  
-  As Envoy's and Hystrix resiliency mechanisms differ, some of the statistics shown in the dashboard 
+
+  As Envoy's and Hystrix resiliency mechanisms differ, some of the statistics shown in the dashboard
   had to be adapted:
-  
-  * **Thread pool rejections** - Generally similar to what's called short circuited in Envoy, 
-    and counted by *upstream_rq_pending_overflow*, although the term thread pool is not accurate for 
-    Envoy. Both in Hystrix and Envoy, the result is rejected requests which are not passed upstream. 
-  * **circuit breaker status (closed or open)** - Since in Envoy, a circuit is opened based on the 
-    current number of connections/requests in queue, there is no sleeping window for circuit breaker, 
+
+  * **Thread pool rejections** - Generally similar to what's called short circuited in Envoy,
+    and counted by *upstream_rq_pending_overflow*, although the term thread pool is not accurate for
+    Envoy. Both in Hystrix and Envoy, the result is rejected requests which are not passed upstream.
+  * **circuit breaker status (closed or open)** - Since in Envoy, a circuit is opened based on the
+    current number of connections/requests in queue, there is no sleeping window for circuit breaker,
     circuit open/closed is momentary. Hence, we set the circuit breaker status to "forced closed".
-  * **Short-circuited (rejected)** - The term exists in Envoy but refers to requests not sent because 
-    of passing a limit (queue or connections), while in Hystrix it refers to requests not sent because 
-    of high percentage of service unavailable responses during some time frame. 
-    In Envoy, service unavailable response will cause **outlier detection** - removing a node off the 
-    load balancer pool, but requests are not rejected as a result. Therefore, this counter is always 
+  * **Short-circuited (rejected)** - The term exists in Envoy but refers to requests not sent because
+    of passing a limit (queue or connections), while in Hystrix it refers to requests not sent because
+    of high percentage of service unavailable responses during some time frame.
+    In Envoy, service unavailable response will cause **outlier detection** - removing a node off the
+    load balancer pool, but requests are not rejected as a result. Therefore, this counter is always
     set to '0'.
-  * Latency information represents data since last flush. 
+  * Latency information represents data since last flush.
     Mean latency is currently not available.
-  
-  
+
+.. http:post:: /tap
+
+  This endpoint is used for configuring an active tap session. It is only
+  available if a valid tap extension has been configured, and that extension has
+  been configured to accept admin configuration. See:
+
+  * :ref:`HTTP tap filter configuration <config_http_filters_tap_admin_handler>`

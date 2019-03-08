@@ -18,6 +18,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -53,16 +54,16 @@ void BufferingStreamDecoder::onComplete() {
 
 void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
 
-DangerousDeprecatedTestTime IntegrationUtil::evil_singleton_test_time_;
-
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
                                    const std::string& method, const std::string& url,
                                    const std::string& body, Http::CodecClient::Type type,
                                    const std::string& host, const std::string& content_type) {
 
-  Api::Impl api(std::chrono::milliseconds(9000));
-  Event::DispatcherPtr dispatcher(api.allocateDispatcher(evil_singleton_test_time_.timeSystem()));
+  NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
+  Event::GlobalTimeSystem time_system;
+  Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system);
+  Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
       Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
@@ -109,8 +110,9 @@ IntegrationUtil::makeSingleRequest(uint32_t port, const std::string& method, con
 RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data,
                                          ReadCallback data_callback,
                                          Network::Address::IpVersion version) {
-  api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
-  dispatcher_ = api_->allocateDispatcher(IntegrationUtil::evil_singleton_test_time_.timeSystem());
+  api_ = Api::createApiForTest(stats_store_);
+  Event::GlobalTimeSystem time_system;
+  dispatcher_ = api_->allocateDispatcher();
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(

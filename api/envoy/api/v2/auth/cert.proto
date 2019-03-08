@@ -1,6 +1,10 @@
 syntax = "proto3";
 
 package envoy.api.v2.auth;
+
+option java_outer_classname = "CertProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2.auth";
 option go_package = "auth";
 
 import "envoy/api/v2/core/base.proto";
@@ -33,15 +37,19 @@ message TlsParameters {
     TLSv1_3 = 4;
   }
 
-  // Minimum TLS protocol version.
+  // Minimum TLS protocol version. By default, it's ``TLSv1_0``.
   TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum.defined_only = true];
 
-  // Maximum TLS protocol version.
+  // Maximum TLS protocol version. By default, it's ``TLSv1_3`` for servers in non-FIPS builds, and
+  // ``TLSv1_2`` for clients and for servers using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`.
   TlsProtocol tls_maximum_protocol_version = 2 [(validate.rules).enum.defined_only = true];
 
   // If specified, the TLS listener will only support the specified `cipher list
-  // <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_.
-  // If not specified, the default list:
+  // <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_
+  // when negotiating TLS 1.0-1.2 (this setting has no effect when negotiating TLS 1.3). If not
+  // specified, the default list will be used.
+  //
+  // In non-FIPS builds, the default cipher list is:
   //
   // .. code-block:: none
   //
@@ -58,11 +66,39 @@ message TlsParameters {
   //   AES256-GCM-SHA384
   //   AES256-SHA
   //
-  // will be used.
+  // In builds using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`, the default cipher list is:
+  //
+  // .. code-block:: none
+  //
+  //   ECDHE-ECDSA-AES128-GCM-SHA256
+  //   ECDHE-RSA-AES128-GCM-SHA256
+  //   ECDHE-ECDSA-AES128-SHA
+  //   ECDHE-RSA-AES128-SHA
+  //   AES128-GCM-SHA256
+  //   AES128-SHA
+  //   ECDHE-ECDSA-AES256-GCM-SHA384
+  //   ECDHE-RSA-AES256-GCM-SHA384
+  //   ECDHE-ECDSA-AES256-SHA
+  //   ECDHE-RSA-AES256-SHA
+  //   AES256-GCM-SHA384
+  //   AES256-SHA
   repeated string cipher_suites = 3;
 
   // If specified, the TLS connection will only support the specified ECDH
-  // curves. If not specified, the default curves (X25519, P-256) will be used.
+  // curves. If not specified, the default curves will be used.
+  //
+  // In non-FIPS builds, the default curves are:
+  //
+  // .. code-block:: none
+  //
+  //   X25519
+  //   P-256
+  //
+  // In builds using :ref:`BoringSSL FIPS <arch_overview_ssl_fips>`, the default curve is:
+  //
+  // .. code-block:: none
+  //
+  //   P-256
   repeated string ecdh_curves = 4;
 }
 
@@ -73,7 +109,8 @@ message TlsCertificate {
   // The TLS private key.
   core.DataSource private_key = 2;
 
-  // [#not-implemented-hide:]
+  // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
+  // TLS private key is not password encrypted.
   core.DataSource password = 3;
 
   // [#not-implemented-hide:]
@@ -124,6 +161,9 @@ message CertificateValidationContext {
   // :ref:`verify_subject_alt_name
   // <envoy_api_field_auth.CertificateValidationContext.verify_subject_alt_name>`) is also
   // specified.
+  //
+  // It can optionally contain certificate revocation lists, in which case Envoy will verify
+  // that the presented peer certificate has not been revoked by one of the included CRLs.
   //
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
@@ -208,7 +248,7 @@ message CertificateValidationContext {
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;
 
   // An optional `certificate revocation list
-  // <http://https://en.wikipedia.org/wiki/Certificate_revocation_list>`_
+  // <https://en.wikipedia.org/wiki/Certificate_revocation_list>`_
   // (in PEM format). If specified, Envoy will verify that the presented peer
   // certificate has not been revoked by this CRL. If this DataSource contains
   // multiple CRLs, all of them will be used.
@@ -223,17 +263,27 @@ message CommonTlsContext {
   // TLS protocol versions, cipher suites etc.
   TlsParameters tls_params = 1;
 
-  // Multiple TLS certificates can be associated with the same context.
-  // E.g. to allow both RSA and ECDSA certificates, two TLS certificates can be configured.
+  // :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>` can be associated with the
+  // same context to allow both RSA and ECDSA certificates.
   //
-  // .. attention::
-  //
-  //   Although this is a list, currently only a single certificate is supported. This will be
-  //   relaxed in the future.
-  repeated TlsCertificate tls_certificates = 2 [(validate.rules).repeated .max_items = 1];
+  // Only a single TLS certificate is supported in client contexts. In server contexts, the first
+  // RSA certificate is used for clients that only support RSA and the first ECDSA certificate is
+  // used for clients that support ECDSA.
+  repeated TlsCertificate tls_certificates = 2;
 
   // Configs for fetching TLS certificates via SDS API.
-  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
+  repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
+      [(validate.rules).repeated .max_items = 1];
+
+  message CombinedCertificateValidationContext {
+    // How to validate peer certificates.
+    CertificateValidationContext default_validation_context = 1
+        [(validate.rules).message.required = true];
+
+    // Config for fetching validation context via SDS API.
+    SdsSecretConfig validation_context_sds_secret_config = 2
+        [(validate.rules).message.required = true];
+  };
 
   oneof validation_context_type {
     // How to validate peer certificates.
@@ -241,6 +291,15 @@ message CommonTlsContext {
 
     // Config for fetching validation context via SDS API.
     SdsSecretConfig validation_context_sds_secret_config = 7;
+
+    // Combined certificate validation context holds a default CertificateValidationContext
+    // and SDS config. When SDS server returns dynamic CertificateValidationContext, both dynamic
+    // and default CertificateValidationContext are merged into a new CertificateValidationContext
+    // for validation. This merge is done by Message::MergeFrom(), so dynamic
+    // CertificateValidationContext overwrites singular fields in default
+    // CertificateValidationContext, and concatenates repeated fields to default
+    // CertificateValidationContext, and logical OR is applied to boolean fields.
+    CombinedCertificateValidationContext combined_validation_context = 8;
   }
 
   // Supplies the list of ALPN protocols that the listener should expose. In
@@ -255,15 +314,7 @@ message CommonTlsContext {
   // There is no default for this parameter. If empty, Envoy will not expose ALPN.
   repeated string alpn_protocols = 4;
 
-  // These fields are deprecated and only are used during the interim v1 -> v2
-  // transition period for internal purposes. They should not be used outside of
-  // the Envoy binary. [#not-implemented-hide:]
-  message DeprecatedV1 {
-    string alt_alpn_protocols = 1;
-  }
-
-  // [#not-implemented-hide:]
-  DeprecatedV1 deprecated_v1 = 5 [deprecated = true];
+  reserved 5;
 }
 
 message UpstreamTlsContext {
@@ -279,6 +330,12 @@ message UpstreamTlsContext {
   //
   //   TLS renegotiation is considered insecure and shouldn't be used unless absolutely necessary.
   bool allow_renegotiation = 3;
+
+  // Maximum number of session keys (Pre-Shared Keys for TLSv1.3+, Session IDs and Session Tickets
+  // for TLSv1.2 and older) to store for the purpose of session resumption.
+  //
+  // Defaults to 1, setting this to 0 disables session resumption.
+  google.protobuf.UInt32Value max_session_keys = 4;
 }
 
 message DownstreamTlsContext {

@@ -11,14 +11,14 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
-//#include "envoy/stats/stats_macros.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/http2/metadata_decoder.h"
+#include "common/http/http2/metadata_encoder.h"
 #include "common/http/utility.h"
 
 #include "absl/types/optional.h"
@@ -69,14 +69,19 @@ public:
 };
 
 /**
+ * Setup nghttp2 trace-level logging for when debugging.
+ */
+void initializeNghttp2Logging();
+
+/**
  * Base class for HTTP/2 client and server codecs.
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                 const Http2Settings& http2_settings)
+                 const Http2Settings& http2_settings, const uint32_t max_request_headers_kb)
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
-        connection_(connection),
+        connection_(connection), max_request_headers_kb_(max_request_headers_kb),
         per_stream_buffer_limit_(http2_settings.initial_stream_window_size_), dispatching_(false),
         raised_goaway_(false), pending_deferred_reset_(false) {}
 
@@ -154,6 +159,7 @@ protected:
     virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                                nghttp2_data_provider* provider) PURE;
     void submitTrailers(const HeaderMap& trailers);
+    void submitMetadata();
 
     // Http::StreamEncoder
     void encode100ContinueHeaders(const HeaderMap& headers) override;
@@ -161,6 +167,7 @@ protected:
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(const HeaderMap& trailers) override;
     Stream& getStream() override { return *this; }
+    void encodeMetadata(const MetadataMapVector& metadata_map_vector) override;
 
     // Http::Stream
     void addCallbacks(StreamCallbacks& callbacks) override { addCallbacks_(callbacks); }
@@ -183,14 +190,16 @@ protected:
     void pendingSendBufferHighWatermark();
     void pendingSendBufferLowWatermark();
 
-    // Max header size of 63K. This is arbitrary but makes it easier to test since nghttp2 doesn't
-    // appear to transmit headers greater than approximtely 64K (NGHTTP2_MAX_HEADERSLEN) for reasons
-    // I don't fully understand.
-    static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
-
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
     void decodeHeaders();
+
+    // Get MetadataEncoder for this stream.
+    MetadataEncoder& getMetadataEncoder();
+    // Get MetadataDecoder for this stream.
+    MetadataDecoder& getMetadataDecoder();
+    // Callback function for MetadataDecoder.
+    void onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr);
 
     virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
     virtual void maybeTransformUpgradeFromH2ToH1() PURE;
@@ -210,6 +219,8 @@ protected:
         [this]() -> void { this->pendingSendBufferLowWatermark(); },
         [this]() -> void { this->pendingSendBufferHighWatermark(); }};
     HeaderMapPtr pending_trailers_;
+    std::unique_ptr<MetadataDecoder> metadata_decoder_;
+    std::unique_ptr<MetadataEncoder> metadata_encoder_;
     absl::optional<StreamResetReason> deferred_reset_;
     HeaderString cookies_;
     bool local_end_stream_sent_ : 1;
@@ -280,7 +291,9 @@ protected:
   nghttp2_session* session_{};
   CodecStats stats_;
   Network::Connection& connection_;
+  const uint32_t max_request_headers_kb_;
   uint32_t per_stream_buffer_limit_;
+  bool allow_metadata_;
 
 private:
   virtual ConnectionCallbacks& callbacks() PURE;
@@ -292,6 +305,9 @@ private:
   int onInvalidFrame(int32_t stream_id, int error_code);
   ssize_t onSend(const uint8_t* data, size_t length);
   int onStreamClose(int32_t stream_id, uint32_t error_code);
+  int onMetadataReceived(int32_t stream_id, const uint8_t* data, size_t len);
+  int onMetadataFrameComplete(int32_t stream_id, bool end_metadata);
+  ssize_t packMetadata(int32_t stream_id, uint8_t* buf, size_t len);
 
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
@@ -304,7 +320,8 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats, const Http2Settings& http2_settings);
+                       Stats::Scope& stats, const Http2Settings& http2_settings,
+                       const uint32_t max_request_headers_kb);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
@@ -324,7 +341,8 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Scope& scope, const Http2Settings& http2_settings);
+                       Stats::Scope& scope, const Http2Settings& http2_settings,
+                       const uint32_t max_request_headers_kb);
 
 private:
   // ConnectionImpl

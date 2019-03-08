@@ -13,11 +13,12 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/hash.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/load_balancer_impl.h"
 
-#include "extensions/filters/network/redis_proxy/codec_impl.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 
 namespace Envoy {
@@ -36,16 +37,20 @@ public:
 
   bool disableOutlierEvents() const override { return false; }
   std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
+  bool enableHashtagging() const override { return enable_hashtagging_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
+  const bool enable_hashtagging_;
 };
 
-class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
+class ClientImpl : public Client,
+                   public Common::Redis::DecoderCallbacks,
+                   public Network::ConnectionCallbacks {
 public:
   static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                          EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                          const Config& config);
+                          Common::Redis::EncoderPtr&& encoder,
+                          Common::Redis::DecoderFactory& decoder_factory, const Config& config);
 
   ~ClientImpl();
 
@@ -54,7 +59,8 @@ public:
     connection_->addConnectionCallbacks(callbacks);
   }
   void close() override;
-  PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
+  PoolRequest* makeRequest(const Common::Redis::RespValue& request,
+                           PoolCallbacks& callbacks) override;
 
 private:
   struct UpstreamReadFilter : public Network::ReadFilterBaseImpl {
@@ -81,14 +87,15 @@ private:
     bool canceled_{};
   };
 
-  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-             DecoderFactory& decoder_factory, const Config& config);
+  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+             Common::Redis::EncoderPtr&& encoder, Common::Redis::DecoderFactory& decoder_factory,
+             const Config& config);
   void onConnectOrOpTimeout();
   void onData(Buffer::Instance& data);
   void putOutlierEvent(Upstream::Outlier::Result result);
 
-  // RedisProxy::DecoderCallbacks
-  void onRespValue(RespValuePtr&& value) override;
+  // Common::Redis::DecoderCallbacks
+  void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -97,9 +104,9 @@ private:
 
   Upstream::HostConstSharedPtr host_;
   Network::ClientConnectionPtr connection_;
-  EncoderPtr encoder_;
+  Common::Redis::EncoderPtr encoder_;
   Buffer::OwnedImpl encoder_buffer_;
-  DecoderPtr decoder_;
+  Common::Redis::DecoderPtr decoder_;
   const Config& config_;
   std::list<PendingRequest> pending_requests_;
   Event::TimerPtr connect_or_op_timer_;
@@ -115,7 +122,7 @@ public:
   static ClientFactoryImpl instance_;
 
 private:
-  DecoderFactoryImpl decoder_factory_;
+  Common::Redis::DecoderFactoryImpl decoder_factory_;
 };
 
 class InstanceImpl : public Instance {
@@ -126,7 +133,7 @@ public:
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
 
   // RedisProxy::ConnPool::Instance
-  PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+  PoolRequest* makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                            PoolCallbacks& callbacks) override;
 
 private:
@@ -147,26 +154,37 @@ private:
 
   typedef std::unique_ptr<ThreadLocalActiveClient> ThreadLocalActiveClientPtr;
 
-  struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
-                    const std::string& cluster_name);
+  struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
+                           public Upstream::ClusterUpdateCallbacks {
+    ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool();
-    PoolRequest* makeRequest(const std::string& hash_key, const RespValue& request,
+    PoolRequest* makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                              PoolCallbacks& callbacks);
+    void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
+
+    // Upstream::ClusterUpdateCallbacks
+    void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override {
+      onClusterAddOrUpdateNonVirtual(cluster);
+    }
+    void onClusterRemoval(const std::string& cluster_name) override;
 
     InstanceImpl& parent_;
     Event::Dispatcher& dispatcher_;
-    Upstream::ThreadLocalCluster* cluster_;
+    const std::string cluster_name_;
+    Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
+    Upstream::ThreadLocalCluster* cluster_{};
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
-    Envoy::Common::CallbackHandle* local_host_set_member_update_cb_handle_;
+    Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContextBase {
-    LbContextImpl(const std::string& hash_key) : hash_key_(std::hash<std::string>()(hash_key)) {}
-    // TODO(danielhochman): convert to HashUtil::xxHash64 when we have a migration strategy.
-    // Upstream::LoadBalancerContext
+    LbContextImpl(const std::string& key, bool enabled_hashtagging)
+        : hash_key_(MurmurHash::murmurHash2_64(hashtag(key, enabled_hashtagging))) {}
+
     absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+
+    absl::string_view hashtag(absl::string_view v, bool enabled);
 
     const absl::optional<uint64_t> hash_key_;
   };

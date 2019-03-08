@@ -15,26 +15,18 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
-
 namespace {
+
 const std::string header = R"EOF(
 { "header": {"name": "key", "exact_match": "value"} }
 )EOF";
 
-const std::string metadata = R"EOF(
-{
-  "metadata": {
-    "filter": "t", "path": [ { "key": "a" } ], "value": { "string_match": { "exact": "x" } }
-  }
-}
-)EOF";
 } // namespace
 
 class RoleBasedAccessControlNetworkFilterConfigFactoryTest : public testing::Test {
 public:
   void validateRule(const std::string& policy_json) {
     checkRule(fmt::sprintf(policy_json, header));
-    checkRule(fmt::sprintf(policy_json, metadata));
   }
 
 private:

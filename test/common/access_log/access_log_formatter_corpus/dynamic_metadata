@@ -1,5 +1,5 @@
 format: "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"
-request_info {
+stream_info {
   dynamic_metadata {
     filter_metadata {
       key: "com.test"

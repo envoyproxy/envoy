@@ -9,8 +9,10 @@
 
 namespace Envoy {
 namespace Stats {
+namespace {
 
 // No truncation occurs in the implementation of HeapStatData.
+// Note: a similar test using RawStatData* is in raw_stat_data_test.cc.
 TEST(HeapStatDataTest, HeapNoTruncate) {
   StatsOptionsImpl stats_options;
   HeapStatDataAllocator alloc;
@@ -21,7 +23,7 @@ TEST(HeapStatDataTest, HeapNoTruncate) {
   alloc.free(*stat);
 }
 
-// Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
+// Note: a similar test using RawStatData* is in raw_stat_data_test.cc.
 TEST(HeapStatDataTest, HeapAlloc) {
   HeapStatDataAllocator alloc;
   HeapStatData* stat_1 = alloc.alloc("ref_name");
@@ -38,5 +40,6 @@ TEST(HeapStatDataTest, HeapAlloc) {
   alloc.free(*stat_3);
 }
 
+} // namespace
 } // namespace Stats
 } // namespace Envoy

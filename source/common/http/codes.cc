@@ -7,122 +7,141 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
+#include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Http {
 
-void CodeUtility::chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
-                                          Code response_code) {
+void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
+                                            Code response_code) const {
   // Build a dynamic stat for the response code and increment it.
-  scope.counter(fmt::format("{}upstream_rq_completed", prefix)).inc();
-  scope.counter(fmt::format("{}upstream_rq_{}", prefix, groupStringForResponseCode(response_code)))
+  scope.counter(absl::StrCat(prefix, upstream_rq_completed_)).inc();
+  scope
+      .counter(absl::StrCat(prefix, upstream_rq_,
+                            CodeUtility::groupStringForResponseCode(response_code)))
       .inc();
-  scope.counter(fmt::format("{}upstream_rq_{}", prefix, enumToInt(response_code))).inc();
+  scope.counter(absl::StrCat(prefix, upstream_rq_, enumToInt(response_code))).inc();
 }
 
-void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
+void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
   const uint64_t response_code = info.response_status_code_;
   chargeBasicResponseStat(info.cluster_scope_, info.prefix_, static_cast<Code>(response_code));
 
-  std::string group_string = groupStringForResponseCode(static_cast<Code>(response_code));
+  std::string group_string =
+      CodeUtility::groupStringForResponseCode(static_cast<Code>(response_code));
 
   // If the response is from a canary, also create canary stats.
   if (info.upstream_canary_) {
-    info.cluster_scope_.counter(fmt::format("{}canary.upstream_rq_completed", info.prefix_)).inc();
-    info.cluster_scope_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, group_string))
+    info.cluster_scope_.counter(absl::StrCat(info.prefix_, canary_upstream_rq_completed_)).inc();
+    info.cluster_scope_.counter(absl::StrCat(info.prefix_, canary_upstream_rq_, group_string))
         .inc();
-    info.cluster_scope_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, response_code))
+    info.cluster_scope_.counter(absl::StrCat(info.prefix_, canary_upstream_rq_, response_code))
         .inc();
   }
 
   // Split stats into external vs. internal.
   if (info.internal_request_) {
-    info.cluster_scope_.counter(fmt::format("{}internal.upstream_rq_completed", info.prefix_))
+    info.cluster_scope_.counter(absl::StrCat(info.prefix_, internal_upstream_rq_completed_)).inc();
+    info.cluster_scope_.counter(absl::StrCat(info.prefix_, internal_upstream_rq_, group_string))
         .inc();
-    info.cluster_scope_
-        .counter(fmt::format("{}internal.upstream_rq_{}", info.prefix_, group_string))
-        .inc();
-    info.cluster_scope_
-        .counter(fmt::format("{}internal.upstream_rq_{}", info.prefix_, response_code))
+    info.cluster_scope_.counter(absl::StrCat(info.prefix_, internal_upstream_rq_, response_code))
         .inc();
   } else {
-    info.cluster_scope_.counter(fmt::format("{}external.upstream_rq_completed", info.prefix_))
+    info.cluster_scope_.counter(absl::StrCat(info.prefix_, external_upstream_rq_completed_)).inc();
+    info.cluster_scope_.counter(absl::StrCat(info.prefix_, external_upstream_rq_, group_string))
         .inc();
-    info.cluster_scope_
-        .counter(fmt::format("{}external.upstream_rq_{}", info.prefix_, group_string))
-        .inc();
-    info.cluster_scope_
-        .counter(fmt::format("{}external.upstream_rq_{}", info.prefix_, response_code))
+    info.cluster_scope_.counter(absl::StrCat(info.prefix_, external_upstream_rq_, response_code))
         .inc();
   }
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
     info.global_scope_
-        .counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_completed", info.request_vhost_name_,
-                             info.request_vcluster_name_))
+        .counter(join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
+                       upstream_rq_completed_}))
         .inc();
     info.global_scope_
-        .counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}", info.request_vhost_name_,
-                             info.request_vcluster_name_, group_string))
+        .counter(join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
+                       absl::StrCat(upstream_rq_, group_string)}))
         .inc();
     info.global_scope_
-        .counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}", info.request_vhost_name_,
-                             info.request_vcluster_name_, response_code))
+        .counter(join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
+                       absl::StrCat(upstream_rq_, response_code)}))
         .inc();
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
+    absl::string_view prefix_without_trailing_dot = stripTrailingDot(info.prefix_);
     info.cluster_scope_
-        .counter(fmt::format("{}zone.{}.{}.upstream_rq_completed", info.prefix_, info.from_zone_,
-                             info.to_zone_))
+        .counter(join({prefix_without_trailing_dot, zone_, info.from_zone_, info.to_zone_,
+                       upstream_rq_completed_}))
         .inc();
     info.cluster_scope_
-        .counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
-                             info.to_zone_, group_string))
+        .counter(join({prefix_without_trailing_dot, zone_, info.from_zone_, info.to_zone_,
+                       absl::StrCat(upstream_rq_, group_string)}))
         .inc();
     info.cluster_scope_
-        .counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
-                             info.to_zone_, response_code))
+        .counter(join({prefix_without_trailing_dot, zone_, info.from_zone_, info.to_zone_,
+                       absl::StrCat(upstream_rq_, response_code)}))
         .inc();
   }
 }
 
-void CodeUtility::chargeResponseTiming(const ResponseTimingInfo& info) {
-  info.cluster_scope_.histogram(info.prefix_ + "upstream_rq_time")
+void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
+  info.cluster_scope_.histogram(absl::StrCat(info.prefix_, upstream_rq_time_))
       .recordValue(info.response_time_.count());
   if (info.upstream_canary_) {
-    info.cluster_scope_.histogram(info.prefix_ + "canary.upstream_rq_time")
+    info.cluster_scope_.histogram(absl::StrCat(info.prefix_, canary_upstream_rq_time_))
         .recordValue(info.response_time_.count());
   }
 
   if (info.internal_request_) {
-    info.cluster_scope_.histogram(info.prefix_ + "internal.upstream_rq_time")
+    info.cluster_scope_.histogram(absl::StrCat(info.prefix_, internal_upstream_rq_time_))
         .recordValue(info.response_time_.count());
   } else {
-    info.cluster_scope_.histogram(info.prefix_ + "external.upstream_rq_time")
+    info.cluster_scope_.histogram(absl::StrCat(info.prefix_, external_upstream_rq_time_))
         .recordValue(info.response_time_.count());
   }
 
   if (!info.request_vcluster_name_.empty()) {
     info.global_scope_
-        .histogram("vhost." + info.request_vhost_name_ + ".vcluster." +
-                   info.request_vcluster_name_ + ".upstream_rq_time")
+        .histogram(join({vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
+                         upstream_rq_time_}))
         .recordValue(info.response_time_.count());
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
     info.cluster_scope_
-        .histogram(fmt::format("{}zone.{}.{}.upstream_rq_time", info.prefix_, info.from_zone_,
-                               info.to_zone_))
+        .histogram(join({stripTrailingDot(info.prefix_), zone_, info.from_zone_, info.to_zone_,
+                         upstream_rq_time_}))
         .recordValue(info.response_time_.count());
   }
+}
+
+absl::string_view CodeStatsImpl::stripTrailingDot(absl::string_view str) {
+  if (absl::EndsWith(str, ".")) {
+    str.remove_suffix(1);
+  }
+  return str;
+}
+
+std::string CodeStatsImpl::join(const std::vector<absl::string_view>& v) {
+  if (v.empty()) {
+    return "";
+  }
+  auto iter = v.begin();
+  if (iter->empty()) {
+    ++iter; // Skip any initial empty prefix.
+  }
+  return absl::StrJoin(iter, v.end(), ".");
 }
 
 std::string CodeUtility::groupStringForResponseCode(Code response_code) {

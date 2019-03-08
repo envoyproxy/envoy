@@ -11,6 +11,7 @@ Architecture overview
   network_filters
   http_connection_management
   http_filters
+  data_sharing_between_filters
   http_routing
   grpc
   websocket
@@ -18,7 +19,7 @@ Architecture overview
   service_discovery
   health_checking
   connection_pooling
-  load_balancing
+  load_balancing/load_balancing
   outlier
   circuit_breaking
   global_rate_limiting
@@ -38,3 +39,4 @@ Architecture overview
   scripting
   ext_authz_filter
   overload_manager
+  ip_transparency

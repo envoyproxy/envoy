@@ -1,49 +1,42 @@
-#!/bin/bash -e
+#!/bin/bash
 
-# scl devtoolset and epel repositories
+set -e
+
+# Note: rh-git218 is needed to run `git -C` in docs build process.
 yum install -y centos-release-scl epel-release
-
-# llvm-5.0.0 repository from copr
-curl -L -o /etc/yum.repos.d/alonid-llvm-5.0.0-epel-7.repo \
-  https://copr.fedorainfracloud.org/coprs/alonid/llvm-5.0.0/repo/epel-7/alonid-llvm-5.0.0-epel-7.repo
-
-# dependencies for bazel and build_recipes
-yum install -y java-1.8.0-openjdk-devel unzip which openssl rpm-build \
-               cmake3 devtoolset-4-gcc-c++ git golang libtool make ninja-build patch rsync wget \
-               clang-5.0.0 devtoolset-4-libatomic-devel llvm-5.0.0 python-virtualenv bc
-yum clean all
+yum update -y
+yum install -y devtoolset-7-gcc devtoolset-7-gcc-c++ devtoolset-7-binutils java-1.8.0-openjdk-headless rsync \
+    rh-git218 wget unzip which make cmake3 patch ninja-build devtoolset-7-libatomic-devel openssl python27 \
+    libtool autoconf tcpdump
 
 ln -s /usr/bin/cmake3 /usr/bin/cmake
 ln -s /usr/bin/ninja-build /usr/bin/ninja
 
-# latest bazel installer
 BAZEL_VERSION="$(curl -s https://api.github.com/repos/bazelbuild/bazel/releases/latest |
-                  python -c "import json, sys; print json.load(sys.stdin)['tag_name']")"
+    python -c "import json, sys; print json.load(sys.stdin)['tag_name']")"
 BAZEL_INSTALLER="bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh"
 curl -OL "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/${BAZEL_INSTALLER}"
-chmod ug+x "./${BAZEL_INSTALLER}"
+chmod u+x "./${BAZEL_INSTALLER}"
 "./${BAZEL_INSTALLER}"
 rm "./${BAZEL_INSTALLER}"
 
-# symbolic links for clang
-pushd /opt/llvm-5.0.0/bin
-ln -s clang++ clang++-5.0
-ln -s clang-format clang-format-5.0
-popd
+# SLES 11 has older glibc than CentOS 7, so pre-built binary for it works on CentOS 7
+LLVM_VERSION=7.0.1
+LLVM_RELEASE="clang+llvm-${LLVM_VERSION}-x86_64-linux-sles11.3"
+curl -OL "https://releases.llvm.org/${LLVM_VERSION}/${LLVM_RELEASE}.tar.xz"
+tar Jxf "${LLVM_RELEASE}.tar.xz"
+mv "./${LLVM_RELEASE}" /opt/llvm
+rm "./${LLVM_RELEASE}.tar.xz"
 
-mkdir -p /usr/lib/llvm-5.0/bin
-pushd /usr/lib/llvm-5.0/bin
-ln -s /opt/llvm-5.0.0/bin/llvm-symbolizer .
-popd
+# httpd24 is equired by rh-git218
+echo "/opt/rh/httpd24/root/usr/lib64" > /etc/ld.so.conf.d/httpd24.conf
+echo "/opt/llvm/lib" > /etc/ld.so.conf.d/llvm.conf
+ldconfig
 
-# setup bash env
-echo '. scl_source enable devtoolset-4' > /etc/profile.d/devtoolset-4.sh
-echo 'PATH=/opt/llvm-5.0.0/bin:$PATH' > /etc/profile.d/llvm-5.0.0.sh
+# Setup tcpdump for non-root.
+groupadd pcap
+chgrp pcap /usr/sbin/tcpdump
+chmod 750 /usr/sbin/tcpdump
+setcap cap_net_raw,cap_net_admin=eip /usr/sbin/tcpdump
 
-# enable devtoolset-4 for current shell
-# disable errexit temporarily, otherwise bash will quit during sourcing
-set +e
-. scl_source enable devtoolset-4
-set -e
-
-EXPECTED_CXX_VERSION="g++ (GCC) 5.3.1 20160406 (Red Hat 5.3.1-6)" ./build_container_common.sh
+./build_container_common.sh

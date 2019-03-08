@@ -64,4 +64,13 @@ TEST_F(TokenBucketImplTest, Refill) {
   EXPECT_TRUE(token_bucket.consume());
 }
 
+TEST_F(TokenBucketImplTest, NextTokenAvailable) {
+  TokenBucketImpl token_bucket{10, time_system_, 5};
+  EXPECT_TRUE(token_bucket.consume(9));
+  EXPECT_EQ(0, token_bucket.nextTokenAvailableMs());
+  EXPECT_TRUE(token_bucket.consume());
+  EXPECT_FALSE(token_bucket.consume());
+  EXPECT_EQ(200, token_bucket.nextTokenAvailableMs());
+}
+
 } // namespace Envoy

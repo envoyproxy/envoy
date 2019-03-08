@@ -4,8 +4,8 @@ Rate limit
 ==========
 
 * Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`
-* :ref:`v1 API reference <config_http_filters_rate_limit_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>`
+* This filter should be configured with the name *envoy.rate_limit*.
 
 The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
 has one or more :ref:`rate limit configurations<envoy_api_field_route.VirtualHost.rate_limits>`
@@ -14,7 +14,7 @@ can optionally include the virtual host rate limit configurations. More than one
 apply to a request. Each configuration results in a descriptor being sent to the rate limit service.
 
 If the rate limit service is called, and the response for any of the descriptors is over limit, a
-429 response is returned.
+429 response is returned. The rate limit filter also sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header.
 
 If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` is 
 set to true, a 500 response is returned.
@@ -23,11 +23,6 @@ set to true, a 500 response is returned.
 
 Composing Actions
 -----------------
-
-.. attention::
-
-  This section is written for the v1 API but the concepts also apply to the v2 API. It will be
-  rewritten to target the v2 API in a future release.
 
 Each :ref:`rate limit action <envoy_api_msg_route.RateLimit>` on the route or
 virtual host populates a descriptor entry. A vector of descriptor entries compose a descriptor. To
@@ -46,19 +41,11 @@ For example, to generate the following descriptor:
 
 The configuration would be:
 
-.. code-block:: json
+.. code-block:: yaml
 
-  {
-    "actions" : [
-    {
-      "type" : "generic_key",
-      "descriptor_value" : "some_value"
-    },
-    {
-      "type" : "source_cluster"
-    }
-    ]
-  }
+  actions:
+      - {source_cluster: {}}
+      - {generic_key: {descriptor_value: some_value}}
 
 Example 2
 ^^^^^^^^^
@@ -68,22 +55,13 @@ the configuration.
 
 For the following configuration:
 
-.. code-block:: json
+.. code-block:: yaml
 
-  {
-    "actions" : [
-    {
-      "type" : "generic_key",
-      "descriptor_value" : "some_value"
-    },
-    {
-      "type" : "remote_address"
-    },
-    {
-      "type" : "souce_cluster"
-    }
-    ]
-  }
+  actions:
+      - {source_cluster: {}}
+      - {remote_address: {}}
+      - {generic_key: {descriptor_value: some_value}}
+
 
 If a request did not set :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`,
 no descriptor is generated.
@@ -100,7 +78,7 @@ the following descriptor is generated:
 Statistics
 ----------
 
-The buffer filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
+The rate limit filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
 429 responses are emitted to the normal cluster :ref:`dynamic HTTP statistics
 <config_cluster_manager_cluster_stats_dynamic_http>`.
 

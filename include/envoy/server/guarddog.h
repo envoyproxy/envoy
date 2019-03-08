@@ -26,9 +26,9 @@ public:
    * to avoid triggering the GuardDog. If no longer needed use the
    * stopWatching() method to remove it from the list of watched objects.
    *
-   * @param thread_id A numeric thread ID, like from Thread::currentThreadId()
+   * @param thread_id a Thread::ThreadIdPtr containing the system thread id
    */
-  virtual WatchDogSharedPtr createWatchDog(int32_t thread_id) PURE;
+  virtual WatchDogSharedPtr createWatchDog(Thread::ThreadIdPtr&& thread_id) PURE;
 
   /**
    * Tell the GuardDog to forget about this WatchDog.

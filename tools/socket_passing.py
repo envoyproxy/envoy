@@ -21,6 +21,7 @@ import time
 # with failure if the file is not found.
 ADMIN_FILE_TIMEOUT_SECS = 20
 
+
 # Because the hot restart files are yaml but yaml support is not included in
 # python by default, we parse this fairly manually.
 def GenerateNewConfig(original_yaml, admin_address, updated_json):
@@ -39,14 +40,14 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
       return False
     else:
       raw_yaml = original_file.readlines()
-      index = 0;
+      index = 0
       for discovered in discovered_listeners:
-        replaced = False;
+        replaced = False
         if discovered.startswith('/'):
           for index in range(index + 1, len(raw_yaml) - 1):
             if 'pipe:' in raw_yaml[index] and 'path:' in raw_yaml[index + 1]:
-              raw_yaml[index + 1] = re.sub(
-                  'path:.*', 'path: "' + discovered + '"', raw_yaml[index + 1])
+              raw_yaml[index + 1] = re.sub('path:.*', 'path: "' + discovered + '"',
+                                           raw_yaml[index + 1])
               replaced = True
               break
         else:
@@ -54,19 +55,19 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
           if addr[0] == '[':
             addr = addr[1:-1]  # strip [] from ipv6 address.
           for index in range(index + 1, len(raw_yaml) - 2):
-            if ('socket_address:' in raw_yaml[index] and 'address:' in raw_yaml[index + 1]
-                and'port_value:' in raw_yaml[index + 2]):
-              raw_yaml[index + 1] = re.sub(
-                  'address:.*', 'address: "' + addr + '"', raw_yaml[index + 1])
-              raw_yaml[index + 2] = re.sub(
-                  'port_value:.*', 'port_value: ' + port, raw_yaml[index + 2])
+            if ('socket_address:' in raw_yaml[index] and 'address:' in raw_yaml[index + 1] and
+                'port_value:' in raw_yaml[index + 2]):
+              raw_yaml[index + 1] = re.sub('address:.*', 'address: "' + addr + '"',
+                                           raw_yaml[index + 1])
+              raw_yaml[index + 2] = re.sub('port_value:.*', 'port_value: ' + port,
+                                           raw_yaml[index + 2])
               replaced = True
               break
         if replaced:
           sys.stderr.write('replaced listener at line ' + str(index) + ' with ' + discovered + '\n')
         else:
           sys.stderr.write('Failed to replace a discovered listener ' + discovered + '\n')
-          return False;
+          return False
       with open(updated_json, 'w') as outfile:
         outfile.writelines(raw_yaml)
     finally:
@@ -74,19 +75,28 @@ def GenerateNewConfig(original_yaml, admin_address, updated_json):
 
   return True
 
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Replace listener addressses in json file.')
-  parser.add_argument('-o', '--original_json', type=str, required=True,
-                      help='Path of the original config json file')
-  parser.add_argument('-a', '--admin_address_path', type=str, required=True,
-                      help='Path of the admin address file')
-  parser.add_argument('-u', '--updated_json', type=str, required=True,
-                      help='Path to output updated json config file')
+  parser.add_argument(
+      '-o',
+      '--original_json',
+      type=str,
+      required=True,
+      help='Path of the original config json file')
+  parser.add_argument(
+      '-a', '--admin_address_path', type=str, required=True, help='Path of the admin address file')
+  parser.add_argument(
+      '-u',
+      '--updated_json',
+      type=str,
+      required=True,
+      help='Path to output updated json config file')
   args = parser.parse_args()
   admin_address_path = args.admin_address_path
 
   # Read admin address from file
-  counter = 0;
+  counter = 0
   while not os.path.exists(admin_address_path):
     time.sleep(1)
     counter += 1

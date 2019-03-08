@@ -572,9 +572,7 @@ public:
       }
     }
   }
-  ResponseHeader(const MessageMetadata& metadata) {
-    spans_ = metadata.spans();
-
+  ResponseHeader(const MessageMetadata& metadata) : spans_(metadata.spans()) {
     metadata.headers().iterate(
         [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
           absl::string_view key = header.key().getStringView();
@@ -1160,8 +1158,7 @@ public:
 /**
  * Static registration for the Twitter protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<TwitterProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_;
+REGISTER_FACTORY(TwitterProtocolConfigFactory, NamedProtocolConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

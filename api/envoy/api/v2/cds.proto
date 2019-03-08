@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+option java_outer_classname = "CdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2";
+
 option java_generic_services = true;
 
 import "envoy/api/v2/core/address.proto";
@@ -17,6 +21,7 @@ import "envoy/api/v2/eds.proto";
 import "envoy/type/percent.proto";
 
 import "google/api/annotations.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -31,8 +36,7 @@ service ClusterDiscoveryService {
   rpc StreamClusters(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
-  rpc IncrementalClusters(stream IncrementalDiscoveryRequest)
-      returns (stream IncrementalDiscoveryResponse) {
+  rpc DeltaClusters(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
 
   rpc FetchClusters(DiscoveryRequest) returns (DiscoveryResponse) {
@@ -46,7 +50,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 36]
+// [#comment:next free field: 38]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -81,7 +85,7 @@ message Cluster {
     // for an explanation.
     LOGICAL_DNS = 2;
 
-    // Refer to the :ref:`service discovery type<arch_overview_service_discovery_types_sds>`
+    // Refer to the :ref:`service discovery type<arch_overview_service_discovery_types_eds>`
     // for an explanation.
     EDS = 3;
 
@@ -230,7 +234,13 @@ message Cluster {
   // for upstream connections. The key should match the extension filter name, such as
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
   // specific options.
-  map<string, google.protobuf.Struct> extension_protocol_options = 35;
+  map<string, google.protobuf.Struct> extension_protocol_options = 35 [deprecated = true];
+
+  // The extension_protocol_options field is used to provide extension-specific protocol options
+  // for upstream connections. The key should match the extension filter name, such as
+  // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
+  // specific options.
+  map<string, google.protobuf.Any> typed_extension_protocol_options = 36;
 
   reserved 15;
 
@@ -238,7 +248,7 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
   // this value is used as the cluster’s DNS refresh
-  // rate. If this setting is not specified, the value defaults to 5000. For
+  // rate. If this setting is not specified, the value defaults to 5000ms. For
   // cluster types other than
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
@@ -368,43 +378,77 @@ message Cluster {
     // host selected but Y having 100, then a lot more load is being dumped on the single host in X
     // than originally anticipated in the load balancing assignment delivered via EDS.
     bool locality_weight_aware = 4;
+
+    // When used with locality_weight_aware, scales the weight of each locality by the ratio
+    // of hosts in the subset vs hosts in the original subset. This aims to even out the load
+    // going to an individual locality if said locality is disproportionally affected by the
+    // subset predicate.
+    bool scale_locality_weight = 5;
+
+    // If true, when a fallback policy is configured and its corresponding subset fails to find
+    // a host this will cause any host to be selected instead.
+    //
+    // This is useful when using the default subset as the fallback policy, given the default
+    // subset might become empty. With this option enabled, if that happens the LB will attempt
+    // to select a host from the entire cluster.
+    bool panic_mode_any = 6;
   }
 
   // Configuration for load balancing subsetting.
   LbSubsetConfig lb_subset_config = 22;
 
+  // Specific configuration for the LeastRequest load balancing policy.
+  message LeastRequestLbConfig {
+    // The number of random healthy hosts from which the host with the fewest active requests will
+    // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
+    google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32.gte = 2];
+  }
+
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
   // load balancing policy.
   message RingHashLbConfig {
-    // Minimum hash ring size, i.e. total virtual nodes. A larger size
-    // will provide better request distribution since each host in the
-    // cluster will have more virtual nodes. Defaults to 1024. In the case
-    // that total number of hosts is greater than the minimum, each host will
-    // be allocated a single virtual node. This field is limited to 8M to bound
-    // resource use.
+    // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
+    // provided host) the better the request distribution will reflect the desired weights. Defaults
+    // to 1024 entries, and limited to 8M entries. See also
+    // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
     google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64.lte = 8388608];
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {
-      // Defaults to true, meaning that std::hash is used to hash hosts onto
-      // the ketama ring. std::hash can vary by platform. For this reason,
-      // Envoy will eventually use `xxHash <https://github.com/Cyan4973/xxHash>`_
-      // by default. This field exists for
-      // migration purposes and will eventually be deprecated. Set it to false
-      // to use `xxHash <https://github.com/Cyan4973/xxHash>`_ now.
+      // Defaults to false, meaning that `xxHash <https://github.com/Cyan4973/xxHash>`_
+      // is to hash hosts onto the ketama ring.
       google.protobuf.BoolValue use_std_hash = 1;
     }
 
     // Deprecated settings from v1 config.
     // [#not-implemented-hide:] Hide from docs.
     DeprecatedV1 deprecated_v1 = 2 [deprecated = true];
+
+    // The hash function used to hash hosts onto the ketama ring.
+    enum HashFunction {
+      // Use `xxHash <https://github.com/Cyan4973/xxHash>`_, this is the default hash function.
+      XX_HASH = 0;
+      // Use `MurmurHash2 <https://sites.google.com/site/murmurhash/>`_, this is compatible with
+      // std:hash<string> in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled
+      // on Linux and not macOS.
+      MURMUR_HASH_2 = 1;
+    }
+
+    // The hash function used to hash hosts onto the ketama ring. The value defaults to
+    // :ref:`XX_HASH<envoy_api_enum_value_Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
+    HashFunction hash_function = 3 [(validate.rules).enum.defined_only = true];
+
+    // Maximum hash ring size. Defaults to 8M entries, and limited to 8M entries, but can be lowered
+    // to further constrain resource use. See also
+    // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
+    google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64.lte = 8388608];
   }
 
   // Specific configuration for the
   // :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   // load balancing policy.
   message OriginalDstLbConfig {
-    // When true, :ref:`x-envoy-orignal-dst-host
+    // When true, :ref:`x-envoy-original-dst-host
     // <config_http_conn_man_headers_x-envoy-original-dst-host>` can be used to override destination
     // address.
     //
@@ -418,16 +462,18 @@ message Cluster {
 
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only
-  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>`
+  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>` and
+  // :ref:`LEAST_REQUEST<envoy_api_enum_value_Cluster.LbPolicy.LEAST_REQUEST>`
   // has additional configuration options.
-  // Specifying ring_hash_lb_config without setting the LbPolicy to
-  // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>`
-  // will generate an error at runtime.
+  // Specifying ring_hash_lb_config or least_request_lb_config without setting the corresponding
+  // LbPolicy will generate an error at runtime.
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
     RingHashLbConfig ring_hash_lb_config = 23;
     // Optional configuration for the Original Destination load balancing policy.
     OriginalDstLbConfig original_dst_lb_config = 34;
+    // Optional configuration for the LeastRequest load balancing policy.
+    LeastRequestLbConfig least_request_lb_config = 37;
   }
 
   // Common configuration for all load balancer implementations.
@@ -465,8 +511,11 @@ message Cluster {
     // merged and delivered in one shot when the duration expires. The start of the duration is when
     // the first update happens. This is useful for big clusters, with potentially noisy deploys
     // that might trigger excessive CPU usage due to a constant stream of healthcheck state changes
-    // or metadata updates. By default, this is not configured and updates apply immediately. Also,
-    // the first set of updates to be seen apply immediately as well (e.g.: a new cluster).
+    // or metadata updates. The first set of updates to be seen apply immediately (e.g.: a new
+    // cluster).
+    //
+    // If this is not set, we default to a merge window of 1000ms. To disable it, set the merge
+    // window to 0.
     //
     // Note: merging does not apply to cluster membership changes (e.g.: adds/removes); this is
     // because merging those updates isn't currently safe. See

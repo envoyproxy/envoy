@@ -21,7 +21,7 @@ typedef std::chrono::time_point<std::chrono::steady_clock> MonotonicTime;
  */
 class TimeSource {
 public:
-  virtual ~TimeSource() {}
+  virtual ~TimeSource() = default;
 
   /**
    * @return the current system time; not guaranteed to be monotonically increasing.

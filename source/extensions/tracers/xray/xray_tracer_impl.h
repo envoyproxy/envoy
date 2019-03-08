@@ -121,7 +121,7 @@ namespace Envoy {
                     void injectContext(Http::HeaderMap& request_headers) override;
 
                     /**
-                     * This function starts a child span.
+                     * Deprecated this function for XRay implementation.
                      */
                     Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                                                 SystemTime start_time) override;

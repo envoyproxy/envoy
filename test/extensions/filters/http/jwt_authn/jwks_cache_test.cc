@@ -2,6 +2,7 @@
 #include <thread>
 
 #include "common/protobuf/utility.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
@@ -18,11 +19,12 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-class JwksCacheTest : public ::testing::Test {
-public:
-  void SetUp() {
+class JwksCacheTest : public testing::Test {
+protected:
+  JwksCacheTest() : api_(Api::createApiForTest()) {}
+  void SetUp() override {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
-    cache_ = JwksCache::create(config_, time_system_);
+    cache_ = JwksCache::create(config_, time_system_, *api_);
     jwks_ = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
   }
 
@@ -30,6 +32,7 @@ public:
   JwtAuthentication config_;
   JwksCachePtr cache_;
   google::jwt_verify::JwksPtr jwks_;
+  Api::ApiPtr api_;
 };
 
 // Test findByIssuer
@@ -43,7 +46,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Set cache_duration to 1 second to test expiration
   provider0.mutable_remote_jwks()->mutable_cache_duration()->set_seconds(1);
-  cache_ = JwksCache::create(config_, time_system_);
+  cache_ = JwksCache::create(config_, time_system_, *api_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
@@ -62,7 +65,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Clear cache_duration to use default one.
   provider0.mutable_remote_jwks()->clear_cache_duration();
-  cache_ = JwksCache::create(config_, time_system_);
+  cache_ = JwksCache::create(config_, time_system_, *api_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
@@ -79,7 +82,7 @@ TEST_F(JwksCacheTest, TestGoodInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string(PublicKey);
 
-  cache_ = JwksCache::create(config_, time_system_);
+  cache_ = JwksCache::create(config_, time_system_, *api_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
@@ -93,7 +96,7 @@ TEST_F(JwksCacheTest, TestBadInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string("BAD-JWKS");
 
-  cache_ = JwksCache::create(config_, time_system_);
+  cache_ = JwksCache::create(config_, time_system_, *api_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
@@ -118,12 +121,12 @@ TEST_F(JwksCacheTest, TestAudiences) {
   // incoming has http://, config doesn't
   EXPECT_TRUE(jwks->areAudiencesAllowed({"http://example_service/"}));
 
-  // incomding has https://, config is http://
+  // incoming has https://, config is http://
   // incoming has tailing slash, config has not tailing slash
   EXPECT_TRUE(jwks->areAudiencesAllowed({"https://example_service1/"}));
 
   // incoming without tailing slash, config has tailing slash
-  // incomding has http://, config is https://
+  // incoming has http://, config is https://
   EXPECT_TRUE(jwks->areAudiencesAllowed({"http://example_service2"}));
 
   // Multiple audiences: a good one and a wrong one

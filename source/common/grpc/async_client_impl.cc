@@ -69,8 +69,9 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
 
   auto& http_async_client = parent_.cm_.httpAsyncClientForCluster(parent_.remote_cluster_name_);
   dispatcher_ = &http_async_client.dispatcher();
-  stream_ = http_async_client.start(*this, absl::optional<std::chrono::milliseconds>(timeout_),
-                                    buffer_body_for_retry);
+  stream_ = http_async_client.start(
+      *this, Http::AsyncClient::StreamOptions().setTimeout(timeout_).setBufferBodyForRetry(
+                 buffer_body_for_retry));
 
   if (stream_ == nullptr) {
     callbacks_.onRemoteClose(Status::GrpcStatus::Unavailable, EMPTY_STRING);
@@ -103,7 +104,9 @@ void AsyncStreamImpl::onHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {
     // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md requires that
     // grpc-status be used if available.
     if (end_stream && grpc_status) {
-      onTrailers(std::move(headers));
+      // There is actually no use-after-move problem here,
+      // because it will only be executed when end_stream is equal to true.
+      onTrailers(std::move(headers)); // NOLINT(bugprone-use-after-move)
       return;
     }
     // Technically this should be

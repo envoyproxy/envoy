@@ -7,7 +7,7 @@
 
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -44,21 +44,26 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   envoy::api::v2::RouteConfiguration route_config;
-  MessageUtil::loadFromFile(router_config_file, route_config);
+  auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
+  auto api = Api::createApiForTest(*stats);
+  MessageUtil::loadFromFile(router_config_file, route_config, *api);
 
   auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
 
-  return RouterCheckTool(std::move(factory_context), std::move(config));
+  return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
+                         std::move(api));
 }
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
-    std::unique_ptr<Router::ConfigImpl> config)
-    : factory_context_(std::move(factory_context)), config_(std::move(config)) {}
+    std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
+    Api::ApiPtr api)
+    : factory_context_(std::move(factory_context)), config_(std::move(config)),
+      stats_(std::move(stats)), api_(std::move(api)) {}
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;
@@ -154,10 +159,10 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11,
-                                                   factory_context_->dispatcher().timeSystem());
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
@@ -166,10 +171,10 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11,
-                                                   factory_context_->dispatcher().timeSystem());
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
@@ -194,11 +199,11 @@ bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::str
 bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                                const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11,
-                                                   factory_context_->dispatcher().timeSystem());
-  request_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSource());
+  stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
     actual = tool_config.headers_->get_(field);
   }

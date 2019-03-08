@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
 
@@ -17,7 +18,7 @@ namespace Http {
   COUNTER  (downstream_cx_total)                                                                   \
   COUNTER  (downstream_cx_ssl_total)                                                               \
   COUNTER  (downstream_cx_http1_total)                                                             \
-  COUNTER  (downstream_cx_websocket_total)                                                         \
+  COUNTER  (downstream_cx_upgrades_total)                                                         \
   COUNTER  (downstream_cx_http2_total)                                                             \
   COUNTER  (downstream_cx_destroy)                                                                 \
   COUNTER  (downstream_cx_destroy_remote)                                                          \
@@ -28,7 +29,7 @@ namespace Http {
   GAUGE    (downstream_cx_active)                                                                  \
   GAUGE    (downstream_cx_ssl_active)                                                              \
   GAUGE    (downstream_cx_http1_active)                                                            \
-  GAUGE    (downstream_cx_websocket_active)                                                        \
+  GAUGE    (downstream_cx_upgrades_active)                                                        \
   GAUGE    (downstream_cx_http2_active)                                                            \
   COUNTER  (downstream_cx_protocol_error)                                                          \
   HISTOGRAM(downstream_cx_length_ms)                                                               \
@@ -61,6 +62,7 @@ namespace Http {
   HISTOGRAM(downstream_rq_time)                                                                    \
   COUNTER  (downstream_rq_idle_timeout)                                                            \
   COUNTER  (downstream_rq_overload_close)                                                          \
+  COUNTER  (downstream_rq_timeout)                                                            \
   COUNTER  (rs_too_large)
 // clang-format on
 
@@ -107,6 +109,7 @@ struct TracingConnectionManagerConfig {
   uint64_t client_sampling_;
   uint64_t random_sampling_;
   uint64_t overall_sampling_;
+  bool verbose_;
 };
 
 typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
@@ -221,10 +224,21 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return maximum request headers size the connection manager will accept.
+   */
+  virtual uint32_t maxRequestHeadersKb() const PURE;
+
+  /**
    * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a
    *         disabled idle timeout.
    */
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
+
+  /**
+   * @return request timeout for incoming connection manager connections. Zero indicates
+   *         a disabled request timeout.
+   */
+  virtual std::chrono::milliseconds requestTimeout() const PURE;
 
   /**
    * @return delayed close timeout for downstream HTTP connections. Zero indicates a disabled

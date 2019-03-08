@@ -1,6 +1,7 @@
 #include <unistd.h>
 
 #include "common/common/lock_guard.h"
+#include "common/common/mutex_tracer_impl.h"
 #include "common/common/thread.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -8,6 +9,7 @@
 
 #include "server/options_impl.h"
 
+#include "test/test_common/contention.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -38,7 +40,20 @@ protected:
             TestEnvironment::PortMap(), GetParam())),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
-               nullptr}) {}
+               nullptr}) {
+    // The test main() sets the ThreadFactorySingleton since it is required by all other tests not
+    // instantiating their own MainCommon.
+    // Reset the singleton to a nullptr to avoid triggering an assertion when MainCommonBase() calls
+    // set() in the tests below.
+    Thread::ThreadFactorySingleton::set(nullptr);
+  }
+
+  ~MainCommonTest() override {
+    // This is ugly, but necessary to enable a stronger ASSERT() in ThreadFactorySingleton::set().
+    // The singleton needs to be reset to a non nullptr value such that when the constructor runs
+    // again, the ThreadFactorySingleton::set(nullptr) does not trigger the assertion.
+    Thread::ThreadFactorySingleton::set(&Thread::threadFactoryForTest());
+  }
 
   /**
    * Computes a numeric ID to incorporate into the names of
@@ -48,7 +63,7 @@ protected:
    * The PID is needed to isolate namespaces between concurrent
    * processes in CI. The random number generator is needed
    * sequentially executed test methods fail with an error in
-   * bindDomainSocket if the the same base-id is re-used.
+   * bindDomainSocket if the same base-id is re-used.
    *
    * @return uint32_t a unique numeric ID based on the PID and a random number.
    */
@@ -72,7 +87,7 @@ protected:
     argv_.push_back(nullptr);
   }
 
-  // Adds options to make Envoy exit immediately after initializtion.
+  // Adds options to make Envoy exit immediately after initialization.
   void initOnly() {
     addArg("--mode");
     addArg("init_only");
@@ -102,33 +117,46 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
-// Ensurees that existing users of main_common() can link.
-TEST_P(MainCommonTest, LegacyMain) {
-#ifdef ENVOY_HANDLE_SIGNALS
-  // Enabled by default. Control with "bazel --define=signal_trace=disabled"
-  Envoy::SignalAction handle_sigs;
-#endif
+// Test that std::set_new_handler() was called and the callback functions as expected.
+// This test fails under TSAN and ASAN, so don't run it in that build:
+//   [  DEATH   ] ==845==ERROR: ThreadSanitizer: requested allocation size 0x3e800000000
+//   exceeds maximum supported size of 0x10000000000
+//
+//   [  DEATH   ] ==33378==ERROR: AddressSanitizer: requested allocation size 0x3e800000000
+//   (0x3e800001000 after adjustments for alignment, red zones etc.) exceeds maximum supported size
+//   of 0x10000000000 (thread T0)
 
-  std::unique_ptr<Envoy::OptionsImpl> options;
-  int return_code = -1;
-  try {
-    initOnly();
-    options = std::make_unique<Envoy::OptionsImpl>(argc(), argv(), &MainCommon::hotRestartVersion,
-                                                   spdlog::level::info);
-  } catch (const Envoy::NoServingException& e) {
-    return_code = EXIT_SUCCESS;
-  } catch (const Envoy::MalformedArgvException& e) {
-    return_code = EXIT_FAILURE;
-  }
-  if (return_code == -1) {
-    return_code = Envoy::main_common(*options);
-  }
-  EXPECT_EQ(EXIT_SUCCESS, return_code);
+class MainCommonDeathTest : public MainCommonTest {};
+
+TEST_P(MainCommonDeathTest, OutOfMemoryHandler) {
+#if defined(__has_feature) && (__has_feature(thread_sanitizer) || __has_feature(address_sanitizer))
+  ENVOY_LOG_MISC(critical,
+                 "MainCommonTest::OutOfMemoryHandler not supported by this compiler configuration");
+#else
+  MainCommon main_common(argc(), argv());
+  EXPECT_DEATH_LOG_TO_STDERR(
+      []() {
+        // Resolving symbols for a backtrace takes longer than the timeout in coverage builds,
+        // so disable handling that signal.
+        signal(SIGABRT, SIG_DFL);
+
+        // Allocating a fixed-size large array that results in OOM on gcc
+        // results in a compile-time error on clang of "array size too big",
+        // so dynamically find a size that is too large.
+        const uint64_t initial = 1 << 30;
+        for (uint64_t size = initial;
+             size >= initial; // Disallow wraparound to avoid infinite loops on failure.
+             size *= 1000) {
+          new int[size];
+        }
+      }(),
+      ".*panic: out of memory.*");
+#endif
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, MainCommonTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 class AdminRequestTest : public MainCommonTest {
 protected:
@@ -155,8 +183,8 @@ protected:
 
   // Initiates Envoy running in its own thread.
   void startEnvoy() {
-    envoy_thread_ = std::make_unique<Thread::Thread>([this]() {
-      // Note: main_common_ is accesesed in the testing thread, but
+    envoy_thread_ = Thread::threadFactoryForTest().createThread([this]() {
+      // Note: main_common_ is accessed in the testing thread, but
       // is race-free, as MainCommon::run() does not return until
       // triggered with an adminRequest POST to /quitquitquit, which
       // is done in the testing thread.
@@ -183,6 +211,28 @@ protected:
     }
   }
 
+  // Wait until Envoy is inside the main server run loop proper. Before entering, Envoy runs any
+  // pending post callbacks, so it's not reliable to use adminRequest() or post() to do this.
+  // Generally, tests should not depend on this for correctness, but as a result of
+  // https://github.com/libevent/libevent/issues/779 we need to for TSAN. This is because the entry
+  // to event_base_loop() is where the signal base race occurs, but once we're in that loop in
+  // blocking mode, we're safe to take signals.
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is fixed.
+  void waitForEnvoyRun() {
+    absl::Notification done;
+    main_common_->dispatcherForTest().post([this, &done] {
+      struct Sacrifice : Event::DeferredDeletable {
+        Sacrifice(absl::Notification& notify) : notify_(notify) {}
+        ~Sacrifice() { notify_.Notify(); }
+        absl::Notification& notify_;
+      };
+      auto sacrifice = std::make_unique<Sacrifice>(done);
+      // Wait for a deferred delete cleanup, this only happens in the main server run loop.
+      main_common_->dispatcherForTest().deferredDelete(std::move(sacrifice));
+    });
+    done.WaitForNotification();
+  }
+
   // Having triggered Envoy to quit (via signal or /quitquitquit), this blocks until Envoy exits.
   bool waitForEnvoyToExit() {
     finished_.WaitForNotification();
@@ -190,6 +240,7 @@ protected:
     return envoy_return_;
   }
 
+  Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
   absl::Notification started_;
@@ -206,7 +257,7 @@ protected:
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();
   started_.WaitForNotification();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -216,7 +267,55 @@ TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   startEnvoy();
   started_.WaitForNotification();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
+  waitForEnvoyRun();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
+  kill(getpid(), SIGTERM);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+// This test is the same as AdminRequestGetStatsAndQuit, except we send ourselves a SIGINT,
+// equivalent to receiving a Ctrl-C from the user.
+TEST_P(AdminRequestTest, AdminRequestGetStatsAndCtrlC) {
+  startEnvoy();
+  started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
+  waitForEnvoyRun();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("access_log_file.reopen_failed"));
+  kill(getpid(), SIGINT);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminRequestContentionDisabled) {
+  startEnvoy();
+  started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
+  waitForEnvoyRun();
+  EXPECT_THAT(adminRequest("/contention", "GET"), HasSubstr("not enabled"));
+  kill(getpid(), SIGTERM);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
+  addArg("--enable-mutex-tracing");
+  startEnvoy();
+  started_.WaitForNotification();
+  // TODO(htuch): Remove when https://github.com/libevent/libevent/issues/779 is
+  // fixed, started_ will then become our real synchronization point.
+  waitForEnvoyRun();
+
+  // Induce contention to guarantee a non-zero num_contentions count.
+  Thread::TestUtil::ContentionGenerator contention_generator;
+  contention_generator.generateContention(MutexTracerImpl::getOrCreateTracer());
+
+  std::string response = adminRequest("/contention", "GET");
+  EXPECT_THAT(response, Not(HasSubstr("not enabled")));
+  EXPECT_THAT(response, HasSubstr("\"num_contentions\":"));
+  EXPECT_THAT(response, Not(HasSubstr("\"num_contentions\": \"0\"")));
+
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
@@ -253,7 +352,7 @@ TEST_P(AdminRequestTest, AdminRequestBeforeRun) {
   EXPECT_TRUE(admin_handler_was_called);
 
   // This just checks that some stat output was reported. We could pick any stat.
-  EXPECT_THAT(out, HasSubstr("filesystem.reopen_failed"));
+  EXPECT_THAT(out, HasSubstr("access_log_file.reopen_failed"));
 }
 
 // Class to track whether an object has been destroyed, which it does by bumping an atomic.
@@ -308,11 +407,14 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
 // destructing MainCommon.
 TEST_P(MainCommonTest, ConstructDestructLogger) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
-  Logger::Registry::getSink()->log({});
+
+  const std::string logger_name = "logger";
+  spdlog::details::log_msg log_msg(&logger_name, spdlog::level::level_enum::err, "error");
+  Logger::Registry::getSink()->log(log_msg);
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminRequestTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminRequestTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

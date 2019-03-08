@@ -11,10 +11,11 @@ using testing::Invoke;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class InitManagerImplTest : public testing::Test {
 public:
-  InitManagerImpl manager_;
+  InitManagerImpl manager_{"test"};
   ReadyWatcher initialized_;
 };
 
@@ -27,7 +28,7 @@ TEST_F(InitManagerImplTest, Targets) {
   InSequence s;
   Init::MockTarget target;
 
-  manager_.registerTarget(target);
+  manager_.registerTarget(target, "");
   EXPECT_CALL(target, initialize(_));
   manager_.initialize([&]() -> void { initialized_.ready(); });
   EXPECT_CALL(initialized_, ready());
@@ -38,7 +39,7 @@ TEST_F(InitManagerImplTest, TargetRemoveWhileInitializing) {
   InSequence s;
   Init::MockTarget target;
 
-  manager_.registerTarget(target);
+  manager_.registerTarget(target, "");
   EXPECT_CALL(target, initialize(_)).WillOnce(Invoke([](std::function<void()> callback) -> void {
     callback();
   }));
@@ -51,17 +52,18 @@ TEST_F(InitManagerImplTest, TargetAfterInitializing) {
   Init::MockTarget target1;
   Init::MockTarget target2;
 
-  manager_.registerTarget(target1);
+  manager_.registerTarget(target1, "");
   EXPECT_CALL(target1, initialize(_));
   manager_.initialize([&]() -> void { initialized_.ready(); });
 
   EXPECT_CALL(target2, initialize(_));
-  manager_.registerTarget(target2);
+  manager_.registerTarget(target2, "");
 
   target2.callback_();
   EXPECT_CALL(initialized_, ready());
   target1.callback_();
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

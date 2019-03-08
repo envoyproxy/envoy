@@ -1,12 +1,17 @@
 syntax = "proto3";
 
 package envoy.config.filter.accesslog.v2;
+
+option java_outer_classname = "AccesslogProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/route/route.proto";
 import "envoy/type/percent.proto";
 
+import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
@@ -24,14 +29,18 @@ message AccessLog {
   // Filter which is used to determine if the access log needs to be written.
   AccessLogFilter filter = 2;
 
-  // Custom configuration that depends on the access log being instantiated. Built-in configurations
-  // include:
+  // Custom configuration that depends on the access log being instantiated. Built-in
+  // configurations include:
   //
   // #. "envoy.file_access_log": :ref:`FileAccessLog
   //    <envoy_api_msg_config.accesslog.v2.FileAccessLog>`
   // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
   //    <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
-  google.protobuf.Struct config = 3;
+  oneof config_type {
+    google.protobuf.Struct config = 3 [deprecated = true];
+
+    google.protobuf.Any typed_config = 4;
+  }
 }
 
 message AccessLogFilter {
@@ -64,6 +73,9 @@ message AccessLogFilter {
 
     // Response flag filter.
     ResponseFlagFilter response_flag_filter = 9;
+
+    // gRPC status filter.
+    GrpcStatusFilter grpc_status_filter = 10;
   }
 }
 
@@ -162,6 +174,55 @@ message ResponseFlagFilter {
   // This field is optional. If it is not specified, then any response flag will pass
   // the filter check.
   repeated string flags = 1 [(validate.rules).repeated .items.string = {
-    in: ["LH", "UH", "UT", "LR", "UR", "UF", "UC", "UO", "NR", "DI", "FI", "RL", "UAEX", "RLSE"]
+    in: [
+      "LH",
+      "UH",
+      "UT",
+      "LR",
+      "UR",
+      "UF",
+      "UC",
+      "UO",
+      "NR",
+      "DI",
+      "FI",
+      "RL",
+      "UAEX",
+      "RLSE",
+      "DC",
+      "URX",
+      "SI"
+    ]
   }];
+}
+
+// Filters gRPC requests based on their response status. If a gRPC status is not provided, the
+// filter will infer the status from the HTTP status code.
+message GrpcStatusFilter {
+  enum Status {
+    OK = 0;
+    CANCELED = 1;
+    UNKNOWN = 2;
+    INVALID_ARGUMENT = 3;
+    DEADLINE_EXCEEDED = 4;
+    NOT_FOUND = 5;
+    ALREADY_EXISTS = 6;
+    PERMISSION_DENIED = 7;
+    RESOURCE_EXHAUSTED = 8;
+    FAILED_PRECONDITION = 9;
+    ABORTED = 10;
+    OUT_OF_RANGE = 11;
+    UNIMPLEMENTED = 12;
+    INTERNAL = 13;
+    UNAVAILABLE = 14;
+    DATA_LOSS = 15;
+    UNAUTHENTICATED = 16;
+  }
+
+  // Logs only responses that have any one of the gRPC statuses in this field.
+  repeated Status statuses = 1 [(validate.rules).repeated .items.enum.defined_only = true];
+
+  // If included and set to true, the filter will instead block all responses with a gRPC status or
+  // inferred gRPC status enumerated in statuses, and allow all other responses.
+  bool exclude = 2;
 }

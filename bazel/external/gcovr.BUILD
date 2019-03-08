@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load("@subpar//:subpar.bzl", "par_binary")
 
 # gcovr is difficult to run from a CI environment because it has hard

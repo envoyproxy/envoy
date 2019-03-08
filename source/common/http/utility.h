@@ -10,15 +10,34 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/message.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/http/query_params.h"
 
 #include "common/json/json_loader.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
 namespace Utility {
+
+/**
+ * Given a fully qualified URL, splits the string_view provided into scheme,
+ * host and path components.
+ */
+class Url {
+public:
+  bool initialize(absl::string_view absolute_url);
+  absl::string_view scheme() { return scheme_; }
+  absl::string_view host_and_port() { return host_and_port_; }
+  absl::string_view path() { return path_; }
+
+private:
+  absl::string_view scheme_;
+  absl::string_view host_and_port_;
+  absl::string_view path_;
+};
 
 /**
  * Append to x-forwarded-for header.
@@ -136,10 +155,13 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
  * @param response_code supplies the HTTP response code.
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
+ * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
  * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                    Code response_code, const std::string& body_text, bool is_head_request);
+                    Code response_code, absl::string_view body_text,
+                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    bool is_head_request);
 
 /**
  * Create a locally generated response using the provided lambdas.
@@ -152,11 +174,13 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
  * @param response_code supplies the HTTP response code.
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
+ * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
  */
 void sendLocalReply(bool is_grpc,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
-                    const bool& is_reset, Code response_code, const std::string& body_text,
+                    const bool& is_reset, Code response_code, absl::string_view body_text,
+                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                     bool is_head_request = false);
 
 struct GetLastAddressFromXffInfo {
@@ -206,6 +230,11 @@ MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
 std::string queryParamsToString(const QueryParams& query_params);
 
 /**
+ * Returns string representation of StreamResetReason.
+ */
+const std::string resetReasonToString(const Http::StreamResetReason reset_reason);
+
+/**
  * Transforms the supplied headers from an HTTP/1 Upgrade request to an H2 style upgrade.
  * Changes the method to connection, moves the Upgrade to a :protocol header,
  * @param headers the headers to convert.
@@ -232,6 +261,109 @@ void transformUpgradeRequestFromH2toH1(HeaderMap& headers);
  * @param headers the headers to convert.
  */
 void transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade);
+
+/**
+ * The non template implementation of resolveMostSpecificPerFilterConfig. see
+ * resolveMostSpecificPerFilterConfig for docs.
+ */
+const Router::RouteSpecificFilterConfig*
+resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
+                                          const Router::RouteConstSharedPtr& route);
+
+/**
+ * Retrieves the route specific config. Route specific config can be in a few
+ * places, that are checked in order. The first config found is returned. The
+ * order is:
+ * - the routeEntry() (for config that's applied on weighted clusters)
+ * - the route
+ * - and finally from the virtual host object (routeEntry()->virtualhost()).
+ *
+ * To use, simply:
+ *
+ *     const auto* config =
+ *         Utility::resolveMostSpecificPerFilterConfig<ConcreteType>(FILTER_NAME,
+ * stream_callbacks_.route());
+ *
+ * See notes about config's lifetime below.
+ *
+ * @param filter_name The name of the filter who's route config should be
+ * fetched.
+ * @param route The route to check for route configs. nullptr routes will
+ * result in nullptr being returned.
+ *
+ * @return The route config if found. nullptr if not found. The returned
+ * pointer's lifetime is the same as the route parameter.
+ */
+template <class ConfigType>
+const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_name,
+                                                     const Router::RouteConstSharedPtr& route) {
+  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
+                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
+  const Router::RouteSpecificFilterConfig* generic_config =
+      resolveMostSpecificPerFilterConfigGeneric(filter_name, route);
+  return dynamic_cast<const ConfigType*>(generic_config);
+}
+
+/**
+ * The non template implementation of traversePerFilterConfig. see
+ * traversePerFilterConfig for docs.
+ */
+void traversePerFilterConfigGeneric(
+    const std::string& filter_name, const Router::RouteConstSharedPtr& route,
+    std::function<void(const Router::RouteSpecificFilterConfig&)> cb);
+
+/**
+ * Fold all the available per route filter configs, invoking the callback with each config (if
+ * it is present). Iteration of the configs is in order of specificity. That means that the callback
+ * will be called first for a config on a Virtual host, then a route, and finally a route entry
+ * (weighted cluster). If a config is not present, the callback will not be invoked.
+ */
+template <class ConfigType>
+void traversePerFilterConfig(const std::string& filter_name,
+                             const Router::RouteConstSharedPtr& route,
+                             std::function<void(const ConfigType&)> cb) {
+  static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
+                "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
+
+  traversePerFilterConfigGeneric(
+      filter_name, route, [&cb](const Router::RouteSpecificFilterConfig& cfg) {
+        const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
+        if (typed_cfg != nullptr) {
+          cb(*typed_cfg);
+        }
+      });
+}
+
+/**
+ * Merge all the available per route filter configs into one. To perform the merge,
+ * the reduce function will be called on each two configs until a single merged config is left.
+ *
+ * @param reduce The first argument for this function will be the config from the previous level
+ * and the second argument is the config from the current level (the more specific one). The
+ * function should merge the second argument into the first argument.
+ *
+ * @return The merged config.
+ */
+template <class ConfigType>
+absl::optional<ConfigType>
+getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteConstSharedPtr& route,
+                         std::function<void(ConfigType&, const ConfigType&)> reduce) {
+  static_assert(std::is_copy_constructible<ConfigType>::value,
+                "ConfigType must be copy constructible");
+
+  absl::optional<ConfigType> merged;
+
+  traversePerFilterConfig<ConfigType>(filter_name, route,
+                                      [&reduce, &merged](const ConfigType& cfg) {
+                                        if (!merged) {
+                                          merged.emplace(cfg);
+                                        } else {
+                                          reduce(merged.value(), cfg);
+                                        }
+                                      });
+
+  return merged;
+}
 
 } // namespace Utility
 } // namespace Http

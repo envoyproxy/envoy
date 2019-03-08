@@ -1,3 +1,4 @@
+#include "common/api/api_impl.h"
 #include "common/grpc/async_client_manager_impl.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -17,19 +18,22 @@ namespace {
 
 class AsyncClientManagerImplTest : public testing::Test {
 public:
+  AsyncClientManagerImplTest() : api_(Api::createApiForTest()) {}
+
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::MockStore scope_;
   DangerousDeprecatedTestTime test_time_;
+  Api::ApiPtr api_;
 };
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem());
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
@@ -39,7 +43,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem());
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
@@ -49,12 +53,12 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem());
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
+  Upstream::MockClusterMockPrioritySet cluster;
   cluster_map.emplace("foo", cluster);
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_CALL(cluster, info());
@@ -65,7 +69,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem());
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -78,7 +82,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownOk) {
-  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem());
+  AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 

@@ -47,17 +47,17 @@ private:
                    parent.lbEndpoint().load_balancing_weight().value(),
                    parent.localityLbEndpoint().locality(),
                    parent.lbEndpoint().endpoint().health_check_config(),
-                   parent.localityLbEndpoint().priority()),
+                   parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           parent_(parent) {}
 
     // Upstream::Host
-    CreateConnectionData
-    createConnection(Event::Dispatcher& dispatcher,
-                     const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
+    CreateConnectionData createConnection(
+        Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+        Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
 
     // Upstream::HostDescription
     // Override setting health check address, since for logical DNS the registered host has 0.0.0.0
-    // as its address (see mattklein123's comment in logical_dns_cluster.cc why this is),
+    // as its address (see @mattklein123's comment in logical_dns_cluster.cc why this is),
     // while the health check address needs the resolved address to do the health checking, so we
     // set it here.
     void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {

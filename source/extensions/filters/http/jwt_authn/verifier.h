@@ -8,10 +8,10 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 class Verifier;
-typedef std::unique_ptr<Verifier> VerifierPtr;
+typedef std::unique_ptr<const Verifier> VerifierConstPtr;
 
 /**
- * Supports verification of JWTs with configured requirments.
+ * Supports verification of JWTs with configured requirements.
  */
 class Verifier {
 public:
@@ -23,6 +23,14 @@ public:
   class Callbacks {
   public:
     virtual ~Callbacks() {}
+
+    /**
+     * Successfully verified JWT payload are stored in the struct with its
+     * *fields* containing **issuer** as keys and **payload** as string values
+     * This function is called before onComplete() function.
+     * It will not be called if no payload to write.
+     */
+    virtual void setPayload(const ProtobufWkt::Struct& payload) PURE;
 
     /**
      * Called on completion of request.
@@ -52,7 +60,7 @@ public:
     virtual Callbacks* callback() const PURE;
 
     /**
-     * Cancel any pending reuqets for this context.
+     * Cancel any pending requests for this context.
      */
     virtual void cancel() PURE;
   };
@@ -63,7 +71,7 @@ public:
   virtual void verify(ContextSharedPtr context) const PURE;
 
   // Factory method for creating verifiers.
-  static VerifierPtr
+  static VerifierConstPtr
   create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement& requirement,
          const Protobuf::Map<ProtobufTypes::String,
                              ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&

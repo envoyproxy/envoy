@@ -48,11 +48,23 @@ public:
   // Stores an authenticator object for this request.
   void storeAuth(AuthenticatorPtr&& auth) { auths_.emplace_back(std::move(auth)); }
 
+  // Add a pair of (name, payload), called by Authenticator
+  void addPayload(const std::string& name, const ProtobufWkt::Struct& payload) {
+    *(*payload_.mutable_fields())[name].mutable_struct_value() = payload;
+  }
+
+  void setPayload() {
+    if (payload_.fields().size() > 0) {
+      callback_->setPayload(payload_);
+    }
+  }
+
 private:
   Http::HeaderMap& headers_;
   Verifier::Callbacks* callback_;
   std::unordered_map<const Verifier*, CompletionState> completion_states_;
   std::vector<AuthenticatorPtr> auths_;
+  ProtobufWkt::Struct payload_;
 };
 
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
@@ -65,6 +77,9 @@ public:
       return parent_->onComplete(status, context);
     }
 
+    if (Status::Ok == status) {
+      context.setPayload();
+    }
     context.callback()->onComplete(status);
     context.cancel();
   }
@@ -97,6 +112,9 @@ public:
     auto auth = auth_factory_.create(getAudienceChecker(), provider_name_, false);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(ctximpl.headers(), extractor_->extract(ctximpl.headers()),
+                 [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
+                   ctximpl.addPayload(name, payload);
+                 },
                  [this, context](const Status& status) {
                    onComplete(status, static_cast<ContextImpl&>(*context));
                  });
@@ -143,6 +161,9 @@ public:
     auto auth = auth_factory_.create(nullptr, absl::nullopt, true);
     extractor_.sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(ctximpl.headers(), extractor_.extract(ctximpl.headers()),
+                 [&ctximpl](const std::string& name, const ProtobufWkt::Struct& payload) {
+                   ctximpl.addPayload(name, payload);
+                 },
                  [this, context](const Status& status) {
                    onComplete(status, static_cast<ContextImpl&>(*context));
                  });
@@ -158,10 +179,10 @@ private:
   const Extractor& extractor_;
 };
 
-VerifierPtr innerCreate(const JwtRequirement& requirement,
-                        const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                        const AuthFactory& factory, const Extractor& extractor,
-                        const BaseVerifierImpl* parent);
+VerifierConstPtr innerCreate(const JwtRequirement& requirement,
+                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                             const AuthFactory& factory, const Extractor& extractor,
+                             const BaseVerifierImpl* parent);
 
 // Base verifier for requires all or any.
 class BaseGroupVerifierImpl : public BaseVerifierImpl {
@@ -180,7 +201,7 @@ public:
 
 protected:
   // The list of requirement verifiers
-  std::vector<VerifierPtr> verifiers_;
+  std::vector<VerifierConstPtr> verifiers_;
 };
 
 // Requires any verifier.
@@ -243,10 +264,10 @@ public:
   }
 };
 
-VerifierPtr innerCreate(const JwtRequirement& requirement,
-                        const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                        const AuthFactory& factory, const Extractor& extractor_for_allow_fail,
-                        const BaseVerifierImpl* parent) {
+VerifierConstPtr innerCreate(const JwtRequirement& requirement,
+                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                             const AuthFactory& factory, const Extractor& extractor_for_allow_fail,
+                             const BaseVerifierImpl* parent) {
   std::string provider_name;
   std::vector<std::string> audiences;
   switch (requirement.requires_type_case()) {
@@ -290,10 +311,10 @@ ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Callbacks* ca
   return std::make_shared<ContextImpl>(headers, callback);
 }
 
-VerifierPtr Verifier::create(const JwtRequirement& requirement,
-                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                             const AuthFactory& factory,
-                             const Extractor& extractor_for_allow_fail) {
+VerifierConstPtr
+Verifier::create(const JwtRequirement& requirement,
+                 const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                 const AuthFactory& factory, const Extractor& extractor_for_allow_fail) {
   return innerCreate(requirement, providers, factory, extractor_for_allow_fail, nullptr);
 }
 

@@ -25,6 +25,8 @@ public:
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
   const LowerCaseString Authorization{"authorization"};
+  const LowerCaseString ProxyAuthenticate{"proxy-authenticate"};
+  const LowerCaseString ProxyAuthorization{"proxy-authorization"};
   const LowerCaseString CacheControl{"cache-control"};
   const LowerCaseString ClientTraceId{"x-client-trace-id"};
   const LowerCaseString Connection{"connection"};
@@ -33,19 +35,24 @@ public:
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
+  const LowerCaseString EnvoyAttemptCount{"x-envoy-attempt-count"};
+  const LowerCaseString EnvoyDegraded{"x-envoy-degraded"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
   const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
   const LowerCaseString EnvoyExternalAddress{"x-envoy-external-address"};
   const LowerCaseString EnvoyForceTrace{"x-envoy-force-trace"};
   const LowerCaseString EnvoyImmediateHealthCheckFail{"x-envoy-immediate-health-check-fail"};
+  const LowerCaseString EnvoyOriginalUrl{"x-envoy-original-url"};
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyIpTags{"x-envoy-ip-tags"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
   const LowerCaseString EnvoyOriginalDstHost{"x-envoy-original-dst-host"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
+  const LowerCaseString EnvoyRateLimited{"x-envoy-ratelimited"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
   const LowerCaseString EnvoyRetryGrpcOn{"x-envoy-retry-grpc-on"};
+  const LowerCaseString EnvoyRetriableStatusCodes{"x-envoy-retriable-status-codes"};
   const LowerCaseString EnvoyUpstreamAltStatName{"x-envoy-upstream-alt-stat-name"};
   const LowerCaseString EnvoyUpstreamCanary{"x-envoy-upstream-canary"};
   const LowerCaseString EnvoyUpstreamRequestTimeoutAltResponse{
@@ -61,6 +68,7 @@ public:
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
+  const LowerCaseString ForwardedHost{"x-forwarded-host"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
@@ -90,11 +98,7 @@ public:
   const LowerCaseString UserAgent{"user-agent"};
   const LowerCaseString Vary{"vary"};
   const LowerCaseString Via{"via"};
-  const LowerCaseString XB3TraceId{"x-b3-traceid"};
-  const LowerCaseString XB3SpanId{"x-b3-spanid"};
-  const LowerCaseString XB3ParentSpanId{"x-b3-parentspanid"};
-  const LowerCaseString XB3Sampled{"x-b3-sampled"};
-  const LowerCaseString XB3Flags{"x-b3-flags"};
+  const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
   const LowerCaseString XAmznTraceId{"x-amzn-trace-id"};
@@ -141,11 +145,16 @@ public:
   } EnvoyOverloadedValues;
 
   struct {
+    const std::string True{"true"};
+  } EnvoyRateLimitedValues;
+
+  struct {
     const std::string _5xx{"5xx"};
     const std::string GatewayError{"gateway-error"};
     const std::string ConnectFailure{"connect-failure"};
     const std::string RefusedStream{"refused-stream"};
     const std::string Retriable4xx{"retriable-4xx"};
+    const std::string RetriableStatusCodes{"retriable-status-codes"};
   } EnvoyRetryOnValues;
 
   struct {
@@ -153,6 +162,7 @@ public:
     const std::string DeadlineExceeded{"deadline-exceeded"};
     const std::string ResourceExhausted{"resource-exhausted"};
     const std::string Unavailable{"unavailable"};
+    const std::string Internal{"internal"};
   } EnvoyRetryOnGrpcValues;
 
   struct {

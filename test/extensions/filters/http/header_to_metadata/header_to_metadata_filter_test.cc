@@ -3,7 +3,7 @@
 #include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/request_info/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -16,11 +16,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
+namespace {
 
 class HeaderToMetadataTest : public testing::Test {
 public:
-  HeaderToMetadataTest() {}
-
   const std::string request_config_yaml = R"EOF(
 request_rules:
   - header: x-version
@@ -48,7 +47,7 @@ request_rules:
   std::shared_ptr<HeaderToMetadataFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  NiceMock<Envoy::RequestInfo::MockRequestInfo> req_info_;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
 };
 
 MATCHER_P(MapEq, rhs, "") {
@@ -77,7 +76,7 @@ TEST_F(HeaderToMetadataTest, BasicRequestTest) {
   Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
   std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
 }
@@ -90,7 +89,7 @@ TEST_F(HeaderToMetadataTest, DefaultEndpointsTest) {
   Http::TestHeaderMapImpl incoming_headers{{"X-FOO", "bar"}};
   std::map<std::string, std::string> expected = {{"default", "true"}};
 
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
 }
@@ -112,11 +111,13 @@ response_rules:
   std::map<std::string, std::string> expected = {{"auth", "1"}};
   Http::TestHeaderMapImpl empty_headers;
 
-  EXPECT_CALL(encoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
               setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
   EXPECT_EQ(empty_headers, incoming_headers);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 }
 
 /**
@@ -135,7 +136,7 @@ response_rules:
   std::map<std::string, int> expected = {{"auth", 1}};
   Http::TestHeaderMapImpl empty_headers;
 
-  EXPECT_CALL(encoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
               setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEqNum(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
@@ -156,7 +157,7 @@ request_rules:
   initializeFilter(config);
   Http::TestHeaderMapImpl incoming_headers{};
 
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
 }
@@ -186,7 +187,7 @@ request_rules:
   };
   std::map<std::string, std::string> expected = {{"version", "v4.0"}, {"python_version", "3.7"}};
 
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
 }
@@ -198,7 +199,7 @@ TEST_F(HeaderToMetadataTest, EmptyHeaderValue) {
   initializeFilter(request_config_yaml);
   Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", ""}};
 
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
 }
@@ -210,7 +211,7 @@ TEST_F(HeaderToMetadataTest, HeaderValueTooLong) {
   initializeFilter(request_config_yaml);
   Http::TestHeaderMapImpl incoming_headers{{"X-VERSION", std::string(101, 'x')}};
 
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(incoming_headers, false));
 }
@@ -233,7 +234,7 @@ response_rules:
   std::map<std::string, std::string> expected = {{"something", "else"}};
   Http::TestHeaderMapImpl empty_headers;
 
-  EXPECT_CALL(encoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
               setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
@@ -268,11 +269,12 @@ request_rules:
   initializeFilter(config);
   Http::TestHeaderMapImpl headers{{"x-version", ""}};
 
-  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
+} // namespace
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions

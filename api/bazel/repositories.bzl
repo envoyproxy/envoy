@@ -1,33 +1,38 @@
-BAZEL_SKYLIB_RELEASE = "0.5.0"
-BAZEL_SKYLIB_SHA = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7ce78541f"
-
-GOOGLEAPIS_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
-GOGOPROTO_SHA = "1adfc126b41513cc696b209667c8656ea7aac67c"  # v1.0.0
-PROMETHEUS_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
-OPENCENSUS_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
-
-PGV_GIT_SHA = "30da78c4bcdd477b3c24d13e43cf39361ae3859f"  # Sep 27, 2018
-
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load(":envoy_http_archive.bzl", "envoy_http_archive")
+load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 
 def api_dependencies():
-    native.http_archive(
-        name = "bazel_skylib",
-        url = "https://github.com/bazelbuild/bazel-skylib/archive/" + BAZEL_SKYLIB_RELEASE + ".tar.gz",
-        sha256 = BAZEL_SKYLIB_SHA,
-        strip_prefix = "bazel-skylib-" + BAZEL_SKYLIB_RELEASE,
+    envoy_http_archive(
+        "bazel_skylib",
+        locations = REPOSITORY_LOCATIONS,
     )
-    git_repository(
-        name = "com_lyft_protoc_gen_validate",
-        remote = "https://github.com/lyft/protoc-gen-validate.git",
-        commit = PGV_GIT_SHA,
+    envoy_http_archive(
+        "com_lyft_protoc_gen_validate",
+        locations = REPOSITORY_LOCATIONS,
     )
-    native.new_http_archive(
+    envoy_http_archive(
         name = "googleapis",
-        strip_prefix = "googleapis-" + GOOGLEAPIS_SHA,
-        url = "https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_SHA + ".tar.gz",
-        # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
-        build_file_content = """
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = GOOGLEAPIS_BUILD_CONTENT,
+    )
+    envoy_http_archive(
+        name = "com_github_gogo_protobuf",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = GOGOPROTO_BUILD_CONTENT,
+    )
+    envoy_http_archive(
+        name = "prometheus_metrics_model",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
+    )
+    envoy_http_archive(
+        name = "io_opencensus_trace",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = OPENCENSUSTRACE_BUILD_CONTENT,
+    )
+
+GOOGLEAPIS_BUILD_CONTENT = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
@@ -184,14 +189,9 @@ py_proto_library(
      visibility = ["//visibility:public"],
      deps = ["@com_google_protobuf//:protobuf_python"],
 )
-""",
-    )
+"""
 
-    native.new_http_archive(
-        name = "com_github_gogo_protobuf",
-        strip_prefix = "protobuf-" + GOGOPROTO_SHA,
-        url = "https://github.com/gogo/protobuf/archive/" + GOGOPROTO_SHA + ".tar.gz",
-        build_file_content = """
+GOGOPROTO_BUILD_CONTENT = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
@@ -244,14 +244,9 @@ py_proto_library(
     visibility = ["//visibility:public"],
     deps = ["@com_google_protobuf//:protobuf_python"],
 )
-        """,
-    )
+"""
 
-    native.new_http_archive(
-        name = "prometheus_metrics_model",
-        strip_prefix = "client_model-" + PROMETHEUS_SHA,
-        url = "https://github.com/prometheus/client_model/archive/" + PROMETHEUS_SHA + ".tar.gz",
-        build_file_content = """
+PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
@@ -269,14 +264,9 @@ go_proto_library(
     proto = ":client_model",
     visibility = ["//visibility:public"],
 )
-        """,
-    )
+"""
 
-    native.new_http_archive(
-        name = "io_opencensus_trace",
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_SHA + "/opencensus/proto/trace",
-        url = "https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_SHA + ".tar.gz",
-        build_file_content = """
+OPENCENSUSTRACE_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
@@ -294,5 +284,4 @@ go_proto_library(
     proto = ":trace_model",
     visibility = ["//visibility:public"],
 )
-        """,
-    )
+"""

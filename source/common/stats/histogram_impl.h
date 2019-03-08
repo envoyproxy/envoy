@@ -31,12 +31,20 @@ public:
   void refresh(const histogram_t* new_histogram_ptr);
 
   // HistogramStatistics
-  std::string summary() const override;
+  std::string quantileSummary() const override;
+  std::string bucketSummary() const override;
   const std::vector<double>& supportedQuantiles() const override;
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
+  const std::vector<double>& supportedBuckets() const override;
+  const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
+  double sampleCount() const override { return sample_count_; }
+  double sampleSum() const override { return sample_sum_; }
 
 private:
   std::vector<double> computed_quantiles_;
+  std::vector<uint64_t> computed_buckets_;
+  double sample_count_;
+  double sample_sum_;
 };
 
 /**
@@ -49,7 +57,8 @@ public:
       : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent), name_(name) {}
 
   // Stats:;Metric
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
+  const char* nameCStr() const override { return name_.c_str(); }
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
@@ -61,6 +70,22 @@ private:
   Store& parent_;
 
   const std::string name_;
+};
+
+/**
+ * Null histogram implementation.
+ * No-ops on all calls and requires no underlying metric or data.
+ */
+class NullHistogramImpl : public Histogram {
+public:
+  NullHistogramImpl() {}
+  ~NullHistogramImpl() {}
+  std::string name() const override { return ""; }
+  const char* nameCStr() const override { return ""; }
+  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
+  void recordValue(uint64_t) override {}
+  bool used() const override { return false; }
 };
 
 } // namespace Stats

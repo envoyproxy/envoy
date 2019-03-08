@@ -122,7 +122,7 @@ public:
   /**
    * Constructor that creates an annotation based on the given parameters.
    *
-   * @param timestamp A 64-bit integer containing the annotation timestasmp attribute.
+   * @param timestamp A 64-bit integer containing the annotation timestamp attribute.
    * @param value A string containing the annotation's value attribute. Valid values
    * appear on ZipkinCoreConstants. The most commonly used values are "cs", "cr", "ss" and "sr".
    * @param endpoint The endpoint object representing the annotation's endpoint attribute.
@@ -357,7 +357,7 @@ public:
   /**
    * Adds an annotation to the span (move semantics).
    */
-  void addAnnotation(const Annotation&& ann) { annotations_.push_back(ann); }
+  void addAnnotation(Annotation&& ann) { annotations_.emplace_back(std::move(ann)); }
 
   /**
    * Sets the span's binary annotations all at once.
@@ -372,7 +372,9 @@ public:
   /**
    * Adds a binary annotation to the span (move semantics).
    */
-  void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
+  void addBinaryAnnotation(BinaryAnnotation&& bann) {
+    binary_annotations_.emplace_back(std::move(bann));
+  }
 
   /**
    * Sets the span's debug attribute.
@@ -546,6 +548,14 @@ public:
    * @param value The binary annotation's value.
    */
   void setTag(const std::string& name, const std::string& value);
+
+  /**
+   * Adds an annotation to the span
+   *
+   * @param timestamp The annotation's timestamp.
+   * @param event The annotation's value.
+   */
+  void log(SystemTime timestamp, const std::string& event);
 
 private:
   static const std::string EMPTY_HEX_STRING_;

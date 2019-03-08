@@ -27,20 +27,24 @@ class HealthCheckCacheManager {
 public:
   HealthCheckCacheManager(Event::Dispatcher& dispatcher, std::chrono::milliseconds timeout);
 
-  Http::Code getCachedResponseCode() { return last_response_code_; }
-  void setCachedResponseCode(Http::Code code) {
-    last_response_code_ = code;
-    use_cached_response_code_ = true;
+  std::pair<Http::Code, bool> getCachedResponse() {
+    return {last_response_code_, last_response_degraded_};
   }
-  bool useCachedResponseCode() { return use_cached_response_code_; }
+  void setCachedResponse(Http::Code code, bool degraded) {
+    last_response_code_ = code;
+    last_response_degraded_ = degraded;
+    use_cached_response_ = true;
+  }
+  bool useCachedResponse() { return use_cached_response_; }
 
 private:
   void onTimer();
 
   Event::TimerPtr clear_cache_timer_;
   const std::chrono::milliseconds timeout_;
-  std::atomic<bool> use_cached_response_code_{};
+  std::atomic<bool> use_cached_response_{};
   std::atomic<Http::Code> last_response_code_{};
+  std::atomic<bool> last_response_degraded_{};
 };
 
 typedef std::shared_ptr<HealthCheckCacheManager> HealthCheckCacheManagerSharedPtr;
@@ -85,6 +89,9 @@ public:
   }
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
+  }
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
 

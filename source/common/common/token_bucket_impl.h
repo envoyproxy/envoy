@@ -13,7 +13,7 @@ namespace Envoy {
 class TokenBucketImpl : public TokenBucket {
 public:
   /**
-   * @param max_tokens supplies the maximun number of tokens in the bucket.
+   * @param max_tokens supplies the maximum number of tokens in the bucket.
    * @param time_source supplies the time source.
    * @param fill_rate supplies the number of tokens that will return to the bucket on each second.
    * The default is 1.
@@ -21,6 +21,8 @@ public:
   explicit TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate = 1);
 
   bool consume(uint64_t tokens = 1) override;
+
+  uint64_t nextTokenAvailableMs() override;
 
 private:
   const double max_tokens_;

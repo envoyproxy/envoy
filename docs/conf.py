@@ -12,12 +12,15 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+from datetime import datetime
+import os
 import sphinx_rtd_theme
 import sys
-import os
+
 
 def setup(app):
   app.add_config_value('release_level', '', 'env')
+
 
 if not os.environ.get('ENVOY_DOCS_RELEASE_LEVEL'):
   raise Exception("ENVOY_DOCS_RELEASE_LEVEL env var must be defined")
@@ -39,8 +42,8 @@ release_level = os.environ['ENVOY_DOCS_RELEASE_LEVEL']
 # ones.
 extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig']
 extlinks = {
-  'repo': ('https://github.com/envoyproxy/envoy/blob/master/%s', ''),
-  'api': ('https://github.com/envoyproxy/envoy/blob/master/api/%s', ''),
+    'repo': ('https://github.com/envoyproxy/envoy/blob/master/%s', ''),
+    'api': ('https://github.com/envoyproxy/envoy/blob/master/api/%s', ''),
 }
 
 # Add any paths that contain templates here, relative to this directory.
@@ -59,7 +62,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'envoy'
-copyright = u'2016-2018, Envoy Project Authors'
+copyright = u'2016-{}, Envoy Project Authors'.format(datetime.now().year)
 author = u'Envoy Project Authors'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -118,7 +121,6 @@ exclude_patterns = ['_build', '_venv', 'Thumbs.db', '.DS_Store']
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
-
 
 # -- Options for HTML output ----------------------------------------------
 

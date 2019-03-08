@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/network/address_impl.h"
 
 #include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
@@ -5,7 +7,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/request_info/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
 using namespace std::chrono_literals;
@@ -19,12 +21,13 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+namespace {
 
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
-  typedef Grpc::MockAsyncStream MockAccessLogStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>
-      AccessLogCallbacks;
+  using MockAccessLogStream = Grpc::MockAsyncStream;
+  using AccessLogCallbacks =
+      Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>;
 
   GrpcAccessLogStreamerImplTest() {
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
@@ -113,9 +116,10 @@ public:
 class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
-    access_log_.reset(new HttpGrpcAccessLog(AccessLog::FilterPtr{filter_}, config_, streamer_));
+    access_log_ =
+        std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, streamer_);
   }
 
   void expectLog(const std::string& expected_request_msg_yaml) {
@@ -144,13 +148,13 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
   InSequence s;
 
   {
-    NiceMock<RequestInfo::MockRequestInfo> request_info;
-    request_info.host_ = nullptr;
-    request_info.start_time_ = SystemTime(1h);
-    request_info.start_time_monotonic_ = MonotonicTime(1h);
-    request_info.last_downstream_tx_byte_sent_ = 2ms;
-    request_info.setDownstreamLocalAddress(
-        std::make_shared<Network::Address::PipeInstance>("/foo"));
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+    stream_info.start_time_monotonic_ = MonotonicTime(1h);
+    stream_info.last_downstream_tx_byte_sent_ = 2ms;
+    stream_info.setDownstreamLocalAddress(std::make_shared<Network::Address::PipeInstance>("/foo"));
+    (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
 
     expectLog(R"EOF(
 http_logs:
@@ -167,17 +171,20 @@ http_logs:
         seconds: 3600
       time_to_last_downstream_tx_byte:
         nanos: 2000000
+      metadata:
+        filter_metadata:
+          foo: {}
     request: {}
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, request_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
   {
-    NiceMock<RequestInfo::MockRequestInfo> request_info;
-    request_info.host_ = nullptr;
-    request_info.start_time_ = SystemTime(1h);
-    request_info.last_downstream_tx_byte_sent_ = std::chrono::nanoseconds(2000000);
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+    stream_info.last_downstream_tx_byte_sent_ = std::chrono::nanoseconds(2000000);
 
     expectLog(R"EOF(
 http_logs:
@@ -198,28 +205,28 @@ http_logs:
     request: {}
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, request_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 
   {
-    NiceMock<RequestInfo::MockRequestInfo> request_info;
-    request_info.start_time_ = SystemTime(1h);
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.start_time_ = SystemTime(1h);
 
-    request_info.last_downstream_rx_byte_received_ = 2ms;
-    request_info.first_upstream_tx_byte_sent_ = 4ms;
-    request_info.last_upstream_tx_byte_sent_ = 6ms;
-    request_info.first_upstream_rx_byte_received_ = 8ms;
-    request_info.last_upstream_rx_byte_received_ = 10ms;
-    request_info.first_downstream_tx_byte_sent_ = 12ms;
-    request_info.last_downstream_tx_byte_sent_ = 14ms;
+    stream_info.last_downstream_rx_byte_received_ = 2ms;
+    stream_info.first_upstream_tx_byte_sent_ = 4ms;
+    stream_info.last_upstream_tx_byte_sent_ = 6ms;
+    stream_info.first_upstream_rx_byte_received_ = 8ms;
+    stream_info.last_upstream_rx_byte_received_ = 10ms;
+    stream_info.first_downstream_tx_byte_sent_ = 12ms;
+    stream_info.last_downstream_tx_byte_sent_ = 14ms;
 
-    request_info.setUpstreamLocalAddress(
+    stream_info.setUpstreamLocalAddress(
         std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2"));
-    request_info.protocol_ = Http::Protocol::Http10;
-    request_info.addBytesReceived(10);
-    request_info.addBytesSent(20);
-    request_info.response_code_ = 200;
-    ON_CALL(request_info, hasResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
+    stream_info.protocol_ = Http::Protocol::Http10;
+    stream_info.addBytesReceived(10);
+    stream_info.addBytesSent(20);
+    stream_info.response_code_ = 200;
+    ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 
     Http::TestHeaderMapImpl request_headers{
@@ -293,13 +300,13 @@ http_logs:
       response_headers_bytes: 10
       response_body_bytes: 20
 )EOF");
-    access_log_->log(&request_headers, &response_headers, nullptr, request_info);
+    access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
   }
 
   {
-    NiceMock<RequestInfo::MockRequestInfo> request_info;
-    request_info.host_ = nullptr;
-    request_info.start_time_ = SystemTime(1h);
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
 
     Http::TestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -323,7 +330,7 @@ http_logs:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
 )EOF");
-    access_log_->log(nullptr, nullptr, nullptr, request_info);
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
   }
 }
 
@@ -348,9 +355,9 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
   init();
 
   {
-    NiceMock<RequestInfo::MockRequestInfo> request_info;
-    request_info.host_ = nullptr;
-    request_info.start_time_ = SystemTime(1h);
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
 
     Http::TestHeaderMapImpl request_headers{
         {":scheme", "scheme_value"},
@@ -408,15 +415,15 @@ http_logs:
         "x-logged-trailer": "value"
         "x-empty-trailer": ""
 )EOF");
-    access_log_->log(&request_headers, &response_headers, &response_trailers, request_info);
+    access_log_->log(&request_headers, &response_headers, &response_trailers, stream_info);
   }
 }
 
 TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
-  NiceMock<RequestInfo::MockRequestInfo> request_info;
-  ON_CALL(request_info, hasResponseFlag(_)).WillByDefault(Return(true));
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, hasResponseFlag(_)).WillByDefault(Return(true));
   envoy::data::accesslog::v2::AccessLogCommon common_access_log;
-  HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(common_access_log, request_info);
+  HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(common_access_log, stream_info);
 
   envoy::data::accesslog::v2::AccessLogCommon common_access_log_expected;
   common_access_log_expected.mutable_response_flags()->set_failed_local_healthcheck(true);
@@ -435,10 +442,14 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
       envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
           ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
   common_access_log_expected.mutable_response_flags()->set_rate_limit_service_error(true);
+  common_access_log_expected.mutable_response_flags()->set_downstream_connection_termination(true);
+  common_access_log_expected.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
+  common_access_log_expected.mutable_response_flags()->set_stream_idle_timeout(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
 
+} // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
 } // namespace Extensions

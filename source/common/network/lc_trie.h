@@ -32,7 +32,7 @@ constexpr size_t MaxLcTrieNodes = (1 << 20);
  * Level Compressed Trie for associating data with CIDR ranges. Both IPv4 and IPv6 addresses are
  * supported within this class with no calling pattern changes.
  *
- * The algorithm to build the LC-Trie is desribed in the paper 'IP-address lookup using LC-tries'
+ * The algorithm to build the LC-Trie is described in the paper 'IP-address lookup using LC-tries'
  * by 'S. Nilsson' and 'G. Karlsson'. The paper and reference C implementation can be found here:
  * https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/
  *
@@ -289,7 +289,7 @@ private:
 
     std::string asString() { return fmt::format("{}/{}", toString(ip_), length_); }
 
-    // The address represented either in Ipv4(uint32_t) or Ipv6(asbl::uint128).
+    // The address represented either in Ipv4(uint32_t) or Ipv6(absl::uint128).
     IpType ip_{0};
     // Length of the cidr range.
     uint32_t length_{0};
@@ -434,7 +434,7 @@ private:
 
   private:
     /**
-     * Builds the Level Compresesed Trie, by first sorting the data, removing duplicated
+     * Builds the Level Compressed Trie, by first sorting the data, removing duplicated
      * prefixes and invoking buildRecursive() to build the trie.
      */
     void build(std::vector<IpPrefix<IpType>>& data) {
@@ -563,7 +563,7 @@ private:
      * Recursively build a trie for IP prefixes from position 'first' to 'first+n-1'.
      * @param prefix supplies the prefix to ignore when building the sub-trie.
      * @param first supplies the index into ip_prefixes_ for this sub-trie.
-     * @param n suppplies the number of entries for the sub-trie.
+     * @param n supplies the number of entries for the sub-trie.
      * @param position supplies the root for this sub-trie.
      * @param next_free_index supplies the next available index in the trie_.
      */
@@ -731,7 +731,7 @@ LcTrie<T>::LcTrieInternal<IpType, address_size>::getData(const IpType& ip_addres
   }
 
   // The path taken through the trie to match the ip_address may have contained skips,
-  // so it is necessary to check whether the the matched prefix really contains the
+  // so it is necessary to check whether the matched prefix really contains the
   // ip_address.
   const auto& prefix = ip_prefixes_[address];
   if (prefix.contains(ip_address)) {

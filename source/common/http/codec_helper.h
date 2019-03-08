@@ -2,6 +2,10 @@
 
 #include <vector>
 
+#include "envoy/http/codec.h"
+
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Http {
 

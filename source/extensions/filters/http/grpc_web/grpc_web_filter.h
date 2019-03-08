@@ -19,11 +19,10 @@ namespace GrpcWeb {
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:
-  GrpcWebFilter(Upstream::ClusterManager& cm) : cm_(cm) {}
-  virtual ~GrpcWebFilter(){};
+  virtual ~GrpcWebFilter() {}
 
   // Http::StreamFilterBase
-  void onDestroy() override{};
+  void onDestroy() override {}
 
   // Implements StreamDecoderFilter.
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
@@ -42,6 +41,9 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override;
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
@@ -56,7 +58,6 @@ private:
   static const uint8_t GRPC_WEB_TRAILER;
   const std::unordered_set<std::string>& gRpcWebContentTypes() const;
 
-  Upstream::ClusterManager& cm_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

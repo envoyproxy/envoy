@@ -15,14 +15,21 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
+#include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
 
-const std::string PerConnectionCluster::Key = "envoy.tcp_proxy.cluster";
+using ::Envoy::Network::UpstreamServerName;
+
+const std::string& PerConnectionCluster::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
+}
 
 Config::Route::Route(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
@@ -111,9 +118,11 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
 
 const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
-  if (connection.perConnectionState().hasData<PerConnectionCluster>(PerConnectionCluster::Key)) {
+  if (connection.streamInfo().filterState().hasData<PerConnectionCluster>(
+          PerConnectionCluster::key())) {
     const PerConnectionCluster& per_connection_cluster =
-        connection.perConnectionState().getData<PerConnectionCluster>(PerConnectionCluster::Key);
+        connection.streamInfo().filterState().getDataReadOnly<PerConnectionCluster>(
+            PerConnectionCluster::key());
     return per_connection_cluster.value();
   }
 
@@ -163,15 +172,15 @@ UpstreamDrainManager& Config::drainManager() {
 Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
                TimeSource& time_source)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(this)), request_info_(time_source) {
+      upstream_callbacks_(new UpstreamCallbacks(this)), stream_info_(time_source) {
   ASSERT(config != nullptr);
 }
 
 Filter::~Filter() {
-  getRequestInfo().onRequestComplete();
+  getStreamInfo().onRequestComplete();
 
   for (const auto& access_log : config_->accessLogs()) {
-    access_log->log(nullptr, nullptr, nullptr, getRequestInfo());
+    access_log->log(nullptr, nullptr, nullptr, getStreamInfo());
   }
 
   ASSERT(upstream_handle_ == nullptr);
@@ -192,8 +201,8 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
   read_callbacks_->connection().enableHalfClose(true);
-  getRequestInfo().setDownstreamLocalAddress(read_callbacks_->connection().localAddress());
-  getRequestInfo().setDownstreamRemoteAddress(read_callbacks_->connection().remoteAddress());
+  getStreamInfo().setDownstreamLocalAddress(read_callbacks_->connection().localAddress());
+  getStreamInfo().setDownstreamRemoteAddress(read_callbacks_->connection().remoteAddress());
 
   // Need to disable reads so that we don't write to an upstream that might fail
   // in onData(). This will get re-enabled when the upstream connection is
@@ -333,7 +342,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
                    cluster_name);
   } else {
     config_->stats().downstream_cx_no_route_.inc();
-    getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoRouteFound);
+    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     onInitFailure(UpstreamFailureReason::NO_ROUTE);
     return Network::FilterStatus::StopIteration;
   }
@@ -343,7 +352,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   // Check this here because the TCP conn pool will queue our request waiting for a connection that
   // will never be released.
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
-    getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
+    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::RESOURCE_LIMIT_EXCEEDED);
     return Network::FilterStatus::StopIteration;
@@ -351,17 +360,30 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   const uint32_t max_connect_attempts = config_->maxConnectAttempts();
   if (connect_attempts_ >= max_connect_attempts) {
+    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
     cluster->stats().upstream_cx_connect_attempts_exceeded_.inc();
     onInitFailure(UpstreamFailureReason::CONNECT_FAILED);
     return Network::FilterStatus::StopIteration;
   }
 
+  Network::TransportSocketOptionsSharedPtr transport_socket_options;
+
+  if (downstreamConnection() &&
+      downstreamConnection()->streamInfo().filterState().hasData<UpstreamServerName>(
+          UpstreamServerName::key())) {
+    const auto& original_requested_server_name =
+        downstreamConnection()->streamInfo().filterState().getDataReadOnly<UpstreamServerName>(
+            UpstreamServerName::key());
+    transport_socket_options = std::make_shared<Network::TransportSocketOptionsImpl>(
+        original_requested_server_name.value());
+  }
+
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this);
+      cluster_name, Upstream::ResourcePriority::Default, this, transport_socket_options);
   if (!conn_pool) {
     // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
     // cluster->stats().upstream_cx_none_healthy in the latter case.
-    getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream);
+    getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NO_HEALTHY_UPSTREAM);
     return Network::FilterStatus::StopIteration;
   }
@@ -380,7 +402,7 @@ void Filter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
   upstream_handle_ = nullptr;
 
   read_callbacks_->upstreamHost(host);
-  getRequestInfo().onUpstreamHostSelected(host);
+  getStreamInfo().onUpstreamHostSelected(host);
 
   switch (reason) {
   case Tcp::ConnectionPool::PoolFailureReason::Overflow:
@@ -413,8 +435,8 @@ void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
 
   connection.enableHalfClose(true);
 
-  getRequestInfo().onUpstreamHostSelected(host);
-  getRequestInfo().setUpstreamLocalAddress(connection.localAddress());
+  getStreamInfo().onUpstreamHostSelected(host);
+  getStreamInfo().setUpstreamLocalAddress(connection.localAddress());
 
   // Simulate the event that onPoolReady represents.
   upstream_callbacks_->onEvent(Network::ConnectionEvent::Connected);
@@ -425,7 +447,7 @@ void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
 void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
-  getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
+  getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
 
   // Raise LocalClose, which will trigger a reconnect if needed/configured.
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
@@ -434,7 +456,7 @@ void Filter::onConnectTimeout() {
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
-  getRequestInfo().addBytesReceived(data.length());
+  getStreamInfo().addBytesReceived(data.length());
   upstream_conn_data_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
@@ -466,7 +488,8 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
   } else if (upstream_handle_) {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
-      upstream_handle_->cancel();
+      // Cancel the conn pool request and close any excess pending requests.
+      upstream_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess);
       upstream_handle_ = nullptr;
     }
   }
@@ -475,7 +498,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
-  getRequestInfo().addBytesSent(data.length());
+  getStreamInfo().addBytesSent(data.length());
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
@@ -494,7 +517,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
-        getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
+        getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure);
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
             Upstream::Outlier::Result::CONNECT_FAILED);
       }
@@ -512,11 +535,10 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
     read_callbacks_->upstreamHost()->outlierDetector().putResult(
         Upstream::Outlier::Result::SUCCESS);
-    onConnectionSuccess();
 
-    getRequestInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
+    getStreamInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
     ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
-              getRequestInfo().requestedServerName());
+              getStreamInfo().requestedServerName());
 
     if (config_->idleTimeout()) {
       // The idle_timer_ can be moved to a Drainer, so related callbacks call into

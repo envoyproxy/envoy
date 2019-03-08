@@ -7,10 +7,14 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 
 namespace Envoy {
 namespace Http {
+
+// Legacy default value of 60K is safely under both codec default limits.
+static const uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
 
 class Stream;
 
@@ -52,6 +56,12 @@ public:
    * @return Stream& the backing stream.
    */
   virtual Stream& getStream() PURE;
+
+  /**
+   * Encode metadata.
+   * @param metadata_map_vector is the vector of metadata maps to encode.
+   */
+  virtual void encodeMetadata(const MetadataMapVector& metadata_map_vector) PURE;
 };
 
 /**
@@ -86,6 +96,12 @@ public:
    * @param trailers supplies the decoded trailers.
    */
   virtual void decodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called with decoded METADATA.
+   * @param decoded METADATA.
+   */
+  virtual void decodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 };
 
 /**
@@ -191,7 +207,7 @@ public:
  * HTTP/1.* Codec settings
  */
 struct Http1Settings {
-  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS
+  // Enable codec to parse absolute URIs. This enables forward/explicit proxy support for non TLS
   // traffic
   bool allow_absolute_url_{false};
   // Allow HTTP/1.0 from downstream.
@@ -210,6 +226,7 @@ struct Http2Settings {
   uint32_t initial_stream_window_size_{DEFAULT_INITIAL_STREAM_WINDOW_SIZE};
   uint32_t initial_connection_window_size_{DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE};
   bool allow_connect_{DEFAULT_ALLOW_CONNECT};
+  bool allow_metadata_{DEFAULT_ALLOW_METADATA};
 
   // disable HPACK compression
   static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
@@ -245,6 +262,8 @@ struct Http2Settings {
   static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
   // By default both nghttp2 and Envoy do not allow CONNECT over H2.
   static const bool DEFAULT_ALLOW_CONNECT = false;
+  // By default Envoy does not allow METADATA support.
+  static const bool DEFAULT_ALLOW_METADATA = false;
 };
 
 /**
@@ -323,9 +342,12 @@ public:
    * Invoked when a new request stream is initiated by the remote.
    * @param response_encoder supplies the encoder to use for creating the response. The request and
    *                         response are backed by the same Stream object.
+   * @param is_internally_created indicates if this stream was originated by a
+   *   client, or was created by Envoy, by example as part of an internal redirect.
    * @return StreamDecoder& supplies the decoder callbacks to fire into for stream decoding events.
    */
-  virtual StreamDecoder& newStream(StreamEncoder& response_encoder) PURE;
+  virtual StreamDecoder& newStream(StreamEncoder& response_encoder,
+                                   bool is_internally_created = false) PURE;
 };
 
 /**

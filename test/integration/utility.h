@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/http/codec_client.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -34,6 +35,7 @@ public:
   void decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Buffer::Instance&, bool end_stream) override;
   void decodeTrailers(Http::HeaderMapPtr&& trailers) override;
+  void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason) override;
@@ -98,6 +100,7 @@ private:
   };
 
   Api::ApiPtr api_;
+  Stats::IsolatedStoreImpl stats_store_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
@@ -118,7 +121,7 @@ public:
    * @param host supplies the host header to use for the request.
    * @param content_type supplies the content-type header to use for the request, if any.
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
-   *         remote easly disconnection.
+   *         remote early disconnection.
    */
   static BufferingStreamDecoderPtr
   makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr, const std::string& method,
@@ -132,20 +135,17 @@ public:
    * @param url supplies the request url.
    * @param body supplies the optional request body to send.
    * @param type supplies the codec to use for the request.
-   * @param version the IP addess version of the client and server.
+   * @param version the IP address version of the client and server.
    * @param host supplies the host header to use for the request.
    * @param content_type supplies the content-type header to use for the request, if any.
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
-   *         remote easly disconnection.
+   *         remote early disconnection.
    */
   static BufferingStreamDecoderPtr
   makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion ip_version, const std::string& host = "host",
                     const std::string& content_type = "");
-
-  // TODO(jmarantz): this should be injectable.
-  static DangerousDeprecatedTestTime evil_singleton_test_time_;
 };
 
 // A set of connection callbacks which tracks connection state.

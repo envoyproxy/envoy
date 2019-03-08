@@ -176,6 +176,17 @@ const char OtherGoodToken[] =
 const char ExpectedPayloadValue[] = "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
                                     "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
                                     "aWNlIn0";
+
+// Base64 decoded Payload JSON
+const char ExpectedPayloadJSON[] = R"(
+{
+  "iss":"https://example.com",
+  "sub":"test@example.com",
+  "exp":2001001001,
+  "aud":"example_service"
+}
+)";
+
 // Config with requires_all requirement
 const char RequiresAllConfig[] = R"(
 providers:

@@ -290,6 +290,39 @@ TEST(PolicyMatcher, PolicyMatcher) {
   checkMatcher(matcher, false, conn);
 }
 
+TEST(RequestedServerNameMatcher, ValidRequestedServerName) {
+  Envoy::Network::MockConnection conn;
+  EXPECT_CALL(conn, requestedServerName())
+      .Times(9)
+      .WillRepeatedly(Return(absl::string_view("www.cncf.io")));
+
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*cncf.io")), true,
+               conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*cncf.*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher("www.*")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*io")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*")), true, conn);
+
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("")), false, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("www.cncf.io")), true,
+               conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("xyz.cncf.io")), false,
+               conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("example.com")), false,
+               conn);
+}
+
+TEST(RequestedServerNameMatcher, EmptyRequestedServerName) {
+  Envoy::Network::MockConnection conn;
+  EXPECT_CALL(conn, requestedServerName()).Times(3).WillRepeatedly(Return(absl::string_view("")));
+
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createRegexMatcher(".*")), true, conn);
+
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("")), true, conn);
+  checkMatcher(RequestedServerNameMatcher(TestUtility::createExactMatcher("example.com")), false,
+               conn);
+}
+
 } // namespace
 } // namespace RBAC
 } // namespace Common

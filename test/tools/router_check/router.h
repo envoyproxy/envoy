@@ -67,7 +67,9 @@ public:
 private:
   RouterCheckTool(
       std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
-      std::unique_ptr<Router::ConfigImpl> config);
+      std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
+      Api::ApiPtr api);
+
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareVirtualHost(ToolConfig& tool_config, const std::string& expected);
@@ -79,7 +81,7 @@ private:
   bool compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                 const std::string& expected);
   /**
-   * Compare the expected and acutal route parameter values. Print out match details if details_
+   * Compare the expected and actual route parameter values. Print out match details if details_
    * flag is set.
    * @param actual holds the actual route returned by the router.
    * @param expected holds the expected parameter value of the route.
@@ -93,5 +95,7 @@ private:
   // TODO(hennna): Switch away from mocks following work done by @rlazarus in github issue #499.
   std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context_;
   std::unique_ptr<Router::ConfigImpl> config_;
+  std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
+  Api::ApiPtr api_;
 };
 } // namespace Envoy

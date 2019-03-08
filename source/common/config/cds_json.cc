@@ -30,14 +30,14 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
   JSON_UTIL_SET_INTEGER(json_health_check, health_check, healthy_threshold);
   JSON_UTIL_SET_BOOL(json_health_check, health_check, reuse_connection);
 
-  const std::string hc_type = json_health_check.getString("type");
-  if (hc_type == "http") {
+  const std::string health_check_type = json_health_check.getString("type");
+  if (health_check_type == "http") {
     health_check.mutable_http_health_check()->set_path(json_health_check.getString("path"));
     if (json_health_check.hasObject("service_name")) {
       health_check.mutable_http_health_check()->set_service_name(
           json_health_check.getString("service_name"));
     }
-  } else if (hc_type == "tcp") {
+  } else if (health_check_type == "tcp") {
     auto* tcp_health_check = health_check.mutable_tcp_health_check();
     std::string send_text;
     for (const Json::ObjectSharedPtr& entry : json_health_check.getObjectArray("send")) {
@@ -52,7 +52,7 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
       tcp_health_check->mutable_receive()->Add()->set_text(hex_string);
     }
   } else {
-    ASSERT(hc_type == "redis");
+    ASSERT(health_check_type == "redis");
     auto* redis_health_check = health_check.mutable_custom_health_check();
     redis_health_check->set_name("envoy.health_checkers.redis");
     if (json_health_check.hasObject("redis_key")) {

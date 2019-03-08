@@ -2,16 +2,18 @@
 
 #include "test/fuzz/fuzz_runner.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Fuzz {
+namespace {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   {
     uint64_t out;
     const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-    StringUtil::atoul(string_buffer.c_str(), out);
+    StringUtil::atoull(string_buffer.c_str(), out);
   }
   {
     const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
@@ -40,7 +42,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     //  @param2: substring of buffer from split_point to end of the string
     {
       const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
-      StringUtil::endsWith(string_buffer.substr(0, split_point), string_buffer.substr(split_point));
+      absl::EndsWith(string_buffer.substr(0, split_point), string_buffer.substr(split_point));
     }
     {
       const std::string string_buffer(reinterpret_cast<const char*>(buf), len);
@@ -59,5 +61,6 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   }
 }
 
+} // namespace
 } // namespace Fuzz
 } // namespace Envoy

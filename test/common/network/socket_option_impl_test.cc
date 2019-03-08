@@ -24,6 +24,44 @@ TEST_F(SocketOptionImplTest, SetOptionSuccessTrue) {
   EXPECT_TRUE(socket_option.setOption(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND));
 }
 
+TEST_F(SocketOptionImplTest, GetOptionDetailsCorrectState) {
+  SocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
+                                 Network::SocketOptionName(std::make_pair(5, 10)), 1};
+
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(*result, makeDetails(std::make_pair(5, 10), 1));
+}
+
+TEST_F(SocketOptionImplTest, GetMoreOptionDetailsCorrectState) {
+  SocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_LISTENING,
+                                 Network::SocketOptionName(std::make_pair(7, 9)), 5};
+
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_LISTENING);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(*result, makeDetails(std::make_pair(7, 9), 5));
+}
+
+TEST_F(SocketOptionImplTest, GetOptionDetailsFailureWrongState) {
+  SocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_LISTENING,
+                                 Network::SocketOptionName(std::make_pair(7, 9)), 5};
+
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_BOUND);
+  EXPECT_FALSE(result.has_value());
+}
+
+TEST_F(SocketOptionImplTest, GetUnsupportedOptReturnsNullopt) {
+  SocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_LISTENING,
+                                 Network::SocketOptionName(absl::nullopt), 5};
+
+  auto result =
+      socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_LISTENING);
+  EXPECT_FALSE(result.has_value());
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

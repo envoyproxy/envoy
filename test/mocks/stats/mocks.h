@@ -29,7 +29,8 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string name() const override { return name_; };
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
 
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(inc, void());
@@ -54,7 +55,8 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string name() const override { return name_; };
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
 
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(dec, void());
@@ -72,6 +74,28 @@ public:
   std::vector<Tag> tags_;
 };
 
+class MockBoolIndicator : public BoolIndicator {
+public:
+  MockBoolIndicator();
+  ~MockBoolIndicator();
+
+  // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
+  // creates a deadlock in gmock and is an unintended use of mock functions.
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
+
+  MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
+  MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
+  MOCK_METHOD1(set, void(bool value));
+  MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(value, bool());
+
+  bool used_;
+  uint64_t value_;
+  std::string name_;
+  std::vector<Tag> tags_;
+};
+
 class MockHistogram : public Histogram {
 public:
   MockHistogram();
@@ -79,7 +103,8 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string name() const override { return name_; };
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
 
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
   MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
@@ -98,9 +123,11 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string name() const override { return name_; };
+  std::string name() const override { return name_; };
+  const char* nameCStr() const override { return name_.c_str(); };
   void merge() override {}
-  const std::string summary() const override { return ""; };
+  const std::string quantileSummary() const override { return ""; };
+  const std::string bucketSummary() const override { return ""; };
 
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
@@ -124,6 +151,7 @@ public:
 
   MOCK_METHOD0(cachedCounters, const std::vector<CounterSharedPtr>&());
   MOCK_METHOD0(cachedGauges, const std::vector<GaugeSharedPtr>&());
+  MOCK_METHOD0(cachedBoolIndicators, const std::vector<BoolIndicatorSharedPtr>&());
   MOCK_METHOD0(cachedHistograms, const std::vector<ParentHistogramSharedPtr>&());
   MOCK_METHOD0(clearCache, void());
 
@@ -154,6 +182,8 @@ public:
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
+  MOCK_METHOD1(boolIndicator, BoolIndicator&(const std::string&));
+  MOCK_CONST_METHOD0(boolIndicators, std::vector<BoolIndicatorSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());

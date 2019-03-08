@@ -17,8 +17,6 @@ namespace {
 
 class OwnedImplTest : public testing::Test {
 public:
-  OwnedImplTest() {}
-
   bool release_callback_called_ = false;
 };
 
@@ -186,6 +184,23 @@ TEST_F(OwnedImplTest, ToString) {
   std::string long_string(5000, 'A');
   append(long_string);
   EXPECT_EQ(absl::StrCat("Hello, world!" + long_string), buffer.toString());
+}
+
+// Regression test for oss-fuzz issue
+// https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=13263, where prepending
+// an empty buffer resulted in a corrupted libevent internal state.
+TEST_F(OwnedImplTest, PrependEmpty) {
+  Buffer::OwnedImpl buf;
+  Buffer::OwnedImpl other_buf;
+  char input[] = "foo";
+  BufferFragmentImpl frag(input, 3, nullptr);
+  buf.addBufferFragment(frag);
+  buf.prepend("");
+  other_buf.move(buf, 1);
+  buf.add("bar");
+  EXPECT_EQ("oobar", buf.toString());
+  buf.drain(5);
+  EXPECT_EQ(0, buf.length());
 }
 
 } // namespace

@@ -1,3 +1,7 @@
+#include "envoy/network/transport_socket.h"
+
+#include "common/network/io_socket_handle_impl.h"
+
 #include "extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
 
 #include "test/mocks/network/mocks.h"
@@ -13,9 +17,11 @@ namespace {
 class TestTransportSocketCallbacks : public Network::TransportSocketCallbacks {
 public:
   explicit TestTransportSocketCallbacks(Network::Connection& connection)
-      : connection_(connection) {}
+      : io_handle_(std::make_unique<Network::IoSocketHandleImpl>()), connection_(connection) {}
 
-  int fd() const override { return 1; }
+  ~TestTransportSocketCallbacks() override {}
+  Network::IoHandle& ioHandle() override { return *io_handle_; }
+  const Network::IoHandle& ioHandle() const override { return *io_handle_; }
   Network::Connection& connection() override { return connection_; }
   bool shouldDrainReadBuffer() override { return false; }
   void setReadBufferReady() override { set_read_buffer_ready_ = true; }
@@ -27,6 +33,7 @@ public:
 private:
   bool event_raised_{false};
   bool set_read_buffer_ready_{false};
+  Network::IoHandlePtr io_handle_;
   Network::Connection& connection_;
 };
 
@@ -41,7 +48,7 @@ protected:
 };
 
 TEST_F(NoOpTransportSocketCallbacksTest, TestAllCallbacks) {
-  EXPECT_EQ(wrapper_callbacks_.fd(), wrapped_callbacks_.fd());
+  EXPECT_EQ(&wrapper_callbacks_.ioHandle(), &wrapped_callbacks_.ioHandle());
   EXPECT_EQ(&connection_, &wrapped_callbacks_.connection());
   EXPECT_FALSE(wrapped_callbacks_.shouldDrainReadBuffer());
 

@@ -26,9 +26,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SetArgReferee;
 using testing::StrictMock;
-using testing::Test;
-using testing::TestParamInfo;
-using testing::TestWithParam;
+using ::testing::TestParamInfo;
 using testing::Values;
 
 namespace Envoy {
@@ -178,7 +176,7 @@ ExpectationSet expectContainerEnd(MockProtocol& proto, MockDecoderEventHandler& 
   return s;
 }
 
-} // end namespace
+} // namespace
 
 class DecoderStateMachineTestBase {
 public:
@@ -191,34 +189,33 @@ public:
 };
 
 class DecoderStateMachineNonValueTest : public DecoderStateMachineTestBase,
-                                        public TestWithParam<ProtocolState> {};
+                                        public testing::TestWithParam<ProtocolState> {};
 
 static std::string protoStateParamToString(const TestParamInfo<ProtocolState>& params) {
   return ProtocolStateNameValues::name(params.param);
 }
 
-INSTANTIATE_TEST_CASE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
-                        Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
-                               ProtocolState::StructBegin, ProtocolState::StructEnd,
-                               ProtocolState::FieldBegin, ProtocolState::FieldEnd,
-                               ProtocolState::MapBegin, ProtocolState::MapEnd,
-                               ProtocolState::ListBegin, ProtocolState::ListEnd,
-                               ProtocolState::SetBegin, ProtocolState::SetEnd),
-                        protoStateParamToString);
+INSTANTIATE_TEST_SUITE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
+                         Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
+                                ProtocolState::StructBegin, ProtocolState::StructEnd,
+                                ProtocolState::FieldBegin, ProtocolState::FieldEnd,
+                                ProtocolState::MapBegin, ProtocolState::MapEnd,
+                                ProtocolState::ListBegin, ProtocolState::ListEnd,
+                                ProtocolState::SetBegin, ProtocolState::SetEnd),
+                         protoStateParamToString);
 
-class DecoderStateMachineTest : public DecoderStateMachineTestBase, public Test {};
-
+class DecoderStateMachineTest : public testing::Test, public DecoderStateMachineTestBase {};
 class DecoderStateMachineValueTest : public DecoderStateMachineTestBase,
-                                     public TestWithParam<FieldType> {};
+                                     public testing::TestWithParam<FieldType> {};
 
-INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
-                        Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
-                               FieldType::I32, FieldType::I64, FieldType::String),
-                        fieldTypeParamToString);
+INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
+                         Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
+                                FieldType::I32, FieldType::I64, FieldType::String),
+                         fieldTypeParamToString);
 
 class DecoderStateMachineNestingTest
     : public DecoderStateMachineTestBase,
-      public TestWithParam<std::tuple<FieldType, FieldType, FieldType>> {};
+      public testing::TestWithParam<std::tuple<FieldType, FieldType, FieldType>> {};
 
 static std::string nestedFieldTypesParamToString(
     const TestParamInfo<std::tuple<FieldType, FieldType, FieldType>>& params) {
@@ -228,7 +225,7 @@ static std::string nestedFieldTypesParamToString(
                      fieldTypeToString(inner_type), fieldTypeToString(value_type));
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     NestedTypes, DecoderStateMachineNestingTest,
     Combine(Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),
             Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),

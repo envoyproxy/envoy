@@ -25,9 +25,9 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-void CheckRequestUtils::setAttrContextPeer(
-    envoy::service::auth::v2alpha::AttributeContext_Peer& peer,
-    const Network::Connection& connection, const std::string& service, const bool local) {
+void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
+                                           const Network::Connection& connection,
+                                           const std::string& service, const bool local) {
 
   // Set the address
   auto addr = peer.mutable_address();
@@ -72,7 +72,7 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
 }
 
 void CheckRequestUtils::setHttpRequest(
-    ::envoy::service::auth::v2alpha::AttributeContext_HttpRequest& httpreq,
+    ::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers) {
 
@@ -93,12 +93,12 @@ void CheckRequestUtils::setHttpRequest(
 
   // Set size
   // need to convert to google buffer 64t;
-  httpreq.set_size(sdfc->requestInfo().bytesReceived());
+  httpreq.set_size(sdfc->streamInfo().bytesReceived());
 
   // Set protocol
-  if (sdfc->requestInfo().protocol()) {
+  if (sdfc->streamInfo().protocol()) {
     httpreq.set_protocol(
-        Envoy::Http::Utility::getProtocolString(sdfc->requestInfo().protocol().value()));
+        Envoy::Http::Utility::getProtocolString(sdfc->streamInfo().protocol().value()));
   }
 
   // Fill in the headers
@@ -117,15 +117,17 @@ void CheckRequestUtils::setHttpRequest(
 }
 
 void CheckRequestUtils::setAttrContextRequest(
-    ::envoy::service::auth::v2alpha::AttributeContext_Request& req,
+    ::envoy::service::auth::v2::AttributeContext_Request& req,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers) {
   setHttpRequest(*req.mutable_http(), callbacks, headers);
 }
 
-void CheckRequestUtils::createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                                        const Envoy::Http::HeaderMap& headers,
-                                        envoy::service::auth::v2alpha::CheckRequest& request) {
+void CheckRequestUtils::createHttpCheck(
+    const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+    const Envoy::Http::HeaderMap& headers,
+    Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
+    envoy::service::auth::v2::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
 
@@ -137,10 +139,13 @@ void CheckRequestUtils::createHttpCheck(const Envoy::Http::StreamDecoderFilterCa
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false);
   setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), "", true);
   setAttrContextRequest(*attrs->mutable_request(), callbacks, headers);
+
+  // Fill in the context extensions:
+  (*attrs->mutable_context_extensions()) = std::move(context_extensions);
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                                       envoy::service::auth::v2alpha::CheckRequest& request) {
+                                       envoy::service::auth::v2::CheckRequest& request) {
 
   auto attrs = request.mutable_attributes();
 

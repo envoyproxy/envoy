@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
 
@@ -36,4 +36,30 @@ api_proto_library_internal(
     name = "memory",
     srcs = ["memory.proto"],
     visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "mutex_stats",
+    srcs = ["mutex_stats.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "certs",
+    srcs = ["certs.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "server_info",
+    srcs = ["server_info.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_proto_library_internal(
+    name = "tap",
+    srcs = ["tap.proto"],
+    deps = [
+        "//envoy/service/tap/v2alpha:common",
+    ],
 )

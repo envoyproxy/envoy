@@ -14,6 +14,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
+namespace {
 
 TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -45,7 +46,9 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
 
 TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
   envoy::config::filter::http::fault::v2::HTTPFault config{};
-  config.mutable_delay()->set_percent(100);
+  config.mutable_delay()->mutable_percentage()->set_numerator(100);
+  config.mutable_delay()->mutable_percentage()->set_denominator(
+      envoy::type::FractionalPercent::HUNDRED);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -66,6 +69,7 @@ TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace Fault
 } // namespace HttpFilters
 } // namespace Extensions

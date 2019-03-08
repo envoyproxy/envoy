@@ -26,6 +26,7 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/network:listener_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
         "//source/common/filesystem:watcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:dns_lib",
@@ -62,6 +63,7 @@ envoy_cc_library(
     ],
     deps = [
         ":libevent_lib",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
@@ -93,6 +95,7 @@ envoy_cc_library(
     ],
     deps = [
         ":dispatcher_lib",
+        "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",

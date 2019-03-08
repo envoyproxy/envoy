@@ -4,11 +4,8 @@
 #include "envoy/event/dispatcher.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
+#include "extensions/filters/network/thrift_proxy/transport.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,11 +13,11 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
-                                     Event::TimeSystem& time_system)
+                                     TimeSource& time_source)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
-      random_generator_(random_generator), time_system_(time_system) {}
+      random_generator_(random_generator), time_source_(time_source) {}
 
 ConnectionManager::~ConnectionManager() {}
 

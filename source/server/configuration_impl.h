@@ -10,55 +10,22 @@
 #include <utility>
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
-#include "envoy/tracing/http_tracer.h"
 
 #include "common/common/logger.h"
 #include "common/json/json_loader.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
-
-/**
- * Implemented by each Tracer and registered via Registry::registerFactory() or the convenience
- * class RegisterFactory.
- */
-class TracerFactory {
-public:
-  virtual ~TracerFactory() {}
-
-  /**
-   * Create a particular HttpTracer implementation. If the implementation is unable to produce an
-   * HttpTracer with the provided parameters, it should throw an EnvoyException in the case of
-   * general error or a Json::Exception if the json configuration is erroneous. The returned
-   * pointer should always be valid.
-   * @param json_config supplies the general json configuration for the HttpTracer
-   * @param server supplies the server instance
-   */
-  virtual Tracing::HttpTracerPtr
-  createHttpTracer(const envoy::config::trace::v2::Tracing& configuration, Instance& server) PURE;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The tracing
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * Returns the identifying name for a particular implementation of tracer produced by the
-   * factory.
-   */
-  virtual std::string name() PURE;
-};
 
 /**
  * Implemented for each Stats::Sink and registered via Registry::registerFactory() or
@@ -112,14 +79,17 @@ public:
 };
 
 /**
- * Implementation of Server::Configuration::Main that reads a configuration from a JSON file.
+ * Implementation of Server::Configuration::Main that reads a configuration from
+ * a JSON file.
  */
 class MainImpl : Logger::Loggable<Logger::Id::config>, public Main {
 public:
   /**
-   * Initialize the configuration. This happens here vs. the constructor because the initialization
-   * will call through the server into the config to get the cluster manager so the config object
-   * must be created already.
+   * MainImpl is created in two phases. In the first phase it is
+   * default-constructed without a configuration as part of the server. The
+   * server won't be fully populated yet. initialize() applies the
+   * configuration in the second phase, as it requires a fully populated server.
+   *
    * @param bootstrap v2 bootstrap proto.
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
@@ -130,7 +100,6 @@ public:
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
   Tracing::HttpTracer& httpTracer() override { return *http_tracer_; }
-  RateLimit::ClientFactory& rateLimitClientFactory() override { return *ratelimit_client_factory_; }
   std::list<Stats::SinkPtr>& statsSinks() override { return stats_sinks_; }
   std::chrono::milliseconds statsFlushInterval() const override { return stats_flush_interval_; }
   std::chrono::milliseconds wdMissTimeout() const override { return watchdog_miss_timeout_; }
@@ -154,12 +123,12 @@ private:
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   Tracing::HttpTracerPtr http_tracer_;
   std::list<Stats::SinkPtr> stats_sinks_;
-  RateLimit::ClientFactoryPtr ratelimit_client_factory_;
   std::chrono::milliseconds stats_flush_interval_;
   std::chrono::milliseconds watchdog_miss_timeout_;
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
+  Extensions::Filters::Common::RateLimit::ClientFactoryPtr ratelimit_client_factory_;
 };
 
 /**

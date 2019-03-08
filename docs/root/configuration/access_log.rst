@@ -9,23 +9,97 @@ Configuration
 Access logs are configured as part of the :ref:`HTTP connection manager config
 <config_http_conn_man>` or :ref:`TCP Proxy <config_network_filters_tcp_proxy>`.
 
-* :ref:`v1 API reference <config_access_log_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.accesslog.v2.AccessLog>`
 
 .. _config_access_log_format:
 
-Format rules
+Format Rules
 ------------
 
-The access log format string contains either command operators or other characters interpreted as a
-plain string. The access log formatter does not make any assumptions about a new line separator, so one
+Access log formats contain command operators that extract the relevant data and insert it.
+They support two formats: :ref:`"format strings" <config_access_log_format_strings>` and
+:ref:`"format dictionaries" <config_access_log_format_dictionaries>`. In both cases, the command operators
+are used to extract the relevant data, which is then inserted into the specified log format.
+Only one access log format may be specified at a time.
+
+.. _config_access_log_format_strings:
+
+Format Strings
+--------------
+
+Format strings are plain strings, specified using the ``format`` key. They may contain
+either command operators or other characters interpreted as a plain string. 
+The access log formatter does not make any assumptions about a new line separator, so one
 has to specified as part of the format string.
 See the :ref:`default format <config_access_log_default_format>` for an example.
-Note that the access log line will contain a '-' character for every not set/empty value.
 
-The same format strings are used by different types of access logs (such as HTTP and TCP). Some
+.. _config_access_log_default_format:
+
+Default Format String
+---------------------
+
+If custom format string is not specified, Envoy uses the following default format:
+
+.. code-block:: none
+
+  [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
+  %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
+  %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
+  "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
+
+Example of the default Envoy access log format:
+
+.. code-block:: none
+
+  [2016-04-15T20:17:00.310Z] "POST /api/v1/locations HTTP/2" 204 - 154 0 226 100 "10.0.35.28"
+  "nsq2http" "cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2" "locations" "tcp://10.0.2.1:80"
+
+.. _config_access_log_format_dictionaries:
+
+Format Dictionaries
+-------------------
+
+Format dictionaries are dictionaries that specify a structured access log output format,
+specified using the ``json_format`` key. This allows logs to be output in a structured format
+such as JSON.
+Similar to format strings, command operators are evaluated and their values inserted into the format
+dictionary to construct the log output.
+
+For example, with the following format provided in the configuration:
+
+.. code-block:: json
+
+  {
+    "config": {
+      "json_format": {
+          "protocol": "%PROTOCOL%",
+          "duration": "%DURATION%",
+          "my_custom_header": "%REQ(MY_CUSTOM_HEADER)%"
+      }
+    }
+  }
+  
+The following JSON object would be written to the log file:
+
+.. code-block:: json
+
+  {"protocol": "HTTP/1.1", "duration": "123", "my_custom_header": "value_of_MY_CUSTOM_HEADER"}
+
+This allows you to specify a custom key for each command operator.
+
+Format dictionaries have the following restrictions:
+
+* The dictionary must map strings to strings (specifically, strings to command operators). Nesting is not currently supported.
+
+Command Operators
+-----------------
+
+Command operators are used to extract values that will be inserted into the access logs.
+The same operators are used by different types of access logs (such as HTTP and TCP). Some
 fields may have slightly different meanings, depending on what type of log it is. Differences
 are noted.
+
+Note that if a value is not set/empty, the logs will contain a '-' character.
 
 The following command operators are supported:
 
@@ -38,7 +112,7 @@ The following command operators are supported:
   TCP
     Downstream connection start time including milliseconds.
 
-  START_TIME can be customized using a `format string <http://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  START_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   In addition to that, START_TIME also accepts following specifiers:
 
   +------------------------+-------------------------------------------------------------+
@@ -121,7 +195,9 @@ The following command operators are supported:
     * **UF**: Upstream connection failure in addition to 503 response code.
     * **UO**: Upstream overflow (:ref:`circuit breaking <arch_overview_circuit_break>`) in addition to 503 response code.
     * **NR**: No :ref:`route configured <arch_overview_http_routing>` for a given request in addition to 404 response code.
+    * **URX**: The request was rejected because the :ref:`upstream retry limit (HTTP) <envoy_api_field_route.RetryPolicy.num_retries>`  or :ref:`maximum connect attempts (TCP) <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>` was reached.
   HTTP only
+    * **DC**: Downstream connection termination.
     * **LH**: Local service failed :ref:`health check request <arch_overview_health_checking>` in addition to 503 response code.
     * **UT**: Upstream request timeout in addition to 504 response code.
     * **LR**: Connection local reset in addition to 503 response code.
@@ -130,6 +206,9 @@ The following command operators are supported:
     * **DI**: The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
     * **FI**: The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
     * **RL**: The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+    * **UAEX**: The request was denied by the external authorization service.
+    * **RLSE**: The request was rejected because there was an error in rate limit service.
+    * **SI**: Stream idle timeout in addition to 408 response code.
 
 %RESPONSE_TX_DURATION%
   HTTP
@@ -208,10 +287,10 @@ The following command operators are supported:
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
     :ref:`Dynamic Metadata <envoy_api_msg_core.Metadata>` info,
-    where NAMESPACE is the the filter namespace used when setting the metadata, KEY is an optional
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
     lookup up key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
-    can be set by filters using the :repo:`RequestInfo <include/envoy/request_info/request_info.h>` API:
+    can be set by filters using the :repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` API:
     *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
 
     ``com.test.my_filter: {"test_key": "foo", "test_object": {"inner_key": "bar"}}``
@@ -233,23 +312,3 @@ The following command operators are supported:
   TCP
     String value set on ssl connection socket for Server Name Indication (SNI)
 
-.. _config_access_log_default_format:
-
-Default format
---------------
-
-If custom format is not specified, Envoy uses the following default format:
-
-.. code-block:: none
-
-  [%START_TIME%] "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%"
-  %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION%
-  %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "%REQ(X-FORWARDED-FOR)%" "%REQ(USER-AGENT)%"
-  "%REQ(X-REQUEST-ID)%" "%REQ(:AUTHORITY)%" "%UPSTREAM_HOST%"\n
-
-Example of the default Envoy access log format:
-
-.. code-block:: none
-
-  [2016-04-15T20:17:00.310Z] "POST /api/v1/locations HTTP/2" 204 - 154 0 226 100 "10.0.35.28"
-  "nsq2http" "cc21d9b0-cf5c-432b-8c7e-98aeb7988cd2" "locations" "tcp://10.0.2.1:80"

@@ -22,6 +22,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace Common {
 namespace Statsd {
+namespace {
 
 class MockWriter : public Writer {
 public:
@@ -29,9 +30,9 @@ public:
 };
 
 class UdpStatsdSinkTest : public testing::TestWithParam<Network::Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -73,9 +74,9 @@ TEST_P(UdpStatsdSinkTest, InitWithIpAddress) {
 }
 
 class UdpStatsdSinkWithTagsTest : public testing::TestWithParam<Network::Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, UdpStatsdSinkWithTagsTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, UdpStatsdSinkWithTagsTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(UdpStatsdSinkWithTagsTest, InitWithIpAddress) {
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -217,6 +218,7 @@ TEST(UdpStatsdSinkWithTagsTest, CheckActualStats) {
   tls_.shutdownThread();
 }
 
+} // namespace
 } // namespace Statsd
 } // namespace Common
 } // namespace StatSinks

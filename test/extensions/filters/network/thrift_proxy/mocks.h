@@ -9,9 +9,11 @@
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"
 #include "extensions/filters/network/thrift_proxy/router/router.h"
+#include "extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
 #include "extensions/filters/network/thrift_proxy/transport.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -174,7 +176,19 @@ public:
   MOCK_METHOD1(onData, bool(Buffer::Instance&));
 };
 
+namespace Router {
+class MockRoute;
+} // namespace Router
+
 namespace ThriftFilters {
+
+class MockFilterChainFactoryCallbacks : public FilterChainFactoryCallbacks {
+public:
+  MockFilterChainFactoryCallbacks();
+  ~MockFilterChainFactoryCallbacks();
+
+  MOCK_METHOD1(addDecoderFilter, void(DecoderFilterSharedPtr));
+};
 
 class MockDecoderFilter : public DecoderFilter {
 public:
@@ -227,9 +241,12 @@ public:
   MOCK_METHOD2(startUpstreamResponse, void(Transport&, Protocol&));
   MOCK_METHOD1(upstreamData, ResponseStatus(Buffer::Instance&));
   MOCK_METHOD0(resetDownstreamConnection, void());
+  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  std::shared_ptr<Router::MockRoute> route_;
 };
 
 class MockFilterConfigFactory : public ThriftFilters::FactoryBase<ProtobufWkt::Struct> {
@@ -251,6 +268,34 @@ public:
 
 namespace Router {
 
+class MockRateLimitPolicyEntry : public RateLimitPolicyEntry {
+public:
+  MockRateLimitPolicyEntry();
+  ~MockRateLimitPolicyEntry();
+
+  MOCK_CONST_METHOD0(stage, uint32_t());
+  MOCK_CONST_METHOD0(disableKey, const std::string&());
+  MOCK_CONST_METHOD5(populateDescriptors,
+                     void(const RouteEntry&, std::vector<RateLimit::Descriptor>&,
+                          const std::string&, const MessageMetadata&,
+                          const Network::Address::Instance&));
+
+  std::string disable_key_;
+};
+
+class MockRateLimitPolicy : public RateLimitPolicy {
+public:
+  MockRateLimitPolicy();
+  ~MockRateLimitPolicy();
+
+  MOCK_CONST_METHOD0(empty, bool());
+  MOCK_CONST_METHOD1(
+      getApplicableRateLimit,
+      const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&(uint32_t));
+
+  std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limit_policy_entry_;
+};
+
 class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
@@ -259,6 +304,10 @@ public:
   // ThriftProxy::Router::RouteEntry
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Envoy::Router::MetadataMatchCriteria*());
+  MOCK_CONST_METHOD0(rateLimitPolicy, RateLimitPolicy&());
+
+  std::string cluster_name_{"fake_cluster"};
+  NiceMock<MockRateLimitPolicy> rate_limit_policy_;
 };
 
 class MockRoute : public Route {
@@ -268,6 +317,8 @@ public:
 
   // ThriftProxy::Router::Route
   MOCK_CONST_METHOD0(routeEntry, const RouteEntry*());
+
+  NiceMock<MockRouteEntry> route_entry_;
 };
 
 } // namespace Router

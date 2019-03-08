@@ -1,5 +1,9 @@
 #pragma once
 
+#include "envoy/common/pure.h"
+#include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/upstream.h"
+
 namespace Envoy {
 namespace Upstream {
 

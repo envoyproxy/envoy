@@ -61,6 +61,23 @@ public:
 
 typedef ConstSingleton<TracingTagValues> Tags;
 
+class TracingLogValues {
+public:
+  // OpenTracing standard key names.
+  const std::string EVENT_KEY = "event";
+
+  // Event names
+  const std::string LAST_DOWNSTREAM_RX_BYTE_RECEIVED = "last_downstream_rx_byte_received";
+  const std::string FIRST_UPSTREAM_TX_BYTE_SENT = "first_upstream_tx_byte_sent";
+  const std::string LAST_UPSTREAM_TX_BYTE_SENT = "last_upstream_tx_byte_sent";
+  const std::string FIRST_UPSTREAM_RX_BYTE_RECEIVED = "first_upstream_rx_byte_received";
+  const std::string LAST_UPSTREAM_RX_BYTE_RECEIVED = "last_upstream_rx_byte_received";
+  const std::string FIRST_DOWNSTREAM_TX_BYTE_SENT = "first_downstream_tx_byte_sent";
+  const std::string LAST_DOWNSTREAM_TX_BYTE_SENT = "last_downstream_tx_byte_sent";
+};
+
+typedef ConstSingleton<TracingLogValues> Logs;
+
 class HttpTracerUtility {
 public:
   /**
@@ -76,7 +93,7 @@ public:
    *
    * @return decision if request is traceable or not and Reason why.
    **/
-  static Decision isTracing(const RequestInfo::RequestInfo& request_info,
+  static Decision isTracing(const StreamInfo::StreamInfo& stream_info,
                             const Http::HeaderMap& request_headers);
 
   /**
@@ -84,8 +101,7 @@ public:
    * 2) Finish active span.
    */
   static void finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
-                           const RequestInfo::RequestInfo& request_info,
-                           const Config& tracing_config);
+                           const StreamInfo::StreamInfo& stream_info, const Config& tracing_config);
 
   static const std::string INGRESS_OPERATION;
   static const std::string EGRESS_OPERATION;
@@ -98,6 +114,7 @@ public:
   const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override {
     return request_headers_for_tags_;
   }
+  bool verbose() const override { return false; }
 
 private:
   const std::vector<Http::LowerCaseString> request_headers_for_tags_;
@@ -115,6 +132,7 @@ public:
   // Tracing::Span
   void setOperation(const std::string&) override {}
   void setTag(const std::string&, const std::string&) override {}
+  void log(SystemTime, const std::string&) override {}
   void finishSpan() override {}
   void injectContext(Http::HeaderMap&) override {}
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
@@ -126,7 +144,7 @@ public:
 class HttpNullTracer : public HttpTracer {
 public:
   // Tracing::HttpTracer
-  SpanPtr startSpan(const Config&, Http::HeaderMap&, const RequestInfo::RequestInfo&,
+  SpanPtr startSpan(const Config&, Http::HeaderMap&, const StreamInfo::StreamInfo&,
                     const Tracing::Decision) override {
     return SpanPtr{new NullSpan()};
   }
@@ -138,7 +156,7 @@ public:
 
   // Tracing::HttpTracer
   SpanPtr startSpan(const Config& config, Http::HeaderMap& request_headers,
-                    const RequestInfo::RequestInfo& request_info,
+                    const StreamInfo::StreamInfo& stream_info,
                     const Tracing::Decision tracing_decision) override;
 
 private:

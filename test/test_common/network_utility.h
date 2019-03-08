@@ -4,6 +4,7 @@
 
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
 namespace Envoy {
@@ -93,7 +94,7 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version,
  * This function tries to create a socket of type IpVersion version and bind to it. If
  * successful this function returns true. If either socket creation or socket
  * bind fail, this function returns false.
- * @param version the IP verson to test.
+ * @param version the IP version to test.
  * @return bool whether IpVersion addresses are "supported".
  */
 bool supportsIpVersion(const Address::IpVersion version);
@@ -106,8 +107,8 @@ bool supportsIpVersion(const Address::IpVersion version);
  * @param type the type of socket to be bound.
  * @returns the address and the fd of the socket bound to that address.
  */
-std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
-                                                                     Address::SocketType type);
+std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
+bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type);
 
 /**
  * Create a transport socket for testing purposes.

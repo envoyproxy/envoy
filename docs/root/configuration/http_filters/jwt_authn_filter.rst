@@ -13,6 +13,8 @@ JWKS is needed to verify JWT signatures. They can be specified in the filter con
 Configuration
 -------------
 
+This filter should be configured with the name *envoy.filters.http.jwt_authn*.
+
 This HTTP :ref:`filter config <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtAuthentication>` has two fields:
 
 * Field *providers* specifies how a JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and where to output its payload.
@@ -78,10 +80,15 @@ Following cluster **example_jwks_cluster** is needed to fetch JWKS.
   cluster:
     name: example_jwks_cluster
     type: STRICT_DNS
-    hosts:
-      socket_address:
-        address: example.com
-        port_value: 80
+    load_assignment:
+      cluster_name: example_jwks_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: example.com
+                port_value: 80
 
 
 Inline JWKS config example

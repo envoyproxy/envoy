@@ -59,18 +59,24 @@ rm -f "${SENTINEL}"
 export USER=bazel
 export TEST_TMPDIR=/build/tmp
 export BAZEL="bazel"
+
+if [[ -f "/etc/redhat-release" ]]
+then
+  export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH ${BAZEL_BUILD_EXTRA_OPTIONS}"
+else
+  export BAZEL_BUILD_EXTRA_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-7/bin --linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
+fi
+
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
 BAZEL_OPTIONS="--package_path %workspace%:${ENVOY_SRCDIR}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
-  --jobs=${NUM_CPUS} --show_task_finish ${BAZEL_BUILD_EXTRA_OPTIONS}"
+  --jobs=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile ${BAZEL_BUILD_EXTRA_OPTIONS}"
 export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE \
   --test_env=UBSAN_OPTIONS=print_stacktrace=1 \
   --cache_test_results=no --test_output=all ${BAZEL_EXTRA_TEST_OPTIONS}"
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
-ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
-ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
 
 # Replace the existing Bazel output cache with a copy of the image's prebuilt deps.
 if [[ -d /bazel-prebuilt-output && ! -d "${TEST_TMPDIR}/_bazel_${USER}" ]]; then
@@ -88,7 +94,7 @@ if [ "$1" != "-nofetch" ]; then
   fi
   
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 3e5b73305b961526ffcee7584251692a9a3ce4b3)
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 6c0625cb4cc9a21df97cef2a1d065463f2ae81ae)
   cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
 fi
 
@@ -105,28 +111,37 @@ mkdir -p "${ENVOY_DELIVERY_DIR}"
 export ENVOY_COVERAGE_DIR="${ENVOY_BUILD_DIR}"/generated/coverage
 mkdir -p "${ENVOY_COVERAGE_DIR}"
 
+# This is where we dump failed test logs for CI collection.
+export ENVOY_FAILED_TEST_LOGS="${ENVOY_BUILD_DIR}"/generated/failed-testlogs
+mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
+
+# This is where we copy the build profile to.
+export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
+mkdir -p "${ENVOY_BUILD_PROFILE}"
+
 # This is where we build for bazel.release* and bazel.dev.
 export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
-
-# Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
-# tools and bazel.rc available for build linkstamping.
-mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools
-mkdir -p "${ENVOY_CI_DIR}"/tools
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/tools/
-ln -sf "${ENVOY_SRCDIR}"/tools/bazel.rc "${ENVOY_CI_DIR}"/tools/
-mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
-mkdir -p "${ENVOY_CI_DIR}"/bazel
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
-
-export BUILDIFIER_BIN="/usr/local/bin/buildifier"
 
 function cleanup() {
   # Remove build artifacts. This doesn't mess with incremental builds as these
   # are just symlinks.
-  rm -f "${ENVOY_SRCDIR}"/bazel-*
-  rm -f "${ENVOY_CI_DIR}"/bazel-*
+  rm -rf "${ENVOY_SRCDIR}"/bazel-*
+  rm -rf "${ENVOY_CI_DIR}"/bazel-*
   rm -rf "${ENVOY_CI_DIR}"/bazel
   rm -rf "${ENVOY_CI_DIR}"/tools
+  rm -f "${ENVOY_CI_DIR}"/.bazelrc
 }
+
+cleanup
 trap cleanup EXIT
+
+# Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
+# .bazelrc available for build linkstamping.
+mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
+mkdir -p "${ENVOY_CI_DIR}"/bazel
+ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
+ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
+cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_CI_DIR}"/
+
+export BUILDIFIER_BIN="/usr/local/bin/buildifier"

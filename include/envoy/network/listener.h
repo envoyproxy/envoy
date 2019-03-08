@@ -7,8 +7,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/network/transport_socket.h"
-#include "envoy/ssl/context.h"
 #include "envoy/stats/scope.h"
 
 namespace Envoy {
@@ -38,6 +36,7 @@ public:
    *         different from configured if for example the configured address binds to port zero.
    */
   virtual Socket& socket() PURE;
+  virtual const Socket& socket() const PURE;
 
   /**
    * @return bool specifies whether the listener should actually listen on the port.
@@ -58,7 +57,14 @@ public:
    * @return uint32_t providing a soft limit on size of the listener's new connection read and write
    *         buffers.
    */
-  virtual uint32_t perConnectionBufferLimitBytes() PURE;
+  virtual uint32_t perConnectionBufferLimitBytes() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the time to wait for all listener filters to complete
+   *         operation. If the timeout is reached, the accepted socket is closed without a
+   *         connection being created. 0 specifies a disabled timeout.
+   */
+  virtual std::chrono::milliseconds listenerFiltersTimeout() const PURE;
 
   /**
    * @return Stats::Scope& the stats scope to use for all listener specific stats.
@@ -101,11 +107,74 @@ public:
 };
 
 /**
+ * Utility struct that encapsulates the information from a udp socket's
+ * recvfrom/recvmmsg call.
+ *
+ * TODO(conqerAtapple): Maybe this belongs inside the UdpListenerCallbacks
+ * class.
+ */
+struct UdpData {
+  Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr peer_address_; // TODO(conquerAtapple): Fix ownership semantics.
+  Buffer::InstancePtr buffer_;
+  // TODO(conquerAtapple):
+  // Add UdpReader here so that the callback handler can
+  // then use the reader to do multiple reads(recvmmsg) once the OS notifies it
+  // has data. We could also just return a `ReaderFactory` that returns either a
+  // `recvfrom` reader (with peer information) or a `read/recvmmsg` reader. This
+  // is still being flushed out (Jan, 2019).
+};
+
+/**
+ * Udp listener callbacks.
+ */
+class UdpListenerCallbacks {
+public:
+  enum class ErrorCode { SyscallError, UnknownError };
+
+  virtual ~UdpListenerCallbacks() = default;
+
+  /**
+   * Called whenever data is received by the underlying udp socket.
+   *
+   * @param data UdpData from the underlying socket.
+   */
+  virtual void onData(const UdpData& data) PURE;
+
+  /**
+   * Called when the underlying socket is ready for write.
+   *
+   * @param socket Underlying server socket for the listener.
+   *
+   * TODO(conqerAtapple): Maybe we need a UdpWriter here instead of Socket.
+   */
+  virtual void onWriteReady(const Socket& socket) PURE;
+
+  /**
+   * Called when there is an error event.
+   *
+   * @param error_code ErrorCode for the error event.
+   * @param error_number System error number.
+   */
+  virtual void onError(const ErrorCode& error_code, int error_number) PURE;
+};
+
+/**
  * An abstract socket listener. Free the listener to stop listening on the socket.
  */
 class Listener {
 public:
   virtual ~Listener() {}
+
+  /**
+   * Temporarily disable accepting new connections.
+   */
+  virtual void disable() PURE;
+
+  /**
+   * Enable accepting new connections.
+   */
+  virtual void enable() PURE;
 };
 
 typedef std::unique_ptr<Listener> ListenerPtr;

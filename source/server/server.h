@@ -8,28 +8,34 @@
 #include <string>
 
 #include "envoy/event/timer.h"
-#include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
+#include "envoy/server/tracer_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_manager_impl.h"
+#include "common/common/assert.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
+#include "common/http/context_impl.h"
+#include "common/memory/heap_shrinker.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
-#include "common/ssl/context_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
+#include "server/configuration_impl.h"
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
+
+#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -40,21 +46,22 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_SERVER_STATS(GAUGE)                                                                    \
-  GAUGE(uptime)                                                                                    \
+#define ALL_SERVER_STATS(BOOL_INDICATOR, COUNTER, GAUGE)                                           \
+  BOOL_INDICATOR(live)                                                                             \
+  COUNTER(debug_assertion_failures)                                                                \
   GAUGE(concurrency)                                                                               \
+  GAUGE(days_until_first_cert_expiring)                                                            \
+  GAUGE(hot_restart_epoch)                                                                         \
   GAUGE(memory_allocated)                                                                          \
   GAUGE(memory_heap_size)                                                                          \
-  GAUGE(live)                                                                                      \
   GAUGE(parent_connections)                                                                        \
   GAUGE(total_connections)                                                                         \
-  GAUGE(version)                                                                                   \
-  GAUGE(days_until_first_cert_expiring)                                                            \
-  GAUGE(hot_restart_epoch)
+  GAUGE(uptime)                                                                                    \
+  GAUGE(version)
 // clang-format on
 
 struct ServerStats {
-  ALL_SERVER_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_SERVER_STATS(GENERATE_BOOL_INDICATOR_STRUCT, GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -80,7 +87,7 @@ public:
  */
 class InstanceUtil : Logger::Loggable<Logger::Id::main> {
 public:
-  enum class BootstrapVersion { V1, V2 };
+  enum class BootstrapVersion { V2 };
 
   /**
    * Default implementation of runtime loader creation used in the real server and in most
@@ -89,7 +96,7 @@ public:
   static Runtime::LoaderPtr createRuntime(Instance& server, Server::Configuration::Initial& config);
 
   /**
-   * Helper for flushing counters, gauges and hisograms to sinks. This takes care of calling
+   * Helper for flushing counters, gauges and histograms to sinks. This takes care of calling
    * flush() on each sink and clearing the cache afterward.
    * @param sinks supplies the list of sinks.
    * @param source provides the metrics being flushed.
@@ -101,10 +108,11 @@ public:
    * @param bootstrap supplies the bootstrap to fill.
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
+   * @param api reference to the Api object
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              Options& options);
+                                              const Options& options, Api::Api& api);
 };
 
 /**
@@ -113,34 +121,32 @@ public:
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
-  RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, HotRestart& hot_restart,
-            AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
-            OverloadManager& overload_manager, std::function<void()> workers_start_cb);
-
-  // Helper function to inititate a shutdown. This can be triggered either by catching SIGTERM
-  // or be called from ServerImpl::shutdown().
-  void shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart);
+  RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
+            Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
+            InitManagerImpl& init_manager, OverloadManager& overload_manager,
+            std::function<void()> workers_start_cb);
 
 private:
   Event::SignalEventPtr sigterm_;
+  Event::SignalEventPtr sigint_;
   Event::SignalEventPtr sig_usr_1_;
   Event::SignalEventPtr sig_hup_;
-  bool shutdown_{};
 };
 
 /**
- * This is the actual full standalone server which stiches together various common components.
+ * This is the actual full standalone server which stitches together various common components.
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
 public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Options& options, Event::TimeSystem& time_system,
+  InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
-               Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls);
+               Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
+               Thread::ThreadFactory& thread_factory);
 
   ~InstanceImpl() override;
 
@@ -162,47 +168,57 @@ public:
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
+  Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
   Runtime::RandomGenerator& random() override { return *random_generator_; }
-  RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
-    return config_->rateLimitClientFactory().create(timeout);
-  }
   Runtime::Loader& runtime() override;
   void shutdown() override;
+  bool isShutdown() override final { return shutdown_; }
   void shutdownAdmin() override;
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
-  Options& options() override { return options_; }
+  const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { return start_time_; }
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
-  Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override { return http_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
-  Event::TimeSystem& timeSystem() override { return time_system_; }
+  TimeSource& timeSource() override { return time_source_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
-    return config_->statsFlushInterval();
+    return config_.statsFlushInterval();
   }
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
-  void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();
   void terminate();
 
-  Options& options_;
-  Event::TimeSystem& time_system_;
+  // init_manager_ must come before any member that participates in initialization, and destructed
+  // only after referencing members are gone, since initialization continuation can potentially
+  // occur at any point during member lifetime.
+  InitManagerImpl init_manager_{"Server"};
+  // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
+  // only after these members can no longer reference it, since:
+  // - There may be active filter chains referencing it in listener_manager_.
+  // - There may be active clusters referencing it in config_.cluster_manager_.
+  // - There may be active connections referencing it.
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
+  bool shutdown_;
+  const Options& options_;
+  TimeSource& time_source_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -210,20 +226,18 @@ private:
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
-  Runtime::LoaderPtr runtime_loader_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
-  std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
+  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
-  std::unique_ptr<Configuration::Main> config_;
+  Configuration::MainImpl config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
   LocalInfo::LocalInfoPtr local_info_;
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
-  InitManagerImpl init_manager_;
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
@@ -235,6 +249,9 @@ private:
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
   std::unique_ptr<RunHelper> run_helper_;
+  Envoy::MutexTracer* mutex_tracer_;
+  Http::ContextImpl http_context_;
+  std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
 };
 
 } // namespace Server

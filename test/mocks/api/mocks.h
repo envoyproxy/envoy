@@ -7,12 +7,15 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
-#include "envoy/stats/store.h"
 
 #include "common/api/os_sys_calls_impl.h"
 
+#if defined(__linux__)
+#include "common/api/os_sys_calls_impl_linux.h"
+#endif
+
 #include "test/mocks/filesystem/mocks.h"
-#include "test/test_common/test_time_system.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -25,18 +28,19 @@ public:
   ~MockApi();
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) override {
-    return Event::DispatcherPtr{allocateDispatcher_(time_system)};
-  }
+  Event::DispatcherPtr allocateDispatcher() override;
+  Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;
+  TimeSource& timeSource() override { return time_system_; }
 
   MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
-  MOCK_METHOD4(createFile,
-               Filesystem::FileSharedPtr(const std::string& path, Event::Dispatcher& dispatcher,
-                                         Thread::BasicLockable& lock, Stats::Store& stats_store));
-  MOCK_METHOD1(fileExists, bool(const std::string& path));
-  MOCK_METHOD1(fileReadToEnd, std::string(const std::string& path));
+  MOCK_METHOD2(allocateDispatcher_,
+               Event::Dispatcher*(Buffer::WatermarkFactoryPtr&& watermark_factory,
+                                  Event::TimeSystem&));
+  MOCK_METHOD0(fileSystem, Filesystem::Instance&());
+  MOCK_METHOD0(threadFactory, Thread::ThreadFactory&());
 
-  std::shared_ptr<Filesystem::MockFile> file_{new Filesystem::MockFile()};
+  testing::NiceMock<Filesystem::MockInstance> file_system_;
+  Event::GlobalTimeSystem time_system_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {
@@ -45,8 +49,6 @@ public:
   ~MockOsSysCalls();
 
   // Api::OsSysCalls
-  SysCallSizeResult write(int fd, const void* buffer, size_t num_bytes) override;
-  SysCallIntResult open(const std::string& full_path, int flags, int mode) override;
   SysCallIntResult setsockopt(int sockfd, int level, int optname, const void* optval,
                               socklen_t optlen) override;
   SysCallIntResult getsockopt(int sockfd, int level, int optname, void* optval,
@@ -55,11 +57,11 @@ public:
   MOCK_METHOD3(bind, SysCallIntResult(int sockfd, const sockaddr* addr, socklen_t addrlen));
   MOCK_METHOD3(ioctl, SysCallIntResult(int sockfd, unsigned long int request, void* argp));
   MOCK_METHOD1(close, SysCallIntResult(int));
-  MOCK_METHOD3(open_, int(const std::string& full_path, int flags, int mode));
-  MOCK_METHOD3(write_, ssize_t(int, const void*, size_t));
   MOCK_METHOD3(writev, SysCallSizeResult(int, const iovec*, int));
   MOCK_METHOD3(readv, SysCallSizeResult(int, const iovec*, int));
   MOCK_METHOD4(recv, SysCallSizeResult(int socket, void* buffer, size_t length, int flags));
+  MOCK_METHOD6(recvfrom, SysCallSizeResult(int sockfd, void* buffer, size_t length, int flags,
+                                           struct sockaddr* addr, socklen_t* addrlen));
 
   MOCK_METHOD3(shmOpen, SysCallIntResult(const char*, int, mode_t));
   MOCK_METHOD1(shmUnlink, SysCallIntResult(const char*));
@@ -73,16 +75,18 @@ public:
                int(int sockfd, int level, int optname, void* optval, socklen_t* optlen));
   MOCK_METHOD3(socket, SysCallIntResult(int domain, int type, int protocol));
 
-  size_t num_writes_;
-  size_t num_open_;
-  Thread::MutexBasicLockable write_mutex_;
-  Thread::MutexBasicLockable open_mutex_;
-  Thread::CondVar write_event_;
-  Thread::CondVar open_event_;
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<int, int, int>;
   std::map<SockOptKey, bool> boolsockopts_;
 };
+
+#if defined(__linux__)
+class MockLinuxOsSysCalls : public LinuxOsSysCallsImpl {
+public:
+  // Api::LinuxOsSysCalls
+  MOCK_METHOD3(sched_getaffinity, SysCallIntResult(pid_t pid, size_t cpusetsize, cpu_set_t* mask));
+};
+#endif
 
 } // namespace Api
 } // namespace Envoy

@@ -1,0 +1,8 @@
+// NOLINT(namespace-envoy)
+constexpr char TEST_SELFSIGNED_RSA_3072_CERT_HASH[] =
+    "bfcd3b22aeb62b29eb9297c9ce32d5ebe2f9d1a8c0b99fea1be861591063e44d";
+constexpr char TEST_SELFSIGNED_RSA_3072_CERT_SPKI[] =
+    "gvALM/Elunobd6QO9sLrXmgrRzyTDwEQ6t4CkxolWQk=";
+constexpr char TEST_SELFSIGNED_RSA_3072_CERT_SERIAL[] = "9dc00702c50003aa";
+constexpr char TEST_SELFSIGNED_RSA_3072_CERT_NOT_BEFORE[] = "Dec 18 01:50:35 2018 GMT";
+constexpr char TEST_SELFSIGNED_RSA_3072_CERT_NOT_AFTER[] = "Dec 17 01:50:35 2020 GMT";

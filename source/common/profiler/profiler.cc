@@ -2,7 +2,7 @@
 
 #include <string>
 
-#ifdef TCMALLOC
+#ifdef PROFILER_AVAILABLE
 
 #include "gperftools/heap-profiler.h"
 #include "gperftools/profiler.h"

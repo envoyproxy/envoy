@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/cidr_range.h"
@@ -26,9 +28,10 @@ public:
     }
     // Use custom fill factors and root branch factors if they are in the valid range.
     if ((fill_factor > 0) && (fill_factor <= 1) && (root_branch_factor > 0)) {
-      trie_.reset(new LcTrie<std::string>(output, exclusive, fill_factor, root_branch_factor));
+      trie_ =
+          std::make_unique<LcTrie<std::string>>(output, exclusive, fill_factor, root_branch_factor);
     } else {
-      trie_.reset(new LcTrie<std::string>(output, exclusive));
+      trie_ = std::make_unique<LcTrie<std::string>>(output, exclusive);
     }
   }
 

@@ -9,6 +9,14 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "pass_through_filter_lib",
+    hdrs = ["pass_through_filter.h"],
+    deps = [
+        "//include/envoy/server:filter_config_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "empty_http_filter_config_lib",
     hdrs = ["empty_http_filter_config.h"],
     deps = [

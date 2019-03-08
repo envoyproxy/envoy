@@ -9,19 +9,20 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RBAC {
-
 namespace {
+
 std::string rbac_config;
+
 } // namespace
 
 class RoleBasedAccessControlNetworkFilterIntegrationTest
-    : public BaseIntegrationTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public BaseIntegrationTest {
 public:
   RoleBasedAccessControlNetworkFilterIntegrationTest()
-      : BaseIntegrationTest(GetParam(), realTime(), rbac_config) {}
+      : BaseIntegrationTest(GetParam(), rbac_config) {}
 
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     rbac_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
@@ -59,9 +60,9 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, RoleBasedAccessControlNetworkFilterIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, RoleBasedAccessControlNetworkFilterIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Allowed) {
   initializeFilter(R"EOF(

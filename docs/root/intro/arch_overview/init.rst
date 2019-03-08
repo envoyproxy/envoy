@@ -7,11 +7,11 @@ accepting new connections.
 
 * During startup, the :ref:`cluster manager <arch_overview_cluster_manager>` goes through a
   multi-phase initialization where it first initializes static/DNS clusters, then predefined
-  :ref:`SDS <arch_overview_dynamic_config_sds>` clusters. Then it initializes
+  :ref:`EDS <arch_overview_dynamic_config_eds>` clusters. Then it initializes
   :ref:`CDS <arch_overview_dynamic_config_cds>` if applicable, waits for one response (or failure),
   and does the same primary/secondary initialization of CDS provided clusters.
 * If clusters use :ref:`active health checking <arch_overview_health_checking>`, Envoy also does a
-  single active HC round.
+  single active health check round.
 * Once cluster manager initialization is done, :ref:`RDS <arch_overview_dynamic_config_rds>` and
   :ref:`LDS <arch_overview_dynamic_config_lds>` initialize (if applicable). The server
   doesn't start accepting connections until there has been at least one response (or failure) for

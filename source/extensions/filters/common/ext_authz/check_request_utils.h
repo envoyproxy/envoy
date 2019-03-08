@@ -13,7 +13,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/service/auth/v2alpha/external_auth.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -45,9 +45,11 @@ public:
    * @param request is the reference to the check request that will be filled up.
    *
    */
-  static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                              const Envoy::Http::HeaderMap& headers,
-                              envoy::service::auth::v2alpha::CheckRequest& request);
+  static void
+  createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                  const Envoy::Http::HeaderMap& headers,
+                  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
+                  envoy::service::auth::v2::CheckRequest& request);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
@@ -57,16 +59,16 @@ public:
    *
    */
   static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                             envoy::service::auth::v2alpha::CheckRequest& request);
+                             envoy::service::auth::v2::CheckRequest& request);
 
 private:
-  static void setAttrContextPeer(envoy::service::auth::v2alpha::AttributeContext_Peer& peer,
+  static void setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
                                  const Network::Connection& connection, const std::string& service,
                                  const bool local);
-  static void setHttpRequest(::envoy::service::auth::v2alpha::AttributeContext_HttpRequest& httpreq,
+  static void setHttpRequest(::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
                              const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                              const Envoy::Http::HeaderMap& headers);
-  static void setAttrContextRequest(::envoy::service::auth::v2alpha::AttributeContext_Request& req,
+  static void setAttrContextRequest(::envoy::service::auth::v2::AttributeContext_Request& req,
                                     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                                     const Envoy::Http::HeaderMap& headers);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);

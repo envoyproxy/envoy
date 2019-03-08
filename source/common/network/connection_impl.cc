@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/exception.h"
 #include "envoy/event/timer.h"
@@ -45,14 +46,15 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
-    : transport_socket_(std::move(transport_socket)), filter_manager_(*this, *this),
-      socket_(std::move(socket)), write_buffer_(dispatcher.getWatermarkFactory().create(
-                                      [this]() -> void { this->onLowWatermark(); },
-                                      [this]() -> void { this->onHighWatermark(); })),
+    : transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
+      filter_manager_(*this, *this), stream_info_(dispatcher.timeSource()),
+      write_buffer_(
+          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
+                                                  [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
-  RELEASE_ASSERT(fd() != -1, "");
+  RELEASE_ASSERT(ioHandle().fd() != -1, "");
 
   if (!connected) {
     connecting_ = true;
@@ -61,14 +63,14 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // We never ask for both early close and read at the same time. If we are reading, we want to
   // consume all available data.
   file_event_ = dispatcher_.createFileEvent(
-      fd(), [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read | Event::FileReadyType::Write);
+      ioHandle().fd(), [this](uint32_t events) -> void { onFileEvent(events); },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(fd() == -1 && delayed_close_timer_ == nullptr,
+  ASSERT(!ioHandle().isOpen() && delayed_close_timer_ == nullptr,
          "ConnectionImpl was unexpectedly torn down without being closed.");
 
   // In general we assume that owning code has called close() previously to the destructor being
@@ -91,7 +93,7 @@ void ConnectionImpl::addReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (fd() == -1) {
+  if (!ioHandle().isOpen()) {
     return;
   }
 
@@ -158,7 +160,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (fd() == -1) {
+  if (!ioHandle().isOpen()) {
     return State::Closed;
   } else if (delayed_close_) {
     return State::Closing;
@@ -168,7 +170,7 @@ Connection::State ConnectionImpl::state() const {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (fd() == -1) {
+  if (!ioHandle().isOpen()) {
     return;
   }
 
@@ -202,14 +204,14 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (fd() == -1) {
+  if (!ioHandle().isOpen()) {
     return;
   }
 
   // Don't set NODELAY for unix domain sockets
   sockaddr addr;
   socklen_t len = sizeof(addr);
-  int rc = getsockname(fd(), &addr, &len);
+  int rc = getsockname(ioHandle().fd(), &addr, &len);
   RELEASE_ASSERT(rc == 0, "");
 
   if (addr.sa_family == AF_UNIX) {
@@ -218,7 +220,7 @@ void ConnectionImpl::noDelay(bool enable) {
 
   // Set NODELAY
   int new_value = enable;
-  rc = setsockopt(fd(), IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
+  rc = setsockopt(ioHandle().fd(), IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #ifdef __APPLE__
   if (-1 == rc && errno == EINVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
@@ -381,9 +383,10 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
     write_buffer_->move(data);
 
     // Activating a write event before the socket is connected has the side-effect of tricking
-    // doWriteReady into thinking the socket is connected. On OS X, the underlying write may fail
+    // doWriteReady into thinking the socket is connected. On macOS, the underlying write may fail
     // with a connection error if a call to write(2) occurs before the connection is completed.
     if (!connecting_) {
+      ASSERT(file_event_ != nullptr, "ConnectionImpl file event was unexpectedly reset");
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
@@ -466,7 +469,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
 
   // It's possible for a write event callback to close the socket (which will cause fd_ to be -1).
   // In this case ignore write event processing.
-  if (fd() != -1 && (events & Event::FileReadyType::Read)) {
+  if (ioHandle().isOpen() && (events & Event::FileReadyType::Read)) {
     onReadReady();
   }
 }
@@ -507,7 +510,7 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    int rc = getsockopt(fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
+    int rc = getsockopt(ioHandle().fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
     ASSERT(0 == rc);
 
     if (error == 0) {
@@ -544,7 +547,7 @@ void ConnectionImpl::onWriteReady() {
       cb(result.bytes_processed_);
 
       // If a callback closes the socket, stop iterating.
-      if (fd() == -1) {
+      if (!ioHandle().isOpen()) {
         return;
       }
     }
@@ -555,7 +558,7 @@ void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
   ASSERT(!connection_stats_,
          "Two network filters are attempting to set connection stats. This indicates an issue "
          "with the configured filter chain.");
-  connection_stats_.reset(new ConnectionStats(stats));
+  connection_stats_ = std::make_unique<ConnectionStats>(stats);
 }
 
 void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {
@@ -610,11 +613,15 @@ ClientConnectionImpl::ClientConnectionImpl(
       file_event_->activate(Event::FileReadyType::Write);
       return;
     }
+    const Network::Address::Instance* source_to_use = source_address.get();
+    if (socket_->localAddress()) {
+      source_to_use = socket_->localAddress().get();
+    }
 
-    if (source_address != nullptr) {
-      const Api::SysCallIntResult result = source_address->bind(fd());
+    if (source_to_use != nullptr) {
+      const Api::SysCallIntResult result = source_to_use->bind(ioHandle().fd());
       if (result.rc_ < 0) {
-        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
+        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_to_use->asString(),
                        strerror(result.errno_));
         bind_error_ = true;
         // Set a special error state to ensure asynchronous close to give the owner of the
@@ -630,7 +637,7 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->remoteAddress()->connect(fd());
+  const Api::SysCallIntResult result = socket_->remoteAddress()->connect(ioHandle().fd());
   if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
@@ -644,7 +651,7 @@ void ClientConnectionImpl::connect() {
       connecting_ = false;
       ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, result.errno_);
 
-      // Trigger a write event. This is needed on OSX and seems harmless on Linux.
+      // Trigger a write event. This is needed on macOS and seems harmless on Linux.
       file_event_->activate(Event::FileReadyType::Write);
     }
   }
@@ -652,7 +659,7 @@ void ClientConnectionImpl::connect() {
   // The local address can only be retrieved for IP connections. Other
   // types, such as UDS, don't have a notion of a local address.
   if (socket_->remoteAddress()->type() == Address::Type::Ip) {
-    socket_->setLocalAddress(Address::addressFromFd(fd()), false);
+    socket_->setLocalAddress(Address::addressFromFd(ioHandle().fd()));
   }
 }
 

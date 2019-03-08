@@ -183,7 +183,7 @@ public:
   virtual ~ThriftMapValue() {}
 
   /**
-   * @return const ThriftValuePtrPairList& containing the ThriftValue key-value paris that comprise
+   * @return const ThriftValuePtrPairList& containing the ThriftValue key-value pairs that comprise
    *         the map.
    */
   virtual const ThriftValuePtrPairList& elements() const PURE;
@@ -223,7 +223,7 @@ public:
 };
 
 /**
- * ThriftObject is a ThrfitStructValue that can be read from a Buffer::Instance.
+ * ThriftObject is a ThriftStructValue that can be read from a Buffer::Instance.
  */
 class ThriftObject : public ThriftStructValue {
 public:

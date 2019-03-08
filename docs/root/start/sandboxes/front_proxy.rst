@@ -44,7 +44,7 @@ First let's create a new machine which will hold the containers::
     $ docker-machine create --driver virtualbox default
     $ eval $(docker-machine env default)
 
-**Step 4: Clone the Envoy repo, and start all of our containers**
+**Step 3: Clone the Envoy repo, and start all of our containers**
 
 If you have not cloned the envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
 or ``git clone https://github.com/envoyproxy/envoy.git``::
@@ -59,7 +59,7 @@ or ``git clone https://github.com/envoyproxy/envoy.git``::
     example_service2_1      /bin/sh -c /usr/local/bin/ ... Up       80/tcp
     example_front-envoy_1   /bin/sh -c /usr/local/bin/ ... Up       0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
 
-**Step 5: Test Envoy's routing capabilities**
+**Step 4: Test Envoy's routing capabilities**
 
 You can now send a request to both services via the front-envoy.
 
@@ -108,7 +108,7 @@ For service2::
 Notice that each request, while sent to the front envoy, was correctly routed
 to the respective application.
 
-**Step 6: Test Envoy's load balancing capabilities**
+**Step 5: Test Envoy's load balancing capabilities**
 
 Now let's scale up our service1 nodes to demonstrate the clustering abilities
 of envoy.::
@@ -175,7 +175,7 @@ requests by doing a round robin of the three service1 machines::
     Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
     * Connection #0 to host 192.168.99.100 left intact
 
-**Step 7: enter containers and curl services**
+**Step 6: enter containers and curl services**
 
 In addition of using ``curl`` from your host machine, you can also enter the
 containers themselves and ``curl`` from inside them. To enter a container you
@@ -192,7 +192,7 @@ enter the ``front-envoy`` container, and ``curl`` for services locally::
   root@81288499f9d7:/# curl localhost:80/service/2
   Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
 
-**Step 8: enter containers and curl admin**
+**Step 7: enter containers and curl admin**
 
 When envoy runs it also attaches an ``admin`` to your desired port. In the example
 configs the admin is bound to port ``8001``. We can ``curl`` it to gain useful information.

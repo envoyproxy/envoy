@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     name = "zipkin_test",
     srcs = [
         "span_buffer_test.cc",
+        "span_context_extractor_test.cc",
         "tracer_test.cc",
         "util_test.cc",
         "zipkin_core_types_test.cc",

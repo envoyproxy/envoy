@@ -16,7 +16,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
-      time_source_(dispatcher.timeSystem()) {
+      time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
@@ -53,6 +53,9 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
+    if (cluster.info()->eds_service_name().has_value()) {
+      cluster_stats->set_cluster_service_name(cluster.info()->eds_service_name().value());
+    }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
       for (auto& hosts : host_set->hostsPerLocality().get()) {
@@ -90,7 +93,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   stats_.responses_.inc();
   // When the connection is established, the message has not yet been read so we
   // will not have a load reporting period.
-  if (message_.get()) {
+  if (message_) {
     startLoadReportPeriod();
   }
 }

@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
+namespace {
 
 TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   NiceMock<Server::MockInstance> server;
@@ -36,11 +37,12 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   MessageUtil::loadFromYaml(yaml_string, configuration);
 
   DynamicOpenTracingTracerFactory factory;
-
-  const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(configuration, server);
+  auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+  const Tracing::HttpTracerPtr tracer = factory.createHttpTracer(*message, server);
   EXPECT_NE(nullptr, tracer);
 }
 
+} // namespace
 } // namespace DynamicOt
 } // namespace Tracers
 } // namespace Extensions

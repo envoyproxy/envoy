@@ -10,7 +10,7 @@ void WatermarkBuffer::add(const void* data, uint64_t size) {
   checkHighWatermark();
 }
 
-void WatermarkBuffer::add(const std::string& data) {
+void WatermarkBuffer::add(absl::string_view data) {
   OwnedImpl::add(data);
   checkHighWatermark();
 }

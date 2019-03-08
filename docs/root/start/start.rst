@@ -68,7 +68,8 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
         filter_chains:
         - filters:
           - name: envoy.http_connection_manager
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
               stat_prefix: ingress_http
               codec_type: AUTO
               route_config:
@@ -93,8 +94,17 @@ The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`
         # Comment out the following line to test on v6 networks
         dns_lookup_family: V4_ONLY
         lb_policy: ROUND_ROBIN
-        hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
-        tls_context: { sni: www.google.com }
+        load_assignment:
+          cluster_name: service_google
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: www.google.com
+                    port_value: 443
+        tls_context:
+          sni: www.google.com
 
 
 Using the Envoy Docker Image
@@ -116,7 +126,7 @@ And now you can execute it with::
 
   $ docker run -d --name envoy -p 9901:9901 -p 10000:10000 envoy:v1
 
-And finally test is using::
+And finally, test it using::
 
   $ curl -v localhost:10000
 
@@ -146,11 +156,15 @@ features. The following sandboxes are available:
 .. toctree::
     :maxdepth: 1
 
+    sandboxes/cors
+    Fault Injection <https://github.com/envoyproxy/envoy/tree/master/examples/fault-injection>
     sandboxes/front_proxy
-    sandboxes/zipkin_tracing
-    sandboxes/jaeger_tracing
-    sandboxes/jaeger_native_tracing
     sandboxes/grpc_bridge
+    sandboxes/jaeger_native_tracing
+    sandboxes/jaeger_tracing
+    Lua <https://github.com/envoyproxy/envoy/tree/master/examples/lua>
+    Redis <https://github.com/envoyproxy/envoy/tree/master/examples/redis>
+    sandboxes/zipkin_tracing
 
 Other use cases
 ---------------
@@ -162,3 +176,4 @@ source distributions that target specific use cases.
     :maxdepth: 1
 
     distro/ambassador
+    distro/gloo

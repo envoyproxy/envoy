@@ -4,7 +4,6 @@ Circuit breaking
 ================
 
 * Circuit Breaking :ref:`architecture overview <arch_overview_circuit_break>`.
-* :ref:`v1 API documentation <config_cluster_manager_cluster_circuit_breakers_v1>`.
 * :ref:`v2 API documentation <envoy_api_msg_cluster.CircuitBreakers>`.
 
 Runtime

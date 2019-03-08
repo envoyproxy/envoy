@@ -1,13 +1,12 @@
 .. _config_overview_v2:
 
-Overview (v2 API)
-=================
+Overview
+========
 
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
 <https://developers.google.com/protocol-buffers/>`_ in the `data plane API
-repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They evolve the
-existing :ref:`v1 APIs and concepts <config_overview_v1>` to support:
+repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They support
 
 * Streaming delivery of `xDS <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_
   API updates via gRPC. This reduces resource requirements and can lower the update latency.
@@ -31,9 +30,8 @@ Bootstrap configuration
 
 To use the v2 API, it's necessary to supply a bootstrap configuration file. This
 provides static server configuration and configures Envoy to access :ref:`dynamic
-configuration if needed <arch_overview_dynamic_config>`. As with the v1
-JSON/YAML configuration, this is supplied on the command-line via the :option:`-c`
-flag, i.e.:
+configuration if needed <arch_overview_dynamic_config>`. This is supplied on the command-line via
+the :option:`-c` flag, i.e.:
 
 .. code-block:: console
 
@@ -43,7 +41,7 @@ where the extension reflects the underlying v2 config representation.
 
 The :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` message is the root of the
 configuration. A key concept in the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
-message is the distinction between static and dynamic resouces. Resources such
+message is the distinction between static and dynamic resources. Resources such
 as a :ref:`Listener <envoy_api_msg_Listener>` or :ref:`Cluster
 <envoy_api_msg_Cluster>` may be supplied either statically in
 :ref:`static_resources <envoy_api_field_config.bootstrap.v2.Bootstrap.static_resources>` or have
@@ -77,7 +75,8 @@ A minimal fully static bootstrap config is provided below:
       filter_chains:
       - filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -109,7 +108,7 @@ Mostly static with dynamic EDS
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A bootstrap config that continues from the above example with :ref:`dynamic endpoint
-discovery <arch_overview_dynamic_config_sds>` via an
+discovery <arch_overview_dynamic_config_eds>` via an
 :ref:`EDS<envoy_api_file_envoy/api/v2/eds.proto>` gRPC management server listening
 on 127.0.0.3:5678 is provided below:
 
@@ -128,7 +127,8 @@ on 127.0.0.3:5678 is provided below:
       filter_chains:
       - filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -255,7 +255,8 @@ The management server could respond to LDS requests with:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: AUTO
           rds:
@@ -323,7 +324,7 @@ Upgrading from v1 configuration
 -------------------------------
 
 While new v2 bootstrap JSON/YAML can be written, it might be expedient to upgrade an existing
-:ref:`v1 JSON/YAML configuration <config_overview_v1>` to v2. To do this (in an Envoy source tree),
+v1 JSON/YAML configuration to v2. To do this (in an Envoy source tree),
 you can run:
 
 .. code-block:: console
@@ -509,7 +510,7 @@ the management of multiple streams and connections to distinct management
 servers.
 
 ADS will allow for hitless updates of configuration by appropriate sequencing.
-For example, suppose *foo.com* was mappped to cluster *X*. We wish to change the
+For example, suppose *foo.com* was mapped to cluster *X*. We wish to change the
 mapping in the route table to point *foo.com* at cluster *Y*. In order to do
 this, a CDS/EDS update must first be delivered containing both clusters *X* and
 *Y*.
@@ -589,8 +590,10 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   connected_state, Gauge, A boolan (1 for connected and 0 for disconnected) that indicates the current connection state with management server
-
+   connected_state, BoolIndicator, Current connection state with management server
+   rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
+   pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
+   
 .. _config_overview_v2_status:
 
 Status
@@ -619,7 +622,7 @@ likely to be at least partially implemented in Envoy but may have wire format
 breaking changes made prior to freezing.
 
 Protos tagged *experimental*, have the same caveats as draft protos
-and may have have major changes made prior to Envoy implementation and freezing.
+and may have major changes made prior to Envoy implementation and freezing.
 
 The current open v2 API issues are tracked `here
 <https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3A%22v2+API%22>`_.

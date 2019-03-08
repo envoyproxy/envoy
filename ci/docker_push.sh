@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Do not ever set -x here, it is a security hazard as it will place the credentials below in the
-# Travis logs.
+# CircleCI logs.
 set -e
 
 # push the envoy image on merge to master
@@ -42,7 +42,7 @@ then
    docker push envoyproxy/envoy-alpine-debug:latest
 
    # This script tests the docker examples.
-   # TODO(mattklein123): This almost always times out on Travis. Do not run for now until we
+   # TODO(mattklein123): This almost always times out on CircleCI. Do not run for now until we
    # have a better CI setup.
    #./ci/verify_examples.sh
 else

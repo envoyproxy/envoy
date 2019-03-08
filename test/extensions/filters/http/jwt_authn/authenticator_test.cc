@@ -27,10 +27,11 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
-class AuthenticatorTest : public ::testing::Test {
+class AuthenticatorTest : public testing::Test {
 public:
-  void SetUp() {
+  void SetUp() override {
     MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
     CreateAuthenticator();
   }
@@ -53,8 +54,12 @@ public:
     std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
       ASSERT_EQ(status, expected_status);
     };
+    auto set_payload_cb = [this](const std::string& name, const ProtobufWkt::Struct& payload) {
+      out_name_ = name;
+      out_payload_ = payload;
+    };
     auto tokens = filter_config_->getExtractor().extract(headers);
-    auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+    auth_->verify(headers, std::move(tokens), std::move(set_payload_cb), std::move(on_complete_cb));
   }
 
   JwtAuthentication proto_config_;
@@ -64,6 +69,8 @@ public:
   AuthenticatorPtr auth_;
   ::google::jwt_verify::JwksPtr jwks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
+  std::string out_name_;
+  ProtobufWkt::Struct out_payload_;
 };
 
 // This test validates a good JWT authentication with a remote Jwks.
@@ -105,6 +112,34 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
 
   // Verify the token is NOT removed.
   EXPECT_TRUE(headers.Authorization());
+
+  // Payload not set by default
+  EXPECT_EQ(out_name_, "");
+}
+
+// This test verifies the Jwt payload is set.
+TEST_F(AuthenticatorTest, TestSetPayload) {
+  // Confit payload_in_metadata flag
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_payload_in_metadata(
+      "my_payload");
+  CreateAuthenticator();
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+      .WillOnce(Invoke(
+          [this](const ::envoy::api::v2::core::HttpUri&, JwksFetcher::JwksReceiver& receiver) {
+            receiver.onJwksSuccess(std::move(jwks_));
+          }));
+
+  // Test OK pubkey and its cache
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Payload is set
+  EXPECT_EQ(out_name_, "my_payload");
+
+  ProtobufWkt::Struct expected_payload;
+  MessageUtil::loadFromJson(ExpectedPayloadJSON, expected_payload);
+  EXPECT_TRUE(TestUtility::protoEqual(out_payload_, expected_payload));
 }
 
 // This test verifies the Jwt with non existing kid
@@ -225,7 +260,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "401"}}}));
 }
 
-// This test verifies when a Jwks fetching is not completed yet, but onDestory() is called,
+// This test verifies when a Jwks fetching is not completed yet, but onDestroy() is called,
 // onComplete() callback should not be called, but internal request->cancel() should be called.
 // Most importantly, no crash.
 TEST_F(AuthenticatorTest, TestOnDestroy) {
@@ -238,13 +273,13 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auto tokens = filter_config_->getExtractor().extract(headers);
   // callback should not be called.
   std::function<void(const Status&)> on_complete_cb = [](const Status&) { FAIL(); };
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  auth_->verify(headers, std::move(tokens), nullptr, std::move(on_complete_cb));
 
   // Destroy the authenticating process.
   auth_->onDestroy();
 }
 
-// This test verifies if "forward_playload_header" is empty, payload is not forwarded.
+// This test verifies if "forward_payload_header" is empty, payload is not forwarded.
 TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   // In this config, there is no forward_payload_header
   auto& provider0 = (*proto_config_.mutable_providers())[std::string(ProviderName)];
@@ -376,6 +411,7 @@ TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
   expectVerifyStatus(Status::JwksPemBadBase64, headers);
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

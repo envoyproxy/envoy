@@ -7,18 +7,20 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
 #include "test/mocks/init/mocks.h"
-#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -39,23 +41,31 @@ const envoy::service::discovery::v2::SdsDummy _sds_dummy;
 // Sds integration base class with following support:
 // * functions to create sds upstream, and send sds response
 // * functions to create secret protobuf.
-class SdsDynamicIntegrationBaseTest : public HttpIntegrationTest,
-                                      public Grpc::GrpcClientIntegrationParamTest {
+class SdsDynamicIntegrationBaseTest : public Grpc::GrpcClientIntegrationParamTest,
+                                      public HttpIntegrationTest {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
         server_cert_("server_cert"), validation_secret_("validation_secret"),
         client_cert_("client_cert") {}
 
 protected:
-  void createSdsStream(FakeUpstream& upstream) {
-    sds_upstream_ = &upstream;
-    AssertionResult result1 = sds_upstream_->waitForHttpConnection(*dispatcher_, sds_connection_);
-    RELEASE_ASSERT(result1, result1.message());
+  void createSdsStream(FakeUpstream&) {
+    createXdsConnection();
 
-    AssertionResult result2 = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+    AssertionResult result2 = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
     RELEASE_ASSERT(result2, result2.message());
-    sds_stream_->startGrpcStream();
+    xds_stream_->startGrpcStream();
+  }
+
+  void setUpSdsConfig(envoy::api::v2::auth::SdsSecretConfig* secret_config,
+                      const std::string& secret_name) {
+    secret_config->set_name(secret_name);
+    auto* config_source = secret_config->mutable_sds_config();
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, "sds_cluster", fake_upstreams_.back()->localAddress());
   }
 
   envoy::api::v2::auth::Secret getServerSecret() {
@@ -75,9 +85,16 @@ protected:
     auto* validation_context = secret.mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-    validation_context->add_verify_certificate_hash(
-        "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
-        "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
+    validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+    return secret;
+  }
+
+  envoy::api::v2::auth::Secret getCvcSecretWithOnlyTrustedCa() {
+    envoy::api::v2::auth::Secret secret;
+    secret.set_name(validation_secret_);
+    auto* validation_context = secret.mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     return secret;
   }
 
@@ -105,19 +122,7 @@ protected:
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
 
-    sds_stream_->sendGrpcMessage(discovery_response);
-  }
-
-  void cleanUpSdsConnection() {
-    ASSERT(sds_upstream_ != nullptr);
-
-    // Don't ASSERT fail if an ADS reconnect ends up unparented.
-    sds_upstream_->set_allow_unexpected_disconnects(true);
-    AssertionResult result = sds_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = sds_connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    sds_connection_.reset();
+    xds_stream_->sendGrpcMessage(discovery_response);
   }
 
   void PrintServerCounters() {
@@ -130,11 +135,6 @@ protected:
   const std::string server_cert_;
   const std::string validation_secret_;
   const std::string client_cert_;
-  Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
-  FakeHttpConnectionPtr sds_connection_;
-  FakeUpstream* sds_upstream_{};
-  FakeStreamPtr sds_stream_;
 };
 
 // Downstream SDS integration test: static Listener with ssl cert from SDS
@@ -152,18 +152,11 @@ public:
       auto* validation_context = common_tls_context->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
-      validation_context->add_verify_certificate_hash(
-          "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
-          "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
+      validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
 
       // Modify the listener ssl cert to use SDS from sds_cluster
       auto* secret_config = common_tls_context->add_tls_certificate_sds_secret_configs();
-      secret_config->set_name("server_cert");
-      auto* config_source = secret_config->mutable_sds_config();
-      auto* api_config_source = config_source->mutable_api_config_source();
-      api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-      auto* grpc_service = api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "sds_cluster", fake_upstreams_.back()->localAddress());
+      setUpSdsConfig(secret_config, "server_cert");
 
       // Add a static sds cluster
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -173,42 +166,40 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory(false, false, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
   }
 
   void createUpstreams() override {
+    create_xds_upstream_ = true;
     HttpIntegrationTest::createUpstreams();
-    // SDS upstream
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
   }
 
   void TearDown() override {
-    cleanUpSdsConnection();
+    cleanUpXdsConnection();
 
     client_ssl_ctx_.reset();
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_.reset();
     codec_client_.reset();
   }
 
   Network::ClientConnectionPtr makeSslClientConnection() {
     Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
     return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_ssl_ctx_->createTransportSocket(), nullptr);
+                                               client_ssl_ctx_->createTransportSocket(nullptr),
+                                               nullptr);
   }
 
 protected:
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getServerSecret());
   };
@@ -217,14 +208,14 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
 // A test that SDS server send a bad secret for a static listener,
 // The first ssl request should fail at connecting.
 // then SDS send a good server secret,  the second request should be OK.
 TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getWrongSecret(server_cert_));
   };
@@ -238,22 +229,20 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   sendSdsResponse(getServerSecret());
 
   // Wait for ssl_context_updated_by_sds counter.
-  if (version_ == Network::Address::IpVersion::v4) {
-    test_server_->waitForCounterGe(
-        "listener.127.0.0.1_0.server_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  } else {
-    test_server_->waitForCounterGe(
-        "listener.[__1]_0.server_ssl_socket_factory.ssl_context_update_by_sds", 1);
-  }
+  test_server_->waitForCounterGe(
+      listenerStatPrefix("server_ssl_socket_factory.ssl_context_update_by_sds"), 1);
 
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
 class SdsDynamicDownstreamCertValidationContextTest : public SdsDynamicDownstreamIntegrationTest {
 public:
+  SdsDynamicDownstreamCertValidationContextTest()
+      : SdsDynamicDownstreamIntegrationTest(), use_combined_validation_context_(false) {}
+
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* common_tls_context = bootstrap.mutable_static_resources()
@@ -269,14 +258,20 @@ public:
       tls_certificate->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
 
-      // Modify the listener certificate context validation to use SDS from sds_cluster
-      auto* secret_config = common_tls_context->mutable_validation_context_sds_secret_config();
-      secret_config->set_name(validation_secret_);
-      auto* config_source = secret_config->mutable_sds_config();
-      auto* api_config_source = config_source->mutable_api_config_source();
-      api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-      auto* grpc_service = api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "sds_cluster", fake_upstreams_.back()->localAddress());
+      if (use_combined_validation_context_) {
+        // Modify the listener context validation type to use combined certificate validation
+        // context.
+        auto* combined_config = common_tls_context->mutable_combined_validation_context();
+        auto* default_validation_context = combined_config->mutable_default_validation_context();
+        default_validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+        auto* secret_config = combined_config->mutable_validation_context_sds_secret_config();
+        setUpSdsConfig(secret_config, validation_secret_);
+      } else {
+        // Modify the listener context validation type to use dynamic certificate validation
+        // context.
+        auto* secret_config = common_tls_context->mutable_validation_context_sds_secret_config();
+        setUpSdsConfig(secret_config, validation_secret_);
+      }
 
       // Add a static sds cluster
       auto* sds_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -286,17 +281,22 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    client_ssl_ctx_ = createClientSslTransportSocketFactory(false, false, context_manager_);
+    client_ssl_ctx_ = createClientSslTransportSocketFactory({}, context_manager_, *api_);
   }
+
+  void enableCombinedValidationContext(bool enable) { use_combined_validation_context_ = enable; }
+
+private:
+  bool use_combined_validation_context_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidationContextTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // A test that SDS server send a good certificate validation context for a static listener.
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getCvcSecret());
   };
@@ -305,7 +305,24 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection();
   };
-  testRouterHeaderOnlyRequestAndResponse(true, &creator);
+  testRouterHeaderOnlyRequestAndResponse(&creator);
+}
+
+// A test that SDS server sends a certificate validation context for a static listener.
+// Listener combines default certificate validation context and the dynamic one.
+// The first ssl request should be OK.
+TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedCertValidationContextSuccess) {
+  enableCombinedValidationContext(true);
+  on_server_init_function_ = [this]() {
+    createSdsStream(*(fake_upstreams_[1]));
+    sendSdsResponse(getCvcSecretWithOnlyTrustedCa());
+  };
+  initialize();
+
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  testRouterHeaderOnlyRequestAndResponse(&creator);
 }
 
 // Upstream SDS integration test: a static cluster has ssl cert from SDS.
@@ -326,12 +343,7 @@ public:
                                 ->mutable_common_tls_context()
                                 ->add_tls_certificate_sds_secret_configs();
 
-      secret_config->set_name("client_cert");
-      auto* config_source = secret_config->mutable_sds_config();
-      auto* api_config_source = config_source->mutable_api_config_source();
-      api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-      auto* grpc_service = api_config_source->add_grpc_services();
-      setGrpcService(*grpc_service, "sds_cluster", fake_upstreams_.back()->localAddress());
+      setUpSdsConfig(secret_config, "client_cert");
     });
 
     HttpIntegrationTest::initialize();
@@ -339,10 +351,9 @@ public:
   }
 
   void TearDown() override {
-    cleanUpSdsConnection();
+    cleanUpXdsConnection();
 
     cleanupUpstreamAndDownstream();
-    fake_upstream_connection_.reset();
     codec_client_.reset();
 
     test_server_.reset();
@@ -351,22 +362,20 @@ public:
 
   void createUpstreams() override {
     // This is for backend with ssl
-    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_), 0,
-                                                  FakeHttpConnection::Type::HTTP1, version_,
+    fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_, *api_),
+                                                  0, FakeHttpConnection::Type::HTTP1, version_,
                                                   timeSystem()));
-    // This is sds.
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_,
-                                                  timeSystem(), enable_half_close_));
+    create_xds_upstream_ = true;
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // To test a static cluster with sds. SDS send a good client secret first.
 // The first request should work.
 TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getClientSecret());
   };
@@ -375,23 +384,23 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
   // There is a race condition here; there are two static clusters:
-  // backend cluster_0 with sds and sds_cluser. cluster_0 is created first, its init_manager
+  // backend cluster_0 with sds and sds_cluster. cluster_0 is created first, its init_manager
   // is called so it issues a sds call, but fail since sds_cluster is not added yet.
   // so cluster_0 is initialized with an empty secret. initialize() will not wait and will return.
-  // the testing request will be called, even though in the pre_workder_function, a good sds is
+  // the testing request will be called, even though in the pre_worker_function, a good sds is
   // send, the cluster will be updated with good secret, the testing request may fail if it is
   // before context is updated. Hence, need to wait for context_update counter.
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
 
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 // To test a static cluster with sds. SDS send a bad client secret first.
 // The first request should fail with 503,  then SDS sends a good client secret,
 // the second request should work.
 TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getWrongSecret(client_cert_));
   };
@@ -413,7 +422,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   test_server_->waitForCounterGe(
       "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
 
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 } // namespace Ssl

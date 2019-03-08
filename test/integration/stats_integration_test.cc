@@ -12,10 +12,10 @@
 namespace Envoy {
 namespace {
 
-class StatsIntegrationTest : public BaseIntegrationTest,
-                             public testing::TestWithParam<Network::Address::IpVersion> {
+class StatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                             public BaseIntegrationTest {
 public:
-  StatsIntegrationTest() : BaseIntegrationTest(GetParam(), realTime()) {}
+  StatsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
 
   void TearDown() override {
     test_server_.reset();
@@ -25,15 +25,15 @@ public:
   void initialize() override { BaseIntegrationTest::initialize(); }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, StatsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(StatsIntegrationTest, WithDefaultConfig) {
   initialize();
 
-  auto live = test_server_->gauge("server.live");
-  EXPECT_EQ(live->value(), 1);
+  auto live = test_server_->boolIndicator("server.live");
+  EXPECT_TRUE(live->value());
   EXPECT_EQ(live->tags().size(), 0);
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -122,8 +122,8 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   });
   initialize();
 
-  auto live = test_server_->gauge("server.live");
-  EXPECT_EQ(live->value(), 1);
+  auto live = test_server_->boolIndicator("server.live");
+  EXPECT_TRUE(live->value());
   EXPECT_EQ(live->tags().size(), 1);
   EXPECT_EQ(live->tags()[0].name_, "test.x");
   EXPECT_EQ(live->tags()[0].value_, "xxx");

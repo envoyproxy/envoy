@@ -13,9 +13,9 @@ Overview
 --------
 
 The HTTP Lua filter allows `Lua <https://www.lua.org/>`_ scripts to be run during both the request
-and response flows. `LuaJIT <http://luajit.org/>`_ is used as the runtime. Because of this, the
+and response flows. `LuaJIT <https://luajit.org/>`_ is used as the runtime. Because of this, the
 supported Lua version is mostly 5.1 with some 5.2 features. See the `LuaJIT documentation
-<http://luajit.org/extensions.html>`_ for more details.
+<https://luajit.org/extensions.html>`_ for more details.
 
 The filter only supports loading Lua code in-line in the configuration. If local filesystem code
 is desired, a trivial in-line script can be used to load the rest of the code from the local
@@ -54,8 +54,8 @@ API.
 Configuration
 -------------
 
-* :ref:`v1 API reference <config_http_filters_lua_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.lua.v2.Lua>`
+* This filter should be configured with the name *envoy.lua*.
 
 Script examples
 ---------------
@@ -74,7 +74,7 @@ more details on the supported API.
 
   -- Called on the response path.
   function envoy_on_response(response_handle)
-    -- Wait for the entire response body and a response header with the the body size.
+    -- Wait for the entire response body and a response header with the body size.
     response_handle:headers():add("response_body_size", response_handle:body():length())
     -- Remove a response header named 'foo'
     response_handle:headers():remove("foo")
@@ -290,16 +290,16 @@ under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 
-requestInfo()
+streamInfo()
 ^^^^^^^^^^^^^
 
 .. code-block:: lua
 
-  requestInfo = handle:requestInfo()
+  streamInfo = handle:streamInfo()
 
-Returns :repo:`information <include/request_info/request_info.h>` related to the current request.
+Returns :repo:`information <include/envoy/stream_info/stream_info.h>` related to the current request.
 
-Returns a :ref:`request info object <config_http_filters_lua_request_info_wrapper>`.
+Returns a :ref:`stream info object <config_http_filters_lua_stream_info_wrapper>`.
 
 connection()
 ^^^^^^^^^^^^
@@ -426,9 +426,9 @@ __pairs()
 Iterates through every *metadata* entry. *key* is a string that supplies a *metadata*
 key. *value* is *metadata* entry value.
 
-.. _config_http_filters_lua_request_info_wrapper:
+.. _config_http_filters_lua_stream_info_wrapper:
 
-Request info object API
+Stream info object API
 -----------------------
 
 protocol()
@@ -436,7 +436,7 @@ protocol()
 
 .. code-block:: lua
 
-  requestInfo:protocol()
+  streamInfo:protocol()
 
 Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
 used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
@@ -446,11 +446,11 @@ dynamicMetadata()
 
 .. code-block:: lua
 
-  requestInfo:dynamicMetadata()
+  streamInfo:dynamicMetadata()
 
-Returns a :ref:`dynamic metadata object <config_http_filters_lua_request_info_dynamic_metadata_wrapper>`.
+Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
 
-.. _config_http_filters_lua_request_info_dynamic_metadata_wrapper:
+.. _config_http_filters_lua_stream_info_dynamic_metadata_wrapper:
 
 Dynamic metadata object API
 ---------------------------

@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/init/init.h"
@@ -24,7 +25,7 @@ public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
              Init::Manager& init_manager, const LocalInfo::LocalInfo& local_info,
-             Stats::Scope& scope, ListenerManager& lm);
+             Stats::Scope& scope, ListenerManager& lm, Api::Api& api);
 
   // Server::LdsApi
   std::string versionInfo() const override { return version_info_; }
@@ -33,7 +34,12 @@ public:
   void initialize(std::function<void()> callback) override;
 
   // Config::SubscriptionCallbacks
+  // TODO(fredlas) deduplicate
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();

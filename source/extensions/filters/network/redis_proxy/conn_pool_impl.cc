@@ -15,15 +15,16 @@ namespace ConnPool {
 
 ConfigImpl::ConfigImpl(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
-    : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)) {}
+    : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
+      enable_hashtagging_(config.enable_hashtagging()) {}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                             EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const Config& config) {
+                             Common::Redis::EncoderPtr&& encoder,
+                             Common::Redis::DecoderFactory& decoder_factory, const Config& config) {
 
   std::unique_ptr<ClientImpl> client(
       new ClientImpl(host, dispatcher, std::move(encoder), decoder_factory, config));
-  client->connection_ = host->createConnection(dispatcher, nullptr).connection_;
+  client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
@@ -32,7 +33,8 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 }
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config)
+                       Common::Redis::EncoderPtr&& encoder,
+                       Common::Redis::DecoderFactory& decoder_factory, const Config& config)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })) {
@@ -52,7 +54,8 @@ ClientImpl::~ClientImpl() {
 
 void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
-PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
+PoolRequest* ClientImpl::makeRequest(const Common::Redis::RespValue& request,
+                                     PoolCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
   pending_requests_.emplace_back(*this, callbacks);
@@ -88,7 +91,7 @@ void ClientImpl::onConnectOrOpTimeout() {
 void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
-  } catch (ProtocolError&) {
+  } catch (Common::Redis::ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::REQUEST_FAILED);
     host_->cluster().stats().upstream_cx_protocol_error_.inc();
     host_->stats().rq_error_.inc();
@@ -139,7 +142,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void ClientImpl::onRespValue(RespValuePtr&& value) {
+void ClientImpl::onRespValue(Common::Redis::RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
   if (!request.canceled_) {
@@ -184,8 +187,9 @@ ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const Config& config) {
-  return ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_,
-                            config);
+  return ClientImpl::create(host, dispatcher,
+                            Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()},
+                            decoder_factory_, config);
 }
 
 InstanceImpl::InstanceImpl(
@@ -199,31 +203,66 @@ InstanceImpl::InstanceImpl(
   });
 }
 
-PoolRequest* InstanceImpl::makeRequest(const std::string& hash_key, const RespValue& value,
+PoolRequest* InstanceImpl::makeRequest(const std::string& key,
+                                       const Common::Redis::RespValue& value,
                                        PoolCallbacks& callbacks) {
-  return tls_->getTyped<ThreadLocalPool>().makeRequest(hash_key, value, callbacks);
+  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, value, callbacks);
 }
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
-                                               const std::string& cluster_name)
-    : parent_(parent), dispatcher_(dispatcher), cluster_(parent_.cm_.get(cluster_name)) {
+                                               std::string cluster_name)
+    : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)) {
 
-  // TODO(mattklein123): Redis is not currently safe for use with CDS. In order to make this work
-  //                     we will need to add thread local cluster removal callbacks so that we can
-  //                     safely clean things up and fail requests.
-  ASSERT(!cluster_->info()->addedViaApi());
-  local_host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
-      [this](uint32_t, const std::vector<Upstream::HostSharedPtr>&,
+  cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
+  Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
+  if (cluster != nullptr) {
+    onClusterAddOrUpdateNonVirtual(*cluster);
+  }
+}
+
+InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
+  if (host_set_member_update_cb_handle_ != nullptr) {
+    host_set_member_update_cb_handle_->remove();
+  }
+  while (!client_map_.empty()) {
+    client_map_.begin()->second->redis_client_->close();
+  }
+}
+
+void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
+    Upstream::ThreadLocalCluster& cluster) {
+  if (cluster.info()->name() != cluster_name_) {
+    return;
+  }
+
+  if (cluster_ != nullptr) {
+    // Treat an update as a removal followed by an add.
+    onClusterRemoval(cluster_name_);
+  }
+
+  ASSERT(cluster_ == nullptr);
+  cluster_ = &cluster;
+  ASSERT(host_set_member_update_cb_handle_ == nullptr);
+  host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
+      [this](const std::vector<Upstream::HostSharedPtr>&,
              const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> void {
         onHostsRemoved(hosts_removed);
       });
 }
 
-InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
-  local_host_set_member_update_cb_handle_->remove();
+void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
+  if (cluster_name != cluster_name_) {
+    return;
+  }
+
+  // Treat cluster removal as a removal of all hosts. Close all connections and fail all pending
+  // requests.
   while (!client_map_.empty()) {
     client_map_.begin()->second->redis_client_->close();
   }
+
+  cluster_ = nullptr;
+  host_set_member_update_cb_handle_ = nullptr;
 }
 
 void InstanceImpl::ThreadLocalPool::onHostsRemoved(
@@ -238,10 +277,16 @@ void InstanceImpl::ThreadLocalPool::onHostsRemoved(
   }
 }
 
-PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_key,
-                                                        const RespValue& request,
+PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
+                                                        const Common::Redis::RespValue& request,
                                                         PoolCallbacks& callbacks) {
-  LbContextImpl lb_context(hash_key);
+  if (cluster_ == nullptr) {
+    ASSERT(client_map_.empty());
+    ASSERT(host_set_member_update_cb_handle_ == nullptr);
+    return nullptr;
+  }
+
+  LbContextImpl lb_context(key, parent_.config_.enableHashtagging());
   Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
   if (!host) {
     return nullptr;
@@ -249,7 +294,7 @@ PoolRequest* InstanceImpl::ThreadLocalPool::makeRequest(const std::string& hash_
 
   ThreadLocalActiveClientPtr& client = client_map_[host];
   if (!client) {
-    client.reset(new ThreadLocalActiveClient(*this));
+    client = std::make_unique<ThreadLocalActiveClient>(*this);
     client->host_ = host;
     client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
     client->redis_client_->addConnectionCallbacks(*client);
@@ -266,6 +311,26 @@ void InstanceImpl::ThreadLocalActiveClient::onEvent(Network::ConnectionEvent eve
     parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->redis_client_));
     parent_.client_map_.erase(client_to_delete);
   }
+}
+
+// Inspired by the redis-cluster hashtagging algorithm
+// https://redis.io/topics/cluster-spec#keys-hash-tags
+absl::string_view InstanceImpl::LbContextImpl::hashtag(absl::string_view v, bool enabled) {
+  if (!enabled) {
+    return v;
+  }
+
+  auto start = v.find('{');
+  if (start == std::string::npos) {
+    return v;
+  }
+
+  auto end = v.find('}', start);
+  if (end == std::string::npos || end == start + 1) {
+    return v;
+  }
+
+  return v.substr(start + 1, end - start - 1);
 }
 
 } // namespace ConnPool

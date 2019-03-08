@@ -2,6 +2,7 @@
 #include "common/event/libevent.h"
 
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/utility.h"
 
 #include "event2/event.h"
 #include "gtest/gtest.h"
@@ -9,6 +10,7 @@
 namespace Envoy {
 namespace Event {
 namespace Test {
+namespace {
 
 class SimulatedTimeSystemTest : public testing::Test {
 protected:
@@ -60,7 +62,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
 
   // Run an event loop in the background to activate timers.
   std::atomic<bool> done(false);
-  auto thread = std::make_unique<Thread::Thread>([this, &done]() {
+  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
     while (!done) {
       event_base_loop(event_system_.get(), 0);
     }
@@ -193,6 +195,7 @@ TEST_F(SimulatedTimeSystemTest, DeleteTime) {
   EXPECT_EQ("36", output_);
 }
 
+} // namespace
 } // namespace Test
 } // namespace Event
 } // namespace Envoy

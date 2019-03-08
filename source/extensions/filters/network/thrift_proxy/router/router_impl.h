@@ -16,6 +16,7 @@
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/router/router.h"
+#include "extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
 #include "extensions/filters/network/thrift_proxy/thrift_object.h"
 
 #include "absl/types/optional.h"
@@ -34,10 +35,10 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
     return metadata_match_criteria_.get();
   }
+  const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
@@ -68,6 +69,7 @@ private:
 
       return parent_.metadataMatchCriteria();
     }
+    const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -85,6 +87,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
+  const RateLimitPolicyImpl rate_limit_policy_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;

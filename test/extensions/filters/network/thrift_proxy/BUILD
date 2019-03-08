@@ -25,7 +25,9 @@ envoy_extension_cc_mock(
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
+        "//source/extensions/filters/network/thrift_proxy/router:router_ratelimit_interface",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
     ],
 )
@@ -52,7 +54,6 @@ envoy_extension_cc_test_library(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:byte_order_lib",
-        "//source/extensions/filters/network/thrift_proxy:protocol_lib",
         "//source/extensions/filters/network/thrift_proxy:thrift_lib",
         "//test/common/buffer:utility_lib",
         "@envoy_api//envoy/config/filter/network/thrift_proxy/v2alpha1:thrift_proxy_cc",
@@ -193,6 +194,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         ":utility_lib",
+        "//source/extensions/filters/network/thrift_proxy:framed_transport_lib",
         "//source/extensions/filters/network/thrift_proxy:twitter_protocol_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
@@ -271,6 +273,24 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:registry_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "router_ratelimit_test",
+    srcs = ["router_ratelimit_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        ":mocks",
+        ":utility_lib",
+        "//include/envoy/common:base_includes",
+        "//source/extensions/filters/network/thrift_proxy:config",
+        "//source/extensions/filters/network/thrift_proxy/router:config",
+        "//source/extensions/filters/network/thrift_proxy/router:router_ratelimit_lib",
+        "//test/mocks/ratelimit:ratelimit_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:printers_lib",
+        "@envoy_api//envoy/config/filter/thrift/rate_limit/v2alpha1:rate_limit_cc",
     ],
 )
 

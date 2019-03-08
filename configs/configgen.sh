@@ -16,7 +16,10 @@ for FILE in $*; do
     cp "$FILE" "$OUT_DIR/certs"
     ;;
   *)
-    cp "$FILE" "$OUT_DIR"
+
+    FILENAME="$(echo $FILE | sed -e 's/.*examples\///g')"
+    # Configuration filenames may conflict. To avoid this we use the full path.
+    cp -v "$FILE" "$OUT_DIR/${FILENAME//\//_}"
     ;;
   esac
 done

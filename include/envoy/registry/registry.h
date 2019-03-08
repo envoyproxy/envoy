@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "envoy/common/exception.h"
 
@@ -28,7 +29,7 @@ template <typename T> class InjectFactory;
  * Note: This class is not thread safe, so registration should only occur in a single threaded
  * environment, which is guaranteed by the static instantiation mentioned above.
  *
- * Exaple lookup: BaseFactoryType *factory =
+ * Example lookup: BaseFactoryType *factory =
  * FactoryRegistry<BaseFactoryType>::getFactory("example_factory_name");
  */
 template <class Base> class FactoryRegistry {
@@ -44,6 +45,13 @@ public:
     }
 
     return absl::StrJoin(ret, ",");
+  }
+  /**
+   * Gets the current map of factory implementations. This is an ordered map for sorting reasons.
+   */
+  static std::map<std::string, Base*>& factories() {
+    static std::map<std::string, Base*>* factories = new std::map<std::string, Base*>;
+    return *factories;
   }
 
   static void registerFactory(Base& factory) {
@@ -94,14 +102,6 @@ private:
     auto result = factories().erase(name);
     RELEASE_ASSERT(result == 1, "");
   }
-
-  /**
-   * Gets the current map of factory implementations. This is an ordered map for sorting reasons.
-   */
-  static std::map<std::string, Base*>& factories() {
-    static std::map<std::string, Base*>* factories = new std::map<std::string, Base*>;
-    return *factories;
-  }
 };
 
 /**
@@ -118,13 +118,21 @@ private:
 template <class T, class Base> class RegisterFactory {
 public:
   /**
-   * Contructor that registers an instance of the factory with the FactoryRegistry.
+   * Constructor that registers an instance of the factory with the FactoryRegistry.
    */
   RegisterFactory() { FactoryRegistry<Base>::registerFactory(instance_); }
 
 private:
   T instance_{};
 };
+
+/**
+ * Macro used for static registration.
+ */
+#define REGISTER_FACTORY(FACTORY, BASE)                                                            \
+  static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
+                                          FACTORY, BASE>                                           \
+      FACTORY##_registered
 
 } // namespace Registry
 } // namespace Envoy

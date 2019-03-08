@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
@@ -32,10 +33,14 @@ public:
   virtual Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) PURE;
 };
 
-typedef SecretProvider<Ssl::TlsCertificateConfig> TlsCertificateConfigProvider;
+typedef std::unique_ptr<envoy::api::v2::auth::TlsCertificate> TlsCertificatePtr;
+typedef std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>
+    CertificateValidationContextPtr;
+
+typedef SecretProvider<envoy::api::v2::auth::TlsCertificate> TlsCertificateConfigProvider;
 typedef std::shared_ptr<TlsCertificateConfigProvider> TlsCertificateConfigProviderSharedPtr;
 
-typedef SecretProvider<Ssl::CertificateValidationContextConfig>
+typedef SecretProvider<envoy::api::v2::auth::CertificateValidationContext>
     CertificateValidationContextConfigProvider;
 typedef std::shared_ptr<CertificateValidationContextConfigProvider>
     CertificateValidationContextConfigProviderSharedPtr;

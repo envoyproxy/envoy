@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_impl.h"
 
@@ -64,6 +66,16 @@ public:
       EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(0);
       EXPECT_TRUE(socket_option.setOption(socket_, state));
     }
+  }
+
+  Socket::Option::Details makeDetails(Network::SocketOptionName name, int value) {
+    absl::string_view value_as_bstr(reinterpret_cast<const char*>(&value), sizeof(value));
+
+    Socket::Option::Details expected_info;
+    expected_info.name_ = name;
+    expected_info.value_ = std::string(value_as_bstr);
+
+    return expected_info;
   }
 };
 

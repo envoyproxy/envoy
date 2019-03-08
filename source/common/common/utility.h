@@ -1,7 +1,5 @@
 #pragma once
 
-#include <strings.h>
-
 #include <chrono>
 #include <cstdint>
 #include <regex>
@@ -21,11 +19,13 @@
 
 namespace Envoy {
 /**
- * Utility class for formatting dates given a strftime style format string.
+ * Utility class for formatting dates given an absl::FormatTime style format string.
  */
 class DateFormatter {
 public:
-  DateFormatter(const std::string& format_string) : format_string_(parse(format_string)) {}
+  DateFormatter(const std::string& format_string) : raw_format_string_(format_string) {
+    parse(format_string);
+  }
 
   /**
    * @return std::string representing the GMT/UTC time based on the input time.
@@ -33,22 +33,18 @@ public:
   std::string fromTime(const SystemTime& time) const;
 
   /**
-   * @return std::string representing the GMT/UTC time based on the input time.
+   * @param time_source time keeping source.
+   * @return std::string representing the GMT/UTC time of a TimeSource based on the format string.
    */
-  std::string fromTime(time_t time) const;
-
-  /**
-   * @return std::string representing the current GMT/UTC time based on the format string.
-   */
-  std::string now();
+  std::string now(TimeSource& time_source);
 
   /**
    * @return std::string the format string used.
    */
-  const std::string& formatString() const { return format_string_; }
+  const std::string& formatString() const { return raw_format_string_; }
 
 private:
-  std::string parse(const std::string& format_string);
+  void parse(const std::string& format_string);
 
   typedef std::vector<int32_t> SpecifierOffsets;
   std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
@@ -72,8 +68,9 @@ private:
     const size_t width_;
 
     // The string before the current specifier's position and after the previous found specifier. A
-    // segment may include strftime accepted specifiers. E.g. given "%3f-this-i%s-a-segment-%4f",
-    // the current specifier is "%4f" and the segment is "-this-i%s-a-segment-".
+    // segment may include absl::FormatTime accepted specifiers. E.g. given
+    // "%3f-this-i%s-a-segment-%4f", the current specifier is "%4f" and the segment is
+    // "-this-i%s-a-segment-".
     const std::string segment_;
 
     // As an indication that this specifier is a %s (expect to be replaced by seconds since the
@@ -84,7 +81,8 @@ private:
   // This holds all specifiers found in a given format string.
   std::vector<Specifier> specifiers_;
 
-  const std::string format_string_;
+  // This is the format string as supplied in configuration, e.g. "foo %3f bar".
+  const std::string raw_format_string_;
 };
 
 /**
@@ -152,29 +150,19 @@ public:
    * Convert a string to an unsigned long, checking for error.
    * @return pointer to the remainder of 'str' if successful, nullptr otherwise.
    */
-  static const char* strtoul(const char* str, uint64_t& out, int base = 10);
+  static const char* strtoull(const char* str, uint64_t& out, int base = 10);
 
   /**
    * Convert a string to an unsigned long, checking for error.
    * @param return true if successful, false otherwise.
    */
-  static bool atoul(const char* str, uint64_t& out, int base = 10);
+  static bool atoull(const char* str, uint64_t& out, int base = 10);
 
   /**
    * Convert a string to a long, checking for error.
    * @param return true if successful, false otherwise.
    */
-  static bool atol(const char* str, int64_t& out, int base = 10);
-
-  /**
-   * Perform a case insensitive compare of 2 strings.
-   * @param lhs supplies string 1.
-   * @param rhs supplies string 2.
-   * @return < 0, 0, > 0 depending on the comparison result.
-   */
-  static int caseInsensitiveCompare(const char* lhs, const char* rhs) {
-    return strcasecmp(lhs, rhs);
-  }
+  static bool atoll(const char* str, int64_t& out, int base = 10);
 
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
@@ -290,7 +278,7 @@ public:
    * @param multi-delimiter supplies chars used to split the delimiter-separated string view.
    * @param keep_empty_string result contains empty strings if the string starts or ends with
    * 'split', or if instances of 'split' are adjacent; default = false.
-   * @return true if found and false otherwise.
+   * @return vector containing views of the split strings
    */
   static std::vector<absl::string_view> splitToken(absl::string_view source,
                                                    absl::string_view delimiters,
@@ -325,17 +313,6 @@ public:
   static std::string escape(const std::string& source);
 
   /**
-   * @return true if @param source ends with @param end.
-   */
-  static bool endsWith(const std::string& source, const std::string& end);
-
-  /**
-   * @param case_sensitive determines if the compare is case sensitive
-   * @return true if @param source starts with @param start and ignores cases.
-   */
-  static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
-
-  /**
    * Provide a default value for a string if empty.
    * @param s string.
    * @param default_value replacement for s if empty.
@@ -350,6 +327,13 @@ public:
    * @return std::string s converted to upper case.
    */
   static std::string toUpper(absl::string_view s);
+
+  /**
+   * Convert a string to lower case.
+   * @param s string.
+   * @return std::string s converted to lower case.
+   */
+  static std::string toLower(absl::string_view s);
 
   /**
    * Callable struct that returns the result of string comparison ignoring case.
@@ -525,6 +509,17 @@ struct StringViewHash {
 };
 
 /**
+ * Hashing functor for use with enum class types.
+ * This is needed for GCC 5.X; newer versions of GCC, as well as clang7, provide native hashing
+ * specializations.
+ */
+struct EnumClassHash {
+  template <typename T> std::size_t operator()(T t) const {
+    return std::hash<std::size_t>()(static_cast<std::size_t>(t));
+  }
+};
+
+/**
  * Computes running standard-deviation using Welford's algorithm:
  * https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
  */
@@ -557,6 +552,54 @@ private:
   uint64_t count_{0};
   double mean_{0};
   double m2_{0};
+};
+
+template <class Value> struct TrieEntry {
+  Value value_{};
+  std::array<std::unique_ptr<TrieEntry>, 256> entries_;
+};
+
+/**
+ * A trie used for faster lookup with lookup time at most equal to the size of the key.
+ */
+template <class Value> struct TrieLookupTable {
+
+  /**
+   * Adds an entry to the Trie at the given Key.
+   * @param key the key used to add the entry.
+   * @param value the value to be associated with the key.
+   */
+  void add(const char* key, Value value) {
+    TrieEntry<Value>* current = &root_;
+    while (uint8_t c = *key) {
+      if (!current->entries_[c]) {
+        current->entries_[c] = std::make_unique<TrieEntry<Value>>();
+      }
+      current = current->entries_[c].get();
+      key++;
+    }
+    current->value_ = value;
+  }
+
+  /**
+   * Finds the entry associated with the key.
+   * @param key the key used to find.
+   * @return the value associated with the key.
+   */
+  Value find(const char* key) const {
+    const TrieEntry<Value>* current = &root_;
+    while (uint8_t c = *key) {
+      current = current->entries_[c].get();
+      if (current) {
+        key++;
+      } else {
+        return nullptr;
+      }
+    }
+    return current->value_;
+  }
+
+  TrieEntry<Value> root_;
 };
 
 } // namespace Envoy

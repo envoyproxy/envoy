@@ -11,5 +11,5 @@ message TestCase {
   test.fuzz.Headers request_headers = 2;
   test.fuzz.Headers response_headers = 3;
   test.fuzz.Headers response_trailers = 4;
-  test.fuzz.RequestInfo request_info = 5;
+  test.fuzz.StreamInfo stream_info = 5;
 }

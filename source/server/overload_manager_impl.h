@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/config/overload/v2alpha/overload.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/overload_manager.h"
@@ -45,20 +46,26 @@ public:
 private:
   std::unordered_map<std::string, TriggerPtr> triggers_;
   std::unordered_set<std::string> fired_triggers_;
-  Stats::Gauge& active_gauge_;
+  Stats::BoolIndicator& active_indicator_;
 };
 
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       ThreadLocal::SlotAllocator& slot_allocator,
-                      const envoy::config::overload::v2alpha::OverloadManager& config);
+                      const envoy::config::overload::v2alpha::OverloadManager& config,
+                      Api::Api& api);
 
   // Server::OverloadManager
   void start() override;
-  void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
+  bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
+
+  // Stop the overload manager timer and wait for any pending resource updates to complete.
+  // After this returns, overload manager clients should not receive any more callbacks
+  // about overload state changes.
+  void stop();
 
 private:
   class Resource : public ResourceMonitor::Callbacks {

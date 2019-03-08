@@ -51,6 +51,9 @@ MockThriftObject::~MockThriftObject() {}
 
 namespace ThriftFilters {
 
+MockFilterChainFactoryCallbacks::MockFilterChainFactoryCallbacks() {}
+MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() {}
+
 MockDecoderFilter::MockDecoderFilter() {
   ON_CALL(*this, transportBegin(_)).WillByDefault(Return(FilterStatus::Continue));
   ON_CALL(*this, transportEnd()).WillByDefault(Return(FilterStatus::Continue));
@@ -77,8 +80,12 @@ MockDecoderFilter::MockDecoderFilter() {
 MockDecoderFilter::~MockDecoderFilter() {}
 
 MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
+  route_.reset(new NiceMock<Router::MockRoute>());
+
   ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
   ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(*this, route()).WillByDefault(Return(route_));
+  ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() {}
 
@@ -106,10 +113,24 @@ FilterFactoryCb MockFilterConfigFactory::createFilterFactoryFromProtoTyped(
 
 namespace Router {
 
-MockRouteEntry::MockRouteEntry() {}
+MockRateLimitPolicyEntry::MockRateLimitPolicyEntry() {
+  ON_CALL(*this, disableKey()).WillByDefault(ReturnRef(disable_key_));
+}
+MockRateLimitPolicyEntry::~MockRateLimitPolicyEntry() {}
+
+MockRateLimitPolicy::MockRateLimitPolicy() {
+  ON_CALL(*this, empty()).WillByDefault(Return(true));
+  ON_CALL(*this, getApplicableRateLimit(_)).WillByDefault(ReturnRef(rate_limit_policy_entry_));
+}
+MockRateLimitPolicy::~MockRateLimitPolicy() {}
+
+MockRouteEntry::MockRouteEntry() {
+  ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
+  ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
+}
 MockRouteEntry::~MockRouteEntry() {}
 
-MockRoute::MockRoute() {}
+MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_)); }
 MockRoute::~MockRoute() {}
 
 } // namespace Router

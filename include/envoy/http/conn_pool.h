@@ -96,6 +96,12 @@ public:
   virtual void drainConnections() PURE;
 
   /**
+   * Determines whether the connection pool is actively processing any requests.
+   * @return true if the connection pool has any pending requests or any active requests.
+   */
+  virtual bool hasActiveConnections() const PURE;
+
+  /**
    * Create a new stream on the pool.
    * @param response_decoder supplies the decoder events to fire when the response is
    *                         available.

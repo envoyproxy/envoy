@@ -64,7 +64,7 @@ bool StringMatcher::match(const ProtobufWkt::Value& value) const {
   return match(value.string_value());
 }
 
-bool StringMatcher::match(const std::string& value) const {
+bool StringMatcher::match(const absl::string_view value) const {
   switch (matcher_.match_pattern_case()) {
   case envoy::type::matcher::StringMatcher::kExact:
     return matcher_.exact() == value;
@@ -73,10 +73,40 @@ bool StringMatcher::match(const std::string& value) const {
   case envoy::type::matcher::StringMatcher::kSuffix:
     return absl::EndsWith(value, matcher_.suffix());
   case envoy::type::matcher::StringMatcher::kRegex:
-    return std::regex_match(value, regex_);
+    return std::regex_match(value.begin(), value.end(), regex_);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+}
+
+bool LowerCaseStringMatcher::match(const absl::string_view value) const {
+  return matcher_.match(value);
+}
+
+bool LowerCaseStringMatcher::match(const ProtobufWkt::Value& value) const {
+  return matcher_.match(value);
+}
+
+envoy::type::matcher::StringMatcher
+LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::StringMatcher& matcher) {
+  envoy::type::matcher::StringMatcher lowercase;
+  switch (matcher.match_pattern_case()) {
+  case envoy::type::matcher::StringMatcher::kRegex:
+    lowercase.set_regex(StringUtil::toLower(matcher.regex()));
+    break;
+  case envoy::type::matcher::StringMatcher::kExact:
+    lowercase.set_exact(StringUtil::toLower(matcher.exact()));
+    break;
+  case envoy::type::matcher::StringMatcher::kPrefix:
+    lowercase.set_prefix(StringUtil::toLower(matcher.prefix()));
+    break;
+  case envoy::type::matcher::StringMatcher::kSuffix:
+    lowercase.set_suffix(StringUtil::toLower(matcher.suffix()));
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+  return lowercase;
 }
 
 ListMatcher::ListMatcher(const envoy::type::matcher::ListMatcher& matcher) : matcher_(matcher) {

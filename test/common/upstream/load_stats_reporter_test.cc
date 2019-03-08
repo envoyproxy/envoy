@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/load_report.pb.h"
 
@@ -23,14 +25,13 @@ using testing::Return;
 // for the happy path for LoadStatsReporter is provided in //test/integration:load_stats_reporter.
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(time_system_);
-  }
+        async_client_(new Grpc::MockAsyncClient()) {}
 
   void createLoadStatsReporter() {
     InSequence s;
@@ -42,8 +43,8 @@ public:
       response_timer_cb_ = timer_cb;
       return response_timer_;
     }));
-    load_stats_reporter_.reset(new LoadStatsReporter(
-        local_info_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_));
+    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
+        local_info_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_);
   }
 
   void expectSendMessage(
@@ -66,6 +67,7 @@ public:
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
 
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -76,7 +78,6 @@ public:
   Event::TimerCb response_timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
@@ -115,9 +116,10 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   createLoadStatsReporter();
   time_system_.setMonotonicTime(std::chrono::microseconds(3));
   // Start reporting on foo.
-  NiceMock<MockCluster> foo_cluster;
+  NiceMock<MockClusterMockPrioritySet> foo_cluster;
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
-  NiceMock<MockCluster> bar_cluster;
+  foo_cluster.info_->eds_service_name_ = "bar";
+  NiceMock<MockClusterMockPrioritySet> bar_cluster;
   MockClusterManager::ClusterInfoMap cluster_info{{"foo", foo_cluster}, {"bar", bar_cluster}};
   ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
   deliverLoadStatsResponse({"foo"});
@@ -127,6 +129,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(5);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
@@ -149,6 +152,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(2);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
@@ -197,6 +201,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(1);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(4));
@@ -224,5 +229,6 @@ TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
   retry_timer_cb_();
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/request_info:request_info_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
     ],
 )

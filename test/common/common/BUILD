@@ -24,6 +24,7 @@ envoy_cc_test(
     srcs = ["assert_test.cc"],
     deps = [
         "//source/common/common:assert_lib",
+        "//test/test_common:logging_lib",
     ],
 )
 
@@ -58,6 +59,12 @@ envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],
     deps = ["//source/common/common:cleanup_lib"],
+)
+
+envoy_cc_test(
+    name = "phantom_test",
+    srcs = ["phantom_test.cc"],
+    deps = ["//source/common/common:phantom"],
 )
 
 envoy_cc_test(
@@ -107,6 +114,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "mutex_tracer_test",
+    srcs = ["mutex_tracer_test.cc"],
+    deps = [
+        "//source/common/common:mutex_tracer_lib",
+        "//test/test_common:contention_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     external_deps = [
@@ -132,6 +148,14 @@ envoy_cc_test(
     srcs = ["perf_annotation_disabled_test.cc"],
     deps = [
         "//source/common/common:perf_annotation_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "stack_array_test",
+    srcs = ["stack_array_test.cc"],
+    deps = [
+        "//source/common/common:stack_array",
     ],
 )
 

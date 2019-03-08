@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/api/v2/cds.pb.h"
+#include "envoy/common/pure.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -51,6 +52,18 @@ public:
    * @return bool whether routing to subsets should take locality weights into account.
    */
   virtual bool localityWeightAware() const PURE;
+
+  /*
+   * @return bool whether the locality weights should be scaled to compensate for the
+   * fraction of hosts removed from the original host set.
+   */
+  virtual bool scaleLocalityWeight() const PURE;
+
+  /*
+   * @return bool whether to attempt to select a host from the entire cluster if host
+   * selection from the fallback subset fails.
+   */
+  virtual bool panicModeAny() const PURE;
 };
 
 } // namespace Upstream

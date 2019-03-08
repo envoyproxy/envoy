@@ -17,6 +17,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Router {
+namespace {
 
 class ShadowWriterImplTest : public testing::Test {
 public:
@@ -28,10 +29,10 @@ public:
     Http::MockAsyncClientRequest request(&cm_.async_client_);
     EXPECT_CALL(
         cm_.async_client_,
-        send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(5))))
-        .WillOnce(Invoke(
-            [&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
-                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+        send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(5))))
+        .WillOnce(
+            Invoke([&](Http::MessagePtr& inner_message, Http::AsyncClient::Callbacks& callbacks,
+                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               EXPECT_EQ(message, inner_message);
               EXPECT_EQ(shadowed_host, message->headers().Host()->value().c_str());
               callback_ = &callbacks;
@@ -69,5 +70,6 @@ TEST_F(ShadowWriterImplTest, NoCluster) {
   writer_.shadow("foo", std::move(message), std::chrono::milliseconds(5));
 }
 
+} // namespace
 } // namespace Router
 } // namespace Envoy

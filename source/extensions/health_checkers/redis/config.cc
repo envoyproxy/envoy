@@ -23,9 +23,7 @@ Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthCh
 /**
  * Static registration for the redis custom health checker. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RedisHealthCheckerFactory,
-                                 Server::Configuration::CustomHealthCheckerFactory>
-    registered_;
+REGISTER_FACTORY(RedisHealthCheckerFactory, Server::Configuration::CustomHealthCheckerFactory);
 
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers

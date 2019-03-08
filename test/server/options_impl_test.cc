@@ -1,4 +1,5 @@
 #include <chrono>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -9,6 +10,13 @@
 
 #include "server/options_impl.h"
 
+#if defined(__linux__)
+#include "server/options_impl_platform_linux.h"
+#endif
+#include "test/mocks/api/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -18,6 +26,7 @@
 using testing::HasSubstr;
 
 namespace Envoy {
+namespace {
 
 class OptionsImplTest : public testing::Test {
 
@@ -33,13 +42,6 @@ public:
     return std::make_unique<OptionsImpl>(argv.size(), argv.data(),
                                          [](uint64_t, uint64_t, bool) { return "1"; },
                                          spdlog::level::warn);
-  }
-
-  const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
-  parseComponentLogLevels(const std::unique_ptr<OptionsImpl>& options,
-                          const std::string& component_log_levels) {
-    options->parseComponentLogLevels(component_log_levels);
-    return options->componentLogLevels();
   }
 };
 
@@ -57,17 +59,6 @@ TEST_F(OptionsImplTest, InvalidCommandLine) {
                           "Couldn't find match for argument");
 }
 
-TEST_F(OptionsImplTest, v1Allowed) {
-  std::unique_ptr<OptionsImpl> options = createOptionsImpl(
-      "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
-      "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
-      "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
-      "--parent-shutdown-time-s 90 --log-path /foo/bar --allow-deprecated-v1-api "
-      "--disable-hot-restart");
-  EXPECT_EQ(Server::Mode::Validate, options->mode());
-  EXPECT_FALSE(options->v2ConfigOnly());
-}
-
 TEST_F(OptionsImplTest, v1Disallowed) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
@@ -75,7 +66,6 @@ TEST_F(OptionsImplTest, v1Disallowed) {
       "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
       "--parent-shutdown-time-s 90 --log-path /foo/bar --disable-hot-restart");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
-  EXPECT_TRUE(options->v2ConfigOnly());
 }
 
 TEST_F(OptionsImplTest, All) {
@@ -85,11 +75,10 @@ TEST_F(OptionsImplTest, All) {
       "--service-cluster cluster --service-node node --service-zone zone "
       "--file-flush-interval-msec 9000 "
       "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
-      "--v2-config-only --disable-hot-restart");
+      "--disable-hot-restart --cpuset-threads");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
-  EXPECT_TRUE(options->v2ConfigOnly());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(1U, options->restartEpoch());
@@ -104,6 +93,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_EQ(true, options->hotRestartDisabled());
+  EXPECT_EQ(true, options->cpusetThreadsEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -111,8 +101,9 @@ TEST_F(OptionsImplTest, All) {
 
 TEST_F(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
-  bool v2_config_only = options->v2ConfigOnly();
   bool hot_restart_disabled = options->hotRestartDisabled();
+  bool signal_handling_enabled = options->signalHandlingEnabled();
+  bool cpuset_threads_enabled = options->cpusetThreadsEnabled();
   Stats::StatsOptionsImpl stats_options;
   stats_options.max_obj_name_length_ = 54321;
   stats_options.max_stat_suffix_length_ = 1234;
@@ -121,7 +112,6 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setConcurrency(42);
   options->setConfigPath("foo");
   options->setConfigYaml("bogus:");
-  options->setV2ConfigOnly(!options->v2ConfigOnly());
   options->setAdminAddressPath("path");
   options->setLocalAddressIpVersion(Network::Address::IpVersion::v6);
   options->setDrainTime(std::chrono::seconds(42));
@@ -138,12 +128,13 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setMaxStats(12345);
   options->setStatsOptions(stats_options);
   options->setHotRestartDisabled(!options->hotRestartDisabled());
+  options->setSignalHandling(!options->signalHandlingEnabled());
+  options->setCpusetThreads(!options->cpusetThreadsEnabled());
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
   EXPECT_EQ("foo", options->configPath());
   EXPECT_EQ("bogus:", options->configYaml());
-  EXPECT_EQ(!v2_config_only, options->v2ConfigOnly());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(std::chrono::seconds(42), options->drainTime());
@@ -161,6 +152,39 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(stats_options.max_obj_name_length_, options->statsOptions().maxObjNameLength());
   EXPECT_EQ(stats_options.max_stat_suffix_length_, options->statsOptions().maxStatSuffixLength());
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
+  EXPECT_EQ(!signal_handling_enabled, options->signalHandlingEnabled());
+  EXPECT_EQ(!cpuset_threads_enabled, options->cpusetThreadsEnabled());
+
+  // Validate that CommandLineOptions is constructed correctly.
+  Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
+
+  EXPECT_EQ(options->baseId(), command_line_options->base_id());
+  EXPECT_EQ(options->concurrency(), command_line_options->concurrency());
+  EXPECT_EQ(options->configPath(), command_line_options->config_path());
+  EXPECT_EQ(options->configYaml(), command_line_options->config_yaml());
+  EXPECT_EQ(options->adminAddressPath(), command_line_options->admin_address_path());
+  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v6,
+            command_line_options->local_address_ip_version());
+  EXPECT_EQ(options->drainTime().count(), command_line_options->drain_time().seconds());
+  // The right hand side char* will be converted into fmt::string_view and then compare.
+  EXPECT_EQ(spdlog::level::to_string_view(options->logLevel()),
+            command_line_options->log_level().data());
+  EXPECT_EQ(options->logFormat(), command_line_options->log_format());
+  EXPECT_EQ(options->logPath(), command_line_options->log_path());
+  EXPECT_EQ(options->parentShutdownTime().count(),
+            command_line_options->parent_shutdown_time().seconds());
+  EXPECT_EQ(options->restartEpoch(), command_line_options->restart_epoch());
+  EXPECT_EQ(options->fileFlushIntervalMsec().count() / 1000,
+            command_line_options->file_flush_interval().seconds());
+  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::Validate, command_line_options->mode());
+  EXPECT_EQ(options->serviceClusterName(), command_line_options->service_cluster());
+  EXPECT_EQ(options->serviceNodeName(), command_line_options->service_node());
+  EXPECT_EQ(options->serviceZone(), command_line_options->service_zone());
+  EXPECT_EQ(options->maxStats(), command_line_options->max_stats());
+  EXPECT_EQ(options->statsOptions().maxObjNameLength(), command_line_options->max_obj_name_len());
+  EXPECT_EQ(options->hotRestartDisabled(), command_line_options->disable_hot_restart());
+  EXPECT_EQ(options->mutexTracingEnabled(), command_line_options->enable_mutex_tracing());
+  EXPECT_EQ(options->cpusetThreadsEnabled(), command_line_options->cpuset_threads());
 }
 
 TEST_F(OptionsImplTest, DefaultParams) {
@@ -171,6 +195,32 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
   EXPECT_EQ(false, options->hotRestartDisabled());
+  EXPECT_EQ(false, options->cpusetThreadsEnabled());
+
+  // Validate that CommandLineOptions is constructed correctly with default params.
+  Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
+
+  EXPECT_EQ(600, command_line_options->drain_time().seconds());
+  EXPECT_EQ(900, command_line_options->parent_shutdown_time().seconds());
+  EXPECT_EQ("", command_line_options->admin_address_path());
+  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v4,
+            command_line_options->local_address_ip_version());
+  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::Serve, command_line_options->mode());
+  EXPECT_EQ(false, command_line_options->disable_hot_restart());
+  EXPECT_EQ(false, command_line_options->cpuset_threads());
+}
+
+// Validates that the server_info proto is in sync with the options.
+TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
+  Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
+  // Failure of this condition indicates that the server_info proto is not in sync with the options.
+  // If an option is added/removed, please update server_info proto as well to keep it in sync.
+  // Currently the following 3 options are not defined in proto, hence the count differs by 3.
+  // 2. version        - default TCLAP argument.
+  // 3. help           - default TCLAP argument.
+  // 4. ignore_rest    - default TCLAP argument.
+  EXPECT_EQ(options->count() - 3, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {
@@ -190,7 +240,7 @@ TEST_F(OptionsImplTest, BadMaxStatsOption) {
 
 TEST_F(OptionsImplTest, ParseComponentLogLevels) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  parseComponentLogLevels(options, "upstream:debug,connection:trace");
+  options->parseComponentLogLevels("upstream:debug,connection:trace");
   const std::vector<std::pair<std::string, spdlog::level::level_enum>>& component_log_levels =
       options->componentLogLevels();
   EXPECT_EQ(2, component_log_levels.size());
@@ -202,33 +252,129 @@ TEST_F(OptionsImplTest, ParseComponentLogLevels) {
 
 TEST_F(OptionsImplTest, ParseComponentLogLevelsWithBlank) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  parseComponentLogLevels(options, "");
+  options->parseComponentLogLevels("");
   EXPECT_EQ(0, options->componentLogLevels().size());
 }
 
 TEST_F(OptionsImplTest, InvalidComponent) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "blah:debug"), MalformedArgvException,
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("blah:debug"), MalformedArgvException,
                           "error: invalid component specified 'blah'");
 }
 
 TEST_F(OptionsImplTest, InvalidLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream:blah,connection:trace"),
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:blah,connection:trace"),
                           MalformedArgvException, "error: invalid log level specified 'blah'");
 }
 
 TEST_F(OptionsImplTest, InvalidComponentLogLevelStructure) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream:foo:bar"),
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream:foo:bar"),
                           MalformedArgvException,
                           "error: component log level not correctly specified 'upstream:foo:bar'");
 }
 
 TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
-  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream"), MalformedArgvException,
+  EXPECT_THROW_WITH_REGEX(options->parseComponentLogLevels("upstream"), MalformedArgvException,
                           "component log level not correctly specified 'upstream'");
 }
 
+// Test that the test constructor comes up with the same default values as the main constructor.
+TEST_F(OptionsImplTest, SaneTestConstructor) {
+  std::unique_ptr<OptionsImpl> regular_options_impl(createOptionsImpl("envoy"));
+  OptionsImpl test_options_impl("service_cluster", "service_node", "service_zone",
+                                spdlog::level::level_enum::info);
+
+  // Specified by constructor
+  EXPECT_EQ("service_cluster", test_options_impl.serviceClusterName());
+  EXPECT_EQ("service_node", test_options_impl.serviceNodeName());
+  EXPECT_EQ("service_zone", test_options_impl.serviceZone());
+  EXPECT_EQ(spdlog::level::level_enum::info, test_options_impl.logLevel());
+
+  // Special (simplified) for tests
+  EXPECT_EQ(1u, test_options_impl.concurrency());
+
+  EXPECT_EQ(regular_options_impl->baseId(), test_options_impl.baseId());
+  EXPECT_EQ(regular_options_impl->configPath(), test_options_impl.configPath());
+  EXPECT_EQ(regular_options_impl->configYaml(), test_options_impl.configYaml());
+  EXPECT_EQ(regular_options_impl->adminAddressPath(), test_options_impl.adminAddressPath());
+  EXPECT_EQ(regular_options_impl->localAddressIpVersion(),
+            test_options_impl.localAddressIpVersion());
+  EXPECT_EQ(regular_options_impl->drainTime(), test_options_impl.drainTime());
+  EXPECT_EQ(spdlog::level::level_enum::info, test_options_impl.logLevel());
+  EXPECT_EQ(regular_options_impl->componentLogLevels(), test_options_impl.componentLogLevels());
+  EXPECT_EQ(regular_options_impl->logPath(), test_options_impl.logPath());
+  EXPECT_EQ(regular_options_impl->parentShutdownTime(), test_options_impl.parentShutdownTime());
+  EXPECT_EQ(regular_options_impl->restartEpoch(), test_options_impl.restartEpoch());
+  EXPECT_EQ(regular_options_impl->mode(), test_options_impl.mode());
+  EXPECT_EQ(regular_options_impl->fileFlushIntervalMsec(),
+            test_options_impl.fileFlushIntervalMsec());
+  EXPECT_EQ(regular_options_impl->maxStats(), test_options_impl.maxStats());
+  EXPECT_EQ(regular_options_impl->statsOptions().maxNameLength(),
+            test_options_impl.statsOptions().maxNameLength());
+  EXPECT_EQ(regular_options_impl->statsOptions().maxObjNameLength(),
+            test_options_impl.statsOptions().maxObjNameLength());
+  EXPECT_EQ(regular_options_impl->statsOptions().maxStatSuffixLength(),
+            test_options_impl.statsOptions().maxStatSuffixLength());
+  EXPECT_EQ(regular_options_impl->hotRestartDisabled(), test_options_impl.hotRestartDisabled());
+  EXPECT_EQ(regular_options_impl->cpusetThreadsEnabled(), test_options_impl.cpusetThreadsEnabled());
+}
+
+TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Both --concurrency and --cpuset-threads options are set; not applying --cpuset-threads.",
+      std::unique_ptr<OptionsImpl> options =
+          createOptionsImpl("envoy -c hello --concurrency 42 --cpuset-threads"));
+}
+
+#if defined(__linux__)
+
+using testing::Return;
+
+class OptionsImplPlatformLinuxTest : public testing::Test {
+public:
+};
+
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest1) {
+  // Success case: cpuset size and hardware thread count are the same.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = fake_cpuset_size;
+
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest2) {
+  // Success case: cpuset size is half of the hardware thread count.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
+
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest3) {
+  // Failure case: cpuset size is bigger than the hardware thread count.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = fake_cpuset_size - 1;
+
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
+  // When sched_getaffinity() fails, expect to get the hardware thread count.
+  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
+  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
+
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
+}
+
+#endif
+
+} // namespace
 } // namespace Envoy

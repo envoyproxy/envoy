@@ -39,7 +39,6 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     // Translate v1 name to v2 name.
     filter->set_name(Extensions::NetworkFilters::NetworkFilterNames::get().v1_converter_.getV2Name(
         json_filter->getString("name")));
-    JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
     const std::string json_config =
         "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +

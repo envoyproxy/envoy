@@ -34,6 +34,8 @@ public:
                                std::vector<Tag>&& tags) override;
   GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
                            std::vector<Tag>&& tags) override;
+  BoolIndicatorSharedPtr makeBoolIndicator(absl::string_view name, std::string&& tag_extracted_name,
+                                           std::vector<Tag>&& tags) override;
 
   /**
    * @param name the full name of the stat.
@@ -67,7 +69,9 @@ public:
   ~CounterImpl() { alloc_.free(data_); }
 
   // Stats::Metric
-  const std::string name() const override { return data_.name(); }
+  std::string name() const override { return std::string(data_.name()); }
+  const char* nameCStr() const override { return data_.name(); }
+  bool used() const override { return data_.flags_ & Flags::Used; }
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -79,12 +83,31 @@ public:
   void inc() override { add(1); }
   uint64_t latch() override { return data_.pending_increment_.exchange(0); }
   void reset() override { data_.value_ = 0; }
-  bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
 
 private:
   StatData& data_;
   StatDataAllocatorImpl<StatData>& alloc_;
+};
+
+/**
+ * Null counter implementation.
+ * No-ops on all calls and requires no underlying metric or data.
+ */
+class NullCounterImpl : public Counter {
+public:
+  NullCounterImpl() {}
+  ~NullCounterImpl() {}
+  std::string name() const override { return ""; }
+  const char* nameCStr() const override { return ""; }
+  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
+  void add(uint64_t) override {}
+  void inc() override {}
+  uint64_t latch() override { return 0; }
+  void reset() override {}
+  bool used() const override { return false; }
+  uint64_t value() const override { return 0; }
 };
 
 /**
@@ -98,7 +121,9 @@ public:
   ~GaugeImpl() { alloc_.free(data_); }
 
   // Stats::Metric
-  const std::string name() const override { return data_.name(); }
+  std::string name() const override { return std::string(data_.name()); }
+  const char* nameCStr() const override { return data_.name(); }
+  bool used() const override { return data_.flags_ & Flags::Used; }
 
   // Stats::Gauge
   virtual void add(uint64_t amount) override {
@@ -113,15 +138,79 @@ public:
   }
   virtual void sub(uint64_t amount) override {
     ASSERT(data_.value_ >= amount);
-    ASSERT(used());
+    ASSERT(used() || amount == 0);
     data_.value_ -= amount;
   }
   virtual uint64_t value() const override { return data_.value_; }
-  bool used() const override { return data_.flags_ & Flags::Used; }
 
 private:
   StatData& data_;
   StatDataAllocatorImpl<StatData>& alloc_;
+};
+
+/**
+ * Null gauge implementation.
+ * No-ops on all calls and requires no underlying metric or data.
+ */
+class NullGaugeImpl : public Gauge {
+public:
+  NullGaugeImpl() {}
+  ~NullGaugeImpl() {}
+  std::string name() const override { return ""; }
+  const char* nameCStr() const override { return ""; }
+  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
+  void add(uint64_t) override {}
+  void inc() override {}
+  void dec() override {}
+  void set(uint64_t) override {}
+  void sub(uint64_t) override {}
+  bool used() const override { return false; }
+  uint64_t value() const override { return 0; }
+};
+
+/**
+ * BoolIndicator implementation that wraps a StatData.
+ */
+template <class StatData> class BoolIndicatorImpl : public BoolIndicator, public MetricImpl {
+public:
+  BoolIndicatorImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
+                    std::string&& tag_extracted_name, std::vector<Tag>&& tags)
+      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), data_(data), alloc_(alloc) {}
+  ~BoolIndicatorImpl() { alloc_.free(data_); }
+
+  // Stats::Metric
+  std::string name() const override { return std::string(data_.name()); }
+  const char* nameCStr() const override { return data_.name(); }
+  bool used() const override { return data_.flags_ & Flags::Used; }
+
+  // Stats::BoolIndicator
+  virtual void set(bool value) override {
+    data_.value_ = value ? 1 : 0;
+    data_.flags_ |= Flags::Used;
+  }
+  virtual bool value() const override { return data_.value_; }
+
+private:
+  StatData& data_;
+  StatDataAllocatorImpl<StatData>& alloc_;
+};
+
+/**
+ * Null bool implementation.
+ * No-ops on all calls and requires no underlying metric or data.
+ */
+class NullBoolIndicatorImpl : public BoolIndicator {
+public:
+  NullBoolIndicatorImpl() {}
+  ~NullBoolIndicatorImpl() {}
+  std::string name() const override { return ""; }
+  const char* nameCStr() const override { return ""; }
+  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
+  void set(bool) override {}
+  bool used() const override { return false; }
+  bool value() const override { return false; }
 };
 
 template <class StatData>
@@ -146,6 +235,17 @@ GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(absl::string_view name
   }
   return std::make_shared<GaugeImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
                                                std::move(tags));
+}
+
+template <class StatData>
+BoolIndicatorSharedPtr StatDataAllocatorImpl<StatData>::makeBoolIndicator(
+    absl::string_view name, std::string&& tag_extracted_name, std::vector<Tag>&& tags) {
+  StatData* data = alloc(name);
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<BoolIndicatorImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
+                                                       std::move(tags));
 }
 
 } // namespace Stats

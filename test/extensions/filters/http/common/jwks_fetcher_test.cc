@@ -49,9 +49,9 @@ timeout:
   seconds: 5
 )";
 
-class JwksFetcherTest : public ::testing::Test {
+class JwksFetcherTest : public testing::Test {
 public:
-  void SetUp() { MessageUtil::loadFromYaml(JwksUri, uri_); }
+  void SetUp() override { MessageUtil::loadFromYaml(JwksUri, uri_); }
   HttpUri uri_;
   testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
 };

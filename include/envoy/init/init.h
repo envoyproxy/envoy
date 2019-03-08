@@ -4,6 +4,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Init {
 
@@ -30,10 +32,32 @@ public:
   virtual ~Manager() {}
 
   /**
-   * Register a target to be initialized in the future. The manager will call initialize() on
-   * each target at some point in the future.
+   * Register a target to be initialized in the future. The manager will call initialize() on each
+   * target at some point in the future. It is an error to register the same target more than once.
+   * @param target the Target to initialize.
+   * @param description a human-readable description of target used for logging and debugging.
    */
-  virtual void registerTarget(Target& target) PURE;
+  virtual void registerTarget(Target& target, absl::string_view description) PURE;
+
+  enum class State {
+    /**
+     * Targets have not been initialized.
+     */
+    NotInitialized,
+    /**
+     * Targets are currently being initialized.
+     */
+    Initializing,
+    /**
+     * All targets have been initialized.
+     */
+    Initialized
+  };
+
+  /**
+   * Returns the current state of the init manager.
+   */
+  virtual State state() const PURE;
 };
 
 } // namespace Init

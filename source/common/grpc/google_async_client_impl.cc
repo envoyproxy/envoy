@@ -13,8 +13,8 @@
 namespace Envoy {
 namespace Grpc {
 
-GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal()
-    : completion_thread_(new Thread::Thread([this] { completionThread(); })) {}
+GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal(Api::Api& api)
+    : completion_thread_(api.threadFactory().createThread([this] { completionThread(); })) {}
 
 GoogleAsyncClientThreadLocal::~GoogleAsyncClientThreadLocal() {
   // Force streams to shutdown and invoke TryCancel() to start the drain of
@@ -68,14 +68,15 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleAsyncClientThreadLocal& tls,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
-                                             const envoy::api::v2::core::GrpcService& config)
+                                             const envoy::api::v2::core::GrpcService& config,
+                                             Api::Api& api)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config);
+  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config, api);
   std::shared_ptr<grpc::Channel> channel = CreateChannel(config.google_grpc().target_uri(), creds);
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
@@ -176,11 +177,16 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
 void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               Http::HeaderMapPtr trailing_metadata,
                                               const std::string& message) {
-  if (grpc_status > Status::GrpcStatus::MaximumValid) {
-    grpc_status = Status::GrpcStatus::Unknown;
+  if (grpc_status > Status::GrpcStatus::MaximumValid || grpc_status < 0) {
+    ENVOY_LOG(error, "notifyRemoteClose invalid gRPC status code {}", grpc_status);
+    // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range
+    // crash..
+    grpc_status = Status::GrpcStatus::InvalidCode;
+    parent_.stats_.streams_closed_[Status::GrpcStatus::Unknown]->inc();
+  } else {
+    parent_.stats_.streams_closed_[grpc_status]->inc();
   }
   ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
-  parent_.stats_.streams_closed_[grpc_status]->inc();
   callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
                                                          : std::make_unique<Http::HeaderMapImpl>());
   callbacks_.onRemoteClose(grpc_status, message);
@@ -326,11 +332,8 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
     Http::HeaderMapPtr trailing_metadata = std::make_unique<Http::HeaderMapImpl>();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
-    const Status::GrpcStatus grpc_status =
-        status_.error_code() <= grpc::StatusCode::DATA_LOSS
-            ? static_cast<Status::GrpcStatus>(status_.error_code())
-            : Status::GrpcStatus::InvalidCode;
-    notifyRemoteClose(grpc_status, std::move(trailing_metadata), status_.error_message());
+    notifyRemoteClose(static_cast<Status::GrpcStatus>(status_.error_code()),
+                      std::move(trailing_metadata), status_.error_message());
     cleanup();
     break;
   }

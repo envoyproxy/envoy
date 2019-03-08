@@ -4,6 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Server {
@@ -35,7 +36,7 @@ public:
    * This can be used if this is later used on a thread where there is no dispatcher.
    */
   virtual void touch() PURE;
-  virtual int32_t threadId() const PURE;
+  virtual const Thread::ThreadId& threadId() const PURE;
   virtual MonotonicTime lastTouchTime() const PURE;
 };
 
