@@ -57,7 +57,7 @@ public:
     stats_.update_attempt_.inc();
     stats_.version_.set(HashUtil::xxHash64(version_info));
     ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
-        resources.size(), version_info);
+              resources.size(), version_info);
     ENVOY_LOG(trace, "resources: {}", RepeatedPtrUtil::debugString(typed_resources));
   }
 
