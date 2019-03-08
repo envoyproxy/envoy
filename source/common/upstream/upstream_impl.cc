@@ -1028,16 +1028,14 @@ void PriorityStateManager::updateClusterPrioritySet(
   // We use std::map to guarantee a stable ordering for zone aware routing.
   std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
 
-  if (hosts) {
-    for (const HostSharedPtr& host : *hosts) {
-      // Take into consideration when a non-EDS cluster has active health checking, i.e. to mark all
-      // the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and then fire
-      // update callbacks to start the health checking process.
-      if (health_checker_flag.has_value()) {
-        host->healthFlagSet(health_checker_flag.value());
-      }
-      hosts_per_locality[host->locality()].push_back(host);
+  for (const HostSharedPtr& host : *hosts) {
+    // Take into consideration when a non-EDS cluster has active health checking, i.e. to mark all
+    // the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and then fire
+    // update callbacks to start the health checking process.
+    if (health_checker_flag.has_value()) {
+      host->healthFlagSet(health_checker_flag.value());
     }
+    hosts_per_locality[host->locality()].push_back(host);
   }
 
   // Do we have hosts for the local locality?
@@ -1068,19 +1066,17 @@ void PriorityStateManager::updateClusterPrioritySet(
   auto per_locality_shared =
       std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), non_empty_local_locality);
 
-  if (hosts) {
-    // If a batch update callback was provided, use that. Otherwise directly update
-    // the PrioritySet.
-    if (update_cb_ != nullptr) {
-      update_cb_->updateHosts(priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
-                              std::move(locality_weights), hosts_added.value_or(*hosts),
-                              hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
-    } else {
-      parent_.prioritySet().updateHosts(
-          priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
-          std::move(locality_weights), hosts_added.value_or(*hosts),
-          hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
-    }
+  // If a batch update callback was provided, use that. Otherwise directly update
+  // the PrioritySet.
+  if (update_cb_ != nullptr) {
+    update_cb_->updateHosts(priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
+                            std::move(locality_weights), hosts_added.value_or(*hosts),
+                            hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
+  } else {
+    parent_.prioritySet().updateHosts(
+        priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
+        std::move(locality_weights), hosts_added.value_or(*hosts),
+        hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
   }
 }
 
@@ -1119,6 +1115,9 @@ void StaticClusterImpl::startPreInit() {
 
   auto& priority_state = priority_state_manager_->priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
+    if (priority_state[i].first == nullptr) {
+      priority_state[i].first = std::make_unique<HostVector>();
+    }
     priority_state_manager_->updateClusterPrioritySet(
         i, std::move(priority_state[i].first), absl::nullopt, absl::nullopt, health_checker_flag,
         overprovisioning_factor_);
