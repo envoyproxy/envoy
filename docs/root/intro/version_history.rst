@@ -25,6 +25,10 @@ Version history
   <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_client_headers>` and :ref:`upstream headers
   <envoy_api_field_config.filter.http.ext_authz.v2.AuthorizationResponse.allowed_upstream_headers>` replaces the previous *allowed_authorization_headers* object.
   All the control header lists now support :ref:`string matcher <envoy_api_msg_type.matcher.StringMatcher>` instead of standard string.
+* fault: added the :ref:`max_active_faults
+  <envoy_api_field_config.filter.http.fault.v2.HTTPFault.max_active_faults>` setting, as well as
+  :ref:`statistics <config_http_filters_fault_injection_stats>` for the number of active faults
+  and the number of faults the overflowed.
 * governance: extending Envoy deprecation policy from 1 release (0-3 months) to 2 releases (3-6 months).
 * health check: expected response codes in http health checks are now :ref:`configurable <envoy_api_msg_core.HealthCheck.HttpHealthCheck>`.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
