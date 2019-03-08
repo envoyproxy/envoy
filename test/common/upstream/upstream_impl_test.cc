@@ -1429,8 +1429,11 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
       "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
 
+// Test for oss-fuzz issue #11329
+// (https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=11329). If no
+// hosts were specified in endpoints but a priority value > 0 there, a
+// crash would happen.
 TEST_F(StaticClusterImplTest, NoHostsTest) {
-
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -1441,9 +1444,8 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
   )EOF";
 
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
-      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                            : cluster_config.alt_stat_name()));
+  Envoy::Stats::ScopePtr scope =
+      stats_.createScope(fmt::format("cluster.{}.", cluster_config.name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
       singleton_manager_, tls_, *api_);
