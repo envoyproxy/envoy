@@ -534,10 +534,7 @@ void Filter::onResponseTimeout() {
   }
 
   updateOutlierDetection(timeout_response_code_);
-  const absl::string_view body =
-      timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
-  onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body,
-                  false);
+  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
 }
 
 void Filter::onPerTryTimeout() {
@@ -547,10 +544,7 @@ void Filter::onPerTryTimeout() {
     return;
   }
 
-  const absl::string_view body =
-      timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
-  onUpstreamAbort(timeout_response_code_, StreamInfo::ResponseFlag::UpstreamRequestTimeout, body,
-                  false);
+  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
 }
 
 void Filter::updateOutlierDetection(Http::Code code) {
@@ -561,6 +555,12 @@ void Filter::updateOutlierDetection(Http::Code code) {
       upstream_host->outlierDetector().putHttpResponseCode(enumToInt(code));
     }
   }
+}
+
+void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags) {
+  const absl::string_view body =
+      timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
+  onUpstreamAbort(timeout_response_code_, response_flags, body, false);
 }
 
 void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flags,
@@ -606,31 +606,33 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 }
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason) {
-  // We don't retry on a global timeout or if we already started the response.
-  if (!downstream_response_started_ && retry_state_) {
-    Upstream::HostDescriptionConstSharedPtr upstream_host;
-    if (upstream_request_) {
-      upstream_host = upstream_request_->upstream_host_;
-    }
+  // We don't retry if we already started the response.
+  if (downstream_response_started_ || !retry_state_) {
+    return false;
+  }
 
-    // Notify retry modifiers about the attempted host.
-    if (upstream_host != nullptr) {
-      retry_state_->onHostAttempted(upstream_host);
-    }
+  Upstream::HostDescriptionConstSharedPtr upstream_host;
+  if (upstream_request_) {
+    upstream_host = upstream_request_->upstream_host_;
+  }
 
-    const RetryStatus retry_status =
-        retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
-    if (retry_status == RetryStatus::Yes && setupRetry(true)) {
-      if (upstream_host) {
-        upstream_host->stats().rq_error_.inc();
-      }
-      return true;
-    } else if (retry_status == RetryStatus::NoOverflow) {
-      callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
-    } else if (retry_status == RetryStatus::NoRetryLimitExceeded) {
-      callbacks_->streamInfo().setResponseFlag(
-          StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+  // Notify retry modifiers about the attempted host.
+  if (upstream_host != nullptr) {
+    retry_state_->onHostAttempted(upstream_host);
+  }
+
+  const RetryStatus retry_status =
+      retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
+  if (retry_status == RetryStatus::Yes && setupRetry(true)) {
+    if (upstream_host) {
+      upstream_host->stats().rq_error_.inc();
     }
+    return true;
+  } else if (retry_status == RetryStatus::NoOverflow) {
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
+  } else if (retry_status == RetryStatus::NoRetryLimitExceeded) {
+    callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
   }
 
   return false;
