@@ -377,7 +377,8 @@ private:
   // Handle an "aborted" upstream request, meaning we didn't see response
   // headers (e.g. due to a reset). Handles recording stats and responding
   // downstream if appropriate.
-  void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag, absl::string_view body, bool dropped);
+  void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
+                       absl::string_view body, bool dropped);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
