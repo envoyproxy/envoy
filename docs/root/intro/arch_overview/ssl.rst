@@ -164,11 +164,11 @@ Client TLS authentication filter :ref:`configuration reference
 Trouble shooting
 ----------------
 
-When Envoy originates TLS when making connections to upstream clusters, its error will be logged into
+When Envoy originates TLS when making connections to upstream clusters, any errors will be logged into
 :ref:`UPSTREAM_TRANSPORT_FAILURE_REASON<config_access_log_format_upstream_transport_failure_reason>` field.
 Common errors are:
 
-* ``Secret is not delivered via SDS``: Envoy is still waiting SDS to deliver key/cert or root CA.
+* ``Secret is not supplied by SDS``: Envoy is still waiting SDS to deliver key/cert or root CA.
 * ``SSLV3_ALERT_CERTIFICATE_EXPIRED``: Peer certificate is expired and not allowed in config.
 * ``SSLV3_ALERT_CERTIFICATE_UNKNOWN``: Peer certificate is not in config specified SPKI.
 * ``SSLV3_ALERT_HANDSHAKE_FAILURE``: Handshake failed, usually due to upstream requires client certificate but not presented.
