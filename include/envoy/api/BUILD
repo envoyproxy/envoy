@@ -25,5 +25,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "os_sys_calls_interface",
-    hdrs = ["os_sys_calls.h"],
+    hdrs = [
+        "os_sys_calls.h",
+        "os_sys_calls_common.h",
+        "os_sys_calls_linux.h",
+    ],
 )

@@ -52,6 +52,7 @@ public:
   void start() override {}
 
   // Envoy::Config::SubscriptionCallbacks
+  // TODO(fredlas) deduplicate
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override {
     const auto& config = resources[0];
     if (checkAndApplyConfig(config, "dummy_config", version_info)) {
@@ -59,6 +60,10 @@ public:
     }
 
     ConfigSubscriptionInstanceBase::onConfigUpdate();
+  }
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   // Envoy::Config::SubscriptionCallbacks

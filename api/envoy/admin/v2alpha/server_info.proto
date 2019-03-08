@@ -128,4 +128,7 @@ message CommandLineOptions {
 
   // See :option:`--restart-epoch` for details.
   uint32 restart_epoch = 24;
+
+  // See :option:`--cpuset-threads` for details.
+  bool cpuset_threads = 25;
 }

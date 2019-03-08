@@ -33,8 +33,7 @@ service RouteDiscoveryService {
   rpc StreamRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
-  rpc IncrementalRoutes(stream IncrementalDiscoveryRequest)
-      returns (stream IncrementalDiscoveryResponse) {
+  rpc DeltaRoutes(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
 
   rpc FetchRoutes(DiscoveryRequest) returns (DiscoveryResponse) {

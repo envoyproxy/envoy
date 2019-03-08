@@ -181,13 +181,16 @@ public:
 
 TEST_F(StatsThreadLocalStoreTest, NoTls) {
   InSequence s;
-  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(3);
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
 
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
+
+  BoolIndicator& b1 = store_->boolIndicator("b1");
+  EXPECT_EQ(&b1, &store_->boolIndicator("b1"));
 
   Histogram& h1 = store_->histogram("h1");
   EXPECT_EQ(&h1, &store_->histogram("h1"));
@@ -203,9 +206,12 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
+  EXPECT_EQ(1UL, store_->boolIndicators().size());
+  EXPECT_EQ(&b1, store_->boolIndicators().front().get()); // front() ok when size()==1
+  EXPECT_EQ(2L, store_->boolIndicators().front().use_count());
 
   // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(3);
+  EXPECT_CALL(*alloc_, free(_)).Times(4);
 
   store_->shutdownThreading();
 }
@@ -214,13 +220,16 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(3);
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
 
   Gauge& g1 = store_->gauge("g1");
   EXPECT_EQ(&g1, &store_->gauge("g1"));
+
+  BoolIndicator& b1 = store_->boolIndicator("b1");
+  EXPECT_EQ(&b1, &store_->boolIndicator("b1"));
 
   Histogram& h1 = store_->histogram("h1");
   EXPECT_EQ(&h1, &store_->histogram("h1"));
@@ -231,6 +240,9 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(3L, store_->gauges().front().use_count());
+  EXPECT_EQ(1UL, store_->boolIndicators().size());
+  EXPECT_EQ(&b1, store_->boolIndicators().front().get()); // front() ok when size()==1
+  EXPECT_EQ(3L, store_->boolIndicators().front().use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
@@ -241,9 +253,12 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
+  EXPECT_EQ(1UL, store_->boolIndicators().size());
+  EXPECT_EQ(&b1, store_->boolIndicators().front().get()); // front() ok when size()==1
+  EXPECT_EQ(2L, store_->boolIndicators().front().use_count());
 
   // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(3);
+  EXPECT_CALL(*alloc_, free(_)).Times(4);
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -251,7 +266,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(6);
   Counter& c1 = store_->counter("c1");
   Counter& c2 = scope1->counter("c2");
   EXPECT_EQ("c1", c1.name());
@@ -261,6 +276,11 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   Gauge& g2 = scope1->gauge("g2");
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
+
+  BoolIndicator& b1 = store_->boolIndicator("b1");
+  BoolIndicator& b2 = scope1->boolIndicator("b2");
+  EXPECT_EQ("b1", b1.name());
+  EXPECT_EQ("scope1.b2", b2.name());
 
   Histogram& h1 = store_->histogram("h1");
   Histogram& h2 = scope1->histogram("h2");
@@ -277,7 +297,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(5);
+  EXPECT_CALL(*alloc_, free(_)).Times(7);
 }
 
 // Validate that we sanitize away bad characters in the stats prefix.
@@ -352,11 +372,15 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   Gauge& g1 = scope2->gauge("some_gauge");
   EXPECT_EQ("scope1.foo.some_gauge", g1.name());
 
+  EXPECT_CALL(*alloc_, alloc(_));
+  BoolIndicator& b1 = scope2->boolIndicator("some_bool");
+  EXPECT_EQ("scope1.foo.some_bool", b1.name());
+
   store_->shutdownThreading();
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(4);
+  EXPECT_CALL(*alloc_, free(_)).Times(5);
 }
 
 TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
@@ -396,8 +420,21 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(1UL, g2.value());
   EXPECT_EQ(1UL, store_->gauges().size());
 
+  // Bools should work just like gauges.
+  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
+  BoolIndicator& b1 = scope1->boolIndicator("b");
+  BoolIndicator& b2 = scope2->boolIndicator("b");
+  EXPECT_NE(&b1, &b2);
+  b1.set(true);
+  EXPECT_EQ(1, b1.value());
+  EXPECT_EQ(1, b2.value());
+  b2.set(false);
+  EXPECT_EQ(0, b1.value());
+  EXPECT_EQ(0, b2.value());
+  EXPECT_EQ(1UL, store_->boolIndicators().size());
+
   // Deleting scope 1 will call free but will be reference counted. It still leaves scope 2 valid.
-  EXPECT_CALL(*alloc_, free(_)).Times(2);
+  EXPECT_CALL(*alloc_, free(_)).Times(7);
   scope1.reset();
   c2.inc();
   EXPECT_EQ(3UL, c2.value());
@@ -405,12 +442,47 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   g2.set(10);
   EXPECT_EQ(10UL, g2.value());
   EXPECT_EQ(1UL, store_->gauges().size());
+  b2.set(false);
+  EXPECT_EQ(0, b2.value());
+  EXPECT_EQ(1UL, store_->boolIndicators().size());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
+}
 
+// Demonstrates that counters, gauges, and indicators are all mixed together in
+// the shared memory, and not separated by type; only the name matters.
+// This test is only here to reassure us that PR #5813, in the context of the current
+// state of the Envoy codebase it is being submitted into, will not break hot restart!
+// It is not meant to enforce this behavior as a desirable feature that must be kept.
+TEST_F(StatsThreadLocalStoreTest, SameNameDifferentType) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
+
+  Counter& c1 = store_->counter("samename");
+  EXPECT_EQ(&c1, &store_->counter("samename"));
+  Gauge& g1 = store_->gauge("samename");
+  EXPECT_EQ(&g1, &store_->gauge("samename"));
+  c1.add(5);
+  EXPECT_EQ(5UL, c1.value());
+  g1.add(3);
+  EXPECT_EQ(8UL, c1.value());
+
+  Gauge& g2 = store_->gauge("samename2");
+  EXPECT_EQ(&g2, &store_->gauge("samename2"));
+  BoolIndicator& b1 = store_->boolIndicator("samename2");
+  EXPECT_EQ(&b1, &store_->boolIndicator("samename2"));
+  g2.add(1);
+  EXPECT_EQ(1UL, g2.value());
+  EXPECT_TRUE(b1.value());
+  b1.set(false);
+  EXPECT_EQ(0UL, g2.value());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
   // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(3);
+  EXPECT_CALL(*alloc_, free(_)).Times(5);
 }
 
 TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
@@ -521,6 +593,21 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   Gauge& noop_gauge_2 = store_->gauge("noop_gauge_2");
   EXPECT_EQ(&noop_gauge, &noop_gauge_2);
 
+  // BoolIndicator
+  BoolIndicator& noop_bool = store_->boolIndicator("noop_bool");
+  EXPECT_EQ(noop_bool.name(), "");
+  EXPECT_EQ(0, noop_bool.value());
+  noop_bool.set(true);
+  EXPECT_EQ(0, noop_bool.value());
+  noop_bool.set(true);
+  EXPECT_EQ(0, noop_bool.value());
+  noop_bool.set(false);
+  EXPECT_EQ(0, noop_bool.value());
+  noop_bool.set(true);
+  EXPECT_EQ(0, noop_bool.value());
+  BoolIndicator& noop_bool_2 = store_->boolIndicator("noop_bool_2");
+  EXPECT_EQ(&noop_bool, &noop_bool_2);
+
   // Histogram
   Histogram& noop_histogram = store_->histogram("noop_histogram");
   EXPECT_EQ(noop_histogram.name(), "");
@@ -538,8 +625,9 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
 TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   InSequence s;
 
-  // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
-  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
+  // Expected to alloc lowercase_counter, lowercase_gauge, lowercase_bool,
+  //                   valid_counter, valid_gauge, valid_bool
+  EXPECT_CALL(*alloc_, alloc(_)).Times(6);
 
   // Will block all stats containing any capital alphanumeric letter.
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
@@ -551,6 +639,8 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
   Gauge& lowercase_gauge = store_->gauge("lowercase_gauge");
   EXPECT_EQ(lowercase_gauge.name(), "lowercase_gauge");
+  BoolIndicator& lowercase_bool = store_->boolIndicator("lowercase_bool");
+  EXPECT_EQ(lowercase_bool.name(), "lowercase_bool");
   Histogram& lowercase_histogram = store_->histogram("lowercase_histogram");
   EXPECT_EQ(lowercase_histogram.name(), "lowercase_histogram");
 
@@ -568,6 +658,11 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   EXPECT_EQ(uppercase_gauge.value(), 0);
   uppercase_gauge.inc();
   EXPECT_EQ(uppercase_gauge.value(), 0);
+
+  BoolIndicator& uppercase_bool = store_->boolIndicator("uppercase_BOOL");
+  EXPECT_EQ(uppercase_bool.name(), "");
+  uppercase_bool.set(true);
+  EXPECT_FALSE(uppercase_bool.value());
 
   // Histograms are harder to query and test, so we resort to testing that name() returns the empty
   // string.
@@ -589,11 +684,11 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   EXPECT_EQ(invalid_counter.value(), 0);
 
   // But the old exclusion rule still holds.
-  Counter& invalid_counter_2 = store_->counter("also_INVALID_counter");
+  Counter& invalid_counter_2 = store_->counter("also_INVLD_counter");
   invalid_counter_2.inc();
   EXPECT_EQ(invalid_counter_2.value(), 0);
 
-  // And we expect the same behavior from gauges and histograms.
+  // And we expect the same behavior from gauges, histograms, and bools.
   Gauge& valid_gauge = store_->gauge("valid_gauge");
   valid_gauge.set(2);
   EXPECT_EQ(valid_gauge.value(), 2);
@@ -602,9 +697,21 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   invalid_gauge_1.inc();
   EXPECT_EQ(invalid_gauge_1.value(), 0);
 
-  Gauge& invalid_gauge_2 = store_->gauge("also_INVALID_gauge");
+  Gauge& invalid_gauge_2 = store_->gauge("also_INVLD_gauge");
   invalid_gauge_2.inc();
   EXPECT_EQ(invalid_gauge_2.value(), 0);
+
+  BoolIndicator& valid_bool = store_->boolIndicator("valid_bool");
+  valid_bool.set(true);
+  EXPECT_EQ(1, valid_bool.value());
+
+  BoolIndicator& invalid_bool_1 = store_->boolIndicator("invalid_bool");
+  invalid_bool_1.set(true);
+  EXPECT_EQ(0, invalid_gauge_1.value());
+
+  BoolIndicator& invalid_bool_2 = store_->boolIndicator("also_INVLD_bool");
+  invalid_bool_2.set(true);
+  EXPECT_EQ(0, invalid_bool_2.value());
 
   Histogram& valid_histogram = store_->histogram("valid_histogram");
   EXPECT_EQ(valid_histogram.name(), "valid_histogram");
@@ -615,9 +722,9 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   Histogram& invalid_histogram_2 = store_->histogram("also_INVALID_histogram");
   EXPECT_EQ(invalid_histogram_2.name(), "");
 
-  // Expected to free lowercase_counter, lowercase_gauge, valid_counter,
-  // valid_gauge, overflow.stats
-  EXPECT_CALL(*alloc_, free(_)).Times(5);
+  // Expected to free lowercase_counter, lowercase_gauge, lowercase_bool,
+  //                  valid_counter, valid_gauge, valid_bool, overflow.stats
+  EXPECT_CALL(*alloc_, free(_)).Times(7);
 
   store_->shutdownThreading();
 }
@@ -641,12 +748,15 @@ public:
 TEST_F(HeapStatsThreadLocalStoreTest, RemoveRejectedStats) {
   Counter& counter = store_->counter("c1");
   Gauge& gauge = store_->gauge("g1");
+  BoolIndicator& boolIndicator = store_->boolIndicator("b1");
   Histogram& histogram = store_->histogram("h1");
   ASSERT_EQ(2, store_->counters().size()); // "stats.overflow" and "c1".
   EXPECT_TRUE(&counter == store_->counters()[0].get() ||
               &counter == store_->counters()[1].get()); // counters() order is non-deterministic.
   ASSERT_EQ(1, store_->gauges().size());
   EXPECT_EQ("g1", store_->gauges()[0]->name());
+  ASSERT_EQ(1, store_->boolIndicators().size());
+  EXPECT_EQ("b1", store_->boolIndicators()[0]->name());
   ASSERT_EQ(1, store_->histograms().size());
   EXPECT_EQ("h1", store_->histograms()[0]->name());
 
@@ -659,11 +769,13 @@ TEST_F(HeapStatsThreadLocalStoreTest, RemoveRejectedStats) {
   // They can no longer be found.
   EXPECT_EQ(0, store_->counters().size());
   EXPECT_EQ(0, store_->gauges().size());
+  EXPECT_EQ(0, store_->boolIndicators().size());
   EXPECT_EQ(0, store_->histograms().size());
 
   // However, referencing the previously allocated stats will not crash.
   counter.inc();
   gauge.inc();
+  boolIndicator.set(true);
   EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 42));
   histogram.recordValue(42);
 }
@@ -733,23 +845,27 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
+  EXPECT_CALL(*alloc_, alloc(_)).Times(6);
   store_->counter("c1");
   store_->gauge("g1");
+  store_->boolIndicator("b1");
   store_->shutdownThreading();
   store_->counter("c2");
   store_->gauge("g2");
+  store_->boolIndicator("b2");
 
-  // c1, g1 should have a thread local ref, but c2, g2 should not.
+  // c1, g1, b1 should have a thread local ref, but c2, g2, b2 should not.
   EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(3L, TestUtility::findGauge(*store_, "g1").use_count());
+  EXPECT_EQ(3L, TestUtility::findBoolIndicator(*store_, "b1").use_count());
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c2").use_count());
   EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
+  EXPECT_EQ(2L, TestUtility::findBoolIndicator(*store_, "b2").use_count());
 
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(5);
+  EXPECT_CALL(*alloc_, free(_)).Times(7);
 }
 
 TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
@@ -971,6 +1087,13 @@ TEST_F(TruncatingAllocTest, GaugeNotTruncated) {
   });
 }
 
+TEST_F(TruncatingAllocTest, BoolNotTruncated) {
+  EXPECT_NO_LOGS({
+    BoolIndicator& boolIndicator = store_->boolIndicator("simple");
+    EXPECT_EQ(&boolIndicator, &store_->boolIndicator("simple"));
+  });
+}
+
 TEST_F(TruncatingAllocTest, CounterTruncated) {
   Counter* counter = nullptr;
   EXPECT_LOG_CONTAINS("warning", "is too long with", {
@@ -987,6 +1110,15 @@ TEST_F(TruncatingAllocTest, GaugeTruncated) {
     gauge = &g;
   });
   EXPECT_NO_LOGS(EXPECT_EQ(gauge, &store_->gauge(long_name_)));
+}
+
+TEST_F(TruncatingAllocTest, BoolTruncated) {
+  BoolIndicator* boolIndicator = nullptr;
+  EXPECT_LOG_CONTAINS("warning", "is too long with", {
+    BoolIndicator& b = store_->boolIndicator(long_name_);
+    boolIndicator = &b;
+  });
+  EXPECT_NO_LOGS(EXPECT_EQ(boolIndicator, &store_->boolIndicator(long_name_)));
 }
 
 TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {
