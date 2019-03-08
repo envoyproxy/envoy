@@ -3698,6 +3698,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
   result = transport_socket->doWrite(buffer, true);
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ("TLS error: Secret is not supplied by SDS", transport_socket->failureReason());
 }
 
 // Validate that if upstream secrets are not yet downloaded from SDS server, Envoy creates
@@ -3736,6 +3737,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
   result = transport_socket->doWrite(buffer, true);
   EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  EXPECT_EQ("TLS error: Secret is not supplied by SDS", transport_socket->failureReason());
 }
 
 class SslReadBufferLimitTest : public SslSocketTest {
