@@ -40,14 +40,15 @@ using IoErrorPtr = std::unique_ptr<IoError, IoErrorDeleterType>;
 /**
  * Basic type for return result which has a return code and error code defined
  * according to different implementations.
- * If the call succeeds, |err_| is nullptr and |rc_| is valid. Otherwise |err_|
+ * If the call succeeds, ok() should return true and |rc_| is valid. Otherwise |err_|
  * can be passed into IoError::getErrorCode() to extract the error. In this
  * case, |rc_| is invalid.
  */
-template <typename T> struct IoCallResult {
-  IoCallResult(T rc, IoErrorPtr err) : rc_(rc), err_(std::move(err)) {}
+template <typename ReturnValue> struct IoCallResult {
+  IoCallResult(ReturnValue rc, IoErrorPtr err) : rc_(rc), err_(std::move(err)) {}
 
-  IoCallResult(IoCallResult<T>&& result) : rc_(result.rc_), err_(std::move(result.err_)) {}
+  IoCallResult(IoCallResult<ReturnValue>&& result)
+      : rc_(result.rc_), err_(std::move(result.err_)) {}
 
   virtual ~IoCallResult() {}
 
@@ -57,9 +58,13 @@ template <typename T> struct IoCallResult {
     return *this;
   }
 
+  /**
+   * @return true if the call succeeds.
+   */
   bool ok() const { return err_ == nullptr; }
 
-  T rc_;
+  // TODO(danzh): rename it to be more meaningful, i.e. return_value_.
+  ReturnValue rc_;
   IoErrorPtr err_;
 };
 
