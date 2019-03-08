@@ -56,7 +56,9 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
   ProtobufWkt::Struct pfc;
-  RELEASE_ASSERT(Protobuf::util::JsonStringToMessage(json_config, &pfc).ok(), "");
+  Protobuf::util::JsonParseOptions options;
+  options.case_insensitive_enum_parsing = true;
+  RELEASE_ASSERT(Protobuf::util::JsonStringToMessage(json_config, &pfc).ok(), "", options);
 
   return
       [pfc](

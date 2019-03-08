@@ -43,8 +43,10 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     const std::string json_config =
         "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +
         "}";
-
-    const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
+    Protobuf::util::JsonParseOptions options;
+    options.case_insensitive_enum_parsing = true;
+    const auto status = Protobuf::util::JsonStringToMessage(
+        json_config, filter->mutable_config(), options);
     // JSON schema has already validated that this is a valid JSON object.
     ASSERT(status.ok());
   }

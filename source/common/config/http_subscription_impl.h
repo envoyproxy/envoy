@@ -79,7 +79,10 @@ public:
 
   void parseResponse(const Http::Message& response) override {
     envoy::api::v2::DiscoveryResponse message;
-    const auto status = Protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
+    Protobuf::util::JsonParseOptions options;
+    options.case_insensitive_enum_parsing = true;
+    const auto status = Protobuf::util::JsonStringToMessage(
+        response.bodyAsString(), &message, options);
     if (!status.ok()) {
       ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
       handleFailure(nullptr);

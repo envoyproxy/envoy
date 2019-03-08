@@ -72,7 +72,9 @@ public:
     file_json.pop_back();
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok());
+    Protobuf::util::JsonParseOptions options;
+    options.case_insensitive_enum_parsing = true;
+    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok(), options);
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(
                     RepeatedProtoEq(
