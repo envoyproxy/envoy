@@ -3636,5 +3636,58 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
   conn_manager_->onData(fake_input, false); // kick off request
 }
 
+TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBuffer) {
+  setup(false, "envoy-custom-server", false);
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<MockStreamDecoderFilter> filter2(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(*filter, decodeHeaders(_, _))
+      .WillOnce(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopAllIterationAndBuffer;
+      }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter2, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addStreamDecoderFilter(filter2);
+      }));
+
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    Buffer::OwnedImpl fake_data("12345");
+    decoder->decodeData(fake_data, true);
+    data.drain(4);
+  }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*filter2, decodeHeaders(_, _))
+      .WillOnce(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_NE(nullptr, headers.ForwardedFor());
+        EXPECT_STREQ("http", headers.ForwardedProto()->value().c_str());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*filter, decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*filter2, decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+
+  filter->callbacks_->continueDecoding();
+}
+
 } // namespace Http
 } // namespace Envoy

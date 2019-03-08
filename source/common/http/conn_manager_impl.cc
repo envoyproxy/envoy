@@ -856,6 +856,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   auto trailers_added_entry = decoder_filters_.end();
   const bool trailers_exists_at_start = request_trailers_ != nullptr;
+  // Indicates if to check the filter's iteration is stopped for all frame types.
+  bool check_stop_all = true;
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
@@ -863,16 +865,20 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
       // The filter iteration has been stopped for all frame types, and now the iteration continues.
       // The current filter's decodeData() has not be called. Call it now.
       entry = filter->entry();
+      // The current filter have stopped iteration for all frame type before. Skip the check.
+      check_stop_all = false;
     } else {
       entry = std::next(filter->entry());
-      // If the filter pointed by entry has stopped for all frame type, return now.
-      if (entry != decoder_filters_.end() && handleDataIfStopAll(**entry, data)) {
-        return;
-      }
     }
   }
 
-  while (entry != decoder_filters_.end()) {
+  for (; entry != decoder_filters_.end(); entry++) {
+    // If the filter pointed by entry has stopped for all frame type, return now.
+    if (check_stop_all && handleDataIfStopAll(**entry, data)) {
+      return;
+    }
+    // Checks iteration state for the following filters.
+    check_stop_all = true;
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
     //
     // In following case, ActiveStreamFilterBase::commonContinue() could be called recursively and
@@ -942,12 +948,6 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
       // a previous filter has added trailers.
       return;
     }
-
-    entry++;
-    // If the filter pointed by entry has stopped for all frame type, return now.
-    if (entry != decoder_filters_.end() && handleDataIfStopAll(**entry, data)) {
-      return;
-    }
   }
 
   // If trailers were adding during decodeData we need to trigger decodeTrailers in order
@@ -1013,6 +1013,8 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
   }
 
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  // Indicates if to check the filter's iteration is stopped for all frame types.
+  bool check_stop_all = true;
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
@@ -1024,16 +1026,21 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
       // addDecodedData(), which will consequently call decodeData(). We want decodeData() to
       // iterate from the next filter.
       (*entry)->allowIteration();
+      // The current filter have stopped iteration for all frame type before. Skip the check.
+      check_stop_all = false;
     } else {
       entry = std::next(filter->entry());
-      // If the filter pointed by entry has stopped for all frame type, return now.
-      if (entry != decoder_filters_.end() && (*entry)->stoppedAll()) {
-        return;
-      }
     }
   }
 
-  while (entry != decoder_filters_.end()) {
+  for (; entry != decoder_filters_.end(); entry++) {
+    // If the filter pointed by entry has stopped for all frame type, return now.
+    if (check_stop_all && (*entry)->stoppedAll()) {
+      return;
+    }
+    // Checks iteration state for the following filters.
+    check_stop_all = true;
+
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
@@ -1043,12 +1050,6 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
-      return;
-    }
-
-    entry++;
-    // If the filter pointed by entry has stopped for all frame type, return now.
-    if (entry != decoder_filters_.end() && (*entry)->stoppedAll()) {
       return;
     }
   }
