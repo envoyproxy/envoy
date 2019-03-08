@@ -631,8 +631,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason) {
   } else if (retry_status == RetryStatus::NoOverflow) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
   } else if (retry_status == RetryStatus::NoRetryLimitExceeded) {
-    callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+    callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
   }
 
   return false;

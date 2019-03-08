@@ -41,7 +41,7 @@ namespace Router {
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_direct_response)                                                                      \
   COUNTER(rq_total)                                                                                \
-  COUNTER(rq_reset_after_downstream_response_started)                                              \
+  COUNTER(rq_reset_after_downstream_response_started)
 // clang-format on
 
 /**
