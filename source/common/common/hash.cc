@@ -59,6 +59,10 @@ const char* StringSet::insert(absl::string_view str) {
 }
 
 const char* StringSet::find(const char* str) const {
+  // The const_cast is necessary because hash_set_ is declared as a
+  // flat_hash_set<char*>, and the find() method does not add a 'const'
+  // qualifier to its key template type. As long as we don't modify the returned
+  // iterator it will not actually mutate the key, and the const_cast is safe.
   auto iter = hash_set_.find(const_cast<char*>(str));
   if (iter == hash_set_.end()) {
     return nullptr;
