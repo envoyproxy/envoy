@@ -214,6 +214,11 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
 
   // Subsequent updates: add/remove hosts.
   fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
+
+  // Same thing for the panic mode subset.
+  if (panic_mode_subset_ != nullptr) {
+    panic_mode_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
+  }
 }
 
 // Iterates over the added and removed hosts, looking up an LbSubsetEntryPtr for each. For every
