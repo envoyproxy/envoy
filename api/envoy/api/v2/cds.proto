@@ -50,7 +50,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 38]
+// [#comment:next free field: 39]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -94,9 +94,25 @@ message Cluster {
     // for an explanation.
     ORIGINAL_DST = 4;
   }
-  // The :ref:`service discovery type <arch_overview_service_discovery_types>`
-  // to use for resolving the cluster.
-  DiscoveryType type = 2 [(validate.rules).enum.defined_only = true];
+
+  // Extended cluster type.
+  message CustomClusterType {
+    // The type of the cluster to instantiate. The name must match a supported cluster type.
+    string name = 1 [(validate.rules).string.min_bytes = 1];
+
+    // Cluster specific configuration which depends on the cluster being instantiated.
+    // See the supported cluster for further documentation.
+    google.protobuf.Any typed_config = 2;
+  }
+
+  oneof cluster_discovery_type {
+    // The :ref:`service discovery type <arch_overview_service_discovery_types>`
+    // to use for resolving the cluster.
+    DiscoveryType type = 2 [(validate.rules).enum.defined_only = true];
+
+    // The custom cluster type.
+    CustomClusterType cluster_type = 38;
+  }
 
   // Only valid when discovery type is EDS.
   message EdsClusterConfig {

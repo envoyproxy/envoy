@@ -607,15 +607,6 @@ ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
   return nullptr;
 }
 
-namespace {
-
-Stats::ScopePtr generateStatsScope(const envoy::api::v2::Cluster& config, Stats::Store& stats) {
-  return stats.createScope(fmt::format(
-      "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
-}
-
-} // namespace
-
 Network::TransportSocketFactoryPtr createTransportSocketFactory(
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
@@ -638,93 +629,6 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   ProtobufTypes::MessagePtr message =
       Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
   return config_factory.createTransportSocketFactory(*message, factory_context);
-}
-
-ClusterSharedPtr ClusterImplBase::create(
-    const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
-    ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-    Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-    AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-    Server::Admin& admin, Singleton::Manager& singleton_manager,
-    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api) {
-  std::unique_ptr<ClusterImplBase> new_cluster;
-
-  // We make this a shared pointer to deal with the distinct ownership
-  // scenarios that can exist: in one case, we pass in the "default"
-  // DNS resolver that is owned by the Server::Instance. In the case
-  // where 'dns_resolvers' is specified, we have per-cluster DNS
-  // resolvers that are created here but ownership resides with
-  // StrictDnsClusterImpl/LogicalDnsCluster.
-  auto selected_dns_resolver = dns_resolver;
-  if (!cluster.dns_resolvers().empty()) {
-    const auto& resolver_addrs = cluster.dns_resolvers();
-    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-    resolvers.reserve(resolver_addrs.size());
-    for (const auto& resolver_addr : resolver_addrs) {
-      resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
-    }
-    selected_dns_resolver = dispatcher.createDnsResolver(resolvers);
-  }
-
-  auto stats_scope = generateStatsScope(cluster, stats);
-  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      admin, ssl_context_manager, *stats_scope, cm, local_info, dispatcher, random, stats,
-      singleton_manager, tls, api);
-
-  switch (cluster.type()) {
-  case envoy::api::v2::Cluster::STATIC:
-    new_cluster = std::make_unique<StaticClusterImpl>(cluster, runtime, factory_context,
-                                                      std::move(stats_scope), added_via_api);
-    break;
-  case envoy::api::v2::Cluster::STRICT_DNS:
-    new_cluster = std::make_unique<StrictDnsClusterImpl>(cluster, runtime, selected_dns_resolver,
-                                                         factory_context, std::move(stats_scope),
-                                                         added_via_api);
-    break;
-  case envoy::api::v2::Cluster::LOGICAL_DNS:
-    new_cluster =
-        std::make_unique<LogicalDnsCluster>(cluster, runtime, selected_dns_resolver, tls,
-                                            factory_context, std::move(stats_scope), added_via_api);
-    break;
-  case envoy::api::v2::Cluster::ORIGINAL_DST:
-    if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
-      throw EnvoyException(fmt::format(
-          "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'"));
-    }
-    if (cluster.has_lb_subset_config() && cluster.lb_subset_config().subset_selectors_size() != 0) {
-      throw EnvoyException(fmt::format(
-          "cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
-    }
-    new_cluster = std::make_unique<OriginalDstCluster>(cluster, runtime, factory_context,
-                                                       std::move(stats_scope), added_via_api);
-    break;
-  case envoy::api::v2::Cluster::EDS:
-    if (!cluster.has_eds_cluster_config()) {
-      throw EnvoyException("cannot create an EDS cluster without an EDS config");
-    }
-
-    // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
-    new_cluster = std::make_unique<EdsClusterImpl>(cluster, runtime, factory_context,
-                                                   std::move(stats_scope), added_via_api);
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
-  if (!cluster.health_checks().empty()) {
-    // TODO(htuch): Need to support multiple health checks in v2.
-    if (cluster.health_checks().size() != 1) {
-      throw EnvoyException("Multiple health checks not supported");
-    } else {
-      new_cluster->setHealthChecker(HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher, log_manager));
-    }
-  }
-
-  new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster, cluster, dispatcher, runtime, outlier_event_logger));
-  return std::move(new_cluster);
 }
 
 ClusterImplBase::ClusterImplBase(

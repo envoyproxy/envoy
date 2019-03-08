@@ -97,6 +97,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "custom_cluster_integration_test",
+    srcs = ["custom_cluster_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/upstream:load_balancer_lib",
+        "//test/config:utility_lib",
+        "//test/integration/clusters:custom_static_cluster",
+        "//test/test_common:network_utility_lib",
+        "@envoy_api//envoy/api/v2:eds_cc",
+    ],
+)
+
+envoy_cc_test(
     name = "delta_cds_integration_test",
     srcs = ["delta_cds_integration_test.cc"],
     data = [
