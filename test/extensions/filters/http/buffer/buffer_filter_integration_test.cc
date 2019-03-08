@@ -58,7 +58,7 @@ ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config
   ProtobufWkt::Struct pfc;
   Protobuf::util::JsonParseOptions options;
   options.case_insensitive_enum_parsing = true;
-  RELEASE_ASSERT(Protobuf::util::JsonStringToMessage(json_config, &pfc).ok(), "", options);
+  RELEASE_ASSERT(Protobuf::util::JsonStringToMessage(json_config, &pfc, options).ok(), "");
 
   return
       [pfc](

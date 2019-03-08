@@ -114,7 +114,7 @@ public:
     envoy::api::v2::DiscoveryResponse response_pb;
     Protobuf::util::JsonParseOptions options;
     options.case_insensitive_enum_parsing = true;
-    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(response_json, &response_pb).ok(), options);
+    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(response_json, &response_pb, options).ok());
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);

@@ -81,8 +81,8 @@ public:
     envoy::api::v2::DiscoveryResponse message;
     Protobuf::util::JsonParseOptions options;
     options.case_insensitive_enum_parsing = true;
-    const auto status = Protobuf::util::JsonStringToMessage(
-        response.bodyAsString(), &message, options);
+    const auto status =
+        Protobuf::util::JsonStringToMessage(response.bodyAsString(), &message, options);
     if (!status.ok()) {
       ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
       handleFailure(nullptr);

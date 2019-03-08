@@ -74,7 +74,7 @@ public:
     envoy::api::v2::DiscoveryResponse response_pb;
     Protobuf::util::JsonParseOptions options;
     options.case_insensitive_enum_parsing = true;
-    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok(), options);
+    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb, options).ok());
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(
                     RepeatedProtoEq(
