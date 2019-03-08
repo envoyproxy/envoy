@@ -29,11 +29,14 @@ public:
                       uint64_t max_connections, uint64_t max_pending_requests,
                       uint64_t max_requests, uint64_t max_retries,
                       ClusterCircuitBreakersStats cb_stats)
-      : connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_),
+      : connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_,
+                     cb_stats.remaining_cx_),
         pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests",
-                          cb_stats.rq_pending_open_),
-        requests_(max_requests, runtime, runtime_key + "max_requests", cb_stats.rq_open_),
-        retries_(max_retries, runtime, runtime_key + "max_retries", cb_stats.rq_retry_open_) {}
+                          cb_stats.rq_pending_open_, cb_stats.remaining_pending_),
+        requests_(max_requests, runtime, runtime_key + "max_requests", cb_stats.rq_open_,
+                  cb_stats.remaining_rq_),
+        retries_(max_retries, runtime, runtime_key + "max_retries", cb_stats.rq_retry_open_,
+                 cb_stats.remaining_retries_) {}
 
   // Upstream::ResourceManager
   Resource& connections() override { return connections_; }
@@ -44,9 +47,11 @@ public:
 private:
   struct ResourceImpl : public Resource {
     ResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
-                 Stats::BoolIndicator& circuit_breaker_open)
+                 Stats::BoolIndicator& circuit_breaker_open, Stats::Gauge& remaining)
         : max_(max), runtime_(runtime), runtime_key_(runtime_key),
-          circuit_breaker_open_(circuit_breaker_open) {}
+          circuit_breaker_open_(circuit_breaker_open), remaining_(remaining) {
+            remaining_.set(max);
+          }
     ~ResourceImpl() { ASSERT(current_ == 0); }
 
     // Upstream::Resource
@@ -54,13 +59,28 @@ private:
     void inc() override {
       current_++;
       circuit_breaker_open_.set(!canCreate());
+      updateRemaining();
     }
     void dec() override {
       ASSERT(current_ > 0);
       current_--;
       circuit_breaker_open_.set(!canCreate());
+      updateRemaining();
     }
     uint64_t max() override { return runtime_.snapshot().getInteger(runtime_key_, max_); }
+
+    /**
+     * We set the gauge instead of using inc() and dec() because, though
+     * atomics are used, it is possible for the current resource count to be
+     * greater than the supplied max.
+     */
+    void updateRemaining() { 
+      /**
+       * We cannot use std::max here because max() and current_ are
+       * unsigned and subtracting them may overflow.
+       */
+      max() > current_ ? remaining_.set(max() - current_) : remaining_.set(0); 
+    }
 
     const uint64_t max_;
     std::atomic<uint64_t> current_{};
@@ -72,6 +92,11 @@ private:
      * true when open.
      */
     Stats::BoolIndicator& circuit_breaker_open_;
+
+    /**
+     * The number of resources remaining before the circuit breaker opens.
+     */
+    Stats::Gauge& remaining_;
   };
 
   ResourceImpl connections_;
