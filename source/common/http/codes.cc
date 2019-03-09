@@ -239,7 +239,7 @@ Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
 
 std::string CodeUtility::groupStringForResponseCode(Code response_code) {
   // Note: this is only used in the unit test and in dynamo_filter.cc, which
-  // needs the same sort of symbloziation treatment we are doing here.
+  // needs the same sort of symbolization treatment we are doing here.
   if (CodeUtility::is1xx(enumToInt(response_code))) {
     return "1xx";
   } else if (CodeUtility::is2xx(enumToInt(response_code))) {
