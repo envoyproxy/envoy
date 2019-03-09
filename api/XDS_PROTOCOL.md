@@ -281,6 +281,11 @@ static_resources:
         port_value: <ADS management server port>
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
+    upstream_connection_options:
+      tcp_keepalive:
+        keepalive_probes: 3
+        keepalive_time: 30
+        keepalive_interval: 10
 admin:
   ...
 
