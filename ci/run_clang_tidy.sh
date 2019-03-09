@@ -11,11 +11,6 @@ echo "build ${BAZEL_BUILD_OPTIONS}" >> .bazelrc
 # by clang-tidy
 "${ENVOY_SRCDIR}/tools/gen_compilation_database.py" --run_bazel_build --include_headers
 
-# It had to be in ENVOY_CI_DIR to run bazel to generate compile database, but clang-tidy-diff
-# diff against current directory, moving them to ENVOY_SRCDIR.
-mv ./compile_commands.json "${ENVOY_SRCDIR}/compile_commands.json"
-cd "${ENVOY_SRCDIR}"
-
 # Do not run incremental clang-tidy on check_format testdata files.
 function exclude_testdata() {
   grep -v tools/testdata/check_format/

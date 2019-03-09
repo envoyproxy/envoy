@@ -39,13 +39,13 @@ function bazel_with_collection() {
 
 function bazel_release_binary_build() {
   echo "Building..."
-  cd "${ENVOY_CI_DIR}"
+  cd "${ENVOY_SRCDIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static
   collect_build_profile release_build
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp -f \
-    "${ENVOY_CI_DIR}"/bazel-bin/source/exe/envoy-static \
+    "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
     "${ENVOY_DELIVERY_DIR}"/envoy
 
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
@@ -58,13 +58,13 @@ function bazel_release_binary_build() {
 
 function bazel_debug_binary_build() {
   echo "Building..."
-  cd "${ENVOY_CI_DIR}"
+  cd "${ENVOY_SRCDIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static
   collect_build_profile debug_build
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container.
   cp -f \
-    "${ENVOY_CI_DIR}"/bazel-bin/source/exe/envoy-static \
+    "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
     "${ENVOY_DELIVERY_DIR}"/envoy-debug
 }
 
@@ -164,13 +164,13 @@ elif [[ "$1" == "bazel.dev" ]]; then
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
   echo "bazel fastbuild build with tests..."
-  cd "${ENVOY_CI_DIR}"
+  cd "${ENVOY_SRCDIR}"
   echo "Building..."
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild //source/exe:envoy-static
   # Copy the envoy-static binary somewhere that we can access outside of the
   # container for developers.
   cp -f \
-    "${ENVOY_CI_DIR}"/bazel-bin/source/exe/envoy-static \
+    "${ENVOY_SRCDIR}"/bazel-bin/source/exe/envoy-static \
     "${ENVOY_DELIVERY_DIR}"/envoy-fastbuild
   echo "Building and testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/...
@@ -218,13 +218,13 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
 
   setup_clang_toolchain
   echo "Testing..."
-  cd "${ENVOY_CI_DIR}"
+  cd "${ENVOY_SRCDIR}"
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} --test_env=ENVOY_IP_TEST_VERSIONS=v6only -c fastbuild \
     //test/integration/... //test/common/network/...
   exit 0
 elif [[ "$1" == "bazel.api" ]]; then
   setup_clang_toolchain
-  cd "${ENVOY_CI_DIR}"
+  cd "${ENVOY_SRCDIR}"
   echo "Building API..."
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
   echo "Testing API..."
@@ -268,7 +268,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
-  cd "${ENVOY_CI_DIR}"
+  cd "${ENVOY_SRCDIR}"
   ./run_clang_tidy.sh
   exit 0
 elif [[ "$1" == "bazel.coverity" ]]; then
@@ -279,7 +279,7 @@ elif [[ "$1" == "bazel.coverity" ]]; then
   setup_gcc_toolchain
   echo "bazel Coverity Scan build"
   echo "Building..."
-  cd "${ENVOY_CI_DIR}"
+  cd "${ENVOY_SRCDIR}"
   /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel build --action_env=LD_PRELOAD ${BAZEL_BUILD_OPTIONS} \
     -c opt //source/exe:envoy-static
   # tar up the coverity results
