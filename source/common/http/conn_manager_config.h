@@ -303,6 +303,12 @@ public:
   virtual ForwardClientCertType forwardClientCert() PURE;
 
   /**
+   * @return ForwardClientCertType the configuration of how to forward the client cert chain
+   * information.
+   */
+  virtual ForwardClientCertType forwardClientCertChain() PURE;
+
+  /**
    * @return vector of ClientCertDetailsType the configuration of the current client cert's details
    * to be forwarded.
    */

@@ -24,7 +24,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 30]
+// [#comment:next free field: 31]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -268,28 +268,29 @@ message HttpConnectionManager {
   // is not desired it can be disabled.
   google.protobuf.BoolValue generate_request_id = 15;
 
-  // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
-  // header.
+  // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) and the
+  // :ref:`config_http_conn_man_headers_x-forwarded-client-cert-chain` (XFCC-chain) HTTP headers.
   enum ForwardClientCertDetails {
     option (gogoproto.goproto_enum_prefix) = false;
 
-    // Do not send the XFCC header to the next hop. This is the default value.
+    // Do not send the XFCC/XFCC-chain header to the next hop. This is the default value.
     SANITIZE = 0;
 
-    // When the client connection is mTLS (Mutual TLS), forward the XFCC header
-    // in the request.
+    // When the client connection is mTLS (Mutual TLS), forward the XFCC/XFCC-chain header in the
+    // request.
     FORWARD_ONLY = 1;
 
-    // When the client connection is mTLS, append the client certificate
-    // information to the request’s XFCC header and forward it.
+    // When the client connection is mTLS, append the client certificate information to the
+    // request’s XFCC header and forward it. Note that this option is not available while
+    // forwarding the XFCC-chain header.
     APPEND_FORWARD = 2;
 
-    // When the client connection is mTLS, reset the XFCC header with the client
-    // certificate information and send it to the next hop.
+    // When the client connection is mTLS, reset the XFCC/XFCC-chain header with the client
+    // certificate/client certificate chain information and send it to the next hop.
     SANITIZE_SET = 3;
 
-    // Always forward the XFCC header in the request, regardless of whether the
-    // client connection is mTLS.
+    // Always forward the XFCC/XFCC-chain header in the request, regardless of whether the client
+    // connection is mTLS.
     ALWAYS_FORWARD_ONLY = 4;
   };
 
@@ -326,6 +327,11 @@ message HttpConnectionManager {
   // *By* is always set when the client certificate presents the URI type Subject Alternative Name
   // value.
   SetCurrentClientCertDetails set_current_client_cert_details = 17;
+
+  // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert-chain`
+  // (XFCC-chain) HTTP header.
+  ForwardClientCertDetails forward_client_cert_chain_details = 30
+      [(validate.rules).enum.defined_only = true];
 
   // If proxy_100_continue is true, Envoy will proxy incoming "Expect:
   // 100-continue" headers upstream, and forward "100 Continue" responses

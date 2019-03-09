@@ -329,6 +329,36 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
   }
 }
 
+void ConnectionManagerUtility::mutateXfccChainRequestHeader(HeaderMap& request_headers,
+                                                            Network::Connection& connection,
+                                                            ConnectionManagerConfig& config) {
+  // When AlwaysForwardOnly is set, always forward the XFCC-chain header without modification.
+  if (config.forwardClientCertChain() == ForwardClientCertType::AlwaysForwardOnly) {
+    return;
+  }
+
+  // When Sanitize is set, or the connection is not mutual TLS, remove the XFCC-chain header.
+  if (config.forwardClientCertChain() == ForwardClientCertType::Sanitize || !connection.ssl() ||
+      connection.ssl()->urlEncodedPemEncodedPeerCertificateChain() == EMPTY_STRING) {
+    request_headers.removeForwardedClientCertChain();
+    return;
+  }
+
+  // When ForwardOnly is set, always forward the XFCC-chain header without modification.
+  if (config.forwardClientCertChain() == ForwardClientCertType::ForwardOnly) {
+    return;
+  }
+
+  // When SanitizeSet is set, the client certificate chain information should be set into the
+  // XFCC-chain header.
+  if (config.forwardClientCertChain() == ForwardClientCertType::SanitizeSet) {
+    request_headers.insertForwardedClientCertChain().value(
+        connection.ssl()->urlEncodedPemEncodedPeerCertificateChain());
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
 void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers,
                                                      const HeaderMap* request_headers,
                                                      const std::string& via) {

@@ -154,6 +154,25 @@ and the
 HTTP connection manager options. If *forward_client_cert_details* is unset, the XFCC header will be sanitized by
 default.
 
+.. _config_http_conn_man_headers_x-forwarded-client-cert-chain:
+
+x-forwarded-client-cert-chain
+-----------------------------
+
+*x-forwarded-client-cert-chain* (XFCC-chain) is a proxy header which indicates certificate chain
+information of clients that a request has flowed through on its way to the server. A proxy may
+choose to sanitize/forward the XFCC-chain header before proxying the request.
+
+The XFCC-chain header value is a concatenated set of URL encoded PEM encoded certificate strings.
+Each substring is either a leaf, intermediate, or a root certificate. If ",", ";" or "=" appear in a
+value, the value should be double-quoted. Double-quotes in the value should be replaced by
+backslash-double-quote (\").
+
+How Envoy processes XFCC-chain is specified by the
+:ref:`forward_client_cert_chain_details <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.forward_client_cert_chain_details>`
+HTTP connection manager option. If *forward_client_cert_chain_details* is unset, the XFCC-chain
+header will be sanitized by default.
+
 .. _config_http_conn_man_headers_x-forwarded-for:
 
 x-forwarded-for

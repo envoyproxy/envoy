@@ -117,6 +117,9 @@ public:
   Http::ForwardClientCertType forwardClientCert() override {
     return Http::ForwardClientCertType::Sanitize;
   }
+  Http::ForwardClientCertType forwardClientCertChain() override {
+    return Http::ForwardClientCertType::Sanitize;
+  }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }

@@ -116,6 +116,9 @@ public:
   bool skipXffAppend() const override { return skip_xff_append_; }
   const std::string& via() const override { return via_; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
+  Http::ForwardClientCertType forwardClientCertChain() override {
+    return forward_client_cert_chain_;
+  }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }
@@ -148,6 +151,7 @@ private:
   const bool skip_xff_append_;
   const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
+  Http::ForwardClientCertType forward_client_cert_chain_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Router::RouteConfigProviderManager& route_config_provider_manager_;
   CodecType codec_type_;

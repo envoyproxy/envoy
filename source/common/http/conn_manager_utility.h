@@ -68,6 +68,10 @@ private:
 
   static void mutateXfccRequestHeader(HeaderMap& request_headers, Network::Connection& connection,
                                       ConnectionManagerConfig& config);
+
+  static void mutateXfccChainRequestHeader(HeaderMap& request_headers,
+                                           Network::Connection& connection,
+                                           ConnectionManagerConfig& config);
 };
 
 } // namespace Http

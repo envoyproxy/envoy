@@ -193,6 +193,30 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::DNS);
   }
 
+  switch (config.forward_client_cert_details()) {
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::SANITIZE:
+    forward_client_cert_chain_ = Http::ForwardClientCertType::Sanitize;
+    break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      FORWARD_ONLY:
+    forward_client_cert_chain_ = Http::ForwardClientCertType::ForwardOnly;
+    break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      SANITIZE_SET:
+    forward_client_cert_chain_ = Http::ForwardClientCertType::SanitizeSet;
+    break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      ALWAYS_FORWARD_ONLY:
+    forward_client_cert_chain_ = Http::ForwardClientCertType::AlwaysForwardOnly;
+    break;
+  case envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+      APPEND_FORWARD:
+    throw EnvoyException("Error: the APPEND_FORWARD mode is not available for the "
+                         "x-forwarded-client-cert-chain header");
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
   if (config.has_add_user_agent() && config.add_user_agent().value()) {
     user_agent_ = context_.localInfo().clusterName();
   }
