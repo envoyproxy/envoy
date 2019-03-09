@@ -68,6 +68,7 @@ public:
   MOCK_CONST_METHOD0(skipXffAppend, bool());
   MOCK_CONST_METHOD0(via, const std::string&());
   MOCK_METHOD0(forwardClientCert, Http::ForwardClientCertType());
+  MOCK_METHOD0(forwardClientCertChain, Http::ForwardClientCertType());
   MOCK_CONST_METHOD0(setCurrentClientCertDetails,
                      const std::vector<Http::ClientCertDetailsType>&());
   MOCK_METHOD0(localAddress, const Network::Address::Instance&());
