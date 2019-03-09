@@ -16,6 +16,7 @@ public:
   // Stats::Source
   std::vector<CounterSharedPtr>& cachedCounters() override;
   std::vector<GaugeSharedPtr>& cachedGauges() override;
+  std::vector<BoolIndicatorSharedPtr>& cachedBoolIndicators() override;
   std::vector<ParentHistogramSharedPtr>& cachedHistograms() override;
   void clearCache() override;
 
@@ -23,6 +24,7 @@ private:
   Store& store_;
   absl::optional<std::vector<CounterSharedPtr>> counters_;
   absl::optional<std::vector<GaugeSharedPtr>> gauges_;
+  absl::optional<std::vector<BoolIndicatorSharedPtr>> bool_indicators_;
   absl::optional<std::vector<ParentHistogramSharedPtr>> histograms_;
 };
 

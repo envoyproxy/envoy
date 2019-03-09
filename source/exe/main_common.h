@@ -84,6 +84,8 @@ class MainCommon {
 public:
   MainCommon(int argc, const char* const* argv);
   bool run() { return base_.run(); }
+  // Only tests have a legitimate need for this today.
+  Event::Dispatcher& dispatcherForTest() { return base_.server()->dispatcher(); }
 
   // Makes an admin-console request by path, calling handler() when complete.
   // The caller can initiate this from any thread, but it posts the request

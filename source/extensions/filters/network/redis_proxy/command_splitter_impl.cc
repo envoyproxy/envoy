@@ -10,7 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 
-#include "extensions/filters/network/redis_proxy/supported_commands.h"
+#include "extensions/filters/network/common/redis/supported_commands.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,15 +18,15 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
 
-RespValuePtr Utility::makeError(const std::string& error) {
-  RespValuePtr response(new RespValue());
-  response->type(RespType::Error);
+Common::Redis::RespValuePtr Utility::makeError(const std::string& error) {
+  Common::Redis::RespValuePtr response(new Common::Redis::RespValue());
+  response->type(Common::Redis::RespType::Error);
   response->asString() = error;
   return response;
 }
 
 void SplitRequestBase::onWrongNumberOfArguments(SplitCallbacks& callbacks,
-                                                const RespValue& request) {
+                                                const Common::Redis::RespValue& request) {
   callbacks.onResponse(Utility::makeError(
       fmt::format("wrong number of arguments for '{}' command", request.asArray()[0].asString())));
 }
@@ -42,7 +42,7 @@ void SplitRequestBase::updateStats(const bool success) {
 
 SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }
 
-void SingleServerRequest::onResponse(RespValuePtr&& response) {
+void SingleServerRequest::onResponse(Common::Redis::RespValuePtr&& response) {
   handle_ = nullptr;
   updateStats(true);
   callbacks_.onResponse(std::move(response));
@@ -60,8 +60,9 @@ void SingleServerRequest::cancel() {
 }
 
 SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
-                                      const RespValue& incoming_request, SplitCallbacks& callbacks,
-                                      CommandStats& command_stats, TimeSource& time_source) {
+                                      const Common::Redis::RespValue& incoming_request,
+                                      SplitCallbacks& callbacks, CommandStats& command_stats,
+                                      TimeSource& time_source) {
   std::unique_ptr<SimpleRequest> request_ptr{
       new SimpleRequest(callbacks, command_stats, time_source)};
 
@@ -76,8 +77,9 @@ SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
 }
 
 SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
-                                    const RespValue& incoming_request, SplitCallbacks& callbacks,
-                                    CommandStats& command_stats, TimeSource& time_source) {
+                                    const Common::Redis::RespValue& incoming_request,
+                                    SplitCallbacks& callbacks, CommandStats& command_stats,
+                                    TimeSource& time_source) {
 
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
   // Ensure there are at least three args to the command or it cannot be hashed.
@@ -121,24 +123,25 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
 }
 
 SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
-                                    const RespValue& incoming_request, SplitCallbacks& callbacks,
-                                    CommandStats& command_stats, TimeSource& time_source) {
+                                    const Common::Redis::RespValue& incoming_request,
+                                    SplitCallbacks& callbacks, CommandStats& command_stats,
+                                    TimeSource& time_source) {
   std::unique_ptr<MGETRequest> request_ptr{new MGETRequest(callbacks, command_stats, time_source)};
 
   request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
 
-  request_ptr->pending_response_ = std::make_unique<RespValue>();
-  request_ptr->pending_response_->type(RespType::Array);
-  std::vector<RespValue> responses(request_ptr->num_pending_responses_);
+  request_ptr->pending_response_ = std::make_unique<Common::Redis::RespValue>();
+  request_ptr->pending_response_->type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> responses(request_ptr->num_pending_responses_);
   request_ptr->pending_response_->asArray().swap(responses);
 
-  std::vector<RespValue> values(2);
-  values[0].type(RespType::BulkString);
+  std::vector<Common::Redis::RespValue> values(2);
+  values[0].type(Common::Redis::RespType::BulkString);
   values[0].asString() = "get";
-  values[1].type(RespType::BulkString);
-  RespValue single_mget;
-  single_mget.type(RespType::Array);
+  values[1].type(Common::Redis::RespType::BulkString);
+  Common::Redis::RespValue single_mget;
+  single_mget.type(Common::Redis::RespType::Array);
   single_mget.asArray().swap(values);
 
   for (uint64_t i = 1; i < incoming_request.asArray().size(); i++) {
@@ -157,28 +160,28 @@ SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
   return request_ptr->num_pending_responses_ > 0 ? std::move(request_ptr) : nullptr;
 }
 
-void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
+void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
   pending_requests_[index].handle_ = nullptr;
 
   pending_response_->asArray()[index].type(value->type());
   switch (value->type()) {
-  case RespType::Array:
-  case RespType::Integer:
-  case RespType::SimpleString: {
-    pending_response_->asArray()[index].type(RespType::Error);
+  case Common::Redis::RespType::Array:
+  case Common::Redis::RespType::Integer:
+  case Common::Redis::RespType::SimpleString: {
+    pending_response_->asArray()[index].type(Common::Redis::RespType::Error);
     pending_response_->asArray()[index].asString() = Response::get().UpstreamProtocolError;
     error_count_++;
     break;
   }
-  case RespType::Error: {
+  case Common::Redis::RespType::Error: {
     error_count_++;
     FALLTHRU;
   }
-  case RespType::BulkString: {
+  case Common::Redis::RespType::BulkString: {
     pending_response_->asArray()[index].asString().swap(value->asString());
     break;
   }
-  case RespType::Null:
+  case Common::Redis::RespType::Null:
     break;
   }
 
@@ -191,8 +194,9 @@ void MGETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 }
 
 SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
-                                    const RespValue& incoming_request, SplitCallbacks& callbacks,
-                                    CommandStats& command_stats, TimeSource& time_source) {
+                                    const Common::Redis::RespValue& incoming_request,
+                                    SplitCallbacks& callbacks, CommandStats& command_stats,
+                                    TimeSource& time_source) {
   if ((incoming_request.asArray().size() - 1) % 2 != 0) {
     onWrongNumberOfArguments(callbacks, incoming_request);
     command_stats.error_.inc();
@@ -203,16 +207,16 @@ SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
   request_ptr->num_pending_responses_ = (incoming_request.asArray().size() - 1) / 2;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
 
-  request_ptr->pending_response_ = std::make_unique<RespValue>();
-  request_ptr->pending_response_->type(RespType::SimpleString);
+  request_ptr->pending_response_ = std::make_unique<Common::Redis::RespValue>();
+  request_ptr->pending_response_->type(Common::Redis::RespType::SimpleString);
 
-  std::vector<RespValue> values(3);
-  values[0].type(RespType::BulkString);
+  std::vector<Common::Redis::RespValue> values(3);
+  values[0].type(Common::Redis::RespType::BulkString);
   values[0].asString() = "set";
-  values[1].type(RespType::BulkString);
-  values[2].type(RespType::BulkString);
-  RespValue single_mset;
-  single_mset.type(RespType::Array);
+  values[1].type(Common::Redis::RespType::BulkString);
+  values[2].type(Common::Redis::RespType::BulkString);
+  Common::Redis::RespValue single_mset;
+  single_mset.type(Common::Redis::RespType::Array);
   single_mset.asArray().swap(values);
 
   uint64_t fragment_index = 0;
@@ -234,11 +238,11 @@ SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
   return request_ptr->num_pending_responses_ > 0 ? std::move(request_ptr) : nullptr;
 }
 
-void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
+void MSETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
   pending_requests_[index].handle_ = nullptr;
 
   switch (value->type()) {
-  case RespType::SimpleString: {
+  case Common::Redis::RespType::SimpleString: {
     if (value->asString() == Response::get().OK) {
       break;
     }
@@ -264,7 +268,7 @@ void MSETRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
 }
 
 SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
-                                                  const RespValue& incoming_request,
+                                                  const Common::Redis::RespValue& incoming_request,
                                                   SplitCallbacks& callbacks,
                                                   CommandStats& command_stats,
                                                   TimeSource& time_source) {
@@ -274,15 +278,15 @@ SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
   request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
 
-  request_ptr->pending_response_ = std::make_unique<RespValue>();
-  request_ptr->pending_response_->type(RespType::Integer);
+  request_ptr->pending_response_ = std::make_unique<Common::Redis::RespValue>();
+  request_ptr->pending_response_->type(Common::Redis::RespType::Integer);
 
-  std::vector<RespValue> values(2);
-  values[0].type(RespType::BulkString);
+  std::vector<Common::Redis::RespValue> values(2);
+  values[0].type(Common::Redis::RespType::BulkString);
   values[0].asString() = incoming_request.asArray()[0].asString();
-  values[1].type(RespType::BulkString);
-  RespValue single_fragment;
-  single_fragment.type(RespType::Array);
+  values[1].type(Common::Redis::RespType::BulkString);
+  Common::Redis::RespValue single_fragment;
+  single_fragment.type(Common::Redis::RespType::Array);
   single_fragment.asArray().swap(values);
 
   for (uint64_t i = 1; i < incoming_request.asArray().size(); i++) {
@@ -302,11 +306,12 @@ SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
   return request_ptr->num_pending_responses_ > 0 ? std::move(request_ptr) : nullptr;
 }
 
-void SplitKeysSumResultRequest::onChildResponse(RespValuePtr&& value, uint32_t index) {
+void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& value,
+                                                uint32_t index) {
   pending_requests_[index].handle_ = nullptr;
 
   switch (value->type()) {
-  case RespType::Integer: {
+  case Common::Redis::RespType::Integer: {
     total_ += value->asInteger();
     break;
   }
@@ -336,24 +341,26 @@ InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scop
       split_keys_sum_result_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source) {
-  for (const std::string& command : SupportedCommands::simpleCommands()) {
+  for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, simple_command_handler_);
   }
 
-  for (const std::string& command : SupportedCommands::evalCommands()) {
+  for (const std::string& command : Common::Redis::SupportedCommands::evalCommands()) {
     addHandler(scope, stat_prefix, command, eval_command_handler_);
   }
 
-  for (const std::string& command : SupportedCommands::hashMultipleSumResultCommands()) {
+  for (const std::string& command :
+       Common::Redis::SupportedCommands::hashMultipleSumResultCommands()) {
     addHandler(scope, stat_prefix, command, split_keys_sum_result_handler_);
   }
 
-  addHandler(scope, stat_prefix, SupportedCommands::mget(), mget_handler_);
-  addHandler(scope, stat_prefix, SupportedCommands::mset(), mset_handler_);
+  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mget(), mget_handler_);
+  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mset(), mset_handler_);
 }
 
-SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbacks& callbacks) {
-  if (request.type() != RespType::Array) {
+SplitRequestPtr InstanceImpl::makeRequest(const Common::Redis::RespValue& request,
+                                          SplitCallbacks& callbacks) {
+  if (request.type() != Common::Redis::RespType::Array) {
     onInvalidRequest(callbacks);
     return nullptr;
   }
@@ -361,10 +368,10 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
   std::string to_lower_string(request.asArray()[0].asString());
   to_lower_table_.toLowerCase(to_lower_string);
 
-  if (to_lower_string == SupportedCommands::ping()) {
+  if (to_lower_string == Common::Redis::SupportedCommands::ping()) {
     // Respond to PING locally.
-    RespValuePtr pong(new RespValue());
-    pong->type(RespType::SimpleString);
+    Common::Redis::RespValuePtr pong(new Common::Redis::RespValue());
+    pong->type(Common::Redis::RespType::SimpleString);
     pong->asString() = "PONG";
     callbacks.onResponse(std::move(pong));
     return nullptr;
@@ -376,8 +383,8 @@ SplitRequestPtr InstanceImpl::makeRequest(const RespValue& request, SplitCallbac
     return nullptr;
   }
 
-  for (const RespValue& value : request.asArray()) {
-    if (value.type() != RespType::BulkString) {
+  for (const Common::Redis::RespValue& value : request.asArray()) {
+    if (value.type() != Common::Redis::RespType::BulkString) {
       onInvalidRequest(callbacks);
       return nullptr;
     }

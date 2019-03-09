@@ -5,6 +5,7 @@ BROWSE
 *.bzlc
 .cache
 .classpath
+.clwb/
 /ci/bazel-*
 /ci/prebuilt/thirdparty
 /ci/prebuilt/thirdparty_build

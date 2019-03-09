@@ -183,6 +183,7 @@ RCU
 RDN
 RDS
 RDWR
+REIMPLEMENT
 REQ
 RFC
 RHS
@@ -258,6 +259,7 @@ WS
 Welford's
 Werror
 XDS
+xDSes
 XFCC
 XFF
 XM
@@ -441,6 +443,7 @@ gregs
 gzip
 hacky
 handshaker
+hd
 hdr
 healths
 healthz
@@ -634,6 +637,7 @@ sanitization
 sanitizer
 scala
 scalability
+sched
 schemas
 serializable
 serializer
@@ -695,6 +699,7 @@ uint
 un
 unary
 unconfigurable
+unconfigured
 uncontended
 undef
 undegraded

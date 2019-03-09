@@ -209,6 +209,9 @@ private:
                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                 Buffer::Instance& response, AdminStream&);
+  Http::Code handlerHeapProfiler(absl::string_view path_and_query,
+                                 Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                 AdminStream&);
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
                                     Http::HeaderMap& response_headers, Buffer::Instance& response,
                                     AdminStream&);
