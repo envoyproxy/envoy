@@ -13,6 +13,7 @@
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
+#include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -61,10 +62,10 @@ public:
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
                                   bool added_via_api) -> ClusterSharedPtr {
-          return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
-                                         ssl_context_manager_, runtime_, random_, dispatcher_,
-                                         log_manager_, local_info_, admin_, singleton_manager_,
-                                         outlier_event_logger, added_via_api, *api_);
+          return ClusterFactoryImplBase::create(
+              cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
+              dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+              outlier_event_logger, added_via_api, *api_);
         }));
   }
 
@@ -916,6 +917,7 @@ version_info: version3
 static_clusters:
   - cluster:
       name: "cds_cluster"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -927,6 +929,7 @@ static_clusters:
       nanos: 234000000
   - cluster:
       name: "fake_cluster"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -938,6 +941,7 @@ static_clusters:
       nanos: 234000000
   - cluster:
       name: "fake_cluster2"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -951,6 +955,7 @@ dynamic_active_clusters:
   - version_info: "version1"
     cluster:
       name: "cluster3"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -963,6 +968,7 @@ dynamic_active_clusters:
   - version_info: "version2"
     cluster:
       name: "cluster4"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -975,6 +981,7 @@ dynamic_active_clusters:
   - version_info: "version3"
     cluster:
       name: "cluster5"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -1088,6 +1095,7 @@ dynamic_warming_clusters:
   - version_info: "version1"
     cluster:
       name: "fake_cluster"
+      type: STATIC
       connect_timeout: 0.25s
       hosts:
       - socket_address:

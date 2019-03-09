@@ -288,35 +288,33 @@ admin:
 
 ### Incremental xDS
 
-Incremental xDS is a separate xDS endpoint available for ADS, CDS and RDS that
-allows:
+Incremental xDS is a separate xDS endpoint that:
 
-  * Incremental updates of the list of tracked resources by the xDS client.
-    This supports Envoy on-demand / lazily requesting additional resources. For
-    example, this may occur when a request corresponding to an unknown cluster
-    arrives.
-  * The xDS server can incrementally update the resources on the client.
-    This supports the goal of scalability of xDS resources. Rather than deliver
-    all 100k clusters when a single cluster is modified, the management server
-    only needs to deliver the single cluster that changed.
+  * Allows the protocol to communicate on the wire in terms of resource/resource
+    name deltas ("Delta xDS"). This supports the goal of scalability of xDS
+    resources. Rather than deliver all 100k clusters when a single cluster is
+    modified, the management server only needs to deliver the single cluster
+    that changed.
+  * Allows the Envoy to on-demand / lazily request additional resources. For
+    example, requesting a cluster only when a request for that cluster arrives.
 
-An xDS incremental session is always in the context of a gRPC bidirectional
+An Incremental xDS session is always in the context of a gRPC bidirectional
 stream. This allows the xDS server to keep track of the state of xDS clients
-connected to it. There is no REST version of Incremental xDS.
+connected to it. There is no REST version of Incremental xDS yet.
 
-In incremental xDS the nonce field is required and used to pair a
-[`IncrementalDiscoveryResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
-to a [`IncrementalDiscoveryRequest`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
+In the delta xDS wire protocol, the nonce field is required and used to pair a
+[`DeltaDiscoveryResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#deltadiscoveryresponse)
+to a [`DeltaDiscoveryRequest`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#deltadiscoveryrequest)
 ACK or NACK.
 Optionally, a response message level system_version_info is present for
 debugging purposes only.
 
-`IncrementalDiscoveryRequest` can be sent in 3 situations:
+`DeltaDiscoveryRequest` can be sent in 3 situations:
   1. Initial message in a xDS bidirectional gRPC stream.
-  2. As an ACK or NACK response to a previous `IncrementalDiscoveryResponse`.
+  2. As an ACK or NACK response to a previous `DeltaDiscoveryResponse`.
      In this case the `response_nonce` is set to the nonce value in the Response.
      ACK or NACK is determined by the absence or presence of `error_detail`.
-  3. Spontaneous `IncrementalDiscoveryRequest` from the client.
+  3. Spontaneous `DeltaDiscoveryRequest` from the client.
      This can be done to dynamically add or remove elements from the tracked
      `resource_names` set. In this case `response_nonce` must be omitted.
 
@@ -326,8 +324,8 @@ client spontaneously requests the "wc" resource.
 
 ![Incremental session example](diagrams/incremental.svg)
 
-On reconnect the xDS Incremental client may tell the server of its known resources
-to avoid resending them over the network.
+On reconnect the Incremental xDS client may tell the server of its known
+resources to avoid resending them over the network.
 
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
 

@@ -55,6 +55,7 @@ envoy_cc_test(
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/network:io_socket_handle_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
@@ -67,6 +68,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/network:io_socket_handle_lib",
     ],
 )
 

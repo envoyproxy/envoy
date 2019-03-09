@@ -184,6 +184,7 @@ RCU
 RDN
 RDS
 RDWR
+REIMPLEMENT
 REQ
 RFC
 RHS
@@ -259,6 +260,7 @@ WS
 Welford's
 Werror
 XDS
+xDSes
 XFCC
 XFF
 XM

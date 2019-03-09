@@ -54,6 +54,41 @@ bool operator==(const RespValue& lhs, const RespValue& rhs) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+MockEncoder::MockEncoder() {
+  ON_CALL(*this, encode(_, _))
+      .WillByDefault(
+          Invoke([this](const Common::Redis::RespValue& value, Buffer::Instance& out) -> void {
+            real_encoder_.encode(value, out);
+          }));
+}
+
+MockEncoder::~MockEncoder() {}
+
+MockDecoder::MockDecoder() {}
+MockDecoder::~MockDecoder() {}
+
+namespace Client {
+
+MockClient::MockClient() {
+  ON_CALL(*this, addConnectionCallbacks(_))
+      .WillByDefault(Invoke([this](Network::ConnectionCallbacks& callbacks) -> void {
+        callbacks_.push_back(&callbacks);
+      }));
+  ON_CALL(*this, close()).WillByDefault(Invoke([this]() -> void {
+    raiseEvent(Network::ConnectionEvent::LocalClose);
+  }));
+}
+
+MockClient::~MockClient() {}
+
+MockPoolRequest::MockPoolRequest() {}
+MockPoolRequest::~MockPoolRequest() {}
+
+MockPoolCallbacks::MockPoolCallbacks() {}
+MockPoolCallbacks::~MockPoolCallbacks() {}
+
+} // namespace Client
+
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

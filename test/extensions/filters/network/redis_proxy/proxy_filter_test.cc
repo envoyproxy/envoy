@@ -113,8 +113,8 @@ public:
     return Common::Redis::DecoderPtr{decoder_};
   }
 
-  MockEncoder* encoder_{new MockEncoder()};
-  MockDecoder* decoder_{new MockDecoder()};
+  Common::Redis::MockEncoder* encoder_{new Common::Redis::MockEncoder()};
+  Common::Redis::MockDecoder* decoder_{new Common::Redis::MockDecoder()};
   Common::Redis::DecoderCallbacks* decoder_callbacks_{};
   CommandSplitter::MockInstance splitter_;
   Stats::IsolatedStoreImpl store_;

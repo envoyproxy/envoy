@@ -1,5 +1,7 @@
-#include "common/api/os_sys_calls_impl.h"
+#include "envoy/api/io_error.h"
+
 #include "common/buffer/buffer_impl.h"
+#include "common/network/io_socket_handle_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/mocks/api/mocks.h"
@@ -179,35 +181,47 @@ TEST_P(OwnedImplTest, Write) {
 
   Buffer::OwnedImpl buffer;
   verifyImplementation(buffer);
+  Network::IoSocketHandleImpl io_handle;
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
-  Api::SysCallIntResult result = buffer.write(-1);
+  Api::IoCallUint64Result result = buffer.write(io_handle);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(7, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{6, 0}));
-  result = buffer.write(-1);
+  result = buffer.write(io_handle);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(6, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
-  result = buffer.write(-1);
+  result = buffer.write(io_handle);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
-  result = buffer.write(-1);
-  EXPECT_EQ(-1, result.rc_);
+  result = buffer.write(io_handle);
+  EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  EXPECT_EQ(0, result.rc_);
+  EXPECT_EQ(1, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EAGAIN}));
+  result = buffer.write(io_handle);
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
+  EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{1, 0}));
-  result = buffer.write(-1);
+  result = buffer.write(io_handle);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(1, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).Times(0);
-  result = buffer.write(-1);
+  result = buffer.write(io_handle);
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 }
@@ -218,18 +232,27 @@ TEST_P(OwnedImplTest, Read) {
 
   Buffer::OwnedImpl buffer;
   verifyImplementation(buffer);
+  Network::IoSocketHandleImpl io_handle;
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
-  Api::SysCallIntResult result = buffer.read(-1, 100);
+  Api::IoCallUint64Result result = buffer.read(io_handle, 100);
+  EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
-  result = buffer.read(-1, 100);
-  EXPECT_EQ(-1, result.rc_);
+  result = buffer.read(io_handle, 100);
+  EXPECT_EQ(Api::IoError::IoErrorCode::UnknownError, result.err_->getErrorCode());
+  EXPECT_EQ(0, result.rc_);
+  EXPECT_EQ(0, buffer.length());
+
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, EAGAIN}));
+  result = buffer.read(io_handle, 100);
+  EXPECT_EQ(Api::IoError::IoErrorCode::Again, result.err_->getErrorCode());
+  EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).Times(0);
-  result = buffer.read(-1, 0);
+  result = buffer.read(io_handle, 0);
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 }

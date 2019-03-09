@@ -25,6 +25,7 @@ envoy_cc_library(
     hdrs = ["conn_pool.h"],
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
+        "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
     ],
 )
@@ -42,6 +43,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:to_lower_table_lib",
         "//source/common/common:utility_lib",
+        "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
     ],
 )
@@ -60,7 +62,7 @@ envoy_cc_library(
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/extensions/filters/network/common/redis:codec_lib",
+        "//source/extensions/filters/network/common/redis:client_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )
