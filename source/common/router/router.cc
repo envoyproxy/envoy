@@ -448,9 +448,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       // since it's all moves from here on.
       Buffer::OwnedImpl copy(data);
       upstream_requests_[i]->encodeData(copy, end_stream);
-
-      if (i == 0) {
-      }
     } else {
       upstream_requests_[i]->encodeData(data, end_stream);
     }
