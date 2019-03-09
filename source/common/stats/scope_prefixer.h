@@ -23,6 +23,7 @@ public:
   ScopePtr createScope(const std::string& name) override;
   Counter& counterFromStatName(StatName name) override;
   Gauge& gaugeFromStatName(StatName name) override;
+  BoolIndicator& boolIndicatorFromStatName(StatName name) override;
   Histogram& histogramFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
@@ -37,6 +38,10 @@ public:
   Histogram& histogram(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName());
+  }
+  BoolIndicator& boolIndicator(const std::string& name) override {
+    StatNameTempStorage storage(name, symbolTable());
+    return boolIndicatorFromStatName(storage.statName());
   }
 
   const Stats::StatsOptions& statsOptions() const override { return scope_->statsOptions(); }

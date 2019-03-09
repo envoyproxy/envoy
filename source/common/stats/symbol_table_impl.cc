@@ -341,7 +341,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
   return bytes;
 }
 
-SymbolTable::StoragePtr SymbolTableImpl::join(StatName a, StatName b) const {
+/*SymbolTable::StoragePtr SymbolTableImpl::join(StatName a, StatName b) const {
   uint64_t a_size = a.dataSize();
   uint64_t b_size = b.dataSize();
   uint64_t num_bytes = a_size + b_size;
@@ -350,7 +350,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(StatName a, StatName b) const {
   memcpy(p, a.data(), a_size);
   memcpy(p + a_size, b.data(), b_size);
   return bytes;
-}
+  }*/
 
 StatNameList::~StatNameList() { ASSERT(!populated()); }
 

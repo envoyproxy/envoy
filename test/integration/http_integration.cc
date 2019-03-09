@@ -284,8 +284,9 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   if (!fake_upstream_connection_) {
     AssertionResult result = AssertionFailure();
     for (auto upstream_index : upstream_indices) {
-      result = fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_,
-                                                                      fake_upstream_connection_);
+      result = fake_upstreams_[upstream_index]->waitForHttpConnection(
+          *dispatcher_, fake_upstream_connection_, TestUtility::DefaultTimeout,
+          max_request_headers_kb_);
       if (result) {
         upstream_with_request = upstream_index;
         break;
@@ -827,6 +828,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t max_si
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void { hcm.mutable_max_request_headers_kb()->set_value(max_size); });
+  max_request_headers_kb_ = max_size;
 
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};

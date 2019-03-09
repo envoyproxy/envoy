@@ -25,7 +25,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("c1", c1.tagExtractedName());
   EXPECT_EQ("scope1.c2", c2.tagExtractedName());
   EXPECT_EQ(0, c1.tags().size());
-  EXPECT_EQ(0, c1.tags().size());
+  EXPECT_EQ(0, c2.tags().size());
 
   Gauge& g1 = store_.gauge("g1");
   Gauge& g2 = scope1->gauge("g2");
@@ -34,7 +34,16 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("g1", g1.tagExtractedName());
   EXPECT_EQ("scope1.g2", g2.tagExtractedName());
   EXPECT_EQ(0, g1.tags().size());
-  EXPECT_EQ(0, g1.tags().size());
+  EXPECT_EQ(0, g2.tags().size());
+
+  BoolIndicator& b1 = store_.boolIndicator("b1");
+  BoolIndicator& b2 = scope1->boolIndicator("b2");
+  EXPECT_EQ("b1", b1.name());
+  EXPECT_EQ("scope1.b2", b2.name());
+  EXPECT_EQ("b1", b1.tagExtractedName());
+  EXPECT_EQ("scope1.b2", b2.tagExtractedName());
+  EXPECT_EQ(0, b1.tags().size());
+  EXPECT_EQ(0, b2.tags().size());
 
   Histogram& h1 = store_.histogram("h1");
   Histogram& h2 = scope1->histogram("h2");
@@ -57,6 +66,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
 
   EXPECT_EQ(4UL, store_.counters().size());
   EXPECT_EQ(2UL, store_.gauges().size());
+  EXPECT_EQ(2UL, store_.boolIndicators().size());
 }
 
 TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
@@ -72,19 +82,22 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
  * Test stats macros. @see stats_macros.h
  */
 // clang-format off
-#define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM)                                                  \
-  COUNTER  (test_counter)                                                                          \
-  GAUGE    (test_gauge)                                                                            \
-  HISTOGRAM(test_histogram)
+#define ALL_TEST_STATS(COUNTER, GAUGE, BOOL_INDICATOR, HISTOGRAM)              \
+  COUNTER       (test_counter)                                                 \
+  GAUGE         (test_gauge)                                                   \
+  BOOL_INDICATOR(test_bool_indicator)                                          \
+  HISTOGRAM     (test_histogram)
 // clang-format on
 
 struct TestStats {
-  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_BOOL_INDICATOR_STRUCT,
+                 GENERATE_HISTOGRAM_STRUCT)
 };
 
 TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
   TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(store_, "test."),
                                       POOL_GAUGE_PREFIX(store_, "test."),
+                                      POOL_BOOL_INDICATOR_PREFIX(store_, "test."),
                                       POOL_HISTOGRAM_PREFIX(store_, "test."))};
 
   Counter& counter = test_stats.test_counter_;
@@ -92,6 +105,9 @@ TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
 
   Gauge& gauge = test_stats.test_gauge_;
   EXPECT_EQ("test.test_gauge", gauge.name());
+
+  BoolIndicator& boolIndicator = test_stats.test_bool_indicator_;
+  EXPECT_EQ("test.test_bool_indicator", boolIndicator.name());
 
   Histogram& histogram = test_stats.test_histogram_;
   EXPECT_EQ("test.test_histogram", histogram.name());

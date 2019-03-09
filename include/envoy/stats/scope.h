@@ -54,6 +54,12 @@ public:
   virtual Gauge& gauge(const std::string& name) PURE;
 
   /**
+   * @return a bool within the scope's namespace.
+   */
+  virtual BoolIndicator& boolIndicatorFromStatName(StatName name) PURE;
+  virtual BoolIndicator& boolIndicator(const std::string& name) PURE;
+
+  /**
    * @return a histogram within the scope's namespace with a particular value type.
    */
   virtual Histogram& histogramFromStatName(StatName name) PURE;

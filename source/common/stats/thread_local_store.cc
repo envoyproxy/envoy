@@ -30,7 +30,8 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
       stats_overflow_("stats.overflow", alloc.symbolTable()),
       num_last_resort_stats_(default_scope_->counterFromStatName(stats_overflow_.statName())),
       heap_allocator_(alloc.symbolTable()), source_(*this), null_counter_(alloc.symbolTable()),
-      null_gauge_(alloc.symbolTable()), null_histogram_(alloc.symbolTable()) {}
+      null_gauge_(alloc.symbolTable()), null_bool_(alloc.symbolTable()),
+      null_histogram_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);
@@ -53,6 +54,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   for (ScopeImpl* scope : scopes_) {
     removeRejectedStats(scope->central_cache_.counters_, deleted_counters_);
     removeRejectedStats(scope->central_cache_.gauges_, deleted_gauges_);
+    removeRejectedStats(scope->central_cache_.bool_indicators_, deleted_bool_indicators_);
     removeRejectedStats(scope->central_cache_.histograms_, deleted_histograms_);
   }
 }
@@ -122,6 +124,22 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
     for (auto& gauge : scope->central_cache_.gauges_) {
       if (names.insert(gauge.first).second) {
         ret.push_back(gauge.second);
+      }
+    }
+  }
+
+  return ret;
+}
+
+std::vector<BoolIndicatorSharedPtr> ThreadLocalStoreImpl::boolIndicators() const {
+  // Handle de-dup due to overlapping scopes.
+  std::vector<BoolIndicatorSharedPtr> ret;
+  StatNameHashSet names;
+  Thread::LockGuard lock(lock_);
+  for (ScopeImpl* scope : scopes_) {
+    for (auto& bool_indicator : scope->central_cache_.bool_indicators_) {
+      if (names.insert(bool_indicator.first).second) {
+        ret.push_back(bool_indicator.second);
       }
     }
   }
@@ -409,8 +427,40 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name) {
                              tls_cache);
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name) {
   // See comments in counterFromStatName(). There is no super clean way (via templates or otherwise) to
+
+BoolIndicator& ThreadLocalStoreImpl::ScopeImpl::boolIndicatorFromStatName(StatName name) {
+  // See comments in counter(). There is no super clean way (via templates or otherwise) to
+  // share this code so I'm leaving it largely duplicated for now.
+  //
+  // Note that we can do map.find(final_name.c_str()), but we cannot do
+  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer
+  // to a temporary, and address sanitization errors would follow. Instead we
+  // must do a find() first, using that if it succeeds. If it fails, then after
+  // we construct the stat we can insert it into the required maps.
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
+  StatName final_stat_name(final_name.get());
+
+  if (parent_.rejects(final_stat_name)) {
+    return parent_.null_bool_;
+  }
+
+  StatMap<BoolIndicatorSharedPtr>* tls_cache = nullptr;
+  if (!parent_.shutting_down_ && parent_.tls_) {
+    tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].bool_indicators_;
+  }
+
+  return safeMakeStat<BoolIndicator>(
+      final_stat_name, central_cache_.bool_indicators_,
+      [](StatDataAllocator& allocator, StatName name, absl::string_view tag_extracted_name,
+         const std::vector<Tag>& tags) -> BoolIndicatorSharedPtr {
+        return allocator.makeBoolIndicator(name, std::move(tag_extracted_name), std::move(tags));
+      },
+      tls_cache);
+}
+
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name) {
+  // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -454,8 +504,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
   return **central_ref;
 }
 
-Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
-                                                         ParentHistogramImpl& parent) {
+Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogramFromStatName(StatName name,
+                                                                     ParentHistogramImpl& parent) {
   if (parent_.rejects(name)) {
     return parent_.null_histogram_;
   }
@@ -531,7 +581,7 @@ ParentHistogramImpl::~ParentHistogramImpl() {
 }
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
-  Histogram& tls_histogram = tls_scope_.tlsHistogram(statName(), *this);
+  Histogram& tls_histogram = tls_scope_.tlsHistogramFromStatName(statName(), *this);
   tls_histogram.recordValue(value);
   parent_.deliverHistogramToSinks(*this, value);
 }

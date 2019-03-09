@@ -168,5 +168,48 @@ public:
   uint64_t value() const override { return 0; }
 };
 
+/**
+ * BoolIndicator implementation that wraps a StatData.
+ */
+template <class StatData> class BoolIndicatorImpl : public BoolIndicator, public MetricImpl {
+public:
+  BoolIndicatorImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
+                    absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
+      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
+  ~BoolIndicatorImpl() {
+    alloc_.free(data_);
+    MetricImpl::clear();
+  }
+
+  // Stats::BoolIndicator
+  virtual void set(bool value) override {
+    data_.value_ = value ? 1 : 0;
+    data_.flags_ |= Flags::Used;
+  }
+  virtual bool value() const override { return data_.value_; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
+
+  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
+  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
+
+protected:
+  StatData& data_;
+  StatDataAllocatorImpl<StatData>& alloc_;
+};
+
+/**
+ * Null bool implementation.
+ * No-ops on all calls and requires no underlying metric or data.
+ */
+class NullBoolIndicatorImpl : public BoolIndicator, public NullMetricImpl {
+public:
+  explicit NullBoolIndicatorImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
+  ~NullBoolIndicatorImpl() { MetricImpl::clear(); }
+
+  void set(bool) override {}
+  bool used() const override { return false; }
+  bool value() const override { return false; }
+};
+
 } // namespace Stats
 } // namespace Envoy

@@ -106,6 +106,21 @@ public:
   uint64_t value_;
 };
 
+class MockBoolIndicator : public BoolIndicator, public MockMetric {
+public:
+  MockBoolIndicator();
+  ~MockBoolIndicator();
+
+  MOCK_METHOD1(set, void(bool value));
+  MOCK_CONST_METHOD0(used, bool());
+  MOCK_CONST_METHOD0(value, bool());
+
+  bool used_;
+  uint64_t value_;
+  std::string name_;
+  std::vector<Tag> tags_;
+};
+
 class MockHistogram : public Histogram, public MockMetric {
 public:
   MockHistogram();
@@ -144,6 +159,7 @@ public:
 
   MOCK_METHOD0(cachedCounters, const std::vector<CounterSharedPtr>&());
   MOCK_METHOD0(cachedGauges, const std::vector<GaugeSharedPtr>&());
+  MOCK_METHOD0(cachedBoolIndicators, const std::vector<BoolIndicatorSharedPtr>&());
   MOCK_METHOD0(cachedHistograms, const std::vector<ParentHistogramSharedPtr>&());
   MOCK_METHOD0(clearCache, void());
 
@@ -174,13 +190,20 @@ public:
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
+  MOCK_METHOD1(boolIndicator, BoolIndicator&(const std::string&));
+  MOCK_CONST_METHOD0(boolIndicators, std::vector<BoolIndicatorSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 
   Counter& counterFromStatName(StatName name) override { return counter(symbol_table_->toString(name)); }
   Gauge& gaugeFromStatName(StatName name) override { return gauge(symbol_table_->toString(name)); }
-  Histogram& histogramFromStatName(StatName name) override { return histogram(symbol_table_->toString(name)); }
+  BoolIndicator& boolIndicatorFromStatName(StatName name) override {
+    return boolIndicator(symbol_table_->toString(name));
+  }
+  Histogram& histogramFromStatName(StatName name) override {
+    return histogram(symbol_table_->toString(name));
+  }
 
   SymbolTable& symbolTable() override { return symbol_table_.get(); }
   const SymbolTable& symbolTable() const override { return symbol_table_.get(); }

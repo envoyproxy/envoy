@@ -145,6 +145,11 @@ public:
     return makeStat<GaugeImpl<RawStatData>>(name, tag_extracted_name, tags);
   }
 
+  BoolIndicatorSharedPtr makeBoolIndicator(StatName name, absl::string_view tag_extracted_name,
+                                           const std::vector<Tag>& tags) override {
+    return makeStat<BoolIndicatorImpl<RawStatData>>(name, tag_extracted_name, tags);
+  }
+
 private:
   Thread::BasicLockable& mutex_;
   RawStatDataSet& stats_set_ GUARDED_BY(mutex_);

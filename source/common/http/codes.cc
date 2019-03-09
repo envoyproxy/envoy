@@ -58,7 +58,7 @@ void CodeStatsImpl::incCounter(Stats::Scope& scope,
 }
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope, Stats::StatName a, Stats::StatName b) const {
-  Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(a, b);
+  Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({a, b});
   scope.counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
 }
 

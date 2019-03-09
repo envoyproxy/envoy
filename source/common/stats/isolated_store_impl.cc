@@ -30,6 +30,10 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       gauges_([this](StatName name) -> GaugeSharedPtr {
         return alloc_.makeGauge(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
       }),
+      bool_indicators_([this](StatName name) -> BoolIndicatorSharedPtr {
+        return alloc_.makeBoolIndicator(name, alloc_.symbolTable().toString(name),
+                                        std::vector<Tag>());
+      }),
       histograms_([this](StatName name) -> HistogramSharedPtr {
         return std::make_shared<HistogramImpl>(name, *this, alloc_.symbolTable().toString(name),
                                                std::vector<Tag>());

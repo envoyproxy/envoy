@@ -130,7 +130,7 @@ public:
    * @return a ThreadLocalHistogram within the scope's namespace.
    * @param name name of the histogram with scope prefix attached.
    */
-  virtual Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) PURE;
+  virtual Histogram& tlsHistogramFromStatName(StatName name, ParentHistogramImpl& parent) PURE;
 };
 
 /**
@@ -151,6 +151,12 @@ public:
   }
   Gauge& gaugeFromStatName(StatName name) override { return default_scope_->gaugeFromStatName(name); }
   Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
+  BoolIndicator& boolIndicatorFromStatName(StatName name) override {
+    return default_scope_->boolIndicatorFromStatName(name);
+  }
+  BoolIndicator& boolIndicator(const std::string& name) override {
+    return default_scope_->boolIndicator(name);
+  }
   Histogram& histogramFromStatName(StatName name) override { return default_scope_->histogramFromStatName(name); }
   Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
   const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
@@ -160,6 +166,7 @@ public:
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
+  std::vector<BoolIndicatorSharedPtr> boolIndicators() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
   // Stats::StoreRoot
@@ -185,6 +192,7 @@ private:
   struct TlsCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
+    StatMap<BoolIndicatorSharedPtr> bool_indicators_;
     StatMap<TlsHistogramSharedPtr> histograms_;
     StatMap<ParentHistogramSharedPtr> parent_histograms_;
   };
@@ -192,6 +200,7 @@ private:
   struct CentralCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
+    StatMap<BoolIndicatorSharedPtr> bool_indicators_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
   };
 
@@ -203,8 +212,10 @@ private:
     Counter& counterFromStatName(StatName name) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatName(StatName name) override;
+    BoolIndicator& boolIndicatorFromStatName(StatName name) override;
     Histogram& histogramFromStatName(StatName name) override;
-    Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
+    Histogram& tlsHistogramFromStatName(StatName name, ParentHistogramImpl& parent) override;
+
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
@@ -220,6 +231,10 @@ private:
     Gauge& gauge(const std::string& name) override {
       StatNameTempStorage storage(name, symbolTable());
       return gaugeFromStatName(storage.statName());
+    }
+    BoolIndicator& boolIndicator(const std::string& name) override {
+      StatNameTempStorage storage(name, symbolTable());
+      return boolIndicatorFromStatName(storage.statName());
     }
     Histogram& histogram(const std::string& name) override {
       StatNameTempStorage storage(name, symbolTable());
@@ -298,6 +313,7 @@ private:
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;
+  NullBoolIndicatorImpl null_bool_;
   NullHistogramImpl null_histogram_;
 
   // Retain storage for deleted stats; these are no longer in maps because the
@@ -310,6 +326,7 @@ private:
   // but that would be fairly complex to change.
   std::vector<CounterSharedPtr> deleted_counters_;
   std::vector<GaugeSharedPtr> deleted_gauges_;
+  std::vector<BoolIndicatorSharedPtr> deleted_bool_indicators_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
 };
 
