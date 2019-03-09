@@ -103,13 +103,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "io_socket_error_lib",
+    srcs = ["io_socket_error_impl.cc"],
+    hdrs = ["io_socket_error_impl.h"],
+    deps = [
+        "//include/envoy/api:io_error_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "io_socket_handle_lib",
     srcs = ["io_socket_handle_impl.cc"],
     hdrs = ["io_socket_handle_impl.h"],
     deps = [
+        ":io_socket_error_lib",
+        "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:io_handle_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:stack_array",
     ],
 )
 
