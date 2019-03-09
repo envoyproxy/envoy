@@ -95,10 +95,9 @@ struct TestStats {
 };
 
 TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
-  TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(store_, "test."),
-                                      POOL_GAUGE_PREFIX(store_, "test."),
-                                      POOL_BOOL_INDICATOR_PREFIX(store_, "test."),
-                                      POOL_HISTOGRAM_PREFIX(store_, "test."))};
+  TestStats test_stats{ALL_TEST_STATS(
+      POOL_COUNTER_PREFIX(store_, "test."), POOL_GAUGE_PREFIX(store_, "test."),
+      POOL_BOOL_INDICATOR_PREFIX(store_, "test."), POOL_HISTOGRAM_PREFIX(store_, "test."))};
 
   Counter& counter = test_stats.test_counter_;
   EXPECT_EQ("test.test_counter", counter.name());

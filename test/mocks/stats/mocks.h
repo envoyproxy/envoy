@@ -196,7 +196,9 @@ public:
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 
-  Counter& counterFromStatName(StatName name) override { return counter(symbol_table_->toString(name)); }
+  Counter& counterFromStatName(StatName name) override {
+    return counter(symbol_table_->toString(name));
+  }
   Gauge& gaugeFromStatName(StatName name) override { return gauge(symbol_table_->toString(name)); }
   BoolIndicator& boolIndicatorFromStatName(StatName name) override {
     return boolIndicator(symbol_table_->toString(name));

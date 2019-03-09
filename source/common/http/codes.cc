@@ -73,9 +73,9 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
   // Build a dynamic stat for the response code and increment it.
-  //incCounter(scope, {prefix, upstream_rq_completed_});
-  //incCounter(scope, {prefix, upstreamRqGroup(response_code)});
-  //incCounter(scope, {prefix, upstream_rq_.statName(response_code)});
+  // incCounter(scope, {prefix, upstream_rq_completed_});
+  // incCounter(scope, {prefix, upstreamRqGroup(response_code)});
+  // incCounter(scope, {prefix, upstream_rq_.statName(response_code)});
   incCounter(scope, prefix, upstream_rq_completed_);
   incCounter(scope, prefix, upstreamRqGroup(response_code));
   incCounter(scope, prefix, upstream_rq_.statName(response_code));

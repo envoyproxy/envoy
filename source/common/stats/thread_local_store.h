@@ -143,13 +143,17 @@ public:
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
-  Counter& counterFromStatName(StatName name) override { return default_scope_->counterFromStatName(name); }
+  Counter& counterFromStatName(StatName name) override {
+    return default_scope_->counterFromStatName(name);
+  }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
-  Gauge& gaugeFromStatName(StatName name) override { return default_scope_->gaugeFromStatName(name); }
+  Gauge& gaugeFromStatName(StatName name) override {
+    return default_scope_->gaugeFromStatName(name);
+  }
   Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
   BoolIndicator& boolIndicatorFromStatName(StatName name) override {
     return default_scope_->boolIndicatorFromStatName(name);
@@ -157,7 +161,9 @@ public:
   BoolIndicator& boolIndicator(const std::string& name) override {
     return default_scope_->boolIndicator(name);
   }
-  Histogram& histogramFromStatName(StatName name) override { return default_scope_->histogramFromStatName(name); }
+  Histogram& histogramFromStatName(StatName name) override {
+    return default_scope_->histogramFromStatName(name);
+  }
   Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
   const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }

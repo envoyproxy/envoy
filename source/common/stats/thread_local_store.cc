@@ -398,8 +398,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 }
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name) {
-  // See comments in counterFromStatName(). There is no super clean way (via templates or otherwise) to
-  // share this code so I'm leaving it largely duplicated for now.
+  // See comments in counterFromStatName(). There is no super clean way (via templates or otherwise)
+  // to share this code so I'm leaving it largely duplicated for now.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
   // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
@@ -427,7 +427,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name) {
                              tls_cache);
 }
 
-  // See comments in counterFromStatName(). There is no super clean way (via templates or otherwise) to
+// See comments in counterFromStatName(). There is no super clean way (via templates or otherwise)
+// to
 
 BoolIndicator& ThreadLocalStoreImpl::ScopeImpl::boolIndicatorFromStatName(StatName name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
