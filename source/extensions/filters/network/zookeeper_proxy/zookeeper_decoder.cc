@@ -14,7 +14,18 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   int32_t len = BufferHelper::peekInt32(data, offset);
   checkLength(len, 8);
 
-  // "Special" requests.
+  // Control requests, with XIDs <= 0.
+  //
+  // These are meant to control the state of a session:
+  // connect, keep-alive, authenticate and set initial watches.
+  //
+  // Note: setWatches is a command historically used to
+  //       set watches right after connecting, typically
+  //       used when roaming from one ZK server to the next.
+  //       Thus, the special XID. There has beeen talks in
+  //       severeal client implementations to expose setWatches
+  //       as a reegular data request as well. So we support
+  //       it without a special XID as well.
   int32_t xid = BufferHelper::peekInt32(data, offset);
   switch (xid) {
   case enumToIntSigned(XidCodes::CONNECT_XID):
@@ -28,9 +39,19 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   case enumToIntSigned(XidCodes::AUTH_XID):
     parseAuthRequest(data, offset, len);
     return;
+  case enumToIntSigned(XidCodes::SET_WATCHES_XID):
+    // Skip opcode.
+    offset += 4;
+    parseSetWatchesRequest(data, offset, len);
+    return;
   }
 
-  // "Regular" requests.
+  // Data requests, with XIDs > 0.
+  //
+  // These are meant to happen after a successful control request, except
+  // for two cases: auth requests can happen at any time and ping requests
+  // must happen every 1/3 of the negotiated session timeout, to keep
+  // the session alive.
   int32_t opcode = BufferHelper::peekInt32(data, offset);
   switch (opcode) {
   case enumToInt(OpCodes::GETDATA):
