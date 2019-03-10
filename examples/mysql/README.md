@@ -11,7 +11,7 @@ metrics.
 
 Build and run the containers:
 
-```bash
+```console
 $ docker-compose build && docker-compose up
 ```
 
