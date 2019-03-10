@@ -81,6 +81,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
 }
 
 std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }
+absl::string_view RawBufferSocket::failureReason() const { return EMPTY_STRING; }
 
 void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Connected); }
 

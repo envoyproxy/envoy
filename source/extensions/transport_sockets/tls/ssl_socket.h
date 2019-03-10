@@ -64,6 +64,7 @@ public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
+  absl::string_view failureReason() const override;
   bool canFlushClose() override { return handshake_complete_; }
   void closeSocket(Network::ConnectionEvent close_type) override;
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
@@ -84,6 +85,7 @@ private:
   bool handshake_complete_{};
   bool shutdown_sent_{};
   uint64_t bytes_to_retry_{};
+  std::string failure_reason_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
