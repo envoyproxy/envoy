@@ -7,6 +7,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
+const uint32_t INT_LENGTH = 4;
+const uint32_t OPCODE_LENGTH = 4;
+const uint32_t ZXID_LENGTH = 8;
+const uint32_t TIMEOUT_LENGTH = 4;
+const uint32_t SESSION_LENGTH = 8;
+
 void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   ENVOY_LOG(trace, "zookeeper_proxy: decoding {} bytes at offset {}", data.length(), offset);
 
@@ -32,16 +38,14 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseConnect(data, offset, len);
     return;
   case enumToIntSigned(XidCodes::PING_XID):
-    // Skip opcode.
-    offset += 4;
+    offset += OPCODE_LENGTH;
     callbacks_.onPing();
     return;
   case enumToIntSigned(XidCodes::AUTH_XID):
     parseAuthRequest(data, offset, len);
     return;
   case enumToIntSigned(XidCodes::SET_WATCHES_XID):
-    // Skip opcode.
-    offset += 4;
+    offset += OPCODE_LENGTH;
     parseSetWatchesRequest(data, offset, len);
     return;
   }
@@ -123,7 +127,7 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
   checkLength(len, 28);
 
   // Read password - skip zxid, timeout, and session id.
-  offset += 20;
+  offset += ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH;
   std::string passwd = BufferHelper::peekString(data, offset);
 
   // Read readonly flag, if it's there.
@@ -139,7 +143,7 @@ void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uin
   checkLength(len, 20);
 
   // Skip opcode + type.
-  offset += 8;
+  offset += OPCODE_LENGTH + INT_LENGTH;
   std::string scheme = BufferHelper::peekString(data, offset);
   std::string credential = BufferHelper::peekString(data, offset);
 
