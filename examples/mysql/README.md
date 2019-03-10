@@ -1,7 +1,7 @@
 MySQL filter example
-===================
+====================
 
-In this example, we show how a [MySQL
+In this example, we show how the [MySQL
 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/network_filters/mysql_proxy_filter)
 can be used with the Envoy proxy. The Envoy proxy [configuration](./envoy.yaml)
 includes a MySQL filter that parses queries and collects MySQL-specific
@@ -17,7 +17,7 @@ metrics.
 
 Use `mysql` to issue some commands and verify they are routed via Envoy:
 
-```
+```console
 $ mysql -h 0.0.0.0 -P 1999 -u root --ssl-mode DISABLED
 ... snip ...
 
@@ -55,7 +55,7 @@ Bye
 
 Check that the egress stats were updated:
 
-```
+```console
 $ curl -s http://localhost:8001/stats?filter=egress_mysql
 mysql.egress_mysql.auth_switch_request: 0
 mysql.egress_mysql.decoder_errors: 0
@@ -70,7 +70,7 @@ mysql.egress_mysql.upgraded_to_ssl: 0
 
 Check that the TCP stats were updated:
 
-```
+```console
 $ curl -s http://localhost:8001/stats?filter=mysql_tcp
 tcp.mysql_tcp.downstream_cx_no_route: 0
 tcp.mysql_tcp.downstream_cx_rx_bytes_buffered: 0
