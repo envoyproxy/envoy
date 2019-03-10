@@ -22,7 +22,7 @@ uint64_t TokenBucketImpl::consume(uint64_t tokens, bool allow_partial) {
   }
 
   if (tokens_ < tokens) {
-    return false;
+    return 0;
   }
 
   tokens_ -= tokens;

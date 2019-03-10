@@ -20,8 +20,9 @@ public:
   /**
    * @param tokens supplies the number of tokens to be consumed.
    * @param allow_partial supplies whether the token bucket will allow consumption of less tokens
-   *                      than asked for. If allow_partial is true, the bucket contains 5 tokens,
-   *                      and the caller asks for 3, the bucket will return 3 tokens.
+   *                      than asked for. If allow_partial is true, the bucket contains 3 tokens,
+   *                      and the caller asks for 5, the bucket will return 3 tokens and now be
+   *                      empty.
    * @return the number of tokens actually consumed.
    */
   virtual uint64_t consume(uint64_t tokens, bool allow_partial) PURE;
