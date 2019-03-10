@@ -23,7 +23,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   //       set watches right after connecting, typically
   //       used when roaming from one ZK server to the next.
   //       Thus, the special XID. There has beeen talks in
-  //       severeal client implementations to expose setWatches
+  //       several client implementations to expose setWatches
   //       as a reegular data request as well. So we support
   //       it without a special XID as well.
   int32_t xid = BufferHelper::peekInt32(data, offset);
