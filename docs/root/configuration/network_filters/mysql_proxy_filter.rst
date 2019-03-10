@@ -18,7 +18,7 @@ as operations performed on each table.
 .. warning::
 
    The mysql_proxy filter was tested with MySQL v5.5. The filter may not work
-   other versions of MySQL due to differences in the protocol implementation.
+   with other versions of MySQL due to differences in the protocol implementation.
 
 .. _config_network_filters_mysql_proxy_config:
 
