@@ -175,6 +175,7 @@ private:
   Common::CallbackHandle* original_priority_set_callback_handle_;
 
   LbSubsetEntryPtr fallback_subset_;
+  LbSubsetEntryPtr panic_mode_subset_;
 
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
   LbSubsetMap subsets_;

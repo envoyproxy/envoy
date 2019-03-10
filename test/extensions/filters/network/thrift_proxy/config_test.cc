@@ -16,7 +16,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-
 namespace {
 
 std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType>

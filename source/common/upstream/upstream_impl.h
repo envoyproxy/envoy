@@ -393,6 +393,7 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 
 class PrioritySetImpl : public PrioritySet {
 public:
+  PrioritySetImpl() : batch_update_(false) {}
   // From PrioritySet
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
@@ -412,6 +413,8 @@ public:
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
+
+  void batchHostUpdate(BatchUpdateCb& callback) override;
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
@@ -438,6 +441,32 @@ private:
   mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
+  bool batch_update_ : 1;
+
+  // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
+  // that have been added/removed throughout the batch update, and ensures that we properly manage
+  // the batch_update_ flag.
+  class BatchUpdateScope : public HostUpdateCb {
+  public:
+    explicit BatchUpdateScope(PrioritySetImpl& parent) : parent_(parent) {
+      ASSERT(!parent_.batch_update_);
+      parent_.batch_update_ = true;
+    }
+    ~BatchUpdateScope() { parent_.batch_update_ = false; }
+
+    virtual void updateHosts(uint32_t priority,
+                             PrioritySet::UpdateHostsParams&& update_hosts_params,
+                             LocalityWeightsConstSharedPtr locality_weights,
+                             const HostVector& hosts_added, const HostVector& hosts_removed,
+                             absl::optional<uint32_t> overprovisioning_factor) override;
+
+    std::unordered_set<HostSharedPtr> all_hosts_added_;
+    std::unordered_set<HostSharedPtr> all_hosts_removed_;
+
+  private:
+    PrioritySetImpl& parent_;
+    std::unordered_set<uint32_t> priorities_;
+  };
 };
 
 /**
@@ -508,6 +537,8 @@ public:
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
 
+  absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -550,6 +581,7 @@ private:
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
+  absl::optional<std::string> eds_service_name_;
 };
 
 /**
@@ -567,14 +599,6 @@ createTransportSocketFactory(const envoy::api::v2::Cluster& config,
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterSharedPtr
-  create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
-         ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-         Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-         AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-         Server::Admin& admin, Singleton::Manager& singleton_manager,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
   // Upstream::Cluster
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }
@@ -656,6 +680,8 @@ private:
   uint64_t pending_initialize_health_checks_{};
 };
 
+using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
+
 /**
  * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts
  * with its corresponding locality weight map. This is useful to store priorities/hosts/localities
@@ -663,7 +689,8 @@ private:
  */
 class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info);
+  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info,
+                       PrioritySet::HostUpdateCb* update_cb);
 
   // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
   void
@@ -701,6 +728,7 @@ private:
   ClusterImplBase& parent_;
   PriorityState priority_state_;
   const envoy::api::v2::core::Node& local_info_node_;
+  PrioritySet::HostUpdateCb* update_cb_;
 };
 
 typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;

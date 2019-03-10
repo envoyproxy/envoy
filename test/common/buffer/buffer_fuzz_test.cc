@@ -5,6 +5,7 @@
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/stack_array.h"
+#include "common/memory/stats.h"
 
 #include "test/common/buffer/buffer_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -329,9 +330,9 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
         FUZZ_ASSERT(rc == 0);
       } else {
         FUZZ_ASSERT(rc > 0);
-        STACK_ARRAY(buf, char, rc);
-        FUZZ_ASSERT(::read(pipe_fds[0], buf.begin(), rc) == rc);
-        FUZZ_ASSERT(::memcmp(buf.begin(), previous_data.data(), rc) == 0);
+        auto buf = std::make_unique<char[]>(rc);
+        FUZZ_ASSERT(::read(pipe_fds[0], buf.get(), rc) == rc);
+        FUZZ_ASSERT(::memcmp(buf.get(), previous_data.data(), rc) == 0);
       }
     } while (rc > 0);
     FUZZ_ASSERT(::close(pipe_fds[0]) == 0);
@@ -360,12 +361,16 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
     linear_buffers.emplace_back(new StringBuffer());
   }
 
+  const uint64_t initial_allocated_bytes = Memory::Stats::totalCurrentlyAllocated();
+
   // Soft bound on the available memory for allocation to avoid OOMs and
   // timeouts.
   uint32_t available_alloc = 2 * MaxAllocation;
-  for (int i = 0; i < input.actions().size(); ++i) {
+  constexpr auto max_actions = 1024;
+  for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
     const char insert_value = 'a' + i % 26;
     const auto& action = input.actions(i);
+    const uint64_t current_allocated_bytes = Memory::Stats::totalCurrentlyAllocated();
     ENVOY_LOG_MISC(debug, "Action {}", action.DebugString());
     const uint32_t allocated = bufferAction(ctxt, insert_value, available_alloc, buffers, action);
     const uint32_t linear_allocated =
@@ -395,6 +400,21 @@ DEFINE_PROTO_FUZZER(const test::common::buffer::BufferFuzzTestCase& input) {
       // pattern), verify that it's never found.
       std::string garbage{"_garbage"};
       FUZZ_ASSERT(buffers[j]->search(garbage.data(), garbage.size(), 0) == -1);
+    }
+    ENVOY_LOG_MISC(debug, "[{} MB allocated total, {} MB since start]",
+                   current_allocated_bytes / (1024.0 * 1024),
+                   (current_allocated_bytes - initial_allocated_bytes) / (1024.0 * 1024));
+    // We bail out if buffers get too big, otherwise we will OOM the sanitizer.
+    // We can't use Memory::Stats::totalCurrentlyAllocated() here as we don't
+    // have tcmalloc in ASAN builds, so just do a simple count.
+    uint64_t total_length = 0;
+    for (const auto& buf : buffers) {
+      total_length += buf->length();
+    }
+    if (total_length > 4 * MaxAllocation) {
+      ENVOY_LOG_MISC(debug, "Terminating early with total buffer length {} to avoid OOM",
+                     total_length);
+      break;
     }
   }
 }

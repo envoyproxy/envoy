@@ -15,6 +15,7 @@ MockSpan::~MockSpan() {}
 MockConfig::MockConfig() {
   ON_CALL(*this, operationName()).WillByDefault(Return(operation_name_));
   ON_CALL(*this, requestHeadersForTags()).WillByDefault(ReturnRef(headers_));
+  ON_CALL(*this, verbose()).WillByDefault(Return(verbose_));
 }
 MockConfig::~MockConfig() {}
 

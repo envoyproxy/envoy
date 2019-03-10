@@ -34,6 +34,7 @@ envoy_cc_fuzz_test(
         ":buffer_fuzz_proto_cc",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:stack_array",
+        "//source/common/memory:stats_lib",
     ],
 )
 

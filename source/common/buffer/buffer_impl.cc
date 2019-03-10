@@ -48,7 +48,7 @@ void OwnedImpl::prepend(absl::string_view data) {
   // evbuffer_prepend doesn't have a check for empty (unlike
   // evbuffer_prepend_buffer which does). This then results in an allocation of
   // an empty chain, which causes problems with a following move/append. This
-  // only seems to happen the the original buffer was created via
+  // only seems to happen the original buffer was created via
   // addBufferFragment(), this forces the code execution path in
   // evbuffer_prepend related to immutable buffers.
   if (data.size() == 0) {

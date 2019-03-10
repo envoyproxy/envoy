@@ -22,6 +22,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 class LoadBalancerTestBase : public testing::TestWithParam<bool> {
 protected:
@@ -1356,5 +1357,6 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   EXPECT_EQ(subset_info.subsetKeys()[0], std::set<std::string>({"selector_key"}));
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

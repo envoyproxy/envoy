@@ -151,13 +151,26 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "options_lib",
-    srcs = ["options_impl.cc"],
-    hdrs = ["options_impl.h"],
+    srcs = ["options_impl.cc"] + select({
+        "@bazel_tools//src/conditions:linux_x86_64": ["options_impl_platform_linux.cc"],
+        "@bazel_tools//src/conditions:linux_aarch64": ["options_impl_platform_linux.cc"],
+        "//conditions:default": ["options_impl_platform_default.cc"],
+    }),
+    hdrs = [
+        "options_impl.h",
+        "options_impl_platform.h",
+    ] + select({
+        "@bazel_tools//src/conditions:linux_x86_64": ["options_impl_platform_linux.h"],
+        "@bazel_tools//src/conditions:linux_aarch64": ["options_impl_platform_linux.h"],
+        "//conditions:default": [],
+    }),
     external_deps = ["tclap"],
     deps = [
         "//include/envoy/network:address_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:logger_lib",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
         "//source/common/protobuf:utility_lib",

@@ -32,6 +32,13 @@ message ApiConfigSource {
     REST = 1;
     // gRPC v2 API.
     GRPC = 2;
+    // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}
+    // rather than Discovery{Request,Response}. Rather than sending Envoy the entire state
+    // with every update, the xDS server only sends what has changed since the last update.
+    //
+    // DELTA_GRPC is not yet entirely implemented! Initially, only CDS is available.
+    // Do not use for other xDSes. TODO(fredlas) update/remove this warning when appropriate.
+    DELTA_GRPC = 3;
   }
   ApiType api_type = 1 [(validate.rules).enum.defined_only = true];
   // Cluster names should be used only with REST. If > 1

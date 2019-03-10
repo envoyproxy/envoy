@@ -9,6 +9,7 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 TEST(HostUtilityTest, All) {
   ClusterInfoConstSharedPtr cluster{new MockClusterInfo()};
@@ -31,5 +32,6 @@ TEST(HostUtilityTest, All) {
   EXPECT_EQ("/failed_outlier_check", HostUtility::healthFlagsToString(*host));
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

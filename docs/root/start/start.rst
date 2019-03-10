@@ -68,7 +68,8 @@ The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/l
         filter_chains:
         - filters:
           - name: envoy.http_connection_manager
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
               stat_prefix: ingress_http
               codec_type: AUTO
               route_config:
@@ -93,8 +94,17 @@ The specification of the :ref:`clusters <envoy_api_file_envoy/api/v2/cds.proto>`
         # Comment out the following line to test on v6 networks
         dns_lookup_family: V4_ONLY
         lb_policy: ROUND_ROBIN
-        hosts: [{ socket_address: { address: google.com, port_value: 443 }}]
-        tls_context: { sni: www.google.com }
+        load_assignment:
+          cluster_name: service_google
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: www.google.com
+                    port_value: 443
+        tls_context:
+          sni: www.google.com
 
 
 Using the Envoy Docker Image

@@ -9,7 +9,7 @@ namespace Envoy {
 class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                         public HttpIntegrationTest {
 public:
-  IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 };
 
 class UpstreamEndpointIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,

@@ -59,19 +59,24 @@ rm -f "${SENTINEL}"
 export USER=bazel
 export TEST_TMPDIR=/build/tmp
 export BAZEL="bazel"
+
+if [[ -f "/etc/redhat-release" ]]
+then
+  export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 --action_env=PATH ${BAZEL_BUILD_EXTRA_OPTIONS}"
+else
+  export BAZEL_BUILD_EXTRA_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-7/bin --linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
+fi
+
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
 BAZEL_OPTIONS="--package_path %workspace%:${ENVOY_SRCDIR}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
-export BAZEL_BUILD_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-7/bin --linkopt=-fuse-ld=lld \
-  --strategy=Genrule=standalone --spawn_strategy=standalone \
+export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
   --jobs=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile ${BAZEL_BUILD_EXTRA_OPTIONS}"
 export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYTHONUSERBASE \
   --test_env=UBSAN_OPTIONS=print_stacktrace=1 \
   --cache_test_results=no --test_output=all ${BAZEL_EXTRA_TEST_OPTIONS}"
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
-ln -sf /thirdparty "${ENVOY_SRCDIR}"/ci/prebuilt
-ln -sf /thirdparty_build "${ENVOY_SRCDIR}"/ci/prebuilt
 
 # Replace the existing Bazel output cache with a copy of the image's prebuilt deps.
 if [[ -d /bazel-prebuilt-output && ! -d "${TEST_TMPDIR}/_bazel_${USER}" ]]; then
