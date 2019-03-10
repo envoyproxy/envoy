@@ -158,6 +158,11 @@ on 127.0.0.3:5678 is provided below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
+      upstream_connection_options:
+        tcp_keepalive:
+          keepalive_probes: 3
+          keepalive_time: 30
+          keepalive_interval: 10
       load_assignment:
         cluster_name: xds_cluster
         endpoints:
@@ -230,6 +235,11 @@ below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
+      upstream_connection_options:
+        tcp_keepalive:
+          keepalive_probes: 3
+          keepalive_time: 30
+          keepalive_interval: 10
       load_assignment:
         cluster_name: xds_cluster
         endpoints:
@@ -593,7 +603,7 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    connected_state, BoolIndicator, Current connection state with management server
    rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
    pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
-   
+
 .. _config_overview_v2_status:
 
 Status
