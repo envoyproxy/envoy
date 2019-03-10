@@ -178,10 +178,10 @@ std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
       PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
 }
 
-std::chrono::milliseconds Utility::configSourceInitialFetchTimeout(
-    const envoy::api::v2::core::ConfigSource& config_source) {
+std::chrono::milliseconds
+Utility::configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSource& config_source) {
   return std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 0));
+      PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 0));
 }
 
 void Utility::translateCdsConfig(const Json::Object& json_config,
