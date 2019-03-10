@@ -49,8 +49,8 @@ public:
   // where timer callbacks are triggered by the advancement of time. This implementation
   // matches recent behavior, where real-time timers were created directly in libevent
   // by dispatcher_impl.cc.
-  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& base) override {
-    return real_time_.createScheduler(base);
+  Event::SchedulerPtr createScheduler(Event::Scheduler& base_scheduler) override {
+    return real_time_.createScheduler(base_scheduler);
   }
   void sleep(const Duration& duration) override { real_time_.sleep(duration); }
   Thread::CondVar::WaitStatus

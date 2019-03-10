@@ -74,6 +74,7 @@ private:
   Thread::ThreadIdPtr run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
+  SchedulerPtr base_scheduler_;
   SchedulerPtr scheduler_;
   TimerPtr deferred_delete_timer_;
   TimerPtr post_timer_;

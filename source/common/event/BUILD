@@ -47,7 +47,6 @@ envoy_cc_library(
         "timer_impl.h",
     ],
     deps = [
-        ":libevent_lib",
         "//include/envoy/event:timer_interface",
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
