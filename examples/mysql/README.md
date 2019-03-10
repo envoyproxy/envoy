@@ -4,8 +4,8 @@ MySQL filter example
 In this example, we show how a [MySQL
 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/network_filters/mysql_proxy_filter)
 can be used with the Envoy proxy. The Envoy proxy [configuration](./envoy.yaml)
-includes a MySQL filter that routes egress requests to a MySQL server instance
-running in a separate container.
+includes a MySQL filter that parses queries and collects MySQL-specific
+metrics.
 
 ## Usage
 
