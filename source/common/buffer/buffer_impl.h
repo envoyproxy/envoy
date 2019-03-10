@@ -474,26 +474,15 @@ public:
   operator uint64_t() const { return value_; }
 
   OverflowDetectingUInt64& operator+=(uint64_t size) {
-#if __has_builtin(__builtin_uaddl_overflow)
-    uint64_t new_value;
-    bool overflow = __builtin_uaddll_overflow(value_, size, &new_value);
-    RELEASE_ASSERT(!overflow, "buffer length overflowed a 64-bit unsigned integer");
+    uint64_t new_value = value_ + size;
+    RELEASE_ASSERT(new_value >= value_, "64-bit unsigned integer overflowed");
     value_ = new_value;
-#else
-    value_ += size;
-#endif
     return *this;
   }
 
   OverflowDetectingUInt64& operator-=(uint64_t size) {
-#if __has_builtin(__builtin_uaddl_overflow)
-    uint64_t new_value;
-    bool overflow = __builtin_usubll_overflow(value_, size, &new_value);
-    RELEASE_ASSERT(!overflow, "buffer length underflowed");
-    value_ = new_value;
-#else
-    value_ += size;
-#endif
+    RELEASE_ASSERT(value_ >= size, "unsigned integer underflowed");
+    value_ -= size;
     return *this;
   }
 
