@@ -218,11 +218,11 @@ and [`Listeners`](https://www.envoyproxy.io/docs/envoy/latest/configuration/list
 go through  `warming` before they can serve requests. This process happens both during 
 [`Envoy initialization`](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/init.html#initialization) 
 and when the `Cluster` or `Listener` is updated. Warming of `Cluster` is completed only when a 
-`ClusterLoadAssignment` response is supplied by management server. Similarly warming of `Listener`
-is completed only when a `RouteConfiguration`  is suppled by management server if the listener 
-refers to an RDS configuration. Management Server is expected to provide the EDS/RDS updates during
-warming. If management server does not provide EDS/RDS information, Envoy will not initialize
-it self during initialization phase and the updates sent via CDS/LDS will not take effect till
+`ClusterLoadAssignment` response is supplied by management server. Similarly, warming of `Listener`
+is completed only when a `RouteConfiguration` is suppled by management server if the listener 
+refers to an RDS configuration. Management server is expected to provide the EDS/RDS updates during
+warming. If management server does not provide EDS/RDS responses, Envoy will not initialize
+itself during initialization phase and the updates sent via CDS/LDS will not take effect till
 EDS/RDS responses are supplied.
 
 #### Eventual consistency considerations
