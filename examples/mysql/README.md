@@ -18,7 +18,7 @@ running in a separate container.
 Use `mysql` to issue some commands and verify they are routed via Envoy:
 
 ```
-$ mysql -h 0.0.0.0 -P 1999 -u root
+$ mysql -h 0.0.0.0 -P 1999 -u root --ssl-mode DISABLED
 ... snip ...
 
 mysql> CREATE DATABASE test;
