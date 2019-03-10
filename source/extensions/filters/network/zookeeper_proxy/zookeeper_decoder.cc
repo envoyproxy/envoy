@@ -145,7 +145,9 @@ void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uin
   // Skip opcode + type.
   offset += OPCODE_LENGTH + INT_LENGTH;
   std::string scheme = BufferHelper::peekString(data, offset);
-  std::string credential = BufferHelper::peekString(data, offset);
+  // Skip credential.
+  int32_t credlen = BufferHelper::peekInt32(data, offset);
+  offset += credlen;
 
   callbacks_.onAuthRequest(scheme);
 }
