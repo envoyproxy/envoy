@@ -25,13 +25,11 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   // These are meant to control the state of a session:
   // connect, keep-alive, authenticate and set initial watches.
   //
-  // Note: setWatches is a command historically used to
-  //       set watches right after connecting, typically
-  //       used when roaming from one ZK server to the next.
-  //       Thus, the special XID. There has beeen talks in
-  //       several client implementations to expose setWatches
-  //       as a reegular data request as well. So we support
-  //       it without a special XID as well.
+  // Note: setWatches is a command historically used to set watches
+  //       right after connecting, typically used when roaming from one
+  //       ZooKeeper server to the next. Thus, the special xid.
+  //       However, some client implementations might expose setWatches
+  //       as a regular data request, so we support that as well.
   int32_t xid = BufferHelper::peekInt32(data, offset);
   switch (xid) {
   case enumToIntSigned(XidCodes::CONNECT_XID):
