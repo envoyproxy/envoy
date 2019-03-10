@@ -57,6 +57,7 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/network:io_socket_handle_lib",
         "//test/mocks/api:api_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )

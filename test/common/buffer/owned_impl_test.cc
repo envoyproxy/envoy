@@ -5,6 +5,7 @@
 
 #include "test/common/buffer/utility.h"
 #include "test/mocks/api/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/str_cat.h"
@@ -424,6 +425,7 @@ TEST_P(OwnedImplTest, PrependEmpty) {
 }
 
 TEST(OverflowDetectingUInt64, Arithmetic) {
+  Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink()); // For coverage build.
   OverflowDetectingUInt64 length;
   length += 1;
   length -= 1;
