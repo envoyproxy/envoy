@@ -6,6 +6,7 @@
 #include "common/common/logger.h"
 #include "common/common/stack_array.h"
 #include "common/memory/stats.h"
+#include "common/network/io_socket_handle_impl.h"
 
 #include "test/common/buffer/buffer_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -106,12 +107,11 @@ public:
     src.data_ = src.data_.substr(length);
   }
 
-  Api::SysCallIntResult read(int fd, uint64_t max_length) override {
+  Api::IoCallUint64Result read(Network::IoHandle& io_handle, uint64_t max_length) override {
     FUZZ_ASSERT(max_length <= MaxAllocation);
-    Api::SysCallIntResult result;
-    result.rc_ = ::read(fd, tmp_buf_.get(), max_length);
-    result.errno_ = errno;
-    FUZZ_ASSERT(result.rc_ > 0);
+    Buffer::RawSlice slice{tmp_buf_.get(), MaxAllocation};
+    Api::IoCallUint64Result result = io_handle.readv(max_length, &slice, 1);
+    FUZZ_ASSERT(result.ok() && result.rc_ > 0);
     data_ += std::string(tmp_buf_.get(), result.rc_);
     return result;
   }
@@ -130,11 +130,10 @@ public:
 
   std::string toString() const override { return data_; }
 
-  Api::SysCallIntResult write(int fd) override {
-    Api::SysCallIntResult result;
-    result.rc_ = ::write(fd, data_.data(), data_.size());
-    result.errno_ = errno;
-    FUZZ_ASSERT(result.rc_ >= 0);
+  Api::IoCallUint64Result write(Network::IoHandle& io_handle) override {
+    const Buffer::RawSlice slice{const_cast<char*>(data_.data()), data_.size()};
+    Api::IoCallUint64Result result = io_handle.writev(&slice, 1);
+    FUZZ_ASSERT(result.ok());
     data_ = data_.substr(result.rc_);
     return result;
   }
@@ -301,14 +300,15 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     }
     int pipe_fds[2] = {0, 0};
     FUZZ_ASSERT(::pipe(pipe_fds) == 0);
+    Network::IoSocketHandleImpl io_handle(pipe_fds[0]);
     FUZZ_ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
     FUZZ_ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
     std::string data(max_length, insert_value);
-    const int rc = ::write(pipe_fds[1], data.data(), max_length);
+    const ssize_t rc = ::write(pipe_fds[1], data.data(), max_length);
     FUZZ_ASSERT(rc > 0);
     const uint32_t previous_length = target_buffer.length();
-    FUZZ_ASSERT(target_buffer.read(pipe_fds[0], max_length).rc_ == rc);
-    FUZZ_ASSERT(::close(pipe_fds[0]) == 0);
+    Api::IoCallUint64Result result = target_buffer.read(io_handle, max_length);
+    FUZZ_ASSERT(result.rc_ == static_cast<uint64_t>(rc));
     FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
     FUZZ_ASSERT(previous_length == target_buffer.search(data.data(), rc, previous_length));
     break;
@@ -316,27 +316,26 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
   case test::common::buffer::Action::kWrite: {
     int pipe_fds[2] = {0, 0};
     FUZZ_ASSERT(::pipe(pipe_fds) == 0);
+    Network::IoSocketHandleImpl io_handle(pipe_fds[1]);
     FUZZ_ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
     FUZZ_ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
-    int rc;
+    uint64_t rc;
     do {
       const bool empty = target_buffer.length() == 0;
       const std::string previous_data = target_buffer.toString();
-      const auto result = target_buffer.write(pipe_fds[1]);
+      const auto result = target_buffer.write(io_handle);
+      FUZZ_ASSERT(result.ok());
       rc = result.rc_;
-      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {} ({})", rc, ::strerror(result.errno_),
-                     result.errno_);
+      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc, result.err_->getErrorDetails());
       if (empty) {
         FUZZ_ASSERT(rc == 0);
       } else {
-        FUZZ_ASSERT(rc > 0);
         auto buf = std::make_unique<char[]>(rc);
-        FUZZ_ASSERT(::read(pipe_fds[0], buf.get(), rc) == rc);
+        FUZZ_ASSERT(static_cast<uint64_t>(::read(pipe_fds[0], buf.get(), rc)) == rc);
         FUZZ_ASSERT(::memcmp(buf.get(), previous_data.data(), rc) == 0);
       }
     } while (rc > 0);
     FUZZ_ASSERT(::close(pipe_fds[0]) == 0);
-    FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
     break;
   }
   default:

@@ -339,7 +339,8 @@ private:
     bool handleDataIfStopAll(ActiveStreamDecoderFilter& filter, Buffer::Instance& data);
 
     // Http::StreamCallbacks
-    void onResetStream(StreamResetReason reason) override;
+    void onResetStream(StreamResetReason reason,
+                       absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 

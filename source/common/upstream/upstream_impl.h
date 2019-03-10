@@ -599,14 +599,6 @@ createTransportSocketFactory(const envoy::api::v2::Cluster& config,
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterSharedPtr
-  create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
-         ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-         Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-         AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-         Server::Admin& admin, Singleton::Manager& singleton_manager,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
   // Upstream::Cluster
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }
@@ -687,6 +679,8 @@ private:
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
 };
+
+using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
 
 /**
  * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts

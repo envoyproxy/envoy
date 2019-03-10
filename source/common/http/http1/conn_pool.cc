@@ -114,7 +114,8 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     return newPendingRequest(response_decoder, callbacks);
   } else {
     ENVOY_LOG(debug, "max pending requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
+                            nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
     return nullptr;
   }
@@ -124,7 +125,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     // The client died.
-    ENVOY_CONN_LOG(debug, "client disconnected", *client.codec_client_);
+    ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", *client.codec_client_,
+                   client.codec_client_->connectionFailureReason());
     ActiveClientPtr removed;
     bool check_for_drained = true;
     if (client.stream_wrapper_) {
@@ -158,7 +160,10 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // that is behaving badly, requests can get stuck here in the pending state. If we see a
       // connect failure, we purge all pending requests so that calling code can determine what to
       // do with the request.
-      purgePendingRequests(client.real_host_description_);
+      ENVOY_CONN_LOG(debug, "purge pending, failure reason: {}", *client.codec_client_,
+                     client.codec_client_->connectionFailureReason());
+      purgePendingRequests(client.real_host_description_,
+                           client.codec_client_->connectionFailureReason());
     }
 
     dispatcher_.deferredDelete(std::move(removed));

@@ -310,7 +310,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 void ConnectionManagerImpl::resetAllStreams() {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case.
-    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination);
+    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
   }
 }
 
@@ -1492,7 +1492,7 @@ bool ConnectionManagerImpl::ActiveStream::handleDataIfStopAll(ActiveStreamDecode
   return false;
 }
 
-void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
+void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl::string_view) {
   // NOTE: This function gets called in all of the following cases:
   //       1) We TX an app level reset
   //       2) The codec TX a codec level reset

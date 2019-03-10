@@ -14,6 +14,7 @@
 #include "common/common/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
 
@@ -87,11 +88,11 @@ protected:
 /**
  * SingleServerRequest is a base class for commands that hash to a single backend.
  */
-class SingleServerRequest : public SplitRequestBase, public ConnPool::PoolCallbacks {
+class SingleServerRequest : public SplitRequestBase, public Common::Redis::Client::PoolCallbacks {
 public:
   ~SingleServerRequest();
 
-  // RedisProxy::ConnPool::PoolCallbacks
+  // Common::Redis::Client::PoolCallbacks
   void onResponse(Common::Redis::RespValuePtr&& response) override;
   void onFailure() override;
 
@@ -104,7 +105,7 @@ protected:
       : SplitRequestBase(command_stats, time_source), callbacks_(callbacks) {}
 
   SplitCallbacks& callbacks_;
-  ConnPool::PoolRequest* handle_{};
+  Common::Redis::Client::PoolRequest* handle_{};
 };
 
 /**
@@ -151,10 +152,10 @@ protected:
   FragmentedRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source)
       : SplitRequestBase(command_stats, time_source), callbacks_(callbacks) {}
 
-  struct PendingRequest : public ConnPool::PoolCallbacks {
+  struct PendingRequest : public Common::Redis::Client::PoolCallbacks {
     PendingRequest(FragmentedRequest& parent, uint32_t index) : parent_(parent), index_(index) {}
 
-    // RedisProxy::ConnPool::PoolCallbacks
+    // Common::Redis::Client::PoolCallbacks
     void onResponse(Common::Redis::RespValuePtr&& value) override {
       parent_.onChildResponse(std::move(value), index_);
     }
@@ -162,7 +163,7 @@ protected:
 
     FragmentedRequest& parent_;
     const uint32_t index_;
-    ConnPool::PoolRequest* handle_{};
+    Common::Redis::Client::PoolRequest* handle_{};
   };
 
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
