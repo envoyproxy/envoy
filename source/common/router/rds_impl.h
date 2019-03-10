@@ -101,7 +101,10 @@ public:
   ~RdsRouteConfigSubscription();
 
   // Init::Target
-  void initialize(std::function<void()> callback) override;
+  void initialize(std::function<void()> callback) override {
+    initialize_callback_ = callback;
+    subscription_->start({route_config_name_}, *this);
+  }
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
@@ -132,8 +135,6 @@ private:
 
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
   std::function<void()> initialize_callback_;
-  Event::TimerPtr initialization_timeout_timer_;
-  std::chrono::milliseconds initialization_timeout_;
   const std::string route_config_name_;
   Stats::ScopePtr scope_;
   RdsStats stats_;

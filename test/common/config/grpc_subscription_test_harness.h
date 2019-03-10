@@ -32,7 +32,9 @@ typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> GrpcEdsSubsc
 
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  GrpcSubscriptionTestHarness()
+  GrpcSubscriptionTestHarness() : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
+
+  GrpcSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
@@ -44,7 +46,7 @@ public:
     }));
     subscription_ = std::make_unique<GrpcEdsSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, stats_, stats_store_, rate_limit_settings_);
+        *method_descriptor_, stats_, stats_store_, rate_limit_settings_, init_fetch_timeout);
   }
 
   ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }

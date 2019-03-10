@@ -28,7 +28,7 @@ public:
                           Api::Api& api);
 
   // Upstream::CdsApi
-  void initialize() override;
+  void initialize() override { subscription_->start({}, *this); }
   void setInitializedCb(std::function<void()> callback) override {
     initialize_callback_ = callback;
   }
@@ -55,8 +55,6 @@ private:
   std::string system_version_info_;
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
-  Event::TimerPtr initialization_timeout_timer_;
-  std::chrono::milliseconds initialization_timeout_;
 };
 
 } // namespace Upstream

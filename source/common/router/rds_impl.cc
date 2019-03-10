@@ -73,24 +73,6 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       factory_context.clusterManager(), factory_context.random(), *scope_,
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes", factory_context.api());
-
-  initialization_timeout_ = std::chrono::milliseconds(
-      PROTOBUF_GET_MS_OR_DEFAULT(rds.config_source(), initial_fetch_timeout, 0));
-  if (initialization_timeout_.count() > 0) {
-    initialization_timeout_timer_ = factory_context.dispatcher().createTimer([this]() -> void {
-      ENVOY_LOG(warn, "rds: initialization timed out for route_config_name={}", route_config_name_);
-      onConfigUpdateFailed(nullptr);
-    });
-  }
-}
-
-void RdsRouteConfigSubscription::initialize(std::function<void()> callback) {
-  initialize_callback_ = callback;
-  if (initialization_timeout_.count() > 0) {
-    ASSERT(initialization_timeout_timer_);
-    initialization_timeout_timer_->enableTimer(initialization_timeout_);
-  }
-  subscription_->start({route_config_name_}, *this);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -155,9 +137,6 @@ void RdsRouteConfigSubscription::runInitializeCallbackIfAny() {
   if (initialize_callback_) {
     initialize_callback_();
     initialize_callback_ = nullptr;
-  }
-  if (initialization_timeout_timer_) {
-    initialization_timeout_timer_->disableTimer();
   }
 }
 

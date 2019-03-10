@@ -4,11 +4,20 @@
 
 #include "gtest/gtest.h"
 
+using testing::InSequence;
+
 namespace Envoy {
 namespace Config {
 namespace {
 
 class HttpSubscriptionImplTest : public testing::Test, public HttpSubscriptionTestHarness {};
+class HttpSubscriptionImplInitFetchTimeoutTest : public testing::Test,
+                                                 public HttpSubscriptionTestHarness {
+public:
+  HttpSubscriptionImplInitFetchTimeoutTest()
+      : HttpSubscriptionTestHarness(std::chrono::milliseconds(1000)) {}
+  Event::MockTimer* init_timeout_timer_;
+};
 
 // Validate that the client can recover from a remote fetch failure.
 TEST_F(HttpSubscriptionImplTest, OnRequestReset) {
@@ -40,6 +49,45 @@ TEST_F(HttpSubscriptionImplTest, BadJsonRecovery) {
   verifyStats(2, 0, 0, 1, 0);
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
   verifyStats(3, 1, 0, 1, 7148434200721666028);
+}
+
+TEST_F(HttpSubscriptionImplInitFetchTimeoutTest, InitialFetchTimeout) {
+  InSequence s;
+
+  init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  startSubscription({"cluster0", "cluster1"});
+  verifyStats(1, 0, 0, 0, 0);
+
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+  init_timeout_timer_->callback_();
+  verifyStats(1, 0, 0, 0, 0);
+}
+
+// Validate that initial fetch timer is disabled on config update
+TEST_F(HttpSubscriptionImplInitFetchTimeoutTest, DisableInitTimeoutOnSuccess) {
+  InSequence s;
+
+  init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  startSubscription({"cluster0", "cluster1"});
+  verifyStats(1, 0, 0, 0, 0);
+
+  EXPECT_CALL(*init_timeout_timer_, disableTimer()).Times(1);
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+}
+
+// Validate that initial fetch timer is disabled on config update failed
+TEST_F(HttpSubscriptionImplInitFetchTimeoutTest, DisableInitTimeoutOnFail) {
+  InSequence s;
+
+  init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  startSubscription({"cluster0", "cluster1"});
+  verifyStats(1, 0, 0, 0, 0);
+
+  EXPECT_CALL(*init_timeout_timer_, disableTimer()).Times(1);
+  deliverConfigUpdate({"cluster0", "cluster1"}, "0", false);
 }
 
 } // namespace

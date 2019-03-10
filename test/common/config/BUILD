@@ -88,6 +88,19 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "delta_subscription_impl_test",
+    srcs = ["delta_subscription_impl_test.cc"],
+    deps = [
+        "//source/common/config:delta_subscription_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "http_subscription_impl_test",
     srcs = ["http_subscription_impl_test.cc"],
     deps = [

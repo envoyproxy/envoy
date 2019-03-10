@@ -36,20 +36,6 @@ protected:
   CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
 
   void setup() {
-    envoy::api::v2::core::ConfigSource cds_config;
-    setupConfig(cds_config);
-    Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockClusterMockPrioritySet cluster;
-    setupClusters(cluster_map, cluster);
-
-    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_);
-    resetCdsInitializedCb();
-
-    expectRequest();
-    cds_->initialize();
-  }
-
-  void setupConfig(envoy::api::v2::core::ConfigSource& cds_config) {
     const std::string config_json = R"EOF(
     {
       "cluster": {
@@ -59,6 +45,7 @@ protected:
     )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
+    envoy::api::v2::core::ConfigSource cds_config;
     Config::Utility::translateCdsConfig(*config, cds_config);
     cds_config.mutable_api_config_source()->set_api_type(
         envoy::api::v2::core::ApiConfigSource::REST);
@@ -188,7 +175,6 @@ protected:
   Http::MockAsyncClientRequest request_;
   CdsApiPtr cds_;
   Event::MockTimer* interval_timer_;
-  Event::MockTimer* initialization_timeout_timer_;
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
   Api::ApiPtr api_;

@@ -33,7 +33,9 @@ typedef HttpSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> HttpEdsSubsc
 
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  HttpSubscriptionTestHarness()
+  HttpSubscriptionTestHarness() : HttpSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
+
+  HttpSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
@@ -45,7 +47,7 @@ public:
     }));
     subscription_ = std::make_unique<HttpEdsSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_, stats_);
+        std::chrono::milliseconds(1000), *method_descriptor_, stats_, init_fetch_timeout);
   }
 
   ~HttpSubscriptionTestHarness() {

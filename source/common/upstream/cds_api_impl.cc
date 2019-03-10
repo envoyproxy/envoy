@@ -132,10 +132,6 @@ void CdsApiImpl::runInitializeCallbackIfAny() {
     initialize_callback_();
     initialize_callback_ = nullptr;
   }
-  if (initialization_timeout_timer_) {
-    initialization_timeout_timer_->disableTimer();
-    initialization_timeout_timer_.reset();
-  }
 }
 
 } // namespace Upstream
