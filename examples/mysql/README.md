@@ -9,11 +9,11 @@ metrics.
 
 ## Usage
 
-1. `docker-compose build`
-2. `docker-compose up`
-3. Issue MySQL commands using a client (such as `mysql`)
+Build and run the containers:
 
-## Sample Output
+```bash
+$ docker-compose build && docker-compose up
+```
 
 Use `mysql` to issue some commands and verify they are routed via Envoy:
 
