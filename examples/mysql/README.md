@@ -57,13 +57,13 @@ Check that the egress stats were updated:
 
 ```
 $ curl -s http://localhost:8001/stats?filter=egress_mysql
-mysql.egress_mysql.auth_switch_request: 1
+mysql.egress_mysql.auth_switch_request: 0
 mysql.egress_mysql.decoder_errors: 0
 mysql.egress_mysql.login_attempts: 1
 mysql.egress_mysql.login_failures: 0
-mysql.egress_mysql.protocol_errors: 21
-mysql.egress_mysql.queries_parse_error: 1
-mysql.egress_mysql.queries_parsed: 4
+mysql.egress_mysql.protocol_errors: 0
+mysql.egress_mysql.queries_parse_error: 0
+mysql.egress_mysql.queries_parsed: 7
 mysql.egress_mysql.sessions: 1
 mysql.egress_mysql.upgraded_to_ssl: 0
 ```
@@ -74,10 +74,10 @@ Check that the TCP stats were updated:
 $ curl -s http://localhost:8001/stats?filter=mysql_tcp
 tcp.mysql_tcp.downstream_cx_no_route: 0
 tcp.mysql_tcp.downstream_cx_rx_bytes_buffered: 0
-tcp.mysql_tcp.downstream_cx_rx_bytes_total: 457
+tcp.mysql_tcp.downstream_cx_rx_bytes_total: 347
 tcp.mysql_tcp.downstream_cx_total: 1
 tcp.mysql_tcp.downstream_cx_tx_bytes_buffered: 0
-tcp.mysql_tcp.downstream_cx_tx_bytes_total: 750
+tcp.mysql_tcp.downstream_cx_tx_bytes_total: 702
 tcp.mysql_tcp.downstream_flow_control_paused_reading_total: 0
 tcp.mysql_tcp.downstream_flow_control_resumed_reading_total: 0
 tcp.mysql_tcp.idle_timeout: 0
