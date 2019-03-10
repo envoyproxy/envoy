@@ -23,10 +23,19 @@ int main(int argc, char** argv) {
 #endif
   Envoy::Thread::ThreadFactorySingleton::set(&Envoy::Thread::threadFactoryForTest());
 
-  Envoy::TestEnvironment::setEnvVar("TEST_RUNDIR",
-                                    (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
-                                     Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE")),
-                                    1);
+  if (std::getenv("EXTERNAL_TEST") != nullptr) {
+    Envoy::TestEnvironment::setEnvVar(
+        "TEST_RUNDIR",
+        (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") + "/" +
+         Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE") + "/external/envoy/"),
+        1);
+  } else {
+    Envoy::TestEnvironment::setEnvVar("TEST_RUNDIR",
+                                      (Envoy::TestEnvironment::getCheckedEnvVar("TEST_SRCDIR") +
+                                       "/" +
+                                       Envoy::TestEnvironment::getCheckedEnvVar("TEST_WORKSPACE")),
+                                      1);
+  }
 
   // Select whether to test only for IPv4, IPv6, or both. The default is to
   // test for both. Options are {"v4only", "v6only", "all"}. Set
