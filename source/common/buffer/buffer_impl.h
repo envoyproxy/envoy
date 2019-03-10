@@ -467,6 +467,41 @@ public:
 };
 
 /**
+ * Wrapper for uint64_t that asserts upon integer overflow and underflow.
+ */
+class OverflowDetectingUInt64 {
+public:
+  operator uint64_t() const { return value_; }
+
+  OverflowDetectingUInt64& operator+=(uint64_t size) {
+#if __has_builtin(__builtin_uaddl_overflow)
+    uint64_t new_value;
+    bool overflow = __builtin_uaddll_overflow(value_, size, &new_value);
+    RELEASE_ASSERT(!overflow, "buffer length overflowed a 64-bit unsigned integer");
+    value_ = new_value;
+#else
+    value_ += size;
+#endif
+    return *this;
+  }
+
+  OverflowDetectingUInt64& operator-=(uint64_t size) {
+#if __has_builtin(__builtin_uaddl_overflow)
+    uint64_t new_value;
+    bool overflow = __builtin_usubll_overflow(value_, size, &new_value);
+    RELEASE_ASSERT(!overflow, "buffer length underflowed");
+    value_ = new_value;
+#else
+    value_ += size;
+#endif
+    return *this;
+  }
+
+private:
+  uint64_t value_{0};
+};
+
+/**
  * Wraps an allocated and owned buffer.
  *
  * Note that due to the internals of move(), OwnedImpl is not
@@ -552,7 +587,7 @@ private:
   SliceDeque slices_;
 
   /** Sum of the dataSize of all slices. */
-  uint64_t length_{0};
+  OverflowDetectingUInt64 length_;
 
   /** Used when old_impl_==true */
   Event::Libevent::BufferPtr buffer_;

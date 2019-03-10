@@ -423,6 +423,18 @@ TEST_P(OwnedImplTest, PrependEmpty) {
   EXPECT_EQ(0, buf.length());
 }
 
+TEST(OverflowDetectingUInt64, Arithmetic) {
+  OverflowDetectingUInt64 length;
+  length += 1;
+  length -= 1;
+  length -= 0;
+  EXPECT_DEATH(length -= 1, "underflow");
+  uint64_t half = uint64_t(1) << 63;
+  length += half;
+  length += (half - 1); // length is now 2^64 - 1
+  EXPECT_DEATH(length += 1, "overflow");
+}
+
 } // namespace
 } // namespace Buffer
 } // namespace Envoy
