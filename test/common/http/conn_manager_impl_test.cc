@@ -3636,7 +3636,7 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
   conn_manager_->onData(fake_input, false); // kick off request
 }
 
-TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBuffer) {
+TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPath) {
   setup(false, "envoy-custom-server", false);
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -3675,9 +3675,8 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBuffer) {
   conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*filter2, decodeHeaders(_, _))
-      .WillOnce(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
-        return FilterHeadersStatus::Continue;
-      }));
+      .WillOnce(Invoke(
+          [&](HeaderMap&, bool) -> FilterHeadersStatus { return FilterHeadersStatus::Continue; }));
 
   EXPECT_CALL(*filter, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
   EXPECT_CALL(*filter2, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
@@ -3685,5 +3684,35 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBuffer) {
   filter->callbacks_->continueDecoding();
 }
 
+TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPath) {
+  setup(false, "envoy-custom-server", false);
+  setUpEncoderAndDecoder();
+  sendRequestHeadersAndData();
+
+  // encoder_filters_[1] is the first filter in the chain.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopAllIterationAndBuffer;
+      }));
+  HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+
+  // invoke encodeData
+  Buffer::OwnedImpl response_body("response");
+  decoder_filters_[0]->callbacks_->encodeData(response_body, true);
+
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeData(_, _));
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  expectOnDestroy();
+
+  encoder_filters_[1]->callbacks_->continueEncoding();
+}
 } // namespace Http
 } // namespace Envoy

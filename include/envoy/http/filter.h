@@ -44,8 +44,7 @@ enum class FilterHeadersStatus {
   // If buffering the request causes buffered data to exceed the configured buffer limit, a 413 will
   // be sent to the user. On the response path exceeding buffer limits will result in a 500.
   //
-  // Only used in decoding path.
-  // TODO(soya3129): add tests for encoding path, and remove the decoding path condition.
+  // TODO(soya3129): stop metadata parsing when StopAllIterationAndBuffer is set.
   StopAllIterationAndBuffer,
   // Do not iterate for headers as well as data and trailers for the current filter and the filters
   // following, and buffer body data for later dispatching. continueDecoding() MUST
@@ -56,8 +55,7 @@ enum class FilterHeadersStatus {
   //
   // This will cause the flow of incoming data to cease until continueDecoding() function is called.
   //
-  // Only used in decoding path.
-  // TODO(soya3129): add tests for encoding path, and remove the decoding path condition.
+  // TODO(soya3129): stop metadata parsing when StopAllIterationAndWatermark is set.
   StopAllIterationAndWatermark,
 };
 
