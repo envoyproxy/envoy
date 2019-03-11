@@ -131,7 +131,7 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
   const std::string passwd = BufferHelper::peekString(data, offset);
 
   // Read readonly flag, if it's there.
-  const bool readonly{};
+  bool readonly{};
   if (data.length() >= offset + 1) {
     readonly = BufferHelper::peekBool(data, offset);
   }
