@@ -47,4 +47,4 @@ services:
       - "80"
 
 networks:
-envoymesh: {}
+  envoymesh: {}

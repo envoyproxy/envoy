@@ -1,90 +1,94 @@
 static_resources:
   listeners:
-  - address:
-      socket_address:
-        address: 0.0.0.0
-        port_value: 80
-    filter_chains:
-    - filters:
-      - name: envoy.http_connection_manager
-        config:
-          tracing:
-            operation_name: ingress
-          codec_type: auto
-          stat_prefix: ingress_http
-          route_config:
-            name: service1_route
-            virtual_hosts:
-            - name: service1
-              domains:
-              - "*"
-              routes:
-              - match:
-                  prefix: "/"
-                route:
-                  cluster: local_service1
-          http_filters:
-          - name: envoy.router
-            config: {}
-  - address:
-      socket_address:
-        address: 0.0.0.0
-        port_value: 9000
-    filter_chains:
-    - filters:
-      - name: envoy.http_connection_manager
-        config:
-          tracing:
-            operation_name: egress
-          codec_type: auto
-          stat_prefix: egress_http
-          route_config:
-            name: service2_route
-            virtual_hosts:
-            - name: service2
-              domains:
-              - "*"
-              routes:
-              - match:
-                  prefix: "/trace/2"
-                route:
-                  cluster: "service|name|2"
-          http_filters:
-          - name: envoy.router
-            config: {}
+    - address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 80
+      filter_chains:
+        - filters:
+          - name: envoy.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+              tracing:
+                operation_name: ingress
+              codec_type: auto
+              stat_prefix: ingress_http
+              route_config:
+                name: service1_route
+                virtual_hosts:
+                - name: service1
+                  domains:
+                    - "*"
+                  routes:
+                    - match:
+                        prefix: "/"
+                      route:
+                        cluster: local_service1
+              http_filters:
+              - name: envoy.router
+                typed_config: {}
+    - address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9000
+      filter_chains:
+        - filters:
+          - name: envoy.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+              tracing:
+                operation_name: egress
+              codec_type: auto
+              stat_prefix: egress_http
+              route_config:
+                name: service2_route
+                virtual_hosts:
+                - name: service2
+                  domains:
+                    - "*"
+                  routes:
+                    - match:
+                        prefix: "/trace/2"
+                      route:
+                        cluster: service2
+              http_filters:
+              - name: envoy.router
+                typed_config: {}
   clusters:
   - name: local_service1
     connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: 127.0.0.1
-        port_value: 8080
-  - name: "service|name|2"
+    load_assignment:
+      cluster_name: local_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8080
+  - name: service2
     connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
     http2_protocol_options: {}
-    hosts:
-    - socket_address:
-        address: "service|name|2"
-        port_value: 80
-  - name: xray
-    connect_timeout: 1s
-    type: strict_dns
-    lb_policy: round_robin
-    hosts:
-    - socket_address:
-        protocol: udp
-        address: xray
-        port_value: 2000
+    load_assignment:
+      cluster_name: service2
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service2
+                port_value: 80
 tracing:
   http:
     name: envoy.xray
-    config:
-      collector_cluster: xray
-      collector_endpoint: "172.19.0.2:2000"
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.XRayConfig
+      daemon_endpoint: "172.19.0.2:2000"
+      segment_name: "service1-proxy"
 admin:
   access_log_path: "/dev/null"
   address:

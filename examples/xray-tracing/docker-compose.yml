@@ -8,7 +8,7 @@ services:
       - ./front-envoy-xray.yaml:/etc/front-envoy.yaml
     networks:
       envoymesh:
-       ipv4_address: 172.19.0.5
+        ipv4_address: 172.19.0.5
     expose:
       - "80"
       - "8001"
@@ -27,7 +27,7 @@ services:
       envoymesh:
         ipv4_address: 172.19.0.4
         aliases:
-          - service|name|1
+          - service1
     environment:
       - SERVICE_NAME=1
     expose:
@@ -44,7 +44,7 @@ services:
       envoymesh:
         ipv4_address: 172.19.0.3
         aliases:
-          - service|name|2
+          - service2
     environment:
       - SERVICE_NAME=2
     expose:
@@ -59,9 +59,9 @@ services:
         aliases:
           - xray
     environment:
-      - AWS_REGION=sa-east-1
-      - AWS_ACCESS_KEY_ID=your_access_key
-      - AWS_SECRET_ACCESS_KEY=your_secret_key
+      - AWS_REGION=You_defined_region
+      - AWS_ACCESS_KEY_ID=Your_Key
+      - AWS_SECRET_ACCESS_KEY=Your_key
     expose:
       - "2000/udp"
     ports:
@@ -71,5 +71,5 @@ networks:
   envoymesh:
     ipam:
       config:
-      - subnet: "172.19.0.0/16"
-        gateway: "172.19.0.1"
+        - subnet: "172.19.0.0/16"
+          gateway: "172.19.0.1"
