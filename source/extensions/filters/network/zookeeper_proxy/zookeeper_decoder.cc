@@ -7,7 +7,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
+const uint32_t BOOL_LENGTH = 1;
 const uint32_t INT_LENGTH = 4;
+const uint32_t LONG_LENGTH = 8;
 const uint32_t XID_LENGTH = 4;
 const uint32_t OPCODE_LENGTH = 4;
 const uint32_t ZXID_LENGTH = 8;
@@ -20,7 +22,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 
   // Check message length.
   const int32_t len = BufferHelper::peekInt32(data, offset);
-  ensureMinLength(len, 8);
+  ensureMinLength(len, INT_LENGTH + XID_LENGTH);
 
   // Control requests, with XIDs <= 0.
   //
@@ -124,7 +126,7 @@ void DecoderImpl::ensureMinLength(const int32_t len, const int32_t minlen) const
 }
 
 void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 28);
+  ensureMinLength(len, XID_LENGTH + ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
 
   // Read password - skip zxid, timeout, and session id.
   offset += ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH;
@@ -140,7 +142,7 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
 }
 
 void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 20);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH + INT_LENGTH + INT_LENGTH);
 
   // Skip opcode + type.
   offset += OPCODE_LENGTH + INT_LENGTH;
@@ -153,7 +155,7 @@ void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uin
 }
 
 void DecoderImpl::parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 13);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH + BOOL_LENGTH);
 
   const std::string path = BufferHelper::peekString(data, offset);
   const bool watch = BufferHelper::peekBool(data, offset);
@@ -173,7 +175,7 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) const {
 
 void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                      const bool two) {
-  ensureMinLength(len, 20);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
 
   const std::string path = BufferHelper::peekString(data, offset);
 
@@ -189,7 +191,7 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 20);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
 
   const std::string path = BufferHelper::peekString(data, offset);
   // Skip data.
@@ -203,7 +205,7 @@ void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint
 
 void DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                           const bool two) {
-  ensureMinLength(len, 14);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH +  INT_LENGTH + BOOL_LENGTH);
 
   const std::string path = BufferHelper::peekString(data, offset);
   const bool watch = BufferHelper::peekBool(data, offset);
@@ -212,7 +214,7 @@ void DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offs
 }
 
 void DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 16);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
 
   const std::string path = BufferHelper::peekString(data, offset);
   const int32_t version = BufferHelper::peekInt32(data, offset);
@@ -221,7 +223,7 @@ void DecoderImpl::parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseExistsRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 13);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH + BOOL_LENGTH);
 
   const std::string path = BufferHelper::peekString(data, offset);
   const bool watch = BufferHelper::peekBool(data, offset);
@@ -230,7 +232,7 @@ void DecoderImpl::parseExistsRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseGetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 8);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH);
 
   const std::string path = BufferHelper::peekString(data, offset);
 
@@ -238,7 +240,7 @@ void DecoderImpl::parseGetAclRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 8);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
 
   const std::string path = BufferHelper::peekString(data, offset);
   skipAcls(data, offset);
@@ -248,7 +250,7 @@ void DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, u
 }
 
 void DecoderImpl::parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 8);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH);
 
   const std::string path = BufferHelper::peekString(data, offset);
 
@@ -256,7 +258,7 @@ void DecoderImpl::parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uin
 }
 
 void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 8);
+  ensureMinLength(len, (2 * INT_LENGTH));
 
   const std::string path = BufferHelper::peekString(data, offset);
   const int32_t version = BufferHelper::peekInt32(data, offset);
@@ -298,10 +300,10 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
 }
 
 void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 28);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH) + LONG_LENGTH);
 
   // Skip joining.
-  const int32_t datalen = BufferHelper::peekInt32(data, offset);
+  int32_t datalen = BufferHelper::peekInt32(data, offset);
   offset += datalen;
   // Skip leaving.
   datalen = BufferHelper::peekInt32(data, offset);
@@ -316,7 +318,7 @@ void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset,
 }
 
 void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
-  ensureMinLength(len, 12);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
 
   // Data watches.
   skipStrings(data, offset);
@@ -330,7 +332,7 @@ void DecoderImpl::parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offse
 
 void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                        OpCodes opcode) {
-  ensureMinLength(len, 8);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (2 * INT_LENGTH));
 
   const std::string path = BufferHelper::peekString(data, offset);
   const int32_t type = BufferHelper::peekInt32(data, offset);
