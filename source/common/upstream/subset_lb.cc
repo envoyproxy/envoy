@@ -42,8 +42,9 @@ SubsetLoadBalancer::SubsetLoadBalancer(
 
       ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer");
     } else {
-      predicate = std::bind(&SubsetLoadBalancer::hostMatches, this, default_subset_metadata_,
-                            std::placeholders::_1);
+      predicate = [this](const Host&) -> bool {
+        return hostMaches(default_subset_metadata_, host);
+      };
 
       ENVOY_LOG(debug, "subset lb: creating fallback load balancer for {}",
                 describeMetadata(default_subset_metadata_));
@@ -252,9 +253,7 @@ void SubsetLoadBalancer::processSubsets(
           if (entry->initialized()) {
             update_cb(entry);
           } else {
-            HostPredicate predicate =
-                std::bind(&SubsetLoadBalancer::hostMatches, this, kvs, std::placeholders::_1);
-
+            HostPredicate predicate = [this](const Host&) -> bool { return hostMaches(kvs, host); };
             new_cb(entry, predicate, kvs, adding_hosts);
           }
         }
