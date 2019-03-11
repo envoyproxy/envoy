@@ -223,6 +223,19 @@ public:
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
+   * Decode data directly to subsequent filters in the filter chain. This method is used in
+   * advanced cases in which a filter needs full control over how subsequent filters view data,
+   * and does not want to make use of HTTP connection manager buffering. Using this method allows
+   * a filter to buffer data (or not) and then periodically inject data to subsequent filters,
+   * indicating end_stream at an appropriate time. This can be used to implement rate limiting,
+   * periodic data emission, etc.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's decodeData() call.
+   */
+  virtual void decodeData(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
    * If called in any other context, an assertion will be triggered.
    *
@@ -475,6 +488,19 @@ public:
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
+   * Encode data directly to subsequent filters in the filter chain. This method is used in
+   * advanced cases in which a filter needs full control over how subsequent filters view data,
+   * and does not want to make use of HTTP connection manager buffering. Using this method allows
+   * a filter to buffer data (or not) and then periodically inject data to subsequent filters,
+   * indicating end_stream at an appropriate time. This can be used to implement rate limiting,
+   * periodic data emission, etc.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's encodeData() call.
+   */
+  virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
    * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
    * If called in any other context, an assertion will be triggered.
    *
@@ -517,7 +543,7 @@ public:
  */
 class StreamEncoderFilter : public StreamFilterBase {
 public:
-  /*
+  /**
    * Called with 100-continue headers.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters
