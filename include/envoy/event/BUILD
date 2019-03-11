@@ -48,6 +48,5 @@ envoy_cc_library(
     hdrs = ["timer.h"],
     deps = [
         "//include/envoy/common:time_interface",
-        "//source/common/event:libevent_lib",
     ],
 )
