@@ -81,10 +81,10 @@ public:
     envoy::api::v2::DiscoveryResponse message;
     Protobuf::util::JsonParseOptions options;
     options.case_insensitive_enum_parsing = true;
-    const auto status =
-        Protobuf::util::JsonStringToMessage(response.bodyAsString(), &message, options);
-    if (!status.ok()) {
-      ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
+    try {
+      MessageUtil::loadFromJson(response.bodyAsString(), &message);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(warn, "REST config JSON conversion error: {}", e,what());
       handleFailure(nullptr);
       return;
     }

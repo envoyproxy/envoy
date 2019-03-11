@@ -10,6 +10,7 @@
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -112,9 +113,7 @@ public:
     response_json.pop_back();
     response_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    Protobuf::util::JsonParseOptions options;
-    options.case_insensitive_enum_parsing = true;
-    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(response_json, &response_pb, options).ok());
+    MessageUtil::loadFromJson(response_json, &response_pb);
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);

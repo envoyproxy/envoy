@@ -7,6 +7,7 @@
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -72,9 +73,7 @@ public:
     file_json.pop_back();
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    Protobuf::util::JsonParseOptions options;
-    options.case_insensitive_enum_parsing = true;
-    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb, options).ok());
+    MessageUtil::loadFromJson(file_json, &response_pb);
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(
                     RepeatedProtoEq(

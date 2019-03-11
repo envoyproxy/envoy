@@ -1,5 +1,7 @@
 #include "test/integration/http_protocol_integration.h"
 
+#include "common/protobuf/utility.h"
+
 namespace Envoy {
 namespace {
 
@@ -56,9 +58,7 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
   ProtobufWkt::Struct pfc;
-  Protobuf::util::JsonParseOptions options;
-  options.case_insensitive_enum_parsing = true;
-  RELEASE_ASSERT(Protobuf::util::JsonStringToMessage(json_config, &pfc, options).ok(), "");
+  MessageUtil::loadFromJson(json_config, &pfc);
 
   return
       [pfc](

@@ -1,5 +1,7 @@
 #include "extensions/filters/http/well_known_names.h"
 
+#include "common/protobuf/utility.h"
+
 #include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
@@ -93,9 +95,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
         ProtobufWkt::Struct pfc;
-        Protobuf::util::JsonParseOptions options;
-        options.case_insensitive_enum_parsing = true;
-        ASSERT_TRUE(Protobuf::util::JsonStringToMessage("{}", &pfc, options).ok());
+        MessageUtil::loadFromJson("{}", &pfc);
 
         auto* config = cfg.mutable_route_config()
                            ->mutable_virtual_hosts()
