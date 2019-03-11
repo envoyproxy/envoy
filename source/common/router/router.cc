@@ -1275,6 +1275,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
 void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
+  conn_pool_stream_handle_ = nullptr;
   switch (reason) {
   case Http::ConnectionPool::PoolFailureReason::Overflow:
     reset_reason = Http::StreamResetReason::Overflow;
