@@ -1,5 +1,6 @@
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+#include "common/event/libevent_scheduler.h"
 #include "common/event/timer_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
@@ -12,27 +13,6 @@ namespace Envoy {
 namespace Event {
 namespace Test {
 namespace {
-
-// SimulatedTimeSystem relies on a base scheduler to execute alarms. In
-// production this is libevent, and to make integration tests as faithful
-// as possible, we want the execution to flow through libevent in tests too.
-class LibeventScheduler : public Scheduler {
-public:
-  LibeventScheduler() : libevent_(event_base_new()) {
-    RELEASE_ASSERT(Libevent::Global::initialized(), "");
-  }
-
-  TimerPtr createTimer(const TimerCb& cb) override {
-    return std::make_unique<TimerImpl>(libevent_, cb);
-  };
-
-  void nonBlockingLoop() { event_base_loop(libevent_.get(), EVLOOP_NONBLOCK); }
-
-  void blockingLoop() { event_base_loop(libevent_.get(), 0); }
-
-private:
-  Libevent::BasePtr libevent_;
-};
 
 class SimulatedTimeSystemTest : public testing::Test {
 protected:
