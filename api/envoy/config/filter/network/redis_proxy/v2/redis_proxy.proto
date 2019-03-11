@@ -63,8 +63,8 @@ message RedisProxy {
 
   message PrefixRoutes {
     message Route {
-      // String prefix that must match the beginning of the keys. Envoy will always favor the longest
-      // matches.
+      // String prefix that must match the beginning of the keys. Envoy will always favor the
+      // longest matches.
       string prefix = 1 [(validate.rules).string.min_bytes = 1];
 
       // Indicates if the prefix needs to be removed from the key when forwarded.
