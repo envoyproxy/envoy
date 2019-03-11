@@ -5,6 +5,8 @@
 #include <iostream>
 #include <string>
 
+#include "envoy/registry/registry.h"
+
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
@@ -121,6 +123,10 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
       "", "enable-mutex-tracing", "Enable mutex contention tracing functionality", cmd, false);
   TCLAP::SwitchArg cpuset_threads(
       "", "cpuset-threads", "Get the default # of worker threads from cpuset size", cmd, false);
+
+  for (const auto& entry : Registry::FactoryRegistry<CommandLineFlagProvider>::factories()) {
+    entry.second->AddFlags(cmd);
+  }
 
   cmd.setExceptionHandling(false);
   try {

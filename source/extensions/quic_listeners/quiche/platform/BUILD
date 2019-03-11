@@ -18,6 +18,26 @@ envoy_package()
 # TODO: add build target for quic_platform_impl_lib
 
 envoy_cc_library(
+    name = "flags_impl_lib",
+    srcs = [
+        "flags_impl.cc",
+    ],
+    hdrs = [
+        "flags_impl.h",
+        "flags_list.h",
+    ],
+    external_deps = [
+        "tclap",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//include/envoy/registry",
+        "//source/common/http:utility_lib",
+        "//source/server:options_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "http2_platform_impl_lib",
     hdrs = [
         "http2_arraysize_impl.h",
@@ -25,6 +45,7 @@ envoy_cc_library(
         "http2_estimate_memory_usage_impl.h",
         "http2_export_impl.h",
         "http2_flag_utils_impl.h",
+        "http2_flags_impl.h",
         "http2_macros_impl.h",
         "http2_optional_impl.h",
         "http2_ptr_util_impl.h",
@@ -36,6 +57,9 @@ envoy_cc_library(
         "abseil_optional",
     ],
     visibility = ["//visibility:public"],
+    deps = [
+        ":flags_impl_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -88,6 +112,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        ":flags_impl_lib",
         "@com_googlesource_quiche//:quic_platform_export",
     ] + envoy_select_quiche([
         "//include/envoy/thread:thread_interface",
@@ -108,6 +133,7 @@ envoy_cc_library(
     ]),
     hdrs = [
         "quic_cert_utils_impl.h",
+        "quic_flags_impl.h",
         "quic_mutex_impl.h",
         "quic_str_cat_impl.h",
         "quic_string_utils_impl.h",
@@ -147,6 +173,7 @@ envoy_cc_library(
         "spdy_endianness_util_impl.h",
         "spdy_estimate_memory_usage_impl.h",
         "spdy_export_impl.h",
+        "spdy_flags_impl.h",
         "spdy_macros_impl.h",
         "spdy_ptr_util_impl.h",
         "spdy_string_impl.h",
@@ -162,4 +189,7 @@ envoy_cc_library(
         "abseil_memory",
     ],
     visibility = ["//visibility:public"],
+    deps = [
+        ":flags_impl_lib",
+    ],
 )

@@ -12,6 +12,7 @@
 #include "common/stats/stats_options_impl.h"
 
 #include "spdlog/spdlog.h"
+#include "tclap/CmdLineInterface.h"
 
 namespace Envoy {
 /**
@@ -142,6 +143,28 @@ private:
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
   uint32_t count_;
+};
+
+/**
+ * Interface allowing extensions to add command-line flags to be parsed, by registering an provider
+ * using Registry::RegisterFactory<CommandLineFlagProvider>.
+ */
+class CommandLineFlagProvider {
+public:
+  virtual ~CommandLineFlagProvider() {}
+
+  /**
+   * Method called by OptionsImpl on any registered providers prior to parsing
+   * command line. Provider implementations should call Add() on the given
+   * CmdLine instance, to register additional flags to be parsed.
+   * @param cmdline CmdLine instance that will be used to parse command line.
+   */
+  virtual void AddFlags(TCLAP::CmdLineInterface& cmdline) PURE;
+
+  /**
+   * Return identifying name of provider.
+   */
+  virtual std::string name() PURE;
 };
 
 /**

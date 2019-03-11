@@ -1,13 +1,16 @@
 #include <functional>
 
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 #include "gtest/gtest.h"
 #include "quiche/spdy/platform/api/spdy_arraysize.h"
 #include "quiche/spdy/platform/api/spdy_containers.h"
 #include "quiche/spdy/platform/api/spdy_endianness_util.h"
 #include "quiche/spdy/platform/api/spdy_estimate_memory_usage.h"
+#include "quiche/spdy/platform/api/spdy_flags.h"
 #include "quiche/spdy/platform/api/spdy_ptr_util.h"
 #include "quiche/spdy/platform/api/spdy_string.h"
 #include "quiche/spdy/platform/api/spdy_string_piece.h"
+#include "tclap/CmdLine.h"
 
 // Basic tests to validate functioning of the QUICHE spdy platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -70,6 +73,33 @@ TEST(SpdyPlatformTest, SpdyStringPiece) {
   spdy::SpdyString s = "bar";
   spdy::SpdyStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
+}
+
+TEST(SpdyPlatformTest, SpdyFlags) {
+  quiche::ResetFlags();
+  EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
+  EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
+
+  {
+    TCLAP::CmdLine cmdline("usage", '=');
+    quiche::RegisterFlags(cmdline);
+    std::vector<std::string> args{"program name",
+                                  "--spdy_reloadable_flag_spdy_testonly_default_false=1"};
+    cmdline.parse(args);
+    EXPECT_TRUE(GetSpdyReloadableFlag(spdy_testonly_default_false));
+    EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
+  }
+
+  quiche::ResetFlags();
+  {
+    TCLAP::CmdLine cmdline("usage", '=');
+    quiche::RegisterFlags(cmdline);
+    std::vector<std::string> args{"program name",
+                                  "--spdy_restart_flag_spdy_testonly_default_false=1"};
+    cmdline.parse(args);
+    EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
+    EXPECT_TRUE(GetSpdyRestartFlag(spdy_testonly_default_false));
+  }
 }
 
 } // namespace

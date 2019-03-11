@@ -110,7 +110,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "options_impl_test",
     srcs = ["options_impl_test.cc"],
+    external_deps = ["tclap"],
     deps = [
+        "//include/envoy/registry",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/server:options_lib",

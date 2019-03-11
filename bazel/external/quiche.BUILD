@@ -56,6 +56,7 @@ cc_library(
         "quiche/http2/platform/api/http2_estimate_memory_usage.h",
         "quiche/http2/platform/api/http2_export.h",
         "quiche/http2/platform/api/http2_flag_utils.h",
+        "quiche/http2/platform/api/http2_flags.h",
         "quiche/http2/platform/api/http2_macros.h",
         "quiche/http2/platform/api/http2_optional.h",
         "quiche/http2/platform/api/http2_ptr_util.h",
@@ -63,7 +64,6 @@ cc_library(
         "quiche/http2/platform/api/http2_string_piece.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/http2/platform/api/http2_bug_tracker.h",
-        # "quiche/http2/platform/api/http2_flags.h",
         # "quiche/http2/platform/api/http2_mock_log.h",
         # "quiche/http2/platform/api/http2_reconstruct_object.h",
         # "quiche/http2/platform/api/http2_string_utils.h",
@@ -83,11 +83,11 @@ cc_library(
         "quiche/spdy/platform/api/spdy_endianness_util.h",
         "quiche/spdy/platform/api/spdy_estimate_memory_usage.h",
         "quiche/spdy/platform/api/spdy_export.h",
+        "quiche/spdy/platform/api/spdy_flags.h",
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
         "quiche/spdy/platform/api/spdy_string_piece.h",
         # TODO: uncomment the following files as implementations are added.
-        # "quiche/spdy/platform/api/spdy_flags.h",
         # "quiche/spdy/platform/api/spdy_mem_slice.h",
         # "quiche/spdy/platform/api/spdy_string_utils.h",
     ],
@@ -109,6 +109,7 @@ cc_library(
     ),
     hdrs = [
         "quiche/quic/platform/api/quic_cert_utils.h",
+        "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_mutex.h",
         "quiche/quic/platform/api/quic_str_cat.h",
     ] + envoy_select_quiche(
@@ -170,7 +171,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_clock.h",
         # "quiche/quic/platform/api/quic_expect_bug.h",
         # "quiche/quic/platform/api/quic_file_utils.h",
-        # "quiche/quic/platform/api/quic_flags.h",
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
         # "quiche/quic/platform/api/quic_goog_cc_sender.h",
         # "quiche/quic/platform/api/quic_interval.h",

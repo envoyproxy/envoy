@@ -1,13 +1,16 @@
 #include <memory>
 
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 #include "gtest/gtest.h"
 #include "quiche/http2/platform/api/http2_arraysize.h"
 #include "quiche/http2/platform/api/http2_containers.h"
 #include "quiche/http2/platform/api/http2_estimate_memory_usage.h"
+#include "quiche/http2/platform/api/http2_flags.h"
 #include "quiche/http2/platform/api/http2_optional.h"
 #include "quiche/http2/platform/api/http2_ptr_util.h"
 #include "quiche/http2/platform/api/http2_string.h"
 #include "quiche/http2/platform/api/http2_string_piece.h"
+#include "tclap/CmdLine.h"
 
 // Basic tests to validate functioning of the QUICHE http2 platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -59,6 +62,22 @@ TEST(Http2PlatformTest, Http2StringPiece) {
   http2::Http2String s = "bar";
   http2::Http2StringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
+}
+
+TEST(Http2PlatformTest, Http2Flags) {
+  quiche::ResetFlags();
+  EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+  SetHttp2ReloadableFlag(http2_testonly_default_false, true);
+  EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+
+  quiche::ResetFlags();
+  EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+  TCLAP::CmdLine cmdline("usage", '=');
+  quiche::RegisterFlags(cmdline);
+  std::vector<std::string> args{"program name",
+                                "--http2_reloadable_flag_http2_testonly_default_false=1"};
+  cmdline.parse(args);
+  EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
 }
 
 } // namespace

@@ -1,7 +1,11 @@
+#include <string>
+#include <vector>
+
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
@@ -12,6 +16,7 @@
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
+#include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
@@ -26,6 +31,9 @@
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
+#include "server/options_impl.h"
+#include "spdlog/spdlog.h"
+#include "tclap/CmdLine.h"
 
 using testing::HasSubstr;
 
@@ -442,6 +450,57 @@ TEST(QuicPlatformTest, QuicTestOutput) {
                           quic::QuicRecordTestOutput("quic_test_output.2", "output 2 content\n"));
   EXPECT_LOG_CONTAINS("info", "Recorded test output into",
                       quic::QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
+}
+
+TEST(QuicPlatformTest, QuicFlags) {
+  quiche::ResetFlags();
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
+  SetQuicReloadableFlag(quic_testonly_default_false, true);
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+
+  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+  SetQuicRestartFlag(quic_testonly_default_false, true);
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
+
+  EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+  SetQuicFlag(quic_time_wait_list_seconds, 100);
+  EXPECT_EQ(100, GetQuicFlag(quic_time_wait_list_seconds));
+
+  quiche::ResetFlags();
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+  EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+  TCLAP::CmdLine cmdline("usage", '=');
+  quiche::RegisterFlags(cmdline);
+  std::vector<std::string> args{
+      "program name", "--quic_reloadable_flag_quic_testonly_default_false=1",
+      "--quic_restart_flag_quic_testonly_default_true=0", "--quic_time_wait_list_seconds=100"};
+  cmdline.parse(args);
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
+  EXPECT_EQ(100, GetQuicFlag(quic_time_wait_list_seconds));
+}
+
+TEST(QuicPlatformTest, OptionsImpl) {
+  quiche::ResetFlags();
+  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
+  EXPECT_EQ(200, GetQuicFlag(quic_time_wait_list_seconds));
+
+  std::vector<const char*> args{"program name",
+                                "--quic_reloadable_flag_quic_testonly_default_false",
+                                "1",
+                                "--quic_restart_flag_quic_testonly_default_true",
+                                "0",
+                                "--quic_time_wait_list_seconds",
+                                "100"};
+  Envoy::OptionsImpl(
+      args.size(), args.data(), [](uint64_t, uint64_t, bool) { return "1"; }, spdlog::level::warn);
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
+  EXPECT_EQ(100, GetQuicFlag(quic_time_wait_list_seconds));
 }
 
 } // namespace

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
 
@@ -22,6 +23,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
+#include "tclap/ValueArg.h"
 
 using testing::HasSubstr;
 
@@ -328,6 +330,40 @@ TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
       "Both --concurrency and --cpuset-threads options are set; not applying --cpuset-threads.",
       std::unique_ptr<OptionsImpl> options =
           createOptionsImpl("envoy -c hello --concurrency 42 --cpuset-threads"));
+}
+
+class TestCommandLineFlagProvider : public CommandLineFlagProvider {
+public:
+  TestCommandLineFlagProvider(const std::string& name, std::vector<TCLAP::Arg*> flags)
+      : name_(name), flags_(flags) {}
+
+  void AddFlags(TCLAP::CmdLineInterface& cmdline) override {
+    for (auto* flag : flags_) {
+      cmdline.add(flag);
+    }
+  }
+
+  std::string name() override { return name_; }
+
+private:
+  std::string name_;
+  std::vector<TCLAP::Arg*> flags_;
+};
+
+TEST_F(OptionsImplTest, CommandLineFlagProvider) {
+  Registry::FactoryRegistry<CommandLineFlagProvider>::factories().clear();
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --options-impl-test-flag-a 3"),
+                          MalformedArgvException, "Couldn't find match for argument");
+
+  TCLAP::ValueArg<int> flag_a("", "options-impl-test-flag-a", "doc", false, 1, "int");
+  TCLAP::ValueArg<int> flag_b("", "options-impl-test-flag-b", "doc", false, 2, "int");
+  TestCommandLineFlagProvider flag_provider("OptionsImplTest", {&flag_a, &flag_b});
+  Registry::FactoryRegistry<CommandLineFlagProvider>::registerFactory(flag_provider);
+
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --options-impl-test-flag-a 3");
+  EXPECT_EQ(3, flag_a.getValue());
+  EXPECT_EQ(2, flag_b.getValue());
+  Registry::FactoryRegistry<CommandLineFlagProvider>::factories().clear();
 }
 
 #if defined(__linux__)
