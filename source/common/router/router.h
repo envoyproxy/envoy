@@ -414,7 +414,8 @@ private:
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest* upstream_request);
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map, UpstreamRequest* upstream_request);
   void onUpstreamComplete(UpstreamRequest* upstream_request);
-  void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure, UpstreamRequest* upstream_request);
+  void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
+                       UpstreamRequest* upstream_request);
   void resetOtherUpstreams(UpstreamRequest* upstream_request);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry();
