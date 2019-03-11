@@ -1,11 +1,14 @@
 #include <string>
 #include <vector>
 
+#include "server/options_impl.h"
+
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 
-#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
@@ -31,7 +34,6 @@
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
-#include "server/options_impl.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
@@ -496,8 +498,8 @@ TEST(QuicPlatformTest, OptionsImpl) {
                                 "0",
                                 "--quic_time_wait_list_seconds",
                                 "100"};
-  Envoy::OptionsImpl(
-      args.size(), args.data(), [](uint64_t, uint64_t, bool) { return "1"; }, spdlog::level::warn);
+  Envoy::OptionsImpl(args.size(), args.data(), [](uint64_t, uint64_t, bool) { return "1"; },
+                     spdlog::level::warn);
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(100, GetQuicFlag(quic_time_wait_list_seconds));

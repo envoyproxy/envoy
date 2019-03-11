@@ -32,15 +32,15 @@ Envoy::Registry::RegisterFactory<QuicheFlagProvider, Envoy::CommandLineFlagProvi
 #undef QUICHE_FLAG
 
 void RegisterFlags(TCLAP::CmdLineInterface& cmdline) {
-  #define QUICHE_FLAG(type, flag, value, doc) cmdline.add(FLAGS_##flag);
-  #include "extensions/quic_listeners/quiche/platform/flags_list.h"
-  #undef QUICHE_FLAG
+#define QUICHE_FLAG(type, flag, value, doc) cmdline.add(FLAGS_##flag);
+#include "extensions/quic_listeners/quiche/platform/flags_list.h"
+#undef QUICHE_FLAG
 }
 
 void ResetFlags() {
-  #define QUICHE_FLAG(type, flag, value, doc) FLAGS_##flag.reset();
-  #include "extensions/quic_listeners/quiche/platform/flags_list.h"
-  #undef QUICHE_FLAG
+#define QUICHE_FLAG(type, flag, value, doc) FLAGS_##flag.reset();
+#include "extensions/quic_listeners/quiche/platform/flags_list.h"
+#undef QUICHE_FLAG
 }
 
-}  // namespace quiche
+} // namespace quiche

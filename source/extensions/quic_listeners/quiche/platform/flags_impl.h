@@ -29,4 +29,4 @@ void RegisterFlags(TCLAP::CmdLineInterface& cmdline);
 // Resets all flags to default values.
 void ResetFlags();
 
-}  // namespace quiche
+} // namespace quiche
