@@ -16,8 +16,9 @@ $ docker-compose build && docker-compose up
 ```
 
 Use `mysql` to issue some commands and verify they are routed via Envoy. Note
-that the current implementation of the protocol filter is known to have
-problems with versions of the MySQL protocol post version 5.5.
+that the current implementation of the protocol filter was tested with MySQL
+v5.5. It may, however, not work with other versions of MySQL due to differences
+in the protocol implementation.
 
 ```console
 $ docker run --rm -it --network envoymesh mysql:5.5 mysql -h envoy -P 1999 -u root
