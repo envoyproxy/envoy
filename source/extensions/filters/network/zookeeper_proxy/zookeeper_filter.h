@@ -62,7 +62,7 @@ public:
   ZooKeeperFilterConfig(const std::string &stat_prefix, uint32_t max_packet_bytes, Stats::Scope& scope);
 
   const ZooKeeperProxyStats& stats() { return stats_; }
-  const uint32_t maxPacketBytes() const { return max_packet_bytes_; }
+  uint32_t maxPacketBytes() const { return max_packet_bytes_; }
 
   Stats::Scope& scope_;
   const uint32_t max_packet_bytes_;
