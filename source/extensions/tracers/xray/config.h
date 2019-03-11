@@ -1,7 +1,8 @@
 #pragma once
 
-#include "envoy/server/instance.h"
-#include "server/configuration_impl.h"
+#include "envoy/config/trace/v2/trace.pb.validate.h"
+
+#include "extensions/tracers/common/factory_base.h"
 
 namespace Envoy {
     namespace Extensions {
@@ -11,18 +12,15 @@ namespace Envoy {
                 /**
                  * Config registration for the xray tracer. @see TracerFactory.
                  */
-                // TracerFactory
-                class XRayTracerFactory : public Server::Configuration::TracerFactory {
+                class XRayTracerFactory : public Common::FactoryBase<envoy::config::trace::v2::XRayConfig> {
                 public:
-                    // TracerFactory
-                    Tracing::HttpTracerPtr createHttpTracer(const envoy::config::trace::v2::Tracing& configuration,
-                                                            Server::Instance& server) override;
+                    XRayTracerFactory();
 
-                    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-                        return std::make_unique<envoy::config::trace::v2::XRayConfig>();
-                    }
-
-                    std::string name() override;
+                private:
+                    // FactoryBase
+                    Tracing::HttpTracerPtr
+                    createHttpTracerTyped(const envoy::config::trace::v2::XRayConfig& proto_config,
+                                          Server::Instance& server) override;
                 };
 
             } // namespace XRay

@@ -9,6 +9,7 @@
 #include "common/http/header_map_impl.h"
 #include "common/json/json_loader.h"
 #include "common/common/logger.h"
+#include "common/network/io_socket_handle_impl.h"
 
 #include "extensions/tracers/xray/tracer.h"
 
@@ -116,6 +117,13 @@ namespace Envoy {
 
                     /**
                      * Deprecated this function for XRay implementation.
+                     * @param timestamp
+                     * @param event
+                     */
+                    void log(SystemTime timestamp, const std::string& event) override;
+
+                    /**
+                     * Deprecated this function for XRay implementation.
                      * This function injects headers into HeaderMap for context propagation.
                      */
                     void injectContext(Http::HeaderMap& request_headers) override;
@@ -191,7 +199,7 @@ namespace Envoy {
                      */
                     Writer(Network::Address::InstanceConstSharedPtr address);
 
-                    Writer() : fd_(-1) {}
+                    Writer() : io_handle_(std::make_unique<Network::IoSocketHandleImpl>()) {}
 
                     /**
                      * Destructor.
@@ -205,7 +213,7 @@ namespace Envoy {
                     virtual void write(const std::string& message);
 
                 private:
-                    int fd_;
+                    Network::IoHandlePtr io_handle_;
                 };
 
                 /**
@@ -216,7 +224,7 @@ namespace Envoy {
                   /**
                    * Constructor.
                    */
-                  ReporterImpl(Writer writer);
+                  ReporterImpl(std::unique_ptr<Writer>& writer);
 
                   /**
                    * Implementation of XRay::Reporter::reportSpan().
@@ -229,10 +237,10 @@ namespace Envoy {
                   /**
                    * @return Pointer to the newly-created XRayReporter.
                    */
-                  static ReporterPtr NewInstance(Writer writer);
+                  static ReporterPtr NewInstance(std::unique_ptr<Writer>& writer);
 
                 private:
-                    Writer writer_;
+                    std::unique_ptr<Writer> writer_;
                 };
             } // namespace XRay
         } // namespace Tracers

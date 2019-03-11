@@ -125,20 +125,22 @@ namespace Envoy {
 
                 bool LocalizedSamplingStrategy::shouldTrace(SamplingRequest request) {
                     ENVOY_LOG(debug, "determining ShouldTrace decision for: host: {} path: {} method: {}", request.host(), request.httpUrl(), request.httpMethod());
-//                    SamplingRule *first_applicable_rule;
-//                    if (!custom_rule_manifest_.rules().empty()) {
-//                        std::vector<SamplingRule> rules = custom_rule_manifest_.rules();
-//                        for (std::vector<SamplingRule>::iterator it = rules.begin(); it != rules.end(); ++it) {
-//                            if (it->appliesTo(request.host(), request.httpUrl(), request.httpMethod())) {
-//                                first_applicable_rule = &*it;
-//                                break;
-//                            }
-//                        }
-//                    }
-//
-//                    if (first_applicable_rule != NULL) {
-//                        return shouldTraceHelper(*first_applicable_rule);
-//                    }
+                    // Will implement custom rules matching if they are provided by customer.
+                    // Below shows the logic about rule matching.
+                    // SamplingRule *first_applicable_rule;
+                    // if (!custom_rule_manifest_.rules().empty()) {
+                    //      std::vector<SamplingRule> rules = custom_rule_manifest_.rules();
+                    //      for (std::vector<SamplingRule>::iterator it = rules.begin(); it != rules.end(); ++it) {
+                    //          if (it->appliesTo(request.host(), request.httpUrl(), request.httpMethod())) {
+                    //              first_applicable_rule = &*it;
+                    //               break;
+                    //           }
+                    //       }
+                    //  }
+                    //
+                    //  if (first_applicable_rule != NULL) {
+                    //     return shouldTraceHelper(*first_applicable_rule);
+                    //  }
 
                     return shouldTraceHelper(default_rule_manifest_.defaultRule());
                 }

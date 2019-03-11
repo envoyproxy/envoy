@@ -5,6 +5,7 @@
 
 #include "extensions/tracers/xray/tracer.h"
 #include "extensions/tracers/xray/util.h"
+#include "extensions/tracers/xray/sampling.h"
 #include "extensions/tracers/xray/xray_core_constants.h"
 
 #include "test/mocks/common.h"
@@ -42,7 +43,8 @@ namespace Envoy {
 
                 TEST_F(XRayTracerTest, spanCreation) {
                     NiceMock<Runtime::MockRandomGenerator> random_generator;
-                    Tracer tracer("test_service_name", random_generator);
+                    LocalizedSamplingStrategy localized_sampling_strategy = LocalizedSamplingStrategy("");
+                    Tracer tracer("test_service_name", random_generator, localized_sampling_strategy);
                     SystemTime timestamp = time_system_.systemTime();
 
                     NiceMock<Tracing::MockConfig> config;
@@ -66,7 +68,6 @@ namespace Envoy {
                     // ==============
                     // Test the creation of a shared-context segment
                     // ==============
-
                     uint64_t span_id(0);
                     ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
                     SpanContext root_span_context(root_span->traceId(), span_id, root_span->childSpans()[0].id(), true);

@@ -68,11 +68,14 @@ namespace Envoy {
                     span_.setTag(name, value);
                 }
 
-                void XRaySpan::injectContext(Http::HeaderMap& request_headers) {
-                    request_headers.size();
-                }
-
                 void XRaySpan::setSampled(bool sampled) { span_.setSampled(sampled); }
+
+                void XRaySpan::injectContext(Http::HeaderMap& request_headers) { request_headers.size(); }
+
+                void XRaySpan::log(SystemTime timestamp, const std::string& event) {
+                    timestamp.time_since_epoch();
+                    event.size();
+                }
 
                 Tracing::SpanPtr XRaySpan::spawnChild(const Tracing::Config& config, const std::string& name,
                                                         SystemTime start_time) {
@@ -105,8 +108,8 @@ namespace Envoy {
                         TracerPtr tracer(new Tracer(span_name, random_generator, localized_sampling_strategy));
                         Network::Address::InstanceConstSharedPtr server_address_ = Network::Utility::parseInternetAddressAndPort(daemon_endpoint, false);
 
-                        Writer wt = Writer(server_address_);
-                        tracer->setReporter(ReporterImpl::NewInstance(wt));
+                        std::unique_ptr<Writer> writer(new Writer(server_address_));
+                        tracer->setReporter(ReporterImpl::NewInstance(writer));
 
                         return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};
                     });
@@ -140,7 +143,7 @@ namespace Envoy {
                         uint64_t span_id(0);
                         uint64_t parent_id(0);
 
-                        if (!xray_header.parentId().empty() && !StringUtil::atoul(xray_header.parentId().c_str(), parent_id, 16)) {
+                        if (!xray_header.parentId().empty() && !StringUtil::atoull(xray_header.parentId().c_str(), parent_id, 16)) {
                             return Tracing::SpanPtr(new Tracing::NullSpan());
                         }
 
@@ -168,23 +171,27 @@ namespace Envoy {
                     return std::move(active_span);
                 }
 
-                Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
-                    fd_ = address->socket(Network::Address::SocketType::Datagram);
-                    ASSERT(fd_ != -1);
+                Writer::Writer(Network::Address::InstanceConstSharedPtr address)
+                        : io_handle_(address->socket(Network::Address::SocketType::Datagram)) {
+                    ASSERT(io_handle_->fd() != -1);
 
-                    const Api::SysCallIntResult result = address->connect(fd_);
+                    const Api::SysCallIntResult result = address->connect(io_handle_->fd());
                     ASSERT(result.rc_ != -1);
                 }
 
-                Writer::~Writer() {}
-
-                void Writer::write(const std::string& message) {
-                    ::send(fd_, message.c_str(), message.size(), MSG_DONTWAIT);
+                Writer::~Writer() {
+                    if (io_handle_->isOpen()) {
+                        RELEASE_ASSERT(io_handle_->close().err_ == nullptr, "");
+                    }
                 }
 
-                ReporterImpl::ReporterImpl(Writer writer) : writer_(writer) {}
+                void Writer::write(const std::string& message) {
+                    ::send(io_handle_->fd(), message.c_str(), message.size(), MSG_DONTWAIT);
+                }
 
-                ReporterPtr ReporterImpl::NewInstance(Writer writer) {
+                ReporterImpl::ReporterImpl(std::unique_ptr<Writer>& writer) : writer_(std::move(writer)) {}
+
+                ReporterPtr ReporterImpl::NewInstance(std::unique_ptr<Writer>& writer) {
                     return ReporterPtr(new ReporterImpl(writer));
                 }
 
@@ -193,7 +200,7 @@ namespace Envoy {
                     if (span.sampled()) {
                         std::vector<Span> span_buffer_;
                         span_buffer_.push_back(std::move(span));
-                        writer_.write(span_buffer_[0].toJson());
+                        writer_->write(span_buffer_[0].toJson());
                     }
                 }
             } // namespace XRay

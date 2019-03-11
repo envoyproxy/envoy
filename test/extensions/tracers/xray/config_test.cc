@@ -13,15 +13,13 @@ namespace Envoy {
             namespace XRay {
                 TEST(XRayTracerConfigTest, XRayHttpTracer) {
                     NiceMock <Server::MockInstance> server;
-                    EXPECT_CALL(server.cluster_manager_, get("fake_cluster")).WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
-
                     const std::string yaml_string = R"EOF(
-                                                          http:
-                                                            name: envoy.xray
-                                                            config:
-                                                              collector_cluster: fake_cluster
-                                                              collector_endpoint: 127.0.0.1:2000
-                                                          )EOF";
+                      http:
+                        name: envoy.xray
+                        config:
+                          segment_name: fake_name
+                          daemon_endpoint: 127.0.0.1:2000
+                      )EOF";
 
                     envoy::config::trace::v2::Tracing configuration;
                     MessageUtil::loadFromYaml(yaml_string, configuration);
@@ -29,6 +27,26 @@ namespace Envoy {
                     XRayTracerFactory factory;
                     Tracing::HttpTracerPtr xray_tracer = factory.createHttpTracer(configuration, server);
                     EXPECT_NE(nullptr, xray_tracer);
+                }
+
+                TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
+                    NiceMock<Server::MockInstance> server;
+                    const std::string yaml_string = R"EOF(
+                      http:
+                        name: envoy.xray
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.config.trace.v2.XRayConfig
+                          segment_name: fake_name
+                          daemon_endpoint: 127.0.0.1:2000
+                      )EOF";
+
+                    envoy::config::trace::v2::Tracing configuration;
+                    MessageUtil::loadFromYaml(yaml_string, configuration);
+
+                    ZipkinTracerFactory factory;
+                    auto message = Config::Utility::translateToFactoryConfig(configuration.http(), factory);
+                    Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*message, server);
+                    EXPECT_NE(nullptr, zipkin_tracer);
                 }
 
                 TEST(XRayTracerConfigTest, DoubleRegistrationTest) {

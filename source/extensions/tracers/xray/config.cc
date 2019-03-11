@@ -12,33 +12,19 @@ namespace Envoy {
     namespace Extensions {
         namespace Tracers {
             namespace XRay {
+                XRayTracerFactory::XRayTracerFactory() : FactoryBase(TracerNames::get().XRay) {}
 
-                Tracing::HttpTracerPtr XRayTracerFactory::createHttpTracer(const envoy::config::trace::v2::Tracing& configuration, Server::Instance& server){
+                Tracing::HttpTracerPtr XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v2::XRayConfig& proto_config, Server::Instance& server){
+                    Tracing::DriverPtr xray_driver = std::make_unique<XRay::Driver>(proto_config, server.threadLocal(),
+                                                                        server.runtime(), server.localInfo(), server.random());
 
-                    Envoy::Runtime::RandomGenerator& rand = server.random();
-
-                    ProtobufTypes::MessagePtr config_ptr = createEmptyConfigProto();
-
-                    if (configuration.http().has_config()) {
-                        MessageUtil::jsonConvert(configuration.http().config(), *config_ptr);
-                    }
-
-                    const auto& xray_config =
-                            dynamic_cast<const envoy::config::trace::v2::XRayConfig&>(*config_ptr);
-
-                    Tracing::DriverPtr xray_driver{std::make_unique<XRay::Driver>(xray_config, server.threadLocal(),
-                                                                        server.runtime(), server.localInfo(), rand)};
-
-                    return Tracing::HttpTracerPtr(new Tracing::HttpTracerImpl(std::move(xray_driver), server.localInfo()));
+                    return std::make_unique<Tracing::HttpTracerImpl>(std::move(xray_driver), server.localInfo());
                 }
-
-                std::string XRayTracerFactory::name() { return TracerNames::get().XRay; }
 
                 /**
                  * Static registration for the xray tracer. @see RegisterFactory.
                  */
-                static Registry::RegisterFactory<XRayTracerFactory, Server::Configuration::TracerFactory>
-                        register_;
+                REGISTER_FACTORY(XRayTracerFactory, Server::Configuration::TracerFactory);
 
             } // namespace XRay
         } // namespace Tracers
