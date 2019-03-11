@@ -30,10 +30,10 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   Config::Utility::checkLocalInfo("cds", local_info);
 
-  bool is_delta = (cds_config.api_config_source().api_type() ==
-                   envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
-  std::string grpc_method = is_delta ? "envoy.api.v2.ClusterDiscoveryService.DeltaClusters"
-                                     : "envoy.api.v2.ClusterDiscoveryService.StreamClusters";
+  const bool is_delta = (cds_config.api_config_source().api_type() ==
+                         envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
+  const std::string grpc_method = is_delta ? "envoy.api.v2.ClusterDiscoveryService.DeltaClusters"
+                                           : "envoy.api.v2.ClusterDiscoveryService.StreamClusters";
   subscription_ =
       Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
           cds_config, local_info, dispatcher, cm, random, *scope_,
