@@ -15,6 +15,8 @@ import "google/protobuf/wrappers.proto";
 import "gogoproto/gogo.proto";
 import "validate/validate.proto";
 
+option (gogoproto.stable_marshaler_all) = true;
+
 // [#protodoc-title: gRPC access logs]
 // Envoy access logs describe incoming interaction with Envoy over a fixed
 // period of time, and typically cover a single request/response exchange,

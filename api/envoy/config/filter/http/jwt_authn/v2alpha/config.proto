@@ -14,6 +14,9 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: JWT Authentication]
 // JWT Authentication :ref:`configuration overview <config_http_filters_jwt_authn>`.
