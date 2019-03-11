@@ -38,8 +38,12 @@ TEST_F(SdsApiTest, BasicTest) {
   ::testing::InSequence s;
   const envoy::service::discovery::v2::SdsDummy dummy;
   NiceMock<Server::MockInstance> server;
-  NiceMock<Init::MockManager> init_manager;
-  EXPECT_CALL(init_manager, registerTarget(_, _));
+  Init::MockManager init_manager;
+  Init::TargetCaller init_target_caller;
+  EXPECT_CALL(init_manager, add(_))
+      .WillOnce(Invoke([&init_target_caller](const Init::TargetReceiver& target_receiver) {
+        init_target_caller = target_receiver.caller("test");
+      }));
 
   envoy::api::v2::core::ConfigSource config_source;
   config_source.mutable_api_config_source()->set_api_type(
@@ -61,8 +65,11 @@ TEST_F(SdsApiTest, BasicTest) {
   EXPECT_CALL(*factory, create()).WillOnce(Invoke([grpc_client] {
     return Grpc::AsyncClientPtr{grpc_client};
   }));
-  EXPECT_CALL(init_manager.initialized_, ready());
-  init_manager.initialize();
+
+  ReadyWatcher initialized;
+  Init::Receiver init_receiver("test", [&initialized]() { initialized.ready(); });
+  EXPECT_CALL(initialized, ready());
+  init_target_caller(init_receiver);
 }
 
 // Validate that TlsCertificateSdsApi updates secrets successfully if a good secret

@@ -2,7 +2,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "init/init_impl.h"
+#include "init/manager_impl.h"
 
 using testing::_;
 using testing::InSequence;
@@ -51,8 +51,7 @@ void expectInitialized(const Manager& m) { EXPECT_EQ(Manager::State::Initialized
 TEST(ManagerTest, AddImmediateTargetsWhenUninitialized) {
   InSequence s;
 
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
+  ManagerImpl m("test");
   expectUninitialized(m);
 
   MockTarget t1("t1", m);
@@ -62,16 +61,16 @@ TEST(ManagerTest, AddImmediateTargetsWhenUninitialized) {
   t2.expectInitializeImmediate();
 
   // initialization should complete immediately
+  MockClient c;
   c.expectCallback();
-  m.initialize();
+  m.initialize(c.receiver_);
   expectInitialized(m);
 }
 
 TEST(ManagerTest, AddAsyncTargetsWhenUninitialized) {
   InSequence s;
 
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
+  ManagerImpl m("test");
   expectUninitialized(m);
 
   MockTarget t1("t1", m);
@@ -81,7 +80,8 @@ TEST(ManagerTest, AddAsyncTargetsWhenUninitialized) {
   t2.expectInitializeAsync();
 
   // initialization should begin
-  m.initialize();
+  MockClient c;
+  m.initialize(c.receiver_);
   expectInitializing(m);
 
   // should still be initializing after first target initializes
@@ -97,8 +97,7 @@ TEST(ManagerTest, AddAsyncTargetsWhenUninitialized) {
 TEST(ManagerTest, AddMixedTargetsWhenUninitialized) {
   InSequence s;
 
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
+  ManagerImpl m("test");
   expectUninitialized(m);
 
   MockTarget t1("t1", m);
@@ -108,7 +107,8 @@ TEST(ManagerTest, AddMixedTargetsWhenUninitialized) {
   t2.expectInitializeAsync();
 
   // initialization should begin, and first target will initialize immediately
-  m.initialize();
+  MockClient c;
+  m.initialize(c.receiver_);
   expectInitializing(m);
 
   // initialization should finish after second target initializes
@@ -120,14 +120,15 @@ TEST(ManagerTest, AddMixedTargetsWhenUninitialized) {
 TEST(ManagerTest, AddImmediateTargetWhenInitializing) {
   InSequence s;
 
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
+  ManagerImpl m("test");
   expectUninitialized(m);
 
   // need an initial async target so initialization doesn't finish immediately
   MockTarget t1("t1", m);
   t1.expectInitializeAsync();
-  m.initialize();
+
+  MockClient c;
+  m.initialize(c.receiver_);
   expectInitializing(m);
 
   // adding an immediate target shouldn't finish initialization
@@ -141,60 +142,19 @@ TEST(ManagerTest, AddImmediateTargetWhenInitializing) {
   expectInitialized(m);
 }
 
-TEST(ManagerTest, AddImmediateTargetWhenInitializingEmpty) {
-  InSequence s;
-
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
-  expectUninitialized(m);
-
-  // it's legal to start initialization with no targets
-  m.initialize();
-  expectInitializing(m);
-
-  // adding a target that initializes immediately will complete initialization
-  MockTarget t1("t1");
-  t1.expectInitializeImmediate();
-  c.expectCallback();
-  m.add(t1.target_receiver_);
-  expectInitialized(m);
-}
-
-TEST(ManagerTest, AddAsyncTargetWhenInitializingEmpty) {
-  InSequence s;
-
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
-  expectUninitialized(m);
-
-  // it's legal to start initialization with no targets
-  m.initialize();
-  expectInitializing(m);
-
-  // adding an async target shouldn't finish initialization
-  MockTarget t1("t1");
-  t1.expectInitializeAsync();
-  m.add(t1.target_receiver_);
-  expectInitializing(m);
-
-  // initialization should finish after target initializes
-  c.expectCallback();
-  t1.caller_();
-  expectInitialized(m);
-}
-
 TEST(ManagerTest, AddWhenInitialized) {
   InSequence s;
 
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
+  ManagerImpl m("test");
   expectUninitialized(m);
 
   // initialize
   MockTarget t1("t1", m);
   t1.expectInitializeImmediate();
+
+  MockClient c;
   c.expectCallback();
-  m.initialize();
+  m.initialize(c.receiver_);
   expectInitialized(m);
 
   MockTarget t2("t2");
@@ -202,45 +162,57 @@ TEST(ManagerTest, AddWhenInitialized) {
                "attempted to add target t2 to initialized init manager test");
 }
 
+TEST(ManagerTest, InitializeEmpty) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  MockClient c;
+  c.expectCallback();
+  m.initialize(c.receiver_);
+  expectInitialized(m);
+}
+
 TEST(ManagerTest, InitializeWhenInitializing) {
   InSequence s;
 
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
+  ManagerImpl m("test");
   expectUninitialized(m);
 
   MockTarget t1("t1", m);
   t1.expectInitializeAsync();
 
   // initialization should begin
-  m.initialize();
+  MockClient c;
+  m.initialize(c.receiver_);
   expectInitializing(m);
 
-  EXPECT_DEATH(m.initialize(), "attempted to initialize init manager test twice");
+  EXPECT_DEATH(m.initialize(c.receiver_), "attempted to initialize init manager test twice");
 }
 
 TEST(ManagerTest, InitializeWhenInitialized) {
   InSequence s;
 
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
+  ManagerImpl m("test");
   expectUninitialized(m);
 
-  // initialize
   MockTarget t1("t1", m);
   t1.expectInitializeImmediate();
+
+  // initialize
+  MockClient c;
   c.expectCallback();
-  m.initialize();
+  m.initialize(c.receiver_);
   expectInitialized(m);
 
-  EXPECT_DEATH(m.initialize(), "attempted to initialize init manager test twice");
+  EXPECT_DEATH(m.initialize(c.receiver_), "attempted to initialize init manager test twice");
 }
 
 TEST(ManagerTest, UnavailableTarget) {
   InSequence s;
 
-  MockClient c;
-  ManagerImpl m(c.receiver_, "test");
+  ManagerImpl m("test");
   expectUninitialized(m);
 
   MockTarget t1("t1", m);
@@ -248,23 +220,24 @@ TEST(ManagerTest, UnavailableTarget) {
   t1.expectInitialize().Times(0);
 
   // initialization should begin and get stuck
+  MockClient c;
   c.expectCallback().Times(0);
-  m.initialize();
+  m.initialize(c.receiver_);
   expectInitializing(m);
 }
 
 TEST(ManagerTest, UnavailableManager) {
   InSequence s;
 
-  MockClient c;
-  auto m = new ManagerImpl(c.receiver_, "test");
+  auto m = new ManagerImpl("test");
   expectUninitialized(*m);
 
   MockTarget t1("t1", *m);
   t1.expectInitializeAsync();
 
   // initialization should begin
-  m->initialize();
+  MockClient c;
+  m->initialize(c.receiver_);
   expectInitializing(*m);
 
   // initialization should get stuck after init manager is destroyed
@@ -276,15 +249,15 @@ TEST(ManagerTest, UnavailableManager) {
 TEST(ManagerTest, UnavailableClient) {
   InSequence s;
 
-  auto c = new MockClient();
-  ManagerImpl m(c->receiver_, "test");
+  ManagerImpl m("test");
   expectUninitialized(m);
 
   MockTarget t1("t1", m);
   t1.expectInitializeAsync();
 
   // initialization should begin
-  m.initialize();
+  auto c = new MockClient();
+  m.initialize(c->receiver_);
   expectInitializing(m);
 
   // initialization should not crash after client is destroyed

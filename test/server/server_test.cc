@@ -79,7 +79,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
-  InitManagerImpl init_manager_{""};
+  Init::ManagerImpl init_manager_{""};
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;

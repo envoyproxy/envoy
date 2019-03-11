@@ -15,6 +15,8 @@
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "init/callback.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -133,21 +135,14 @@ class MutableConfigProviderImplBase;
  * This class can not be instantiated directly; instead, it provides the foundation for
  * config subscription implementations which derive from it.
  */
-class ConfigSubscriptionInstanceBase : public Init::Target,
-                                       protected Logger::Loggable<Logger::Id::config> {
+class ConfigSubscriptionInstanceBase : protected Logger::Loggable<Logger::Id::config> {
 public:
   struct LastConfigInfo {
     uint64_t last_config_hash_;
     std::string last_config_version_;
   };
 
-  ~ConfigSubscriptionInstanceBase() override;
-
-  // Init::Target
-  void initialize(std::function<void()> callback) override {
-    initialize_callback_ = callback;
-    start();
-  }
+  virtual ~ConfigSubscriptionInstanceBase();
 
   /**
    * Starts the subscription corresponding to a config source.
@@ -211,9 +206,7 @@ protected:
   void runInitializeCallbackIfAny();
 
 private:
-  void registerInitTarget(Init::Manager& init_manager) {
-    init_manager.registerTarget(*this, fmt::format("ConfigSubscriptionInstanceBase {}", name_));
-  }
+  void registerInitTarget(Init::Manager& init_manager) { init_manager.add(init_target_receiver_); }
 
   void bindConfigProvider(MutableConfigProviderImplBase* provider);
 
@@ -222,13 +215,19 @@ private:
   }
 
   const std::string name_;
-  std::function<void()> initialize_callback_;
   std::unordered_set<MutableConfigProviderImplBase*> mutable_config_providers_;
   const uint64_t manager_identifier_;
   ConfigProviderManagerImplBase& config_provider_manager_;
   TimeSource& time_source_;
   SystemTime last_updated_;
   absl::optional<LastConfigInfo> config_info_;
+
+  Init::Caller init_caller_;
+  const Init::TargetReceiver init_target_receiver_{
+      fmt::format("ConfigSubscriptionInstanceBase {}", name_), [this](Init::Caller caller) {
+        init_caller_ = std::move(caller);
+        start();
+      }};
 
   // ConfigSubscriptionInstanceBase, MutableConfigProviderImplBase and ConfigProviderManagerImplBase
   // are tightly coupled with the current shared ownership model; use friend classes to explicitly

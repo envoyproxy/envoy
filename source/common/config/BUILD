@@ -397,5 +397,6 @@ envoy_cc_library(
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/protobuf",
+        "//source/init:callback_lib",
     ],
 )

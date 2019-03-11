@@ -15,8 +15,9 @@
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
-#include "server/init_manager_impl.h"
 #include "server/lds_api.h"
+
+#include "init/manager_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -382,6 +383,9 @@ private:
 
   static bool isWildcardServerName(const std::string& name);
 
+  Init::Receiver init_receiver_;
+  Init::ManagerImpl dynamic_init_manager_;
+
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
@@ -400,7 +404,6 @@ private:
   const bool modifiable_;
   const bool workers_started_;
   const uint64_t hash_;
-  InitManagerImpl dynamic_init_manager_;
   bool initialize_canceled_{};
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;

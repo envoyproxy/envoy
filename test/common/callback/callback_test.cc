@@ -51,6 +51,18 @@ TEST(CallbackTest, CallResetReceiver) {
   caller(123);
 }
 
+TEST(CallbackTest, DefaultInitializedCaller) {
+  C caller;
+  EXPECT_FALSE(caller);
+}
+
+TEST(CallbackTest, ResetCaller) {
+  R receiver{[](uint32_t) {}};
+  C caller(receiver.caller());
+  caller.reset();
+  EXPECT_FALSE(caller);
+}
+
 } // namespace
 } // namespace Callback
 } // namespace Common

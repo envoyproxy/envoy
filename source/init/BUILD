@@ -20,8 +20,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "init_lib",
-    srcs = ["init_impl.cc"],
-    hdrs = ["init_impl.h"],
+    srcs = ["manager_impl.cc"],
+    hdrs = ["manager_impl.h"],
     deps = [
         ":callback_lib",
         "//include/envoy/init:init_interface",

@@ -61,6 +61,7 @@ envoy_cc_test(
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
+        "//source/init:callback_lib",
         "//source/server/http:admin_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",

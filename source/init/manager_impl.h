@@ -27,10 +27,9 @@ class ManagerImpl : public Manager, Logger::Loggable<Logger::Id::init> {
 public:
   /**
    * Constructs an initialization manager for a given caller.
-   * @param receiver callback to be invoked when initialization of all targets is complete.
    * @param name human-readable name of the init manager for tracing.
    */
-  ManagerImpl(const Receiver& receiver, absl::string_view name);
+  ManagerImpl(absl::string_view name);
 
   /**
    * @return the current state of the manager.
@@ -49,8 +48,9 @@ public:
   /**
    * Start initialization of all previously registered targets. It is an error to call initialize
    * on a manager that is already in initializing or initialized state.
+   * @param receiver callback to be invoked when initialization of all targets is complete.
    */
-  void initialize() override;
+  void initialize(const Receiver& receiver) override;
 
 private:
   std::string name_;

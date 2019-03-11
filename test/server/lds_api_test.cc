@@ -25,7 +25,12 @@ namespace {
 
 class LdsApiTest : public testing::Test {
 public:
-  LdsApiTest() : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)) {}
+  LdsApiTest() : request_(&cluster_manager_.async_client_), api_(Api::createApiForTest(store_)) {
+    ON_CALL(init_, add(_))
+        .WillByDefault(Invoke([this](const Init::TargetReceiver& target_receiver) {
+          init_target_caller_ = target_receiver.caller("test");
+        }));
+  }
 
   void setup() {
     const std::string config_json = R"EOF(
@@ -50,12 +55,12 @@ public:
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(init_, registerTarget(_, _));
+    EXPECT_CALL(init_, add(_));
     lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_, init_,
                                         local_info_, store_, listener_manager_, *api_);
 
     expectRequest();
-    init_.initialize();
+    init_target_caller_(init_receiver_);
   }
 
   void expectAdd(const std::string& listener_name, absl::optional<std::string> version,
@@ -121,7 +126,6 @@ public:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Init::MockManager init_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl store_;
   MockListenerManager listener_manager_;
@@ -130,6 +134,11 @@ public:
   Event::MockTimer* interval_timer_{};
   Http::AsyncClient::Callbacks* callbacks_{};
   Api::ApiPtr api_;
+
+  Init::MockManager init_;
+  ReadyWatcher initialized_;
+  Init::TargetCaller init_target_caller_;
+  Init::Receiver init_receiver_{"test", [this]() { initialized_.ready(); }};
 
 private:
   std::list<NiceMock<Network::MockListenerConfig>> listeners_;
@@ -191,7 +200,7 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
 
   EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
       .WillOnce(Throw(EnvoyException("something is wrong")));
-  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(initialized_, ready());
 
   EXPECT_THROW_WITH_MESSAGE(
       lds_->onConfigUpdate(listeners, ""), EnvoyException,
@@ -209,7 +218,7 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
-  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
 
   lds_->onConfigUpdate(listeners, "");
@@ -237,7 +246,7 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
       .WillOnce(Return(true))
       .WillOnce(Throw(EnvoyException("something else is wrong")));
 
-  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(initialized_, ready());
 
   EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
                             "Error adding/updating listener(s) invalid-listener-1: something is "
@@ -324,7 +333,7 @@ TEST_F(LdsApiTest, Basic) {
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
   expectAdd("listener2", "0", true);
-  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
@@ -397,7 +406,7 @@ TEST_F(LdsApiTest, TlsConfigWithoutCaCert) {
 
   makeListenersAndExpectCall({"listener0"});
   expectAdd("listener0", {}, true);
-  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
@@ -474,7 +483,7 @@ TEST_F(LdsApiTest, Failure) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
 
-  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
@@ -524,7 +533,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
   expectAdd("listener2", "0", true);
-  EXPECT_CALL(init_.initialized_, ready());
+  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 

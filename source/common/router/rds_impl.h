@@ -25,6 +25,8 @@
 #include "common/common/logger.h"
 #include "common/protobuf/utility.h"
 
+#include "init/callback.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -94,17 +96,10 @@ class RdsRouteConfigProviderImpl;
  * RDS config providers.
  */
 class RdsRouteConfigSubscription
-    : public Init::Target,
-      Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
+    : Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
       Logger::Loggable<Logger::Id::router> {
 public:
   ~RdsRouteConfigSubscription();
-
-  // Init::Target
-  void initialize(std::function<void()> callback) override {
-    initialize_callback_ = callback;
-    subscription_->start({route_config_name_}, *this);
-  }
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
@@ -134,7 +129,6 @@ private:
   void runInitializeCallbackIfAny();
 
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
-  std::function<void()> initialize_callback_;
   const std::string route_config_name_;
   Stats::ScopePtr scope_;
   RdsStats stats_;
@@ -145,6 +139,9 @@ private:
   absl::optional<LastConfigInfo> config_info_;
   envoy::api::v2::RouteConfiguration route_config_proto_;
   std::unordered_set<RdsRouteConfigProviderImpl*> route_config_providers_;
+
+  Init::TargetReceiver init_target_receiver_;
+  Init::Caller init_caller_;
 
   friend class RouteConfigProviderManagerImpl;
   friend class RdsRouteConfigProviderImpl;

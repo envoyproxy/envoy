@@ -21,6 +21,7 @@ class Caller : Logger::Loggable<Logger::Id::init> {
 public:
   Caller() = default;
   explicit operator bool() const;
+  void reset();
   void operator()() const;
 
 private:

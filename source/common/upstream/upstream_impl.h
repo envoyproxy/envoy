@@ -40,9 +40,8 @@
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
-#include "server/init_manager_impl.h"
-
 #include "absl/synchronization/mutex.h"
+#include "init/manager_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -662,7 +661,8 @@ protected:
   void onInitDone();
 
   Runtime::Loader& runtime_;
-  Server::InitManagerImpl init_manager_;
+  Init::Receiver init_receiver_;
+  Init::ManagerImpl init_manager_;
   ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;

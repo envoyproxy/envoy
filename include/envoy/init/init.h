@@ -6,10 +6,13 @@ namespace Envoy {
 namespace Init {
 
 /**
- * Implementation-defined representation of an initialization target
- * (see e.g. /source/init/callback.h).
+ * Implementation-defined representations of initialization callbacks (see e.g.
+ * /source/init/callback.h). A TargetReceiver is called by the init manager to signal the target
+ * should begin initialization, and a Receiver is called by the init manager when initialization of
+ * all targets is complete.
  */
 class TargetReceiver;
+class Receiver;
 
 /**
  * Init::Manager coordinates initialization of one or more "targets." A target registers its need
@@ -55,7 +58,7 @@ struct Manager {
    * Start initialization of all previously registered targets. It is an error to call initialize
    * on a manager that is already in initializing or initialized state.
    */
-  virtual void initialize() PURE;
+  virtual void initialize(const Receiver& receiver) PURE;
 };
 
 } // namespace Init

@@ -9,6 +9,8 @@ Caller::Caller(Common::Callback::Caller<> caller, absl::string_view name,
 
 Caller::operator bool() const { return caller_; }
 
+void Caller::reset() { caller_.reset(); }
+
 void Caller::operator()() const {
   if (caller_) {
     ENVOY_LOG(debug, "{} initialized, notifying {}", name_, receiver_name_);

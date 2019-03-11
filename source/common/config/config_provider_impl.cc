@@ -21,10 +21,8 @@ ConfigSubscriptionInstanceBase::~ConfigSubscriptionInstanceBase() {
 }
 
 void ConfigSubscriptionInstanceBase::runInitializeCallbackIfAny() {
-  if (initialize_callback_) {
-    initialize_callback_();
-    initialize_callback_ = nullptr;
-  }
+  init_caller_();
+  init_caller_.reset();
 }
 
 bool ConfigSubscriptionInstanceBase::checkAndApplyConfig(const Protobuf::Message& config_proto,

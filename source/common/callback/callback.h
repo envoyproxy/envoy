@@ -108,6 +108,11 @@ public:
   operator bool() const { return !fn_.expired(); }
 
   /**
+   * Reset this caller to not reference a Receiver.
+   */
+  void reset() { fn_.reset(); }
+
+  /**
    * Invoke the corresponding Receiver's callback, if it is still available. If the receiver has
    * been destroyed or reset, this has no effect.
    * @param args the arguments, if any, to pass to the receiver's callback function.

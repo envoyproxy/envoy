@@ -44,9 +44,9 @@
 #include "common/upstream/resource_manager_impl.h"
 #include "common/upstream/upstream_impl.h"
 
-#include "server/init_manager_impl.h"
-
 #include "extensions/clusters/well_known_names.h"
+
+#include "init/manager_impl.h"
 
 namespace Envoy {
 namespace Upstream {
