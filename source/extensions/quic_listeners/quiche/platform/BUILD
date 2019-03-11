@@ -113,6 +113,7 @@ envoy_cc_library(
         "quic_string_utils_impl.h",
         "quic_text_utils_impl.h",
     ] + envoy_select_quiche([
+        "quic_bug_tracker_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_test_output_impl.h",
     ]),

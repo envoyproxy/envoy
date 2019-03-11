@@ -14,6 +14,9 @@ import "envoy/api/v2/core/http_uri.proto";
 import "envoy/type/matcher/string.proto";
 
 import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.

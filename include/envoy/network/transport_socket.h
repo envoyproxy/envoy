@@ -106,6 +106,12 @@ public:
   virtual std::string protocol() const PURE;
 
   /**
+   * @return std::string the last failure reason occurred on the transport socket. If no failure
+   *         has been occurred the empty string is returned.
+   */
+  virtual absl::string_view failureReason() const PURE;
+
+  /**
    * @return bool whether the socket can be flushed and closed.
    */
   virtual bool canFlushClose() PURE;

@@ -188,7 +188,7 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap& response_h
   return shouldRetry(wouldRetryFromHeaders(response_headers), callback);
 }
 
-RetryStatus RetryStateImpl::shouldRetryReset(const Http::StreamResetReason reset_reason,
+RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
                                              DoRetryCallback callback) {
   return shouldRetry(wouldRetryFromReset(reset_reason), callback);
 }
