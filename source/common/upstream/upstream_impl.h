@@ -81,7 +81,7 @@ public:
       // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
       // for a pipe address is a misconfiguration. Throw an exception.
       throw EnvoyException(
-          fmt::format("Invalid host configuration: non-null port for non-IP address"));
+          fmt::format("Invalid host configuration: non-zero port for non-IP address"));
     }
     health_check_address_ =
         health_check_config.port_value() == 0

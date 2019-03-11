@@ -880,7 +880,7 @@ TEST(HostImplTest, HealthPipeAddress) {
                                   envoy::api::v2::core::Metadata::default_instance(),
                                   envoy::api::v2::core::Locality().default_instance(), config, 1);
       },
-      EnvoyException, "Invalid host configuration: non-null port for non-IP address");
+      EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
