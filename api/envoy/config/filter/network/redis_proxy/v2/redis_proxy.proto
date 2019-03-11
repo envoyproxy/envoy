@@ -93,15 +93,15 @@ message RedisProxy {
   // Example:
   // .. code-block:: yaml
   //
-  //   prefix_routes:
-  //     routes:
-  //       - prefix: "abc"
-  //         cluster: "cluster_a"
-  //       # the following route will be ignored
-  //       - prefix: "abc"
-  //         cluster: "cluster_b"
-  //       - prefix: "a"
-  //         cluster: "cluster_c"
+  //    prefix_routes:
+  //      routes:
+  //        - prefix: "abc"
+  //          cluster: "cluster_a"
+  //        # the following route will be ignored
+  //        - prefix: "abc"
+  //          cluster: "cluster_b"
+  //        - prefix: "a"
+  //          cluster: "cluster_c"
   //
   // See the :ref:`configuration section
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
