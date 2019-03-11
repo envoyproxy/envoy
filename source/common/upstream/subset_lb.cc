@@ -253,7 +253,7 @@ void SubsetLoadBalancer::processSubsets(
           if (entry->initialized()) {
             update_cb(entry);
           } else {
-            HostPredicate predicate = [this](const Host& host) -> bool {
+            HostPredicate predicate = [this, kvs](const Host& host) -> bool {
               return hostMatches(kvs, host);
             };
             new_cb(entry, predicate, kvs, adding_hosts);
