@@ -157,14 +157,19 @@ if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name"))
 }
 ```
 Runtime guarded features named with the "envoy.reloadable_features." prefix must be safe to flip
-true or false on running Envoy instances. In some situations, for example the buffer rewrite in
-[#5441](https://github.com/envoyproxy/envoy/pull/5441), it may make more sense to
+true or false on running Envoy instances. In some situations it may make more sense to
 latch the value in a member variable on class creation, for example:
 
 ```
 bool use_new_code_path_ =
     Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name")
 ```
+
+This should only be done if the lifetime of the object in question is relatively short compared to
+the lifetime of most Envoy instances, i.e. latching state on creation of the
+Http::ConnectionManagerImpl or all Network::ConnectionImpl classes, to ensure that the new behavio
+will be exercised as the runtime value is flipped, and that the old behavior will trail off over
+time.
 
 Runtime guarded features may either set true (running the new code by default) in the initial PR,
 after a testing interval, or during the next release cycle, at the PR author's and reviewing

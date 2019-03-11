@@ -24,64 +24,14 @@
 
 #include "server/options_impl.h"
 
-#include "test/common/runtime/utility.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
-
-#include "common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-#include "tclap/CmdLine.h"
-
-#include "gtest/gtest.h"
-
 namespace Envoy {
 namespace {
-
-std::string findAndRemove(const std::regex& pattern, int& argc, char**& argv) {
-  std::smatch matched;
-  std::string return_value;
-  for (int i = 0; i < argc; ++i) {
-    if (return_value.empty()) {
-      std::string argument = std::string(argv[i]);
-      if (regex_search(argument, matched, pattern)) {
-        return_value = matched[1];
-        argc--;
-      }
-    }
-    if (!return_value.empty() && i < argc) {
-      argv[i] = argv[i + 1];
-    }
-  }
-  return return_value;
-}
-
-// This class is created iff a test is run with the special runtime override flag.
-class RuntimeManagingListener : public ::testing::EmptyTestEventListener {
-public:
-  RuntimeManagingListener(std::string& runtime_override) : runtime_override_(runtime_override) {}
-
-  // On each test start, edit RuntimeFeaturesDefaults with our custom runtime defaults.
-  void OnTestStart(const ::testing::TestInfo&) override {
-    if (!runtime_override_.empty()) {
-      if (!Runtime::RuntimeFeaturesPeer::addFeature(runtime_override_)) {
-        // If the entry was already in the hash map, don't remove it OnTestEnd.
-        runtime_override_.clear();
-      }
-    }
-  }
-
-  // As each test ends, clean up the RuntimeFeaturesDefaults state.
-  void OnTestEnd(const ::testing::TestInfo&) override {
-    if (!runtime_override_.empty()) {
-      Runtime::RuntimeFeaturesPeer::removeFeature(runtime_override_);
-    }
-  }
-  std::string runtime_override_;
-};
 
 std::string makeTempDir(char* name_template) {
 #ifdef WIN32
@@ -179,20 +129,6 @@ std::string TestEnvironment::getCheckedEnvVar(const std::string& var) {
 }
 
 void TestEnvironment::initializeOptions(int argc, char** argv) {
-  // Before latching argv and argc, remove any runtime override flag.
-  // This allows doing test overrides of Envoy runtime features without adding
-  // test flags to the Envoy production command line.
-  const std::regex PATTERN{"--runtime-feature-override-for-tests=(.*)", std::regex::optimize};
-  std::string runtime_override = findAndRemove(PATTERN, argc, argv);
-  if (!runtime_override.empty()) {
-    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), info,
-                        "Running with runtime feature override {}", runtime_override);
-    // Set up a listener which will create a global runtime and set the feature
-    // to true for the duration of each test instance.
-    ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
-    listeners.Append(new RuntimeManagingListener(runtime_override));
-  }
-
   argc_ = argc;
   argv_ = argv;
 }

@@ -36,7 +36,6 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
         "//test/common/runtime:utility_lib",
-        "//test/mocks/server:server_mocks",
     ],
 )
 

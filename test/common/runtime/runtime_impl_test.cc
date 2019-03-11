@@ -123,7 +123,7 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   // Feature defaults.
   // test_feature_true is explicitly set true in runtime_features.cc
   EXPECT_EQ(true, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
-  // test_feature_false is not in runtime_features.cc and so isf else by default.
+  // test_feature_false is not in runtime_features.cc and so is false by default.
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
   // Feature defaults via helper function.
