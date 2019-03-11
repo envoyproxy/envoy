@@ -3675,10 +3675,8 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBuffer) {
   conn_manager_->onData(fake_input, false);
 
   EXPECT_CALL(*filter2, decodeHeaders(_, _))
-      .WillOnce(Invoke([&](HeaderMap& headers, bool) -> FilterHeadersStatus {
-        EXPECT_NE(nullptr, headers.ForwardedFor());
-        EXPECT_STREQ("http", headers.ForwardedProto()->value().c_str());
-        return FilterHeadersStatus::StopIteration;
+      .WillOnce(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::Continue;
       }));
 
   EXPECT_CALL(*filter, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
