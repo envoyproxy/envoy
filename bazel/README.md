@@ -559,28 +559,6 @@ Once this is set up, you can run clang-tidy without docker:
 Setting up an HTTP cache for Bazel output helps optimize Bazel performance and resource usage when
 using multiple compilation modes or multiple trees.
 
-## Setup common `envoy_deps`
-
-This step sets up the common `envoy_deps` allowing HTTP or disk cache (described below) to work
-across working trees in different paths. Also it allows new working trees to skip dependency
-compilation. The drawback is that the cached dependencies won't be updated automatically, so make
-sure all your working trees have same (or compatible) dependencies, and run this step periodically
-to update them.
-
-Make sure you don't have `--override_repository` in your `.bazelrc` when you run this step.
-
-```
-bazel fetch //test/...
-cp -LR $(bazel info output_base)/external/envoy_deps ${HOME}/envoy_deps_cache
-```
-
-Adding the following parameter to Bazel everytime or persist them in `.bazelrc`, note you will need to expand
-the environment variables for `.bazelrc`.
-
-```
---override_repository=envoy_deps=${HOME}/envoy_deps_cache
-```
-
 ## Setup local cache
 
 You may use any [Remote Caching](https://docs.bazel.build/versions/master/remote-caching.html) backend

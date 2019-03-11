@@ -135,6 +135,12 @@ message AccessLogCommon {
   // that ID in this field and cross reference later. It can also be used to
   // determine if a canary endpoint was used or not.
   envoy.api.v2.core.Metadata metadata = 17;
+
+  // If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
+  // failure reason from the transport socket. The format of this field depends on the configured
+  // upstream transport socket. Common TLS failures are in
+  // :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  string upstream_transport_failure_reason = 18;
 }
 
 // Flags indicating occurrences during request/response processing.

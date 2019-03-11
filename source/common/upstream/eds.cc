@@ -1,19 +1,8 @@
 #include "common/upstream/eds.h"
 
 #include "envoy/api/v2/eds.pb.validate.h"
-#include "envoy/common/exception.h"
-#include "envoy/stats/scope.h"
 
-#include "common/common/fmt.h"
-#include "common/config/metadata.h"
 #include "common/config/subscription_factory.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/network/address_impl.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -172,6 +161,23 @@ void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
   // We need to allow server startup to continue, even if we have a bad config.
   onPreInitComplete();
 }
+
+ClusterImplBaseSharedPtr EdsClusterFactory::createClusterImpl(
+    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Stats::ScopePtr&& stats_scope) {
+  if (!cluster.has_eds_cluster_config()) {
+    throw EnvoyException("cannot create an EDS cluster without an EDS config");
+  }
+
+  return std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
+                                          std::move(stats_scope), context.addedViaApi());
+}
+
+/**
+ * Static registration for the strict dns cluster factory. @see RegisterFactory.
+ */
+REGISTER_FACTORY(EdsClusterFactory, ClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

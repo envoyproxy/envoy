@@ -10,8 +10,7 @@ namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
 
 Http::FilterFactoryCb Config::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig&
-        config,
+    const envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfig& config,
     const std::string&, Server::Configuration::FactoryContext&) {
   return [config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(

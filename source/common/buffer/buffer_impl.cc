@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 
@@ -124,44 +123,30 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
-Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
+Api::IoCallUint64Result OwnedImpl::read(Network::IoHandle& io_handle, uint64_t max_length) {
   if (max_length == 0) {
-    return {0, 0};
+    return Api::ioCallUint64ResultNoError();
   }
   constexpr uint64_t MaxSlices = 2;
   RawSlice slices[MaxSlices];
   const uint64_t num_slices = reserve(max_length, slices, MaxSlices);
-  STACK_ARRAY(iov, iovec, num_slices);
-  uint64_t num_slices_to_read = 0;
-  uint64_t num_bytes_to_read = 0;
-  for (; num_slices_to_read < num_slices && num_bytes_to_read < max_length; num_slices_to_read++) {
-    iov[num_slices_to_read].iov_base = slices[num_slices_to_read].mem_;
-    const size_t slice_length = std::min(slices[num_slices_to_read].len_,
-                                         static_cast<size_t>(max_length - num_bytes_to_read));
-    iov[num_slices_to_read].iov_len = slice_length;
-    num_bytes_to_read += slice_length;
+  Api::IoCallUint64Result result = io_handle.readv(max_length, slices, num_slices);
+  if (result.ok()) {
+    // Read succeeded.
+    uint64_t num_slices_to_commit = 0;
+    uint64_t bytes_to_commit = result.rc_;
+    ASSERT(bytes_to_commit <= max_length);
+    while (bytes_to_commit != 0) {
+      slices[num_slices_to_commit].len_ =
+          std::min(slices[num_slices_to_commit].len_, static_cast<size_t>(bytes_to_commit));
+      ASSERT(bytes_to_commit >= slices[num_slices_to_commit].len_);
+      bytes_to_commit -= slices[num_slices_to_commit].len_;
+      num_slices_to_commit++;
+    }
+    ASSERT(num_slices_to_commit <= num_slices);
+    commit(slices, num_slices_to_commit);
   }
-  ASSERT(num_slices_to_read <= MaxSlices);
-  ASSERT(num_bytes_to_read <= max_length);
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result =
-      os_syscalls.readv(fd, iov.begin(), static_cast<int>(num_slices_to_read));
-  if (result.rc_ < 0) {
-    return {static_cast<int>(result.rc_), result.errno_};
-  }
-  uint64_t num_slices_to_commit = 0;
-  uint64_t bytes_to_commit = result.rc_;
-  ASSERT(bytes_to_commit <= max_length);
-  while (bytes_to_commit != 0) {
-    slices[num_slices_to_commit].len_ =
-        std::min(slices[num_slices_to_commit].len_, static_cast<size_t>(bytes_to_commit));
-    ASSERT(bytes_to_commit >= slices[num_slices_to_commit].len_);
-    bytes_to_commit -= slices[num_slices_to_commit].len_;
-    num_slices_to_commit++;
-  }
-  ASSERT(num_slices_to_commit <= num_slices);
-  commit(slices, num_slices_to_commit);
-  return {static_cast<int>(result.rc_), result.errno_};
+  return result;
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
@@ -184,28 +169,15 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   return result_ptr.pos;
 }
 
-Api::SysCallIntResult OwnedImpl::write(int fd) {
+Api::IoCallUint64Result OwnedImpl::write(Network::IoHandle& io_handle) {
   constexpr uint64_t MaxSlices = 16;
   RawSlice slices[MaxSlices];
   const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
-  STACK_ARRAY(iov, iovec, num_slices);
-  uint64_t num_slices_to_write = 0;
-  for (uint64_t i = 0; i < num_slices; i++) {
-    if (slices[i].mem_ != nullptr && slices[i].len_ != 0) {
-      iov[num_slices_to_write].iov_base = slices[i].mem_;
-      iov[num_slices_to_write].iov_len = slices[i].len_;
-      num_slices_to_write++;
-    }
-  }
-  if (num_slices_to_write == 0) {
-    return {0, 0};
-  }
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallSizeResult result = os_syscalls.writev(fd, iov.begin(), num_slices_to_write);
-  if (result.rc_ > 0) {
+  Api::IoCallUint64Result result = io_handle.writev(slices, num_slices);
+  if (result.ok() && result.rc_ > 0) {
     drain(static_cast<uint64_t>(result.rc_));
   }
-  return {static_cast<int>(result.rc_), result.errno_};
+  return result;
 }
 
 OwnedImpl::OwnedImpl() : buffer_(evbuffer_new()) {}

@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Config {
 
-// Oversees communication for gRPC xDS implementations (parent to both regular xDS and incremental
+// Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
 template <class RequestProto, class ResponseProto, class RequestQueueItem>
@@ -49,6 +49,14 @@ public:
     drainRequests();
   }
 
+  void clearRequestQueue() {
+    control_plane_stats_.pending_requests_.sub(request_queue_.size());
+    // TODO(fredlas) when we have C++17: request_queue_ = {};
+    while (!request_queue_.empty()) {
+      request_queue_.pop();
+    }
+  }
+
   void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
     stream_ = async_client_->start(service_method_, *this);
@@ -78,6 +86,10 @@ public:
   void onReceiveMessage(std::unique_ptr<ResponseProto>&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
+    // Some times during hot restarts this stat's value becomes inconsistent and will continue to
+    // have 0 till it is reconnected. Setting here ensures that it is consistent with the state of
+    // management server connection.
+    control_plane_stats_.connected_state_.set(1);
     handleResponse(std::move(message));
   }
 

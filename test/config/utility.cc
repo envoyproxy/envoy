@@ -148,6 +148,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 
   uint32_t port_idx = 0;
   bool eds_hosts = false;
+  bool custom_cluster = false;
   auto* static_resources = bootstrap_.mutable_static_resources();
   const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
   if (tap_path) {
@@ -176,6 +177,8 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     auto* cluster = static_resources->mutable_clusters(i);
     if (cluster->type() == envoy::api::v2::Cluster::EDS) {
       eds_hosts = true;
+    } else if (cluster->has_cluster_type()) {
+      custom_cluster = true;
     } else {
       for (int j = 0; j < cluster->hosts_size(); ++j) {
         if (cluster->mutable_hosts(j)->has_socket_address()) {
@@ -213,7 +216,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
-  ASSERT(port_idx == ports.size() || eds_hosts);
+  ASSERT(port_idx == ports.size() || eds_hosts || custom_cluster);
 
   if (!connect_timeout_set_) {
 #ifdef __APPLE__

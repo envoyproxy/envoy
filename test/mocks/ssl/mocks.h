@@ -43,6 +43,7 @@ public:
   MOCK_CONST_METHOD0(uriSanPeerCertificate, std::string());
   MOCK_CONST_METHOD0(subjectLocalCertificate, std::string());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificate, std::string&());
+  MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificateChain, std::string&());
   MOCK_CONST_METHOD0(dnsSansPeerCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(dnsSansLocalCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(validFromPeerCertificate, absl::optional<SystemTime>());
