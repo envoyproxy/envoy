@@ -61,21 +61,21 @@ message RedisProxy {
   // milliseconds.
   bool latency_in_micros = 4;
 
-  message PrefixRoute {
-    // String prefix that must match the beginning of the keys. Envoy will always favor the longest
-    // matches.
-    string prefix = 1 [(validate.rules).string.min_bytes = 1];
-
-    // Indicates if the prefix needs to be removed from the key when forwarded.
-    bool preserve_prefix = 2;
-
-    // Upstream cluster to forward the command to.
-    string cluster = 3;
-  }
-
   message PrefixRoutes {
+    message Route {
+      // String prefix that must match the beginning of the keys. Envoy will always favor the longest
+      // matches.
+      string prefix = 1 [(validate.rules).string.min_bytes = 1];
+
+      // Indicates if the prefix needs to be removed from the key when forwarded.
+      bool remove_prefix = 2;
+
+      // Upstream cluster to forward the command to.
+      string cluster = 3;
+    }
+
     // List of prefix routes.
-    repeated PrefixRoute routes = 1 [(gogoproto.nullable) = false];
+    repeated Route routes = 1 [(gogoproto.nullable) = false];
 
     // Indicates that prefix matching should be case insensitive.
     bool case_insensitive = 2;
@@ -89,6 +89,19 @@ message RedisProxy {
   // overlapping prefixes will be ignored, and Envoy will always favor the longest matches first. A
   // catch-all cluster can be used to forward commands to when there is no match. Time complexity of
   // the lookups are in O(min(longest key prefix, key length)).
+  //
+  // Example:
+  // .. code-block:: yaml
+  //
+  //   prefix_routes:
+  //     routes:
+  //       - prefix: "abc"
+  //         cluster: "cluster_a"
+  //       # the following route will be ignored
+  //       - prefix: "abc"
+  //         cluster: "cluster_b"
+  //       - prefix: "a"
+  //         cluster: "cluster_c"
   //
   // See the :ref:`configuration section
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on

@@ -34,7 +34,7 @@ public:
 private:
   struct Prefix {
     const std::string prefix;
-    const bool preserve_prefix;
+    const bool remove_prefix;
     ConnPool::InstanceSharedPtr upstream;
   };
 

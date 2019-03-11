@@ -22,7 +22,7 @@ PrefixRoutes::PrefixRoutes(
 
     prefix_lookup_table_.add(copy.c_str(), std::make_shared<Prefix>(Prefix{
                                                route.prefix(),
-                                               route.preserve_prefix(),
+                                               route.remove_prefix(),
                                                upstreams_.at(route.cluster()),
                                            }));
   }
@@ -39,7 +39,7 @@ Common::Redis::Client::PoolRequest* PrefixRoutes::makeRequest(const std::string&
   auto value = prefix_lookup_table_.findPrefix(copy.c_str());
 
   if (value != nullptr) {
-    // TODO: preserve_prefix
+    // TODO: remove_prefix
     value->upstream->makeRequest(key, request, callbacks);
   } else if (catch_all_upstream_ != nullptr) {
     catch_all_upstream_.value()->makeRequest(key, request, callbacks);
