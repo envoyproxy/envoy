@@ -30,7 +30,7 @@ public:
   ZooKeeperFilterTest() { ENVOY_LOG_MISC(info, "test"); }
 
   void initialize() {
-    config_ = std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, scope_);
+    config_ = std::make_shared<ZooKeeperFilterConfig>(stat_prefix_, 1048576, scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
