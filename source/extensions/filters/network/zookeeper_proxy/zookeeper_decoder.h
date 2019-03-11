@@ -54,26 +54,26 @@ public:
   virtual ~DecoderCallbacks() {}
 
   virtual void onDecodeError() PURE;
-  virtual void onRequestBytes(const uint64_t bytes) PURE;
-  virtual void onConnect(const bool readonly) PURE;
+  virtual void onRequestBytes(uint64_t bytes) PURE;
+  virtual void onConnect(bool readonly) PURE;
   virtual void onPing() PURE;
   virtual void onAuthRequest(const std::string& scheme) PURE;
-  virtual void onGetDataRequest(const std::string& path, const bool watch) PURE;
-  virtual void onCreateRequest(const std::string& path, const bool ephemeral, const bool sequence,
-                               const bool two) PURE;
+  virtual void onGetDataRequest(const std::string& path, bool watch) PURE;
+  virtual void onCreateRequest(const std::string& path, bool ephemeral, bool sequence,
+                               bool two) PURE;
   virtual void onSetRequest(const std::string& path) PURE;
-  virtual void onGetChildrenRequest(const std::string& path, const bool watch, const bool two) PURE;
-  virtual void onDeleteRequest(const std::string& path, const int32_t version) PURE;
-  virtual void onExistsRequest(const std::string& path, const bool watch) PURE;
+  virtual void onGetChildrenRequest(const std::string& path, bool watch, bool two) PURE;
+  virtual void onDeleteRequest(const std::string& path, int32_t version) PURE;
+  virtual void onExistsRequest(const std::string& path, bool watch) PURE;
   virtual void onGetAclRequest(const std::string& path) PURE;
-  virtual void onSetAclRequest(const std::string& path, const int32_t version) PURE;
+  virtual void onSetAclRequest(const std::string& path, int32_t version) PURE;
   virtual void onSyncRequest(const std::string& path) PURE;
-  virtual void onCheckRequest(const std::string& path, const int32_t version) PURE;
+  virtual void onCheckRequest(const std::string& path, int32_t version) PURE;
   virtual void onMultiRequest() PURE;
   virtual void onReconfigRequest() PURE;
   virtual void onSetWatchesRequest() PURE;
-  virtual void onCheckWatchesRequest(const std::string& path, const int32_t type) PURE;
-  virtual void onRemoveWatchesRequest(const std::string& path, const int32_t type) PURE;
+  virtual void onCheckWatchesRequest(const std::string& path, int32_t type) PURE;
+  virtual void onRemoveWatchesRequest(const std::string& path, int32_t type) PURE;
   virtual void onCloseRequest() PURE;
 };
 
@@ -101,11 +101,10 @@ private:
   void parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
-  void parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, const bool two);
+  void parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, bool two);
   void skipAcls(Buffer::Instance& data, uint64_t& offset) const;
   void parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
-  void parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
-                               const bool two);
+  void parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, bool two);
   void parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseExistsRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
@@ -117,7 +116,7 @@ private:
   void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
   void skipStrings(Buffer::Instance& data, uint64_t& offset) const;
-  void ensureMinLength(const int32_t len, const int32_t minlen) const;
+  void ensureMinLength(int32_t len, int32_t minlen) const;
 
   DecoderCallbacks& callbacks_;
 };
