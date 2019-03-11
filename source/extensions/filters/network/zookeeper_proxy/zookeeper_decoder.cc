@@ -205,7 +205,7 @@ void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint
 
 void DecoderImpl::parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
                                           const bool two) {
-  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH +  INT_LENGTH + BOOL_LENGTH);
+  ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH + BOOL_LENGTH);
 
   const std::string path = BufferHelper::peekString(data, offset);
   const bool watch = BufferHelper::peekBool(data, offset);
