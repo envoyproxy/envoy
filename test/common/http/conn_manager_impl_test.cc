@@ -3666,7 +3666,10 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPat
     decoder->decodeHeaders(std::move(headers), false);
 
     Buffer::OwnedImpl fake_data("12345");
-    decoder->decodeData(fake_data, true);
+    decoder->decodeData(fake_data, false);
+
+    HeaderMapPtr trailers{new TestHeaderMapImpl{{"foo", "bar"}}};
+    decoder->decodeTrailers(std::move(trailers));
     data.drain(4);
   }));
 
@@ -3678,8 +3681,10 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPat
       .WillOnce(Invoke(
           [&](HeaderMap&, bool) -> FilterHeadersStatus { return FilterHeadersStatus::Continue; }));
 
-  EXPECT_CALL(*filter, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
-  EXPECT_CALL(*filter2, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*filter, decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*filter2, decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*filter, decodeTrailers(_)).WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*filter2, decodeTrailers(_)).WillOnce(Return(FilterTrailersStatus::Continue));
 
   filter->callbacks_->continueDecoding();
 }
@@ -3699,15 +3704,24 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPat
 
   // invoke encodeData
   Buffer::OwnedImpl response_body("response");
-  decoder_filters_[0]->callbacks_->encodeData(response_body, true);
+  decoder_filters_[0]->callbacks_->encodeData(response_body, false);
+  decoder_filters_[0]->callbacks_->encodeTrailers(
+      HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
+
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
 
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeData(_, _));
 
-  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
-  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeTrailers(_));
+
   EXPECT_CALL(*encoder_filters_[0], encodeComplete());
   EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   expectOnDestroy();
