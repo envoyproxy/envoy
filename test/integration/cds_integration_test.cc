@@ -113,6 +113,8 @@ public:
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   }
 
+  // Does the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
+  // Split out into its own function so that DeltaCdsIntegrationTest can override it.
   virtual void giveInitialCluster() {
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
     sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster, {cluster1_},
@@ -225,6 +227,8 @@ public:
     fake_upstreams_.clear();
   }
 
+  // Does the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
+  // Split out into its own function so that DeltaCdsIntegrationTest can override it.
   void giveInitialCluster() override {
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().Cluster, {}, {}));
     sendDeltaDiscoveryResponse<envoy::api::v2::Cluster>({cluster1_}, {}, "55");
