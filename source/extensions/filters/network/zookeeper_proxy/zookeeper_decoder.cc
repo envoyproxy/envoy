@@ -8,10 +8,12 @@ namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
 const uint32_t INT_LENGTH = 4;
+const uint32_t XID_LENGTH = 4;
 const uint32_t OPCODE_LENGTH = 4;
 const uint32_t ZXID_LENGTH = 8;
 const uint32_t TIMEOUT_LENGTH = 4;
 const uint32_t SESSION_LENGTH = 8;
+const uint32_t MULTI_HEADER_LENGTH = 9;
 
 void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   ENVOY_LOG(trace, "zookeeper_proxy: decoding {} bytes at offset {}", data.length(), offset);
@@ -264,7 +266,7 @@ void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, ui
 
 void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   // Treat empty transactions as a decoding error, there should be at least 1 header.
-  checkLength(len, 17);
+  checkLength(len, XID_LENGTH + OPCODE_LENGTH + MULTI_HEADER_LENGTH);
 
   while (true) {
     const int32_t type = BufferHelper::peekInt32(data, offset);
