@@ -19,7 +19,7 @@ int64_t BufferHelper::peekInt64(Buffer::Instance& buffer, uint64_t& offset) {
 
 bool BufferHelper::peekBool(Buffer::Instance& buffer, uint64_t& offset) {
   char byte = buffer.peekInt<char, ByteOrder::Host, 1>(offset);
-  bool val = static_cast<bool>(byte & 255);
+  bool val = static_cast<bool>(byte);
   offset += 1;
   return val;
 }
