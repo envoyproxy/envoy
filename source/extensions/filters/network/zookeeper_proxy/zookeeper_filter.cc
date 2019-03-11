@@ -12,8 +12,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
-ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix, Stats::Scope& scope)
-    : scope_(scope), stat_prefix_(stat_prefix), stats_(generateStats(stat_prefix, scope)) {}
+ZooKeeperFilterConfig::ZooKeeperFilterConfig(const std::string& stat_prefix,
+                                             const uint32_t max_packet_bytes, Stats::Scope& scope)
+    : scope_(scope), max_packet_bytes_(max_packet_bytes), stat_prefix_(stat_prefix),
+      stats_(generateStats(stat_prefix, scope)) {}
 
 ZooKeeperFilter::ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config)
     : config_(std::move(config)) {}
@@ -54,7 +56,7 @@ void ZooKeeperFilter::doDecode(Buffer::Instance& buffer) {
 }
 
 DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks) {
-  return std::make_unique<DecoderImpl>(callbacks);
+  return std::make_unique<DecoderImpl>(callbacks, config_->maxPacketBytes());
 }
 
 void ZooKeeperFilter::setDynamicMetadata(const std::string& key, const std::string& value) {

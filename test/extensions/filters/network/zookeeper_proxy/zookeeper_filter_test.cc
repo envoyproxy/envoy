@@ -68,6 +68,14 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodeTooBigMessage() const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<uint32_t>(1048577);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodePing() const {
     Buffer::OwnedImpl buffer;
 
@@ -398,6 +406,15 @@ TEST_F(ZooKeeperFilterTest, Fallback) {
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(0UL, config_->stats().connect_rq_.value());
   EXPECT_EQ(0UL, config_->stats().connect_readonly_rq_.value());
+  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, PacketTooBig) {
+  initialize();
+
+  Buffer::OwnedImpl data = encodeTooBigMessage();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 

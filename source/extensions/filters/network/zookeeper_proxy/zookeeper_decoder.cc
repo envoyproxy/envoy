@@ -23,6 +23,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   // Check message length.
   const int32_t len = BufferHelper::peekInt32(data, offset);
   ensureMinLength(len, INT_LENGTH + XID_LENGTH);
+  ensureMaxLength(len);
 
   // Control requests, with XIDs <= 0.
   //
@@ -121,7 +122,13 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
 
 void DecoderImpl::ensureMinLength(const int32_t len, const int32_t minlen) const {
   if (len < minlen) {
-    throw EnvoyException("Package is too small");
+    throw EnvoyException("Packet is too small");
+  }
+}
+
+void DecoderImpl::ensureMaxLength(const int32_t len) const {
+  if (len > max_packet_bytes_) {
+    throw EnvoyException("Packet is too big");
   }
 }
 
@@ -167,9 +174,14 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) const {
   const int32_t count = BufferHelper::peekInt32(data, offset);
 
   for (int i = 0; i < count; ++i) {
+    // Perms.
     BufferHelper::peekInt32(data, offset);
-    BufferHelper::peekString(data, offset);
-    BufferHelper::peekString(data, offset);
+    // Skip scheme.
+    int32_t datalen = BufferHelper::peekInt32(data, offset);
+    offset += datalen;
+    // Skip cred.
+    datalen = BufferHelper::peekInt32(data, offset);
+    offset += datalen;
   }
 }
 
