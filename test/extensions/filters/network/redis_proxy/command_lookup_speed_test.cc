@@ -31,8 +31,9 @@ public:
 };
 
 class NullRouterImpl : public Router {
-  Common::Redis::Client::PoolRequest* makeRequest(const std::string&, const Common::Redis::RespValue&,
-                                     Common::Redis::Client::PoolCallbacks&) override {
+  Common::Redis::Client::PoolRequest* makeRequest(const std::string&,
+                                                  const Common::Redis::RespValue&,
+                                                  Common::Redis::Client::PoolCallbacks&) override {
     return nullptr;
   }
 };

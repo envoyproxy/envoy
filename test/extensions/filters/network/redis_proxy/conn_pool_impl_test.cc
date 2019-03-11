@@ -44,8 +44,8 @@ public:
       EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
     }
 
-    conn_pool_ =
-        std::make_shared<InstanceImpl>(cluster_name_, cm_, *this, tls_, Common::Redis::Client::createConnPoolSettings());
+    conn_pool_ = std::make_shared<InstanceImpl>(cluster_name_, cm_, *this, tls_,
+                                                Common::Redis::Client::createConnPoolSettings());
   }
 
   void makeSimpleRequest(bool create_client) {

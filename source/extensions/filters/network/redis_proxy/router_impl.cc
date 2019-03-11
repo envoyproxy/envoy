@@ -28,8 +28,9 @@ PrefixRoutes::PrefixRoutes(
   }
 }
 
-Common::Redis::Client::PoolRequest* PrefixRoutes::makeRequest(const std::string& key, const Common::Redis::RespValue& request,
-                                                 Common::Redis::Client::PoolCallbacks& callbacks) {
+Common::Redis::Client::PoolRequest*
+PrefixRoutes::makeRequest(const std::string& key, const Common::Redis::RespValue& request,
+                          Common::Redis::Client::PoolCallbacks& callbacks) {
 
   std::string copy(key);
   if (case_insensitive_) {

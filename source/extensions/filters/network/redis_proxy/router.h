@@ -29,8 +29,9 @@ public:
    * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
    *         for some reason.
    */
-  virtual Common::Redis::Client::PoolRequest* makeRequest(const std::string& key, const Common::Redis::RespValue& request,
-                                             Common::Redis::Client::PoolCallbacks& callbacks) PURE;
+  virtual Common::Redis::Client::PoolRequest*
+  makeRequest(const std::string& key, const Common::Redis::RespValue& request,
+              Common::Redis::Client::PoolCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<Router> RouterPtr;

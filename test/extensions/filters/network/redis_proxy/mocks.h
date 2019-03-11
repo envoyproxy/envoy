@@ -25,8 +25,9 @@ public:
   ~MockRouter();
 
   MOCK_METHOD3(makeRequest,
-               Common::Redis::Client::PoolRequest*(const std::string& hash_key, const Common::Redis::RespValue& request,
-                                      Common::Redis::Client::PoolCallbacks& callbacks));
+               Common::Redis::Client::PoolRequest*(
+                   const std::string& hash_key, const Common::Redis::RespValue& request,
+                   Common::Redis::Client::PoolCallbacks& callbacks));
 };
 
 namespace ConnPool {

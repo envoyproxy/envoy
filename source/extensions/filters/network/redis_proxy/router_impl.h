@@ -29,8 +29,10 @@ public:
                    prefix_routes,
                Upstreams&& upstreams);
 
-  Common::Redis::Client::PoolRequest* makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request,
-                                     Common::Redis::Client::PoolCallbacks& callbacks) override;
+  Common::Redis::Client::PoolRequest*
+  makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request,
+              Common::Redis::Client::PoolCallbacks& callbacks) override;
+
 private:
   struct Prefix {
     const std::string prefix;
