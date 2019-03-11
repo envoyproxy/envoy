@@ -4,9 +4,9 @@
 #include "extensions/filters/network/zookeeper_proxy/zookeeper_filter.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 
@@ -25,7 +25,7 @@ bool protoMapEq(const ProtobufWkt::Struct& obj, const std::map<std::string, std:
 
 MATCHER_P(MapEq, rhs, "") { return protoMapEq(arg, rhs); }
 
-class ZooKeeperFilterTest : public TestBase {
+class ZooKeeperFilterTest : public testing::Test {
 public:
   ZooKeeperFilterTest() { ENVOY_LOG_MISC(info, "test"); }
 
@@ -366,11 +366,11 @@ public:
 TEST_F(ZooKeeperFilterTest, Connect) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeConnect()));
+  Buffer::OwnedImpl data = encodeConnect();
 
   expectSetDynamicMetadata({{"opname", "connect"}}, {{"bytes", "32"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().connect_rq_.value());
   EXPECT_EQ(32UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -379,11 +379,11 @@ TEST_F(ZooKeeperFilterTest, Connect) {
 TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeConnect(true)));
+  Buffer::OwnedImpl data = encodeConnect(true);
 
   expectSetDynamicMetadata({{"opname", "connect_readonly"}}, {{"bytes", "33"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(0UL, config_->stats().connect_rq_.value());
   EXPECT_EQ(1UL, config_->stats().connect_readonly_rq_.value());
   EXPECT_EQ(33UL, config_->stats().request_bytes_.value());
@@ -393,9 +393,9 @@ TEST_F(ZooKeeperFilterTest, ConnectReadonly) {
 TEST_F(ZooKeeperFilterTest, Fallback) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeBadMessage()));
+  Buffer::OwnedImpl data = encodeBadMessage();
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(0UL, config_->stats().connect_rq_.value());
   EXPECT_EQ(0UL, config_->stats().connect_readonly_rq_.value());
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
@@ -404,20 +404,20 @@ TEST_F(ZooKeeperFilterTest, Fallback) {
 TEST_F(ZooKeeperFilterTest, UnknownOpcode) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeUnknownOpcode()));
+  Buffer::OwnedImpl data = encodeUnknownOpcode();
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
 }
 
 TEST_F(ZooKeeperFilterTest, PingRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodePing()));
+  Buffer::OwnedImpl data = encodePing();
 
   expectSetDynamicMetadata({{"opname", "ping"}}, {{"bytes", "12"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().ping_rq_.value());
   EXPECT_EQ(12UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -426,11 +426,11 @@ TEST_F(ZooKeeperFilterTest, PingRequest) {
 TEST_F(ZooKeeperFilterTest, AuthRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeAuth("digest")));
+  Buffer::OwnedImpl data = encodeAuth("digest");
 
   expectSetDynamicMetadata({{"opname", "auth"}}, {{"bytes", "36"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(scope_.counter("test.zookeeper.auth.digest_rq").value(), 1);
   EXPECT_EQ(36UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -439,12 +439,12 @@ TEST_F(ZooKeeperFilterTest, AuthRequest) {
 TEST_F(ZooKeeperFilterTest, GetDataRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodePathWatch("/foo", true)));
+  Buffer::OwnedImpl data = encodePathWatch("/foo", true);
 
   expectSetDynamicMetadata({{"opname", "getdata"}, {"path", "/foo"}, {"watch", "true"}},
                            {{"bytes", "21"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(21UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(1UL, config_->stats().getdata_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -453,13 +453,13 @@ TEST_F(ZooKeeperFilterTest, GetDataRequest) {
 TEST_F(ZooKeeperFilterTest, CreateRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeCreateRequest("/foo", "bar", false, false)));
+  Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", false, false);
 
   expectSetDynamicMetadata(
       {{"opname", "create"}, {"path", "/foo"}, {"ephemeral", "false"}, {"sequence", "false"}},
       {{"bytes", "35"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().create_rq_.value());
   EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -468,14 +468,14 @@ TEST_F(ZooKeeperFilterTest, CreateRequest) {
 TEST_F(ZooKeeperFilterTest, CreateRequest2) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(
-      encodeCreateRequest("/foo", "bar", false, false, false, enumToInt(OpCodes::CREATE2))));
+  Buffer::OwnedImpl data =
+      encodeCreateRequest("/foo", "bar", false, false, false, enumToInt(OpCodes::CREATE2));
 
   expectSetDynamicMetadata(
       {{"opname", "create2"}, {"path", "/foo"}, {"ephemeral", "false"}, {"sequence", "false"}},
       {{"bytes", "35"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().create2_rq_.value());
   EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -484,11 +484,11 @@ TEST_F(ZooKeeperFilterTest, CreateRequest2) {
 TEST_F(ZooKeeperFilterTest, SetRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeSetRequest("/foo", "bar", -1)));
+  Buffer::OwnedImpl data = encodeSetRequest("/foo", "bar", -1);
 
   expectSetDynamicMetadata({{"opname", "setdata"}, {"path", "/foo"}}, {{"bytes", "31"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().setdata_rq_.value());
   EXPECT_EQ(31UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -497,13 +497,12 @@ TEST_F(ZooKeeperFilterTest, SetRequest) {
 TEST_F(ZooKeeperFilterTest, GetChildrenRequest) {
   initialize();
 
-  Buffer::InstancePtr data(
-      new Buffer::OwnedImpl(encodePathWatch("/foo", false, enumToInt(OpCodes::GETCHILDREN))));
+  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToInt(OpCodes::GETCHILDREN));
 
   expectSetDynamicMetadata({{"opname", "getchildren"}, {"path", "/foo"}, {"watch", "false"}},
                            {{"bytes", "21"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().getchildren_rq_.value());
   EXPECT_EQ(21UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -512,13 +511,12 @@ TEST_F(ZooKeeperFilterTest, GetChildrenRequest) {
 TEST_F(ZooKeeperFilterTest, GetChildrenRequest2) {
   initialize();
 
-  Buffer::InstancePtr data(
-      new Buffer::OwnedImpl(encodePathWatch("/foo", false, enumToInt(OpCodes::GETCHILDREN2))));
+  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToInt(OpCodes::GETCHILDREN2));
 
   expectSetDynamicMetadata({{"opname", "getchildren2"}, {"path", "/foo"}, {"watch", "false"}},
                            {{"bytes", "21"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().getchildren2_rq_.value());
   EXPECT_EQ(21UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -527,12 +525,12 @@ TEST_F(ZooKeeperFilterTest, GetChildrenRequest2) {
 TEST_F(ZooKeeperFilterTest, DeleteRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeDeleteRequest("/foo", -1)));
+  Buffer::OwnedImpl data = encodeDeleteRequest("/foo", -1);
 
   expectSetDynamicMetadata({{"opname", "remove"}, {"path", "/foo"}, {"version", "-1"}},
                            {{"bytes", "24"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().remove_rq_.value());
   EXPECT_EQ(24UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -541,13 +539,12 @@ TEST_F(ZooKeeperFilterTest, DeleteRequest) {
 TEST_F(ZooKeeperFilterTest, ExistsRequest) {
   initialize();
 
-  Buffer::InstancePtr data(
-      new Buffer::OwnedImpl(encodePathWatch("/foo", false, enumToInt(OpCodes::EXISTS))));
+  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToInt(OpCodes::EXISTS));
 
   expectSetDynamicMetadata({{"opname", "exists"}, {"path", "/foo"}, {"watch", "false"}},
                            {{"bytes", "21"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().exists_rq_.value());
   EXPECT_EQ(21UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -556,11 +553,11 @@ TEST_F(ZooKeeperFilterTest, ExistsRequest) {
 TEST_F(ZooKeeperFilterTest, GetAclRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodePath("/foo", enumToInt(OpCodes::GETACL))));
+  Buffer::OwnedImpl data = encodePath("/foo", enumToInt(OpCodes::GETACL));
 
   expectSetDynamicMetadata({{"opname", "getacl"}, {"path", "/foo"}}, {{"bytes", "20"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().getacl_rq_.value());
   EXPECT_EQ(20UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -569,13 +566,12 @@ TEST_F(ZooKeeperFilterTest, GetAclRequest) {
 TEST_F(ZooKeeperFilterTest, SetAclRequest) {
   initialize();
 
-  Buffer::InstancePtr data(
-      new Buffer::OwnedImpl(encodeSetAclRequest("/foo", "digest", "passwd", -1)));
+  Buffer::OwnedImpl data = encodeSetAclRequest("/foo", "digest", "passwd", -1);
 
   expectSetDynamicMetadata({{"opname", "setacl"}, {"path", "/foo"}, {"version", "-1"}},
                            {{"bytes", "52"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().setacl_rq_.value());
   EXPECT_EQ(52UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -584,11 +580,11 @@ TEST_F(ZooKeeperFilterTest, SetAclRequest) {
 TEST_F(ZooKeeperFilterTest, SyncRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodePath("/foo", enumToInt(OpCodes::SYNC))));
+  Buffer::OwnedImpl data = encodePath("/foo", enumToInt(OpCodes::SYNC));
 
   expectSetDynamicMetadata({{"opname", "sync"}, {"path", "/foo"}}, {{"bytes", "20"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().sync_rq_.value());
   EXPECT_EQ(20UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -597,12 +593,11 @@ TEST_F(ZooKeeperFilterTest, SyncRequest) {
 TEST_F(ZooKeeperFilterTest, CheckRequest) {
   initialize();
 
-  Buffer::InstancePtr data(
-      new Buffer::OwnedImpl(encodePathVersion("/foo", 100, enumToInt(OpCodes::CHECK))));
+  Buffer::OwnedImpl data = encodePathVersion("/foo", 100, enumToInt(OpCodes::CHECK));
 
   expectSetDynamicMetadata({{"bytes", "24"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().check_rq_.value());
   EXPECT_EQ(24UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -622,9 +617,9 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
   ops.push_back(std::make_pair(enumToInt(OpCodes::CHECK), std::move(check1)));
   ops.push_back(std::make_pair(enumToInt(OpCodes::SETDATA), std::move(set1)));
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeMultiRequest(ops)));
+  Buffer::OwnedImpl data = encodeMultiRequest(ops);
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().multi_rq_.value());
   EXPECT_EQ(128UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(2UL, config_->stats().create_rq_.value());
@@ -636,11 +631,11 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
 TEST_F(ZooKeeperFilterTest, ReconfigRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeReconfigRequest("s1", "s2", "s3", 1000)));
+  Buffer::OwnedImpl data = encodeReconfigRequest("s1", "s2", "s3", 1000);
 
   expectSetDynamicMetadata({{"opname", "reconfig"}}, {{"bytes", "38"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().reconfig_rq_.value());
   EXPECT_EQ(38UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -653,12 +648,12 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequestControlXid) {
   const std::vector<std::string> existw = {"/foo1", "/bar1"};
   const std::vector<std::string> childw = {"/foo2", "/bar2"};
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(
-      encodeSetWatchesRequest(dataw, existw, childw, enumToInt(XidCodes::SET_WATCHES_XID))));
+  Buffer::OwnedImpl data =
+      encodeSetWatchesRequest(dataw, existw, childw, enumToInt(XidCodes::SET_WATCHES_XID));
 
   expectSetDynamicMetadata({{"opname", "setwatches"}}, {{"bytes", "76"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().setwatches_rq_.value());
   EXPECT_EQ(76UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -671,11 +666,11 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
   const std::vector<std::string> existw = {"/foo1", "/bar1"};
   const std::vector<std::string> childw = {"/foo2", "/bar2"};
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeSetWatchesRequest(dataw, existw, childw)));
+  Buffer::OwnedImpl data = encodeSetWatchesRequest(dataw, existw, childw);
 
   expectSetDynamicMetadata({{"opname", "setwatches"}}, {{"bytes", "76"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().setwatches_rq_.value());
   EXPECT_EQ(76UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -684,12 +679,12 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
 TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodePathVersion(
-      "/foo", enumToInt(WatcherType::CHILDREN), enumToInt(OpCodes::CHECKWATCHES))));
+  Buffer::OwnedImpl data =
+      encodePathVersion("/foo", enumToInt(WatcherType::CHILDREN), enumToInt(OpCodes::CHECKWATCHES));
 
   expectSetDynamicMetadata({{"opname", "checkwatches"}, {"path", "/foo"}}, {{"bytes", "24"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().checkwatches_rq_.value());
   EXPECT_EQ(24UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -698,12 +693,12 @@ TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
 TEST_F(ZooKeeperFilterTest, RemoveWatchesRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(
-      encodePathVersion("/foo", enumToInt(WatcherType::DATA), enumToInt(OpCodes::REMOVEWATCHES))));
+  Buffer::OwnedImpl data =
+      encodePathVersion("/foo", enumToInt(WatcherType::DATA), enumToInt(OpCodes::REMOVEWATCHES));
 
   expectSetDynamicMetadata({{"opname", "removewatches"}, {"path", "/foo"}}, {{"bytes", "24"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().removewatches_rq_.value());
   EXPECT_EQ(24UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
@@ -712,11 +707,11 @@ TEST_F(ZooKeeperFilterTest, RemoveWatchesRequest) {
 TEST_F(ZooKeeperFilterTest, CloseRequest) {
   initialize();
 
-  Buffer::InstancePtr data(new Buffer::OwnedImpl(encodeCloseRequest()));
+  Buffer::OwnedImpl data = encodeCloseRequest();
 
   expectSetDynamicMetadata({{"opname", "close"}}, {{"bytes", "12"}});
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(*data, false));
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().close_rq_.value());
   EXPECT_EQ(12UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
