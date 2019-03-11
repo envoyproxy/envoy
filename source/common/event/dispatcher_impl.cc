@@ -29,10 +29,7 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system)
-    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {
-  // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
-  RELEASE_ASSERT(Libevent::Global::initialized(), "");
-}
+    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
 
 DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
                                Event::TimeSystem& time_system)

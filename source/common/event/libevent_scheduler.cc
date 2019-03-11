@@ -7,6 +7,7 @@ namespace Envoy {
 namespace Event {
 
 LibeventScheduler::LibeventScheduler() : libevent_(event_base_new()) {
+  // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
 }
 
