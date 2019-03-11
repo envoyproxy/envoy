@@ -35,7 +35,7 @@ public:
   /**
    * TODO(jmarantz): consider strengthening this abstraction and instead of
    * exposing the libevent base pointer, provide API abstractions for the calls
-   * into it. Among other beneits this might make it more tractable to someday
+   * into it. Among other benefits this might make it more tractable to someday
    * consider an alternative to libevent if the need arises.
    *
    * @return the underlying libevent structure.
