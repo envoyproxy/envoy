@@ -127,7 +127,7 @@ void DecoderImpl::ensureMinLength(const int32_t len, const int32_t minlen) const
 }
 
 void DecoderImpl::ensureMaxLength(const int32_t len) const {
-  if (len > max_packet_bytes_) {
+  if (static_cast<uint32_t>(len) > max_packet_bytes_) {
     throw EnvoyException("Packet is too big");
   }
 }
