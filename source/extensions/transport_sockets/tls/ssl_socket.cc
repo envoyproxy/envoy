@@ -21,12 +21,16 @@ namespace TransportSockets {
 namespace Tls {
 
 namespace {
+
+constexpr absl::string_view NotReadyReason{"TLS error: Secret is not supplied by SDS"};
+
 // This SslSocket will be used when SSL secret is not fetched from SDS server.
 class NotReadySslSocket : public Network::TransportSocket {
 public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
   std::string protocol() const override { return EMPTY_STRING; }
+  absl::string_view failureReason() const override { return NotReadyReason; }
   bool canFlushClose() override { return true; }
   void closeSocket(Network::ConnectionEvent) override {}
   Network::IoResult doRead(Buffer::Instance&) override { return {PostIoAction::Close, 0, false}; }
@@ -161,10 +165,14 @@ void SslSocket::drainErrorQueue() {
     }
     saw_error = true;
 
-    ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", callbacks_->connection(), err,
-                   ERR_lib_error_string(err), ERR_func_error_string(err),
-                   ERR_reason_error_string(err));
+    if (failure_reason_.empty()) {
+      failure_reason_ = "TLS error:";
+    }
+    failure_reason_.append(absl::StrCat(" ", err, ":", ERR_lib_error_string(err), ":",
+                                        ERR_func_error_string(err), ":",
+                                        ERR_reason_error_string(err)));
   }
+  ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }
@@ -366,6 +374,8 @@ std::string SslSocket::protocol() const {
   SSL_get0_alpn_selected(ssl_.get(), &proto, &proto_len);
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
+
+absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 
 std::string SslSocket::serialNumberPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));

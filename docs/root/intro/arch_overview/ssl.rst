@@ -158,3 +158,23 @@ infrastructure.
 
 Client TLS authentication filter :ref:`configuration reference
 <config_network_filters_client_ssl_auth>`.
+
+.. _arch_overview_ssl_trouble_shooting:
+
+Trouble shooting
+----------------
+
+When Envoy originates TLS when making connections to upstream clusters, any errors will be logged into
+:ref:`UPSTREAM_TRANSPORT_FAILURE_REASON<config_access_log_format_upstream_transport_failure_reason>` field or
+:ref:`AccessLogCommon.upstream_transport_failure_reason<envoy_api_field_data.accesslog.v2.AccessLogCommon.upstream_transport_failure_reason>` field.
+Common errors are:
+
+* ``Secret is not supplied by SDS``: Envoy is still waiting SDS to deliver key/cert or root CA.
+* ``SSLV3_ALERT_CERTIFICATE_EXPIRED``: Peer certificate is expired and not allowed in config.
+* ``SSLV3_ALERT_CERTIFICATE_UNKNOWN``: Peer certificate is not in config specified SPKI.
+* ``SSLV3_ALERT_HANDSHAKE_FAILURE``: Handshake failed, usually due to upstream requires client certificate but not presented.
+* ``TLSV1_ALERT_PROTOCOL_VERSION``: TLS protocol version mismatch.
+* ``TLSV1_ALERT_UNKNOWN_CA``: Peer certificate CA is not in trusted CA.
+
+More detailed list of error that can be raised by BoringSSL can be found
+`here <https://github.com/google/boringssl/blob/master/crypto/err/ssl.errordata>`_

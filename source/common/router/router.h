@@ -312,7 +312,8 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
     // Http::StreamCallbacks
-    void onResetStream(Http::StreamResetReason reason) override;
+    void onResetStream(Http::StreamResetReason reason,
+                       absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override { disableDataFromDownstream(); }
     void onBelowWriteBufferLowWatermark() override { enableDataFromDownstream(); }
 
@@ -327,6 +328,7 @@ private:
 
     // Http::ConnectionPool::Callbacks
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                       absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Http::StreamEncoder& request_encoder,
                      Upstream::HostDescriptionConstSharedPtr host) override;
@@ -412,7 +414,7 @@ private:
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest* upstream_request);
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map, UpstreamRequest* upstream_request);
   void onUpstreamComplete(UpstreamRequest* upstream_request);
-  void onUpstreamReset(Http::StreamResetReason reset_reason, UpstreamRequest* upstream_request);
+  void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure, UpstreamRequest* upstream_request);
   void resetOtherUpstreams(UpstreamRequest* upstream_request);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry();
