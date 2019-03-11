@@ -33,7 +33,7 @@ std::string BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset)
   }
 
   if (buffer.length() < (offset + len)) {
-    throw EnvoyException("buffer is too small");
+    throw EnvoyException("peekString: buffer is smaller than string length");
   }
 
   std::unique_ptr<char[]> data(new char[len]);
