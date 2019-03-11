@@ -1,6 +1,6 @@
-#include "extensions/filters/http/well_known_names.h"
-
 #include "common/protobuf/utility.h"
+
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_protocol_integration.h"
 

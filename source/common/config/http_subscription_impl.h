@@ -84,7 +84,7 @@ public:
     try {
       MessageUtil::loadFromJson(response.bodyAsString(), &message);
     } catch (const EnvoyException& e) {
-      ENVOY_LOG(warn, "REST config JSON conversion error: {}", e,what());
+      ENVOY_LOG(warn, "REST config JSON conversion error: {}", e.what());
       handleFailure(nullptr);
       return;
     }

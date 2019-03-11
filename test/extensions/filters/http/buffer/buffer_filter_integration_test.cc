@@ -1,6 +1,6 @@
-#include "test/integration/http_protocol_integration.h"
-
 #include "common/protobuf/utility.h"
+
+#include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
 namespace {
