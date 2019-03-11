@@ -165,7 +165,7 @@ void FilterJson::translateHttpConnectionManager(
         "}";
 
     // JSON schema has already validated that this is a valid JSON object.
-    MessageUtil::loadFromJson(deprecated_config, filter->mutable_config());
+    MessageUtil::loadFromJson(deprecated_config, *filter->mutable_config());
   }
 
   JSON_UTIL_SET_BOOL(json_config, proto_config, add_user_agent);

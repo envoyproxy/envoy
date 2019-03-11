@@ -79,10 +79,8 @@ public:
 
   void parseResponse(const Http::Message& response) override {
     envoy::api::v2::DiscoveryResponse message;
-    Protobuf::util::JsonParseOptions options;
-    options.case_insensitive_enum_parsing = true;
     try {
-      MessageUtil::loadFromJson(response.bodyAsString(), &message);
+      MessageUtil::loadFromJson(response.bodyAsString(), message);
     } catch (const EnvoyException& e) {
       ENVOY_LOG(warn, "REST config JSON conversion error: {}", e.what());
       handleFailure(nullptr);

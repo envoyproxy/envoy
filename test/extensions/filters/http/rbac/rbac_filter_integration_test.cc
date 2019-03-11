@@ -95,7 +95,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
         ProtobufWkt::Struct pfc;
-        MessageUtil::loadFromJson("{}", &pfc);
+        MessageUtil::loadFromJson("{}", pfc);
 
         auto* config = cfg.mutable_route_config()
                            ->mutable_virtual_hosts()

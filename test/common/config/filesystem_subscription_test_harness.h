@@ -73,7 +73,7 @@ public:
     file_json.pop_back();
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    MessageUtil::loadFromJson(file_json, &response_pb);
+    MessageUtil::loadFromJson(file_json, response_pb);
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(
                     RepeatedProtoEq(

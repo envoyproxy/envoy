@@ -45,7 +45,7 @@ void LdsJson::translateListener(const Json::Object& json_listener,
         "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +
         "}";
     // JSON schema has already validated that this is a valid JSON object.
-    MessageUtil::loadFromJson(json_config, filter->mutable_config());
+    MessageUtil::loadFromJson(json_config, *filter->mutable_config());
   }
 
   const std::string drain_type = json_listener.getString("drain_type", "default");
