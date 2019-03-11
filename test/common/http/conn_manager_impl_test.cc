@@ -3681,10 +3681,8 @@ TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBuffer) {
         return FilterHeadersStatus::StopIteration;
       }));
 
-  EXPECT_CALL(*filter, decodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::Continue));
-  EXPECT_CALL(*filter2, decodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*filter, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*filter2, decodeData(_, true)).WillOnce(Return(FilterDataStatus::Continue));
 
   filter->callbacks_->continueDecoding();
 }
