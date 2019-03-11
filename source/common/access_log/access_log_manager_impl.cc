@@ -44,8 +44,8 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
 void AccessLogFileImpl::open() {
   const Api::IoCallBoolResult result = file_->open();
   if (!result.rc_) {
-    throw EnvoyException(fmt::format("unable to open file '{}': {}", file_->path(),
-                                     Api::IoError::getErrorDetails(*result.err_)));
+    throw EnvoyException(
+        fmt::format("unable to open file '{}': {}", file_->path(), result.err_->getErrorDetails()));
   }
 }
 
@@ -70,7 +70,7 @@ AccessLogFileImpl::~AccessLogFileImpl() {
 
     const Api::IoCallBoolResult result = file_->close();
     ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                   Api::IoError::getErrorDetails(*result.err_)));
+                                   result.err_->getErrorDetails()));
   }
 }
 
@@ -133,7 +133,7 @@ void AccessLogFileImpl::flushThreadFunc() {
           reopen_file_ = false;
           const Api::IoCallBoolResult result = file_->close();
           ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                         Api::IoError::getErrorDetails(*result.err_)));
+                                         result.err_->getErrorDetails()));
           open();
         }
 

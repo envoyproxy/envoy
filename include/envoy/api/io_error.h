@@ -25,6 +25,8 @@ public:
     InProgress,
     // Permission denied.
     Permission,
+    // Bad handle
+    BadHandle,
     // Other error codes cannot be mapped to any one above in getErrorCode().
     UnknownError
   };

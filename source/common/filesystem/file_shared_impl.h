@@ -15,11 +15,10 @@ public:
 
   ~IoFileError() override {}
 
-private:
-  // Api::IoError
-  IoErrorCode errorCode() const override;
-  std::string errorDetails() const override;
+  Api::IoError::IoErrorCode getErrorCode() const override;
+  std::string getErrorDetails() const override;
 
+private:
   const int errno_;
 };
 
