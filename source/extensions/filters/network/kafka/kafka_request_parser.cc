@@ -5,8 +5,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-ParseResponse RequestStartParser::parse(const char*& buffer, uint64_t& remaining) {
-  request_length_.feed(buffer, remaining);
+const RequestParserResolver& RequestParserResolver::getDefaultInstance() {
+  CONSTRUCT_ON_FIRST_USE(RequestParserResolver);
+}
+
+ParseResponse RequestStartParser::parse(absl::string_view& data) {
+  request_length_.feed(data);
   if (request_length_.ready()) {
     context_->remaining_request_size_ = request_length_.get();
     return ParseResponse::nextParser(
@@ -16,14 +20,14 @@ ParseResponse RequestStartParser::parse(const char*& buffer, uint64_t& remaining
   }
 }
 
-ParseResponse RequestHeaderParser::parse(const char*& buffer, uint64_t& remaining) {
-  const uint64_t orig_remaining = remaining;
+ParseResponse RequestHeaderParser::parse(absl::string_view& data) {
+  const absl::string_view orig_data = data;
   try {
-    context_->remaining_request_size_ -= deserializer_->feed(buffer, remaining);
+    context_->remaining_request_size_ -= deserializer_->feed(data);
   } catch (const EnvoyException& e) {
     // unable to compute request header, but we still need to consume rest of request (some of the
     // data might have been consumed)
-    const int32_t consumed = static_cast<int32_t>(orig_remaining - remaining);
+    const int32_t consumed = static_cast<int32_t>(orig_data.size() - data.size());
     context_->remaining_request_size_ -= consumed;
     context_->request_header_ = {-1, -1, -1, absl::nullopt};
     return ParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
@@ -40,10 +44,9 @@ ParseResponse RequestHeaderParser::parse(const char*& buffer, uint64_t& remainin
   }
 }
 
-ParseResponse SentinelParser::parse(const char*& buffer, uint64_t& remaining) {
-  const size_t min = std::min<size_t>(context_->remaining_request_size_, remaining);
-  buffer += min;
-  remaining -= min;
+ParseResponse SentinelParser::parse(absl::string_view& data) {
+  const size_t min = std::min<size_t>(context_->remaining_request_size_, data.size());
+  data = {data.data() + min, data.size() - min};
   context_->remaining_request_size_ -= min;
   if (0 == context_->remaining_request_size_) {
     return ParseResponse::parsedMessage(

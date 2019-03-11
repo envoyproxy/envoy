@@ -2,6 +2,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -11,11 +12,20 @@ load(
 
 envoy_package()
 
+envoy_cc_test_library(
+    name = "serialization_utilities_lib",
+    hdrs = ["serialization_utilities.h"],
+    deps = [
+        "//source/extensions/filters/network/kafka:serialization_lib",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "serialization_test",
     srcs = ["serialization_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
+        ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:serialization_lib",
         "//test/mocks/server:server_mocks",
     ],
@@ -26,8 +36,22 @@ envoy_extension_cc_test(
     srcs = ["serialization_composite_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
+        ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:serialization_lib",
         "//test/mocks/server:server_mocks",
+    ],
+)
+
+genrule(
+    name = "serialization_composite_test_generator",
+    srcs = [],
+    outs = ["serialization_composite_test.cc"],
+    cmd = """
+        ./$(location //source/extensions/filters/network/kafka:serialization_composite_generator) generate-test \
+        $(location serialization_composite_test.cc)
+    """,
+    tools = [
+        "//source/extensions/filters/network/kafka:serialization_composite_generator",
     ],
 )
 
@@ -36,6 +60,7 @@ envoy_extension_cc_test(
     srcs = ["kafka_request_parser_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
+        ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:kafka_request_lib",
         "//test/mocks/server:server_mocks",
     ],
@@ -62,13 +87,17 @@ envoy_extension_cc_test(
 )
 
 genrule(
-    name = "kafka_generated_test",
+    name = "requests_test_generator",
     srcs = [
         "@kafka_produce_request_spec//file",
         "@kafka_fetch_request_spec//file",
     ],
     outs = ["requests_test.cc"],
-    cmd = "./$(location //source/extensions/filters/network/kafka:kafka_code_generator) generate-test $(location requests_test.cc) $(location @kafka_produce_request_spec//file) $(location @kafka_fetch_request_spec//file)",
+    cmd = """
+        ./$(location //source/extensions/filters/network/kafka:kafka_code_generator) generate-test \
+        $(location requests_test.cc) \
+        $(location @kafka_produce_request_spec//file) $(location @kafka_fetch_request_spec//file)
+    """,
     tools = [
         "//source/extensions/filters/network/kafka:kafka_code_generator",
     ],

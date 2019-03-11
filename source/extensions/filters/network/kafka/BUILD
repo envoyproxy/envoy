@@ -54,7 +54,11 @@ genrule(
         "requests.h",
         "kafka_request_resolver.cc",
     ],
-    cmd = "./$(location :kafka_code_generator) generate-source $(location requests.h) $(location kafka_request_resolver.cc) $(location @kafka_produce_request_spec//file) $(location @kafka_fetch_request_spec//file)",
+    cmd = """
+      ./$(location :kafka_code_generator) generate-source \
+        $(location requests.h) $(location kafka_request_resolver.cc) \
+        $(location @kafka_produce_request_spec//file) $(location @kafka_fetch_request_spec//file)
+    """,
     tools = [
         ":kafka_code_generator",
     ],
@@ -99,6 +103,29 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:byte_order_lib",
     ],
+)
+
+genrule(
+    name = "serialization_composite_generated_source",
+    srcs = [],
+    outs = [
+        "serialization_composite.h",
+    ],
+    cmd = """
+      ./$(location :serialization_composite_generator) generate-source \
+      $(location serialization_composite.h)
+    """,
+    tools = [
+        ":serialization_composite_generator",
+    ],
+)
+
+py_binary(
+    name = "serialization_composite_generator",
+    srcs = ["serialization_code_generator/serialization_composite_generator.py"],
+    data = glob(["serialization_code_generator/*.j2"]),
+    main = "serialization_code_generator/serialization_composite_generator.py",
+    deps = ["@com_github_pallets_jinja//:jinja2"],
 )
 
 envoy_cc_library(

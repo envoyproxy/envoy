@@ -3,6 +3,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/stack_array.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -29,10 +31,11 @@ void RequestDecoder::onData(Buffer::Instance& data) {
  * --- replace parser with new start parser, as we are going to parse another request
  */
 void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& slice) {
-  const char* buffer = reinterpret_cast<const char*>(slice.mem_);
-  uint64_t remaining = slice.len_;
-  while (remaining) {
-    ParseResponse result = parser->parse(buffer, remaining);
+  const char* bytes = reinterpret_cast<const char*>(slice.mem_);
+  absl::string_view data = {bytes, slice.len_};
+
+  while (!data.empty()) {
+    ParseResponse result = parser->parse(data);
     // this loop guarantees that parsers consuming 0 bytes also get processed
     while (result.hasData()) {
       if (!result.next_parser_) {
@@ -48,14 +51,14 @@ void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& sl
       } else {
         parser = result.next_parser_;
       }
-      result = parser->parse(buffer, remaining);
+      result = parser->parse(data);
     }
   }
 }
 
 void MessageEncoderImpl::encode(const Message& message) {
   Buffer::OwnedImpl data_buffer;
-  // TODO precompute the size instead of using temporary
+  // TODO(adamkotwasinski) precompute the size instead of using temporary
   // also, when we have 'computeSize' method, then we can push encoding request's size into
   // Request::encode
   int32_t data_len = message.encode(data_buffer); // encode data computing data length

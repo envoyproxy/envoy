@@ -1,16 +1,35 @@
 #!/usr/bin/python
 
-# usage:
-# kafka_generator.py COMMAND OUTPUT FILES INPUT_FILES
-# where:
-# COMMAND : 'generate-source', to generate source files
-#           'generate-test', to generate test files
-# OUTPUT_FILES : if generate-source: location of 'requests.h' and 'kafka_request_resolver.cc',
-#                if generate-test: location of 'requests_test.cc'
-# INPUT_FILES: Kafka protocol json files to be processed
-
 
 def main():
+  """
+  Kafka header generator script
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Generates C++ headers from Kafka protocol specification
+  Can generate both main source code, as well as test code
+
+  Usage:
+  kafka_generator.py COMMAND OUTPUT FILES INPUT_FILES
+  where:
+  COMMAND : 'generate-source', to generate source files
+            'generate-test', to generate test files
+  OUTPUT_FILES : if generate-source: location of 'requests.h' and 'kafka_request_resolver.cc',
+                 if generate-test: location of 'requests_test.cc'
+  INPUT_FILES: Kafka protocol json files to be processed
+
+  Kafka spec files are provided at https://github.com/apache/kafka/tree/2.2.0-rc0/clients/src/main/resources/common/message and in Kafka clients jar file
+  When generating source code, it creates:
+    - requests.h - definition of all the structures/deserializers/parsers related to Kafka requests
+    - kafka_request_resolver.cc - resolver that binds api_key & api_version to parsers from requests.h
+  When generating test code, it creates:
+    - requests_test.cc - serialization/deserialization tests for kafka structures
+
+  Templates used are:
+  - to create 'requests.h': requests_h.j2, complex_type_template.j2, request_parser.j2
+  - to create 'kafka_request_resolver.cc': kafka_request_resolver_cc.j2
+  - to create 'requests_test.cc': requests_test_cc.j2
+  """
+
   import sys
   import os
 
@@ -30,6 +49,7 @@ def main():
 
   requests = []
 
+  # for each request spec file, remove comments, and parse the remains
   for input_file in input_files:
     with open(input_file, 'r') as fd:
       raw_contents = fd.read()
@@ -38,18 +58,21 @@ def main():
       request = parse_request(request_spec)
       requests.append(request)
 
+  # sort requests by api_key
   requests.sort(key=lambda x: x.get_extra('api_key'))
 
+  # main source code
   if 'generate-source' == command:
     complex_type_template = RenderingHelper.get_template('complex_type_template.j2')
     request_parsers_template = RenderingHelper.get_template('request_parser.j2')
+
     requests_h_contents = ''
 
     for request in requests:
-      # structures holding payload data
+      # for each structure that is used by request, render its corresponding structures
       for dependency in request.declaration_chain:
         requests_h_contents += complex_type_template.render(complex_type=dependency)
-      # request parser
+      # each top-level structure (e.g. FetchRequest) is going to have corresponding parsers
       requests_h_contents += request_parsers_template.render(complex_type=request)
 
     # full file with headers, namespace declaration etc.
@@ -65,6 +88,7 @@ def main():
     with open(kafka_request_resolver_cc_file, 'w') as fd:
       fd.write(contents)
 
+  # test code
   if 'generate-test' == command:
     requests_test_template = RenderingHelper.get_template('requests_test_cc.j2')
     contents = requests_test_template.render(request_types=requests)
@@ -74,7 +98,10 @@ def main():
 
 
 def parse_request(spec):
-  # a request is just a complex type, that has name & versions kept in differently named fields
+  """
+  Parse a given structure into a request
+  Request is just a complex type, that has name & versions kept in differently named fields
+  """
   request_type_name = spec['name']
   request_versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
   return parse_complex_type(request_type_name, spec, request_versions).with_extra(
@@ -82,6 +109,9 @@ def parse_request(spec):
 
 
 def parse_complex_type(type_name, field_spec, versions):
+  """
+  Parse given complex type, returning a structure that holds its name, field specification and allowed versions
+  """
   fields = []
   for child_field in field_spec['fields']:
     child = parse_field(child_field, versions[-1])
@@ -90,7 +120,10 @@ def parse_complex_type(type_name, field_spec, versions):
 
 
 def parse_field(field_spec, highest_possible_version):
-  # obviously, field cannot be used in version higher than its type's usage
+  """
+  Parse given field, returning a structure holding the name, type, and versions when this field is actually used (nullable or not)
+  Obviously, field cannot be used in version higher than its type's usage
+  """
   version_usage = Statics.parse_version_string(field_spec['versions'], highest_possible_version)
   version_usage_as_nullable = Statics.parse_version_string(
       field_spec['nullableVersions'],
@@ -100,8 +133,11 @@ def parse_field(field_spec, highest_possible_version):
 
 
 def parse_type(type_name, field_spec, highest_possible_version):
-  # array types are defined as `[]underlying_type` instead of having its own element with type inside :\
+  """
+  Parse a given type element - returns an array type, primitive (e.g. uint32_t) or complex one (== struct)
+  """
   if (type_name.startswith('[]')):
+    # in spec files, array types are defined as `[]underlying_type` instead of having its own element with type inside :\
     underlying_type = parse_type(type_name[2:], field_spec, highest_possible_version)
     return Array(underlying_type)
   else:
@@ -116,6 +152,9 @@ class Statics:
 
   @staticmethod
   def parse_version_string(raw_versions, highest_possible_version):
+    """
+    Return integer range that corresponds to version string in spec file
+    """
     if raw_versions.endswith('+'):
       return range(int(raw_versions[:-1]), highest_possible_version + 1)
     else:
@@ -128,19 +167,34 @@ class Statics:
 
 
 class FieldList:
+  """
+  List of fields used by given entity (request or child structure) in given request version
+  (as fields get added/removed across versions)
+  """
 
   def __init__(self, version, fields):
     self.version = version
     self.fields = fields
 
   def used_fields(self):
+    """
+    Return list of fields that are actually used in this version of structure
+    """
     return filter(lambda x: x.used_in_version(self.version), self.fields)
 
   def constructor_signature(self):
+    """
+    Return constructor signature
+    Mutliple versions of the same structure can have identical signatures (due to version bumps in Kafka)
+    """
     parameter_spec = map(lambda x: x.parameter_declaration(self.version), self.used_fields())
     return ', '.join(parameter_spec)
 
   def constructor_init_list(self):
+    """
+    Renders member initialization list in constructor
+    Takes care of potential optional<T> conversions (as field could be T in V1, but optional<T> in V2)
+    """
     init_list = []
     for field in self.fields:
       if field.used_in_version(self.version):
@@ -172,6 +226,10 @@ class FieldList:
 
 
 class FieldSpec:
+  """
+  Represents a field present in a structure (request, or child structure thereof)
+  Contains name, type, and versions when it is used (nullable or not)
+  """
 
   def __init__(self, name, type, version_usage, version_usage_as_nullable):
     import re
@@ -185,6 +243,11 @@ class FieldSpec:
     return len(self.version_usage_as_nullable) > 0
 
   def is_nullable_in_version(self, version):
+    """
+    Whether thie field is nullable in given version
+    Fields can be non-nullable in earlier versions
+    See https://github.com/apache/kafka/tree/2.2.0-rc0/clients/src/main/resources/common/message#nullable-fields
+    """
     return version in self.version_usage_as_nullable
 
   def used_in_version(self, version):
@@ -228,9 +291,15 @@ class FieldSpec:
 class TypeSpecification:
 
   def deserializer_name_in_version(self, version):
+    """
+    Renders the deserializer name of given type, in request with given version
+    """
     raise NotImplementedError()
 
   def default_value(self):
+    """
+    Returns a default value for given type
+    """
     raise NotImplementedError()
 
   def example_value_for_test(self, version):
@@ -241,6 +310,11 @@ class TypeSpecification:
 
 
 class Array(TypeSpecification):
+  """
+  Represents array complex type
+  To use instance of this type, it is necessary to declare structures required by self.underlying
+  (e.g. to use Array<Foo>, we need to have `struct Foo {...}`)
+  """
 
   def __init__(self, underlying):
     self.underlying = underlying
@@ -266,6 +340,9 @@ class Array(TypeSpecification):
 
 
 class Primitive(TypeSpecification):
+  """
+  Represents a Kafka primitive value
+  """
 
   PRIMITIVE_TYPE_NAMES = ['bool', 'int8', 'int16', 'int32', 'int64', 'string', 'bytes']
 
@@ -342,6 +419,10 @@ class Primitive(TypeSpecification):
 
 
 class Complex(TypeSpecification):
+  """
+  Represents a complex type (multiple types aggregated into one)
+  This type gets mapped to C++ struct
+  """
 
   def __init__(self, name, fields, versions):
     self.name = name
@@ -351,6 +432,10 @@ class Complex(TypeSpecification):
     self.attributes = {}
 
   def __compute_declaration_chain(self):
+    """
+    Computes all dependendencies, what means all non-primitive types used by this type
+    They need to be declared before this struct is declared
+    """
     result = []
     for field in self.fields:
       result.extend(field.type.declaration_chain)
@@ -365,8 +450,10 @@ class Complex(TypeSpecification):
     return self.attributes[key]
 
   def compute_constructors(self):
-    # field lists for different versions may not differ (as Kafka can bump version without any changes)
-    # but constructors need to be unique
+    """
+    Field lists for different versions may not differ (as Kafka can bump version without any changes)
+    But constructors need to be unique, so we need to remove duplicates if the signatures match
+    """
     signature_to_constructor = {}
     for field_list in self.compute_field_lists():
       signature = field_list.constructor_signature()
@@ -386,6 +473,9 @@ class Complex(TypeSpecification):
     return sorted(signature_to_constructor.values(), key=lambda x: x['versions'][0])
 
   def compute_field_lists(self):
+    """
+    Return field lists representing each of structure versions
+    """
     field_lists = []
     for version in self.versions:
       field_list = FieldList(version, self.fields)
@@ -408,6 +498,9 @@ class Complex(TypeSpecification):
 
 
 class RenderingHelper:
+  """
+  Helper for jinja templates
+  """
 
   @staticmethod
   def get_template(template):

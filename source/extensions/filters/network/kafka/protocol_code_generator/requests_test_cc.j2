@@ -1,5 +1,8 @@
-// DO NOT EDIT - THIS FILE WAS GENERATED
-// clang-format off
+{#
+	Template for request serialization/deserialization tests
+	For every request, we want to check if it can be serialized and deserialized properly
+#}
+
 #include "extensions/filters/network/kafka/requests.h"
 #include "extensions/filters/network/kafka/request_codec.h"
 
@@ -25,12 +28,17 @@ public:
   MOCK_METHOD1(onMessage, void(MessageSharedPtr));
 };
 
+/**
+ * Helper method
+ * Takes an instance of a request, serializes it, then deserializes it
+ * This method gets executed for every request * version pair
+ */
 template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeserialize(T request) {
   MessageEncoderImpl serializer{buffer_};
   serializer.encode(request);
 
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
-  RequestDecoder testee{RequestParserResolver::INSTANCE, {mock_listener}};
+  RequestDecoder testee{RequestParserResolver::getDefaultInstance(), {mock_listener}};
 
   MessageSharedPtr receivedMessage;
   EXPECT_CALL(*mock_listener, onMessage(testing::_)).WillOnce(testing::SaveArg<0>(&receivedMessage));
@@ -39,6 +47,11 @@ template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeseria
 
   return std::dynamic_pointer_cast<T>(receivedMessage);
 };
+
+{#
+	Concrete tests for each request_type and version (field_list)
+	Each request is naively constructed using some default values (put "string" as std::string, 32 as uint32_t, etc.)
+#}
 {% for request_type in request_types %}{% for field_list in request_type.compute_field_lists() %}
 TEST_F(RequestDecoderTest, shouldParse{{ request_type.name }}V{{ field_list.version }}) {
   // given
@@ -58,4 +71,3 @@ TEST_F(RequestDecoderTest, shouldParse{{ request_type.name }}V{{ field_list.vers
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
-// clang-format on

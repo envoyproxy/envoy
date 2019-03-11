@@ -7,6 +7,8 @@
 #include "extensions/filters/network/kafka/kafka_types.h"
 #include "extensions/filters/network/kafka/message.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -27,11 +29,10 @@ public:
   /**
    * Submit data to be processed by parser, will consume as much data as it is necessary to reach
    * the conclusion what should be the next parse step
-   * @param buffer data pointer, will be updated by parser
-   * @param remaining remaining data in buffer, will be updated by parser
+   * @param data bytes to be processed, will be updated by parser if any have been consumed
    * @return parse status - decision what should be done with current parser (keep/replace)
    */
-  virtual ParseResponse parse(const char*& buffer, uint64_t& remaining) PURE;
+  virtual ParseResponse parse(absl::string_view& data) PURE;
 };
 
 typedef std::shared_ptr<Parser> ParserSharedPtr;

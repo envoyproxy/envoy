@@ -14,6 +14,8 @@
 
 #include "extensions/filters/network/kafka/kafka_types.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -33,12 +35,14 @@ public:
 
   /**
    * Submit data to be processed, will consume as much data as it is necessary.
+   * If any bytes are consumed, then the provided string view is updated by stepping over consumed
+   * bytes.
    * Invoking this method when deserializer is ready has no effect (consumes 0 bytes)
-   * @param buffer data pointer, will be updated if data is consumed
-   * @param remaining remaining data in buffer, will be updated if data is consumed
-   * @return bytes consumed
+   *
+   * @param data bytes to be processed, will be updated if any have been consumed
+   * @return number of bytes consumed (equal to change in 'data')
    */
-  virtual size_t feed(const char*& buffer, uint64_t& remaining) PURE;
+  virtual size_t feed(absl::string_view& data) PURE;
 
   /**
    * Whether deserializer has consumed enough data to return result
@@ -60,17 +64,16 @@ template <typename T> class IntDeserializer : public Deserializer<T> {
 public:
   IntDeserializer() : written_{0}, ready_(false){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) override {
-    const size_t available = std::min<size_t>(sizeof(buf_) - written_, remaining);
-    memcpy(buf_ + written_, buffer, available);
+  size_t feed(absl::string_view& data) override {
+    const size_t available = std::min<size_t>(sizeof(buf_) - written_, data.size());
+    memcpy(buf_ + written_, data.data(), available);
     written_ += available;
 
     if (written_ == sizeof(buf_)) {
       ready_ = true;
     }
 
-    buffer += available;
-    remaining -= available;
+    data = {data.data() + available, data.size() - available};
 
     return available;
   }
@@ -157,9 +160,7 @@ class BooleanDeserializer : public Deserializer<bool> {
 public:
   BooleanDeserializer(){};
 
-  size_t feed(const char*& buffer, uint64_t& remaining) override {
-    return buffer_.feed(buffer, remaining);
-  }
+  size_t feed(absl::string_view& data) override { return buffer_.feed(data); }
 
   bool ready() const override { return buffer_.ready(); }
 
@@ -183,8 +184,8 @@ public:
   /**
    * Can throw EnvoyException if given string length is not valid
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) override {
-    const size_t length_consumed = length_buf_.feed(buffer, remaining);
+  size_t feed(absl::string_view& data) override {
+    const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
       return length_consumed;
@@ -200,13 +201,12 @@ public:
       length_consumed_ = true;
     }
 
-    const size_t data_consumed = std::min<size_t>(required_, remaining);
+    const size_t data_consumed = std::min<size_t>(required_, data.size());
     const size_t written = data_buf_.size() - required_;
-    memcpy(data_buf_.data() + written, buffer, data_consumed);
+    memcpy(data_buf_.data() + written, data.data(), data_consumed);
     required_ -= data_consumed;
 
-    buffer += data_consumed;
-    remaining -= data_consumed;
+    data = {data.data() + data_consumed, data.size() - data_consumed};
 
     if (required_ == 0) {
       ready_ = true;
@@ -245,8 +245,8 @@ public:
   /**
    * Can throw EnvoyException if given string length is not valid
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) override {
-    const size_t length_consumed = length_buf_.feed(buffer, remaining);
+  size_t feed(absl::string_view& data) override {
+    const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
       return length_consumed;
@@ -272,13 +272,12 @@ public:
       return length_consumed;
     }
 
-    const size_t data_consumed = std::min<size_t>(required_, remaining);
+    const size_t data_consumed = std::min<size_t>(required_, data.size());
     const size_t written = data_buf_.size() - required_;
-    memcpy(data_buf_.data() + written, buffer, data_consumed);
+    memcpy(data_buf_.data() + written, data.data(), data_consumed);
     required_ -= data_consumed;
 
-    buffer += data_consumed;
-    remaining -= data_consumed;
+    data = {data.data() + data_consumed, data.size() - data_consumed};
 
     if (required_ == 0) {
       ready_ = true;
@@ -318,8 +317,8 @@ public:
   /**
    * Can throw EnvoyException if given bytes length is not valid
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) override {
-    const size_t length_consumed = length_buf_.feed(buffer, remaining);
+  size_t feed(absl::string_view& data) override {
+    const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
       return length_consumed;
@@ -335,13 +334,12 @@ public:
       length_consumed_ = true;
     }
 
-    const size_t data_consumed = std::min<size_t>(required_, remaining);
+    const size_t data_consumed = std::min<size_t>(required_, data.size());
     const size_t written = data_buf_.size() - required_;
-    memcpy(data_buf_.data() + written, buffer, data_consumed);
+    memcpy(data_buf_.data() + written, data.data(), data_consumed);
     required_ -= data_consumed;
 
-    buffer += data_consumed;
-    remaining -= data_consumed;
+    data = {data.data() + data_consumed, data.size() - data_consumed};
 
     if (required_ == 0) {
       ready_ = true;
@@ -378,8 +376,8 @@ public:
   /**
    * Can throw EnvoyException if given bytes length is not valid
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) override {
-    const size_t length_consumed = length_buf_.feed(buffer, remaining);
+  size_t feed(absl::string_view& data) override {
+    const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
       return length_consumed;
@@ -405,13 +403,12 @@ public:
       return length_consumed;
     }
 
-    const size_t data_consumed = std::min<size_t>(required_, remaining);
+    const size_t data_consumed = std::min<size_t>(required_, data.size());
     const size_t written = data_buf_.size() - required_;
-    memcpy(data_buf_.data() + written, buffer, data_consumed);
+    memcpy(data_buf_.data() + written, data.data(), data_consumed);
     required_ -= data_consumed;
 
-    buffer += data_consumed;
-    remaining -= data_consumed;
+    data = {data.data() + data_consumed, data.size() - data_consumed};
 
     if (required_ == 0) {
       ready_ = true;
@@ -461,9 +458,9 @@ public:
   /**
    * Can throw EnvoyException if array length is invalid or if DeserializerType can throw
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) override {
+  size_t feed(absl::string_view& data) override {
 
-    const size_t length_consumed = length_buf_.feed(buffer, remaining);
+    const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
       return length_consumed;
@@ -485,7 +482,7 @@ public:
 
     size_t child_consumed{0};
     for (DeserializerType& child : children_) {
-      child_consumed += child.feed(buffer, remaining);
+      child_consumed += child.feed(data);
     }
 
     bool children_ready_ = true;
@@ -538,9 +535,9 @@ public:
   /**
    * Can throw EnvoyException if array length is invalid or if DeserializerType can throw
    */
-  size_t feed(const char*& buffer, uint64_t& remaining) override {
+  size_t feed(absl::string_view& data) override {
 
-    const size_t length_consumed = length_buf_.feed(buffer, remaining);
+    const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // break early: we still need to fill in length buffer
       return length_consumed;
@@ -568,7 +565,7 @@ public:
 
     size_t child_consumed{0};
     for (DeserializerType& child : children_) {
-      child_consumed += child.feed(buffer, remaining);
+      child_consumed += child.feed(data);
     }
 
     bool children_ready_ = true;
@@ -616,8 +613,8 @@ private:
  * structure-tree during encoding (currently api_version, as different request versions serialize
  * differently)
  */
-// XXX that class might be split into Request/ResponseEncodingContext in future,
-// but leaving it as it is now
+// TODO(adamkotwasinski) that class might be split into Request/ResponseEncodingContext
+// in future, but leaving it as it is now
 class EncodingContext {
 public:
   EncodingContext(int16_t api_version) : api_version_{api_version} {};

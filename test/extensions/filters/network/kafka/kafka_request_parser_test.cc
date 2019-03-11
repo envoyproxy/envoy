@@ -1,11 +1,9 @@
-#include "common/common/stack_array.h"
-
 #include "extensions/filters/network/kafka/kafka_request_parser.h"
 
+#include "test/extensions/filters/network/kafka/serialization_utilities.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -47,22 +45,23 @@ TEST_F(BufferBasedTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
   int32_t request_len = 1234;
   encoder_.encode(request_len, buffer());
 
-  const char* bytes = getBytes();
-  uint64_t remaining = 1024;
+  const absl::string_view orig_data = {getBytes(), 1024};
+  absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(bytes, remaining);
+  const ParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
   ASSERT_NE(std::dynamic_pointer_cast<RequestHeaderParser>(result.next_parser_), nullptr);
   ASSERT_EQ(result.message_, nullptr);
   ASSERT_EQ(testee.contextForTest()->remaining_request_size_, request_len);
+  assertStringViewIncrement(data, orig_data, sizeof(int32_t));
 }
 
 class MockParser : public Parser {
 public:
-  ParseResponse parse(const char*&, uint64_t&) override {
+  ParseResponse parse(absl::string_view&) override {
     throw new EnvoyException("should not be invoked");
   }
 };
@@ -82,29 +81,28 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNext
   const int16_t api_version{2};
   const int32_t correlation_id{10};
   const NullableString client_id{"aaa"};
-  size_t written = 0;
-  written += encoder_.encode(api_key, buffer());
-  written += encoder_.encode(api_version, buffer());
-  written += encoder_.encode(correlation_id, buffer());
-  written += encoder_.encode(client_id, buffer());
+  size_t header_len = 0;
+  header_len += encoder_.encode(api_key, buffer());
+  header_len += encoder_.encode(api_version, buffer());
+  header_len += encoder_.encode(correlation_id, buffer());
+  header_len += encoder_.encode(client_id, buffer());
 
-  const char* bytes = getBytes();
-  uint64_t remaining = 100000;
-  const uint64_t orig_remaining = remaining;
+  const absl::string_view orig_data = {getBytes(), 100000};
+  absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(bytes, remaining);
+  const ParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
   ASSERT_EQ(result.next_parser_, parser);
   ASSERT_EQ(result.message_, nullptr);
 
-  ASSERT_EQ(testee.contextForTest()->remaining_request_size_, request_len - written);
-  ASSERT_EQ(remaining, orig_remaining - written);
-
   const RequestHeader expected_header{api_key, api_version, correlation_id, client_id};
   ASSERT_EQ(testee.contextForTest()->request_header_, expected_header);
+  ASSERT_EQ(testee.contextForTest()->remaining_request_size_, request_len - header_len);
+
+  assertStringViewIncrement(data, orig_data, header_len);
 }
 
 TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDuringFeeding) {
@@ -113,10 +111,9 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDur
   // throws during feeding
   class ThrowingRequestHeaderDeserializer : public RequestHeaderDeserializer {
   public:
-    size_t feed(const char*& buffer, uint64_t& remaining) override {
+    size_t feed(absl::string_view& data) override {
       // move some pointers to simulate data consumption
-      buffer += FAILED_DESERIALIZER_STEP;
-      remaining -= FAILED_DESERIALIZER_STEP;
+      data = {data.data() + FAILED_DESERIALIZER_STEP, data.size() - FAILED_DESERIALIZER_STEP};
       throw EnvoyException("feed");
     };
 
@@ -134,38 +131,30 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDur
   RequestHeaderParser testee{parser_resolver, request_context,
                              std::make_unique<ThrowingRequestHeaderDeserializer>()};
 
-  const char* bytes = getBytes();
-  const char* orig_bytes = bytes;
-  uint64_t remaining = 100000;
-  const uint64_t orig_remaining = remaining;
+  const absl::string_view orig_data = {getBytes(), 100000};
+  absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(bytes, remaining);
+  const ParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
   ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result.next_parser_), nullptr);
   ASSERT_EQ(result.message_, nullptr);
 
-  ASSERT_EQ(bytes, orig_bytes + FAILED_DESERIALIZER_STEP);
-  ASSERT_EQ(remaining, orig_remaining - FAILED_DESERIALIZER_STEP);
-
   ASSERT_EQ(testee.contextForTest()->remaining_request_size_,
             request_size - FAILED_DESERIALIZER_STEP);
+
+  assertStringViewIncrement(data, orig_data, FAILED_DESERIALIZER_STEP);
 }
 
 TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerExceptionsDuringFeeding) {
   // given
-
-  const int32_t move = FAILED_DESERIALIZER_STEP;
-
   // throws during feeding
   class ThrowingDeserializer : public Deserializer<int32_t> {
   public:
-    size_t feed(const char*& buffer, uint64_t& remaining) override {
+    size_t feed(absl::string_view&) override {
       // move some pointers to simulate data consumption
-      buffer += move;
-      remaining -= move;
       throw EnvoyException("feed");
     };
 
@@ -174,37 +163,28 @@ TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerExceptionsDuringFee
     int32_t get() const override { throw std::runtime_error("should not be invoked at all"); };
   };
 
-  const int32_t request_size = 1024; // there are still 1024 bytes to read to complete the request
-  RequestContextSharedPtr request_context{new RequestContext{request_size, {}}};
-
+  RequestContextSharedPtr request_context{new RequestContext{1024, {}}};
   RequestParser<int32_t, ThrowingDeserializer> testee{request_context};
 
-  const char* bytes = getBytes();
-  const char* orig_bytes = bytes;
-  uint64_t remaining = 100000;
-  const uint64_t orig_remaining = remaining;
+  absl::string_view data = {getBytes(), 100000};
 
   // when
-  const ParseResponse result = testee.parse(bytes, remaining);
+  bool caught = false;
+  try {
+    testee.parse(data);
+  } catch (EnvoyException& e) {
+    caught = true;
+  }
 
   // then
-  ASSERT_EQ(result.hasData(), true);
-  ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result.next_parser_), nullptr);
-  ASSERT_EQ(result.message_, nullptr);
-
-  ASSERT_EQ(bytes, orig_bytes + FAILED_DESERIALIZER_STEP);
-  ASSERT_EQ(remaining, orig_remaining - FAILED_DESERIALIZER_STEP);
-
-  ASSERT_EQ(testee.contextForTest()->remaining_request_size_,
-            request_size - FAILED_DESERIALIZER_STEP);
+  ASSERT_EQ(caught, true);
 }
 
 // deserializer that consumes FAILED_DESERIALIZER_STEP bytes and returns 0
 class SomeBytesDeserializer : public Deserializer<int32_t> {
 public:
-  size_t feed(const char*& buffer, uint64_t& remaining) override {
-    buffer += FAILED_DESERIALIZER_STEP;
-    remaining -= FAILED_DESERIALIZER_STEP;
+  size_t feed(absl::string_view& data) override {
+    data = {data.data() + FAILED_DESERIALIZER_STEP, data.size() - FAILED_DESERIALIZER_STEP};
     return FAILED_DESERIALIZER_STEP;
   };
 
@@ -220,24 +200,21 @@ TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerClaimingItsReadyBut
 
   RequestParser<int32_t, SomeBytesDeserializer> testee{request_context};
 
-  const char* bytes = getBytes();
-  const char* orig_bytes = bytes;
-  uint64_t remaining = 100000;
-  const uint64_t orig_remaining = remaining;
+  const absl::string_view orig_data = {getBytes(), 100000};
+  absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(bytes, remaining);
+  const ParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
   ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result.next_parser_), nullptr);
   ASSERT_EQ(result.message_, nullptr);
 
-  ASSERT_EQ(bytes, orig_bytes + FAILED_DESERIALIZER_STEP);
-  ASSERT_EQ(remaining, orig_remaining - FAILED_DESERIALIZER_STEP);
-
   ASSERT_EQ(testee.contextForTest()->remaining_request_size_,
             request_size - FAILED_DESERIALIZER_STEP);
+
+  assertStringViewIncrement(data, orig_data, FAILED_DESERIALIZER_STEP);
 }
 
 TEST_F(BufferBasedTest, SentinelParserShouldConsumeDataUntilEndOfRequest) {
@@ -250,12 +227,11 @@ TEST_F(BufferBasedTest, SentinelParserShouldConsumeDataUntilEndOfRequest) {
   const Bytes garbage(request_len * 2);
   encoder_.encode(garbage, buffer());
 
-  const char* bytes = getBytes();
-  uint64_t remaining = request_len * 2;
-  const uint64_t orig_remaining = remaining;
+  const absl::string_view orig_data = {getBytes(), request_len * 2};
+  absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(bytes, remaining);
+  const ParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
@@ -263,7 +239,8 @@ TEST_F(BufferBasedTest, SentinelParserShouldConsumeDataUntilEndOfRequest) {
   ASSERT_NE(std::dynamic_pointer_cast<UnknownRequest>(result.message_), nullptr);
 
   ASSERT_EQ(testee.contextForTest()->remaining_request_size_, 0);
-  ASSERT_EQ(remaining, orig_remaining - request_len);
+
+  assertStringViewIncrement(data, orig_data, request_len);
 }
 
 } // namespace Kafka

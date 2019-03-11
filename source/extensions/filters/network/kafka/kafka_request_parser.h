@@ -44,9 +44,9 @@ public:
                                        RequestContextSharedPtr context) const;
 
   /**
-   * Request parser singleton
+   * Return default resolver, that uses request's api key and version to provide a matching parser
    */
-  static const RequestParserResolver INSTANCE;
+  static const RequestParserResolver& getDefaultInstance();
 };
 
 /**
@@ -59,10 +59,10 @@ public:
       : parser_resolver_{parser_resolver}, context_{std::make_shared<RequestContext>()} {};
 
   /**
-   * Consumes INT32 bytes as request length and updates the context with that value
+   * Consumes 4 bytes (INT32) as request length and updates the context with that value
    * @return RequestHeaderParser instance to process request header
    */
-  ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
+  ParseResponse parse(absl::string_view& data) override;
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
@@ -106,7 +106,7 @@ public:
    * Uses data provided to compute request header
    * @return Parser instance responsible for processing rest of the message
    */
-  ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
+  ParseResponse parse(absl::string_view& data) override;
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
@@ -128,7 +128,7 @@ public:
   /**
    * Returns UnknownRequest
    */
-  ParseResponse parse(const char*& buffer, uint64_t& remaining) override;
+  ParseResponse parse(absl::string_view& data) override;
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
@@ -156,17 +156,8 @@ public:
    * Consume enough data to fill in deserializer and receive the parsed request
    * Fill in request's header with data stored in context
    */
-  ParseResponse parse(const char*& buffer, uint64_t& remaining) override {
-    const uint64_t orig_remaining = remaining;
-    try {
-      context_->remaining_request_size_ -= deserializer.feed(buffer, remaining);
-    } catch (const EnvoyException&) {
-      // treat the whole request as invalid, throw away the rest of the data
-      const int32_t consumed = static_cast<int32_t>(orig_remaining - remaining);
-      context_->remaining_request_size_ -=
-          consumed; // some of the data might have been consumed by throwing deserializer
-      return ParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
-    }
+  ParseResponse parse(absl::string_view& data) override {
+    context_->remaining_request_size_ -= deserializer.feed(data);
 
     if (deserializer.ready()) {
       if (0 == context_->remaining_request_size_) {

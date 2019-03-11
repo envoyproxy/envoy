@@ -25,8 +25,7 @@ public:
 };
 
 /**
- * Kafka message decoder
- * @tparam MessageType message type (Kafka request or Kafka response)
+ * Kafka message encoder
  */
 class MessageEncoder {
 public:
