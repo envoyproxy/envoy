@@ -184,5 +184,27 @@ void OriginalDstCluster::cleanup() {
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }
 
+ClusterImplBaseSharedPtr OriginalDstClusterFactory::createClusterImpl(
+    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Stats::ScopePtr&& stats_scope) {
+  if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
+    throw EnvoyException(fmt::format(
+        "cluster: cluster type 'original_dst' may only be used with LB type 'original_dst_lb'"));
+  }
+  if (cluster.has_lb_subset_config() && cluster.lb_subset_config().subset_selectors_size() != 0) {
+    throw EnvoyException(
+        fmt::format("cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
+  }
+
+  return std::make_unique<OriginalDstCluster>(cluster, context.runtime(), socket_factory_context,
+                                              std::move(stats_scope), context.addedViaApi());
+}
+
+/**
+ * Static registration for the strict dns cluster factory. @see RegisterFactory.
+ */
+REGISTER_FACTORY(OriginalDstClusterFactory, ClusterFactory);
+
 } // namespace Upstream
 } // namespace Envoy

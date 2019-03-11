@@ -57,7 +57,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -214,6 +215,29 @@ public:
       discovery_response.add_resources()->PackFrom(message);
     }
     xds_stream_->sendGrpcMessage(discovery_response);
+  }
+
+  AssertionResult compareDeltaDiscoveryRequest(
+      const std::string& expected_type_url,
+      const std::vector<std::string>& expected_resource_subscriptions,
+      const std::vector<std::string>& expected_resource_unsubscriptions,
+      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const std::string& expected_error_message = "");
+  template <class T>
+  void sendDeltaDiscoveryResponse(const std::vector<T>& added_or_updated,
+                                  const std::vector<std::string>& removed,
+                                  const std::string& version) {
+    envoy::api::v2::DeltaDiscoveryResponse response;
+    response.set_system_version_info("system_version_info_this_is_a_test");
+    for (const auto& message : added_or_updated) {
+      auto* resource = response.add_resources();
+      resource->set_name(message.name());
+      resource->set_version(version);
+      resource->mutable_resource()->PackFrom(message);
+    }
+    *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+    response.set_nonce("noncense");
+    xds_stream_->sendGrpcMessage(response);
   }
 
 private:

@@ -68,7 +68,6 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       http_context_(store.symbolTable()) {
-
   try {
     if (!options.logPath().empty()) {
       try {
