@@ -19,7 +19,7 @@ public:
     Startup,
 
     /**
-     * The server instance is being shutdown and the dispatcher is aboout the exit.
+     * The server instance is being shutdown and the dispatcher is about the exit.
      */
     ShutdownExit
   };
