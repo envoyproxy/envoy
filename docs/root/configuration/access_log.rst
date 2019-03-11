@@ -314,15 +314,15 @@ The following command operators are supported:
 
 %DOWNSTREAM_LOCAL_URI_SAN%
   HTTP
-    The URI present in the SAN of the local certificate used to establish the downstream TLS connection.
+    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
   TCP
-    The URI present in the SAN of the local certificate used to establish the downstream TLS connection.
+    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
 
 %DOWNSTREAM_PEER_URI_SAN%
   HTTP
-    The URI present in the SAN of the peer certificate used to establish the downstream TLS connection.
+    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
   TCP
-    The URI present in the SAN of the peer certificate used to establish the downstream TLS connection.
+    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
 
 %DOWNSTREAM_LOCAL_SUBJECT%
   HTTP

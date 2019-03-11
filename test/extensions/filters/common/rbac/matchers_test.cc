@@ -192,9 +192,11 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnectionInfo ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
+  const std::vector<std::string> sans{"foo", "baz"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
+  // We should get the first URI SAN.
   envoy::config::rbac::v2alpha::Principal_Authenticated auth;
   auth.mutable_principal_name()->set_exact("foo");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
@@ -207,7 +209,8 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnectionInfo ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(""));
+  const std::vector<std::string> sans;
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(ssl, subjectPeerCertificate()).WillRepeatedly(Return("bar"));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
@@ -222,7 +225,8 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
 TEST(AuthenticatedMatcher, AnySSLSubject) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnectionInfo ssl;
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
+  const std::vector<std::string> sans{"foo", "baz"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
   envoy::config::rbac::v2alpha::Principal_Authenticated auth;
@@ -273,7 +277,8 @@ TEST(PolicyMatcher, PolicyMatcher) {
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return("bar"));
+  const std::vector<std::string> sans{"bar", "baz"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).Times(2).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(&ssl));
   EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 

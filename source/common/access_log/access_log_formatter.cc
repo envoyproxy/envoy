@@ -374,12 +374,12 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.uriSanPeerCertificate();
+          return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_URI_SAN") {
     field_extractor_ =
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.uriSanLocalCertificate();
+          return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
         });
   } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
     field_extractor_ =

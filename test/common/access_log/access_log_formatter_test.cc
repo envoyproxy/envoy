@@ -207,14 +207,24 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
     NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return("san"));
+    const std::vector<std::string> sans{"san"};
+    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(sans));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
     EXPECT_EQ("san", upstream_format.format(header, header, header, stream_info));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
     NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(""));
+    const std::vector<std::string> sans{"san1", "san2"};
+    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(sans));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+    EXPECT_EQ("san1,san2", upstream_format.format(header, header, header, stream_info));
+  }
+  {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, uriSanPeerCertificate())
+        .WillByDefault(Return(std::vector<std::string>()));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -226,14 +236,24 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
     NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return("san"));
+    const std::vector<std::string> sans{"san"};
+    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(sans));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
     EXPECT_EQ("san", upstream_format.format(header, header, header, stream_info));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
     NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(""));
+    const std::vector<std::string> sans{"san1", "san2"};
+    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(sans));
+    EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
+    EXPECT_EQ("san1,san2", upstream_format.format(header, header, header, stream_info));
+  }
+  {
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    ON_CALL(connection_info, uriSanLocalCertificate())
+        .WillByDefault(Return(std::vector<std::string>()));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -252,7 +272,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_SUBJECT");
     NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(""));
+    ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return(""));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }
@@ -271,7 +291,7 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(""));
+    ON_CALL(connection_info, subjectPeerCertificate()).WillByDefault(Return(""));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(&connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
   }

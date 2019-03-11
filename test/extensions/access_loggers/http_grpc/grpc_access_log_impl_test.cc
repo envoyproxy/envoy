@@ -340,8 +340,10 @@ http_logs:
     stream_info.start_time_ = SystemTime(1h);
 
     NiceMock<Ssl::MockConnectionInfo> connection_info;
-    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return("peerUriSan"));
-    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return("localUriSan"));
+    const std::vector<std::string> peerSans{"peerSan1", "peerSan2"};
+    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(peerSans));
+    const std::vector<std::string> localSans{"localSan1", "localSan2"};
+    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
     ON_CALL(connection_info, subjectPeerCertificate()).WillByDefault(Return("peerSubject"));
     ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return("localSubject"));
     stream_info.setDownstreamSslConnection(&connection_info);
@@ -369,11 +371,13 @@ http_logs:
         tls_sni_hostname: sni
         local_certificate_properties:
           subject_alt_name:
-          - uri: localUriSan
+          - uri: localSan1
+          - uri: localSan2
           subject: localSubject
         peer_certificate_properties:
           subject_alt_name:
-          - uri: peerUriSan
+          - uri: peerSan1
+          - uri: peerSan2
           subject: peerSubject
     request:
       request_method: "METHOD_UNSPECIFIED"

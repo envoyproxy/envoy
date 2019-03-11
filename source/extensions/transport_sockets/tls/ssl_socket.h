@@ -48,12 +48,12 @@ public:
 
   // Ssl::Connection
   bool peerCertificatePresented() const override;
-  std::string uriSanLocalCertificate() const override;
+  std::vector<std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   std::string serialNumberPeerCertificate() const override;
   std::string subjectPeerCertificate() const override;
   std::string subjectLocalCertificate() const override;
-  std::string uriSanPeerCertificate() const override;
+  std::vector<std::string> uriSanPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   std::vector<std::string> dnsSansPeerCertificate() const override;
   std::vector<std::string> dnsSansLocalCertificate() const override;

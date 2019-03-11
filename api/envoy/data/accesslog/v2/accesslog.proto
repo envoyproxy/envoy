@@ -230,6 +230,7 @@ message TLSProperties {
     message SubjectAltName {
       oneof san {
         string uri = 1;
+        // [#not-implemented-hide:]
         string dns = 2;
       }
     }

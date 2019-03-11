@@ -59,7 +59,9 @@ namespace {
  */
 class TestUtilOptionsBase {
 public:
-  const std::string& expectedClientCertUri() const { return expected_client_cert_uri_; }
+  const std::vector<std::string>& expectedClientCertUri() const {
+    return expected_client_cert_uri_;
+  }
   const std::string& expectedServerStats() const { return expected_server_stats_; }
   bool expectSuccess() const { return expect_success_; }
   Network::Address::IpVersion version() const { return version_; }
@@ -69,7 +71,7 @@ protected:
       : expect_success_(expect_success), version_(version) {}
 
   void setExpectedClientCertUri(const std::string& expected_client_cert_uri) {
-    expected_client_cert_uri_ = expected_client_cert_uri;
+    expected_client_cert_uri_ = {expected_client_cert_uri};
   }
 
   void setExpectedServerStats(const std::string& expected_server_stats) {
@@ -81,7 +83,7 @@ private:
   const Network::Address::IpVersion version_;
 
   std::string expected_server_stats_;
-  std::string expected_client_cert_uri_;
+  std::vector<std::string> expected_client_cert_uri_;
 };
 
 /**
@@ -128,11 +130,11 @@ public:
   const std::string& expectedDigest() const { return expected_digest_; }
 
   TestUtilOptions& setExpectedLocalUri(const std::string& expected_local_uri) {
-    expected_local_uri_ = expected_local_uri;
+    expected_local_uri_ = {expected_local_uri};
     return *this;
   }
 
-  const std::string& expectedLocalUri() const { return expected_local_uri_; }
+  const std::vector<std::string>& expectedLocalUri() const { return expected_local_uri_; }
 
   TestUtilOptions& setExpectedSerialNumber(const std::string& expected_serial_number) {
     expected_serial_number_ = expected_serial_number;
@@ -186,7 +188,7 @@ private:
 
   bool expect_no_cert_;
   std::string expected_digest_;
-  std::string expected_local_uri_;
+  std::vector<std::string> expected_local_uri_;
   std::string expected_serial_number_;
   std::string expected_subjectl_;
   std::string expected_local_subject_;

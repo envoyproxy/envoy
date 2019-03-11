@@ -43,16 +43,18 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeCo
   Ssl::ConnectionInfo* ssl = const_cast<Ssl::ConnectionInfo*>(connection.ssl());
   if (ssl != nullptr) {
     if (local) {
-      peer.set_principal(ssl->uriSanLocalCertificate());
-
-      if (peer.principal().empty()) {
+      const auto uriSans = ssl->uriSanLocalCertificate();
+      if (uriSans.empty()) {
         peer.set_principal(ssl->subjectLocalCertificate());
+      } else {
+        peer.set_principal(uriSans[0]);
       }
     } else {
-      peer.set_principal(ssl->uriSanPeerCertificate());
-
-      if (peer.principal().empty()) {
+      const auto uriSans = ssl->uriSanPeerCertificate();
+      if (uriSans.empty()) {
         peer.set_principal(ssl->subjectPeerCertificate());
+      } else {
+        peer.set_principal(uriSans[0]);
       }
     }
   }
