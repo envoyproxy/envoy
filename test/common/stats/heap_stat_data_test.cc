@@ -1,8 +1,9 @@
 #include <string>
 
 #include "common/stats/heap_stat_data.h"
+
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/stats_options_impl.h"
-#include "common/stats/symbol_table_impl.h"
 
 #include "test/test_common/logging.h"
 
@@ -34,7 +35,7 @@ protected:
     EXPECT_EQ(0, symbol_table_.numSymbols());
   }
 
-  SymbolTableImpl symbol_table_;
+  FakeSymbolTableImpl symbol_table_;
   HeapStatDataAllocator alloc_;
   std::vector<StatNameStorage> stat_name_storage_;
 };

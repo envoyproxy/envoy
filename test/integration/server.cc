@@ -174,7 +174,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
-  Stats::SymbolTableImpl symbol_table;
+  Stats::FakeSymbolTableImpl symbol_table;
   Server::HotRestartNopImpl restarter(symbol_table);
   ThreadLocal::InstanceImpl tls;
   Stats::HeapStatDataAllocator stats_allocator(symbol_table);

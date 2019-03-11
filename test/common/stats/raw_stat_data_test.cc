@@ -17,7 +17,7 @@ public:
   RawStatDataTest() : allocator_(stats_options_, symbol_table_) {}
 
   StatsOptionsImpl stats_options_;
-  SymbolTableImpl symbol_table_;
+  FakeSymbolTableImpl symbol_table_;
   TestAllocator allocator_; // This is RawStatDataAllocator with some size settings.
 };
 

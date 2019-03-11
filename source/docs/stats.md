@@ -101,7 +101,7 @@ followed.
 
 Stat names are replicated in several places in various forms.
 
- * Held fully elaborated next to the values, in `RawStatData` and `HeapStatData`
+ * Held with the stat values, in `RawStatData` and `HeapStatData`
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
@@ -120,6 +120,36 @@ rather than `operator[]`, as the latter would insert a pointer to a temporary as
 the key. If the `.find` fails, the actual stat must be constructed first, and
 then inserted into the map using its key storage. This strategy saves
 duplication of the keys, but costs an extra map lookup on each miss.
+
+### Naming Representation
+
+When stored as flat strings, stat names can dominate Envoy memory usage when
+there are a large number of clusters. Stat names typically combine a small
+number of keywords, cluster names, host names, and response codes, separated by
+".". For example "CLUSTER.upstream_cx_connect_attempts_exceeded". There may be
+thousands of clusters, and ~100 stats per cluster. Thus, the number of
+combinations can be large. It is significantly more efficient to symbolize each
+"."-delimited token and represent stats as arrays of symbols.
+
+The transformation between flattened string and symbolized form is CPU-intensive
+at scale. It requires parsing, encoding, and lookups in a shared map, which must
+be mutex-protected. To avoid adding latency and CPU overhead while serving
+requests, the tokens can be symbolized and saved in data structures. This can
+occur on startup or when new hosts or clusters are configured dynamically. Thus
+users of stats that are allocated dynamically per cluster, host, etc, must
+explicitly store partial stat-names their class instances, which can be composed
+dynamically at runtime in order to fully elaborate counters, gauges, etc,
+without taking symbol-table locks.
+
+### Implementation
+
+The SymbolTable 
+[SymbolTable](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/symbol.h)
+abstraction has, temporarily, two implementions, 
+[FakeSymbolTableImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h)
+and
+[SymbolTableImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/symbol_table_impl.h).
+The fake will eventually be deleted.
 
 ## Tags and Tag Extraction
 
