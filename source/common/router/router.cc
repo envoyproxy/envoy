@@ -851,7 +851,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
             StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
         could_not_retry = true;
       }
-
     }
   }
 
