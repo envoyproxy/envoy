@@ -34,6 +34,7 @@ public:
 
   void setOperation(const std::string& operation) override;
   void setTag(const std::string& name, const std::string& value) override;
+  void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
   void injectContext(Http::HeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
@@ -76,6 +77,11 @@ void Span::setOperation(const std::string& operation) {
 
 void Span::setTag(const std::string& name, const std::string& value) {
   span_.AddAttribute(name, value);
+}
+
+void Span::log(SystemTime /*timestamp*/, const std::string& event) {
+  // timestamp is ignored.
+  span_.AddAnnotation(event);
 }
 
 void Span::finishSpan() { span_.End(); }
