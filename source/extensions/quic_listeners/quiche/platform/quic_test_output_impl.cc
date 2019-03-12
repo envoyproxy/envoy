@@ -8,7 +8,7 @@
 
 #include <cstdlib>
 
-#include "common/filesystem/posix/filesystem_impl.h"
+#include "common/filesystem/filesystem_impl.h"
 
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
