@@ -490,7 +490,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 void Filter::cleanup() {
   while (!upstream_requests_.empty()) {
     UpstreamRequestPtr upstream_request =
-        upstream_requests_.front()->removeFromList(upstream_requests_);
+        upstream_requests_.back()->removeFromList(upstream_requests_);
     if (final_upstream_request_ != nullptr && upstream_request.get() == final_upstream_request_) {
       callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
     } else {
@@ -851,11 +851,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
             StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
         could_not_retry = true;
       }
-    }
 
-    // Make sure any retry timers are destroyed since we may not call cleanup() if end_stream is
-    // false.
-    retry_state_.reset();
+    }
   }
 
   if (static_cast<Http::Code>(response_code) == Http::Code::Found &&
@@ -871,6 +868,12 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
   // chance to return before returning a response downstream.
   if (could_not_retry && (numRequestsAwaitingHeaders() > 0 || pending_retries_ > 0)) {
     return;
+  }
+
+  // Make sure any retry timers are destroyed since we may not call cleanup() if end_stream is
+  // false.
+  if (retry_state_) {
+    retry_state_.reset();
   }
 
   // Only send upstream service time if we received the complete request and this is not a

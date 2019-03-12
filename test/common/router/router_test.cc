@@ -1446,6 +1446,8 @@ TEST_F(RouterTest, RetryOnlyOnceForSameUpstreamRequest) {
   EXPECT_CALL(*router_.retry_state_, wouldRetryFromHeaders(_)).WillOnce(Return(true));
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
 
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+
   response_timeout_->callback_();
 }
 
@@ -1510,6 +1512,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
         EXPECT_EQ(headers.Status()->value(), "200");
         EXPECT_TRUE(end_stream);
       }));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder2->decodeHeaders(std::move(response_headers2), true);
 }
 
