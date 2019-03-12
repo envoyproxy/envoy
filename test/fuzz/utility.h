@@ -13,7 +13,7 @@ namespace Fuzz {
 // Convert from test proto Headers to TestHeaderMapImpl.
 inline Http::TestHeaderMapImpl fromHeaders(
     const test::fuzz::Headers& headers,
-    const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>({})) {
+    const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
   Http::TestHeaderMapImpl header_map;
   for (const auto& header : headers.headers()) {
     // HeaderMapImpl and places such as the route lookup should never see strings with embedded NULL
