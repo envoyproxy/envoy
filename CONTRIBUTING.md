@@ -167,7 +167,7 @@ bool use_new_code_path_ =
 
 This should only be done if the lifetime of the object in question is relatively short compared to
 the lifetime of most Envoy instances, i.e. latching state on creation of the
-Http::ConnectionManagerImpl or all Network::ConnectionImpl classes, to ensure that the new behavio
+Http::ConnectionManagerImpl or all Network::ConnectionImpl classes, to ensure that the new behavior
 will be exercised as the runtime value is flipped, and that the old behavior will trail off over
 time.
 

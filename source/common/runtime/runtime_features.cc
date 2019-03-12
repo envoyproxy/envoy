@@ -9,7 +9,7 @@ namespace Runtime {
 // by runtime feature guards, i.e
 //
 // if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name")) {
-//     [new code path]
+//   [new code path]
 // else {
 //   [old_code_path]
 // }
