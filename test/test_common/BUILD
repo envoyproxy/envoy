@@ -196,6 +196,7 @@ envoy_cc_test(
     deps = [
         ":simulated_time_system_lib",
         ":utility_lib",
+        "//source/common/event:libevent_scheduler_lib",
     ],
 )
 

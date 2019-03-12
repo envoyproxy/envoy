@@ -14,7 +14,9 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
+#include "common/event/libevent_scheduler.h"
 #include "common/event/signal_impl.h"
+#include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
@@ -27,20 +29,15 @@ namespace Envoy {
 namespace Event {
 
 DispatcherImpl::DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system)
-    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {
-  // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
-  RELEASE_ASSERT(Libevent::Global::initialized(), "");
-}
+    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
 
 DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
                                Event::TimeSystem& time_system)
-    : api_(api), buffer_factory_(std::move(factory)), base_(event_base_new()),
-      scheduler_(time_system.createScheduler(base_)),
+    : api_(api), buffer_factory_(std::move(factory)),
+      scheduler_(time_system.createScheduler(base_scheduler_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {
-  RELEASE_ASSERT(Libevent::Global::initialized(), "");
-}
+      current_to_delete_(&to_delete_1_) {}
 
 DispatcherImpl::~DispatcherImpl() {}
 
@@ -139,7 +136,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   }
 }
 
-void DispatcherImpl::exit() { event_base_loopexit(base_.get(), nullptr); }
+void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
 
 SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
@@ -168,7 +165,11 @@ void DispatcherImpl::run(RunType type) {
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
 
-  event_base_loop(base_.get(), type == RunType::NonBlock ? EVLOOP_NONBLOCK : 0);
+  if (type == RunType::NonBlock) {
+    base_scheduler_.nonBlockingLoop();
+  } else {
+    base_scheduler_.blockingLoop();
+  }
 }
 
 void DispatcherImpl::runPostCallbacks() {

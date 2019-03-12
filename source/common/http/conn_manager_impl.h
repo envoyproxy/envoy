@@ -192,6 +192,7 @@ private:
 
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
+    void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
     HeaderMap& addDecodedTrailers() override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
@@ -274,6 +275,7 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
+    void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
     HeaderMap& addEncodedTrailers() override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;

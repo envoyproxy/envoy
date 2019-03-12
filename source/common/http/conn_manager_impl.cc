@@ -1849,6 +1849,11 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::In
   parent_.addDecodedData(*this, data, streaming);
 }
 
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
+  parent_.decodeData(this, data, end_stream);
+}
+
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encode100ContinueHeaders(
@@ -1963,6 +1968,11 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data,
                                                                       bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
+  parent_.encodeData(this, data, end_stream);
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
