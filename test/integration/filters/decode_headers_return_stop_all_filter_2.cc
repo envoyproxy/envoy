@@ -38,7 +38,8 @@ public:
     // Request data (size 70000) and added data by DecodeHeadersReturnStopAllFilter (size 1) are
     // received together.
     ASSERT(timer_triggered_);
-    EXPECT_TRUE(data.length() == content_size_ + added_size_ || data.length() == content_size_ + added_size_ * 2);
+    EXPECT_TRUE(data.length() == content_size_ + added_size_ ||
+                data.length() == content_size_ + added_size_ * 2);
     return Http::FilterDataStatus::Continue;
   }
 

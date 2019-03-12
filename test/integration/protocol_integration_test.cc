@@ -747,7 +747,6 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
   testLargeRequestHeaders(95, 96);
 }
 
-
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
 // once after iteration is resumed.
 TEST_P(DownstreamProtocolIntegrationTest, testDecodeHeadersReturnsStopAll) {
