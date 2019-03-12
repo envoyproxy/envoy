@@ -415,7 +415,7 @@ private:
                          UpstreamRequest* upstream_request, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest* upstream_request, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest* upstream_request);
-  void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map, UpstreamRequest* upstream_request);
+  void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
   void onUpstreamComplete(UpstreamRequest* upstream_request);
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
                        UpstreamRequest* upstream_request);

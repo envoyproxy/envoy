@@ -949,11 +949,8 @@ void Filter::onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest* 
   }
 }
 
-void Filter::onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map,
-                                UpstreamRequest* upstream_request) {
-  if (final_upstream_request_ == upstream_request) {
-    callbacks_->encodeMetadata(std::move(metadata_map));
-  }
+void Filter::onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) {
+  callbacks_->encodeMetadata(std::move(metadata_map));
 }
 
 void Filter::onUpstreamComplete(UpstreamRequest* upstream_request) {
@@ -1172,7 +1169,7 @@ void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
 }
 
 void Filter::UpstreamRequest::decodeMetadata(Http::MetadataMapPtr&& metadata_map) {
-  parent_.onUpstreamMetadata(std::move(metadata_map), this);
+  parent_.onUpstreamMetadata(std::move(metadata_map));
 }
 
 void Filter::UpstreamRequest::maybeEndDecode(bool end_stream) {
