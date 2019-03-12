@@ -1280,7 +1280,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
     ENVOY_STREAM_LOG(debug, "upstream per try timeout", *parent_.callbacks_);
 
     // Set response flag to UT for now, but it might be overwritten if a
-    // response arrives later and hedg_on_per_try_timeout_ is set
+    // response arrives later and hedge_on_per_try_timeout_ is set
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
     parent_.onPerTryTimeout(this);
   } else {
