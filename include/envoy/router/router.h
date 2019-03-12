@@ -241,6 +241,16 @@ public:
                                          DoRetryCallback callback) PURE;
 
   /**
+   * Determines whether given response headers would be retried by the retry policy, assuming
+   * sufficient retry budget and circuit breaker headroom. This is useful in cases where
+   * the information about whether a response is "good" or not is useful, but a retry should
+   * not be attempted for other reasons.
+   * @param response_headers supplies the response headers.
+   * @return bool true if a retry would be warranted based on the retry policy.
+   */
+  virtual bool wouldRetryFromHeaders(const Http::HeaderMap& response_headers) PURE;
+
+  /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
    * @param reset_reason supplies the reset reason.
    * @param callback supplies the callback that will be invoked when the retry should take place.

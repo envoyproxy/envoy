@@ -21,6 +21,7 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
+#include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
@@ -282,7 +283,8 @@ protected:
 private:
   struct UpstreamRequest : public Http::StreamDecoder,
                            public Http::StreamCallbacks,
-                           public Http::ConnectionPool::Callbacks {
+                           public Http::ConnectionPool::Callbacks,
+                           public LinkedObject<UpstreamRequest> {
     UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
     ~UpstreamRequest();
 
@@ -393,6 +395,7 @@ private:
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest* upstream_request);
+  uint32_t numRequestsAwaitingHeaders();
   void onGlobalTimeout();
   void onPerTryTimeout(UpstreamRequest* upstream_request);
   void onRequestComplete();
@@ -440,7 +443,7 @@ private:
   FilterUtility::TimeoutData timeout_;
   FilterUtility::HedgingParams hedging_params_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
-  std::vector<UpstreamRequestPtr> upstream_requests_;
+  std::list<UpstreamRequestPtr> upstream_requests_;
   // Tracks which upstream request "wins" and will have the corresponding
   // response forwarded downstream
   UpstreamRequest* final_upstream_request_;
@@ -461,6 +464,7 @@ private:
   bool include_attempt_count_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
   uint32_t attempt_count_{1};
+  int32_t pending_retries_{0};
 };
 
 class ProdFilter : public Filter {

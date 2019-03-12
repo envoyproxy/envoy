@@ -145,6 +145,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:common_lib",
