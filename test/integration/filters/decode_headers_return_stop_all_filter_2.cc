@@ -30,27 +30,30 @@ public:
   }
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
-    // Request data (size 5000) and added data by DecodeHeadersReturnStopAllFilter (size 1) are
+    // Request data (size 70000) and added data by DecodeHeadersReturnStopAllFilter (size 1) are
     // received together.
+    ASSERT(timer_triggered_);
     EXPECT_TRUE(data.length() == 70001 || data.length() == 70002);
-    Buffer::OwnedImpl added_data("a");
     return Http::FilterDataStatus::Continue;
   }
 
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
-    Buffer::OwnedImpl data("a");
+    ASSERT(timer_triggered_);
     return Http::FilterTrailersStatus::Continue;
   }
 
 private:
   // Creates a timer to continue iteration after 1s.
   void createTimerForContinue() {
-    delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
-        [this]() -> void { decoder_callbacks_->continueDecoding(); });
+    delay_timer_ = decoder_callbacks_->dispatcher().createTimer([this]() -> void {
+      timer_triggered_ = true;
+      decoder_callbacks_->continueDecoding();
+    });
     delay_timer_->enableTimer(std::chrono::seconds(1));
   }
 
   Event::TimerPtr delay_timer_;
+  bool timer_triggered_ = false;
 };
 
 constexpr char DecodeHeadersReturnStopAllFilter2::name[];

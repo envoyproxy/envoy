@@ -33,6 +33,7 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
     // High watermark reached before all data are received. The rest of the data is sent after
     // iteration resumes.
+    ASSERT(timer_triggered_);
     EXPECT_LT(data.length(), 70000);
     Buffer::OwnedImpl added_data("a");
     decoder_callbacks_->addDecodedData(added_data, false);
@@ -40,6 +41,7 @@ public:
   }
 
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
+    ASSERT(timer_triggered_);
     Buffer::OwnedImpl data("a");
     decoder_callbacks_->addDecodedData(data, false);
     return Http::FilterTrailersStatus::Continue;
@@ -48,12 +50,15 @@ public:
 private:
   // Creates a timer to continue iteration after 5s.
   void createTimerForContinue() {
-    delay_timer_ = decoder_callbacks_->dispatcher().createTimer(
-        [this]() -> void { decoder_callbacks_->continueDecoding(); });
+    delay_timer_ = decoder_callbacks_->dispatcher().createTimer([this]() -> void {
+      timer_triggered_ = true;
+      decoder_callbacks_->continueDecoding();
+    });
     delay_timer_->enableTimer(std::chrono::seconds(5));
   }
 
   Event::TimerPtr delay_timer_;
+  bool timer_triggered_ = false;
 };
 
 constexpr char DecodeHeadersReturnStopAllWatermarkFilter::name[];

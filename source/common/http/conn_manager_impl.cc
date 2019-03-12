@@ -863,9 +863,9 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   } else {
     if ((*(filter->entry()))->stoppedAll()) {
       // The filter iteration has been stopped for all frame types, and now the iteration continues.
-      // The current filter's decodeData() has not be called. Call it now.
+      // The current filter's decodeData() has not been called. Call it now.
       entry = filter->entry();
-      // The current filter have stopped iteration for all frame type before. Skip the check.
+      // The current filter has stopped iteration for all frame type before. Skip the check.
       check_stop_all = false;
     } else {
       entry = std::next(filter->entry());
@@ -873,7 +873,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   for (; entry != decoder_filters_.end(); entry++) {
-    // If the filter pointed by entry has stopped for all frame type, return now.
+    // If the filter pointed by entry has stopped for all frame types, return now.
     if (check_stop_all && handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
       return;
     }
@@ -1026,7 +1026,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
       // addDecodedData(), which will consequently call decodeData(). We want decodeData() to
       // iterate from the next filter.
       (*entry)->allowIteration();
-      // The current filter have stopped iteration for all frame type before. Skip the check.
+      // The current filter has stopped iteration for all frame type before. Skip the check.
       check_stop_all = false;
     } else {
       entry = std::next(filter->entry());
@@ -1087,7 +1087,7 @@ ConnectionManagerImpl::ActiveStream::commonEncodePrefix(ActiveStreamEncoderFilte
     return encoder_filters_.begin();
   } else {
     if ((*(filter->entry()))->stoppedAll()) {
-      // The current filter have stopped iteration for all frame type before. Skip the check.
+      // The current filter has stopped iteration for all frame type before. Skip the check.
       check_iteration_state = false;
       // The filter iteration has been stopped for all frame types, and now the iteration continues.
       // The current filter's encoding callback has not be called. Call it now.
@@ -1670,6 +1670,10 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doTrailers();
   }
 
+  // Resets iteration_state_ to Continue here so both doData() and doTrailers() can start iterate
+  // with the current filter instead of the next one. doTrailers() also resets iteration_state_ to
+  // Continue to avoid addDecodeData() to iterate from the current filter. As a result, the
+  // following code will be triggered when the filter has stopped all, and no trailer is present.
   if (stoppedAll()) {
     allowIteration();
   }
