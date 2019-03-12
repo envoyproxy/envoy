@@ -501,10 +501,8 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
 
   // Root span so have same trace and span id
   const std::string id = Hex::uint64ToHex(generateRandom64());
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                   id);
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
-                                   id);
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, id);
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, id);
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
                                    ZipkinCoreConstants::get().SAMPLED);
 
