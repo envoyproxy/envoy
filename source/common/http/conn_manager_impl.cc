@@ -1734,8 +1734,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::In
   parent_.addDecodedData(*this, data, streaming);
 }
 
-void ConnectionManagerImpl::ActiveStreamDecoderFilter::decodeData(Buffer::Instance& data,
-                                                                  bool end_stream) {
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
   parent_.decodeData(this, data, end_stream);
 }
 
@@ -1855,8 +1855,8 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::In
   return parent_.addEncodedData(*this, data, streaming);
 }
 
-void ConnectionManagerImpl::ActiveStreamEncoderFilter::encodeData(Buffer::Instance& data,
-                                                                  bool end_stream) {
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
   parent_.encodeData(this, data, end_stream);
 }
 
