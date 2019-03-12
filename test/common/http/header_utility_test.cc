@@ -9,6 +9,7 @@
 
 #include "test/test_common/utility.h"
 
+#include "fmt/printf.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -401,6 +402,65 @@ invert_match: true
   header_data.push_back(HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml)));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
+}
+
+bool matchPathHeader(const std::string& expect, const std::string& input,
+                     const std::string& match_type = "exact_match",
+                     const HeaderUtility::MatchOption& option = HeaderUtility::MatchOption{
+                         .remove_dot_segments_in_path = true}) {
+  const std::string yaml = fmt::sprintf(R"EOF(
+name: ":path"
+%s: %s
+  )EOF",
+                                        match_type, expect);
+  TestHeaderMapImpl input_header{{":path", input}};
+  HeaderUtility::HeaderData header_data = parseHeaderMatcherFromYaml(yaml);
+  return HeaderUtility::matchHeaders(input_header, header_data, option);
+}
+
+TEST(MatchHeadersTest, HeaderMatchRemoveDotsInPath) {
+  HeaderUtility::MatchOption option{false};
+  EXPECT_FALSE(matchPathHeader("/a", "/./a/.", "exact_match", option));
+  EXPECT_FALSE(matchPathHeader("/a", "/./a/.", "prefix_match", option));
+  EXPECT_FALSE(matchPathHeader("/a", "/./a/.", "suffix_match", option));
+
+  // Test the dots is removed for exact match.
+  EXPECT_TRUE(matchPathHeader("", "."));
+  EXPECT_TRUE(matchPathHeader("", "/."));
+  EXPECT_TRUE(matchPathHeader("", ".."));
+  EXPECT_TRUE(matchPathHeader("", "/.."));
+
+  EXPECT_TRUE(matchPathHeader("a", "./a"));
+  EXPECT_TRUE(matchPathHeader("a", "././a"));
+  EXPECT_TRUE(matchPathHeader("a", "../a"));
+  EXPECT_TRUE(matchPathHeader("a", ".././a"));
+  EXPECT_TRUE(matchPathHeader("a", "../../a"));
+  EXPECT_TRUE(matchPathHeader("a", "./.././../a"));
+
+  EXPECT_TRUE(matchPathHeader("/a", "/a"));
+  EXPECT_TRUE(matchPathHeader("/a", "/./a"));
+  EXPECT_TRUE(matchPathHeader("/a/", "/a/"));
+  EXPECT_TRUE(matchPathHeader("/a/", "/a/."));
+  EXPECT_TRUE(matchPathHeader("/a/", "/a/./"));
+  EXPECT_TRUE(matchPathHeader("/a/b", "/a/./b"));
+
+  EXPECT_TRUE(matchPathHeader("/a/", "/a/b/.."));
+  EXPECT_TRUE(matchPathHeader("/a/", "/a/b/../"));
+  EXPECT_TRUE(matchPathHeader("/a", "/../a"));
+  EXPECT_TRUE(matchPathHeader("/b", "/a/../b"));
+  EXPECT_TRUE(matchPathHeader("/b", "/a/../../b"));
+
+  EXPECT_TRUE(matchPathHeader("/", "/a/b/../../../.."));
+  EXPECT_TRUE(matchPathHeader("/", "/a/b/../../../."));
+  EXPECT_TRUE(matchPathHeader("/", "/a/b/../.././.."));
+
+  EXPECT_TRUE(matchPathHeader("/a/g", "/a/b/c/./../../g"));
+  EXPECT_TRUE(matchPathHeader("mid/6", "mid/content=5/../6"));
+
+  // Test the dots is removed for prefix/suffix/regex match.
+  EXPECT_TRUE(matchPathHeader("/a/", "/./a/.", "prefix_match"));
+  EXPECT_TRUE(matchPathHeader("/a/", "/./a/.", "suffix_match"));
+  EXPECT_TRUE(matchPathHeader("/a/", "/./a/.", "regex_match"));
 }
 
 TEST(HeaderAddTest, HeaderAdd) {

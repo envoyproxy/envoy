@@ -195,6 +195,8 @@ message Principal {
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
+    // Note: the dot segments in the :path header will be removed before used for matching. For
+    // example, the :path header "/a/./b/../c" will be converted to "/a/c" before used for matching.
     envoy.api.v2.route.HeaderMatcher header = 6;
 
     // Metadata that describes additional information about the principal.

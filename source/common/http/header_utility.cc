@@ -6,6 +6,8 @@
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Http {
@@ -64,12 +66,77 @@ HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
         return header_matcher;
       }()) {}
 
+std::string removeDotSegments(absl::string_view input) {
+  std::vector<std::string> output;
+  while (!input.empty()) {
+    // A. If the input buffer begins with a prefix of "../" or "./",
+    // then remove that prefix from the input buffer;
+    if (absl::StartsWith(input, "../")) {
+      input.remove_prefix(3);
+      continue;
+    }
+    if (absl::StartsWith(input, "./")) {
+      input.remove_prefix(2);
+      continue;
+    }
+
+    // B. if the input buffer begins with a prefix of "/./" or "/.",
+    // where "." is a complete path segment, then replace that
+    // prefix with "/" in the input buffer;
+    if (absl::StartsWith(input, "/./")) {
+      input.remove_prefix(2);
+      continue;
+    }
+    if (input == "/.") {
+      output.push_back("/");
+      break;
+    }
+
+    // C. if the input buffer begins with a prefix of "/../" or "/..",
+    // where ".." is a complete path segment, then replace that
+    // prefix with "/" in the input buffer and remove the last
+    // segment and its preceding "/" (if any) from the output
+    // buffer;
+    if (absl::StartsWith(input, "/../")) {
+      if (!output.empty()) {
+        output.pop_back();
+      }
+      input.remove_prefix(3);
+      continue;
+    }
+    if (input == "/..") {
+      if (!output.empty()) {
+        output.pop_back();
+      }
+      output.push_back("/");
+      break;
+    }
+
+    // D. if the input buffer consists only of "." or "..", then remove
+    // that from the input buffer;
+    if (input == "." || input == "..") {
+      break;
+    }
+
+    // E. move the first path segment in the input buffer to the end of
+    // the output buffer, including the initial "/" character (if
+    // any) and any subsequent characters up to, but not including,
+    // the next "/" character or the end of the input buffer.
+    auto j = input.find("/", 1);
+    auto seg = input.substr(0, j);
+    output.push_back(std::string(seg));
+    input.remove_prefix(seg.length());
+  }
+  return absl::StrJoin(output, "");
+}
+
 bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
-                                 const std::vector<HeaderData>& config_headers) {
+                                 const std::vector<HeaderData>& config_headers,
+                                 const MatchOption& match_option) {
   // No headers to match is considered a match.
   if (!config_headers.empty()) {
     for (const HeaderData& cfg_header_data : config_headers) {
-      if (!matchHeaders(request_headers, cfg_header_data)) {
+      if (!matchHeaders(request_headers, cfg_header_data, match_option)) {
         return false;
       }
     }
@@ -79,20 +146,27 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
 }
 
 bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
-                                 const HeaderData& header_data) {
+                                 const HeaderData& header_data, const MatchOption& match_option) {
   const Http::HeaderEntry* header = request_headers.get(header_data.name_);
 
   if (header == nullptr) {
     return header_data.invert_match_ && header_data.header_match_type_ == HeaderMatchType::Present;
   }
 
+  auto value = header->value().getStringView();
+  std::string path_removed_dots;
+  if (match_option.remove_dot_segments_in_path && header->key().getStringView() == ":path") {
+    path_removed_dots = removeDotSegments(value);
+    value = path_removed_dots;
+  }
+
   bool match;
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
-    match = header_data.value_.empty() || header->value() == header_data.value_.c_str();
+    match = header_data.value_.empty() || value == header_data.value_.c_str();
     break;
   case HeaderMatchType::Regex:
-    match = std::regex_match(header->value().c_str(), header_data.regex_pattern_);
+    match = std::regex_match(value.data(), header_data.regex_pattern_);
     break;
   case HeaderMatchType::Range: {
     int64_t header_value = 0;
@@ -104,10 +178,10 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
     match = true;
     break;
   case HeaderMatchType::Prefix:
-    match = absl::StartsWith(header->value().getStringView(), header_data.value_);
+    match = absl::StartsWith(value, header_data.value_);
     break;
   case HeaderMatchType::Suffix:
-    match = absl::EndsWith(header->value().getStringView(), header_data.value_);
+    match = absl::EndsWith(value, header_data.value_);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

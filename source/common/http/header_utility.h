@@ -33,17 +33,30 @@ public:
     const bool invert_match_;
   };
 
+  // A MatchOption specifies how to match the header value.
+  struct MatchOption {
+    // If true, remove the dot segments in the ":path" header before matching.
+    // Single dot is removed directly from the path, double dots are removed
+    // together with the preceding path segment (if exist). For example,
+    // "/a/./c/../d" will be converted to "/a/d" before matching. See
+    // https://tools.ietf.org/html/rfc3986#section-5.2.4.
+    bool remove_dot_segments_in_path;
+  };
+
   /**
    * See if the headers specified in the config are present in a request.
    * @param request_headers supplies the headers from the request.
    * @param config_headers supplies the list of configured header conditions on which to match.
+   * @param MatchOption the match option that specifies how to match the header.
    * @return bool true if all the headers (and values) in the config_headers are found in the
    *         request_headers. If no config_headers are specified, returns true.
    */
   static bool matchHeaders(const Http::HeaderMap& request_headers,
-                           const std::vector<HeaderData>& config_headers);
+                           const std::vector<HeaderData>& config_headers,
+                           const MatchOption& match_option = MatchOption{});
 
-  static bool matchHeaders(const Http::HeaderMap& request_headers, const HeaderData& config_header);
+  static bool matchHeaders(const Http::HeaderMap& request_headers, const HeaderData& config_header,
+                           const MatchOption& match_option = MatchOption{});
 
   /**
    * Add headers from one HeaderMap to another

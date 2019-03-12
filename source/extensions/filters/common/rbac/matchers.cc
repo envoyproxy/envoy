@@ -8,6 +8,9 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
+static constexpr Envoy::Http::HeaderUtility::MatchOption headerMatchOption{
+    .remove_dot_segments_in_path = true};
+
 MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permission& permission) {
   switch (permission.rule_case()) {
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kAndRules:
@@ -114,7 +117,7 @@ bool NotMatcher::matches(const Network::Connection& connection,
 
 bool HeaderMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap& headers,
                             const envoy::api::v2::core::Metadata&) const {
-  return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
+  return Envoy::Http::HeaderUtility::matchHeaders(headers, header_, headerMatchOption);
 }
 
 bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::HeaderMap&,

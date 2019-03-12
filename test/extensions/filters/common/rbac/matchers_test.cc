@@ -151,6 +151,27 @@ TEST(HeaderMatcher, HeaderMatcher) {
   checkMatcher(matcher, false);
 }
 
+TEST(HeaderMatcher, HeaderMatcherForPath) {
+  envoy::api::v2::route::HeaderMatcher config;
+  config.set_name(":path");
+  config.set_prefix_match("/abc");
+
+  Envoy::Http::HeaderMapImpl headers;
+  Envoy::Http::LowerCaseString key(":path");
+  std::string value = "/abc/xyz";
+  headers.setReference(key, value);
+
+  RBAC::HeaderMatcher matcher(config);
+
+  checkMatcher(matcher, true, Envoy::Network::MockConnection(), headers);
+
+  value = "/abc/../data";
+  headers.setReference(key, value);
+
+  checkMatcher(matcher, false, Envoy::Network::MockConnection(), headers);
+  checkMatcher(matcher, false);
+}
+
 TEST(IPMatcher, IPMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr local =
