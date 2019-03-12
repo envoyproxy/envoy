@@ -493,9 +493,8 @@ void Filter::cleanup() {
         upstream_requests_.back()->removeFromList(upstream_requests_);
     if (final_upstream_request_ != nullptr && upstream_request.get() == final_upstream_request_) {
       callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
-    } else {
-      upstream_request->resetStream(); // Idempotent.
     }
+    upstream_request->resetStream(); // Idempotent.
   }
   retry_state_.reset();
   if (response_timeout_) {
