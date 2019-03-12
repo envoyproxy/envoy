@@ -144,6 +144,6 @@ gRPC or RESTful JSON requests to localhost:51051.
           - endpoint:
               address:
                 socket_address:
-                  address: docker.for.mac.localhost
+                  address: host.docker.internal
                   port_value: 50051
 
