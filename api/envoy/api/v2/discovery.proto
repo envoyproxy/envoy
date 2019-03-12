@@ -14,6 +14,7 @@ import "google/rpc/status.proto";
 import "gogoproto/gogo.proto";
 
 option (gogoproto.equal_all) = true;
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: Common discovery API components]
 

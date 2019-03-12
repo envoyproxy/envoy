@@ -64,14 +64,6 @@ public:
   Event::TestRealTimeSystem real_time_; // NO_CHECK_FORMAT(real_time)
 };
 
-class MockTokenBucket : public TokenBucket {
-public:
-  MockTokenBucket();
-  ~MockTokenBucket();
-
-  MOCK_METHOD1(consume, bool(uint64_t));
-};
-
 // Captures absl::string_view parameters into temp strings, for use
 // with gmock's SaveArg<n>. Providing an absl::string_view compiles,
 // but fails because by the time you examine the saved value, its

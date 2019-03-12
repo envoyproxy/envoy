@@ -126,14 +126,13 @@ private:
   }
 
   bool checkRateLimitAllowsDrain() {
-    if (!rate_limiting_enabled_ || limit_request_->consume()) {
+    if (!rate_limiting_enabled_ || limit_request_->consume(1, false)) {
       return true;
     }
     ASSERT(drain_request_timer_ != nullptr);
     control_plane_stats_.rate_limit_enforced_.inc();
     // Enable the drain request timer.
-    drain_request_timer_->enableTimer(
-        std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
+    drain_request_timer_->enableTimer(limit_request_->nextTokenAvailable());
     return false;
   }
 
