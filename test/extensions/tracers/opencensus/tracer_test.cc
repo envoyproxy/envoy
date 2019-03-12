@@ -1,3 +1,6 @@
+// Usage:
+// bazel run //test/extensions/tracers/opencensus:tracer_test -- -l debug
+
 #include <iostream>
 #include <vector>
 
@@ -128,6 +131,44 @@ TEST(OpenCensusTracerTest, Span) {
   EXPECT_EQ("setSampled", sd.annotations().events()[2].event().description());
 
   EXPECT_TRUE(sd.has_ended());
+}
+
+// Test that trace context propagation works.
+TEST(OpenCensusTracerTest, PropagateTraceContext) {
+  using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
+  registerSpanCatcher();
+  OpenCensusConfig oc_config;
+  oc_config.add_incoming_trace_context(OpenCensusConfig::trace_context);
+  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
+
+  NiceMock<Tracing::MockConfig> config;
+  Http::TestHeaderMapImpl request_headers{
+      {":path", "/"},
+      {":method", "GET"},
+      {"x-request-id", "foo"},
+      {"traceparent", "00-404142434445464748494a4b4c4d4e4f-6162636465666768-01"},
+  };
+  const std::string operation_name{"my_operation_1"};
+  SystemTime start_time;
+
+  {
+    Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
+                                              {Tracing::Reason::Sampling, false});
+    span->finishSpan();
+  }
+
+  // Retrieve SpanData from the OpenCensus trace exporter.
+  std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
+  ASSERT_EQ(1, spans.size());
+  const auto& sd = spans[0];
+  ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
+
+  // Check contents.
+  EXPECT_TRUE(sd.has_remote_parent());
+  EXPECT_EQ("6162636465666768", sd.parent_span_id().ToHex());
+  EXPECT_EQ("404142434445464748494a4b4c4d4e4f", sd.context().trace_id().ToHex());
+  EXPECT_TRUE(sd.context().trace_options().IsSampled())
+      << "parent was sampled, child should be also";
 }
 
 } // namespace OpenCensus

@@ -9,6 +9,7 @@
 #include "opencensus/trace/propagation/trace_context.h"
 #include "opencensus/trace/sampler.h"
 #include "opencensus/trace/span.h"
+#include "opencensus/trace/span_context.h"
 #include "opencensus/trace/trace_config.h"
 #include "opencensus/trace/trace_params.h"
 
@@ -46,22 +47,73 @@ private:
   const envoy::config::trace::v2::OpenCensusConfig* oc_config_;
 };
 
-::opencensus::trace::Span StartSpan(const std::string& name, bool traced) {
+::opencensus::trace::Span
+StartSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& request_headers,
+                const envoy::config::trace::v2::OpenCensusConfig& oc_config) {
+  // Determine if there is a parent context.
+  using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
+  ::opencensus::trace::SpanContext parent_ctx;
+  for (const auto& incoming : oc_config.incoming_trace_context()) {
+    bool found = false;
+    switch (incoming) {
+    case OpenCensusConfig::trace_context: {
+      const Http::HeaderEntry* header = request_headers.get(Http::LowerCaseString{"traceparent"});
+      if (header != nullptr) {
+        found = true;
+        parent_ctx = ::opencensus::trace::propagation::FromTraceParentHeader(
+            header->value().getStringView());
+      }
+      break;
+    }
+
+    case OpenCensusConfig::grpc_trace_bin: {
+      const Http::HeaderEntry* header =
+          request_headers.get(Http::LowerCaseString{"grpc-trace-bin"});
+      if (header != nullptr) {
+        found = true;
+        parent_ctx = ::opencensus::trace::propagation::FromGrpcTraceBinHeader(
+            header->value().getStringView());
+      }
+      break;
+    }
+
+    case OpenCensusConfig::cloud_trace_context: {
+      const Http::HeaderEntry* header =
+          request_headers.get(Http::LowerCaseString{"x-cloud-trace-context"});
+      if (header != nullptr) {
+        found = true;
+        parent_ctx = ::opencensus::trace::propagation::FromCloudTraceContextHeader(
+            header->value().getStringView());
+      }
+      break;
+    }
+    }
+    // First header found wins.
+    if (found)
+      break;
+  }
+
+  // Honor Envoy's tracing decision.
   ::opencensus::trace::AlwaysSampler always_sampler;
   ::opencensus::trace::NeverSampler never_sampler;
+  // This is safe because opts are not used after StartSpan.
   ::opencensus::trace::StartSpanOptions opts{&never_sampler};
   if (traced) {
     opts.sampler = &always_sampler;
   }
-  // opts are not used after StartSpan.
+
+  if (parent_ctx.IsValid()) {
+    return ::opencensus::trace::Span::StartSpanWithRemoteParent(name, parent_ctx, opts);
+  }
   return ::opencensus::trace::Span::StartSpan(name, /*parent=*/nullptr, opts);
 }
 
 Span::Span(const Tracing::Config& config,
            const envoy::config::trace::v2::OpenCensusConfig* oc_config,
-           Http::HeaderMap& /*request_headers*/, const std::string& operation_name,
+           Http::HeaderMap& request_headers, const std::string& operation_name,
            SystemTime /*start_time*/, const Tracing::Decision tracing_decision)
-    : span_(StartSpan(operation_name, tracing_decision.traced)), oc_config_(oc_config) {
+    : span_(StartSpanHelper(operation_name, tracing_decision.traced, request_headers, *oc_config)),
+      oc_config_(oc_config) {
   span_.AddAttribute("OperationName", config.operationName() == Tracing::OperationName::Ingress
                                           ? "Ingress"
                                           : "Egress");
@@ -87,19 +139,27 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 void Span::finishSpan() { span_.End(); }
 
 void Span::injectContext(Http::HeaderMap& request_headers) {
-  if (oc_config_->propagate_cloud_trace_context()) {
-    request_headers.addCopy(
-        Http::LowerCaseString{"x-cloud-trace-context"},
-        ::opencensus::trace::propagation::ToCloudTraceContextHeader(span_.context()));
-  }
-  if (oc_config_->propagate_trace_context()) {
-    request_headers.addCopy(Http::LowerCaseString{"traceparent"},
-                            ::opencensus::trace::propagation::ToTraceParentHeader(span_.context()));
-  }
-  if (oc_config_->propagate_grpc_trace_bin()) {
-    request_headers.addCopy(
-        Http::LowerCaseString{"grpc-trace-bin"},
-        ::opencensus::trace::propagation::ToGrpcTraceBinHeader(span_.context()));
+  using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
+  for (const auto& outgoing : oc_config_->outgoing_trace_context()) {
+    switch (outgoing) {
+    case OpenCensusConfig::trace_context:
+      request_headers.addCopy(
+          Http::LowerCaseString{"traceparent"},
+          ::opencensus::trace::propagation::ToTraceParentHeader(span_.context()));
+      break;
+
+    case OpenCensusConfig::grpc_trace_bin:
+      request_headers.addCopy(
+          Http::LowerCaseString{"grpc-trace-bin"},
+          ::opencensus::trace::propagation::ToGrpcTraceBinHeader(span_.context()));
+      break;
+
+    case OpenCensusConfig::cloud_trace_context:
+      request_headers.addCopy(
+          Http::LowerCaseString{"x-cloud-trace-context"},
+          ::opencensus::trace::propagation::ToCloudTraceContextHeader(span_.context()));
+      break;
+    }
   }
 }
 
