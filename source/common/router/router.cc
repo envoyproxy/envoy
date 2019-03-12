@@ -489,7 +489,8 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 
 void Filter::cleanup() {
   while (!upstream_requests_.empty()) {
-    UpstreamRequestPtr upstream_request = upstream_requests_.front()->removeFromList(upstream_requests_);
+    UpstreamRequestPtr upstream_request =
+        upstream_requests_.front()->removeFromList(upstream_requests_);
     if (final_upstream_request_ != nullptr && upstream_request.get() == final_upstream_request_) {
       callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
     } else {
@@ -540,9 +541,7 @@ void Filter::onRequestComplete() {
   }
 }
 
-void Filter::onDestroy() {
-  cleanup();
-}
+void Filter::onDestroy() { cleanup(); }
 
 void Filter::onResponseTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream timeout", *callbacks_);
@@ -1097,7 +1096,8 @@ void Filter::doRetry() {
 
 uint32_t Filter::numRequestsAwaitingHeaders() {
   uint32_t ret = 0;
-  for (auto upstream_request = upstream_requests_.cbegin(); upstream_request != upstream_requests_.cend(); upstream_request++) {
+  for (auto upstream_request = upstream_requests_.cbegin();
+       upstream_request != upstream_requests_.cend(); upstream_request++) {
     if (!upstream_request->get()->upstream_headers_) {
       ret++;
     }
