@@ -130,7 +130,7 @@ public:
 
   ~Http1ConnPoolImplTest() {
     // Make sure all gauges are 0, except those in circuit_breakers which default
-    // to the resource max
+    // to the resource max.
     for (const Stats::GaugeSharedPtr& gauge : cluster_->stats_store_.gauges()) {
       if (!absl::StrContains(gauge->name(), "circuit_breakers")) {
         EXPECT_EQ(0U, gauge->value());
