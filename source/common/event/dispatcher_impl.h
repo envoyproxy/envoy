@@ -14,6 +14,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+#include "common/event/libevent_scheduler.h"
 
 namespace Envoy {
 namespace Event {
@@ -31,7 +32,7 @@ public:
   /**
    * @return event_base& the libevent base.
    */
-  event_base& base() { return *base_; }
+  event_base& base() { return base_scheduler_.base(); }
 
   // Event::Dispatcher
   TimeSource& timeSource() override { return api_.timeSource(); }
@@ -73,7 +74,7 @@ private:
   Api::Api& api_;
   Thread::ThreadIdPtr run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
-  Libevent::BasePtr base_;
+  LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
   TimerPtr deferred_delete_timer_;
   TimerPtr post_timer_;

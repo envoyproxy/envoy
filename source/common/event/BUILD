@@ -20,6 +20,7 @@ envoy_cc_library(
     ],
     deps = [
         ":dispatcher_includes",
+        ":libevent_scheduler_lib",
         ":real_time_system_lib",
         "//include/envoy/common:time_interface",
         "//include/envoy/event:signal_interface",
@@ -35,19 +36,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "event_impl_base_lib",
+    srcs = ["event_impl_base.cc"],
+    hdrs = ["event_impl_base.h"],
+    external_deps = [
+        "event",
+    ],
+)
+
+envoy_cc_library(
     name = "real_time_system_lib",
-    srcs = [
-        "event_impl_base.cc",
-        "real_time_system.cc",
-        "timer_impl.cc",
-    ],
-    hdrs = [
-        "event_impl_base.h",
-        "real_time_system.h",
-        "timer_impl.h",
-    ],
+    srcs = ["real_time_system.cc"],
+    hdrs = ["real_time_system.h"],
     deps = [
-        ":libevent_lib",
+        ":event_impl_base_lib",
+        ":timer_lib",
         "//include/envoy/event:timer_interface",
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
@@ -63,6 +66,7 @@ envoy_cc_library(
     ],
     deps = [
         ":libevent_lib",
+        ":libevent_scheduler_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
@@ -83,6 +87,31 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "libevent_scheduler_lib",
+    srcs = ["libevent_scheduler.cc"],
+    hdrs = ["libevent_scheduler.h"],
+    external_deps = ["event"],
+    deps = [
+        ":libevent_lib",
+        ":timer_lib",
+        "//include/envoy/event:timer_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "timer_lib",
+    srcs = ["timer_impl.cc"],
+    hdrs = ["timer_impl.h"],
+    external_deps = ["event"],
+    deps = [
+        ":event_impl_base_lib",
+        ":libevent_lib",
+        "//include/envoy/event:timer_interface",
     ],
 )
 
