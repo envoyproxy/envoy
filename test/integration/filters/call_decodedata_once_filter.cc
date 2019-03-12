@@ -15,20 +15,29 @@ class CallDecodeDataOnceFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "call-decodedata-once-filter";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
+    Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    Http::HeaderEntry* entry_added = header_map.get(Envoy::Http::LowerCaseString("added_size"));
+    ASSERT(entry_content != nullptr && entry_added != nullptr);
+    content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
+    added_size_ = std::stoul(std::string(entry_added->value().getStringView()));
     return Http::FilterHeadersStatus::Continue;
   }
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
     // Request data length (size 5000) + data from addDecodedData() called in dataDecode (size 1).
     // Or data from addDecodedData() called in dataTrailers (size 1)
-    EXPECT_TRUE(data.length() == 70001 || data.length() == 1);
+    EXPECT_TRUE(data.length() == content_size_ + added_size_ || data.length() == added_size_);
     return Http::FilterDataStatus::Continue;
   }
 
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
+
+private:
+  size_t content_size_ = 0;
+  size_t added_size_ = 0;
 };
 
 constexpr char CallDecodeDataOnceFilter::name[];

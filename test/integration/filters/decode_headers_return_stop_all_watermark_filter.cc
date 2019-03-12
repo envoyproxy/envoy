@@ -24,7 +24,10 @@ public:
 
   // Returns Http::FilterHeadersStatus::StopAllIterationAndWatermark for headers, and sets buffer
   // limit to 100.
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
+    Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    ASSERT(entry_content != nullptr);
+    content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
     decoder_callbacks_->setDecoderBufferLimit(100);
     createTimerForContinue();
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
@@ -34,7 +37,7 @@ public:
     // High watermark reached before all data are received. The rest of the data is sent after
     // iteration resumes.
     ASSERT(timer_triggered_);
-    EXPECT_LT(data.length(), 70000);
+    EXPECT_LT(data.length(), content_size_);
     Buffer::OwnedImpl added_data("a");
     decoder_callbacks_->addDecodedData(added_data, false);
     return Http::FilterDataStatus::Continue;
@@ -59,6 +62,7 @@ private:
 
   Event::TimerPtr delay_timer_;
   bool timer_triggered_ = false;
+  size_t content_size_ = 0;
 };
 
 constexpr char DecodeHeadersReturnStopAllWatermarkFilter::name[];

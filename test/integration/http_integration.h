@@ -176,10 +176,6 @@ protected:
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
                                     bool with_encoder_filter = false);
 
-  void testDecodeHeadersReturnsStopAll();
-  void testTwoFiltersDecodeHeadersReturnsStopAll();
-  void testDecodeHeadersReturnsStopAllWatermark();
-
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
   void testTrailers(uint64_t request_size, uint64_t response_size);

@@ -24,7 +24,12 @@ public:
 
   // Returns Http::FilterHeadersStatus::StopAllIterationAndBuffer for headers. Triggers a timer to
   // continue iteration after 1s.
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
+    Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    Http::HeaderEntry* entry_added = header_map.get(Envoy::Http::LowerCaseString("added_size"));
+    ASSERT(entry_content != nullptr && entry_added != nullptr);
+    content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
+    added_size_ = std::stoul(std::string(entry_added->value().getStringView()));
     createTimerForContinue();
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   }
@@ -33,7 +38,7 @@ public:
     // Request data (size 70000) and added data by DecodeHeadersReturnStopAllFilter (size 1) are
     // received together.
     ASSERT(timer_triggered_);
-    EXPECT_TRUE(data.length() == 70001 || data.length() == 70002);
+    EXPECT_TRUE(data.length() == content_size_ + added_size_ || data.length() == content_size_ + added_size_ * 2);
     return Http::FilterDataStatus::Continue;
   }
 
@@ -54,6 +59,8 @@ private:
 
   Event::TimerPtr delay_timer_;
   bool timer_triggered_ = false;
+  size_t content_size_ = 0;
+  size_t added_size_ = 0;
 };
 
 constexpr char DecodeHeadersReturnStopAllFilter2::name[];
