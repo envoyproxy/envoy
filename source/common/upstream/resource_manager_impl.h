@@ -50,8 +50,8 @@ private:
                  Stats::BoolIndicator& circuit_breaker_open, Stats::Gauge& remaining)
         : max_(max), runtime_(runtime), runtime_key_(runtime_key),
           circuit_breaker_open_(circuit_breaker_open), remaining_(remaining) {
-            remaining_.set(max);
-          }
+      remaining_.set(max);
+    }
     ~ResourceImpl() { ASSERT(current_ == 0); }
 
     // Upstream::Resource
@@ -74,12 +74,12 @@ private:
      * atomics are used, it is possible for the current resource count to be
      * greater than the supplied max.
      */
-    void updateRemaining() { 
+    void updateRemaining() {
       /**
        * We cannot use std::max here because max() and current_ are
        * unsigned and subtracting them may overflow.
        */
-      max() > current_ ? remaining_.set(max() - current_) : remaining_.set(0); 
+      max() > current_ ? remaining_.set(max() - current_) : remaining_.set(0);
     }
 
     const uint64_t max_;

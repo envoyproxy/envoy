@@ -28,8 +28,8 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1,
-      ClusterCircuitBreakersStats{ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_BOOL_INDICATOR(store),
-                                                                     POOL_GAUGE(store))});
+      ClusterCircuitBreakersStats{
+          ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_BOOL_INDICATOR(store), POOL_GAUGE(store))});
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -66,12 +66,11 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   NiceMock<Runtime::MockLoader> runtime;
   Stats::IsolatedStoreImpl store;
 
-  auto stats = ClusterCircuitBreakersStats{ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_BOOL_INDICATOR(store),
-                                           POOL_GAUGE(store))};
+  auto stats = ClusterCircuitBreakersStats{
+      ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_BOOL_INDICATOR(store), POOL_GAUGE(store))};
   ResourceManagerImpl resource_manager(
-      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0,
-      stats);
-  
+      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, stats);
+
   // Test remaining_cx_ gauge
   EXPECT_EQ(1U, resource_manager.connections().max());
   EXPECT_EQ(1U, stats.remaining_cx_.value());
