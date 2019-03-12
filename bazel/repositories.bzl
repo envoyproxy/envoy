@@ -577,10 +577,18 @@ def _io_opencensus_cpp():
     )
 
 def _com_github_curl():
-    # Curl library - used by OpenCensus Zipkin exporter.
-    _repository_impl(
-        "com_github_curl",
-        build_file = "@envoy//bazel/external:curl.BUILD",
+    # Used by OpenCensus Zipkin exporter.
+    location = REPOSITORY_LOCATIONS["com_github_curl"]
+    http_archive(
+        name = "com_github_curl",
+        build_file_content = BUILD_ALL_CONTENT + """
+cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
+""",
+        **location
+    )
+    native.bind(
+        name = "curl",
+        actual = "@envoy//bazel/foreign_cc:curl",
     )
 
 def _com_googlesource_quiche():
