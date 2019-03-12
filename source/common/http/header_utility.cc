@@ -67,7 +67,7 @@ HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
       }()) {}
 
 std::string removeDotSegments(absl::string_view input) {
-  std::vector<std::string> output;
+  std::vector<absl::string_view> output;
   while (!input.empty()) {
     // A. If the input buffer begins with a prefix of "../" or "./",
     // then remove that prefix from the input buffer;
@@ -124,7 +124,7 @@ std::string removeDotSegments(absl::string_view input) {
     // the next "/" character or the end of the input buffer.
     auto j = input.find("/", 1);
     auto seg = input.substr(0, j);
-    output.push_back(std::string(seg));
+    output.push_back(seg);
     input.remove_prefix(seg.length());
   }
   return absl::StrJoin(output, "");
