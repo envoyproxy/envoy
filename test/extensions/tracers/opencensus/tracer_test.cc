@@ -103,6 +103,7 @@ TEST(OpenCensusTracerTest, Span) {
                                               {Tracing::Reason::Sampling, true});
     span->setOperation("my_operation_2");
     span->setTag("my_key", "my_value");
+    span->log(start_time, "my annotation");
     // TODO: injectContext.
     // TODO: spawnChild.
     span->setSampled(false); // Abandon tracer.
@@ -121,9 +122,10 @@ TEST(OpenCensusTracerTest, Span) {
   ::opencensus::trace::SpanId zeros;
   EXPECT_EQ(zeros, sd.parent_span_id());
 
-  ASSERT_EQ(2, sd.annotations().events().size());
+  ASSERT_EQ(3, sd.annotations().events().size());
   EXPECT_EQ("setOperation", sd.annotations().events()[0].event().description());
-  EXPECT_EQ("setSampled", sd.annotations().events()[1].event().description());
+  EXPECT_EQ("my annotation", sd.annotations().events()[1].event().description());
+  EXPECT_EQ("setSampled", sd.annotations().events()[2].event().description());
 
   EXPECT_TRUE(sd.has_ended());
 }

@@ -39,7 +39,7 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
       "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
       trace_config:
         constant_sampler:
-          decision: true
+          decision: ALWAYS_ON
         max_number_of_attributes: 12
         max_number_of_annotations: 34
         max_number_of_message_events: 56
