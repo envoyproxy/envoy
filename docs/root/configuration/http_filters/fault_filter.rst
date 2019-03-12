@@ -106,7 +106,7 @@ owning HTTP connection manager.
 
   delays_injected, Counter, Total requests that were delayed
   aborts_injected, Counter, Total requests that were aborted
-  response_rl_injected, Counter, Total requests that had a response rate limit selected for injection (actually injection may not occur due to disconnect, reset, no body, etc.)
+  response_rl_injected, Counter, "Total requests that had a response rate limit selected for injection (actually injection may not occur due to disconnect, reset, no body, etc.)"
   faults_overflow, Counter, Total number of faults that were not injected due to overflowing the :ref:`max_active_faults <envoy_api_field_config.filter.http.fault.v2.HTTPFault.max_active_faults>` setting
   active_faults, Gauge, Total number of faults active at the current time
   <downstream-cluster>.delays_injected, Counter, Total delayed requests for the given downstream cluster
