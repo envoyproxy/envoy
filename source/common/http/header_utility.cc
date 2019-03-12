@@ -67,6 +67,8 @@ HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
       }()) {}
 
 std::string removeDotSegments(absl::string_view input) {
+  // This function implements the "Remove Dot Segments" algorithm specified in the rfc3986:
+  // https://tools.ietf.org/html/rfc3986#section-5.2.4
   std::vector<absl::string_view> output;
   while (!input.empty()) {
     // A. If the input buffer begins with a prefix of "../" or "./",
