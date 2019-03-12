@@ -263,8 +263,8 @@ public:
 
 class MockServerLifecycleNotifier : public ServerLifecycleNotifier {
 public:
-  MockServerLifecycleNotifier() {}
-  ~MockServerLifecycleNotifier() {}
+  MockServerLifecycleNotifier();
+  ~MockServerLifecycleNotifier();
 
   MOCK_METHOD2(registerCallback, void(Stage, StageCallback));
 };

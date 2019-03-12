@@ -2,12 +2,14 @@
 
 #include <functional>
 
+#include "envoy/common/pure.h"
+
 namespace Envoy {
 namespace Server {
 
 class ServerLifecycleNotifier {
 public:
-  virtual ~ServerLifecycleNotifier() {}
+  virtual ~ServerLifecycleNotifier() = default;
 
   /**
    * Stages of the envoy server instance lifecycle.

@@ -99,6 +99,9 @@ MockListenerComponentFactory::MockListenerComponentFactory()
 }
 MockListenerComponentFactory::~MockListenerComponentFactory() = default;
 
+MockServerLifecycleNotifier::MockServerLifecycleNotifier() = default;
+MockServerLifecycleNotifier::~MockServerLifecycleNotifier() = default;
+
 MockListenerManager::MockListenerManager() = default;
 MockListenerManager::~MockListenerManager() = default;
 
