@@ -820,7 +820,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
 
     response.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags,
                              stats.sampleCount()));
-    response.add(fmt::format("{0}_sum{{{1}}} {2}\n", metric_name, tags, stats.sampleSum()));
+    response.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", metric_name, tags, stats.sampleSum()));
     response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
   }
 
