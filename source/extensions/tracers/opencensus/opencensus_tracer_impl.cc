@@ -136,6 +136,7 @@ Driver::Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config)
 
 void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& config) {
   using SamplerCase = opencensus::proto::trace::v1::TraceConfig::SamplerCase;
+  using opencensus::proto::trace::v1::ConstantSampler;
   constexpr double kDefaultSamplingProbability = 1e-4;
   double probability = kDefaultSamplingProbability;
 
@@ -144,7 +145,19 @@ void Driver::applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& c
     probability = config.probability_sampler().samplingprobability();
     break;
   case SamplerCase::kConstantSampler:
-    probability = config.constant_sampler().decision() ? 1. : 0.;
+    switch (config.constant_sampler().decision()) {
+    case ConstantSampler::ALWAYS_OFF:
+      probability = 0.;
+      break;
+    case ConstantSampler::ALWAYS_ON:
+      probability = 1.;
+      break;
+    case ConstantSampler::ALWAYS_PARENT:
+      probability = 1.;
+      break;
+    default:
+      break; /* Keep default probability. */
+    }
     break;
   case SamplerCase::kRateLimitingSampler:
     ENVOY_LOG(error, "RateLimitingSampler is not supported.");
