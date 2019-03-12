@@ -157,7 +157,7 @@ void FaultFilter::maybeSetupResponseRateLimit() {
   incActiveFaults();
   config_->stats().response_rl_injected_.inc();
 
-  response_limiter_.reset(new StreamRateLimiter(
+  response_limiter_ = std::make_unique<StreamRateLimiter>(
       fault_settings_->responseRateLimit().value().fixed_rate_kbps_,
       encoder_callbacks_->encoderBufferLimit(),
       [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
@@ -171,7 +171,7 @@ void FaultFilter::maybeSetupResponseRateLimit() {
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
       [this] { encoder_callbacks_->continueEncoding(); }, config_->timeSource(),
-      decoder_callbacks_->dispatcher()));
+      decoder_callbacks_->dispatcher());
 }
 
 bool FaultFilter::faultOverflow() {
