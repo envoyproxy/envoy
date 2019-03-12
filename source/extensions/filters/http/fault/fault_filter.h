@@ -13,7 +13,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "common/buffer/watermark_buffer.h"
 #include "common/common/token_bucket_impl.h"
 #include "common/http/header_utility.h"
 
@@ -148,9 +148,6 @@ private:
   static constexpr uint64_t SecondDivisor = 16;
 
   const uint64_t bytes_per_time_slice_;
-  const uint64_t max_buffered_data_;
-  const std::function<void()> pause_data_cb_;
-  const std::function<void()> resume_data_cb_;
   const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
   const std::function<void()> continue_cb_;
   TokenBucketImpl token_bucket_;
@@ -158,8 +155,7 @@ private:
   bool waiting_for_token_{};
   bool saw_end_stream_{};
   bool saw_trailers_{};
-  bool buffer_overflow_{};
-  Buffer::OwnedImpl buffer_;
+  Buffer::WatermarkBuffer buffer_;
 };
 
 /**

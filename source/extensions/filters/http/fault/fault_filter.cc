@@ -161,12 +161,7 @@ void FaultFilter::maybeSetupResponseRateLimit() {
       fault_settings_->responseRateLimit().value().fixed_rate_kbps_,
       encoder_callbacks_->encoderBufferLimit(),
       [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
-      [this] {
-        // TODO(mattklein123): Do we want an actual high/low watermark within
-        // this filter? Probably? Can we share the code/logic with the primary
-        // high/low watermark logic?
-        encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
-      },
+      [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
       [this](Buffer::Instance& data, bool end_stream) {
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
@@ -297,6 +292,7 @@ void FaultFilter::incActiveFaults() {
     return;
   }
 
+  // TODO(mattklein123): Consider per-fault type active fault gauges.
   config_->stats().active_faults_.inc();
   fault_active_ = true;
 }
@@ -384,16 +380,17 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
                                      std::function<void()> continue_cb, TimeSource& time_source,
                                      Event::Dispatcher& dispatcher)
     : // bytes_per_time_slice is KiB converted to bytes divided by the number of ticks per second.
-      bytes_per_time_slice_((max_kbps * 1024) / SecondDivisor),
-      max_buffered_data_(max_buffered_data), pause_data_cb_(pause_data_cb),
-      resume_data_cb_(resume_data_cb), write_data_cb_(write_data_cb), continue_cb_(continue_cb),
+      bytes_per_time_slice_((max_kbps * 1024) / SecondDivisor), write_data_cb_(write_data_cb),
+      continue_cb_(continue_cb),
       // The token bucket is configured with a max token count of the number of ticks per second,
       // and refills at the same rate, so that we have a per second limit which refills gradually in
       // ~63ms intervals.
       token_bucket_(SecondDivisor, time_source, SecondDivisor),
-      token_timer_(dispatcher.createTimer([this] { onTokenTimer(); })) {
+      token_timer_(dispatcher.createTimer([this] { onTokenTimer(); })),
+      buffer_(resume_data_cb, pause_data_cb) {
   ASSERT(bytes_per_time_slice_ > 0);
-  ASSERT(max_buffered_data_ > 0);
+  ASSERT(max_buffered_data > 0);
+  buffer_.setWatermarks(max_buffered_data);
 }
 
 void StreamRateLimiter::onTokenTimer() {
@@ -427,12 +424,6 @@ void StreamRateLimiter::onTokenTimer() {
     }
   }
 
-  // If we need to resume receiving data, so that now.
-  if (buffer_overflow_ && buffer_.length() < max_buffered_data_) {
-    buffer_overflow_ = false;
-    resume_data_cb_();
-  }
-
   // Write the data out, indicating end stream if we saw end stream, there is no further data to
   // send, and there are no trailers.w
   write_data_cb_(data_to_write, saw_end_stream_ && buffer_.length() == 0 && !saw_trailers_);
@@ -448,11 +439,6 @@ void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_st
   ENVOY_LOG(trace, "limiter: incoming data length={} buffered={}", incoming_buffer.length(),
             buffer_.length());
   buffer_.move(incoming_buffer);
-  if (!buffer_overflow_ && buffer_.length() > max_buffered_data_) {
-    buffer_overflow_ = true;
-    pause_data_cb_();
-  }
-
   saw_end_stream_ = end_stream;
   if (!waiting_for_token_) {
     // TODO(mattklein123): In an optimal world we would be able to continue iteration with the data
