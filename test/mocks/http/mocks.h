@@ -192,8 +192,7 @@ public:
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
   testing::NiceMock<MockScopedTrackedObject> scope_;
   std::string details_;
-  bool is_grpc_request_{};
-  bool is_head_request_{false};
+  Utility::LocalReplyInfo local_reply_info_;
   bool stream_destroyed_{};
 };
 

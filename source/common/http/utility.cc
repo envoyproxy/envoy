@@ -264,6 +264,7 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
   return ret;
 }
 
+<<<<<<< HEAD
 void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
                              const bool& is_reset, Code response_code, absl::string_view body_text,
                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -277,17 +278,57 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
         callbacks.encodeData(data, end_stream);
       },
       is_reset, response_code, body_text, grpc_status, is_head_request);
+=======
+Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& request_headers) {
+  bool is_grpc = false, is_head_request = false, is_json_content_type = false;
+  const Http::HeaderEntry* content_type = request_headers.ContentType();
+  // Content type is gRPC if it is exactly "application/grpc" or starts with
+  // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
+  is_grpc =
+      content_type != nullptr &&
+      absl::StartsWith(content_type->value().getStringView(),
+                       Http::Headers::get().ContentTypeValues.Grpc) &&
+      (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
+       content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
+
+  if (Http::Headers::get().MethodValues.Head == request_headers.Method()->value().c_str()) {
+    is_head_request = true;
+  }
+
+  if (!is_grpc) {
+    is_json_content_type =
+        content_type != nullptr &&
+        (Http::Headers::get().ContentTypeValues.Json == content_type->value().c_str());
+  }
+
+  return LocalReplyInfo{is_grpc, is_head_request, is_json_content_type};
+}
+
+void Utility::sendLocalReply(const Utility::LocalReplyInfo& info,
+                             StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
+                             Code response_code, absl::string_view body_text,
+                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+  sendLocalReply(info,
+                 [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+                   callbacks.encodeHeaders(std::move(headers), end_stream);
+                 },
+                 [&](Buffer::Instance& data, bool end_stream) -> void {
+                   callbacks.encodeData(data, end_stream);
+                 },
+                 is_reset, response_code, body_text, grpc_status);
+>>>>>>> Refactor sendLocalReply
 }
 
 void Utility::sendLocalReply(
-    bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
+    const Utility::LocalReplyInfo& info,
+    std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
     Code response_code, absl::string_view body_text,
-    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, bool is_head_request) {
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
-  if (is_grpc) {
+  if (info.is_grpc) {
     HeaderMapPtr response_headers{new HeaderMapImpl{
         {Headers::get().Status, std::to_string(enumToInt(Code::OK))},
         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
@@ -295,7 +336,7 @@ void Utility::sendLocalReply(
          std::to_string(
              enumToInt(grpc_status ? grpc_status.value()
                                    : Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
-    if (!body_text.empty() && !is_head_request) {
+    if (!body_text.empty() && !info.is_head_request) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
       response_headers->insertGrpcMessage().value(PercentEncoding::encode(body_text));
@@ -311,7 +352,7 @@ void Utility::sendLocalReply(
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
   }
 
-  if (is_head_request) {
+  if (info.is_head_request) {
     encode_headers(std::move(response_headers), true);
     return;
   }

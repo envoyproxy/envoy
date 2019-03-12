@@ -436,8 +436,8 @@ TEST(HttpUtility, SendLocalReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks, encodeData(_, true));
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, false);
+  Utility::sendLocalReply(Utility::LocalReplyInfo{}, callbacks, is_reset,
+                          Http::Code::PayloadTooLarge, "large", absl::nullopt);
 }
 
 TEST(HttpUtility, SendLocalGrpcReply) {
@@ -453,8 +453,10 @@ TEST(HttpUtility, SendLocalGrpcReply) {
         EXPECT_NE(headers.GrpcMessage(), nullptr);
         EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), "large");
       }));
-  Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, false);
+  Utility::LocalReplyInfo info;
+  info.is_grpc = true;
+  Utility::sendLocalReply(info, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
+                          absl::nullopt);
 }
 
 TEST(HttpUtility, SendLocalGrpcReplyWithUpstreamJsonPayload) {
@@ -493,8 +495,9 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
         EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unavailable)));
       }));
-  Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt,
-                          false);
+  Utility::LocalReplyInfo info;
+  info.is_grpc = true;
+  Utility::sendLocalReply(info, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt);
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
@@ -503,9 +506,8 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::ResourceExhausted)));
       }));
   Utility::sendLocalReply(
-      true, callbacks, false, Http::Code::TooManyRequests, "",
-      absl::make_optional<Grpc::Status::GrpcStatus>(Grpc::Status::GrpcStatus::ResourceExhausted),
-      false);
+      info, callbacks, false, Http::Code::TooManyRequests, "",
+      absl::make_optional<Grpc::Status::GrpcStatus>(Grpc::Status::GrpcStatus::ResourceExhausted));
 }
 
 TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
@@ -516,8 +518,9 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
     is_reset = true;
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, false);
+
+  Utility::sendLocalReply(Utility::LocalReplyInfo{}, callbacks, is_reset,
+                          Http::Code::PayloadTooLarge, "large", absl::nullopt);
 }
 
 TEST(HttpUtility, SendLocalReplyHeadRequest) {
@@ -528,8 +531,10 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
         EXPECT_EQ(headers.ContentLength()->value().getStringView(),
                   fmt::format("{}", strlen("large")));
       }));
-  Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
-                          absl::nullopt, true);
+  Utility::LocalReplyInfo info;
+  info.is_head_request = true;
+  Utility::sendLocalReply(info, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
+                          absl::nullopt);
 }
 
 TEST(HttpUtility, TestExtractHostPathFromUri) {

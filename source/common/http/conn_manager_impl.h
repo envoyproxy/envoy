@@ -267,8 +267,7 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details) override {
       parent_.stream_info_.setResponseCodeDetails(details);
-      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
-                             grpc_status, details);
+      parent_.sendLocalReply(local_reply_info_, code, body, modify_headers, grpc_status, details);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -297,7 +296,7 @@ private:
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
     FilterHeadersStatus decodeHeaders(HeaderMap& headers, bool end_stream) {
-      is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+      local_reply_info_ = Utility::generateLocalReplyInfo(headers);
       FilterHeadersStatus status = handle_->decodeHeaders(headers, end_stream);
       if (end_stream) {
         handle_->decodeComplete();
@@ -309,7 +308,7 @@ private:
     void requestDataDrained();
 
     StreamDecoderFilterSharedPtr handle_;
-    bool is_grpc_request_{};
+    Utility::LocalReplyInfo local_reply_info_;
   };
 
   using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
@@ -423,9 +422,8 @@ private:
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
-    void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
+    void sendLocalReply(const Utility::LocalReplyInfo& info, Code code, absl::string_view body,
                         const std::function<void(HeaderMap& headers)>& modify_headers,
-                        bool is_head_request,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                         absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
@@ -617,7 +615,6 @@ private:
     // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_{};
-    bool is_head_request_{};
     // Whether a filter has indicated that the request should be treated as a headers only request.
     bool decoding_headers_only_{};
     // Whether a filter has indicated that the response should be treated as a headers only

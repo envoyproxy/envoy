@@ -110,11 +110,15 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
+<<<<<<< HEAD
   if (Http::Headers::get().MethodValues.Head == headers.Method()->value().getStringView()) {
     is_head_request_ = true;
   }
 
   is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+=======
+  local_reply_info_ = Utility::generateLocalReplyInfo(headers);
+>>>>>>> Refactor sendLocalReply
   headers.insertEnvoyInternalRequest().value().setReference(
       Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {

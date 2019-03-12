@@ -175,6 +175,18 @@ Http2Settings parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOption
  */
 Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& config);
 
+struct LocalReplyInfo {
+  bool is_grpc{false};
+  bool is_head_request{false};
+  bool is_json_content_type{false};
+};
+
+/**
+ * @return LocalReplyInfo An LocalReplyInfo populated from the
+ * Http::HeaderMap& request_headers.
+ */
+LocalReplyInfo generateLocalReplyInfo(const Http::HeaderMap& request_headers);
+
 /**
  * Create a locally generated response using filter callbacks.
  * @param is_grpc tells if this is a response to a gRPC request.
@@ -188,10 +200,9 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
  * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
  * @param is_head_request tells if this is a response to a HEAD request
  */
-void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                    Code response_code, absl::string_view body_text,
-                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                    bool is_head_request);
+void sendLocalReply(const LocalReplyInfo& info, StreamDecoderFilterCallbacks& callbacks,
+                    const bool& is_reset, Code response_code, absl::string_view body_text,
+                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
 
 /**
  * Create a locally generated response using the provided lambdas.
@@ -206,12 +217,11 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
  *                  type.
  * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
  */
-void sendLocalReply(bool is_grpc,
+void sendLocalReply(const LocalReplyInfo& info,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
                     const bool& is_reset, Code response_code, absl::string_view body_text,
-                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                    bool is_head_request = false);
+                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
