@@ -91,14 +91,14 @@ message RedisProxy {
   // the lookups are in O(min(longest key prefix, key length)).
   //
   // Example:
+  //
   // .. code-block:: yaml
   //
   //    prefix_routes:
   //      routes:
   //        - prefix: "abc"
   //          cluster: "cluster_a"
-  //        # the following route will be ignored
-  //        - prefix: "abc"
+  //        - prefix: "abc" # this prefix will be ignored.
   //          cluster: "cluster_b"
   //        - prefix: "a"
   //          cluster: "cluster_c"
