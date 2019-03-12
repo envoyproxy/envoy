@@ -816,7 +816,7 @@ name: passthrough-filter
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(DownstreamProtocolIntegrationTest, testDecodeHeadersReturnsStopAllWatermark) {
   config_helper_.addFilter(R"EOF(
-name: decode-headers-return-stop-all-watermark-filter
+name: decode-headers-return-stop-all-filter
 )EOF");
   config_helper_.addFilter(R"EOF(
 name: passthrough-filter
@@ -837,8 +837,10 @@ name: passthrough-filter
   const int count = 70;
   const int size = 1000;
   const int added_decoded_data_size = 1;
+  const int buffer_limit = 100;
   default_request_headers_.addCopy("content_size", std::to_string(count * size));
   default_request_headers_.addCopy("added_size", std::to_string(added_decoded_data_size));
+  default_request_headers_.addCopy("buffer_limit", std::to_string(buffer_limit));
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);

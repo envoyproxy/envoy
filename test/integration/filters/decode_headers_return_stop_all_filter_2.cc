@@ -35,8 +35,8 @@ public:
   }
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
-    // Request data (size 70000) and added data by DecodeHeadersReturnStopAllFilter (size 1) are
-    // received together.
+    // Request data (content_size_) and added data by DecodeHeadersReturnStopAllFilter (added_size_)
+    // are received together.
     ASSERT(timer_triggered_);
     EXPECT_TRUE(data.length() == content_size_ + added_size_ ||
                 data.length() == content_size_ + added_size_ * 2);

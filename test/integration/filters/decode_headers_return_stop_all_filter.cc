@@ -17,12 +17,14 @@
 
 namespace Envoy {
 
-// A filter returns StopAllIterationAndBuffer for headers. The iteration continues after 5s.
+// A filter returns StopAllIterationAndBuffer or StopAllIterationAndWatermark for headers. The
+// iteration continues after 5s.
 class DecodeHeadersReturnStopAllFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "decode-headers-return-stop-all-filter";
 
-  // Returns Http::FilterHeadersStatus::StopAllIterationAndBuffer for headers. Triggers a timer to
+  // Returns Http::FilterHeadersStatus::StopAllIterationAndBuffer or
+  // Http::FilterHeadersStatus::StopAllIterationAndWatermark for headers. Triggers a timer to
   // continue iteration after 5s.
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
     Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
@@ -31,13 +33,28 @@ public:
     content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
     added_size_ = std::stoul(std::string(entry_added->value().getStringView()));
     createTimerForContinue();
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+
+    Http::HeaderEntry* entry_buffer = header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
+    if (entry_buffer == nullptr) {
+      return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    } else {
+      watermark_enabled_ = true;
+      decoder_callbacks_->setDecoderBufferLimit(
+          std::stoul(std::string(entry_buffer->value().getStringView())));
+      return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
   }
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool) override {
-    // decodeData will only be called once after iteration resumes.
     ASSERT(timer_triggered_);
-    EXPECT_EQ(data.length(), content_size_);
+    if (watermark_enabled_) {
+      // High watermark reached before all data are received. The rest of the data is sent after
+      // iteration resumes.
+      EXPECT_LT(data.length(), content_size_);
+    } else {
+      // decodeData will only be called once after iteration resumes.
+      EXPECT_EQ(data.length(), content_size_);
+    }
     Buffer::OwnedImpl added_data("a");
     decoder_callbacks_->addDecodedData(added_data, false);
     return Http::FilterDataStatus::Continue;
@@ -64,6 +81,7 @@ private:
   bool timer_triggered_ = false;
   size_t content_size_ = 0;
   size_t added_size_ = 0;
+  bool watermark_enabled_ = false;
 };
 
 constexpr char DecodeHeadersReturnStopAllFilter::name[];
