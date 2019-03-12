@@ -90,12 +90,20 @@ message OutputConfig {
   // <envoy_api_field_data.tap.v2alpha.Body.truncated>` field will be set. If not specified, the
   // default is 1KiB.
   google.protobuf.UInt32Value max_buffered_tx_bytes = 3;
+
+  // Indicates whether taps produce a single buffered message per tap, or multiple streamed
+  // messages per tap in the emitted :ref:`TraceWrapper
+  // <envoy_api_msg_data.tap.v2alpha.TraceWrapper>` messages. Note that streamed tapping does not
+  // mean that no buffering takes place. Buffering may be required if data is processed before a
+  // match can be determined. See the HTTP tap filter :ref:`streaming
+  // <config_http_filters_tap_streaming>` documentation for more information.
+  bool streaming = 4;
 }
 
 // Tap output sink configuration.
 message OutputSink {
-  // Output format. All output is in the form of one or more :ref:`BufferedTraceWrapper
-  // <envoy_api_msg_data.tap.v2alpha.BufferedTraceWrapper>` messages. This enumeration indicates
+  // Output format. All output is in the form of one or more :ref:`TraceWrapper
+  // <envoy_api_msg_data.tap.v2alpha.TraceWrapper>` messages. This enumeration indicates
   // how those messages are written. Note that not all sinks support all output formats. See
   // individual sink documentation for more information.
   enum Format {
@@ -121,8 +129,15 @@ message OutputSink {
     // this output format makes consumption simpler.
     PROTO_BINARY = 2;
 
+    // Messages are written as a sequence tuples, where each tuple is the message length encoded
+    // as a `protobuf 32-bit varint
+    // <https://developers.google.com/protocol-buffers/docs/reference/cpp/google.protobuf.io.coded_stream>`_
+    // followed by the binary message. The messages can be read back using the language specific
+    // protobuf coded stream implementation to obtain the message length and the message.
+    PROTO_BINARY_LENGTH_DELIMITED = 3;
+
     // Text proto format.
-    PROTO_TEXT = 3;
+    PROTO_TEXT = 4;
   }
 
   // Sink output format.

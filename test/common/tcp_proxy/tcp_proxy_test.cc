@@ -41,6 +41,7 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace TcpProxy {
+namespace {
 
 using ::Envoy::Network::UpstreamServerName;
 
@@ -51,6 +52,7 @@ Config constructConfigFromJson(const Json::Object& json,
   Envoy::Config::FilterJson::translateTcpProxy(json, tcp_proxy);
   return Config(tcp_proxy, context);
 }
+
 } // namespace
 
 TEST(ConfigTest, NoRouteConfig) {
@@ -1203,5 +1205,6 @@ TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
   filter_->onNewConnection();
 }
 
+} // namespace
 } // namespace TcpProxy
 } // namespace Envoy

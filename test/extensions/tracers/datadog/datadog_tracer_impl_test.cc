@@ -37,6 +37,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
+namespace {
 
 class DatadogDriverTest : public testing::Test {
 public:
@@ -161,6 +162,7 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
   EXPECT_EQ(0U, stats_.counter("tracing.datadog.reports_failed").value());
 }
 
+} // namespace
 } // namespace Datadog
 } // namespace Tracers
 } // namespace Extensions

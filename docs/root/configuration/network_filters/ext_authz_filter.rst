@@ -42,8 +42,15 @@ A sample filter configuration could be:
     - name: ext-authz
       type: static
       http2_protocol_options: {}
-      hosts:
-        - socket_address: { address: 127.0.0.1, port_value: 10003 }
+      load_assignment:
+        cluster_name: ext-authz
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 10003
 
 Statistics
 ----------

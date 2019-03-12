@@ -4,7 +4,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "extensions/filters/network/redis_proxy/codec.h"
+#include "extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,7 +38,7 @@ public:
    * Called when the response is ready.
    * @param value supplies the response which is now owned by the callee.
    */
-  virtual void onResponse(RespValuePtr&& value) PURE;
+  virtual void onResponse(Common::Redis::RespValuePtr&& value) PURE;
 };
 
 /**
@@ -57,7 +57,8 @@ public:
    *         been satisfied (via onResponse() being called). The splitter ALWAYS calls
    *         onResponse() for a given request.
    */
-  virtual SplitRequestPtr makeRequest(const RespValue& request, SplitCallbacks& callbacks) PURE;
+  virtual SplitRequestPtr makeRequest(const Common::Redis::RespValue& request,
+                                      SplitCallbacks& callbacks) PURE;
 };
 
 } // namespace CommandSplitter

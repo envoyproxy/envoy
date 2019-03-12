@@ -599,14 +599,6 @@ createTransportSocketFactory(const envoy::api::v2::Cluster& config,
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterSharedPtr
-  create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
-         ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-         Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-         AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-         Server::Admin& admin, Singleton::Manager& singleton_manager,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
   // Upstream::Cluster
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }
@@ -688,6 +680,8 @@ private:
   uint64_t pending_initialize_health_checks_{};
 };
 
+using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
+
 /**
  * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts
  * with its corresponding locality weight map. This is useful to store priorities/hosts/localities
@@ -695,7 +689,8 @@ private:
  */
 class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info);
+  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info,
+                       PrioritySet::HostUpdateCb* update_cb);
 
   // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
   void
@@ -733,6 +728,7 @@ private:
   ClusterImplBase& parent_;
   PriorityState priority_state_;
   const envoy::api::v2::core::Node& local_info_node_;
+  PrioritySet::HostUpdateCb* update_cb_;
 };
 
 typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;

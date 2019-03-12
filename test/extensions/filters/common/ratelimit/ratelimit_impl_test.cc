@@ -31,6 +31,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace RateLimit {
+namespace {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
@@ -155,6 +156,7 @@ TEST(RateLimitNullFactoryTest, Basic) {
   client->cancel();
 }
 
+} // namespace
 } // namespace RateLimit
 } // namespace Common
 } // namespace Filters

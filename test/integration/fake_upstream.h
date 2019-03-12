@@ -153,7 +153,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -401,7 +402,7 @@ public:
   enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
-                     Event::TestTimeSystem& time_system);
+                     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFailure if an unexpected event occurs. If a caller truly
@@ -529,7 +530,8 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult

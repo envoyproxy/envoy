@@ -13,6 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
+namespace {
 
 TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   auto factory =
@@ -29,6 +30,7 @@ TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   EXPECT_NE(monitor, nullptr);
 }
 
+} // namespace
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

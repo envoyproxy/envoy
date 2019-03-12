@@ -316,7 +316,8 @@ private:
     uint64_t streamId() { return stream_id_; }
 
     // Http::StreamCallbacks
-    void onResetStream(StreamResetReason reason) override;
+    void onResetStream(StreamResetReason reason,
+                       absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 
@@ -341,8 +342,9 @@ private:
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
 
     // Tracing::TracingConfig
-    virtual Tracing::OperationName operationName() const override;
-    virtual const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    Tracing::OperationName operationName() const override;
+    const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    bool verbose() const override;
 
     void traceRequest();
 

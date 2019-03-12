@@ -17,6 +17,7 @@ import "gogoproto/gogo.proto";
 import "envoy/type/percent.proto";
 
 option (gogoproto.equal_all) = true;
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: Common types]
 
@@ -162,6 +163,11 @@ message HeaderValueOption {
   // Should the value be appended? If true (default), the value is appended to
   // existing values.
   google.protobuf.BoolValue append = 2;
+}
+
+// Wrapper for a set of headers.
+message HeaderMap {
+  repeated HeaderValue headers = 1;
 }
 
 // Data source consisting of either a file or an inline value.
