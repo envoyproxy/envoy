@@ -60,6 +60,7 @@ envoy_cmake_external(
     cache_entries = {
         "BUILD_CURL_EXE": "off",
         "BUILD_SHARED_LIBS": "off",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "HTTP_ONLY": "on",
         "BUILD_TESTING": "off",
         "CMAKE_USE_OPENSSL": "off",
