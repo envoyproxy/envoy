@@ -70,9 +70,9 @@ private:
     uint64_t max() override { return runtime_.snapshot().getInteger(runtime_key_, max_); }
 
     /**
-     * We set the gauge instead of using inc() and dec() because, though
-     * atomics are used, it is possible for the current resource count to be
-     * greater than the supplied max.
+     * We set the gauge instead of incrementing and decrementing because,
+     * though atomics are used, it is possible for the current resource count
+     * to be greater than the supplied max.
      */
     void updateRemaining() {
       /**
