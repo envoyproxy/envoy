@@ -163,6 +163,7 @@ features. The following sandboxes are available:
     sandboxes/jaeger_native_tracing
     sandboxes/jaeger_tracing
     Lua <https://github.com/envoyproxy/envoy/tree/master/examples/lua>
+    MySQL <https://github.com/envoyproxy/envoy/tree/master/examples/mysql>
     Redis <https://github.com/envoyproxy/envoy/tree/master/examples/redis>
     sandboxes/zipkin_tracing
 

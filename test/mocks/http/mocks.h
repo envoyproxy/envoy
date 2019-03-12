@@ -64,7 +64,7 @@ public:
   ~MockStreamCallbacks();
 
   // Http::StreamCallbacks
-  MOCK_METHOD1(onResetStream, void(StreamResetReason reason));
+  MOCK_METHOD2(onResetStream, void(StreamResetReason reason, absl::string_view));
   MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
   MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };

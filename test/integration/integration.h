@@ -56,7 +56,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 

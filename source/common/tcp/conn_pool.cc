@@ -161,6 +161,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
       // do with the request.
       // NOTE: We move the existing pending requests to a temporary list. This is done so that
       //       if retry logic submits a new request to the pool, we don't fail it inline.
+      // TODO(lizan): If pool failure due to transport socket, propagate the reason to access log.
       ConnectionPool::PoolFailureReason reason;
       if (conn.timed_out_) {
         reason = ConnectionPool::PoolFailureReason::Timeout;

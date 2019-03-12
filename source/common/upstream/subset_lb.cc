@@ -35,6 +35,26 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       scale_locality_weight_(subsets.scaleLocalityWeight()) {
   ASSERT(subsets.isEnabled());
 
+  if (fallback_policy_ != envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK) {
+    HostPredicate predicate;
+    if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
+      predicate = [](const Host&) -> bool { return true; };
+
+      ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer");
+    } else {
+      predicate = [this](const Host& host) -> bool {
+        return hostMatches(default_subset_metadata_, host);
+      };
+
+      ENVOY_LOG(debug, "subset lb: creating fallback load balancer for {}",
+                describeMetadata(default_subset_metadata_));
+    }
+
+    fallback_subset_ = std::make_unique<LbSubsetEntry>();
+    fallback_subset_->priority_subset_ = std::make_unique<PrioritySubsetImpl>(
+        *this, predicate, locality_weight_aware_, scale_locality_weight_);
+  }
+
   if (subsets.panicModeAny()) {
     HostPredicate predicate = [](const Host&) -> bool { return true; };
 
@@ -186,34 +206,18 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
 
 void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                                               const HostVector& hosts_removed) {
-  if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK) {
+  if (fallback_subset_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: fallback load balancer disabled");
     return;
   }
 
-  if (fallback_subset_ == nullptr) {
-    // First update: create the default host subset.
-    HostPredicate predicate;
-    if (fallback_policy_ == envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
-      predicate = [](const Host&) -> bool { return true; };
-
-      ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer");
-    } else {
-      predicate = std::bind(&SubsetLoadBalancer::hostMatches, this, default_subset_metadata_,
-                            std::placeholders::_1);
-
-      ENVOY_LOG(debug, "subset lb: creating fallback load balancer for {}",
-                describeMetadata(default_subset_metadata_));
-    }
-
-    fallback_subset_.reset(new LbSubsetEntry());
-    fallback_subset_->priority_subset_.reset(
-        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
-    return;
-  }
-
-  // Subsequent updates: add/remove hosts.
+  // Add/remove hosts.
   fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
+
+  // Same thing for the panic mode subset.
+  if (panic_mode_subset_ != nullptr) {
+    panic_mode_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
+  }
 }
 
 // Iterates over the added and removed hosts, looking up an LbSubsetEntryPtr for each. For every
@@ -249,9 +253,9 @@ void SubsetLoadBalancer::processSubsets(
           if (entry->initialized()) {
             update_cb(entry);
           } else {
-            HostPredicate predicate =
-                std::bind(&SubsetLoadBalancer::hostMatches, this, kvs, std::placeholders::_1);
-
+            HostPredicate predicate = [this, kvs](const Host& host) -> bool {
+              return hostMatches(kvs, host);
+            };
             new_cb(entry, predicate, kvs, adding_hosts);
           }
         }

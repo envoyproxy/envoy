@@ -282,7 +282,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
                            -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                cm_.conn_pool_.host_);
+                                absl::string_view(), cm_.conn_pool_.host_);
         return nullptr;
       }));
 
@@ -1398,7 +1398,7 @@ TEST_F(RouterTest, RetryUpstreamConnectionFailure) {
   router_.retry_state_->expectResetRetry();
 
   conn_pool_callbacks->onPoolFailure(Http::ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                     nullptr);
+                                     absl::string_view(), nullptr);
 
   Http::StreamDecoder* response_decoder = nullptr;
   // We expect this reset to kick off a new request.

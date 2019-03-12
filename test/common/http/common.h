@@ -46,7 +46,7 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
     pool_ready_.ready();
   }
 
-  void onPoolFailure(Http::ConnectionPool::PoolFailureReason,
+  void onPoolFailure(Http::ConnectionPool::PoolFailureReason, absl::string_view,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     host_ = host;
     pool_failure_.ready();
