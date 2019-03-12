@@ -45,7 +45,10 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
         max_number_of_message_events: 56
         max_number_of_links: 78
       stdout_exporter_enabled: true
-      propagate_trace_context: true
+      incoming_trace_context: trace_context
+      incoming_trace_context: grpc_trace_bin
+      incoming_trace_context: cloud_trace_context
+      outgoing_trace_context: trace_context
   )EOF";
 
   envoy::config::trace::v2::Tracing configuration;
