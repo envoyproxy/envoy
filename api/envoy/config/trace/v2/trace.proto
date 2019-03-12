@@ -11,7 +11,7 @@ option java_package = "io.envoyproxy.envoy.config.trace.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
-import "trace_config.proto";
+import "opencensus/proto/trace/v1/trace_config.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";

@@ -44,8 +44,12 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/prometheus/client_model/archive/" + PROMETHEUS_GIT_SHA + ".tar.gz"],
     ),
     io_opencensus_trace = dict(
-        sha256 = OPENCENSUS_PROTO_SHA256,
-        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src/opencensus/proto/trace/v1",
-        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_PROTO_GIT_SHA + ".tar.gz"],
+        # TODO: Revert this after https://github.com/census-instrumentation/opencensus-proto/pull/194 is merged.
+        #sha256 = OPENCENSUS_PROTO_SHA256,
+        #strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src",
+        #urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_PROTO_GIT_SHA + ".tar.gz"],
+        urls = ["https://github.com/g-easy/opencensus-proto/archive/py.zip"],
+        strip_prefix = "opencensus-proto-py/src",
+        sha256 = "2594ee18375c3829abe746681c98a826af730cbf1c92aaffbb82c2efaf4ef756",
     ),
 )
