@@ -11,6 +11,7 @@
 #include "server/options_impl.h"
 
 #if defined(__linux__)
+#include <sched.h>
 #include "server/options_impl_platform_linux.h"
 #endif
 #include "test/mocks/api/mocks.h"
@@ -332,7 +333,9 @@ TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
 
 #if defined(__linux__)
 
+using testing::DoAll;
 using testing::Return;
+using testing::SetArgPointee;
 
 class OptionsImplPlatformLinuxTest : public testing::Test {
 public:
@@ -340,37 +343,85 @@ public:
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest1) {
   // Success case: cpuset size and hardware thread count are the same.
-  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
-  unsigned int fake_hw_threads = fake_cpuset_size;
+  unsigned int fake_hw_threads = 4;
+  cpu_set_t test_set;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
 
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
+  // Set cpuset size to be four.
+  CPU_ZERO(&test_set);
+  CPU_SET(0, &test_set);
+  CPU_SET(3, &test_set);
+  CPU_SET(4, &test_set);
+  CPU_SET(7, &test_set);
+
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), 4);
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest2) {
   // Success case: cpuset size is half of the hardware thread count.
-  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
-  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
+  unsigned int fake_hw_threads = 16;
+  cpu_set_t test_set;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
 
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
+  // Set cpuset size to be eight.
+  CPU_ZERO(&test_set);
+  CPU_SET(0, &test_set);
+  CPU_SET(3, &test_set);
+  CPU_SET(4, &test_set);
+  CPU_SET(7, &test_set);
+  CPU_SET(12, &test_set);
+  CPU_SET(15, &test_set);
+  CPU_SET(16, &test_set);
+  CPU_SET(19, &test_set);
+
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), 8);
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest3) {
   // Failure case: cpuset size is bigger than the hardware thread count.
-  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
-  unsigned int fake_hw_threads = fake_cpuset_size - 1;
+  unsigned int fake_hw_threads = 4;
+  cpu_set_t test_set;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
 
+  // Set cpuset size to be eight.
+  CPU_ZERO(&test_set);
+  CPU_SET(0, &test_set);
+  CPU_SET(3, &test_set);
+  CPU_SET(4, &test_set);
+  CPU_SET(7, &test_set);
+  CPU_SET(12, &test_set);
+  CPU_SET(15, &test_set);
+  CPU_SET(16, &test_set);
+  CPU_SET(19, &test_set);
+
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
   // When sched_getaffinity() fails, expect to get the hardware thread count.
-  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
-  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
+  unsigned int fake_hw_threads = 8;
+  cpu_set_t test_set;
   Api::MockLinuxOsSysCalls linux_os_sys_calls;
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
 
+  // Set cpuset size to be four.
+  CPU_ZERO(&test_set);
+  CPU_SET(0, &test_set);
+  CPU_SET(3, &test_set);
+  CPU_SET(4, &test_set);
+  CPU_SET(7, &test_set);
+
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
-      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{-1, 0})));
   EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
 }
 
