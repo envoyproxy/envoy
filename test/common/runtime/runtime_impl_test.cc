@@ -260,22 +260,22 @@ void testNewOverrides(Loader& loader, Stats::Store& store) {
   // New string
   loader.mergeValues({{"foo", "bar"}});
   EXPECT_EQ("bar", loader.snapshot().get("foo"));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove new string
   loader.mergeValues({{"foo", ""}});
   EXPECT_EQ("", loader.snapshot().get("foo"));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 
   // New integer
   loader.mergeValues({{"baz", "42"}});
   EXPECT_EQ(42, loader.snapshot().getInteger("baz", 0));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove new integer
   loader.mergeValues({{"baz", ""}});
   EXPECT_EQ(0, loader.snapshot().getInteger("baz", 0));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 }
 
 TEST_F(DiskBackedLoaderImplTest, mergeValues) {
@@ -286,32 +286,32 @@ TEST_F(DiskBackedLoaderImplTest, mergeValues) {
   // Override string
   loader->mergeValues({{"file2", "new world"}});
   EXPECT_EQ("new world", loader->snapshot().get("file2"));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove overridden string
   loader->mergeValues({{"file2", ""}});
   EXPECT_EQ("world", loader->snapshot().get("file2"));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 
   // Override integer
   loader->mergeValues({{"file3", "42"}});
   EXPECT_EQ(42, loader->snapshot().getInteger("file3", 1));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove overridden integer
   loader->mergeValues({{"file3", ""}});
   EXPECT_EQ(2, loader->snapshot().getInteger("file3", 1));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 
   // Override override string
   loader->mergeValues({{"file1", "hello overridden override"}});
   EXPECT_EQ("hello overridden override", loader->snapshot().get("file1"));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove overridden override string
   loader->mergeValues({{"file1", ""}});
   EXPECT_EQ("hello override", loader->snapshot().get("file1"));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 }
 
 TEST(LoaderImplTest, All) {

@@ -339,7 +339,7 @@ void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>&
       values_.emplace(kv.first, SnapshotImpl::createEntry(kv.second));
     }
   }
-  stats_.admin_overrides_active_.set(!values_.empty());
+  stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
 }
 
 DiskLayer::DiskLayer(const std::string& name, const std::string& path, Api::Api& api)
@@ -449,9 +449,8 @@ DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";
-  RuntimeStats stats{ALL_RUNTIME_STATS(POOL_BOOL_INDICATOR_PREFIX(store, prefix),
-                                       POOL_COUNTER_PREFIX(store, prefix),
-                                       POOL_GAUGE_PREFIX(store, prefix))};
+  RuntimeStats stats{
+      ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
   return stats;
 }
 
