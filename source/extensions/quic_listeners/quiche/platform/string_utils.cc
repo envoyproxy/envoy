@@ -81,8 +81,10 @@ char HexDigitToInt(char c) {
 }
 
 bool HexDecodeToUInt32(absl::string_view data, uint32_t* out) {
-  if (data.empty() || data.size() > 8u)
+  if (data.empty() || data.size() > 8u) {
     return false;
+  }
+
   for (char c : data) {
     if (!absl::ascii_isxdigit(c)) {
       return false;
