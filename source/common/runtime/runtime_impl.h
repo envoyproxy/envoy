@@ -24,6 +24,8 @@
 namespace Envoy {
 namespace Runtime {
 
+bool runtimeFeatureEnabled(const std::string& feature);
+
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
 /**
@@ -72,6 +74,7 @@ public:
 
   // Runtime::Snapshot
   bool deprecatedFeatureEnabled(const std::string& key) const override;
+  bool runtimeFeatureEnabled(const std::string& key) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
                       uint64_t num_buckets) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
