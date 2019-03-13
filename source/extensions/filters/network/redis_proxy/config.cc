@@ -32,7 +32,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       filter_config->cluster_name_, context.clusterManager(),
       ConnPool::ClientFactoryImpl::instance_, context.threadLocal(), proto_config.settings()));
   std::shared_ptr<CommandSplitter::Instance> splitter(new CommandSplitter::InstanceImpl(
-      std::move(conn_pool), context.scope(), filter_config->stat_prefix_, context.timeSource()));
+      std::move(conn_pool), context.scope(), filter_config->stat_prefix_, context.timeSource(),
+      proto_config.latency_in_micros()));
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(

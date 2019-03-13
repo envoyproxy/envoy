@@ -53,7 +53,8 @@ public:
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_};
+  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_,
+                         false};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -768,6 +769,47 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
 INSTANTIATE_TEST_SUITE_P(
     RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,
     testing::ValuesIn(Common::Redis::SupportedCommands::hashMultipleSumResultCommands()));
+
+class RedisSingleServerRequestWithLatencyMicrosTest : public RedisSingleServerRequestTest {
+public:
+  void makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request) {
+    EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Ref(request), _))
+        .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
+    handle_ = splitter_.makeRequest(request, callbacks_);
+  }
+
+  ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
+  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_,
+                         true};
+};
+
+TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {
+  InSequence s;
+
+  ToLowerTable table;
+  std::string lower_command(GetParam());
+  table.toLowerCase(lower_command);
+
+  Common::Redis::RespValue request;
+  makeBulkStringArray(request, {GetParam(), "hello"});
+  makeRequest("hello", request);
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10000));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
+};
+
+INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithLatencyMicrosTest,
+                         RedisSingleServerRequestWithLatencyMicrosTest,
+                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

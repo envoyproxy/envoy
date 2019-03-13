@@ -65,8 +65,8 @@ private:
   // ActiveMessage tracks downstream requests for which no response has been received.
   struct ActiveMessage {
     ActiveMessage(Filter& parent, int32_t request_id)
-        : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_,
-                                                              parent_.time_source_)),
+        : parent_(parent), request_timer_(new Stats::Timespan<std::chrono::milliseconds>(
+                               parent_.stats_.request_time_ms_, parent_.time_source_)),
           request_id_(request_id) {
       parent_.stats_.request_active_.inc();
     }
@@ -76,7 +76,7 @@ private:
     }
 
     Filter& parent_;
-    Stats::TimespanPtr request_timer_;
+    Stats::CompletableTimespanPtr request_timer_;
     const int32_t request_id_;
     absl::optional<bool> success_{};
   };
