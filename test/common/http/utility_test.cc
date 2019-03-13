@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/data/core/v2alpha/local_reply_body.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/api/v2/core/protocol.pb.validate.h"
 
@@ -533,6 +534,27 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
       }));
   Utility::LocalReplyInfo info;
   info.is_head_request = true;
+  Utility::sendLocalReply(info, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
+                          absl::nullopt);
+}
+
+TEST(HttpUtility, SendLocalReplyJsonConntentTypeRequest) {
+  MockStreamDecoderFilterCallbacks callbacks;
+  bool is_reset = false;
+  EXPECT_CALL(callbacks, encodeHeaders_(_, false))
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.ContentType()->value().c_str(),
+                  Http::Headers::get().ContentTypeValues.Json);
+      }));
+  EXPECT_CALL(callbacks, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) -> void {
+        envoy::data::core::v2alpha::LocalReplyBody local_reply_body;
+        local_reply_body.set_body("large");
+        EXPECT_EQ(MessageUtil::getJsonStringFromMessage(local_reply_body, true, true),
+                  data.toString());
+      }));
+  Utility::LocalReplyInfo info;
+  info.is_json_content_type = true;
   Utility::sendLocalReply(info, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt);
 }

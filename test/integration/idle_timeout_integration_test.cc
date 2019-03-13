@@ -1,3 +1,5 @@
+#include "envoy/data/core/v2alpha/local_reply_body.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
 
@@ -32,7 +34,9 @@ public:
     HttpProtocolIntegrationTest::initialize();
   }
 
-  IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest(const char* method = "GET") {
+  IntegrationStreamDecoderPtr
+  setupPerStreamIdleTimeoutTest(const char* method = "GET",
+                                const char* content_type = "text/plain") {
     initialize();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -40,7 +44,8 @@ public:
         codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", method},
                                                             {":path", "/test/long/url"},
                                                             {":scheme", "http"},
-                                                            {":authority", "host"}});
+                                                            {":authority", "host"},
+                                                            {"content-type", content_type}});
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     AssertionResult result =
@@ -187,6 +192,23 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutHeadRequestAfterDownstrea
   EXPECT_EQ(fmt::format("{}", strlen("stream timeout")),
             response->headers().ContentLength()->value().getStringView());
   EXPECT_EQ("", response->body());
+}
+
+TEST_P(IdleTimeoutIntegrationTest,
+       PerStreamIdleTimeoutHeadRequestAfterDownstreamJsonContentTypeRequest) {
+  enable_per_stream_idle_timeout_ = true;
+  auto response = setupPerStreamIdleTimeoutTest("GET", "application/json");
+
+  waitForTimeout(*response, "downstream_rq_idle_timeout");
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("408", response->headers().Status()->value().c_str());
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
+            response->headers().ContentType()->value().c_str());
+  envoy::data::core::v2alpha::LocalReplyBody local_reply_body;
+  local_reply_body.set_body("stream timeout");
+  EXPECT_EQ(MessageUtil::getJsonStringFromMessage(local_reply_body, true, true), response->body());
 }
 
 // Global per-stream idle timeout applies if there is no per-stream idle timeout.

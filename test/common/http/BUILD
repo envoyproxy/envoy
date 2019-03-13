@@ -334,6 +334,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+		"@envoy_api//envoy/data/core/v2alpha:local_reply_body_cc",
         "@envoy_api//envoy/api/v2/core:protocol_cc",
     ],
 )

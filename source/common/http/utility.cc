@@ -282,6 +282,8 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
 =======
 Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& request_headers) {
   bool is_grpc = false, is_head_request = false, is_json_content_type = false;
+  // TODO(zyfjeff): This code is copied from Envoy::Grpc::Common::hasGrpcContentType in order to
+  // rely directly on it to avoid causing circular dependencies.
   const Http::HeaderEntry* content_type = request_headers.ContentType();
   // Content type is gRPC if it is exactly "application/grpc" or starts with
   // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
