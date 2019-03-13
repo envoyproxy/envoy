@@ -39,7 +39,7 @@ public:
    * Complete a connection length timespan for the target user agent.
    * @param span supplies the timespan to complete.
    */
-  void completeConnectionLength(Stats::Timespan& span);
+  void completeConnectionLength(Stats::Timespan<std::chrono::milliseconds>& span);
 
   /**
    * Initialize the user agent from request headers. This is only done once and the user-agent

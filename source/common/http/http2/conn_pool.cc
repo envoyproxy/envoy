@@ -271,7 +271,7 @@ void ConnPoolImpl::onUpstreamReady() {
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
-  parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan>(
+  parent_.conn_connect_ms_ = std::make_unique<Stats::Timespan<std::chrono::milliseconds>>(
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   Upstream::Host::CreateConnectionData data =
       parent_.host_->createConnection(parent_.dispatcher_, parent_.socket_options_, nullptr);
@@ -287,7 +287,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_total_.inc();
   parent_.host_->cluster().stats().upstream_cx_active_.inc();
   parent_.host_->cluster().stats().upstream_cx_http2_total_.inc();
-  conn_length_ = std::make_unique<Stats::Timespan>(
+  conn_length_ = std::make_unique<Stats::Timespan<std::chrono::milliseconds>>(
       parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSource());
 
   client_->setConnectionStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,

@@ -48,7 +48,8 @@ Per command statistics
 ----------------------
 
 The Redis filter will gather statistics for commands in the
-*redis.<stat_prefix>.command.<command>.* namespace.
+*redis.<stat_prefix>.command.<command>.* namespace. By default latency stats are in milliseconds and can be
+changed to microseconds by providing the configuration parameter *latency_in_micros*
 
 .. csv-table::
   :header: Name, Type, Description

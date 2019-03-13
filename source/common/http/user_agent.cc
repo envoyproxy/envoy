@@ -13,7 +13,7 @@
 namespace Envoy {
 namespace Http {
 
-void UserAgent::completeConnectionLength(Stats::Timespan& span) {
+void UserAgent::completeConnectionLength(Stats::Timespan<std::chrono::milliseconds>& span) {
 
   // Note: stats_ and scope_ are set together, so it's assumed that scope_ will be non-nullptr if
   // stats_ is.

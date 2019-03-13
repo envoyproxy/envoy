@@ -97,7 +97,7 @@ protected:
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     StreamWrapperPtr stream_wrapper_;
     Event::TimerPtr connect_timer_;
-    Stats::TimespanPtr conn_length_;
+    Stats::CompletableTimespanPtr conn_length_;
     uint64_t remaining_requests_;
   };
 
@@ -113,7 +113,7 @@ protected:
   void onUpstreamReady();
   void processIdleClient(ActiveClient& client, bool delay);
 
-  Stats::TimespanPtr conn_connect_ms_;
+  Stats::CompletableTimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
   std::list<ActiveClientPtr> ready_clients_;
   std::list<ActiveClientPtr> busy_clients_;
