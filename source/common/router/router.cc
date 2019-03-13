@@ -441,8 +441,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     do_shadowing_ = false;
   }
 
-  for (auto it = upstream_requests_.cbegin(); it != upstream_requests_.cend(); it++) {
-    UpstreamRequest* upstream_request = it->get();
+  for (auto& upstream_request : upstream_requests_) {
     if (buffering) {
       // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
       // since it's all moves from here on.
@@ -472,8 +471,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
   ENVOY_STREAM_LOG(debug, "router decoding trailers:\n{}", *callbacks_, trailers);
   downstream_trailers_ = &trailers;
-  for (auto it = upstream_requests_.cbegin(); it != upstream_requests_.cend(); it++) {
-    it->get()->encodeTrailers(trailers);
+  for (auto& upstream_request : upstream_requests_) {
+    upstream_request->encodeTrailers(trailers);
   }
   onRequestComplete();
   return Http::FilterTrailersStatus::StopIteration;
@@ -546,8 +545,7 @@ void Filter::onResponseTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream timeout", *callbacks_);
 
   // Reset any upstream requests that are still in flight.
-  for (auto it = upstream_requests_.cbegin(); it != upstream_requests_.cend(); it++) {
-    UpstreamRequest* upstream_request = it->get();
+  for (auto& upstream_request : upstream_requests_) {
     // Don't record a timeout for upstream requests we've already seen headers
     // for.
     if (!upstream_request->upstream_headers_) {
@@ -559,11 +557,11 @@ void Filter::onResponseTimeout() {
       // If this upstream request already hit a "soft" timeout, then it
       // already recorded a timeout into outlier detection. Don't do it again.
       if (!upstream_request->outlier_detection_timeout_recorded_) {
-        updateOutlierDetection(timeout_response_code_, upstream_request);
+        updateOutlierDetection(timeout_response_code_, upstream_request.get());
       }
       upstream_request->resetStream();
 
-      chargeUpstreamAbort(timeout_response_code_, false, upstream_request);
+      chargeUpstreamAbort(timeout_response_code_, false, upstream_request.get());
     }
   }
 
@@ -790,10 +788,8 @@ void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
 }
 
 void Filter::resetOtherUpstreams(UpstreamRequest* upstream_request) {
-  UpstreamRequest* upstream_request_tmp;
-  for (auto it = upstream_requests_.cbegin(); it != upstream_requests_.cend(); it++) {
-    upstream_request_tmp = it->get();
-    if (upstream_request_tmp != upstream_request) {
+  for (auto& upstream_request_tmp : upstream_requests_) {
+    if (upstream_request_tmp.get() != upstream_request) {
       if (!upstream_request_tmp->encode_complete_ || !upstream_request_tmp->decode_complete_) {
         upstream_request_tmp->resetStream();
         if (upstream_request_tmp->upstream_host_) {
@@ -1094,9 +1090,8 @@ void Filter::doRetry() {
 
 uint32_t Filter::numRequestsAwaitingHeaders() {
   uint32_t ret = 0;
-  for (auto upstream_request = upstream_requests_.cbegin();
-       upstream_request != upstream_requests_.cend(); upstream_request++) {
-    if (!upstream_request->get()->upstream_headers_) {
+  for (auto& upstream_request : upstream_requests_) {
+    if (!upstream_request->upstream_headers_) {
       ret++;
     }
   }
