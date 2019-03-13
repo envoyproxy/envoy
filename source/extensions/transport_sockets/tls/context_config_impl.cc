@@ -104,6 +104,17 @@ getCertificateValidationContextConfigProvider(
   }
 }
 
+Ssl::PrivateKeyOperationsProviderSharedPtr getPrivateKeyOperationsProvider(
+    const envoy::api::v2::auth::CommonTlsContext& config,
+    Server::Configuration::TransportSocketFactoryContext& factory_context) {
+  (void)config;
+  (void)factory_context;
+
+  // TODO: get PrivateKeyOperationsManager from the factory_context and
+  // get a provider based on the provider name in the TLS context.
+  return nullptr;
+}
+
 } // namespace
 
 ContextConfigImpl::ContextConfigImpl(
@@ -120,6 +131,7 @@ ContextConfigImpl::ContextConfigImpl(
       tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
       certificate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
+      private_key_provider_(getPrivateKeyOperationsProvider(config, factory_context)),
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),

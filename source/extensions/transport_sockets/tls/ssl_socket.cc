@@ -60,6 +60,15 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 
+  provider_ = ctx_->getPrivateKeyOperationsProvider();
+  if (provider_) {
+    ops_ = provider_->getPrivateKeyOperations(*this, callbacks_->connection().dispatcher());
+    Ssl::PrivateKeyMethodSharedPtr private_key_methods = ops_->getPrivateKeyMethods(ssl_.get());
+    if (private_key_methods) {
+      SSL_set_private_key_method(ssl_.get(), private_key_methods.get());
+    }
+  }
+
   BIO* bio = BIO_new_socket(callbacks_->ioHandle().fd(), 0);
   SSL_set_bio(ssl_.get(), bio, bio);
 }
@@ -124,6 +133,21 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   return {action, bytes_read, end_stream};
 }
 
+void SslSocket::complete(Envoy::Ssl::PrivateKeyOperationStatus status) {
+  if (status == Envoy::Ssl::PrivateKeyOperationStatus::Success) {
+    ENVOY_CONN_LOG(debug, "async handshake complete", callbacks_->connection());
+    async_handshake_in_progress_ = false;
+    if (!handshake_complete_) {
+      // It's possible that the async call comes in later, but the handshare has been retried from
+      // doWrite or similar. */
+      doHandshake();
+    }
+  } else {
+    ENVOY_CONN_LOG(debug, "async handshake failed", callbacks_->connection());
+    callbacks_->raiseEvent(Network::ConnectionEvent::LocalClose);
+  }
+}
+
 PostIoAction SslSocket::doHandshake() {
   ASSERT(!handshake_complete_);
   int rc = SSL_do_handshake(ssl_.get());
@@ -139,12 +163,18 @@ PostIoAction SslSocket::doHandshake() {
                : PostIoAction::Close;
   } else {
     int err = SSL_get_error(ssl_.get(), rc);
-    ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_->connection(), err);
     switch (err) {
     case SSL_ERROR_WANT_READ:
     case SSL_ERROR_WANT_WRITE:
+      ENVOY_CONN_LOG(debug, "handshake expecting {}", callbacks_->connection(),
+                     err == SSL_ERROR_WANT_READ ? "read" : "write");
+      return PostIoAction::KeepOpen;
+    case SSL_ERROR_WANT_PRIVATE_KEY_OPERATION:
+      ENVOY_CONN_LOG(debug, "handshake continued asynchronously", callbacks_->connection());
+      async_handshake_in_progress_ = true;
       return PostIoAction::KeepOpen;
     default:
+      ENVOY_CONN_LOG(debug, "handshake error: {}", callbacks_->connection(), err);
       drainErrorQueue();
       return PostIoAction::Close;
     }
@@ -238,7 +268,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
 void SslSocket::onConnected() { ASSERT(!handshake_complete_); }
 
 void SslSocket::shutdownSsl() {
-  ASSERT(handshake_complete_);
+  ASSERT(handshake_complete_ || async_handshake_in_progress_);
   if (!shutdown_sent_ && callbacks_->connection().state() != Network::Connection::State::Closed) {
     int rc = SSL_shutdown(ssl_.get());
     ENVOY_CONN_LOG(debug, "SSL shutdown: rc={}", callbacks_->connection(), rc);

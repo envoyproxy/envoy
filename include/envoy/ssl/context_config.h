@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
+#include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
 namespace Envoy {
@@ -69,6 +70,12 @@ public:
    * @param callback callback that is executed by context config.
    */
   virtual void setSecretUpdateCallback(std::function<void()> callback) PURE;
+
+  /**
+   * @return the configured BoringSSL private key operations provider.
+   */
+  virtual const Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr
+  privateKeyOperationsProvider() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

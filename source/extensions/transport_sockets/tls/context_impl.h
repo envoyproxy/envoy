@@ -7,6 +7,7 @@
 
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
+#include "envoy/ssl/private_key/private_key.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -72,6 +73,10 @@ public:
   static bool dNSNameMatch(const std::string& dnsName, const char* pattern);
 
   SslStats& stats() { return stats_; }
+
+  Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr getPrivateKeyOperationsProvider() {
+    return private_key_provider_;
+  }
 
   // Ssl::Context
   size_t daysUntilFirstCertExpires() const override;
@@ -159,6 +164,7 @@ protected:
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
   const unsigned tls_max_version_;
+  Ssl::PrivateKeyOperationsProviderSharedPtr private_key_provider_;
 };
 
 typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;

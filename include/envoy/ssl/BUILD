@@ -31,6 +31,7 @@ envoy_cc_library(
     deps = [
         ":certificate_validation_context_config_interface",
         ":tls_certificate_config_interface",
+        "//include/envoy/ssl/private_key:private_key_interface",
     ],
 )
 

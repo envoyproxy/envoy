@@ -6,6 +6,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
+#include "envoy/ssl/private_key/private_key_callbacks.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -41,6 +42,7 @@ enum class InitialState { Client, Server };
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::ConnectionInfo,
+                  public Envoy::Ssl::PrivateKeyOperationsCallbacks,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
@@ -72,6 +74,9 @@ public:
   void onConnected() override;
   const Ssl::ConnectionInfo* ssl() const override { return this; }
 
+  // Ssl::PrivateKeyOperationsCallbacks
+  void complete(Envoy::Ssl::PrivateKeyOperationStatus status) override;
+
   SSL* rawSslForTest() const { return ssl_.get(); }
 
 private:
@@ -89,6 +94,9 @@ private:
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
+  Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr provider_;
+  Envoy::Ssl::PrivateKeyOperationsPtr ops_;
+  bool async_handshake_in_progress_{};
 };
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory,
