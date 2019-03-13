@@ -18,10 +18,24 @@ envoy_package()
 # TODO: add build target for quic_platform_impl_lib
 
 envoy_cc_library(
-    name = "http2_platform_impl_lib",
+    name = "string_utils_lib",
     srcs = [
-        "http2_string_utils_impl.cc",
+        "string_utils.cc",
     ],
+    hdrs = [
+        "string_utils.h",
+    ],
+    external_deps = [
+        "abseil_str_format",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "http2_platform_impl_lib",
     hdrs = [
         "http2_arraysize_impl.h",
         "http2_containers_impl.h",
@@ -33,14 +47,18 @@ envoy_cc_library(
         "http2_ptr_util_impl.h",
         "http2_string_impl.h",
         "http2_string_piece_impl.h",
+    ] + envoy_select_quiche([
         "http2_string_utils_impl.h",
-    ],
+    ]),
     external_deps = [
         "abseil_base",
         "abseil_optional",
         "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
+    deps = envoy_select_quiche([
+        ":string_utils_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -106,7 +124,6 @@ envoy_cc_library(
     name = "quic_platform_impl_lib",
     srcs = [
         "quic_cert_utils_impl.cc",
-        "quic_text_utils_impl.cc",
     ] + envoy_select_quiche([
         "quic_hostname_utils_impl.cc",
         "quic_test_output_impl.cc",
@@ -115,12 +132,12 @@ envoy_cc_library(
         "quic_cert_utils_impl.h",
         "quic_mutex_impl.h",
         "quic_str_cat_impl.h",
-        "quic_string_utils_impl.h",
-        "quic_text_utils_impl.h",
     ] + envoy_select_quiche([
         "quic_bug_tracker_impl.h",
         "quic_hostname_utils_impl.h",
+        "quic_string_utils_impl.h",
         "quic_test_output_impl.h",
+        "quic_text_utils_impl.h",
     ]),
     external_deps = [
         "quiche_quic_platform_base",
@@ -130,10 +147,12 @@ envoy_cc_library(
         "ssl",
     ],
     visibility = ["//visibility:public"],
-    deps = envoy_select_quiche([
-        "//source/common/filesystem:filesystem_lib",
-        "//source/common/http:utility_lib",
-    ]),
+    deps =
+        envoy_select_quiche([
+            ":string_utils_lib",
+            "//source/common/filesystem:filesystem_lib",
+            "//source/common/http:utility_lib",
+        ]),
 )
 
 envoy_cc_library(
@@ -147,9 +166,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "spdy_platform_impl_lib",
-    srcs = envoy_select_quiche([
-        "spdy_string_utils_impl.cc",
-    ]),
     hdrs = [
         "spdy_arraysize_impl.h",
         "spdy_containers_impl.h",
@@ -176,6 +192,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = envoy_select_quiche([
+        ":string_utils_lib",
         "//source/common/common:assert_lib",
     ]),
 )

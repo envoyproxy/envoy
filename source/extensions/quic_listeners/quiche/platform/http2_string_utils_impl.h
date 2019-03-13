@@ -6,6 +6,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include "extensions/quic_listeners/quiche/platform/string_utils.h"
+
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -34,7 +36,7 @@ inline std::string Http2HexDecodeImpl(absl::string_view data) {
   return absl::HexStringToBytes(data);
 }
 
-std::string Http2HexDumpImpl(absl::string_view data);
+std::string Http2HexDumpImpl(absl::string_view data) { return quiche::HexDump(data); }
 
 inline std::string Http2HexEscapeImpl(absl::string_view data) { return absl::CHexEscape(data); }
 
