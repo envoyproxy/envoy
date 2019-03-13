@@ -16,7 +16,7 @@ struct AppException : public EnvoyException,
                       public DubboFilters::DirectResponse,
                       Logger::Loggable<Logger::Id::dubbo> {
   AppException(ResponseStatus status, const std::string& what);
-  explicit AppException(const AppException& ex);
+  AppException(const AppException& ex) = default;
 
   using ResponseType = DubboFilters::DirectResponse::ResponseType;
   ResponseType encode(MessageMetadata& metadata, Protocol& protocol, Deserializer& deserializer,

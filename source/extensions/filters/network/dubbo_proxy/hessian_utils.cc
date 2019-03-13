@@ -32,7 +32,7 @@ void addSeq(Buffer::Instance& buffer, const std::initializer_list<uint8_t>& valu
   }
 }
 
-size_t doWriteString(Buffer::Instance& instance, const absl::string_view& str_view) {
+size_t doWriteString(Buffer::Instance& instance, absl::string_view str_view) {
   const size_t length = str_view.length();
   constexpr size_t str_max_length = 0xffff;
   constexpr size_t two_octet_max_lenth = 1024;
@@ -564,7 +564,7 @@ std::string HessianUtils::readByte(Buffer::Instance& buffer) {
   return result;
 }
 
-size_t HessianUtils::writeString(Buffer::Instance& buffer, const absl::string_view str) {
+size_t HessianUtils::writeString(Buffer::Instance& buffer, absl::string_view str) {
   return doWriteString(buffer, str);
 }
 

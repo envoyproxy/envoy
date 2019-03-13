@@ -13,9 +13,6 @@ AppException::AppException(ResponseStatus status, const std::string& what)
     : EnvoyException(what), status_(status),
       response_type_(RpcResponseType::ResponseWithException) {}
 
-AppException::AppException(const AppException& ex)
-    : EnvoyException(ex.what()), status_(ex.status_), response_type_(ex.response_type_) {}
-
 AppException::ResponseType AppException::encode(MessageMetadata& metadata,
                                                 DubboProxy::Protocol& protocol,
                                                 Deserializer& deserializer,
