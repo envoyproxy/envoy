@@ -64,6 +64,13 @@ void UdpStatsdSink::flush(Stats::Source& source) {
                                buildTagStr(gauge->tags())));
     }
   }
+
+  for (const Stats::BoolIndicatorSharedPtr& boolIndicator : source.cachedBoolIndicators()) {
+    if (boolIndicator->used()) {
+      writer.write(fmt::format("{}.{}:{}|g{}", prefix_, getName(*boolIndicator), boolIndicator->value(),
+                               buildTagStr(boolIndicator->tags())));
+    }
+  }
 }
 
 void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) {
@@ -124,6 +131,13 @@ void TcpStatsdSink::flush(Stats::Source& source) {
       tls_sink.flushGauge(gauge->name(), gauge->value());
     }
   }
+
+  for (const Stats::BoolIndicatorSharedPtr& boolIndicator : source.cachedBoolIndicators()) {
+    if (boolIndicator->used()) {
+      tls_sink.flushGauge(boolIndicator->name(), static_cast<uint64_t>(boolIndicator->value()));
+    }
+  }
+
   tls_sink.endFlush(true);
 }
 

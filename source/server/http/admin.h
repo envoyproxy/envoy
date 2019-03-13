@@ -377,6 +377,7 @@ public:
   static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                                    const std::vector<Stats::BoolIndicatorSharedPtr>& boolIndicators,
                                     Buffer::Instance& response, const bool used_only);
   /**
    * Format the given tags, returning a string as a comma-separated list

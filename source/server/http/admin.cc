@@ -686,6 +686,12 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     }
   }
 
+  for (const Stats::BoolIndicatorSharedPtr& boolIndicator : server_.stats().boolIndicators()) {
+    if (shouldShowMetric(boolIndicator, used_only, regex)) {
+      all_stats.emplace(boolIndicator->name(), boolIndicator->value());
+    }
+  }
+
   if (has_format) {
     const std::string format_value = params.at("format");
     if (format_value == "json") {
@@ -725,7 +731,7 @@ Http::Code AdminImpl::handlerPrometheusStats(absl::string_view path_and_query, H
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(), response, used_only);
+                                              server_.stats().histograms(), server_.stats().boolIndicators(), response, used_only);
   return Http::Code::OK;
 }
 
@@ -758,7 +764,9 @@ std::string PrometheusStatsFormatter::metricName(const std::string& extractedNam
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, 
+    const std::vector<Stats::BoolIndicatorSharedPtr>& boolIndicators,
+    Buffer::Instance& response,
     const bool used_only) {
   std::unordered_set<std::string> metric_type_tracker;
   for (const auto& counter : counters) {
@@ -787,6 +795,21 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
     }
     response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags, gauge->value()));
+  }
+
+  for (const auto& boolIndicator : boolIndicators) {
+    if (!shouldShowMetric(boolIndicator, used_only)) {
+      continue;
+    }
+
+    const std::string tags = formattedTags(boolIndicator->tags());
+    const std::string metric_name = metricName(boolIndicator->tagExtractedName());
+    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
+      metric_type_tracker.insert(metric_name);
+      response.add(fmt::format("# TYPE {0} gauge\n", metric_name));
+    }
+
+    response.add(fmt::format("{0}{{{1}}} {2}\n", metric_name, tags,  static_cast<uint8_t>(boolIndicator->value())));
   }
 
   for (const auto& histogram : histograms) {
