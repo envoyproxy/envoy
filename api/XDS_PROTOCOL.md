@@ -345,6 +345,11 @@ resources to avoid resending them over the network.
 
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
 
+#### Resource names
+Resources are identified by a resource name or an alias. Aliases of a resource, if present, can be identified by the alias field in the resource of a DeltaDiscoveryResponse. The resource names
+will be returned in either the name field in the resource of a DeltaDiscoveryResponse or in the actual body
+of the resource. Either the alias or the resource name can be passed in the resource_names_subscribe and resource_names_unsubscribe fields of a DeltaDiscoveryRequest to identify a specific resource. 
+
 ## REST-JSON polling subscriptions
 
 Synchronous (long) polling via REST endpoints is also available for the xDS
