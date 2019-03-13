@@ -16,12 +16,13 @@ public:
    */
   enum class Stage {
     /**
-     * The server instance main thread has entered the dispatcher loop.
+     * The server instance main thread is about to enter the dispatcher loop.
      */
     Startup,
 
     /**
-     * The server instance is being shutdown and the dispatcher is about the exit.
+     * The server instance is being shutdown and the dispatcher is about to exit.
+     * This provides listeners a last chance to run a callback on the main dispatcher.
      */
     ShutdownExit
   };
