@@ -30,8 +30,11 @@ class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpV
                              public MySQLTestUtils,
                              public BaseIntegrationTest {
   std::string mysqlConfig() {
-    return TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-        "test/extensions/filters/network/mysql_proxy/mysql_test_config.yaml"));
+    return fmt::format(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+                           "test/extensions/filters/network/mysql_proxy/mysql_test_config.yaml")),
+                       Network::Test::getLoopbackAddressString(GetParam()),
+                       Network::Test::getLoopbackAddressString(GetParam()),
+                       Network::Test::getAnyAddressString(GetParam()));
   }
 
 public:
