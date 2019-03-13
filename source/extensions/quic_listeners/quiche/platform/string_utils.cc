@@ -68,12 +68,15 @@ std::string HexDump(absl::string_view data) {
 char HexDigitToInt(char c) {
   ASSERT(std::isxdigit(c));
 
-  if (std::isdigit(c))
+  if (std::isdigit(c)) {
     return c - '0';
-  if (c >= 'A' && c <= 'F')
+  }
+  if (c >= 'A' && c <= 'F') {
     return c - 'A' + 10;
-  if (c >= 'a' && c <= 'f')
+  }
+  if (c >= 'a' && c <= 'f') {
     return c - 'a' + 10;
+  }
   return 0;
 }
 
