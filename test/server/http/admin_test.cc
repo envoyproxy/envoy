@@ -1276,7 +1276,7 @@ protected:
 
   void addBoolIndicator(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     std::string tname = std::string(name);
-    bool_indicators_.push_back(alloc_.makeBoolIndicator(name, std::move(tname), std::move(cluster_tags)));
+    boolIndicators_.push_back(alloc_.makeBoolIndicator(name, std::move(tname), std::move(cluster_tags)));
   }
 
   Stats::StatsOptionsImpl stats_options_;
@@ -1335,7 +1335,7 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
 
   Buffer::OwnedImpl response;
   auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, bool_indicators_, response, false);
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, boolIndicators_, response, false);
   EXPECT_EQ(2UL, size);
 }
 
@@ -1355,7 +1355,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
 
   Buffer::OwnedImpl response;
   auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, bool_indicators_, response, false);
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, boolIndicators_, response, false);
   EXPECT_EQ(4UL, size);
 }
 
@@ -1374,7 +1374,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
 
   Buffer::OwnedImpl response;
   auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, bool_indicators_,response, false);
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, boolIndicators_,response, false);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
@@ -1426,7 +1426,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
 
   Buffer::OwnedImpl response;
   auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, bool_indicators_, response, false);
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, boolIndicators_, response, false);
   EXPECT_EQ(5UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
@@ -1486,7 +1486,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
 
   Buffer::OwnedImpl response;
   auto size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, bool_indicators_, response, true);
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, boolIndicators_, response, true);
   EXPECT_EQ(1UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_rq_time histogram
@@ -1535,7 +1535,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
     Buffer::OwnedImpl response;
     auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                            bool_indicators_, response, used_only);
+                                                            boolIndicators_, response, used_only);
     EXPECT_EQ(0UL, size);
   }
 
@@ -1546,7 +1546,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
     Buffer::OwnedImpl response;
     auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
-                                                            bool_indicators_, response, used_only);
+                                                            boolIndicators_, response, used_only);
     EXPECT_EQ(1UL, size);
   }
 }
