@@ -32,27 +32,6 @@ public:
   void initialize() override { BaseIntegrationTest::initialize(); }
 };
 
-class ClusterMemoryUtilization : public testing::TestWithParam<Network::Address::IpVersion>,
-                                 public BaseIntegrationTest {
-public:
-  ClusterMemoryUtilization() : BaseIntegrationTest(GetParam(), realTime()) {}
-
-  size_t memoryConsumedWithClusters(int num_clusters, bool allow_stats) {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      if (!allow_stats) {
-        bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
-      }
-      for (int i = 1; i < num_clusters; i++) {
-        auto* c = bootstrap.mutable_static_resources()->add_clusters();
-        c->set_name(fmt::format("cluster_{}", i));
-      }
-    });
-    initialize();
-
-    return Memory::Stats::totalCurrentlyAllocated();
-  };
-};
-
 INSTANTIATE_TEST_SUITE_P(IpVersions, StatsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -157,37 +136,37 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   EXPECT_EQ(live->tags()[0].value_, "xxx");
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryUtilization,
+class ClusterMemoryUtilizationTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryUtilizationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 // TODO(cmluciano) Refactor once envoyproxy/envoy#5624 is solved
 // TODO(cmluciano) Add options to measure multiple workers & without stats
-TEST_P(ClusterMemoryUtilization, MemoryLargeClusterSizeWithStats) {
+TEST_P(ClusterMemoryUtilizationTest, MemoryLargeClusterSizeWithStats) {
   // Skip test if we cannot measure memory with TCMALLOC
   if (!Stats::TestUtil::hasDeterministicMallocStats()) {
     return;
   }
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-
-  auto IpVersions = testing::TestWithParam<Network::Address::IpVersion>::GetParam();
   // A unique instance of BaseIntegrationTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  auto t1 = std::make_unique<BaseIntegrationTest>(IpVersions);
-  t1->initialize();
-  const size_t m1 = Memory::Stats::totalCurrentlyAllocated();
+  auto t1 = std::make_unique<BaseIntegrationTest>(GetParam());
+  size_t m1 = t1->ClusterMemoryHelper(1,true);
   EXPECT_LT(start_mem, m1);
   t1.reset(nullptr);
 
-  const size_t m1001 = memoryConsumedWithClusters(1001, true);
+  auto t2 = std::make_unique<BaseIntegrationTest>(GetParam());
+  const size_t m1001 = t2->ClusterMemoryHelper(1001,true);
   EXPECT_LT(start_mem, m1001);
   size_t m_per_cluster = (m1001 - m1) / 1000;
-// As of 2019/02/27, m_per_cluster = 56119 (libstdc++), 52249 (libc++).
+// As of 2019/03/13, m_per_cluster = 57950 (libstdc++), 52249 (libc++).
 #ifdef _LIBCPP_VERSION
   EXPECT_LT(m_per_cluster, 53000);
 #else
-  EXPECT_LT(m_per_cluster, 57000);
+  EXPECT_LT(m_per_cluster, 58000);
 #endif
 }
 

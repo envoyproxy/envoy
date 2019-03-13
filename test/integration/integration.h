@@ -239,6 +239,8 @@ public:
     xds_stream_->sendGrpcMessage(response);
   }
 
+  size_t ClusterMemoryHelper(int num_clusters, bool allow_stats);
+
 private:
   Event::GlobalTimeSystem time_system_;
 
