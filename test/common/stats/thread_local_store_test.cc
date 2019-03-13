@@ -548,34 +548,6 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  using LookupStatFn = std::function<std::string(Scope&, const std::string&)>;
-
-  // Helper function to test the rejection cache. The goal here is to use
-  // mocks to ensure that we don't call rejects() more than once on any of the
-  // stats, even with 5 name-based lookups.
-  void testRememberMatcher(const LookupStatFn lookup_stat, bool is_allocated) {
-    InSequence s;
-
-    MockStatsMatcher* matcher = new MockStatsMatcher;
-    EXPECT_CALL(*matcher, rejects("stats.overflow")).WillRepeatedly(Return(false));
-
-    StatsMatcherPtr matcher_ptr(matcher);
-    store_->setStatsMatcher(std::move(matcher_ptr));
-
-    EXPECT_CALL(*matcher, rejects("scope.reject")).WillOnce(Return(true));
-    EXPECT_CALL(*matcher, rejects("scope.ok")).WillOnce(Return(false));
-    if (is_allocated) {
-      EXPECT_CALL(*alloc_, alloc(_)).Times(1);
-      EXPECT_CALL(*alloc_, free(_)).Times(1);
-    }
-    ScopePtr scope = store_->createScope("scope.");
-
-    for (int j = 0; j < 5; ++j) {
-      EXPECT_EQ("", lookup_stat(*scope, "reject"));
-      EXPECT_EQ("scope.ok", lookup_stat(*scope, "ok"));
-    }
-  }
-
   envoy::config::metrics::v2::StatsConfig stats_config_;
 };
 
@@ -651,8 +623,6 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
 // test/common/stats:stats_matcher_test.
 TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   InSequence s;
-
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   // Expected to alloc lowercase_counter, lowercase_gauge, lowercase_bool,
   //                   valid_counter, valid_gauge, valid_bool
