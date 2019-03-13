@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/data/core/v2alpha/local_reply_body.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -347,8 +348,21 @@ void Utility::sendLocalReply(
 
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
-  if (!body_text.empty()) {
-    response_headers->insertContentLength().value(body_text.size());
+
+  envoy::data::core::v2alpha::LocalReplyBody local_reply_body;
+  std::string json_body;
+  absl::string_view finally_body_text = body_text;
+
+  if (info.is_json_content_type) {
+    local_reply_body.set_body(finally_body_text.begin(), finally_body_text.length());
+    json_body = MessageUtil::getJsonStringFromMessage(local_reply_body, true, true);
+    response_headers->insertContentLength().value(json_body.size());
+    finally_body_text = absl::string_view(json_body);
+    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Json);
+  }
+
+  if (!info.is_json_content_type && !finally_body_text.empty()) {
+    response_headers->insertContentLength().value(finally_body_text.size());
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
   }
 
@@ -357,10 +371,10 @@ void Utility::sendLocalReply(
     return;
   }
 
-  encode_headers(std::move(response_headers), body_text.empty());
+  encode_headers(std::move(response_headers), finally_body_text.empty());
   // encode_headers()) may have changed the referenced is_reset so we need to test it
-  if (!body_text.empty() && !is_reset) {
-    Buffer::OwnedImpl buffer(body_text);
+  if (!finally_body_text.empty() && !is_reset) {
+    Buffer::OwnedImpl buffer(finally_body_text);
     encode_data(buffer, true);
   }
 }

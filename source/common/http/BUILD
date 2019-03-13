@@ -307,6 +307,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:http_uri_cc",
         "@envoy_api//envoy/api/v2/core:protocol_cc",
+        "@envoy_api//envoy/data/core/v2alpha:local_reply_body_cc",
     ],
 )
 

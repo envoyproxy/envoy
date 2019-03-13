@@ -1,4 +1,4 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
+load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
 
@@ -12,4 +12,9 @@ api_proto_library(
         "//envoy/api/v2/core:address",
         "//envoy/api/v2/core:base",
     ],
+)
+
+api_proto_library_internal(
+    name = "local_reply_body",
+    srcs = ["local_reply_body.proto"],
 )
