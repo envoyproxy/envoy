@@ -861,7 +861,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
-    if ((*(filter->entry()))->stoppedAll()) {
+    if ((*(filter->entry()))->iterate_from_current_filter_) {
       // The filter iteration has been stopped for all frame types, and now the iteration continues.
       // The current filter's decodeData() has not been called. Call it now.
       entry = filter->entry();
@@ -983,9 +983,13 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
     // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
+    bool saved_iterate_from_current_filter = filter.iterate_from_current_filter_;
+    // decodeData() below should always iterate from the next filter.
+    filter.iterate_from_current_filter_ = false;
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
     decodeData(&filter, data, false);
+    filter.iterate_from_current_filter_ = saved_iterate_from_current_filter;
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -1018,14 +1022,10 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
-    if ((*(filter->entry()))->stoppedAll()) {
+    if ((*(filter->entry()))->iterate_from_current_filter_) {
       // The filter iteration has been stopped for all frame types, and now the iteration continues.
       // The current filter's decodeTrailers() has not be called. Call it now.
       entry = filter->entry();
-      // Needs to set the iteration state to Continue in case filter's decodeTrailers() calls
-      // addDecodedData(), which will consequently call decodeData(). We want decodeData() to
-      // iterate from the next filter.
-      (*entry)->allowIteration();
       // The current filter has stopped iteration for all frame type before. Skip the check.
       check_stop_all = false;
     } else {
@@ -1086,7 +1086,7 @@ ConnectionManagerImpl::ActiveStream::commonEncodePrefix(ActiveStreamEncoderFilte
   if (!filter) {
     return encoder_filters_.begin();
   } else {
-    if ((*(filter->entry()))->stoppedAll()) {
+    if ((*(filter->entry()))->iterate_from_current_filter_) {
       // The current filter has stopped iteration for all frame type before. Skip the check.
       check_iteration_state = false;
       // The filter iteration has been stopped for all frame types, and now the iteration continues.
@@ -1389,7 +1389,11 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
+    bool saved_iterate_from_current_filter = filter.iterate_from_current_filter_;
+    // decodeData() below should always iterate from the next filter.
+    filter.iterate_from_current_filter_ = false;
     encodeData(&filter, data, false);
+    filter.iterate_from_current_filter_ = saved_iterate_from_current_filter;
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -1660,6 +1664,11 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doHeaders(complete() && !bufferedData() && !trailers());
   }
 
+  if (stoppedAll()) {
+    allowIteration();
+    iterate_from_current_filter_ = true;
+  }
+
   // TODO(mattklein123): If a filter returns StopIterationNoBuffer and then does a continue, we
   // won't be able to end the stream if there is no buffered data. Need to handle this.
   if (bufferedData()) {
@@ -1670,13 +1679,7 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doTrailers();
   }
 
-  // Resets iteration_state_ to Continue here so both doData() and doTrailers() can start iterate
-  // with the current filter instead of the next one. doTrailers() also resets iteration_state_ to
-  // Continue to avoid addDecodeData() to iterate from the current filter. As a result, the
-  // following code will be triggered when the filter has stopped all, and no trailer is present.
-  if (stoppedAll()) {
-    allowIteration();
-  }
+  iterate_from_current_filter_ = false;
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(

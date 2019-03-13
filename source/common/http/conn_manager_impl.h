@@ -95,8 +95,9 @@ private:
    */
   struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks {
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
-        : iteration_state_(IterationState::Continue), parent_(parent), headers_continued_(false),
-          continue_headers_continued_(false), end_stream_(false), dual_filter_(dual_filter) {}
+        : iteration_state_(IterationState::Continue), iterate_from_current_filter_(false),
+          parent_(parent), headers_continued_(false), continue_headers_continued_(false),
+          end_stream_(false), dual_filter_(dual_filter) {}
 
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
@@ -150,6 +151,7 @@ private:
                            // be buffered until high watermark is reached.
     };
     IterationState iteration_state_;
+    bool iterate_from_current_filter_;
     ActiveStream& parent_;
     bool headers_continued_ : 1;
     bool continue_headers_continued_ : 1;
