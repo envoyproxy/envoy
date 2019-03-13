@@ -80,11 +80,11 @@ public:
   SubscriptionImplInitFetchTimeoutTest() : SubscriptionImplTest(std::chrono::milliseconds(1000)) {}
 };
 
-const auto impls = {SubscriptionType::Grpc, SubscriptionType::DeltaGrpc, SubscriptionType::Http,
-                    SubscriptionType::Filesystem};
-INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplTest, testing::ValuesIn(impls));
+SubscriptionType types[] = {SubscriptionType::Grpc, SubscriptionType::DeltaGrpc,
+                            SubscriptionType::Http, SubscriptionType::Filesystem};
+INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplTest, testing::ValuesIn(types));
 INSTANTIATE_TEST_SUITE_P(SubscriptionImplTest, SubscriptionImplInitFetchTimeoutTest,
-                         testing::ValuesIn(impls));
+                         testing::ValuesIn(types));
 
 // Validate basic request-response succeeds.
 TEST_P(SubscriptionImplTest, InitialRequestResponse) {
