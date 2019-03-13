@@ -1,5 +1,7 @@
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+#include "common/event/libevent_scheduler.h"
+#include "common/event/timer_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -15,7 +17,7 @@ namespace {
 class SimulatedTimeSystemTest : public testing::Test {
 protected:
   SimulatedTimeSystemTest()
-      : event_system_(event_base_new()), scheduler_(time_system_.createScheduler(event_system_)),
+      : scheduler_(time_system_.createScheduler(base_scheduler_)),
         start_monotonic_time_(time_system_.monotonicTime()),
         start_system_time_(time_system_.systemTime()) {}
 
@@ -31,16 +33,16 @@ protected:
 
   void sleepMsAndLoop(int64_t delay_ms) {
     time_system_.sleep(std::chrono::milliseconds(delay_ms));
-    event_base_loop(event_system_.get(), EVLOOP_NONBLOCK);
+    base_scheduler_.nonBlockingLoop();
   }
 
   void advanceSystemMsAndLoop(int64_t delay_ms) {
     time_system_.setSystemTime(time_system_.systemTime() + std::chrono::milliseconds(delay_ms));
-    event_base_loop(event_system_.get(), EVLOOP_NONBLOCK);
+    base_scheduler_.nonBlockingLoop();
   }
 
+  LibeventScheduler base_scheduler_;
   SimulatedTimeSystem time_system_;
-  Libevent::BasePtr event_system_;
   SchedulerPtr scheduler_;
   std::string output_;
   std::vector<TimerPtr> timers_;
@@ -64,7 +66,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   std::atomic<bool> done(false);
   auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
     while (!done) {
-      event_base_loop(event_system_.get(), 0);
+      base_scheduler_.blockingLoop();
     }
   });
   Thread::CondVar condvar;

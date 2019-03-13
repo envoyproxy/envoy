@@ -69,17 +69,25 @@ public:
       const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
-        health_check_address_(health_check_config.port_value() == 0
-                                  ? dest_address
-                                  : Network::Utility::getAddressWithPort(
-                                        *dest_address, health_check_config.port_value())),
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
         locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
                                                    POOL_GAUGE(stats_store_))},
-        priority_(priority) {}
+        priority_(priority) {
+    if (health_check_config.port_value() != 0 &&
+        dest_address->type() != Network::Address::Type::Ip) {
+      // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
+      // for a pipe address is a misconfiguration. Throw an exception.
+      throw EnvoyException(
+          fmt::format("Invalid host configuration: non-zero port for non-IP address"));
+    }
+    health_check_address_ =
+        health_check_config.port_value() == 0
+            ? dest_address
+            : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
+  }
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }

@@ -49,24 +49,28 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_cc_test(
-    name = "mysql_integration_test",
-    srcs = [
-        "mysql_integration_test.cc",
-    ],
-    data = [
-        "mysql_test_config.yaml",
-    ],
-    extension_name = "envoy.filters.network.mysql_proxy",
-    deps = [
-        ":mysql_test_utils_lib",
-        "//source/common/tcp_proxy",
-        "//source/extensions/filters/network/mysql_proxy:config",
-        "//source/extensions/filters/network/mysql_proxy:proxy_lib",
-        "//source/extensions/filters/network/tcp_proxy:config",
-        "//test/integration:integration_lib",
-    ],
-)
+# See https://github.com/envoyproxy/envoy/issues/6162.
+#
+# TODO(venilnoronha, #6162): uncomment this once this works on all platforms.
+#
+# envoy_extension_cc_test(
+#     name = "mysql_integration_test",
+#     srcs = [
+#         "mysql_integration_test.cc",
+#     ],
+#     data = [
+#         "mysql_test_config.yaml",
+#     ],
+#     extension_name = "envoy.filters.network.mysql_proxy",
+#     deps = [
+#         ":mysql_test_utils_lib",
+#         "//source/common/tcp_proxy",
+#         "//source/extensions/filters/network/mysql_proxy:config",
+#         "//source/extensions/filters/network/mysql_proxy:proxy_lib",
+#         "//source/extensions/filters/network/tcp_proxy:config",
+#         "//test/integration:integration_lib",
+#     ],
+# )
 
 envoy_extension_cc_test(
     name = "mysql_command_tests",
