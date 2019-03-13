@@ -22,6 +22,16 @@
 namespace Envoy {
 namespace Runtime {
 
+bool runtimeFeatureEnabled(const std::string& feature) {
+  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->snapshot().runtimeFeatureEnabled(feature);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
+}
+
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 uint64_t RandomGeneratorImpl::random() {
@@ -148,11 +158,10 @@ std::string RandomGeneratorImpl::uuid() {
 
 bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
   bool allowed = false;
-  // See if this value is explicitly set as a runtime boolean.
-  bool stored = getBoolean(key, allowed);
-  // If not, the default value is based on disallowedByDefault.
-  if (!stored) {
-    allowed = !DisallowedFeaturesDefaults::get().disallowedByDefault(key);
+  // If the value is not explicitly set as a runtime boolean, the default value is based on
+  // disallowedByDefault.
+  if (!getBoolean(key, allowed)) {
+    allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
   }
 
   if (!allowed) {
@@ -163,6 +172,17 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
   // is about to be used, so increment the feature use stat.
   stats_.deprecated_feature_use_.inc();
   return true;
+}
+
+bool SnapshotImpl::runtimeFeatureEnabled(const std::string& key) const {
+  bool enabled = false;
+  // If the value is not explicitly set as a runtime boolean, the default value is based on
+  // disallowedByDefault.
+  if (!getBoolean(key, enabled)) {
+    enabled = RuntimeFeaturesDefaults::get().enabledByDefault(key);
+  }
+
+  return enabled;
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
