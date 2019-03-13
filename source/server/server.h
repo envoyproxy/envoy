@@ -259,7 +259,7 @@ private:
   Envoy::MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
-  std::thread::id main_thread_id_;
+  const std::thread::id main_thread_id_;
   std::unordered_map<Stage, std::vector<StageCallback>> stage_callbacks_;
 };
 
