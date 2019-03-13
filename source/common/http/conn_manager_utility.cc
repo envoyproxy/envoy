@@ -304,7 +304,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
       case ClientCertDetailsType::URI: {
         // The "URI" key still exists even if the URI is empty.
         const auto sans = connection.ssl()->uriSanPeerCertificate();
-        const auto& uriSan = sans.empty() ? "" : sans[0];
+        const auto& uri_san = sans.empty() ? "" : sans[0];
         client_cert_details.push_back("URI=" + uriSan);
         break;
       }
