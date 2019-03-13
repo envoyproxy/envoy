@@ -11,11 +11,6 @@ curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild
 export CC=gcc
 export CXX=g++
 
-export THIRDPARTY_DEPS=/tmp
-export THIRDPARTY_SRC=/thirdparty
-DEPS=$(python <(cat /bazel-prebuilt/bazel/target_recipes.bzl; \
-  echo "print ' '.join(\"${THIRDPARTY_DEPS}/%s.dep\" % r for r in set(TARGET_RECIPES.values()))"))
-
 echo "Building Bazel-managed deps (//bazel/external:all_external)"
 mkdir /bazel-prebuilt-root /bazel-prebuilt-output
 BAZEL_OPTIONS="--output_user_root=/bazel-prebuilt-root --output_base=/bazel-prebuilt-output"

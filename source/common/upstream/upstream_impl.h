@@ -69,17 +69,25 @@ public:
       const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
-        health_check_address_(health_check_config.port_value() == 0
-                                  ? dest_address
-                                  : Network::Utility::getAddressWithPort(
-                                        *dest_address, health_check_config.port_value())),
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
         locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
                                                    POOL_GAUGE(stats_store_))},
-        priority_(priority) {}
+        priority_(priority) {
+    if (health_check_config.port_value() != 0 &&
+        dest_address->type() != Network::Address::Type::Ip) {
+      // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
+      // for a pipe address is a misconfiguration. Throw an exception.
+      throw EnvoyException(
+          fmt::format("Invalid host configuration: non-zero port for non-IP address"));
+    }
+    health_check_address_ =
+        health_check_config.port_value() == 0
+            ? dest_address
+            : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
+  }
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -599,14 +607,6 @@ createTransportSocketFactory(const envoy::api::v2::Cluster& config,
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterSharedPtr
-  create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
-         ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-         Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-         AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-         Server::Admin& admin, Singleton::Manager& singleton_manager,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api, Api::Api& api);
   // Upstream::Cluster
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }
@@ -687,6 +687,8 @@ private:
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
 };
+
+using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
 
 /**
  * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts

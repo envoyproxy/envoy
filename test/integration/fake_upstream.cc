@@ -120,7 +120,7 @@ void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vect
       [this, &metadata_map_vector]() -> void { encoder_.encodeMetadata(metadata_map_vector); });
 }
 
-void FakeStream::onResetStream(Http::StreamResetReason) {
+void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
   Thread::LockGuard lock(lock_);
   saw_reset_ = true;
   decoder_event_.notifyOne();

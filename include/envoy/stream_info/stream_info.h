@@ -364,6 +364,17 @@ public:
    * @return SNI value for downstream host.
    */
   virtual const std::string& requestedServerName() const PURE;
+
+  /**
+   * @param failure_reason the upstream transport failure reason.
+   */
+  virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @return const std::string& the upstream transport failure reason, e.g. certificate validation
+   *         failed.
+   */
+  virtual const std::string& upstreamTransportFailureReason() const PURE;
 };
 
 } // namespace StreamInfo

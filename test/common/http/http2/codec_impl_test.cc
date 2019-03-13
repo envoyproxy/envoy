@@ -186,7 +186,7 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
   response_encoder_->encodeHeaders(continue_headers, true);
 
   // Flush pending data.
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
   setupDefaultConnectionMocks();
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 
@@ -216,7 +216,7 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
   response_encoder_->encodeHeaders(continue_headers, true);
 
   // Flush pending data.
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
   setupDefaultConnectionMocks();
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 
@@ -272,8 +272,8 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
   response_encoder_->encodeHeaders(response_headers, false);
 
   // Flush pending data.
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset));
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::LocalReset, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
   setupDefaultConnectionMocks();
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 
@@ -290,8 +290,9 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
 
   MockStreamCallbacks callbacks;
   request_encoder_->getStream().addCallbacks(callbacks);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalRefusedStreamReset));
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset));
+  EXPECT_CALL(server_stream_callbacks_,
+              onResetStream(StreamResetReason::LocalRefusedStreamReset, _));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset, _));
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
 }
 
@@ -306,8 +307,8 @@ TEST_P(Http2CodecImplTest, InvalidFrame) {
           Invoke([&](Buffer::Instance& data, bool) -> void { server_wrapper_.buffer_.add(data); }));
 
   request_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset));
-  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+  EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
 }
 
@@ -469,7 +470,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   EXPECT_CALL(client_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
   request_encoder_->encodeData(body, true);
-  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _));
   request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
 
   // Dispatch server. We expect to see some data.
@@ -482,7 +483,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetClient) {
     response_encoder_->encodeHeaders(response_headers, false);
   }));
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
 
   setupDefaultConnectionMocks();
   server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
@@ -507,14 +508,14 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServer) {
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
   response_encoder_->encodeData(body, true);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
   response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
 
   MockStreamCallbacks client_stream_callbacks;
   request_encoder_->getStream().addCallbacks(client_stream_callbacks);
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset));
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   setupDefaultConnectionMocks();
   client_wrapper_.dispatch(Buffer::OwnedImpl(), *client_);
 }
@@ -662,13 +663,14 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   EXPECT_EQ(initial_stream_window, server_->getStream(1)->unconsumed_bytes_);
   EXPECT_GT(initial_connection_window, nghttp2_session_get_remote_window_size(client_->session()));
 
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalRefusedStreamReset));
+  EXPECT_CALL(server_stream_callbacks_,
+              onResetStream(StreamResetReason::LocalRefusedStreamReset, _));
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(0);
   EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(0);
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset))
-      .WillOnce(Invoke([&](StreamResetReason) -> void {
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset, _))
+      .WillOnce(Invoke([&](StreamResetReason, absl::string_view) -> void {
         // Test the case where the reset callbacks cause the socket to fill up,
         // causing the underlying connection to back up. Given the stream is
         // being destroyed the watermark callbacks should not fire (mocks for Times(0)
@@ -872,7 +874,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersInvokeResetStream) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(63 * 1024, 'q');
   request_headers.addCopy("big", long_string);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(1);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(1);
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
@@ -886,7 +888,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAccepted) {
   request_headers.addCopy("big", long_string);
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
@@ -923,7 +925,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersOverDefaultCodecLibraryLimit) 
   request_headers.addCopy("big", long_string);
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
@@ -959,7 +961,7 @@ TEST_P(Http2CodecImplTest, TestManyLargeRequestHeadersUnderPerHeaderLimit) {
   }
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
@@ -977,7 +979,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtMaxConfigurable) {
   }
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_)).Times(0);
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   request_encoder_->encodeHeaders(request_headers, true);
 }
 

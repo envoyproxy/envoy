@@ -16,6 +16,8 @@ import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
+option (gogoproto.stable_marshaler_all) = true;
+
 // [#protodoc-title: Dubbo route configuration]
 
 message RouteConfiguration {

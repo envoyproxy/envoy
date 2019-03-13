@@ -151,5 +151,21 @@ Upstream::Host::CreateConnectionData LogicalDnsCluster::LogicalHost::createConne
                                       parent_.lbEndpoint(), shared_from_this())}};
 }
 
+ClusterImplBaseSharedPtr LogicalDnsClusterFactory::createClusterImpl(
+    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Stats::ScopePtr&& stats_scope) {
+  auto selected_dns_resolver = selectDnsResolver(cluster, context);
+
+  return std::make_unique<LogicalDnsCluster>(cluster, context.runtime(), selected_dns_resolver,
+                                             context.tls(), socket_factory_context,
+                                             std::move(stats_scope), context.addedViaApi());
+}
+
+/**
+ * Static registration for the strict dns cluster factory. @see RegisterFactory.
+ */
+REGISTER_FACTORY(LogicalDnsClusterFactory, ClusterFactory);
+
 } // namespace Upstream
 } // namespace Envoy

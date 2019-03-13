@@ -1,16 +1,19 @@
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
+#include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
+#include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
@@ -21,6 +24,7 @@
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
 
@@ -47,6 +51,16 @@ TEST(QuicPlatformTest, QuicArraysize) {
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
+TEST(QuicPlatformTest, QuicBugTracker) {
+  EXPECT_DEBUG_DEATH(QUIC_BUG << "Here is a bug,", " bug");
+  EXPECT_DEBUG_DEATH(QUIC_BUG_IF(true) << "There is a bug,", " bug");
+  EXPECT_LOG_NOT_CONTAINS("error", "", QUIC_BUG_IF(false) << "A feature is not a bug.");
+
+  EXPECT_LOG_CONTAINS("error", " bug", QUIC_PEER_BUG << "Everywhere's a bug,");
+  EXPECT_LOG_CONTAINS("error", " here", QUIC_PEER_BUG_IF(true) << "Including here.");
+  EXPECT_LOG_NOT_CONTAINS("error", "", QUIC_PEER_BUG_IF(false) << "But not there.");
+}
+
 TEST(QuicPlatformTest, QuicClientStats) {
   // Just make sure they compile.
   QUIC_CLIENT_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
@@ -66,6 +80,15 @@ TEST(QuicPlatformTest, QuicExportedStats) {
                        quic::QuicTime::Delta::FromSeconds(1),
                        quic::QuicTime::Delta::FromSecond(3600), 100, "doc");
   QUIC_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
+}
+
+TEST(QuicPlatformTest, QuicHostnameUtils) {
+  EXPECT_FALSE(quic::QuicHostnameUtils::IsValidSNI("!!"));
+  EXPECT_FALSE(quic::QuicHostnameUtils::IsValidSNI("envoyproxy"));
+  EXPECT_TRUE(quic::QuicHostnameUtils::IsValidSNI("www.envoyproxy.io"));
+  EXPECT_EQ("lyft.com", quic::QuicHostnameUtils::NormalizeHostname("lyft.com"));
+  EXPECT_EQ("google.com", quic::QuicHostnameUtils::NormalizeHostname("google.com..."));
+  EXPECT_EQ("quicwg.org", quic::QuicHostnameUtils::NormalizeHostname("QUICWG.ORG"));
 }
 
 TEST(QuicPlatformTest, QuicUnorderedMap) {
@@ -414,6 +437,22 @@ TEST(QuicPlatformTest, QuicCertUtils) {
             "0\x12\x6\x3U\x4\x3\f\vTest Server",
             out);
   OPENSSL_free(static_cast<void*>(der));
+}
+
+TEST(QuicPlatformTest, QuicTestOutput) {
+  QuicLogThresholdSaver saver;
+
+  Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
+
+  // Set log level to INFO to see the test output path in log.
+  quic::GetLogger().set_level(quic::INFO);
+
+  EXPECT_LOG_NOT_CONTAINS("warn", "",
+                          quic::QuicRecordTestOutput("quic_test_output.1", "output 1 content\n"));
+  EXPECT_LOG_NOT_CONTAINS("error", "",
+                          quic::QuicRecordTestOutput("quic_test_output.2", "output 2 content\n"));
+  EXPECT_LOG_CONTAINS("info", "Recorded test output into",
+                      quic::QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
 
 } // namespace

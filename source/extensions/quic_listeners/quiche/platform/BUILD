@@ -107,21 +107,33 @@ envoy_cc_library(
     srcs = [
         "quic_cert_utils_impl.cc",
         "quic_text_utils_impl.cc",
-    ],
+    ] + envoy_select_quiche([
+        "quic_hostname_utils_impl.cc",
+        "quic_test_output_impl.cc",
+    ]),
     hdrs = [
         "quic_cert_utils_impl.h",
         "quic_mutex_impl.h",
         "quic_str_cat_impl.h",
         "quic_string_utils_impl.h",
         "quic_text_utils_impl.h",
-    ],
+    ] + envoy_select_quiche([
+        "quic_bug_tracker_impl.h",
+        "quic_hostname_utils_impl.h",
+        "quic_test_output_impl.h",
+    ]),
     external_deps = [
         "quiche_quic_platform_base",
         "abseil_str_format",
         "abseil_synchronization",
+        "abseil_time",
         "ssl",
     ],
     visibility = ["//visibility:public"],
+    deps = envoy_select_quiche([
+        "//source/common/filesystem:filesystem_lib",
+        "//source/common/http:utility_lib",
+    ]),
 )
 
 envoy_cc_library(

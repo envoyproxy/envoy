@@ -866,6 +866,23 @@ TEST(HostImplTest, HealthFlags) {
   EXPECT_EQ(Host::Health::Unhealthy, host->health());
 }
 
+// Test that it's not possible to do a HostDescriptionImpl with a unix
+// domain socket host and a health check config with non-zero port.
+// This is a regression test for oss-fuzz issue
+// https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=11095
+TEST(HostImplTest, HealthPipeAddress) {
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig config;
+        config.set_port_value(8000);
+        HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("unix://foo"),
+                                  envoy::api::v2::core::Metadata::default_instance(),
+                                  envoy::api::v2::core::Locality().default_instance(), config, 1);
+      },
+      EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
+}
+
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 TEST_F(StaticClusterImplTest, InitialHosts) {
@@ -1427,6 +1444,32 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
       EnvoyException,
       "malformed IP address: foo.bar.com. Consider setting resolver_name or "
       "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
+}
+
+// Test for oss-fuzz issue #11329
+// (https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=11329). If no
+// hosts were specified in endpoints but a priority value > 0 there, a
+// crash would happen.
+TEST_F(StaticClusterImplTest, NoHostsTest) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    load_assignment:
+      cluster_name: foo
+      endpoints:
+      - priority: 1
+  )EOF";
+
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope =
+      stats_.createScope(fmt::format("cluster.{}.", cluster_config.name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, *api_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 TEST(ClusterDefinitionTest, BadClusterConfig) {
