@@ -61,7 +61,7 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
   upstream_request_->encodeData(data, true);
   decoder->waitForBodyData(1024);
 
-  // Advance time and wait for a ticks worth of data.
+  // Advance time and wait for a tick worth of data.
   simTime().sleep(std::chrono::milliseconds(63));
   decoder->waitForBodyData(1088);
 

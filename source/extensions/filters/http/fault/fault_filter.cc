@@ -154,7 +154,8 @@ void FaultFilter::maybeSetupResponseRateLimit() {
     return;
   }
 
-  incActiveFaults();
+  // General stats. All injected faults are considered a single aggregate active fault.
+  maybeIncActiveFaults();
   config_->stats().response_rl_injected_.inc();
 
   response_limiter_ = std::make_unique<StreamRateLimiter>(
@@ -248,8 +249,8 @@ void FaultFilter::recordDelaysInjectedStats() {
     config_->scope().counter(stats_counter).inc();
   }
 
-  // General stats.
-  incActiveFaults();
+  // General stats. All injected faults are considered a single aggregate active fault.
+  maybeIncActiveFaults();
   config_->stats().delays_injected_.inc();
 }
 
@@ -262,8 +263,8 @@ void FaultFilter::recordAbortsInjectedStats() {
     config_->scope().counter(stats_counter).inc();
   }
 
-  // General stats.
-  incActiveFaults();
+  // General stats. All injected faults are considered a single aggregate active fault.
+  maybeIncActiveFaults();
   config_->stats().aborts_injected_.inc();
 }
 
@@ -286,7 +287,7 @@ FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Sta
                                  POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-void FaultFilter::incActiveFaults() {
+void FaultFilter::maybeIncActiveFaults() {
   // Only charge 1 active fault per filter in case we are injecting multiple faults.
   if (fault_active_) {
     return;
@@ -394,9 +395,6 @@ StreamRateLimiter::StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_da
 }
 
 void StreamRateLimiter::onTokenTimer() {
-  ASSERT(waiting_for_token_);
-  waiting_for_token_ = false;
-
   ENVOY_LOG(trace, "limiter: timer wakeup: buffered={}", buffer_.length());
   Buffer::OwnedImpl data_to_write;
 
@@ -420,12 +418,11 @@ void StreamRateLimiter::onTokenTimer() {
     if (ms.count() > 0) {
       ENVOY_LOG(trace, "limiter: scheduling wakeup for {}ms", ms.count());
       token_timer_->enableTimer(ms);
-      waiting_for_token_ = true;
     }
   }
 
   // Write the data out, indicating end stream if we saw end stream, there is no further data to
-  // send, and there are no trailers.w
+  // send, and there are no trailers.
   write_data_cb_(data_to_write, saw_end_stream_ && buffer_.length() == 0 && !saw_trailers_);
 
   // If there is no more data to send and we saw trailers, we need to continue iteration to release
@@ -440,14 +437,13 @@ void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_st
             buffer_.length());
   buffer_.move(incoming_buffer);
   saw_end_stream_ = end_stream;
-  if (!waiting_for_token_) {
+  if (!token_timer_->enabled()) {
     // TODO(mattklein123): In an optimal world we would be able to continue iteration with the data
     // we want in the buffer, but have a way to clear end_stream in case we can't send it all.
     // The filter API does not currently support that and it will not be a trivial change to add.
     // Instead we cheat here by scheduling the token timer to run immediately after the stack is
     // unwound, at which point we can directly called encode/decodeData.
     token_timer_->enableTimer(std::chrono::milliseconds(0));
-    waiting_for_token_ = true;
   }
 }
 

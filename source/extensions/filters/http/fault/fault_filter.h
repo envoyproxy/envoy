@@ -152,7 +152,6 @@ private:
   const std::function<void()> continue_cb_;
   TokenBucketImpl token_bucket_;
   Event::TimerPtr token_timer_;
-  bool waiting_for_token_{};
   bool saw_end_stream_{};
   bool saw_trailers_{};
   Buffer::WatermarkBuffer buffer_;
@@ -218,7 +217,7 @@ private:
   bool isDelayEnabled();
   absl::optional<uint64_t> delayDuration();
   uint64_t abortHttpStatus();
-  void incActiveFaults();
+  void maybeIncActiveFaults();
   void maybeSetupResponseRateLimit();
 
   FaultFilterConfigSharedPtr config_;

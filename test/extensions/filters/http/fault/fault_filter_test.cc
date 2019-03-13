@@ -419,7 +419,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
-  timer_->callback_();
+  timer_->invokeCallback();
   filter_->onDestroy();
 
   EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
@@ -477,7 +477,7 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
 
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
@@ -545,7 +545,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -604,7 +604,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -656,7 +656,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -721,7 +721,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
 
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -850,7 +850,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
               setResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
       .Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -960,7 +960,7 @@ void FaultFilterTest::TestPerFilterConfigFault(
       .WillOnce(Return(false));
 
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding());
-  timer_->callback_();
+  timer_->invokeCallback();
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
@@ -1037,7 +1037,8 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   setupRateLimitTest(true);
 
   ON_CALL(encoder_filter_callbacks_, encoderBufferLimit()).WillByDefault(Return(1100));
-  Event::MockTimer* token_timer = new Event::MockTimer(&decoder_filter_callbacks_.dispatcher_);
+  Event::MockTimer* token_timer =
+      new NiceMock<Event::MockTimer>(&decoder_filter_callbacks_.dispatcher_);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));
 
   EXPECT_EQ(1UL, config_->stats().response_rl_injected_.value());
@@ -1055,7 +1056,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data1, false));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual("hello"), false));
-  token_timer->callback_();
+  token_timer->invokeCallback();
 
   // Advance time by 1s which should refill all tokens.
   time_system_.sleep(std::chrono::seconds(1));
@@ -1070,14 +1071,14 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_CALL(encoder_filter_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'a')), false));
-  token_timer->callback_();
+  token_timer->invokeCallback();
 
   // Fire timer, also advance time.
   time_system_.sleep(std::chrono::milliseconds(63));
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
-  token_timer->callback_();
+  token_timer->invokeCallback();
 
   // Get new data with current data buffered, not end_stream.
   Buffer::OwnedImpl data3(std::string(64, 'b'));
@@ -1088,13 +1089,13 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_CALL(*token_timer, enableTimer(std::chrono::milliseconds(63)));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'a')), false));
-  token_timer->callback_();
+  token_timer->invokeCallback();
 
   // Fire timer, also advance time. No time enable because there is nothing buffered.
   time_system_.sleep(std::chrono::milliseconds(63));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(64, 'b')), false));
-  token_timer->callback_();
+  token_timer->invokeCallback();
 
   // Advance time by 1s for a full refill.
   time_system_.sleep(std::chrono::seconds(1));
@@ -1105,7 +1106,7 @@ TEST_F(FaultFilterRateLimitTest, ResponseRateLimitEnabled) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(data4, true));
   EXPECT_CALL(encoder_filter_callbacks_,
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(1024, 'c')), true));
-  token_timer->callback_();
+  token_timer->invokeCallback();
 
   filter_->onDestroy();
   EXPECT_EQ(0UL, config_->stats().active_faults_.value());
