@@ -138,6 +138,21 @@ public:
     timerTick();
   }
 
+  void expectConfigUpdateFailed() override {
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+  }
+
+  void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
+    init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+  }
+
+  void expectDisableInitFetchTimeoutTimer() override {
+    EXPECT_CALL(*init_timeout_timer_, disableTimer());
+  }
+
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+
   void timerTick() {
     expectSendMessage(cluster_names_, version_);
     timer_cb_();
@@ -158,6 +173,7 @@ public:
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Event::MockTimer* init_timeout_timer_;
 };
 
 } // namespace Config

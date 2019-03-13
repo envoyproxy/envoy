@@ -130,6 +130,21 @@ public:
     last_cluster_names_ = cluster_names;
   }
 
+  void expectConfigUpdateFailed() override {
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+  }
+
+  void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
+    init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+  }
+
+  void expectDisableInitFetchTimeoutTimer() override {
+    EXPECT_CALL(*init_timeout_timer_, disableTimer());
+  }
+
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+
   std::string version_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;
@@ -146,6 +161,7 @@ public:
   std::vector<std::string> last_cluster_names_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
+  Event::MockTimer* init_timeout_timer_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned

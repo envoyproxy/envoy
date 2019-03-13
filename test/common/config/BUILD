@@ -87,10 +87,11 @@ envoy_cc_test_library(
     ],
 )
 
-envoy_cc_test(
-    name = "delta_subscription_impl_test",
-    srcs = ["delta_subscription_impl_test.cc"],
+envoy_cc_test_library(
+    name = "delta_subscription_test_harness",
+    hdrs = ["delta_subscription_test_harness.h"],
     deps = [
+        ":subscription_test_harness",
         "//source/common/config:delta_subscription_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
@@ -151,6 +152,7 @@ envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
     deps = [
+        ":delta_subscription_test_harness",
         ":filesystem_subscription_test_harness",
         ":grpc_subscription_test_harness",
         ":http_subscription_test_harness",
