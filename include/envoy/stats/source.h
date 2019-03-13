@@ -38,14 +38,6 @@ public:
   virtual const std::vector<GaugeSharedPtr>& cachedGauges() PURE;
 
   /**
-   * Returns all known bools. Will use cached values if already accessed and clearCache() hasn't
-   * been called since.
-   * @return std::vector<BoolIndicatorSharedPtr>& all known bools. Note: reference may not be
-   * valid after clearCache() is called.
-   */
-  virtual const std::vector<BoolIndicatorSharedPtr>& cachedBoolIndicators() PURE;
-
-  /**
    * Returns all known parent histograms. Will use cached values if already accessed and
    * clearCache() hasn't been called since.
    * @return std::vector<ParentHistogramSharedPtr>& all known histograms. Note: reference may not be

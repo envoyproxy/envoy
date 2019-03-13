@@ -45,7 +45,6 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   for (ScopeImpl* scope : scopes_) {
     removeRejectedStats(scope->central_cache_.counters_, deleted_counters_);
     removeRejectedStats(scope->central_cache_.gauges_, deleted_gauges_);
-    removeRejectedStats(scope->central_cache_.bool_indicators_, deleted_bool_indicators_);
     removeRejectedStats(scope->central_cache_.histograms_, deleted_histograms_);
   }
 }
@@ -105,22 +104,6 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
     for (auto& gauge : scope->central_cache_.gauges_) {
       if (names.insert(gauge.first).second) {
         ret.push_back(gauge.second);
-      }
-    }
-  }
-
-  return ret;
-}
-
-std::vector<BoolIndicatorSharedPtr> ThreadLocalStoreImpl::boolIndicators() const {
-  // Handle de-dup due to overlapping scopes.
-  std::vector<BoolIndicatorSharedPtr> ret;
-  CharStarHashSet names;
-  Thread::LockGuard lock(lock_);
-  for (ScopeImpl* scope : scopes_) {
-    for (auto& bool_indicator : scope->central_cache_.bool_indicators_) {
-      if (names.insert(bool_indicator.first).second) {
-        ret.push_back(bool_indicator.second);
       }
     }
   }
@@ -372,34 +355,6 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
       [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
          std::vector<Tag>&& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
-      },
-      tls_cache);
-}
-
-BoolIndicator& ThreadLocalStoreImpl::ScopeImpl::boolIndicator(const std::string& name) {
-  // See comments in counter(). There is no super clean way (via templates or otherwise) to
-  // share this code so I'm leaving it largely duplicated for now.
-  //
-  // Note that we can do map.find(final_name.c_str()), but we cannot do
-  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
-  // a temporary, and address sanitization errors would follow. Instead we must
-  // do a find() first, using that if it succeeds. If it fails, then after we
-  // construct the stat we can insert it into the required maps.
-  std::string final_name = prefix_ + name;
-  if (parent_.rejects(final_name)) {
-    return null_bool_;
-  }
-
-  StatMap<BoolIndicatorSharedPtr>* tls_cache = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].bool_indicators_;
-  }
-
-  return safeMakeStat<BoolIndicator>(
-      final_name, central_cache_.bool_indicators_,
-      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
-         std::vector<Tag>&& tags) -> BoolIndicatorSharedPtr {
-        return allocator.makeBoolIndicator(name, std::move(tag_extracted_name), std::move(tags));
       },
       tls_cache);
 }
