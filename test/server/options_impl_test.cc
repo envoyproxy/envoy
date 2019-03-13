@@ -350,10 +350,9 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest1) {
 
   // Set cpuset size to be four.
   CPU_ZERO(&test_set);
-  CPU_SET(0, &test_set);
-  CPU_SET(3, &test_set);
-  CPU_SET(4, &test_set);
-  CPU_SET(7, &test_set);
+  for (int i = 0; i < 4; i++) {
+    CPU_SET(i, &test_set);
+  }
 
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
@@ -369,14 +368,9 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest2) {
 
   // Set cpuset size to be eight.
   CPU_ZERO(&test_set);
-  CPU_SET(0, &test_set);
-  CPU_SET(3, &test_set);
-  CPU_SET(4, &test_set);
-  CPU_SET(7, &test_set);
-  CPU_SET(12, &test_set);
-  CPU_SET(15, &test_set);
-  CPU_SET(16, &test_set);
-  CPU_SET(19, &test_set);
+  for (int i = 0; i < 8; i++) {
+    CPU_SET(i, &test_set);
+  }
 
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
@@ -392,14 +386,9 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest3) {
 
   // Set cpuset size to be eight.
   CPU_ZERO(&test_set);
-  CPU_SET(0, &test_set);
-  CPU_SET(3, &test_set);
-  CPU_SET(4, &test_set);
-  CPU_SET(7, &test_set);
-  CPU_SET(12, &test_set);
-  CPU_SET(15, &test_set);
-  CPU_SET(16, &test_set);
-  CPU_SET(19, &test_set);
+  for (int i = 0; i < 8; i++) {
+    CPU_SET(i, &test_set);
+  }
 
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
@@ -415,10 +404,9 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 
   // Set cpuset size to be four.
   CPU_ZERO(&test_set);
-  CPU_SET(0, &test_set);
-  CPU_SET(3, &test_set);
-  CPU_SET(4, &test_set);
-  CPU_SET(7, &test_set);
+  for (int i = 0; i < 4; i++) {
+    CPU_SET(i, &test_set);
+  }
 
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{-1, 0})));
