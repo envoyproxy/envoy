@@ -79,7 +79,8 @@ private:
        * We cannot use std::max here because max() and current_ are
        * unsigned and subtracting them may overflow.
        */
-      remaining_.set(max() > current_ ? max() - current_ : 0);
+      const uint64_t current_copy = current_;
+      remaining_.set(max() > current_copy ? max() - current_copy : 0);
     }
 
     const uint64_t max_;
