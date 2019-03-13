@@ -79,7 +79,7 @@ def envoy_copts(repository, test = False):
                "//conditions:default": [],
            }) + select({
                # TCLAP command line parser needs this to support int64_t/uint64_t
-               "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
+               repository + "//bazel:apple": ["-DHAVE_LONG_LONG"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
@@ -97,7 +97,7 @@ def envoy_static_link_libstdcpp_linkopts():
 def envoy_linkopts():
     return select({
                # The macOS system library transitively links common libraries (e.g., pthread).
-               "@bazel_tools//tools/osx:darwin": [
+               "@envoy//bazel:apple": [
                    # See note here: https://luajit.org/install.html
                    "-pagezero_size 10000",
                    "-image_base 100000000",
@@ -126,7 +126,7 @@ def _envoy_stamped_linkopts():
 
         # macOS doesn't have an official equivalent to the `.note.gnu.build-id`
         # ELF section, so just stuff the raw ID into a new text section.
-        "@bazel_tools//tools/osx:darwin": [
+        "@envoy//bazel:apple": [
             "-sectcreate __TEXT __build_id",
             "$(location @envoy//bazel:raw_build_id.ldscript)",
         ],
@@ -139,7 +139,7 @@ def _envoy_stamped_linkopts():
 
 def _envoy_stamped_deps():
     return select({
-        "@bazel_tools//tools/osx:darwin": [
+        "@envoy//bazel:apple": [
             "@envoy//bazel:raw_build_id.ldscript",
         ],
         "//conditions:default": [
@@ -150,7 +150,7 @@ def _envoy_stamped_deps():
 # Compute the test linkopts based on various options.
 def envoy_test_linkopts():
     return select({
-        "@bazel_tools//tools/osx:darwin": [
+        "@envoy//bazel:apple": [
             # See note here: https://luajit.org/install.html
             "-pagezero_size 10000",
             "-image_base 100000000",
@@ -407,7 +407,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         data = [corpus_name],
         # No fuzzing on macOS.
         deps = select({
-            "@bazel_tools//tools/osx:darwin": ["//test:dummy_main"],
+            "@envoy//bazel:apple": ["//test:dummy_main"],
             "//conditions:default": [
                 ":" + test_lib_name,
                 "//test/fuzz:main",
@@ -641,7 +641,7 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
 def envoy_select_hot_restart(xs, repository = ""):
     return select({
         repository + "//bazel:disable_hot_restart": [],
-        "@bazel_tools//tools/osx:darwin": [],
+        repository + "//bazel:apple": [],
         "//conditions:default": xs,
     })
 
@@ -668,7 +668,7 @@ def envoy_select_exported_symbols(xs):
 def envoy_select_force_libcpp(if_libcpp, default = None):
     return select({
         "@envoy//bazel:force_libcpp": if_libcpp,
-        "@bazel_tools//tools/osx:darwin": [],
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": default or [],
     })

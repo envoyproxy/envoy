@@ -9,20 +9,16 @@
 #include "common/event/real_time_system.h"
 #include "common/event/timer_impl.h"
 
-#include "event2/event.h"
-
 namespace Envoy {
 namespace Event {
 
 // Our simulated alarm inherits from TimerImpl so that the same dispatching
 // mechanism used in RealTimeSystem timers is employed for simulated alarms.
-// Note that libevent is placed into thread-safe mode due to the call to
-// evthread_use_pthreads() in source/common/event/libevent.cc.
-class SimulatedTimeSystemHelper::Alarm : public TimerImpl {
+class SimulatedTimeSystemHelper::Alarm : public Timer {
 public:
-  Alarm(SimulatedTimeSystemHelper& time_system, Libevent::BasePtr& libevent, TimerCb cb)
-      : TimerImpl(libevent, [this, cb] { runAlarm(cb); }), time_system_(time_system),
-        index_(time_system.nextIndex()), armed_(false) {}
+  Alarm(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler, TimerCb cb)
+      : base_timer_(base_scheduler.createTimer([this, cb] { runAlarm(cb); })),
+        time_system_(time_system), index_(time_system.nextIndex()), armed_(false) {}
 
   virtual ~Alarm();
 
@@ -40,7 +36,7 @@ public:
     armed_ = false;
     std::chrono::milliseconds duration = std::chrono::milliseconds::zero();
     time_system_.incPending();
-    TimerImpl::enableTimer(duration);
+    base_timer_->enableTimer(duration);
   }
 
   MonotonicTime time() const {
@@ -56,6 +52,7 @@ private:
     cb();
   }
 
+  TimerPtr base_timer_;
   SimulatedTimeSystemHelper& time_system_;
   MonotonicTime time_;
   uint64_t index_;
@@ -81,15 +78,15 @@ bool SimulatedTimeSystemHelper::CompareAlarms::operator()(const Alarm* a, const 
 // the expected thread.
 class SimulatedTimeSystemHelper::SimulatedScheduler : public Scheduler {
 public:
-  SimulatedScheduler(SimulatedTimeSystemHelper& time_system, Libevent::BasePtr& libevent)
-      : time_system_(time_system), libevent_(libevent) {}
+  SimulatedScheduler(SimulatedTimeSystemHelper& time_system, Scheduler& base_scheduler)
+      : time_system_(time_system), base_scheduler_(base_scheduler) {}
   TimerPtr createTimer(const TimerCb& cb) override {
-    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(time_system_, libevent_, cb);
+    return std::make_unique<SimulatedTimeSystemHelper::Alarm>(time_system_, base_scheduler_, cb);
   };
 
 private:
   SimulatedTimeSystemHelper& time_system_;
-  Libevent::BasePtr& libevent_;
+  Scheduler& base_scheduler_;
 };
 
 SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
@@ -207,8 +204,8 @@ void SimulatedTimeSystemHelper::removeAlarm(Alarm* alarm) {
   alarms_.erase(alarm);
 }
 
-SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Libevent::BasePtr& libevent) {
-  return std::make_unique<SimulatedScheduler>(*this, libevent);
+SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& base_scheduler) {
+  return std::make_unique<SimulatedScheduler>(*this, base_scheduler);
 }
 
 void SimulatedTimeSystemHelper::setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) {

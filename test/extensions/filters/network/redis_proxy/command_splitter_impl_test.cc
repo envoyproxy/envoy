@@ -130,8 +130,8 @@ public:
     pool_callbacks_->onResponse(std::move(response1));
   }
 
-  ConnPool::PoolCallbacks* pool_callbacks_;
-  ConnPool::MockPoolRequest pool_request_;
+  Common::Redis::Client::PoolCallbacks* pool_callbacks_;
+  Common::Redis::Client::MockPoolRequest pool_request_;
 };
 
 TEST_P(RedisSingleServerRequestTest, Success) {
@@ -349,11 +349,11 @@ public:
     std::vector<Common::Redis::RespValue> tmp_expected_requests(num_gets);
     expected_requests_.swap(tmp_expected_requests);
     pool_callbacks_.resize(num_gets);
-    std::vector<ConnPool::MockPoolRequest> tmp_pool_requests(num_gets);
+    std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_gets);
     pool_requests_.swap(tmp_pool_requests);
     for (uint32_t i = 0; i < num_gets; i++) {
       makeBulkStringArray(expected_requests_[i], {"get", std::to_string(i)});
-      ConnPool::PoolRequest* request_to_use = nullptr;
+      Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
@@ -366,8 +366,8 @@ public:
   }
 
   std::vector<Common::Redis::RespValue> expected_requests_;
-  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
-  std::vector<ConnPool::MockPoolRequest> pool_requests_;
+  std::vector<Common::Redis::Client::PoolCallbacks*> pool_callbacks_;
+  std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
 };
 
 TEST_F(RedisMGETCommandHandlerTest, Normal) {
@@ -552,11 +552,11 @@ public:
     std::vector<Common::Redis::RespValue> tmp_expected_requests(num_sets);
     expected_requests_.swap(tmp_expected_requests);
     pool_callbacks_.resize(num_sets);
-    std::vector<ConnPool::MockPoolRequest> tmp_pool_requests(num_sets);
+    std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_sets);
     pool_requests_.swap(tmp_pool_requests);
     for (uint32_t i = 0; i < num_sets; i++) {
       makeBulkStringArray(expected_requests_[i], {"set", std::to_string(i), std::to_string(i)});
-      ConnPool::PoolRequest* request_to_use = nullptr;
+      Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
@@ -569,8 +569,8 @@ public:
   }
 
   std::vector<Common::Redis::RespValue> expected_requests_;
-  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
-  std::vector<ConnPool::MockPoolRequest> pool_requests_;
+  std::vector<Common::Redis::Client::PoolCallbacks*> pool_callbacks_;
+  std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
 };
 
 TEST_F(RedisMSETCommandHandlerTest, Normal) {
@@ -675,11 +675,11 @@ public:
     std::vector<Common::Redis::RespValue> tmp_expected_requests(num_commands);
     expected_requests_.swap(tmp_expected_requests);
     pool_callbacks_.resize(num_commands);
-    std::vector<ConnPool::MockPoolRequest> tmp_pool_requests(num_commands);
+    std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_commands);
     pool_requests_.swap(tmp_pool_requests);
     for (uint32_t i = 0; i < num_commands; i++) {
       makeBulkStringArray(expected_requests_[i], {GetParam(), std::to_string(i)});
-      ConnPool::PoolRequest* request_to_use = nullptr;
+      Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
@@ -692,8 +692,8 @@ public:
   }
 
   std::vector<Common::Redis::RespValue> expected_requests_;
-  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
-  std::vector<ConnPool::MockPoolRequest> pool_requests_;
+  std::vector<Common::Redis::Client::PoolCallbacks*> pool_callbacks_;
+  std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
 };
 
 TEST_P(RedisSplitKeysSumResultHandlerTest, Normal) {
