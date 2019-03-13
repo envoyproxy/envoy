@@ -78,7 +78,7 @@ TEST_P(MySQLIntegrationTest, MySQLStatsNewSessionTest) {
  * - no failures
  */
 TEST_P(MySQLIntegrationTest, MySQLLoginTest) {
-  std::string str = "";
+  std::string str;
   std::string rcvd_data;
   std::string user = "user1";
 
@@ -125,7 +125,7 @@ TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
   std::string rcvd_data;
 
   for (idx = 0; idx < CLIENT_NUM; idx++) {
-    std::string str = "";
+    std::string str;
     std::string user("user");
     user.append(std::to_string(idx));
 
