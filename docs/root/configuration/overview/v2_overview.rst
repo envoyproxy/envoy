@@ -110,7 +110,7 @@ Mostly static with dynamic EDS
 A bootstrap config that continues from the above example with :ref:`dynamic endpoint
 discovery <arch_overview_dynamic_config_eds>` via an
 :ref:`EDS<envoy_api_file_envoy/api/v2/eds.proto>` gRPC management server listening
-on 127.0.0.3:5678 is provided below:
+on 127.0.0.1:5678 is provided below:
 
 .. code-block:: yaml
 
@@ -590,7 +590,7 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   connected_state, BoolIndicator, Current connection state with management server
+   connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
    rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
    pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
    

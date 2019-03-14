@@ -637,7 +637,8 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason) {
   return false;
 }
 
-void Filter::onUpstreamReset(Http::StreamResetReason reset_reason) {
+void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
+                             absl::string_view transport_failure_reason) {
   ASSERT(upstream_request_);
   ENVOY_STREAM_LOG(debug, "upstream reset: reset reason {}", *callbacks_,
                    Http::Utility::resetReasonToString(reset_reason));
@@ -654,6 +655,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason) {
                    Http::Utility::resetReasonToString(reset_reason));
 
   const bool dropped = reset_reason == Http::StreamResetReason::Overflow;
+  callbacks_->streamInfo().setUpstreamTransportFailureReason(transport_failure_reason);
   onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped);
 }
 
@@ -1086,11 +1088,12 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
   }
 }
 
-void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason) {
+void Filter::UpstreamRequest::onResetStream(Http::StreamResetReason reason,
+                                            absl::string_view transport_failure_reason) {
   clearRequestEncoder();
   if (!calling_encode_headers_) {
     stream_info_.setResponseFlag(parent_.streamResetReasonToResponseFlag(reason));
-    parent_.onUpstreamReset(reason);
+    parent_.onUpstreamReset(reason, transport_failure_reason);
   } else {
     deferred_reset_reason_ = reason;
   }
@@ -1140,6 +1143,7 @@ void Filter::UpstreamRequest::onPerTryTimeout() {
 }
 
 void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                                            absl::string_view transport_failure_reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {
   Http::StreamResetReason reset_reason = Http::StreamResetReason::ConnectionFailure;
   switch (reason) {
@@ -1153,7 +1157,7 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
 
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
-  onResetStream(reset_reason);
+  onResetStream(reset_reason, transport_failure_reason);
 }
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
@@ -1188,7 +1192,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   // specific example of a case where this happens is if we try to encode a total header size that
   // is too big in HTTP/2 (64K currently).
   if (deferred_reset_reason_) {
-    onResetStream(deferred_reset_reason_.value());
+    onResetStream(deferred_reset_reason_.value(), absl::string_view());
   } else {
     if (buffered_request_body_) {
       stream_info_.addBytesSent(buffered_request_body_->length());

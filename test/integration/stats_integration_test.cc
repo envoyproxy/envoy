@@ -32,8 +32,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StatsIntegrationTest,
 TEST_P(StatsIntegrationTest, WithDefaultConfig) {
   initialize();
 
-  auto live = test_server_->boolIndicator("server.live");
-  EXPECT_TRUE(live->value());
+  auto live = test_server_->gauge("server.live");
+  EXPECT_EQ(live->value(), 1);
   EXPECT_EQ(live->tags().size(), 0);
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -122,8 +122,8 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   });
   initialize();
 
-  auto live = test_server_->boolIndicator("server.live");
-  EXPECT_TRUE(live->value());
+  auto live = test_server_->gauge("server.live");
+  EXPECT_EQ(live->value(), 1);
   EXPECT_EQ(live->tags().size(), 1);
   EXPECT_EQ(live->tags()[0].name_, "test.x");
   EXPECT_EQ(live->tags()[0].value_, "xxx");

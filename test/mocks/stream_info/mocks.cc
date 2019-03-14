@@ -81,6 +81,8 @@ MockStreamInfo::MockStreamInfo()
         requested_server_name_ = std::string(requested_server_name);
       }));
   ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
+  ON_CALL(*this, upstreamTransportFailureReason())
+      .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
 }
 
 MockStreamInfo::~MockStreamInfo() {}
