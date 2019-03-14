@@ -54,8 +54,8 @@ public:
    * representation during encoding and prior to retained allocation.
    */
   class Encoding {
-   public:
-    //Encoding() : storage_(nullptr) {}
+  public:
+    // Encoding() : storage_(nullptr) {}
 
     void fromString(absl::string_view str) {
       storage_ = std::make_unique<Storage>(str.size() + 2);
@@ -97,11 +97,9 @@ public:
       return bytes_required;
     }
 
-    StoragePtr transferStorage() {
-      return std::move(storage_);
-    }
+    StoragePtr transferStorage() { return std::move(storage_); }
 
-   private:
+  private:
     StoragePtr storage_;
   };
 

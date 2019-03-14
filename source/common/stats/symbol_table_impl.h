@@ -75,7 +75,7 @@ public:
    * representation during encoding and prior to retained allocation.
    */
   class Encoding {
-   public:
+  public:
     Encoding() = default;
 
     /**
@@ -129,10 +129,9 @@ public:
 
     void swap(Encoding& src) { vec_.swap(src.vec_); }
 
-   private:
+  private:
     std::vector<uint8_t> vec_;
   };
-
 
   SymbolTableImpl();
   ~SymbolTableImpl() override;
@@ -387,9 +386,7 @@ class StatNameList {
 public:
   ~StatNameList();
 
-  void moveStorageIntoList(SymbolTable::StoragePtr&& storage) {
-    storage_ = std::move(storage);
-  }
+  void moveStorageIntoList(SymbolTable::StoragePtr&& storage) { storage_ = std::move(storage); }
 
   /**
    * @return true if populate() has been called on this list.

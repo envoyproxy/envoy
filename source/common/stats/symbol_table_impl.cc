@@ -60,7 +60,8 @@ void SymbolTableImpl::Encoding::addSymbol(Symbol symbol) {
   } while (symbol != 0);
 }
 
-SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array, uint64_t size) {
+SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array,
+                                                   uint64_t size) {
   SymbolVec symbol_vec;
   Symbol symbol = 0;
   for (uint32_t shift = 0; size > 0; --size, ++array) {
@@ -149,11 +150,12 @@ uint64_t SymbolTableImpl::numSymbols() const {
 }
 
 std::string SymbolTableImpl::toString(const StatName& stat_name) const {
-  return decodeSymbolVec(SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
+  return decodeSymbolVec(
+      SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
 }
 
 void SymbolTableImpl::callWithStringView(StatName stat_name,
-                        const std::function<void(absl::string_view)>& fn) const {
+                                         const std::function<void(absl::string_view)>& fn) const {
   fn(toString(stat_name));
 }
 
@@ -172,7 +174,8 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
 
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  SymbolVec symbols = SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+  SymbolVec symbols =
+      SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
@@ -188,7 +191,8 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
 
 void SymbolTableImpl::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  SymbolVec symbols = SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+  SymbolVec symbols =
+      SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
@@ -337,7 +341,8 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
   return bytes;
 }
 
-void SymbolTableImpl::populateList(absl::string_view* names, int32_t num_names, StatNameList& list) {
+void SymbolTableImpl::populateList(absl::string_view* names, int32_t num_names,
+                                   StatNameList& list) {
   RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
   // First encode all the names.

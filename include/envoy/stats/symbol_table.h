@@ -30,7 +30,7 @@ class StatNameList;
  * a vptr overhead per object, and the representation is shared between the
  * SymbolTable implementations, so this is just a pre-declare.
  */
-//class SymbolEncoding;
+// class SymbolEncoding;
 
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
