@@ -528,7 +528,8 @@ public:
   GAUGE (cx_open)                                                                                  \
   GAUGE (rq_pending_open)                                                                          \
   GAUGE (rq_open)                                                                                  \
-  GAUGE (rq_retry_open)
+  GAUGE (rq_retry_open)                                                                            \
+  GAUGE (cx_pool_open)
 // clang-format on
 
 /**
