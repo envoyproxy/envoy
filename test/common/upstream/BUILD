@@ -269,6 +269,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "priority_agnostic_conn_pool_map_impl_test",
+    srcs = ["priority_agnostic_conn_pool_map_impl_test.cc"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+        "//source/common/upstream:priority_agnostic_conn_pool_map_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "resource_manager_impl_test",
     srcs = ["resource_manager_impl_test.cc"],
     deps = [

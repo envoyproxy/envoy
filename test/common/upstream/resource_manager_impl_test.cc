@@ -57,6 +57,13 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
       .WillRepeatedly(Return(0U));
   EXPECT_EQ(0U, resource_manager.retries().max());
   EXPECT_FALSE(resource_manager.retries().canCreate());
+  EXPECT_CALL(
+      runtime.snapshot_,
+      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_connection_pools", 0U))
+      .Times(2)
+      .WillRepeatedly(Return(5U));
+  EXPECT_EQ(5U, resource_manager.connectionPools().max());
+  EXPECT_TRUE(resource_manager.connectionPools().canCreate());
 }
 
 } // namespace
