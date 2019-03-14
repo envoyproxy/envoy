@@ -26,6 +26,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1ReverseBridge {
+namespace {
 
 class ReverseBridgeTest : public testing::Test {
 protected:
@@ -481,6 +482,8 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
                                      "envoy reverse bridge: upstream responded with unsupported "
                                      "content-type application/json, status code 400"));
 }
+
+} // namespace
 } // namespace GrpcHttp1ReverseBridge
 } // namespace HttpFilters
 } // namespace Extensions

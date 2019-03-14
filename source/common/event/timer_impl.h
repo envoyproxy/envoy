@@ -5,6 +5,7 @@
 #include "envoy/event/timer.h"
 
 #include "common/event/event_impl_base.h"
+#include "common/event/libevent.h"
 
 namespace Envoy {
 namespace Event {

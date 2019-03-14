@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Event {
 
 // Implements a simulated time system including a scheduler for timers. This is
-// designed to be used as as the exclusive time-system resident in a process at
+// designed to be used as the exclusive time-system resident in a process at
 // any particular time, and as such should not be instantiated directly by
 // tests. Instead it should be instantiated via SimulatedTimeSystem, declared
 // below.
@@ -22,7 +22,7 @@ public:
   ~SimulatedTimeSystemHelper() override;
 
   // TimeSystem
-  SchedulerPtr createScheduler(Libevent::BasePtr&) override;
+  SchedulerPtr createScheduler(Scheduler& base_scheduler) override;
 
   // TestTimeSystem
   void sleep(const Duration& duration) override;
@@ -116,6 +116,17 @@ public:
   template <class Duration> void setSystemTime(const Duration& duration) {
     setSystemTime(SystemTime(duration));
   }
+};
+
+// Class encapsulating a SimulatedTimeSystem, intended for integration tests.
+// Inherit from this mixin in a test fixture class to use a SimulatedTimeSystem
+// during the test.
+class TestUsingSimulatedTime {
+public:
+  SimulatedTimeSystem& simTime() { return sim_time_; }
+
+private:
+  SimulatedTimeSystem sim_time_;
 };
 
 } // namespace Event

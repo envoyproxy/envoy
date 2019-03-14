@@ -79,6 +79,8 @@ public:
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
+  MOCK_CONST_METHOD0(libeventBufferEnabled, bool());
+  MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
 
   std::string config_path_;
@@ -95,6 +97,7 @@ public:
   bool hot_restart_disabled_{};
   bool signal_handling_enabled_{true};
   bool mutex_tracing_enabled_{};
+  bool cpuset_threads_enabled_{};
 };
 
 class MockConfigTracker : public ConfigTracker {
@@ -259,6 +262,14 @@ public:
   MOCK_METHOD0(stopWorkers, void());
 };
 
+class MockServerLifecycleNotifier : public ServerLifecycleNotifier {
+public:
+  MockServerLifecycleNotifier();
+  ~MockServerLifecycleNotifier();
+
+  MOCK_METHOD2(registerCallback, void(Stage, StageCallback));
+};
+
 class MockWorkerFactory : public WorkerFactory {
 public:
   MockWorkerFactory();
@@ -337,6 +348,7 @@ public:
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());
+  MOCK_METHOD0(lifecycleNotifier, ServerLifecycleNotifier&());
   MOCK_METHOD0(listenerManager, ListenerManager&());
   MOCK_METHOD0(mutexTracer, Envoy::MutexTracer*());
   MOCK_METHOD0(options, const Options&());
@@ -375,6 +387,7 @@ public:
   testing::NiceMock<MockHotRestart> hot_restart_;
   testing::NiceMock<MockOptions> options_;
   testing::NiceMock<Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
@@ -418,6 +431,7 @@ public:
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(initManager, Init::Manager&());
+  MOCK_METHOD0(lifecycleNotifier, ServerLifecycleNotifier&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(scope, Stats::Scope&());
@@ -439,6 +453,7 @@ public:
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
   testing::NiceMock<Init::MockManager> init_manager_;
+  testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;

@@ -15,6 +15,7 @@ using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
@@ -58,5 +59,6 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   EXPECT_FALSE(resource_manager.retries().canCreate());
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

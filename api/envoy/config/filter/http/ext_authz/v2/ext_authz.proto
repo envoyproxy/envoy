@@ -3,8 +3,8 @@ syntax = "proto3";
 package envoy.config.filter.http.ext_authz.v2;
 
 option java_outer_classname = "ExtAuthzProto";
-option java_package = "io.envoyproxy.envoy.config.filter.http.ext_authz.v2";
 option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.http.ext_authz.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/base.proto";
@@ -14,9 +14,13 @@ import "envoy/api/v2/core/http_uri.proto";
 import "envoy/type/matcher/string.proto";
 
 import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: External Authorization]
-// ExtAuthz :ref:`configuration overview <config_http_filters_ext_authz>`.
+// External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
+
 message ExtAuthz {
   // External authorization service configuration.
   oneof services {
@@ -41,7 +45,7 @@ message ExtAuthz {
   // <config_http_filters_ext_authz_stats>`.
   bool failure_mode_allow = 2;
 
-  // Sets the package version the the gRPC service should use. This is particularly
+  // Sets the package version the gRPC service should use. This is particularly
   // useful when transitioning from alpha to release versions assuming that both definitions are
   // semantically compatible. Deprecation note: This field is deprecated and should only be used for
   // version upgrade. See release notes for more details.
@@ -140,7 +144,7 @@ message ExtAuthzPerRoute {
 // external authorization server on specific virtual hosts \ routes. For example, adding a context
 // extension on the virtual host level can give the ext-authz server information on what virtual
 // host is used without needing to parse the host header. If CheckSettings is specified in multiple
-// per-filter-configs, they will be merged in order, and the result will be be used.
+// per-filter-configs, they will be merged in order, and the result will be used.
 message CheckSettings {
   // Context extensions to set on the CheckRequest's
   // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v2.AttributeContext.context_extensions>`

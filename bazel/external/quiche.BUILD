@@ -29,6 +29,7 @@ load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_select_quiche",
 )
 
 src_files = glob([
@@ -98,12 +99,24 @@ cc_library(
 
 cc_library(
     name = "quic_platform",
-    srcs = ["quiche/quic/platform/api/quic_mutex.cc"],
+    srcs = [
+        "quiche/quic/platform/api/quic_mutex.cc",
+    ] + envoy_select_quiche(
+        [
+            "quiche/quic/platform/api/quic_hostname_utils.cc",
+        ],
+        "@envoy",
+    ),
     hdrs = [
         "quiche/quic/platform/api/quic_cert_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
         "quiche/quic/platform/api/quic_str_cat.h",
-    ],
+    ] + envoy_select_quiche(
+        [
+            "quiche/quic/platform/api/quic_hostname_utils.h",
+        ],
+        "@envoy",
+    ),
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
@@ -127,10 +140,12 @@ cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
+        "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
         "quiche/quic/platform/api/quic_estimate_memory_usage.h",
+        "quiche/quic/platform/api/quic_exported_stats.h",
         "quiche/quic/platform/api/quic_fallthrough.h",
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_iovec.h",
@@ -140,24 +155,24 @@ cc_library(
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_reference_counted.h",
+        "quiche/quic/platform/api/quic_server_stats.h",
+        "quiche/quic/platform/api/quic_singleton.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_string.h",
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_string_utils.h",
         "quiche/quic/platform/api/quic_test.h",
+        "quiche/quic/platform/api/quic_test_output.h",
         "quiche/quic/platform/api/quic_text_utils.h",
         "quiche/quic/platform/api/quic_uint128.h",
+        "quiche/quic/platform/api/quic_thread.h",
         # TODO: uncomment the following files as implementations are added.
-        # "quiche/quic/platform/api/quic_bug_tracker.h",
         # "quiche/quic/platform/api/quic_clock.h",
         # "quiche/quic/platform/api/quic_expect_bug.h",
-        # "quiche/quic/platform/api/quic_exported_stats.h",
         # "quiche/quic/platform/api/quic_file_utils.h",
         # "quiche/quic/platform/api/quic_flags.h",
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
         # "quiche/quic/platform/api/quic_goog_cc_sender.h",
-        # "quiche/quic/platform/api/quic_hostname_utils.h",
-        # "quiche/quic/platform/api/quic_interval.h",
         # "quiche/quic/platform/api/quic_ip_address_family.h",
         # "quiche/quic/platform/api/quic_ip_address.h",
         # "quiche/quic/platform/api/quic_lru_cache.h",
@@ -165,15 +180,11 @@ cc_library(
         # "quiche/quic/platform/api/quic_mem_slice_span.h",
         # "quiche/quic/platform/api/quic_mem_slice_storage.h",
         # "quiche/quic/platform/api/quic_pcc_sender.h",
-        # "quiche/quic/platform/api/quic_server_stats.h",
-        # "quiche/quic/platform/api/quic_singleton.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
         # "quiche/quic/platform/api/quic_stack_trace.h",
         # "quiche/quic/platform/api/quic_test.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
-        # "quiche/quic/platform/api/quic_test_output.h",
-        # "quiche/quic/platform/api/quic_thread.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -209,6 +220,7 @@ envoy_cc_test(
     name = "quic_platform_test",
     srcs = [
         "quiche/quic/platform/api/quic_reference_counted_test.cc",
+        "quiche/quic/platform/api/quic_singleton_test.cc",
         "quiche/quic/platform/api/quic_string_utils_test.cc",
         "quiche/quic/platform/api/quic_text_utils_test.cc",
     ],

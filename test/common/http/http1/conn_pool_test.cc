@@ -35,6 +35,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+namespace {
 
 /**
  * A test version of ConnPoolImpl that allows for mocking beneath the codec clients.
@@ -420,7 +421,7 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
 
   // We should get a reset callback when the connection disconnects.
   Http::MockStreamCallbacks stream_callbacks;
-  EXPECT_CALL(stream_callbacks, onResetStream(StreamResetReason::ConnectionTermination));
+  EXPECT_CALL(stream_callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
   request_encoder.getStream().addCallbacks(stream_callbacks);
 
   // Kill the connection while it has an active request.
@@ -763,6 +764,7 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+} // namespace
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

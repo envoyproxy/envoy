@@ -13,6 +13,7 @@
 
 namespace Envoy {
 namespace Event {
+namespace {
 
 class FileEventImplTest : public testing::Test {
 public:
@@ -165,5 +166,6 @@ TEST_F(FileEventImplTest, SetEnabled) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
+} // namespace
 } // namespace Event
 } // namespace Envoy

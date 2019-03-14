@@ -30,14 +30,14 @@ import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 option (gogoproto.equal_all) = true;
+option (gogoproto.stable_marshaler_all) = true;
 
 // Return list of all clusters this proxy will load balance to.
 service ClusterDiscoveryService {
   rpc StreamClusters(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
-  rpc IncrementalClusters(stream IncrementalDiscoveryRequest)
-      returns (stream IncrementalDiscoveryResponse) {
+  rpc DeltaClusters(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
 
   rpc FetchClusters(DiscoveryRequest) returns (DiscoveryResponse) {
@@ -51,7 +51,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 38]
+// [#comment:next free field: 39]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -95,9 +95,25 @@ message Cluster {
     // for an explanation.
     ORIGINAL_DST = 4;
   }
-  // The :ref:`service discovery type <arch_overview_service_discovery_types>`
-  // to use for resolving the cluster.
-  DiscoveryType type = 2 [(validate.rules).enum.defined_only = true];
+
+  // Extended cluster type.
+  message CustomClusterType {
+    // The type of the cluster to instantiate. The name must match a supported cluster type.
+    string name = 1 [(validate.rules).string.min_bytes = 1];
+
+    // Cluster specific configuration which depends on the cluster being instantiated.
+    // See the supported cluster for further documentation.
+    google.protobuf.Any typed_config = 2;
+  }
+
+  oneof cluster_discovery_type {
+    // The :ref:`service discovery type <arch_overview_service_discovery_types>`
+    // to use for resolving the cluster.
+    DiscoveryType type = 2 [(validate.rules).enum.defined_only = true];
+
+    // The custom cluster type.
+    CustomClusterType cluster_type = 38;
+  }
 
   // Only valid when discovery type is EDS.
   message EdsClusterConfig {
@@ -385,6 +401,14 @@ message Cluster {
     // going to an individual locality if said locality is disproportionally affected by the
     // subset predicate.
     bool scale_locality_weight = 5;
+
+    // If true, when a fallback policy is configured and its corresponding subset fails to find
+    // a host this will cause any host to be selected instead.
+    //
+    // This is useful when using the default subset as the fallback policy, given the default
+    // subset might become empty. With this option enabled, if that happens the LB will attempt
+    // to select a host from the entire cluster.
+    bool panic_mode_any = 6;
   }
 
   // Configuration for load balancing subsetting.
@@ -402,9 +426,9 @@ message Cluster {
   message RingHashLbConfig {
     // Minimum hash ring size. The larger the ring is (that is, the more hashes there are for each
     // provided host) the better the request distribution will reflect the desired weights. Defaults
-    // to 1024 entries. See also
+    // to 1024 entries, and limited to 8M entries. See also
     // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
-    google.protobuf.UInt64Value minimum_ring_size = 1;
+    google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64.lte = 8388608];
 
     // [#not-implemented-hide:] Hide from docs.
     message DeprecatedV1 {
@@ -431,10 +455,10 @@ message Cluster {
     // :ref:`XX_HASH<envoy_api_enum_value_Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
     HashFunction hash_function = 3 [(validate.rules).enum.defined_only = true];
 
-    // Maximum hash ring size. Defaults to 8M entries, but can be lowered to further constrain
-    // resource use. See also
+    // Maximum hash ring size. Defaults to 8M entries, and limited to 8M entries, but can be lowered
+    // to further constrain resource use. See also
     // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
-    google.protobuf.UInt64Value maximum_ring_size = 4;
+    google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64.lte = 8388608];
   }
 
   // Specific configuration for the

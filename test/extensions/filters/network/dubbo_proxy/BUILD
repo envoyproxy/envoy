@@ -73,6 +73,7 @@ envoy_extension_cc_test(
         ":mocks_lib",
         ":utility_lib",
         "//source/extensions/filters/network/dubbo_proxy:hessian_deserializer_impl_lib",
+        "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
         "//test/mocks/server:server_mocks",
     ],
 )
@@ -113,8 +114,51 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.dubbo_proxy",
     deps = [
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
-        "//source/extensions/filters/network/dubbo_proxy/router:router_matcher",
+        "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
         "//test/mocks/server:server_mocks",
         "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:dubbo_proxy_cc",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "router_test",
+    srcs = ["router_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        ":mocks_lib",
+        "//source/extensions/filters/network/dubbo_proxy:app_exception_lib",
+        "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",
+        "//source/extensions/filters/network/dubbo_proxy:hessian_deserializer_impl_lib",
+        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
+        "//source/extensions/filters/network/dubbo_proxy/router:config",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:registry_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "app_exception_test",
+    srcs = ["app_exception_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        ":mocks_lib",
+        ":utility_lib",
+        "//source/extensions/filters/network/dubbo_proxy:app_exception_lib",
+        "//source/extensions/filters/network/dubbo_proxy:dubbo_protocol_impl_lib",
+        "//source/extensions/filters/network/dubbo_proxy:hessian_deserializer_impl_lib",
+        "//source/extensions/filters/network/dubbo_proxy:hessian_utils_lib",
+        "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "router_filter_config_test",
+    srcs = ["router_filter_config_test.cc"],
+    extension_name = "envoy.filters.network.dubbo_proxy",
+    deps = [
+        ":mocks_lib",
+        "//source/extensions/filters/network/dubbo_proxy/filters:well_known_names",
+        "//source/extensions/filters/network/dubbo_proxy/router:config",
+        "//test/mocks/server:server_mocks",
     ],
 )

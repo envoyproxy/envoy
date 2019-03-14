@@ -21,6 +21,7 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+namespace {
 
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
@@ -306,6 +307,7 @@ http_logs:
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
+    stream_info.upstream_transport_failure_reason_ = "TLS error";
 
     Http::TestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -325,6 +327,7 @@ http_logs:
           port_value: 0
       start_time:
         seconds: 3600
+      upstream_transport_failure_reason: "TLS error"
     request:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
@@ -448,6 +451,7 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
 
+} // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
 } // namespace Extensions

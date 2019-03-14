@@ -247,6 +247,7 @@ decisions. Stats are rooted at *cluster.<name>.* and contain the following stati
   lb_subsets_removed, Counter, Number of subsets removed due to no hosts
   lb_subsets_selected, Counter, Number of times any subset was selected for load balancing
   lb_subsets_fallback, Counter, Number of times the fallback policy was invoked
+  lb_subsets_fallback_panic, Counter, Number of times the subset panic mode triggered
 
 .. _config_cluster_manager_cluster_stats_ring_hash_lb:
 
@@ -264,3 +265,19 @@ Statistics for monitoring the size and effective distribution of hashes when usi
   size, Gauge, Total number of host hashes on the ring
   min_hashes_per_host, Gauge, Minimum number of hashes for a single host
   max_hashes_per_host, Gauge, Maximum number of hashes for a single host
+
+.. _config_cluster_manager_cluster_stats_maglev_lb:
+
+Maglev load balancer statistics
+-------------------------------
+
+Statistics for monitoring effective host weights when using the
+:ref:`Maglev load balancer <arch_overview_load_balancing_types_maglev>`. Stats are rooted at
+*cluster.<name>.maglev_lb.* and contain the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  min_entries_per_host, Gauge, Minimum number of entries for a single host
+  max_entries_per_host, Gauge, Maximum number of entries for a single host

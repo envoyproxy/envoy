@@ -25,6 +25,7 @@ using ::testing::Return;
 
 namespace Envoy {
 namespace Config {
+namespace {
 
 class SubscriptionFactoryTest : public testing::Test {
 public:
@@ -171,9 +172,9 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillRepeatedly(Return(false));
   EXPECT_CALL(*cluster.info_, type()).WillRepeatedly(Return(envoy::api::v2::Cluster::STATIC));
 
-  EXPECT_THROW_WITH_REGEX(
-      subscriptionFromConfigSource(config), EnvoyException,
-      "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified:");
+  EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
+                          "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must have a "
+                          "single gRPC service specified:");
 }
 
 TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
@@ -372,5 +373,6 @@ TEST_P(SubscriptionFactoryTestApiConfigSource, EDSClusterBackingEDSCluster) {
       "non-EDS cluster: 'static_cluster' does not exist, was added via api, or is an EDS cluster");
 }
 
+} // namespace
 } // namespace Config
 } // namespace Envoy

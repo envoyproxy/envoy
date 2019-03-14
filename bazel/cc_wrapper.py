@@ -7,6 +7,7 @@ import tempfile
 
 envoy_real_cc = {ENVOY_REAL_CC}
 envoy_real_cxx = {ENVOY_REAL_CXX}
+envoy_cflags = {ENVOY_CFLAGS}
 envoy_cxxflags = {ENVOY_CXXFLAGS}
 
 
@@ -27,33 +28,31 @@ def sanitize_flagfile(in_path, out_fd):
         os.write(out_fd, "-lc++\n")
 
 
+# Is the arg a flag indicating that we're building for C++ (rather than C)?
+def is_cpp_flag(arg):
+  return arg in ["-static-libstdc++", "-stdlib=libc++", "-lstdc++", "-lc++"
+                ] or arg.startswith("-std=c++") or arg.startswith("-std=gnu++")
+
+
 def main():
   # Append CXXFLAGS to correctly detect include paths for either libstdc++ or libc++.
   if sys.argv[1:5] == ["-E", "-xc++", "-", "-v"]:
     os.execv(envoy_real_cxx, [envoy_real_cxx] + sys.argv[1:] + shlex.split(envoy_cxxflags))
 
-  # `g++` and `gcc -lstdc++` have similar behavior and Bazel treats them as
-  # interchangeable, but `gcc` will ignore the `-static-libstdc++` flag.
-  # This check lets Envoy statically link against libstdc++ to be more
-  # portable between installed glibc versions.
-  #
-  # Similar behavior exists for Clang's `-stdlib=libc++` flag, so we handle
-  # it in the same test.
-  if ("-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in sys.argv[1:] or
-      "-std=c++0x" in sys.argv[1:]):
+  # Detect if we're building for C++ or vanilla C.
+  if any(map(is_cpp_flag, sys.argv[1:])):
     compiler = envoy_real_cxx
+    # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
+    argv = shlex.split(envoy_cxxflags)
   else:
     compiler = envoy_real_cc
+    # Append CFLAGS to all C targets (this is mostly for dependencies).
+    argv = shlex.split(envoy_cflags)
 
   # Either:
   # a) remove all occurrences of -lstdc++ (when statically linking against libstdc++),
   # b) replace all occurrences of -lstdc++ with -lc++ (when linking against libc++).
   if "-static-libstdc++" in sys.argv[1:] or "-stdlib=libc++" in envoy_cxxflags:
-    # Append CXXFLAGS to all C++ targets (this is mostly for dependencies).
-    if envoy_cxxflags and "-std=c++" in str(sys.argv[1:]):
-      argv = shlex.split(envoy_cxxflags)
-    else:
-      argv = []
     for arg in sys.argv[1:]:
       if arg == "-lstdc++":
         if "-stdlib=libc++" in envoy_cxxflags:
@@ -70,7 +69,7 @@ def main():
       else:
         argv.append(arg)
   else:
-    argv = sys.argv[1:]
+    argv += sys.argv[1:]
 
   # Add compiler-specific options
   if "clang" in compiler:

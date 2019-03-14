@@ -30,6 +30,7 @@ using testing::StrictMock;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
@@ -170,6 +171,21 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
+  initialize("test/server/node_bootstrap.yaml");
+  bool got_startup_notification = false, got_shutdown_notification = false;
+  server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
+                            [&got_startup_notification, this] {
+                              got_startup_notification = true;
+                              server_->shutdown();
+                            });
+  server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                            [&got_shutdown_notification] { got_shutdown_notification = true; });
+  server_->run();
+  EXPECT_TRUE(got_startup_notification);
+  EXPECT_TRUE(got_shutdown_notification);
+}
 
 TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -402,5 +418,6 @@ TEST_P(ServerInstanceImplTest, ZipkinHttpTracingEnabled) {
   EXPECT_NE(nullptr, dynamic_cast<Tracing::HttpTracerImpl*>(tracer()));
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

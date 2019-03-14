@@ -32,6 +32,7 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 enum class ConfigType { V2_YAML, V1_JSON };
 
@@ -422,5 +423,6 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 8000);
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -65,7 +65,9 @@ protected:
     void onDecodeComplete() override;
 
     // Http::StreamCallbacks
-    void onResetStream(StreamResetReason) override { parent_.parent_.onDownstreamReset(parent_); }
+    void onResetStream(StreamResetReason, absl::string_view) override {
+      parent_.parent_.onDownstreamReset(parent_);
+    }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -126,9 +128,9 @@ protected:
 /**
  * Production implementation of the ConnPoolImpl.
  */
-class ConnPoolImplProd : public ConnPoolImpl {
+class ProdConnPoolImpl : public ConnPoolImpl {
 public:
-  ConnPoolImplProd(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
+  ProdConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options)
       : ConnPoolImpl(dispatcher, host, priority, options) {}

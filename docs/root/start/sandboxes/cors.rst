@@ -9,7 +9,7 @@ access certain or all routes of your domain. Browsers use the presence of HTTP
 headers to determine if a response from a different origin is allowed.
 
 To help demonstrate how front-envoy can enforce CORS policies, we are
-releasing a set of `docker compose <http://docs.docker.com/compose/>`_ sandboxes
+releasing a set of `docker compose <https://docs.docker.com/compose/>`_ sandboxes
 that deploy a frontend and backend service on different origins, both behind
 front-envoy.
 
