@@ -5,11 +5,18 @@ ZooKeeper proxy
 
 The ZooKeeper proxy filter decodes the client protocol for
 `Apache ZooKeeper <https://zookeeper.apache.org/>`_. It decodes the requests,
-responses and events in the payload. The decoded info is emitted as dynamic
-metadata that can be combined with access log filters to get detailed
-information on paths that are accessed as well as the requests that are
-performed on each path. Most opcodes known in ZooKeeper version 3.5.4 are
-supported, while unknown ones will be treated as decoding errors.
+responses and events in the payload. Most opcodes known in
+`ZooKeeper 3.5 <https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java>`_
+are supported.
+
+The unsupported ones are:
+
+* createContainer
+* deleteContainer
+* createTTL
+* sasl
+* getEphemerals
+* getAllChildrenNumber
 
 .. attention::
 
