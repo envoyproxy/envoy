@@ -32,6 +32,7 @@ void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
   if (response_code == enumToInt(Http::Code::NotModified)) {
     requestComplete();
+    return;
   } else if (response_code != enumToInt(Http::Code::OK)) {
     onFailure(Http::AsyncClient::FailureReason::Reset);
     return;
