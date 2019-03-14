@@ -137,7 +137,9 @@ void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_
 
   // Read password - skip zxid, timeout, and session id.
   offset += ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH;
-  const std::string passwd = BufferHelper::peekString(data, offset);
+
+  // Skip passwd.
+  skipString(data, offset);
 
   // Read readonly flag, if it's there.
   bool readonly{};
@@ -155,8 +157,7 @@ void DecoderImpl::parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uin
   offset += OPCODE_LENGTH + INT_LENGTH;
   const std::string scheme = BufferHelper::peekString(data, offset);
   // Skip credential.
-  const int32_t credlen = BufferHelper::peekInt32(data, offset);
-  offset += credlen;
+  skipString(data, offset);
 
   callbacks_.onAuthRequest(scheme);
 }
@@ -177,11 +178,9 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) const {
     // Perms.
     BufferHelper::peekInt32(data, offset);
     // Skip scheme.
-    int32_t datalen = BufferHelper::peekInt32(data, offset);
-    offset += datalen;
+    skipString(data, offset);
     // Skip cred.
-    datalen = BufferHelper::peekInt32(data, offset);
-    offset += datalen;
+    skipString(data, offset);
   }
 }
 
@@ -192,8 +191,7 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
   const std::string path = BufferHelper::peekString(data, offset);
 
   // Skip data.
-  const int32_t datalen = BufferHelper::peekInt32(data, offset);
-  offset += datalen;
+  skipString(data, offset);
   skipAcls(data, offset);
   const int32_t flags = BufferHelper::peekInt32(data, offset);
   const bool ephemeral = (flags & 0x1) == 1;
@@ -207,8 +205,7 @@ void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint
 
   const std::string path = BufferHelper::peekString(data, offset);
   // Skip data.
-  const int32_t datalen = BufferHelper::peekInt32(data, offset);
-  offset += datalen;
+  skipString(data, offset);
   // Ignore version.
   BufferHelper::peekInt32(data, offset);
 
@@ -315,14 +312,11 @@ void DecoderImpl::parseReconfigRequest(Buffer::Instance& data, uint64_t& offset,
   ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH) + LONG_LENGTH);
 
   // Skip joining.
-  int32_t datalen = BufferHelper::peekInt32(data, offset);
-  offset += datalen;
+  skipString(data, offset);
   // Skip leaving.
-  datalen = BufferHelper::peekInt32(data, offset);
-  offset += datalen;
+  skipString(data, offset);
   // Skip new members.
-  datalen = BufferHelper::peekInt32(data, offset);
-  offset += datalen;
+  skipString(data, offset);
   // Read config id.
   BufferHelper::peekInt64(data, offset);
 
@@ -356,12 +350,16 @@ void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset,
   }
 }
 
+void DecoderImpl::skipString(Buffer::Instance& data, uint64_t& offset) const {
+  const int32_t slen = BufferHelper::peekInt32(data, offset);
+  offset += slen;
+}
+
 void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) const {
   const int32_t count = BufferHelper::peekInt32(data, offset);
 
   for (int i = 0; i < count; ++i) {
-    const int32_t len = BufferHelper::peekInt32(data, offset);
-    offset += len;
+    skipString(data, offset);
   }
 }
 
