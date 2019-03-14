@@ -76,6 +76,7 @@ envoy_cc_library(
         "quic_singleton_impl.h",
         "quic_stack_trace_impl.h",
         "quic_thread_impl.h",
+        "quic_mem_slice_impl.h",
     ]),
     external_deps = [
         "abseil_base",
@@ -90,6 +91,7 @@ envoy_cc_library(
     deps = [
         "@com_googlesource_quiche//:quic_platform_export",
     ] + envoy_select_quiche([
+        "//include/envoy/buffer:buffer_interface",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",

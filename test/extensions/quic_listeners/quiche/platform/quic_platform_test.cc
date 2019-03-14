@@ -28,6 +28,11 @@
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
 
+#include "quiche/quic/platform/api/quic_mem_slice.h"
+
+#include "quiche/quic/platform/api/quic_test.h"
+
+
 using testing::HasSubstr;
 
 // Basic tests to validate functioning of the QUICHE quic platform
@@ -454,6 +459,45 @@ TEST(QuicPlatformTest, QuicTestOutput) {
   EXPECT_LOG_CONTAINS("info", "Recorded test output into",
                       quic::QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
+
+class QuicMemSliceTest : public QuicTest {
+ public:
+  QuicMemSliceTest() {
+    size_t length = 1024;
+    slice_ = quic::QuicMemSlice(&allocator_, length);
+    orig_data_ = slice_.data();
+    orig_length_ = slice_.length();
+  
+  }
+  ~QuicMemSliceTest() {
+    std::cerr << "=========== ~QuicMemSliceTest";
+  }
+
+  quic::SimpleBufferAllocator allocator_;
+  quic::QuicMemSlice slice_;
+  const char* orig_data_;
+  size_t orig_length_;
+};
+
+TEST_F(QuicMemSliceTest, MoveConstruct) {
+  quic::QuicMemSlice moved(std::move(slice_));
+  EXPECT_EQ(moved.data(), orig_data_);
+  EXPECT_EQ(moved.length(), orig_length_);
+  EXPECT_EQ(nullptr, slice_.data());
+  EXPECT_EQ(0u, slice_.length());
+  EXPECT_TRUE(slice_.empty());
+}
+
+TEST_F(QuicMemSliceTest, MoveAssign) {
+  quic::QuicMemSlice moved;
+  moved = std::move(slice_);
+  EXPECT_EQ(moved.data(), orig_data_);
+  EXPECT_EQ(moved.length(), orig_length_);
+  EXPECT_EQ(nullptr, slice_.data());
+  EXPECT_EQ(0u, slice_.length());
+  EXPECT_TRUE(slice_.empty());
+}
+
 
 } // namespace
 } // namespace Quiche

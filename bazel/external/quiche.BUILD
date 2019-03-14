@@ -83,12 +83,12 @@ cc_library(
         "quiche/spdy/platform/api/spdy_endianness_util.h",
         "quiche/spdy/platform/api/spdy_estimate_memory_usage.h",
         "quiche/spdy/platform/api/spdy_export.h",
+        "quiche/spdy/platform/api/spdy_mem_slice.h",
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
         "quiche/spdy/platform/api/spdy_string_piece.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/spdy/platform/api/spdy_flags.h",
-        # "quiche/spdy/platform/api/spdy_mem_slice.h",
         # "quiche/spdy/platform/api/spdy_string_utils.h",
     ],
     visibility = ["//visibility:public"],
@@ -151,6 +151,7 @@ cc_library(
         "quiche/quic/platform/api/quic_iovec.h",
         "quiche/quic/platform/api/quic_logging.h",
         "quiche/quic/platform/api/quic_map_util.h",
+        "quiche/quic/platform/api/quic_mem_slice.h",
         "quiche/quic/platform/api/quic_mock_log.h",
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
@@ -176,7 +177,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_ip_address_family.h",
         # "quiche/quic/platform/api/quic_ip_address.h",
         # "quiche/quic/platform/api/quic_lru_cache.h",
-        # "quiche/quic/platform/api/quic_mem_slice.h",
         # "quiche/quic/platform/api/quic_mem_slice_span.h",
         # "quiche/quic/platform/api/quic_mem_slice_storage.h",
         # "quiche/quic/platform/api/quic_pcc_sender.h",
@@ -216,6 +216,23 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "quic_buffer_allocator_lib",
+    srcs = [
+    "quiche/quic/core/quic_simple_buffer_allocator.cc",
+     "quiche/quic/core/quic_buffer_allocator.cc",
+    ],
+    hdrs = [
+    "quiche/quic/core/quic_simple_buffer_allocator.h",
+     "quiche/quic/core/quic_buffer_allocator.h",
+    ],
+      visibility = ["//visibility:public"],
+
+    deps = [
+    ":quic_platform_base",
+    ],
+)
+
 envoy_cc_test(
     name = "quic_platform_test",
     srcs = [
@@ -223,9 +240,11 @@ envoy_cc_test(
         "quiche/quic/platform/api/quic_singleton_test.cc",
         "quiche/quic/platform/api/quic_string_utils_test.cc",
         "quiche/quic/platform/api/quic_text_utils_test.cc",
+	"quiche/quic/platform/api/quic_mem_slice_test.cc",
     ],
     repository = "@envoy",
     deps = [
         ":quic_platform",
+	":quic_buffer_allocator_lib"
     ],
 )
