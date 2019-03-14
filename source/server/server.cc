@@ -519,13 +519,11 @@ void InstanceImpl::terminate() {
 Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }
 
 void InstanceImpl::shutdown() {
-  dispatcher_->post([this] {
-    ENVOY_LOG(info, "shutting down server instance");
-    shutdown_ = true;
-    restarter_.terminateParent();
-    notifyCallbacksForStage(Stage::ShutdownExit);
-    dispatcher_->exit();
-  });
+  ENVOY_LOG(info, "shutting down server instance");
+  shutdown_ = true;
+  restarter_.terminateParent();
+  notifyCallbacksForStage(Stage::ShutdownExit);
+  dispatcher_->exit();
 }
 
 void InstanceImpl::shutdownAdmin() {
