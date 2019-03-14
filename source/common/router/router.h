@@ -464,7 +464,7 @@ private:
   bool include_attempt_count_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
   uint32_t attempt_count_{1};
-  int32_t pending_retries_{0};
+  uint32_t pending_retries_{0};
 };
 
 class ProdFilter : public Filter {

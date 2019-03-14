@@ -397,9 +397,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
-  UpstreamRequest* upstream_request_ptr = upstream_request.get();
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_request_ptr->encodeHeaders(end_stream);
+  upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
   }
@@ -442,14 +441,11 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   for (auto& upstream_request : upstream_requests_) {
-    if (buffering) {
-      // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
-      // since it's all moves from here on.
-      Buffer::OwnedImpl copy(data);
-      upstream_request->encodeData(copy, end_stream);
-    } else {
-      upstream_request->encodeData(data, end_stream);
-    }
+    // We need to make a copy before encoding since it's all moves from here on
+    // and we might have multiple upstream requests or traffic
+    // shadowing/retries.
+    Buffer::OwnedImpl copy(data);
+    upstream_request->encodeData(copy, end_stream);
   }
 
   if (buffering) {
@@ -822,7 +818,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
       // if we could.
       could_not_retry = retry_state_->wouldRetryFromHeaders(*headers);
     } else {
-      RetryStatus retry_status =
+      const RetryStatus retry_status =
           retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
       // Capture upstream_host since setupRetry() in the following line will clear
       // upstream_request.
@@ -1071,19 +1067,18 @@ void Filter::doRetry() {
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
-  UpstreamRequest* upstream_request_ptr = upstream_request.get();
   upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
-  upstream_request_ptr->encodeHeaders(!callbacks_->decodingBuffer() && !downstream_trailers_);
+  upstream_requests_.front()->encodeHeaders(!callbacks_->decodingBuffer() && !downstream_trailers_);
   // It's possible we got immediately reset.
-  if (upstream_request_ptr) {
+  if (upstream_requests_.front()) {
     if (callbacks_->decodingBuffer()) {
       // If we are doing a retry we need to make a copy.
       Buffer::OwnedImpl copy(*callbacks_->decodingBuffer());
-      upstream_request_ptr->encodeData(copy, !downstream_trailers_);
+      upstream_requests_.front()->encodeData(copy, !downstream_trailers_);
     }
 
     if (downstream_trailers_) {
-      upstream_request_ptr->encodeTrailers(*downstream_trailers_);
+      upstream_requests_.front()->encodeTrailers(*downstream_trailers_);
     }
   }
 }

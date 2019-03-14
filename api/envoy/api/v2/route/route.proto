@@ -873,7 +873,11 @@ message HedgePolicy {
 
   // Indicates that a hedged request should be sent when the per-try timeout
   // is hit. This will only occur if the retry policy also indicates that a
-  // timed out request should be retried. Defaults to false.
+  // timed out request should be retried.
+  // Once a timed out request is retried due to per try timeout, it will not be
+  // retried again even if the returned response headers would otherwise b
+  // according the specified :ref:`RetryPolicy <envoy_api_msg_route.RetryPolicy>`.
+  // Defaults to false.
   bool hedge_on_per_try_timeout = 3;
 }
 
