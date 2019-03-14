@@ -239,6 +239,12 @@ public:
     xds_stream_->sendGrpcMessage(response);
   }
 
+  /**
+   *
+   * @param num_clusters number of clusters appended to bootstrap_config
+   * @param allow_stats if false, enable set_reject_all in stats_config
+   * @return size_t the total memory allocated
+   */
   size_t ClusterMemoryHelper(int num_clusters, bool allow_stats);
 
 private:

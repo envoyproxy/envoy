@@ -286,13 +286,13 @@ void BaseIntegrationTest::initialize() {
 
 size_t BaseIntegrationTest::ClusterMemoryHelper(int num_clusters, bool allow_stats) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      if (!allow_stats) {
-        bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
-      }
-      for (int i = 1; i < num_clusters; i++) {
-        auto* c = bootstrap.mutable_static_resources()->add_clusters();
-        c->set_name(fmt::format("cluster_{}", i));
-      }
+    if (!allow_stats) {
+      bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
+    }
+    for (int i = 1; i < num_clusters; i++) {
+      auto* c = bootstrap.mutable_static_resources()->add_clusters();
+      c->set_name(fmt::format("cluster_{}", i));
+    }
   });
   BaseIntegrationTest::initialize();
 

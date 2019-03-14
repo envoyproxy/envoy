@@ -154,12 +154,12 @@ TEST_P(ClusterMemoryUtilizationTest, MemoryLargeClusterSizeWithStats) {
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
   auto t1 = std::make_unique<BaseIntegrationTest>(GetParam());
-  size_t m1 = t1->ClusterMemoryHelper(1,true);
+  size_t m1 = t1->ClusterMemoryHelper(1, true);
   EXPECT_LT(start_mem, m1);
   t1.reset(nullptr);
 
   auto t2 = std::make_unique<BaseIntegrationTest>(GetParam());
-  const size_t m1001 = t2->ClusterMemoryHelper(1001,true);
+  const size_t m1001 = t2->ClusterMemoryHelper(1001, true);
   EXPECT_LT(start_mem, m1001);
   size_t m_per_cluster = (m1001 - m1) / 1000;
 // As of 2019/03/13, m_per_cluster = 57950 (libstdc++), 52249 (libc++).
