@@ -3,6 +3,15 @@
 set -e
 
 echo "Generating compilation database..."
+
+cp -f .bazelrc .bazelrc.bak
+
+function cleanup() {
+  cp -f .bazelrc.bak .bazelrc
+  rm -f .bazelrc.bak
+}
+trap cleanup EXIT
+
 # The compilation database generate script doesn't support passing build options via CLI.
 # Writing them into bazelrc
 echo "build ${BAZEL_BUILD_OPTIONS}" >> .bazelrc
