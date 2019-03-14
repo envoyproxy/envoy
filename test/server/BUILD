@@ -114,6 +114,10 @@ envoy_cc_test(
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/server:options_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -635,7 +635,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(AdminInstanceTest, AdminProfiler) {
+TEST_P(AdminInstanceTest, AdminCpuProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
 
@@ -652,6 +652,41 @@ TEST_P(AdminInstanceTest, AdminProfiler) {
 
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=n", header_map, data));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+}
+
+TEST_P(AdminInstanceTest, AdminHeapProfilerOnRepeatedRequest) {
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+  auto repeatResultCode = Http::Code::BadRequest;
+#ifndef PROFILER_AVAILABLE
+  repeatResultCode = Http::Code::NotImplemented;
+#endif
+
+  postCallback("/heapprofiler?enable=y", header_map, data);
+  EXPECT_EQ(repeatResultCode, postCallback("/heapprofiler?enable=y", header_map, data));
+
+  postCallback("/heapprofiler?enable=n", header_map, data);
+  EXPECT_EQ(repeatResultCode, postCallback("/heapprofiler?enable=n", header_map, data));
+}
+
+TEST_P(AdminInstanceTest, AdminHeapProfiler) {
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+
+  // The below flow need to begin with the profiler not running
+  Profiler::Heap::stopProfiler();
+
+#ifdef PROFILER_AVAILABLE
+  EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_TRUE(Profiler::Heap::isProfilerStarted());
+  EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=n", header_map, data));
+#else
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_FALSE(Profiler::Heap::isProfilerStarted());
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=n", header_map, data));
+#endif
+
+  EXPECT_FALSE(Profiler::Heap::isProfilerStarted());
 }
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {

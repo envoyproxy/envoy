@@ -178,6 +178,7 @@ public:
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
+
   ClusterInfoMap clusters() override {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     ClusterInfoMap clusters_map;

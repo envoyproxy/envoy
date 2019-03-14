@@ -175,6 +175,16 @@ public:
   virtual bool mutexTracingEnabled() const PURE;
 
   /**
+   * @return whether to use the old libevent evbuffer-based Buffer implementation.
+   */
+  virtual bool libeventBufferEnabled() const PURE;
+
+  /**
+   * @return bool indicating whether cpuset size should determine the number of worker threads.
+   */
+  virtual bool cpusetThreadsEnabled() const PURE;
+
+  /**
    * Converts the Options in to CommandLineOptions proto message defined in server_info.proto.
    * @return CommandLineOptionsPtr the protobuf representation of the options.
    */

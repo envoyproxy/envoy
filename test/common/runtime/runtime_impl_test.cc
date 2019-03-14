@@ -120,6 +120,16 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   // File1 is not a boolean.
   EXPECT_EQ(false, snapshot->getBoolean("file1", value));
 
+  // Feature defaults.
+  // test_feature_true is explicitly set true in runtime_features.cc
+  EXPECT_EQ(true, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+  // test_feature_false is not in runtime_features.cc and so is false by default.
+  EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+
+  // Feature defaults via helper function.
+  EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+
   // Files with comments.
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
   EXPECT_EQ("/home#about-us", loader->snapshot().get("file6"));
@@ -338,6 +348,15 @@ TEST_F(DiskLayerTest, Loop) {
       DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
                 *api_),
       EnvoyException, "Walk recursion depth exceeded 16");
+}
+
+TEST(NoRuntime, FeatureEnabled) {
+  // Make sure the registry is not set up.
+  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
+
+  // Feature defaults should still work.
+  EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
 } // namespace
