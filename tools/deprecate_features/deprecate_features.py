@@ -4,6 +4,7 @@ import re
 import subprocess
 import fileinput
 
+
 # Sorts out the list of deprecated proto fields which should be disallowed and returns a tuple of
 # email and code changes.
 def deprecate_proto():
@@ -37,10 +38,12 @@ def deprecate_proto():
 
   return (email, code)
 
+
 # Sorts out the list of features which should be default enabled and returns a tuple of
 # email and code changes.
 def flip_runtime_features():
-  grep_output = subprocess.check_output('grep -r "envoy.reloadable_features\." source/*', shell=True)
+  grep_output = subprocess.check_output(
+      'grep -r "envoy.reloadable_features\." source/*', shell=True)
 
   features_to_flip = set()
 
@@ -55,13 +58,13 @@ def flip_runtime_features():
 
   # Exempt the two test flags.
   features_to_flip.remove('envoy.reloadable_features.my_feature_name')
-  features_to_flip.remove("envoy.reloadable_features.test_feature_true");
+  features_to_flip.remove('envoy.reloadable_features.test_feature_true')
 
   code = ''
   email = 'the following features will be defaulted to true:\n'
   for (feature) in features_to_flip:
     code += ('    "' + feature + '",\n')
-    email += (feature +  '\n')
+    email += (feature + '\n')
 
   return (email, code)
 
@@ -70,7 +73,7 @@ def flip_runtime_features():
 (runtime_email, runtime_features_code) = flip_runtime_features()
 (deprecate_email, deprecate_code) = deprecate_proto()
 
-email = ("The Envoy maintainer team is cutting the next Envoy release.  In the new release " +
+email = ('The Envoy maintainer team is cutting the next Envoy release.  In the new release ' +
          runtime_email + deprecate_email)
 
 print '\n\nSuggested envoy-announce email: \n'
