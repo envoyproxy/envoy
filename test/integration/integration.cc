@@ -10,8 +10,6 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/header_map.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
@@ -20,7 +18,6 @@
 #include "common/common/stack_array.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
-#include "common/memory/stats.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -33,7 +30,6 @@
 #include "test/integration/utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -282,21 +278,6 @@ void BaseIntegrationTest::initialize() {
   createUpstreams();
   createXdsUpstream();
   createEnvoy();
-}
-
-size_t BaseIntegrationTest::ClusterMemoryHelper(int num_clusters, bool allow_stats) {
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-    if (!allow_stats) {
-      bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
-    }
-    for (int i = 1; i < num_clusters; i++) {
-      auto* c = bootstrap.mutable_static_resources()->add_clusters();
-      c->set_name(fmt::format("cluster_{}", i));
-    }
-  });
-  BaseIntegrationTest::initialize();
-
-  return Memory::Stats::totalCurrentlyAllocated();
 }
 
 void BaseIntegrationTest::createUpstreams() {
