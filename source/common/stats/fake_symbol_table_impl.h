@@ -49,7 +49,60 @@ namespace Stats {
  */
 class FakeSymbolTableImpl : public SymbolTable {
 public:
-  SymbolEncoding encode(absl::string_view name) override { return encodeHelper(name); }
+  /**
+   * Represents an 8-bit encoding of a vector of symbols, used as a transient
+   * representation during encoding and prior to retained allocation.
+   */
+  class Encoding {
+   public:
+    Encoding() : storage_(nullptr) {}
+
+    explicit Encoding(absl::string_view str)
+        : storage_(new uint8_t[str.size() + 2]) {
+      uint8_t* p = saveLengthToBytesReturningNext(str.size(), storage_);
+      memcpy(p, str.data(), str.size());
+    }
+
+    void swap(Encoding& rhs) {
+      std::swap(rhs.storage_, storage_);
+    }
+
+    /**
+     * Before destructing SymbolEncoding, you must call moveToStorage. This
+     * transfers ownership, and in particular, the responsibility to call
+     * SymbolTable::clear() on all referenced symbols. If we ever wanted
+     * to be able to destruct a SymbolEncoding without transferring it
+     * we could add a clear(SymbolTable&) method.
+     */
+    ~Encoding() { ASSERT(storage_ == nullptr); }
+
+    uint64_t bytesRequired() const { return StatName(storage_).size(); }
+
+    /**
+     * Moves the contents of the vector into an allocated array. The array
+     * must have been allocated with bytesRequired() bytes.
+     *
+     * @param array destination memory to receive the encoded bytes.
+     * @return uint64_t the number of bytes transferred.
+     */
+    uint64_t moveToStorage(SymbolTable::Storage array) {
+      uint64_t bytes_required = bytesRequired();
+      memcpy(array, storage_, bytes_required);
+      delete [] storage_;
+      storage_ = nullptr;
+      return bytes_required;
+    }
+
+   private:
+    uint8_t* storage_;
+  };
+
+
+  Encoding encode(absl::string_view name) { return Encoding(name); }
+
+  void populateList(const std::vector<absl::string_view>& names, StatNameList& list) override {
+    list.populate<FakeSymbolTableImpl>(names, *this);
+  }
 
   std::string toString(const StatName& stat_name) const override {
     return std::string(toStringView(stat_name));
@@ -93,18 +146,12 @@ private:
     return bytes;
   }
 
-  SymbolEncoding encodeHelper(absl::string_view name) const {
-    SymbolEncoding encoding;
-    encoding.addStringForFakeSymbolTable(name);
-    return encoding;
-  }
-
   absl::string_view toStringView(const StatName& stat_name) const {
     return {reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize()};
   }
 
-  SymbolTable::StoragePtr stringToStorage(absl::string_view name) const {
-    SymbolEncoding encoding = encodeHelper(name);
+  StoragePtr stringToStorage(absl::string_view name) const {
+    Encoding encoding(name);
     auto bytes = std::make_unique<uint8_t[]>(encoding.bytesRequired());
     encoding.moveToStorage(bytes.get());
     return bytes;

@@ -39,7 +39,9 @@ protected:
       break;
     }
     case SymbolTableType::Fake:
-      table_ = std::make_unique<FakeSymbolTableImpl>();
+      auto table = std::make_unique<FakeSymbolTableImpl>();
+      fake_symbol_table_ = table.get();
+      table_ = std::move(table);
       break;
     }
   }
@@ -54,7 +56,7 @@ protected:
   }
 
   SymbolVec getSymbols(StatName stat_name) {
-    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+    return SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
   }
   std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
     return real_symbol_table_->decodeSymbolVec(symbol_vec);
@@ -71,6 +73,7 @@ protected:
     return stat_name_storage_.back().statName();
   }
 
+  FakeSymbolTableImpl* fake_symbol_table_{nullptr};
   SymbolTableImpl* real_symbol_table_{nullptr};
   std::unique_ptr<SymbolTable> table_;
 
@@ -271,7 +274,15 @@ TEST_P(StatNameTest, List) {
   std::vector<absl::string_view> names{"hello.world", "goodbye.world"};
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
-  name_list.populate(names, *table_);
+  switch (GetParam()) {
+    case SymbolTableType::Real:
+      name_list.populate<SymbolTableImpl>(names, *real_symbol_table_);
+      break;
+    case SymbolTableType::Fake:
+      name_list.populate<FakeSymbolTableImpl>(names, *fake_symbol_table_);
+      break;
+  }
+
   EXPECT_TRUE(name_list.populated());
 
   // First, decode only the first name.

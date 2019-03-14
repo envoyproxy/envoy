@@ -26,7 +26,7 @@ MetricImpl::MetricImpl(absl::string_view tag_extracted_name, const std::vector<T
     names[++index] = tag.name_;
     names[++index] = tag.value_;
   }
-  stat_names_.populate(names, symbol_table);
+  symbol_table.populateList(names, stat_names_);
 }
 
 void MetricImpl::clear() { stat_names_.clear(symbolTable()); }

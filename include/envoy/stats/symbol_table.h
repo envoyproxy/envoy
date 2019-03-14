@@ -19,6 +19,8 @@ namespace Stats {
  */
 class StatName;
 
+class StatNameList;
+
 /**
  * Intermediate representation for a stat-name. This helps store multiple names
  * in a single packed allocation. First we encode each desired name, then sum
@@ -27,7 +29,7 @@ class StatName;
  * a vptr overhead per object, and the representation is shared between the
  * SymbolTable implementations, so this is just a pre-declare.
  */
-class SymbolEncoding;
+//class SymbolEncoding;
 
 /**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
@@ -58,22 +60,6 @@ public:
   using StoragePtr = std::unique_ptr<Storage>;
 
   virtual ~SymbolTable() = default;
-
-  /**
-   * Encodes a stat name using the symbol table, returning a SymbolEncoding. The
-   * SymbolEncoding is not intended for long-term storage, but is used to help
-   * allocate a StatName with the correct amount of storage.
-   *
-   * When a name is encoded, it bumps reference counts held in the table for
-   * each symbol. The caller is responsible for creating a StatName using this
-   * SymbolEncoding and ultimately disposing of it by calling
-   * SymbolTable::free(). Users are protected from leaking symbols into the pool
-   * by ASSERTions in the SymbolTable destructor.
-   *
-   * @param name The name to encode.
-   * @return SymbolEncoding the encoded symbols.
-   */
-  virtual SymbolEncoding encode(absl::string_view name) PURE;
 
   /**
    * @return uint64_t the number of symbols in the symbol table.
@@ -129,6 +115,8 @@ public:
    * @return Storage allocated for the joined name.
    */
   virtual StoragePtr join(const std::vector<StatName>& stat_names) const PURE;
+
+  virtual void populateList(const std::vector<absl::string_view>& names, StatNameList& list) PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;
