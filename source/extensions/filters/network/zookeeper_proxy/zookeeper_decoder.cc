@@ -135,10 +135,10 @@ void DecoderImpl::ensureMaxLength(const int32_t len) const {
 void DecoderImpl::parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   ensureMinLength(len, XID_LENGTH + ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH + INT_LENGTH);
 
-  // Read password - skip zxid, timeout, and session id.
+  // Skip zxid, timeout, and session id.
   offset += ZXID_LENGTH + TIMEOUT_LENGTH + SESSION_LENGTH;
 
-  // Skip passwd.
+  // Skip password.
   skipString(data, offset);
 
   // Read readonly flag, if it's there.
