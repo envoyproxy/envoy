@@ -116,7 +116,7 @@ public:
    */
   virtual StoragePtr join(const std::vector<StatName>& stat_names) const PURE;
 
-  virtual void populateList(const std::vector<absl::string_view>& names, StatNameList& list) PURE;
+  virtual void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;

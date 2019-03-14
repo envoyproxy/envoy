@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/common/macros.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/fake_symbol_table_impl.h"
@@ -271,15 +272,15 @@ TEST_P(StatNameTest, TestShrinkingExpectation) {
 // you don't free all the StatNames you've allocated bytes for. StatNameList
 // provides this capability.
 TEST_P(StatNameTest, List) {
-  std::vector<absl::string_view> names{"hello.world", "goodbye.world"};
+  absl::string_view names[] = {"hello.world", "goodbye.world"};
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
   switch (GetParam()) {
     case SymbolTableType::Real:
-      name_list.populate<SymbolTableImpl>(names, *real_symbol_table_);
+      name_list.populate<SymbolTableImpl>(names, ARRAY_SIZE(names), *real_symbol_table_);
       break;
     case SymbolTableType::Fake:
-      name_list.populate<FakeSymbolTableImpl>(names, *fake_symbol_table_);
+      name_list.populate<FakeSymbolTableImpl>(names, ARRAY_SIZE(names), *fake_symbol_table_);
       break;
   }
 

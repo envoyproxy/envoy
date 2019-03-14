@@ -116,11 +116,9 @@ SymbolTableImpl::~SymbolTableImpl() {
 // TODO(ambuc): There is a possible performance optimization here for avoiding
 // the encoding of IPs / numbers if they appear in stat names. We don't want to
 // waste time symbolizing an integer as an integer, if we can help it.
-SymbolTableImpl::Encoding SymbolTableImpl::encode(const absl::string_view name) {
-  Encoding encoding;
-
+void SymbolTableImpl::encode(const absl::string_view name, Encoding& encoding) {
   if (name.empty()) {
-    return encoding;
+    return;
   }
 
   // We want to hold the lock for the minimum amount of time, so we do the
@@ -142,7 +140,6 @@ SymbolTableImpl::Encoding SymbolTableImpl::encode(const absl::string_view name) 
   for (Symbol symbol : symbols) {
     encoding.addSymbol(symbol);
   }
-  return encoding;
 }
 
 uint64_t SymbolTableImpl::numSymbols() const {
@@ -290,7 +287,8 @@ void SymbolTableImpl::debugPrint() const {
 #endif
 
 SymbolTable::StoragePtr SymbolTableImpl::copyToBytes(absl::string_view name) {
-  Encoding encoding = encode(name);
+  Encoding encoding;
+  encode(name, encoding);
   auto bytes = std::make_unique<uint8_t[]>(encoding.bytesRequired());
   encoding.moveToStorage(bytes.get());
   return bytes;
@@ -334,8 +332,8 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
   return bytes;
 }
 
-void SymbolTableImpl::populateList(const std::vector<absl::string_view>& names, StatNameList& list) {
-  list.populate<SymbolTableImpl>(names, *this);
+void SymbolTableImpl::populateList(absl::string_view* names, int32_t num_names, StatNameList& list) {
+  list.populate<SymbolTableImpl>(names, num_names, *this);
 }
 
 StatNameList::~StatNameList() { ASSERT(!populated()); }

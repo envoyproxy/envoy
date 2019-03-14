@@ -145,8 +145,8 @@ public:
   void incRefCount(const StatName& stat_name) override;
   SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
 
-  Encoding encode(absl::string_view name);
-  void populateList(const std::vector<absl::string_view>& names, StatNameList& list) override;
+  void encode(absl::string_view name, Encoding& encoding);
+  void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
@@ -392,26 +392,25 @@ public:
    * @param encodings The list names to encode.
    * @param symbol_table The symbol table in which to encode the names.
    */
-  template<class SymbolTableType> void populate(const std::vector<absl::string_view>& names,
+  template<class SymbolTableType> void populate(absl::string_view* names, int32_t num_names,
                                                 SymbolTableType& symbol_table) {
-    RELEASE_ASSERT(names.size() < 256, "Maximum number elements in a StatNameList exceeded");
+    RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
     // First encode all the names.
     size_t total_size_bytes = 1; /* one byte for holding the number of names */
 
-    STACK_ARRAY(encodings, typename SymbolTableType::Encoding, names.size());
-    size_t i = 0;
-    for (auto& name : names) {
-      typename SymbolTableType::Encoding encoding = symbol_table.encode(name);
+    STACK_ARRAY(encodings, typename SymbolTableType::Encoding, num_names);
+    for (int32_t i = 0; i < num_names; ++i) {
+      typename SymbolTableType::Encoding& encoding = encodings[i];
+      symbol_table.encode(names[i], encoding);
       total_size_bytes += encoding.bytesRequired();
-      encodings[i++].swap(encoding);
     }
 
     // Now allocate the exact number of bytes required and move the encodings
     // into storage.
     storage_ = std::make_unique<uint8_t[]>(total_size_bytes);
     uint8_t* p = &storage_[0];
-    *p++ = names.size();
+    *p++ = num_names;
     for (auto& encoding : encodings) {
       p += encoding.moveToStorage(p);
     }

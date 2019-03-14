@@ -55,17 +55,22 @@ public:
    */
   class Encoding {
    public:
-    Encoding() : storage_(nullptr) {}
+    //Encoding() : storage_(nullptr) {}
 
-    explicit Encoding(absl::string_view str)
-        : storage_(new uint8_t[str.size() + 2]) {
-      uint8_t* p = saveLengthToBytesReturningNext(str.size(), storage_);
+    void fromString(absl::string_view str) {
+      storage_ = std::make_unique<Storage>(str.size() + 2);
+      uint8_t* p = saveLengthToBytesReturningNext(str.size(), storage_.get());
       memcpy(p, str.data(), str.size());
     }
 
-    void swap(Encoding& rhs) {
+    /*Encoding& operator=(Encoding&& src) {
+      storage_ = std::move(src.storage_);
+      return *this;
+      }*/
+
+    /*void swap(Encoding& rhs) {
       std::swap(rhs.storage_, storage_);
-    }
+      }*/
 
     /**
      * Before destructing SymbolEncoding, you must call moveToStorage. This
@@ -76,7 +81,7 @@ public:
      */
     ~Encoding() { ASSERT(storage_ == nullptr); }
 
-    uint64_t bytesRequired() const { return StatName(storage_).size(); }
+    uint64_t bytesRequired() const { return StatName(storage_.get()).size(); }
 
     /**
      * Moves the contents of the vector into an allocated array. The array
@@ -87,21 +92,23 @@ public:
      */
     uint64_t moveToStorage(SymbolTable::Storage array) {
       uint64_t bytes_required = bytesRequired();
-      memcpy(array, storage_, bytes_required);
-      delete [] storage_;
-      storage_ = nullptr;
+      memcpy(array, storage_.get(), bytes_required);
+      storage_.reset();
       return bytes_required;
     }
 
+    StoragePtr transferStorage() {
+      return std::move(storage_);
+    }
+
    private:
-    uint8_t* storage_;
+    StoragePtr storage_;
   };
 
+  void encode(absl::string_view name, Encoding& encoding) { encoding.fromString(name); }
 
-  Encoding encode(absl::string_view name) { return Encoding(name); }
-
-  void populateList(const std::vector<absl::string_view>& names, StatNameList& list) override {
-    list.populate<FakeSymbolTableImpl>(names, *this);
+  void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override {
+    list.populate<FakeSymbolTableImpl>(names, num_names, *this);
   }
 
   std::string toString(const StatName& stat_name) const override {
@@ -151,10 +158,9 @@ private:
   }
 
   StoragePtr stringToStorage(absl::string_view name) const {
-    Encoding encoding(name);
-    auto bytes = std::make_unique<uint8_t[]>(encoding.bytesRequired());
-    encoding.moveToStorage(bytes.get());
-    return bytes;
+    Encoding encoding;
+    encoding.fromString(name);
+    return encoding.transferStorage();
   }
 };
 
