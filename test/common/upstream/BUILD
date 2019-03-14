@@ -71,6 +71,7 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:utility_lib",
     ],
 )

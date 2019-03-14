@@ -8,6 +8,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/conn_pool.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -30,10 +31,13 @@ public:
   using TestMap = ConnPoolMap<int, Http::ConnectionPool::Instance>;
   using TestMapPtr = std::unique_ptr<TestMap>;
 
-  TestMapPtr makeTestMap() { return std::make_unique<TestMap>(dispatcher_, absl::nullopt); }
+  TestMapPtr makeTestMap() {
+    return std::make_unique<TestMap>(dispatcher_, host_, ResourcePriority::Default);
+  }
 
   TestMapPtr makeTestMapWithLimit(uint64_t limit) {
-    return std::make_unique<TestMap>(dispatcher_, absl::make_optional(limit));
+    host_->cluster_.resetResourceManager(1024, 1024, 1024, 1024, limit);
+    return std::make_unique<TestMap>(dispatcher_, host_, ResourcePriority::Default);
   }
 
   TestMap::PoolFactory getBasicFactory() {
@@ -73,6 +77,7 @@ public:
 protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<NiceMock<Http::ConnectionPool::MockInstance>*> mock_pools_;
+  std::shared_ptr<NiceMock<MockHost>> host_ = std::make_shared<NiceMock<MockHost>>();
 };
 
 TEST_F(ConnPoolMapImplTest, TestMapIsEmptyOnConstruction) {

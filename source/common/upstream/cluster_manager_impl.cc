@@ -31,10 +31,10 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
-#include "common/upstream/conn_pool_map_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
+#include "common/upstream/priority_agnostic_conn_pool_map_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
 
@@ -1043,7 +1043,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
     if (!allocate) {
       return nullptr;
     }
-    ConnPoolsContainer container{thread_local_dispatcher_};
+    ConnPoolsContainer container{thread_local_dispatcher_, host};
     container_iter = host_http_conn_pool_map_.emplace(host, std::move(container)).first;
   }
 
@@ -1153,11 +1153,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
-  ConnPoolsContainer::ConnPools::OptPoolRef pool = container.pools_->getPool(hash_key, [&]() {
-    return parent_.parent_.factory_.allocateConnPool(
-        parent_.thread_local_dispatcher_, host, priority, protocol,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
-  });
+  ConnPoolsContainer::ConnPools::OptPoolRef pool =
+      container.pools_->getPool(priority, hash_key, [&]() {
+        return parent_.parent_.factory_.allocateConnPool(
+            parent_.thread_local_dispatcher_, host, priority, protocol,
+            have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+      });
   // The Connection Pool tracking is a work in progress. We plan for it to eventually have the
   // ability to fail, but until we add upper layer handling for failures, it should not. So, assert
   // that we don't accidentally add conditions that could allow it to fail.
