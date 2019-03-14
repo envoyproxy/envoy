@@ -11,6 +11,14 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "char_star_set_test",
+    srcs = ["char_star_set_test.cc"],
+    deps = [
+        "//source/common/stats:char_star_set_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "heap_stat_data_test",
     srcs = ["heap_stat_data_test.cc"],
     deps = [

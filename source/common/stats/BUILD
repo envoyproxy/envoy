@@ -9,6 +9,17 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "char_star_set_lib",
+    srcs = ["char_star_set.cc"],
+    hdrs = ["char_star_set.h"],
+    external_deps = ["abseil_base"],
+    deps = [
+        "//source/common/common:hash_lib",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "heap_stat_data_lib",
     srcs = ["heap_stat_data.cc"],
     hdrs = ["heap_stat_data.h"],
@@ -190,6 +201,7 @@ envoy_cc_library(
     srcs = ["thread_local_store.cc"],
     hdrs = ["thread_local_store.h"],
     deps = [
+        ":char_star_set_lib",
         ":heap_stat_data_lib",
         ":stats_lib",
         ":stats_matcher_lib",

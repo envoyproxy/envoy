@@ -58,10 +58,10 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
     }
   }
   for (const char* stat_name : remove_list) {
-    auto p = map.find(stat_name);
-    ASSERT(p != map.end());
-    list.push_back(p->second); // Save SharedPtr to the list to avoid invalidating refs to stat.
-    map.erase(p);
+    auto iter = map.find(stat_name);
+    ASSERT(iter != map.end());
+    list.push_back(iter->second); // Save SharedPtr to the list to avoid invalidating refs to stat.
+    map.erase(iter);
   }
 }
 
@@ -270,10 +270,10 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   // We must now look in the central store so we must be locked. We grab a reference to the
   // central store location. It might contain nothing. In this case, we allocate a new stat.
   Thread::LockGuard lock(parent_.lock_);
-  auto p = central_cache_map.find(stat_key);
+  auto iter = central_cache_map.find(stat_key);
   std::shared_ptr<StatType>* central_ref = nullptr;
-  if (p != central_cache_map.end()) {
-    central_ref = &(p->second);
+  if (iter != central_cache_map.end()) {
+    central_ref = &(iter->second);
   } else if (parent_.checkAndRememberRejection(name, tls_rejected_stats)) {
     // Note that again we do the name-rejection lookup on the untruncated name.
     return null_stat;
@@ -419,9 +419,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.parent_histograms_;
-    auto p = tls_cache->find(final_name.c_str());
-    if (p != tls_cache->end()) {
-      return *p->second;
+    auto iter = tls_cache->find(final_name.c_str());
+    if (iter != tls_cache->end()) {
+      return *iter->second;
     }
     tls_rejected_stats = &entry.rejected_stats_;
     if (tls_rejected_stats->find(final_name.c_str()) != tls_rejected_stats->end()) {
@@ -430,10 +430,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   }
 
   Thread::LockGuard lock(parent_.lock_);
-  auto p = central_cache_.histograms_.find(final_name.c_str());
+  auto iter = central_cache_.histograms_.find(final_name.c_str());
   ParentHistogramImplSharedPtr* central_ref = nullptr;
-  if (p != central_cache_.histograms_.end()) {
-    central_ref = &p->second;
+  if (iter != central_cache_.histograms_.end()) {
+    central_ref = &iter->second;
   } else if (parent_.checkAndRememberRejection(final_name, tls_rejected_stats)) {
     return null_histogram_;
   } else {
@@ -461,9 +461,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
   StatMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_;
-    auto p = tls_cache->find(name.c_str());
-    if (p != tls_cache->end()) {
-      return *p->second;
+    auto iter = tls_cache->find(name.c_str());
+    if (iter != tls_cache->end()) {
+      return *iter->second;
     }
   }
 

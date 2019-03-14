@@ -9,6 +9,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
+#include "common/stats/char_star_set.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/source_impl.h"

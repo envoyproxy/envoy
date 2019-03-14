@@ -34,40 +34,4 @@ uint64_t MurmurHash::murmurHash2_64(absl::string_view key, uint64_t seed) {
   return hash;
 }
 
-CharStarSet::~CharStarSet() {
-  std::vector<char*> keys;
-  keys.reserve(hash_set_.size());
-  for (char* p : hash_set_) {
-    keys.push_back(p);
-  }
-  hash_set_.clear();
-  for (char* p : keys) {
-    delete[] p;
-  }
-}
-
-const char* CharStarSet::insert(absl::string_view str) {
-  char* p = new char[str.size() + 1];
-  memcpy(p, str.data(), str.size());
-  p[str.size()] = '\0';
-  auto insertion = hash_set_.insert(p);
-  if (!insertion.second) {
-    delete[] p;
-    return *insertion.first;
-  }
-  return p;
-}
-
-const char* CharStarSet::find(const char* str) const {
-  // The const_cast is necessary because hash_set_ is declared as a
-  // flat_hash_set<char*>, and the find() method does not add a 'const'
-  // qualifier to its key template type. As long as we don't modify the returned
-  // iterator it will not actually mutate the key, and the const_cast is safe.
-  auto iter = hash_set_.find(const_cast<char*>(str));
-  if (iter == hash_set_.end()) {
-    return nullptr;
-  }
-  return *iter;
-}
-
 } // namespace Envoy

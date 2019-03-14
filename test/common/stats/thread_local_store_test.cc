@@ -629,7 +629,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 // once on given stat name.
 class RememberStatsMatcherTest : public testing::TestWithParam<bool> {
 public:
-  RememberStatsMatcherTest() : store_(options_, heap_alloc_) {
+  RememberStatsMatcherTest() : store_(options_, heap_alloc_), scope_(store_.createScope("scope.")) {
     if (GetParam()) {
       store_.initializeThreading(main_thread_dispatcher_, tls_);
     }
@@ -640,7 +640,7 @@ public:
     tls_.shutdownThread();
   }
 
-  using LookupStatFn = std::function<std::string(Scope&, const std::string&)>;
+  using LookupStatFn = std::function<std::string(const std::string&)>;
 
   // Helper function to test the rejection cache. The goal here is to use
   // mocks to ensure that we don't call rejects() more than once on any of the
@@ -656,11 +656,10 @@ public:
 
     EXPECT_CALL(*matcher, rejects("scope.reject")).WillOnce(Return(true));
     EXPECT_CALL(*matcher, rejects("scope.ok")).WillOnce(Return(false));
-    ScopePtr scope = store_.createScope("scope.");
 
     for (int j = 0; j < 5; ++j) {
-      EXPECT_EQ("", lookup_stat(*scope, "reject"));
-      EXPECT_EQ("scope.ok", lookup_stat(*scope, "ok"));
+      EXPECT_EQ("", lookup_stat("reject"));
+      EXPECT_EQ("scope.ok", lookup_stat("ok"));
     }
   }
 
@@ -677,7 +676,7 @@ public:
 
     for (int j = 0; j < 5; ++j) {
       // Note: zero calls to reject() are made, as reject-all should short-circuit.
-      EXPECT_EQ("", lookup_stat(*scope, "reject"));
+      EXPECT_EQ("", lookup_stat("reject"));
     }
   }
 
@@ -690,12 +689,39 @@ public:
     StatsMatcherPtr matcher_ptr(matcher);
     store_.setStatsMatcher(std::move(matcher_ptr));
 
-    ScopePtr scope = store_.createScope("scope.");
-
     for (int j = 0; j < 5; ++j) {
       // Note: zero calls to reject() are made, as accept-all should short-circuit.
-      EXPECT_EQ("scope.ok", lookup_stat(*scope, "ok"));
+      EXPECT_EQ("scope.ok", lookup_stat("ok"));
     }
+  }
+
+  LookupStatFn lookupCounterFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->counter(stat_name).name();
+    };
+  }
+
+  LookupStatFn lookupGaugeFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->gauge(stat_name).name();
+    };
+  }
+
+// TODO(jmarantz): restore BoolIndicator tests when https://github.com/envoyproxy/envoy/pull/6280
+// is reverted.
+#define HAS_BOOL_INDICATOR 0
+#if HAS_BOOL_INDICATOR
+  LookupStatFn lookupBoolIndicator() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->boolIndicator(stat_name).name();
+    };
+  }
+#endif
+
+  LookupStatFn lookupHistogramFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->histogram(stat_name).name();
+    };
   }
 
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
@@ -703,6 +729,7 @@ public:
   StatsOptionsImpl options_;
   HeapStatDataAllocator heap_alloc_;
   ThreadLocalStoreImpl store_;
+  ScopePtr scope_;
 };
 
 INSTANTIATE_TEST_CASE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
@@ -710,94 +737,33 @@ INSTANTIATE_TEST_CASE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
 
 // Tests that the logic for remembering rejected stats works properly, both
 // with and without threading.
-TEST_P(RememberStatsMatcherTest, CounterRejectOne) {
-  auto make_counter = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.counter(stat_name).name();
-  };
-  testRememberMatcher(make_counter);
-}
+TEST_P(RememberStatsMatcherTest, CounterRejectOne) { testRememberMatcher(lookupCounterFn()); }
 
-TEST_P(RememberStatsMatcherTest, CounterRejectsAll) {
-  auto make_counter = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.counter(stat_name).name();
-  };
-  testRejectsAll(make_counter);
-}
+TEST_P(RememberStatsMatcherTest, CounterRejectsAll) { testRejectsAll(lookupCounterFn()); }
 
-TEST_P(RememberStatsMatcherTest, CounterAcceptsAll) {
-  auto make_counter = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.counter(stat_name).name();
-  };
-  testAcceptsAll(make_counter);
-}
+TEST_P(RememberStatsMatcherTest, CounterAcceptsAll) { testAcceptsAll(lookupCounterFn()); }
 
-TEST_P(RememberStatsMatcherTest, GaugeRejectOne) {
-  auto make_gauge = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.gauge(stat_name).name();
-  };
-  testRememberMatcher(make_gauge);
-}
+TEST_P(RememberStatsMatcherTest, GaugeRejectOne) { testRememberMatcher(lookupGaugeFn()); }
 
-TEST_P(RememberStatsMatcherTest, GaugeRejectsAll) {
-  auto make_gauge = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.gauge(stat_name).name();
-  };
-  testRejectsAll(make_gauge);
-}
+TEST_P(RememberStatsMatcherTest, GaugeRejectsAll) { testRejectsAll(lookupGaugeFn()); }
 
-TEST_P(RememberStatsMatcherTest, GaugeAcceptsAll) {
-  auto make_gauge = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.gauge(stat_name).name();
-  };
-  testAcceptsAll(make_gauge);
-}
+TEST_P(RememberStatsMatcherTest, GaugeAcceptsAll) { testAcceptsAll(lookupGaugeFn()); }
 
-// TODO(jmarantz): restore BoolIndicator tests when https://github.com/envoyproxy/envoy/pull/6280
-// is reverted.
-#define HAS_BOOL_INDICATOR 0
 #if HAS_BOOL_INDICATOR
 TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectOne) {
-  auto make_bool_indicator = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.boolIndicator(stat_name).name();
-  };
-  testRememberMatcher(make_bool_indicator);
+  testRememberMatcher(lookupBoolIndicator());
 }
 
-TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectsAll) {
-  auto make_bool_indicator = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.boolIndicator(stat_name).name();
-  };
-  testRejectsAll(make_bool_indicator);
-}
+TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectsAll) { testRejectsAll(lookupBoolIndicator()); }
 
-TEST_P(RememberStatsMatcherTest, BoolIndicatorAcceptsAll) {
-  auto make_bool_indicator = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.boolIndicator(stat_name).name();
-  };
-  testAcceptsAll(make_bool_indicator);
-}
+TEST_P(RememberStatsMatcherTest, BoolIndicatorAcceptsAll) { testAcceptsAll(lookupBoolIndicator()); }
 #endif
 
-TEST_P(RememberStatsMatcherTest, HistogramRejectOne) {
-  auto make_histogram = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.histogram(stat_name).name();
-  };
-  testRememberMatcher(make_histogram);
-}
+TEST_P(RememberStatsMatcherTest, HistogramRejectOne) { testRememberMatcher(lookupHistogramFn()); }
 
-TEST_P(RememberStatsMatcherTest, HistogramRejectsAll) {
-  auto make_histogram = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.histogram(stat_name).name();
-  };
-  testRejectsAll(make_histogram);
-}
+TEST_P(RememberStatsMatcherTest, HistogramRejectsAll) { testRejectsAll(lookupHistogramFn()); }
 
-TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) {
-  auto make_histogram = [](Scope& scope, const std::string& stat_name) -> std::string {
-    return scope.histogram(stat_name).name();
-  };
-  testAcceptsAll(make_histogram);
-}
+TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) { testAcceptsAll(lookupHistogramFn()); }
 
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
 public:
