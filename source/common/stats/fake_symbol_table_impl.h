@@ -51,6 +51,14 @@ class FakeSymbolTableImpl : public SymbolTable {
 public:
   // SymbolTable
   void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override {
+    // This implementation of populateList is similar to
+    // SymboLableImpl::populateList. This variant is more efficient for
+    // FakeSymbolTableImpl, because it avoid "encoding" each name in names. The
+    // strings are laid out abutting each other with 2-byte length prefixes, so
+    // encoding isn't needed, and doing a dummy encoding step would cost one
+    // memory allocation per element, adding significant overhead as measured by
+    // thread_local_store_speed_test.
+
     RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
     // First encode all the names.

@@ -276,17 +276,6 @@ TEST_P(StatNameTest, List) {
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
   table_->populateList(names, ARRAY_SIZE(names), name_list);
-  /*
-  switch (GetParam()) {
-    case SymbolTableType::Real:
-      name_list.populate<SymbolTableImpl>(names, ARRAY_SIZE(names), *real_symbol_table_);
-      break;
-    case SymbolTableType::Fake:
-      name_list.populate<FakeSymbolTableImpl>(names, ARRAY_SIZE(names), *fake_symbol_table_);
-      break;
-  }
-  */
-
   EXPECT_TRUE(name_list.populated());
 
   // First, decode only the first name.
