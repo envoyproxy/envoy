@@ -7,15 +7,15 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
-const uint32_t BOOL_LENGTH = 1;
-const uint32_t INT_LENGTH = 4;
-const uint32_t LONG_LENGTH = 8;
-const uint32_t XID_LENGTH = 4;
-const uint32_t OPCODE_LENGTH = 4;
-const uint32_t ZXID_LENGTH = 8;
-const uint32_t TIMEOUT_LENGTH = 4;
-const uint32_t SESSION_LENGTH = 8;
-const uint32_t MULTI_HEADER_LENGTH = 9;
+constexpr uint32_t BOOL_LENGTH = 1;
+constexpr uint32_t INT_LENGTH = 4;
+constexpr uint32_t LONG_LENGTH = 8;
+constexpr uint32_t XID_LENGTH = 4;
+constexpr uint32_t OPCODE_LENGTH = 4;
+constexpr uint32_t ZXID_LENGTH = 8;
+constexpr uint32_t TIMEOUT_LENGTH = 4;
+constexpr uint32_t SESSION_LENGTH = 8;
+constexpr uint32_t MULTI_HEADER_LENGTH = 9;
 
 void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   ENVOY_LOG(trace, "zookeeper_proxy: decoding {} bytes at offset {}", data.length(), offset);
