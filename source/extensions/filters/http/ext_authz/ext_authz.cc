@@ -23,8 +23,7 @@ bool isHeaderOnlyMethod(absl::string_view method) {
        Http::Headers::get().MethodValues.Connect, Http::Headers::get().MethodValues.Options,
        Http::Headers::get().MethodValues.Trace});
 
-  return std::any_of(keys->begin(), keys->end(),
-                     [&method](const auto& key) { return key == method; });
+  return keys->find(method) != keys->end();
 }
 } // namespace
 
@@ -106,10 +105,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
     if (!end_stream && !isBufferFull()) {
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
-
-    // Call the authorization service.
-    ENVOY_STREAM_LOG(debug, "ext_authz finished buffering", *callbacks_);
-    initiateCall(*request_headers_);
+    return Http::FilterDataStatus::StopIterationAndWatermark;
   }
 
   return filter_return_ == FilterReturn::StopDecoding
@@ -118,6 +114,12 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
+  if (buffer_data_) {
+    // Call the authorization service.
+    ENVOY_STREAM_LOG(debug, "ext_authz finished buffering", *callbacks_);
+    initiateCall(*request_headers_);
+  }
+
   return filter_return_ == FilterReturn::StopDecoding ? Http::FilterTrailersStatus::StopIteration
                                                       : Http::FilterTrailersStatus::Continue;
 }

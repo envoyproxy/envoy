@@ -161,7 +161,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  Http::HeaderMapPtr headers{};
+  Http::HeaderMapPtr headers;
   const uint64_t request_length = request.attributes().request().http().body().size();
   if (request_length > 0) {
     headers =
