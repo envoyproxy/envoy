@@ -7,7 +7,6 @@
 #include "extensions/filters/network/dubbo_proxy/metadata.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -20,7 +19,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-class AppExceptionTest : public TestBase {
+class AppExceptionTest : public testing::Test {
 public:
   AppExceptionTest() : metadata_(std::make_shared<MessageMetadata>()) {}
 
