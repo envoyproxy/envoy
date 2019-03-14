@@ -59,7 +59,7 @@ QUICHE_FLAG(bool, quic_reloadable_flag_enable_quic_stateless_reject_support, tru
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_always_reset_short_header_packets, true,
             "If true, instead of send encryption none termination packets, send stateless reset in "
-            "reponse to short headers.")
+            "response to short headers.")
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_bbr_app_limited_recovery, false,
             "When you're app-limited entering recovery, stay app-limited until you exit recovery "
