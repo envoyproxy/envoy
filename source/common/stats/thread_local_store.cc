@@ -250,31 +250,15 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   prefix_.free(symbolTable());
 }
 
-/*
-void ThreadLocalStoreImpl::ScopeImpl::extractTagsAndTruncate(
-    StatName& name, std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
-    std::vector<Tag>& tags,
-    std::string& tag_extracted_name) {
-
-  // Tag extraction occurs on the original, untruncated name so the extraction
-  // can complete properly, even if the tag values are partially truncated.
-  std::string name_str = name.toString(parent_.symbolTable());
-  tag_extracted_name = parent_.getTagsForName(name_str, tags);
-  absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name_str);
-  if (truncated_name.size() < name_str.size()) {
-    truncated_name_storage = std::make_unique<StatNameTempStorage>(truncated_name, symbolTable());
-    name = truncated_name_storage->statName();
-  }
-  }*/
-
 // Manages the truncation and tag-extration of stat names. Tag extraction occurs
 // on the original, untruncated name so the extraction can complete properly,
 // even if the tag values are partially truncated.
 class TagExtraction {
 public:
   TagExtraction(ThreadLocalStoreImpl& tls, StatName name) {
-    std::string name_str = tls.symbolTable().toString(name);
-    tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags_);
+    tls.symbolTable().callWithStringView(name, [this, &tls](absl::string_view name_str) {
+      tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags_);
+    });
   }
 
   const std::vector<Tag>& tags() { return tags_; }

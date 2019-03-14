@@ -152,6 +152,11 @@ std::string SymbolTableImpl::toString(const StatName& stat_name) const {
   return decodeSymbolVec(SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
 }
 
+void SymbolTableImpl::callWithStringView(StatName stat_name,
+                        const std::function<void(absl::string_view)>& fn) const {
+  fn(toString(stat_name));
+}
+
 std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
   std::vector<absl::string_view> name_tokens;
   name_tokens.reserve(symbols.size());

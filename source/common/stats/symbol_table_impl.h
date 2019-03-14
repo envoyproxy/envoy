@@ -154,6 +154,9 @@ public:
 
   StoragePtr copyToBytes(absl::string_view name) override;
 
+  void callWithStringView(StatName stat_name,
+                          const std::function<void(absl::string_view)>& fn) const override;
+
 private:
   friend class StatName;
   friend class StatNameTest;

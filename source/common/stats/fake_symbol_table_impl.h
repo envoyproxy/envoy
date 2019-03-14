@@ -166,6 +166,11 @@ public:
     return bytes;
   }
 
+  void callWithStringView(StatName stat_name,
+                          const std::function<void(absl::string_view)>& fn) const override {
+    fn(toStringView(stat_name));
+  }
+
 private:
   // Saves the specified length into the byte array, returning the next byte.
   // There is no guarantee that bytes will be aligned, so we can't cast to a

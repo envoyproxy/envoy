@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -129,6 +130,9 @@ public:
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;
 #endif
+
+  virtual void callWithStringView(StatName stat_name,
+                                  const std::function<void(absl::string_view)>& fn) const PURE;
 
 private:
   friend struct HeapStatData;
