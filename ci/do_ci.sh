@@ -243,7 +243,6 @@ elif [[ "$1" == "bazel.coverage" ]]; then
 
   export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
   export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
-  export WORKSPACE=ci
 
   # Reduce the amount of memory and number of cores Bazel tries to use to
   # prevent it from launching too many subprocesses. This should prevent the
@@ -253,17 +252,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # after 0.21.
   [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,4,1"
 
-  # There is a bug in gcovr 3.3, where it takes the -r path,
-  # in our case /source, and does a regex replacement of various
-  # source file paths during HTML generation. It attempts to strip
-  # out the prefix (e.g. /source), but because it doesn't do a match
-  # and only strip at the start of the string, it removes /source from
-  # the middle of the string, corrupting the path. The workaround is
-  # to point -r in the gcovr invocation in run_envoy_bazel_coverage.sh at
-  # some Bazel created symlinks to the source directory in its output
-  # directory. Wow.
-  cd "${ENVOY_BUILD_DIR}"
-  SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
+  test/run_envoy_bazel_coverage.sh
   collect_build_profile coverage
   exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
