@@ -13,7 +13,7 @@ namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
 /**
- * IO helpers for reading/writing ZooKeeper data from/to a buffer.
+ * Helpers for reading/writing ZooKeeper data from/to a buffer.
  *
  * Note: ZooKeeper's protocol uses network byte ordering (big-endian).
  */
