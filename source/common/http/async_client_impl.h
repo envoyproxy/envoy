@@ -311,6 +311,9 @@ private:
     // filter which uses this function for buffering.
     ASSERT(buffered_body_ != nullptr);
   }
+  void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;

@@ -156,6 +156,14 @@ public:
 
   const std::string& requestedServerName() const override { return requested_server_name_; }
 
+  void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
+    upstream_transport_failure_reason_ = std::string(failure_reason);
+  }
+
+  const std::string& upstreamTransportFailureReason() const override {
+    return upstream_transport_failure_reason_;
+  }
+
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
   SystemTime start_time_;
@@ -184,6 +192,7 @@ public:
   Envoy::StreamInfo::FilterStateImpl filter_state_{};
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
+  std::string upstream_transport_failure_reason_;
   DangerousDeprecatedTestTime test_time_;
 };
 

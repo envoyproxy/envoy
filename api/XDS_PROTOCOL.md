@@ -151,7 +151,9 @@ For EDS/RDS, the management server does not need to supply every requested
 resource and may also supply additional, unrequested resources. `resource_names`
 is only a hint. Envoy will silently ignore any superfluous resources. When a
 requested resource is missing in a RDS or EDS update, Envoy will retain the last
-known value for this resource. The management server may be able to infer all
+known value for this resource except in the case where the `Cluster` or `Listener` 
+is being warmed. See [Resource warming](#resource-warming) section below on the expectations
+during warming. The management server may be able to infer all
 the required EDS/RDS resources from the `node` identification in the
 `DiscoveryRequest`, in which case this hint may be discarded. An empty EDS/RDS
 `DiscoveryResponse` is effectively a nop from the perspective of the respective
@@ -208,6 +210,20 @@ multiple `DiscoveryRequests` at a version until a new version is ready.
 
 An implication of the above resource update sequencing is that Envoy does not
 expect a `DiscoveryResponse` for every `DiscoveryRequest` it issues.
+
+### Resource warming
+
+[`Clusters`](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/cluster_manager.html#cluster-warming) 
+and [`Listeners`](https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/lds#config-listeners-lds)
+go through  `warming` before they can serve requests. This process happens both during 
+[`Envoy initialization`](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/init.html#initialization) 
+and when the `Cluster` or `Listener` is updated. Warming of `Cluster` is completed only when a 
+`ClusterLoadAssignment` response is supplied by management server. Similarly, warming of `Listener`
+is completed only when a `RouteConfiguration` is supplied by management server if the listener 
+refers to an RDS configuration. Management server is expected to provide the EDS/RDS updates during
+warming. If management server does not provide EDS/RDS responses, Envoy will not initialize
+itself during the initialization phase and the updates sent via CDS/LDS will not take effect until
+EDS/RDS responses are supplied.
 
 #### Eventual consistency considerations
 

@@ -93,6 +93,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_EQ(true, options->hotRestartDisabled());
+  EXPECT_EQ(true, options->libeventBufferEnabled());
   EXPECT_EQ(true, options->cpusetThreadsEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
@@ -216,11 +217,12 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
-  // Currently the following 3 options are not defined in proto, hence the count differs by 3.
-  // 2. version        - default TCLAP argument.
-  // 3. help           - default TCLAP argument.
-  // 4. ignore_rest    - default TCLAP argument.
-  EXPECT_EQ(options->count() - 3, command_line_options->GetDescriptor()->field_count());
+  // Currently the following 4 options are not defined in proto, hence the count differs by 5.
+  // 1. version        - default TCLAP argument.
+  // 2. help           - default TCLAP argument.
+  // 3. ignore_rest    - default TCLAP argument.
+  // 4. use-libevent-buffers  - short-term override for rollout of new buffer implementation.
+  EXPECT_EQ(options->count() - 4, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {

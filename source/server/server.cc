@@ -20,6 +20,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
@@ -124,7 +125,10 @@ void InstanceImpl::drainListeners() {
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
+void InstanceImpl::failHealthcheck(bool fail) {
+  // We keep liveness state in shared memory so the parent process sees the same state.
+  server_stats_->live_.set(!fail);
+}
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
                                        Stats::Source& source) {
@@ -164,7 +168,7 @@ void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
   info.num_connections_ = numConnections();
 }
 
-bool InstanceImpl::healthCheckFailed() { return !server_stats_->live_.value(); }
+bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
@@ -220,6 +224,12 @@ void InstanceImpl::initialize(const Options& options,
             Registry::FactoryRegistry<
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
+  // Enable the selected buffer implementation (old libevent evbuffer version or new native
+  // version) early in the initialization, before any buffers can be created.
+  Buffer::OwnedImpl::useOldImpl(options.libeventBufferEnabled());
+  ENVOY_LOG(info, "buffer implementation: {}",
+            Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
+
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());
   bootstrap_config_update_time_ = time_source_.systemTime();
@@ -231,8 +241,7 @@ void InstanceImpl::initialize(const Options& options,
 
   const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
-      ServerStats{ALL_SERVER_STATS(POOL_BOOL_INDICATOR_PREFIX(stats_store_, server_stats_prefix),
-                                   POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
+      ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix))});
 
   server_stats_->concurrency_.set(options_.concurrency());
