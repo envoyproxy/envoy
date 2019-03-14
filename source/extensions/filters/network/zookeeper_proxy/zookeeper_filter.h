@@ -96,25 +96,25 @@ public:
 
   // ZooKeeperProxy::DecoderCallback
   void onDecodeError() override;
-  void onRequestBytes(const uint64_t bytes) override;
-  void onConnect(const bool readonly) override;
+  void onRequestBytes(uint64_t bytes) override;
+  void onConnect(bool readonly) override;
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;
-  void onGetDataRequest(const std::string& path, const bool watch) override;
-  void onCreateRequest(const std::string& path, const bool ephemeral, const bool sequence, const bool two) override;
+  void onGetDataRequest(const std::string& path, bool watch) override;
+  void onCreateRequest(const std::string& path, bool ephemeral, bool sequence, bool two) override;
   void onSetRequest(const std::string& path) override;
-  void onGetChildrenRequest(const std::string& path, const bool watch, const bool two) override;
-  void onDeleteRequest(const std::string& path, const int32_t version) override;
-  void onExistsRequest(const std::string& path, const bool watch) override;
+  void onGetChildrenRequest(const std::string& path, bool watch, bool two) override;
+  void onDeleteRequest(const std::string& path, int32_t version) override;
+  void onExistsRequest(const std::string& path, bool watch) override;
   void onGetAclRequest(const std::string& path) override;
-  void onSetAclRequest(const std::string& path, const int32_t version) override;
+  void onSetAclRequest(const std::string& path, int32_t version) override;
   void onSyncRequest(const std::string& path) override;
-  void onCheckRequest(const std::string& path, const int32_t version) override;
+  void onCheckRequest(const std::string& path, int32_t version) override;
   void onMultiRequest() override;
   void onReconfigRequest() override;
   void onSetWatchesRequest() override;
-  void onCheckWatchesRequest(const std::string& path, const int32_t type) override;
-  void onRemoveWatchesRequest(const std::string& path, const int32_t type) override;
+  void onCheckWatchesRequest(const std::string& path, int32_t type) override;
+  void onRemoveWatchesRequest(const std::string& path, int32_t type) override;
   void onCloseRequest() override;
 
   void doDecode(Buffer::Instance& buffer);
