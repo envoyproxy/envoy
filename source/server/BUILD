@@ -297,6 +297,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/api:api_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",

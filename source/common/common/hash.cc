@@ -34,7 +34,7 @@ uint64_t MurmurHash::murmurHash2_64(absl::string_view key, uint64_t seed) {
   return hash;
 }
 
-StringSet::~StringSet() {
+CharStarSet::~CharStarSet() {
   std::vector<char*> keys;
   keys.reserve(hash_set_.size());
   for (char* p : hash_set_) {
@@ -46,7 +46,7 @@ StringSet::~StringSet() {
   }
 }
 
-const char* StringSet::insert(absl::string_view str) {
+const char* CharStarSet::insert(absl::string_view str) {
   char* p = new char[str.size() + 1];
   memcpy(p, str.data(), str.size());
   p[str.size()] = '\0';
@@ -58,7 +58,7 @@ const char* StringSet::insert(absl::string_view str) {
   return p;
 }
 
-const char* StringSet::find(const char* str) const {
+const char* CharStarSet::find(const char* str) const {
   // The const_cast is necessary because hash_set_ is declared as a
   // flat_hash_set<char*>, and the find() method does not add a 'const'
   // qualifier to its key template type. As long as we don't modify the returned

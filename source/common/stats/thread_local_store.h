@@ -145,9 +145,6 @@ public:
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
   Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
-  BoolIndicator& boolIndicator(const std::string& name) override {
-    return default_scope_->boolIndicator(name);
-  }
   Histogram& histogram(const std::string& name) override {
     return default_scope_->histogram(name);
   };
@@ -155,7 +152,6 @@ public:
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
-  std::vector<BoolIndicatorSharedPtr> boolIndicators() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
   // Stats::StoreRoot
@@ -182,7 +178,6 @@ private:
   struct TlsCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
-    StatMap<BoolIndicatorSharedPtr> bool_indicators_;
     StatMap<TlsHistogramSharedPtr> histograms_;
     StatMap<ParentHistogramSharedPtr> parent_histograms_;
 
@@ -210,7 +205,6 @@ private:
   struct CentralCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
-    StatMap<BoolIndicatorSharedPtr> bool_indicators_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
   };
 
@@ -227,7 +221,6 @@ private:
     }
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gauge(const std::string& name) override;
-    BoolIndicator& boolIndicator(const std::string& name) override;
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
@@ -264,7 +257,6 @@ private:
 
     NullCounterImpl null_counter_;
     NullGaugeImpl null_gauge_;
-    NullBoolIndicatorImpl null_bool_;
     NullHistogramImpl null_histogram_;
   };
 
@@ -301,7 +293,7 @@ private:
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
-  StringSet rejected_stats_ GUARDED_BY(lock_); // See comment in TLSCacheEntry above.
+  CharStarSet rejected_stats_ GUARDED_BY(lock_); // See comment in TLSCacheEntry above.
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
@@ -318,7 +310,6 @@ private:
   // but that would be fairly complex to change.
   std::vector<CounterSharedPtr> deleted_counters_;
   std::vector<GaugeSharedPtr> deleted_gauges_;
-  std::vector<BoolIndicatorSharedPtr> deleted_bool_indicators_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
 };
 

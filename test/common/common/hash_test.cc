@@ -38,4 +38,11 @@ TEST(Hash, stdhash) {
 }
 #endif
 
+TEST(Hash, charStarSet) {
+  CharStarSet set;
+  const char* foo = set.insert("foo");
+  EXPECT_EQ(foo, set.find("foo"));
+  EXPECT_EQ(foo, set.find(std::string("foo")));
+}
+
 } // namespace Envoy

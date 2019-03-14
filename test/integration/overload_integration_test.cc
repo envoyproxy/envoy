@@ -63,8 +63,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   // Put envoy in overloaded state and check that it drops new requests.
   // Test both header-only and header+body requests since the code paths are slightly different.
   updateResource(0.9);
-  test_server_->waitForBoolIndicatorEq(
-      "overload.envoy.overload_actions.stop_accepting_requests.active", true);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 1);
 
   Http::TestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
@@ -88,8 +87,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
 
   // Deactivate overload state and check that new requests are accepted.
   updateResource(0.8);
-  test_server_->waitForBoolIndicatorEq(
-      "overload.envoy.overload_actions.stop_accepting_requests.active", false);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_requests.active", 0);
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
@@ -111,8 +109,7 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
 
   // Put envoy in overloaded state and check that it disables keepalive
   updateResource(0.8);
-  test_server_->waitForBoolIndicatorEq(
-      "overload.envoy.overload_actions.disable_http_keepalive.active", true);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 1);
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestHeaderMapImpl request_headers{
@@ -126,8 +123,7 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
 
   // Deactivate overload state and check that keepalive is not disabled
   updateResource(0.7);
-  test_server_->waitForBoolIndicatorEq(
-      "overload.envoy.overload_actions.disable_http_keepalive.active", false);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.disable_http_keepalive.active", 0);
 
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   response = sendRequestAndWaitForResponse(request_headers, 1, default_response_headers_, 1);
@@ -143,8 +139,8 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
 
   // Put envoy in overloaded state and check that it doesn't accept the new client connection.
   updateResource(0.95);
-  test_server_->waitForBoolIndicatorEq(
-      "overload.envoy.overload_actions.stop_accepting_connections.active", true);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
+                               1);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   Http::TestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
@@ -155,8 +151,8 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   // Reduce load a little to allow the connection to be accepted but then immediately reject the
   // request.
   updateResource(0.9);
-  test_server_->waitForBoolIndicatorEq(
-      "overload.envoy.overload_actions.stop_accepting_connections.active", false);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.stop_accepting_connections.active",
+                               0);
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());

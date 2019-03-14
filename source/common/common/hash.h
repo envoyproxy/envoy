@@ -94,12 +94,12 @@ using ConstCharStarHashSet =
 // Implements a set of nul-terminated char*, with the property that once
 // inserted, the char* pointers remain stable for the life of the set. Note
 // there is currently no 'erase' method.
-class StringSet {
+class CharStarSet {
 public:
-  StringSet() = default;
-  ~StringSet();
-  StringSet(const StringSet&) = delete;
-  StringSet& operator=(const StringSet&) = delete;
+  CharStarSet() = default;
+  ~CharStarSet();
+  CharStarSet(const CharStarSet&) = delete;
+  CharStarSet& operator=(const CharStarSet&) = delete;
 
   // Inserts a nul-terminated string, returning a stable char* reference to it.
   const char* insert(absl::string_view str);
