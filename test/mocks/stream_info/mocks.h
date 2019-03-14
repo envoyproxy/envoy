@@ -71,6 +71,8 @@ public:
   MOCK_CONST_METHOD0(filterState, const FilterState&());
   MOCK_METHOD1(setRequestedServerName, void(const absl::string_view));
   MOCK_CONST_METHOD0(requestedServerName, const std::string&());
+  MOCK_METHOD1(setUpstreamTransportFailureReason, void(absl::string_view));
+  MOCK_CONST_METHOD0(upstreamTransportFailureReason, const std::string&());
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
@@ -95,6 +97,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   std::string requested_server_name_;
+  std::string upstream_transport_failure_reason_;
 };
 
 } // namespace StreamInfo

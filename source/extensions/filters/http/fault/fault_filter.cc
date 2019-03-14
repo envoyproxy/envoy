@@ -26,11 +26,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Fault {
 
-const std::string FaultFilter::DELAY_PERCENT_KEY = "fault.http.delay.fixed_delay_percent";
-const std::string FaultFilter::ABORT_PERCENT_KEY = "fault.http.abort.abort_percent";
-const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_duration_ms";
-const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
-
 FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
 
   if (fault.has_abort()) {
@@ -54,13 +49,17 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
   for (const auto& node : fault.downstream_nodes()) {
     downstream_nodes_.insert(node);
   }
+
+  if (fault.has_max_active_faults()) {
+    max_active_faults_ = fault.max_active_faults().value();
+  }
 }
 
 FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
                                      Runtime::Loader& runtime, const std::string& stats_prefix,
-                                     Stats::Scope& scope, Runtime::RandomGenerator& generator)
+                                     Stats::Scope& scope)
     : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
-      stats_prefix_(stats_prefix), scope_(scope), generator_(generator) {}
+      stats_prefix_(stats_prefix), scope_(scope) {}
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
@@ -84,6 +83,10 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
     const FaultSettings* per_route_settings =
         tmp ? tmp : route_entry->virtualHost().perFilterConfigTyped<FaultSettings>(name);
     fault_settings_ = per_route_settings ? per_route_settings : fault_settings_;
+  }
+
+  if (faultOverflow()) {
+    return Http::FilterHeadersStatus::Continue;
   }
 
   if (!matchesTargetUpstreamCluster()) {
@@ -129,34 +132,37 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   return Http::FilterHeadersStatus::Continue;
 }
 
+bool FaultFilter::faultOverflow() {
+  const uint64_t max_faults = config_->runtime().snapshot().getInteger(
+      RuntimeKeys::get().MaxActiveFaultsKey, fault_settings_->maxActiveFaults().has_value()
+                                                 ? fault_settings_->maxActiveFaults().value()
+                                                 : std::numeric_limits<uint64_t>::max());
+  // Note: Since we don't compare/swap here this is a fuzzy limit which is similar to how the
+  // other circuit breakers work.
+  if (config_->stats().active_faults_.value() >= max_faults) {
+    config_->stats().faults_overflow_.inc();
+    return true;
+  }
+
+  return false;
+}
+
 bool FaultFilter::isDelayEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(
-      DELAY_PERCENT_KEY, fault_settings_->delayPercentage().numerator(),
-      config_->randomGenerator().random(),
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-          fault_settings_->delayPercentage().denominator()));
+  bool enabled = config_->runtime().snapshot().featureEnabled(RuntimeKeys::get().DelayPercentKey,
+                                                              fault_settings_->delayPercentage());
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(
-        downstream_cluster_delay_percent_key_, fault_settings_->delayPercentage().numerator(),
-        config_->randomGenerator().random(),
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-            fault_settings_->delayPercentage().denominator()));
+    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
+                                                            fault_settings_->delayPercentage());
   }
   return enabled;
 }
 
 bool FaultFilter::isAbortEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(
-      ABORT_PERCENT_KEY, fault_settings_->abortPercentage().numerator(),
-      config_->randomGenerator().random(),
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-          fault_settings_->abortPercentage().denominator()));
+  bool enabled = config_->runtime().snapshot().featureEnabled(RuntimeKeys::get().AbortPercentKey,
+                                                              fault_settings_->abortPercentage());
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(
-        downstream_cluster_abort_percent_key_, fault_settings_->abortPercentage().numerator(),
-        config_->randomGenerator().random(),
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-            fault_settings_->abortPercentage().denominator()));
+    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
+                                                            fault_settings_->abortPercentage());
   }
   return enabled;
 }
@@ -168,7 +174,7 @@ absl::optional<uint64_t> FaultFilter::delayDuration() {
     return ret;
   }
 
-  uint64_t duration = config_->runtime().snapshot().getInteger(DELAY_DURATION_KEY,
+  uint64_t duration = config_->runtime().snapshot().getInteger(RuntimeKeys::get().DelayDurationKey,
                                                                fault_settings_->delayDuration());
   if (!downstream_cluster_delay_duration_key_.empty()) {
     duration =
@@ -185,8 +191,8 @@ absl::optional<uint64_t> FaultFilter::delayDuration() {
 
 uint64_t FaultFilter::abortHttpStatus() {
   // TODO(mattklein123): check http status codes obtained from runtime.
-  uint64_t http_status =
-      config_->runtime().snapshot().getInteger(ABORT_HTTP_STATUS_KEY, fault_settings_->abortCode());
+  uint64_t http_status = config_->runtime().snapshot().getInteger(
+      RuntimeKeys::get().AbortHttpStatusKey, fault_settings_->abortCode());
 
   if (!downstream_cluster_abort_http_status_key_.empty()) {
     http_status = config_->runtime().snapshot().getInteger(
@@ -206,6 +212,7 @@ void FaultFilter::recordDelaysInjectedStats() {
   }
 
   // General stats.
+  incActiveFaults();
   config_->stats().delays_injected_.inc();
 }
 
@@ -219,6 +226,7 @@ void FaultFilter::recordAbortsInjectedStats() {
   }
 
   // General stats.
+  incActiveFaults();
   config_->stats().aborts_injected_.inc();
 }
 
@@ -236,11 +244,27 @@ Http::FilterTrailersStatus FaultFilter::decodeTrailers(Http::HeaderMap&) {
 }
 
 FaultFilterStats FaultFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  std::string final_prefix = prefix + "fault.";
-  return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  const std::string final_prefix = prefix + "fault.";
+  return {ALL_FAULT_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                 POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-void FaultFilter::onDestroy() { resetTimerState(); }
+void FaultFilter::incActiveFaults() {
+  // Only charge 1 active fault per filter in case we are injecting multiple faults.
+  if (fault_active_) {
+    return;
+  }
+
+  config_->stats().active_faults_.inc();
+  fault_active_ = true;
+}
+
+void FaultFilter::onDestroy() {
+  resetTimerState();
+  if (fault_active_) {
+    config_->stats().active_faults_.dec();
+  }
+}
 
 void FaultFilter::postDelayInjection() {
   resetTimerState();

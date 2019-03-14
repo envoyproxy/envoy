@@ -205,7 +205,7 @@ public:
    * @param message message to validate.
    * @param loader optional a pointer to the runtime loader for live deprecation status.
    * @throw ProtoValidationException if deprecated fields are used and listed
-   *   Runtime::DisallowedFeatures
+   *    in disallowed_features in runtime_features.h
    */
   static void
   checkForDeprecation(const Protobuf::Message& message,

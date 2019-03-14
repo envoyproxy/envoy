@@ -98,23 +98,30 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
     return false;
   }
 
+  // Check whether the two buffers contain the same content. It is valid for the content
+  // to be arranged differently in the buffers. For example, lhs could have one slice
+  // containing 10 bytes while rhs has ten slices containing one byte each.
   uint64_t lhs_num_slices = lhs.getRawSlices(nullptr, 0);
   uint64_t rhs_num_slices = rhs.getRawSlices(nullptr, 0);
-  if (lhs_num_slices != rhs_num_slices) {
-    return false;
-  }
-
   STACK_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
   lhs.getRawSlices(lhs_slices.begin(), lhs_num_slices);
   STACK_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
   rhs.getRawSlices(rhs_slices.begin(), rhs_num_slices);
-  for (size_t i = 0; i < lhs_num_slices; i++) {
-    if (lhs_slices[i].len_ != rhs_slices[i].len_) {
-      return false;
-    }
-
-    if (0 != memcmp(lhs_slices[i].mem_, rhs_slices[i].mem_, lhs_slices[i].len_)) {
-      return false;
+  size_t rhs_slice = 0;
+  size_t rhs_offset = 0;
+  for (size_t lhs_slice = 0; lhs_slice < lhs_num_slices; lhs_slice++) {
+    for (size_t lhs_offset = 0; lhs_offset < lhs_slices[lhs_slice].len_; lhs_offset++) {
+      while (rhs_offset >= rhs_slices[rhs_slice].len_) {
+        rhs_slice++;
+        ASSERT(rhs_slice < rhs_num_slices);
+        rhs_offset = 0;
+      }
+      auto lhs_str = static_cast<const uint8_t*>(lhs_slices[lhs_slice].mem_);
+      auto rhs_str = static_cast<const uint8_t*>(rhs_slices[rhs_slice].mem_);
+      if (lhs_str[lhs_offset] != rhs_str[rhs_offset]) {
+        return false;
+      }
+      rhs_offset++;
     }
   }
 

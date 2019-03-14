@@ -35,6 +35,7 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
+        "//test/common/runtime:utility_lib",
     ],
 )
 
@@ -197,6 +198,7 @@ envoy_cc_test(
     deps = [
         ":simulated_time_system_lib",
         ":utility_lib",
+        "//source/common/event:libevent_scheduler_lib",
     ],
 )
 

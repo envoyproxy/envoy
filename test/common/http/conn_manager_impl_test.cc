@@ -3422,6 +3422,180 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
   encoder_filters_[2]->callbacks_->continueEncoding();
 }
 
+// Use filter direct decode/encodeData() calls without trailers.
+TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataNoTrailers) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    Buffer::OwnedImpl fake_data("hello");
+    decoder->decodeData(fake_data, true);
+  }));
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  Buffer::OwnedImpl decode_buffer;
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        decode_buffer.move(data);
+        return FilterDataStatus::StopIterationNoBuffer;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  Buffer::OwnedImpl decoded_data_to_forward;
+  decoded_data_to_forward.move(decode_buffer, 2);
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("he"), false))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decoded_data_to_forward, false);
+
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("llo"), true))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decode_buffer, true);
+
+  // Response path.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+
+  Buffer::OwnedImpl encoder_buffer;
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        encoder_buffer.move(data);
+        return FilterDataStatus::StopIterationNoBuffer;
+      }));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
+  Buffer::OwnedImpl response_body("response");
+  decoder_filters_[1]->callbacks_->encodeData(response_body, true);
+
+  Buffer::OwnedImpl encoded_data_to_forward;
+  encoded_data_to_forward.move(encoder_buffer, 3);
+  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("res"), false));
+  EXPECT_CALL(response_encoder_, encodeData(_, false));
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoded_data_to_forward, false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("ponse"), true));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoder_buffer, true);
+}
+
+// Use filter direct decode/encodeData() calls with trailers.
+TEST_F(HttpConnectionManagerImplTest, FilterDirectDecodeEncodeDataTrailers) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    Buffer::OwnedImpl fake_data("hello");
+    decoder->decodeData(fake_data, false);
+
+    HeaderMapPtr trailers{new TestHeaderMapImpl{{"foo", "bar"}}};
+    decoder->decodeTrailers(std::move(trailers));
+  }));
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _));
+  setupFilterChain(2, 2);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  Buffer::OwnedImpl decode_buffer;
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        decode_buffer.move(data);
+        return FilterDataStatus::StopIterationNoBuffer;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  Buffer::OwnedImpl decoded_data_to_forward;
+  decoded_data_to_forward.move(decode_buffer, 2);
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("he"), false))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decoded_data_to_forward, false);
+
+  EXPECT_CALL(*decoder_filters_[1], decodeData(BufferStringEqual("llo"), false))
+      .WillOnce(Return(FilterDataStatus::StopIterationNoBuffer));
+  decoder_filters_[0]->callbacks_->injectDecodedDataToFilterChain(decode_buffer, false);
+
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  decoder_filters_[0]->callbacks_->continueDecoding();
+
+  // Response path.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+
+  Buffer::OwnedImpl encoder_buffer;
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        encoder_buffer.move(data);
+        return FilterDataStatus::StopIterationNoBuffer;
+      }));
+  EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, false);
+  Buffer::OwnedImpl response_body("response");
+  decoder_filters_[1]->callbacks_->encodeData(response_body, false);
+  decoder_filters_[1]->callbacks_->encodeTrailers(
+      HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}});
+
+  Buffer::OwnedImpl encoded_data_to_forward;
+  encoded_data_to_forward.move(encoder_buffer, 3);
+  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("res"), false));
+  EXPECT_CALL(response_encoder_, encodeData(_, false));
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoded_data_to_forward, false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeData(BufferStringEqual("ponse"), false));
+  EXPECT_CALL(response_encoder_, encodeData(_, false));
+  encoder_filters_[1]->callbacks_->injectEncodedDataToFilterChain(encoder_buffer, false);
+
+  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(response_encoder_, encodeTrailers(_));
+  expectOnDestroy();
+  encoder_filters_[1]->callbacks_->continueEncoding();
+}
+
 TEST_F(HttpConnectionManagerImplTest, MultipleFilters) {
   InSequence s;
   setup(false, "");

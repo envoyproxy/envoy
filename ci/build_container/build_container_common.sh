@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
 # buildifier
-VERSION=0.20.0
-SHA256=92c74a3c2331a12f578fcf9c5ace645b7537e1a18f02f91d0fdbb6f0655e8493
+VERSION=0.22.0
+SHA256=25159de982ec8896fc8213499df0a7003dfb4a03dd861f90fa5679d16faf0f99
 curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild/buildtools/releases/download/"$VERSION"/buildifier \
   && echo "$SHA256" '/usr/local/bin/buildifier' | sha256sum --check \
   && chmod +x /usr/local/bin/buildifier
@@ -10,18 +10,6 @@ curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild
 # GCC for everything.
 export CC=gcc
 export CXX=g++
-
-export THIRDPARTY_DEPS=/tmp
-export THIRDPARTY_SRC=/thirdparty
-DEPS=$(python <(cat /bazel-prebuilt/bazel/target_recipes.bzl; \
-  echo "print ' '.join(\"${THIRDPARTY_DEPS}/%s.dep\" % r for r in set(TARGET_RECIPES.values()))"))
-
-# TODO(htuch): We build twice as a workaround for https://github.com/google/protobuf/issues/3322.
-# Fix this. This will be gone real soon now.
-export THIRDPARTY_BUILD=/thirdparty_build
-export CPPFLAGS="-DNDEBUG"
-echo "Building opt deps ${DEPS}"
-"$(dirname "$0")"/build_and_install_deps.sh ${DEPS}
 
 echo "Building Bazel-managed deps (//bazel/external:all_external)"
 mkdir /bazel-prebuilt-root /bazel-prebuilt-output
