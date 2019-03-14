@@ -49,53 +49,6 @@ namespace Stats {
  */
 class FakeSymbolTableImpl : public SymbolTable {
 public:
-  /**
-   * Represents an 8-bit encoding of a vector of symbols, used as a transient
-   * representation during encoding and prior to retained allocation.
-   */
-  class Encoding {
-  public:
-    void fromString(absl::string_view str) {
-      storage_ = std::make_unique<Storage>(str.size() + 2);
-      uint8_t* p = saveLengthToBytesReturningNext(str.size(), storage_.get());
-      memcpy(p, str.data(), str.size());
-    }
-
-    /**
-     * Before destructing SymbolEncoding, you must call moveToStorage. This
-     * transfers ownership, and in particular, the responsibility to call
-     * SymbolTable::clear() on all referenced symbols. If we ever wanted
-     * to be able to destruct a SymbolEncoding without transferring it
-     * we could add a clear(SymbolTable&) method.
-     */
-    ~Encoding() { ASSERT(storage_ == nullptr); }
-
-    uint64_t bytesRequired() const { return StatName(storage_.get()).size(); }
-
-    /**
-     * Moves the contents of the vector into an allocated array. The array
-     * must have been allocated with bytesRequired() bytes.
-     *
-     * @param array destination memory to receive the encoded bytes.
-     * @return uint64_t the number of bytes transferred.
-     */
-    uint64_t moveToStorage(SymbolTable::Storage array) {
-      uint64_t bytes_required = bytesRequired();
-      memcpy(array, storage_.get(), bytes_required);
-      storage_.reset();
-      return bytes_required;
-    }
-
-    /**
-     * Removes the storage from this, and returns it to the caller.
-     * @return the allocated storage.
-     */
-    StoragePtr transferStorage() { return std::move(storage_); }
-
-  private:
-    StoragePtr storage_;
-  };
-
   // SymbolTable
   void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override {
     RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
@@ -177,9 +130,10 @@ private:
   }
 
   StoragePtr stringToStorage(absl::string_view name) const {
-    Encoding encoding;
-    encoding.fromString(name);
-    return encoding.transferStorage();
+    auto storage = std::make_unique<Storage>(name.size() + 2);
+    uint8_t* p = saveLengthToBytesReturningNext(name.size(), storage.get());
+    memcpy(p, name.data(), name.size());
+    return storage;
   }
 };
 

@@ -71,8 +71,12 @@ using SymbolVec = std::vector<Symbol>;
 class SymbolTableImpl : public SymbolTable {
 public:
   /**
-   * Represents an 8-bit encoding of a vector of symbols, used as a transient
-   * representation during encoding and prior to retained allocation.
+   * Intermediate representation for a stat-name. This helps store multiple names
+   * in a single packed allocation. First we encode each desired name, then sum
+   * their sizes for the single packed allocation. This is used to store
+   * MetricImpl's tags and tagExtractedName. Like StatName, we don't want to pay
+   * a vptr overhead per object, and the representation is shared between the
+   * SymbolTable implementations, so this is just a pre-declare.
    */
   class Encoding {
   public:

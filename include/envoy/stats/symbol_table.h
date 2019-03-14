@@ -23,16 +23,6 @@ class StatName;
 class StatNameList;
 
 /**
- * Intermediate representation for a stat-name. This helps store multiple names
- * in a single packed allocation. First we encode each desired name, then sum
- * their sizes for the single packed allocation. This is used to store
- * MetricImpl's tags and tagExtractedName. Like StatName, we don't want to pay
- * a vptr overhead per object, and the representation is shared between the
- * SymbolTable implementations, so this is just a pre-declare.
- */
-// class SymbolEncoding;
-
-/**
  * SymbolTable manages a namespace optimized for stat names, exploiting their
  * typical composition from "."-separated tokens, with a significant overlap
  * between the tokens. The interface is designed to balance optimal storage
