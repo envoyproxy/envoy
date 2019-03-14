@@ -116,6 +116,14 @@ public:
    */
   virtual StoragePtr join(const std::vector<StatName>& stat_names) const PURE;
 
+  /**
+   * Populates a StatNameList from a list of encodings. This is not done at
+   * construction time to enable StatNameList to be instantiated directly in
+   * a class that doesn't have a live SymbolTable when it is constructed.
+   *
+   * @param encodings The list names to encode.
+   * @param symbol_table The symbol table in which to encode the names.
+   */
   virtual void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE

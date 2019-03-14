@@ -275,6 +275,8 @@ TEST_P(StatNameTest, List) {
   absl::string_view names[] = {"hello.world", "goodbye.world"};
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
+  table_->populateList(names, ARRAY_SIZE(names), name_list);
+  /*
   switch (GetParam()) {
     case SymbolTableType::Real:
       name_list.populate<SymbolTableImpl>(names, ARRAY_SIZE(names), *real_symbol_table_);
@@ -283,6 +285,7 @@ TEST_P(StatNameTest, List) {
       name_list.populate<FakeSymbolTableImpl>(names, ARRAY_SIZE(names), *fake_symbol_table_);
       break;
   }
+  */
 
   EXPECT_TRUE(name_list.populated());
 

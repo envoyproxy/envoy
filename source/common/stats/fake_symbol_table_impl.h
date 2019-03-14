@@ -108,7 +108,31 @@ public:
   void encode(absl::string_view name, Encoding& encoding) { encoding.fromString(name); }
 
   void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override {
-    list.populate<FakeSymbolTableImpl>(names, num_names, *this);
+    RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
+
+    // First encode all the names.
+    size_t total_size_bytes = 1 + num_names * StatNameSizeEncodingBytes;
+
+    for (int32_t i = 0; i < num_names; ++i) {
+      total_size_bytes += names[i].size();
+    }
+
+    // Now allocate the exact number of bytes required and move the encodings
+    // into storage.
+    auto storage = std::make_unique<uint8_t[]>(total_size_bytes);
+    uint8_t* p = &storage[0];
+    *p++ = num_names;
+    for (int32_t i = 0; i < num_names; ++i) {
+      auto& name = names[i];
+      size_t sz = name.size();
+      p = saveLengthToBytesReturningNext(sz, p);
+      if (!name.empty()) {
+        memcpy(p, name.data(), sz * sizeof(uint8_t));
+        p += sz;
+      }
+    }
+    ASSERT(p == &storage[0] + total_size_bytes);
+    list.moveStorageIntoList(std::move(storage));
   }
 
   std::string toString(const StatName& stat_name) const override {

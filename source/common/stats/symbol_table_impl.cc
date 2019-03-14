@@ -333,7 +333,28 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
 }
 
 void SymbolTableImpl::populateList(absl::string_view* names, int32_t num_names, StatNameList& list) {
-  list.populate<SymbolTableImpl>(names, num_names, *this);
+  RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
+
+  // First encode all the names.
+  size_t total_size_bytes = 1; /* one byte for holding the number of names */
+
+  STACK_ARRAY(encodings, Encoding, num_names);
+  for (int32_t i = 0; i < num_names; ++i) {
+    Encoding& encoding = encodings[i];
+    encode(names[i], encoding);
+    total_size_bytes += encoding.bytesRequired();
+  }
+
+  // Now allocate the exact number of bytes required and move the encodings
+  // into storage.
+  auto storage = std::make_unique<uint8_t[]>(total_size_bytes);
+  uint8_t* p = &storage[0];
+  *p++ = num_names;
+  for (auto& encoding : encodings) {
+    p += encoding.moveToStorage(p);
+  }
+  ASSERT(p == &storage[0] + total_size_bytes);
+  list.moveStorageIntoList(std::move(storage));
 }
 
 StatNameList::~StatNameList() { ASSERT(!populated()); }
