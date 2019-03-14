@@ -26,9 +26,8 @@ NetworkFilters::ZooKeeperProxy::ZooKeeperConfigFactory::createFilterFactoryFromP
   ASSERT(!proto_config.stat_prefix().empty());
 
   const std::string stat_prefix = fmt::format("{}.zookeeper.", proto_config.stat_prefix());
-  const uint32_t default_max_bytes = 1048576;
   const uint32_t max_packet_bytes =
-      proto_config.max_packet_bytes() == 0 ? default_max_bytes : proto_config.max_packet_bytes();
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_packet_bytes, 1024 * 1024);
 
   ZooKeeperFilterConfigSharedPtr filter_config(
       std::make_shared<ZooKeeperFilterConfig>(stat_prefix, max_packet_bytes, context.scope()));
