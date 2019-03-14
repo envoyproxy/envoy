@@ -55,22 +55,11 @@ public:
    */
   class Encoding {
   public:
-    // Encoding() : storage_(nullptr) {}
-
     void fromString(absl::string_view str) {
       storage_ = std::make_unique<Storage>(str.size() + 2);
       uint8_t* p = saveLengthToBytesReturningNext(str.size(), storage_.get());
       memcpy(p, str.data(), str.size());
     }
-
-    /*Encoding& operator=(Encoding&& src) {
-      storage_ = std::move(src.storage_);
-      return *this;
-      }*/
-
-    /*void swap(Encoding& rhs) {
-      std::swap(rhs.storage_, storage_);
-      }*/
 
     /**
      * Before destructing SymbolEncoding, you must call moveToStorage. This
@@ -97,14 +86,17 @@ public:
       return bytes_required;
     }
 
+    /**
+     * Removes the storage from this, and returns it to the caller.
+     * @return the allocated storage.
+     */
     StoragePtr transferStorage() { return std::move(storage_); }
 
   private:
     StoragePtr storage_;
   };
 
-  void encode(absl::string_view name, Encoding& encoding) { encoding.fromString(name); }
-
+  // SymbolTable
   void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override {
     RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 

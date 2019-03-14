@@ -122,7 +122,8 @@ public:
    * construction time to enable StatNameList to be instantiated directly in
    * a class that doesn't have a live SymbolTable when it is constructed.
    *
-   * @param encodings The list names to encode.
+   * @param names A pointer to the first name in an array.
+   * @param num_names The number of names.
    * @param symbol_table The symbol table in which to encode the names.
    */
   virtual void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) PURE;
@@ -131,6 +132,19 @@ public:
   virtual void debugPrint() const PURE;
 #endif
 
+  /**
+   * Calls the provided function with a string-view representation of the
+   * elaborated name. This is useful during the interim period when we
+   * are using FakeSymbolTableImpl, to avoid an extra allocation. Once
+   * we migrate to using SymbolTableImpl, this interface will no longer
+   * be helpful and can be removed. The reason it's useful now is that
+   * it makes up, in part, for some extra runtime overhead that is spent
+   * on the SymbolTable abstraction and API, without getting any benefit
+   * from the improved representation.
+   *
+   * @param stat_name The stat name.
+   * @param fn The function to call with the elaborated stat name as a string_view.
+   */
   virtual void callWithStringView(StatName stat_name,
                                   const std::function<void(absl::string_view)>& fn) const PURE;
 

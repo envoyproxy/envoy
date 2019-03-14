@@ -76,8 +76,6 @@ public:
    */
   class Encoding {
   public:
-    Encoding() = default;
-
     /**
      * Before destructing SymbolEncoding, you must call moveToStorage. This
      * transfers ownership, and in particular, the responsibility to call
