@@ -8,7 +8,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_base.h"
 
 #include "gtest/gtest.h"
 
@@ -227,7 +226,7 @@ public:
   NiceMock<Network::MockClientConnection> upstream_connection_;
 };
 
-class DubboRouterTest : public DubboRouterTestBase, public TestBase {};
+class DubboRouterTest : public DubboRouterTestBase, public testing::Test {};
 
 TEST_F(DubboRouterTest, PoolRemoteConnectionFailure) {
   initializeRouter();
