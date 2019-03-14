@@ -219,7 +219,6 @@ private:
     SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
     Counter& counter(const std::string& name) override {
-      // std::cerr << "counter(" << name << ")" << std::endl;
       StatNameTempStorage storage(name, symbolTable());
       return counterFromStatName(storage.statName());
     }
