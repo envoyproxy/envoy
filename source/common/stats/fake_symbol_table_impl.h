@@ -52,7 +52,7 @@ public:
   // SymbolTable
   void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override {
     // This implementation of populateList is similar to
-    // SymboLableImpl::populateList. This variant is more efficient for
+    // SymbolTableImpl::populateList. This variant is more efficient for
     // FakeSymbolTableImpl, because it avoid "encoding" each name in names. The
     // strings are laid out abutting each other with 2-byte length prefixes, so
     // encoding isn't needed, and doing a dummy encoding step would cost one
@@ -70,7 +70,7 @@ public:
 
     // Now allocate the exact number of bytes required and move the encodings
     // into storage.
-    auto storage = std::make_unique<uint8_t[]>(total_size_bytes);
+    auto storage = std::make_unique<Storage>(total_size_bytes);
     uint8_t* p = &storage[0];
     *p++ = num_names;
     for (int32_t i = 0; i < num_names; ++i) {
@@ -111,7 +111,7 @@ public:
 #endif
 
   StoragePtr copyToBytes(absl::string_view name) override {
-    auto bytes = std::make_unique<uint8_t[]>(name.size() + StatNameSizeEncodingBytes);
+    auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
     uint8_t* buffer = saveLengthToBytesReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());
     return bytes;

@@ -388,8 +388,6 @@ class StatNameList {
 public:
   ~StatNameList();
 
-  void moveStorageIntoList(SymbolTable::StoragePtr&& storage) { storage_ = std::move(storage); }
-
   /**
    * @return true if populate() has been called on this list.
    */
@@ -415,6 +413,27 @@ public:
   void clear(SymbolTable& symbol_table);
 
 private:
+  friend class FakeSymbolTableImpl;
+  friend class SymbolTableImpl;
+
+  /**
+   * Moves the specified storage into the list. The storage format is an
+   * array of bytes, organized like this:
+   *
+   * [0] The number of elements in the list (must be < 256).
+   * [1] low order 8 bits of the number of symbols in the first element.
+   * [2] high order 8 bits of the number of symbols in the first element.
+   * [3...] the symbols in the first element.
+   * ...
+   *
+   *
+   * For FakeSymbolTableImpl, each symbol is a single char, casted into a
+   * uint8_t. For SymbolTableImpl, each symbol is 1 or more bytes, in a
+   * variable-length encoding. See SymbolTableImpl::Encoding::addSymbol for
+   * details.
+   */
+  void moveStorageIntoList(SymbolTable::StoragePtr&& storage) { storage_ = std::move(storage); }
+
   SymbolTable::StoragePtr storage_;
 };
 
