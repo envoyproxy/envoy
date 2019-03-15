@@ -103,8 +103,8 @@ public:
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
-        suppress_envoy_headers_(suppress_envoy_headers), shadow_writer_(std::move(shadow_writer)),
-        time_source_(time_source), http_context_(http_context) {}
+        suppress_envoy_headers_(suppress_envoy_headers), http_context_(http_context),
+        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -121,7 +121,6 @@ public:
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
-  Http::Context& httpContext() { return http_context_; }
 
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
@@ -133,11 +132,11 @@ public:
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
+  Http::Context& http_context_;
 
 private:
   ShadowWriterPtr shadow_writer_;
   TimeSource& time_source_;
-  Http::Context& http_context_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
@@ -149,8 +148,12 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public Http::StreamDecoderFilter,
                public Upstream::LoadBalancerContextBase {
 public:
-  explicit Filter(FilterConfig& config);
-  ~Filter() override;
+  Filter(FilterConfig& config)
+      : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
+        do_shadowing_(false), is_retry_(false),
+        attempting_internal_redirect_with_complete_stream_(false) {}
+
+  ~Filter();
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -395,7 +398,7 @@ private:
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
   TimeSource& timeSource() { return config_.timeSource(); }
-  Http::Context& httpContext() { return config_.httpContext(); }
+  Http::Context& httpContext() { return config_.http_context_; }
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
