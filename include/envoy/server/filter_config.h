@@ -13,6 +13,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
@@ -78,6 +79,11 @@ public:
    *         will start listening.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
+   */
+  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
    * @return information about the local environment the server is running in.

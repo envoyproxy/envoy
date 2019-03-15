@@ -722,7 +722,7 @@ TEST_F(Http1ClientConnectionImplTest, Reset) {
 
   Http::MockStreamCallbacks callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::LocalReset));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::LocalReset, _));
   request_encoder.getStream().resetStream(StreamResetReason::LocalReset);
 }
 
