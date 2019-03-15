@@ -31,6 +31,11 @@ public:
    * Enable a pending timeout. If a timeout is already pending, it will be reset to the new timeout.
    */
   virtual void enableTimer(const std::chrono::milliseconds& d) PURE;
+
+  /**
+   * Return whether the timer is currently armed.
+   */
+  virtual bool enabled() PURE;
 };
 
 typedef std::unique_ptr<Timer> TimerPtr;

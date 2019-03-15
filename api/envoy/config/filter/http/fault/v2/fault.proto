@@ -30,13 +30,13 @@ message FaultAbort {
 
   // The percentage of requests/operations/connections that will be aborted with the error code
   // provided.
-  envoy.type.FractionalPercent percentage = 3;
+  type.FractionalPercent percentage = 3;
 }
 
 message HTTPFault {
   // If specified, the filter will inject delays based on the values in the
-  // object. At least *abort* or *delay* must be specified.
-  envoy.config.filter.fault.v2.FaultDelay delay = 1;
+  // object.
+  filter.fault.v2.FaultDelay delay = 1;
 
   // If specified, the filter will abort requests based on the values in
   // the object. At least *abort* or *delay* must be specified.
@@ -79,4 +79,11 @@ message HTTPFault {
   //   limit. It's possible for the number of active faults to rise slightly above the configured
   //   amount due to the implementation details.
   google.protobuf.UInt32Value max_active_faults = 6;
+
+  // The response rate limit to be applied to the response body of the stream.
+  //
+  // .. attention::
+  //  This is a per-stream limit versus a connection level limit. This means that concurrent streams
+  //  will each get an independent limit.
+  filter.fault.v2.FaultRateLimit response_rate_limit = 7;
 }
