@@ -30,27 +30,9 @@ public:
    */
   ManagerImpl(absl::string_view name);
 
-  /**
-   * @return the current state of the manager.
-   */
+  // SafeInit::Manager
   State state() const override;
-
-  /**
-   * Register an initialization target. If the manager's current state is uninitialized, the target
-   * will be saved for invocation later, when `initialize` is called. If the current state is
-   * initializing, the target will be invoked immediately. It is an error to register a target with
-   * a manager that is already in initialized state.
-   * @param target the target to be invoked when initialization begins.
-   */
   void add(const Target& target) override;
-
-  /**
-   * Start initialization of all previously registered targets, and notify the given Watcher when
-   * initialization is complete. It is an error to call initialize on a manager that is already in
-   * initializing or initialized state. If the manager contains no targets, initialization completes
-   * immediately.
-   * @param watcher the watcher to notify when initialization is complete.
-   */
   void initialize(const Watcher& watcher) override;
 
 private:

@@ -20,11 +20,7 @@ private:
                    std::weak_ptr<std::function<void(WatcherHandlePtr)>> fn);
 
 public:
-  /**
-   * Tell the target to begin initialization, if it is still available.
-   * @param watcher A Watcher for the target to notify when it has initialized.
-   * @return true if the target received this call, false if the target was already destroyed.
-   */
+  // SafeInit::TargetHandle
   bool initialize(const Watcher& watcher) const override;
 
 private:
@@ -55,16 +51,8 @@ public:
   TargetImpl(absl::string_view name);
   ~TargetImpl() override;
 
-  /**
-   * @return a human-readable target name, for logging / debugging.
-   */
+  // SafeInit::Target
   absl::string_view name() const override;
-
-  /**
-   * Create a new handle that can initialize this target.
-   * @param name a human readable handle name, for logging / debugging.
-   * @return a new handle that can initialize this target.
-   */
   TargetHandlePtr createHandle(absl::string_view handle_name) const override;
 
   /**

@@ -22,10 +22,7 @@ private:
                     std::weak_ptr<std::function<void()>> fn);
 
 public:
-  /**
-   * Tell the watcher that initialization has completed, if it is still available.
-   * @return true if the watcher received this call, false if the watcher was already destroyed.
-   */
+  // SafeInit::WatcherHandle
   bool ready() const override;
 
 private:
@@ -54,16 +51,8 @@ public:
   WatcherImpl(absl::string_view name, std::function<void()> fn);
   ~WatcherImpl() override;
 
-  /**
-   * @return a human-readable target name, for logging / debugging.
-   */
+  // SafeInit::Watcher
   absl::string_view name() const override;
-
-  /**
-   * Create a new handle that can notify this watcher.
-   * @param name a human readable handle name, for logging / debugging.
-   * @return a new handle that can notify this watcher.
-   */
   WatcherHandlePtr createHandle(absl::string_view handle_name) const override;
 
 private:
