@@ -179,11 +179,6 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   return timeout;
 }
 
-Filter::Filter(FilterConfig& config)
-    : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
-      do_shadowing_(false), is_retry_(false),
-      attempting_internal_redirect_with_complete_stream_(false) {}
-
 Filter::~Filter() {
   // Upstream resources should already have been cleaned.
   ASSERT(!upstream_request_);
