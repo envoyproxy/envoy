@@ -34,7 +34,6 @@ HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
   lock.release();
 
   if (ret.second) {
-    // symbolTable().incRefCount(existing_data->statName());
     return *data_ptr.release();
   }
   ++existing_data->ref_count_;
