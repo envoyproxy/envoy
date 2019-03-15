@@ -451,7 +451,6 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
-  // Http::CodeStats& code_stats_;
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxPtr ads_mux_;
   LoadStatsReporterPtr load_stats_reporter_;

@@ -21,8 +21,7 @@ void UserAgent::completeConnectionLength(Stats::Timespan& span) {
     return;
   }
 
-  Stats::Histogram& histogram = scope_->histogram(prefix_ + "downstream_cx_length_ms");
-  histogram.recordValue(span.getRawDuration().count());
+  scope_->histogram(prefix_ + "downstream_cx_length_ms").recordValue(span.getRawDuration().count());
 }
 
 void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::string& prefix,

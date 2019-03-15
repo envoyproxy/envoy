@@ -67,7 +67,7 @@ public:
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
   HeapStatDataAllocator(SymbolTable& symbol_table) : StatDataAllocatorImpl(symbol_table) {}
-  virtual ~HeapStatDataAllocator();
+  ~HeapStatDataAllocator() override;
 
   HeapStatData& alloc(StatName name);
   void free(HeapStatData& data) override;
