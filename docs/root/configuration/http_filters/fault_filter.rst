@@ -16,15 +16,6 @@ The scope of failures is restricted to those that are observable by an
 application communicating over the network. CPU and disk failures on the
 local host cannot be emulated.
 
-Currently, the fault injection filter has the following limitations:
-
-* Abort codes are restricted to HTTP status codes only
-* Delays are restricted to fixed duration.
-
-Future versions will include support for restricting faults to specific
-routes, injecting *gRPC* and *HTTP/2* specific error codes and delay
-durations based on distributions.
-
 Configuration
 -------------
 
@@ -35,6 +26,44 @@ Configuration
 
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.fault.v2.HTTPFault>`
 * This filter should be configured with the name *envoy.fault*.
+
+.. _config_http_filters_fault_injection_http_header:
+
+HTTP header fault configuration
+-------------------------------
+
+The fault filter has the capability to allow fault configuration to be specified by the caller.
+This is useful in certain scenarios in which it is desired to allow the client to specify its own
+fault configuration. The currently supported header controls are:
+
+* Request delay configuration via the *x-envoy-throttle-request-latency* header. The header value
+  should be an integer that specifies the number of milliseconds to throttle the latency for.
+* Response rate limit configuration via the *x-envoy-throttle-response-throughput* header. The
+  header value should be an integer that specified the limit in KiB/s and must be > 0.
+
+.. attention::
+
+  Allowing header control is inherently dangerous if exposed to untrusted clients. In this case,
+  it is suggested to use the :ref:`max_active_faults
+  <envoy_api_field_config.filter.http.fault.v2.HTTPFault.max_active_faults>` setting to limit the
+  maximum concurrent faults that can be active at any given time.
+
+The following is an example configuration that enables header control for both of the above
+options:
+
+.. code-block:: yaml
+
+  name: envoy.fault
+  config:
+    max_active_faults: 100
+    delay:
+      header_delay: {}
+      percentage:
+        numerator: 100
+    response_rate_limit:
+      header_limit: {}
+      percentage:
+        numerator: 100
 
 .. _config_http_filters_fault_injection_runtime:
 

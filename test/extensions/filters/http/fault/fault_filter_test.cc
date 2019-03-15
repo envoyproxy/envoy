@@ -262,13 +262,6 @@ TEST(FaultFilterBadConfigTest, MissingDelayDuration) {
   faultFilterBadConfigHelper(json);
 }
 
-MATCHER_P(Percent, rhs, "") {
-  envoy::type::FractionalPercent expected;
-  expected.set_numerator(rhs);
-  expected.set_denominator(envoy::type::FractionalPercent::HUNDRED);
-  return TestUtility::protoEqual(expected, arg);
-}
-
 TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   envoy::config::filter::http::fault::v2::HTTPFault fault;
   fault.mutable_abort()->mutable_percentage()->set_numerator(100);
@@ -281,13 +274,6 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
       .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
 
-  // Delay related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.delay.fixed_delay_percent",
-                             Matcher<const envoy::type::FractionalPercent&>(Percent(0))))
-      .WillOnce(Return(false));
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::DelayInjected))
@@ -375,7 +361,6 @@ TEST_F(FaultFilterTest, Overflow) {
 
 TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
   envoy::config::filter::http::fault::v2::HTTPFault fault;
-  fault.mutable_delay()->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
   fault.mutable_delay()->mutable_percentage()->set_numerator(50);
   fault.mutable_delay()->mutable_percentage()->set_denominator(
       envoy::type::FractionalPercent::HUNDRED);
@@ -1009,10 +994,6 @@ public:
                 featureEnabled("fault.http.rate_limit.response_percent",
                                Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
         .WillOnce(Return(enable_runtime));
-    EXPECT_CALL(runtime_.snapshot_,
-                featureEnabled("fault.http.delay.fixed_delay_percent",
-                               Matcher<const envoy::type::FractionalPercent&>(Percent(0))))
-        .WillOnce(Return(false));
     EXPECT_CALL(runtime_.snapshot_,
                 featureEnabled("fault.http.abort.abort_percent",
                                Matcher<const envoy::type::FractionalPercent&>(Percent(0))))
