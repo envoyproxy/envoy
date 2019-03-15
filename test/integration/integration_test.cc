@@ -749,6 +749,34 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
             1);
 }
 
+// Test that if no connection pools are free, Envoy fails to establish an upstream connection.
+TEST_P(IntegrationTest, NoConnectionPoolsFree) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+
+    // Somewhat contrived with 0, but this is the simplest way to test right now.
+    auto* circuit_breakers = cluster->mutable_circuit_breakers();
+    circuit_breakers->add_thresholds()->mutable_max_connection_pools()->set_value(0);
+  });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Request 1.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+
+  // Validate none active.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+
+  response->waitForEndStream();
+
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
