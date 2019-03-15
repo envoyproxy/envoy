@@ -60,8 +60,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/tcp:conn_pool_lib",
-        "//source/common/upstream:priority_agnostic_conn_pool_map",
-        "//source/common/upstream:priority_agnostic_conn_pool_map_impl_lib",
+        "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2/core:base_cc",
@@ -88,8 +87,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "priority_agnostic_conn_pool_map",
-    hdrs = ["priority_agnostic_conn_pool_map.h"],
+    name = "priority_conn_pool_map",
+    hdrs = ["priority_conn_pool_map.h"],
     deps = [
         ":conn_pool_map",
         "//include/envoy/event:dispatcher_interface",
@@ -100,11 +99,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "priority_agnostic_conn_pool_map_impl_lib",
-    hdrs = ["priority_agnostic_conn_pool_map_impl.h"],
+    name = "priority_conn_pool_map_impl_lib",
+    hdrs = ["priority_conn_pool_map_impl.h"],
     deps = [
         ":conn_pool_map_impl_lib",
-        ":priority_agnostic_conn_pool_map",
+        ":priority_conn_pool_map",
     ],
 )
 

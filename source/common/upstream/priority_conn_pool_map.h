@@ -11,15 +11,15 @@ namespace Upstream {
 /**
  *  A class mapping keys to connection pools, with some recycling logic built in.
  */
-template <typename KEY_TYPE, typename POOL_TYPE> class PriorityAgnosticConnPoolMap {
+template <typename KEY_TYPE, typename POOL_TYPE> class PriorityConnPoolMap {
 public:
   using ConnPoolMapType = ConnPoolMap<KEY_TYPE, POOL_TYPE>;
   using PoolFactory = typename ConnPoolMapType::PoolFactory;
   using DrainedCb = typename ConnPoolMapType::DrainedCb;
   using OptPoolRef = typename ConnPoolMapType::OptPoolRef;
 
-  PriorityAgnosticConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr host);
-  ~PriorityAgnosticConnPoolMap();
+  PriorityConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr host);
+  ~PriorityConnPoolMap();
   /**
    * Returns an existing pool for the given priority and `key`, or creates a new one using
    * `factory`. Note that it is possible for this to fail if a limit on the number of pools allowed

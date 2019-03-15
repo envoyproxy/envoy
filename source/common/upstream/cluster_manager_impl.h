@@ -23,7 +23,7 @@
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
-#include "common/upstream/priority_agnostic_conn_pool_map.h"
+#include "common/upstream/priority_conn_pool_map.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -239,8 +239,7 @@ private:
       ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr host)
           : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
-      typedef PriorityAgnosticConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance>
-          ConnPools;
+      typedef PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance> ConnPools;
 
       // This is a shared_ptr so we can keep it alive while cleaning up.
       std::shared_ptr<ConnPools> pools_;

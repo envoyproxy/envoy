@@ -2,7 +2,7 @@
 
 #include "envoy/http/conn_pool.h"
 
-#include "common/upstream/priority_agnostic_conn_pool_map_impl.h"
+#include "common/upstream/priority_conn_pool_map_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -21,9 +21,9 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class PriorityAgnosticConnPoolMapImplTest : public testing::Test {
+class PriorityConnPoolMapImplTest : public testing::Test {
 public:
-  using TestMap = PriorityAgnosticConnPoolMap<int, Http::ConnectionPool::Instance>;
+  using TestMap = PriorityConnPoolMap<int, Http::ConnectionPool::Instance>;
   using TestMapPtr = std::unique_ptr<TestMap>;
 
   TestMapPtr makeTestMap() { return std::make_unique<TestMap>(dispatcher_, host_); }
@@ -44,7 +44,7 @@ protected:
 };
 
 // Show that we return a non-null value, and that we ask invoke the default resouce manager
-TEST_F(PriorityAgnosticConnPoolMapImplTest, DefaultPriorityProxiedThrough) {
+TEST_F(PriorityConnPoolMapImplTest, DefaultPriorityProxiedThrough) {
   TestMapPtr test_map = makeTestMap();
 
   EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::High)).Times(0);
@@ -58,7 +58,7 @@ TEST_F(PriorityAgnosticConnPoolMapImplTest, DefaultPriorityProxiedThrough) {
 }
 
 // Show that we return a non-null value, and that we ask invoke the high resouce manager
-TEST_F(PriorityAgnosticConnPoolMapImplTest, HighPriorityProxiedThrough) {
+TEST_F(PriorityConnPoolMapImplTest, HighPriorityProxiedThrough) {
   TestMapPtr test_map = makeTestMap();
 
   EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::Default)).Times(0);
@@ -71,7 +71,7 @@ TEST_F(PriorityAgnosticConnPoolMapImplTest, HighPriorityProxiedThrough) {
   EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::Default)).Times(AnyNumber());
 }
 
-TEST_F(PriorityAgnosticConnPoolMapImplTest, TestSizeForSinglePriority) {
+TEST_F(PriorityConnPoolMapImplTest, TestSizeForSinglePriority) {
 
   TestMapPtr test_map = makeTestMap();
 
@@ -81,7 +81,7 @@ TEST_F(PriorityAgnosticConnPoolMapImplTest, TestSizeForSinglePriority) {
   EXPECT_EQ(test_map->size(), 2);
 }
 
-TEST_F(PriorityAgnosticConnPoolMapImplTest, TestSizeForMultuplePriorities) {
+TEST_F(PriorityConnPoolMapImplTest, TestSizeForMultuplePriorities) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());
@@ -93,7 +93,7 @@ TEST_F(PriorityAgnosticConnPoolMapImplTest, TestSizeForMultuplePriorities) {
   EXPECT_EQ(test_map->size(), 5);
 }
 
-TEST_F(PriorityAgnosticConnPoolMapImplTest, TestClearEmptiesOut) {
+TEST_F(PriorityConnPoolMapImplTest, TestClearEmptiesOut) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());
@@ -108,7 +108,7 @@ TEST_F(PriorityAgnosticConnPoolMapImplTest, TestClearEmptiesOut) {
 
 // Show that the drained callback is invoked once for the high priority pool, and once for
 // the default priority pool.
-TEST_F(PriorityAgnosticConnPoolMapImplTest, TestAddDrainedCbProxiedThrough) {
+TEST_F(PriorityConnPoolMapImplTest, TestAddDrainedCbProxiedThrough) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());
@@ -127,7 +127,7 @@ TEST_F(PriorityAgnosticConnPoolMapImplTest, TestAddDrainedCbProxiedThrough) {
   cbDefault();
 }
 
-TEST_F(PriorityAgnosticConnPoolMapImplTest, TestDrainConnectionsProxiedThrough) {
+TEST_F(PriorityConnPoolMapImplTest, TestDrainConnectionsProxiedThrough) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());
