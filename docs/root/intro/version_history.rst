@@ -18,6 +18,7 @@ Version history
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * config: finish cluster warming only when a named response i.e. ClusterLoadAssignment associated to the cluster being warmed comes in the EDS response. This is a behavioural change from the current implementation where warming of cluster completes on missing load assignments also.
 * config: use Envoy cpuset size to set the default number or worker threads if :option:`--cpuset-threads` is enabled.
+* config: added support for :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`. The timeout is disabled by default.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
 * ext_authz: added an configurable option to make the gRPC service cross-compatible with V2Alpha. Note that this feature is already deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
 * ext_authz: migrated from V2alpha to V2 and improved the documentation.

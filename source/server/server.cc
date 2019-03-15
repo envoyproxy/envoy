@@ -67,7 +67,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                           store),
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
-                                                  : nullptr) {
+                                                  : nullptr),
+      main_thread_id_(std::this_thread::get_id()) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -478,6 +479,7 @@ void InstanceImpl::run() {
   ENVOY_LOG(info, "starting main dispatch loop");
   auto watchdog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
+  dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
   guard_dog_->stopWatching(watchdog);
@@ -526,8 +528,10 @@ void InstanceImpl::terminate() {
 Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }
 
 void InstanceImpl::shutdown() {
+  ENVOY_LOG(info, "shutting down server instance");
   shutdown_ = true;
   restarter_.terminateParent();
+  notifyCallbacksForStage(Stage::ShutdownExit);
   dispatcher_->exit();
 }
 
@@ -542,6 +546,20 @@ void InstanceImpl::shutdownAdmin() {
 
   ENVOY_LOG(warn, "terminating parent process");
   restarter_.terminateParent();
+}
+
+void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {
+  stage_callbacks_[stage].push_back(callback);
+}
+
+void InstanceImpl::notifyCallbacksForStage(Stage stage) {
+  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  auto it = stage_callbacks_.find(stage);
+  if (it != stage_callbacks_.end()) {
+    for (const StageCallback& callback : it->second) {
+      callback();
+    }
+  }
 }
 
 ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
