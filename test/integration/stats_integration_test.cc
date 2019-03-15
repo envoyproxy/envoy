@@ -136,11 +136,13 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   EXPECT_EQ(live->tags()[0].value_, "xxx");
 }
 
-// TODO(cmluciano) Refactor once envoyproxy/envoy#5624 is solved
+// TODO(cmluciano) Refactor once https://github.com/envoyproxy/envoy/issues/5624 is solved
 // TODO(cmluciano) Add options to measure multiple workers & without stats
-class ClusterMemoryTest : public BaseIntegrationTest {
+// This class itself does not add additional tests. It is a helper for use in other tests measuring
+// cluster overhead.
+class ClusterMemoryTestHelper : public BaseIntegrationTest {
 public:
-  ClusterMemoryTest()
+  ClusterMemoryTestHelper()
       : BaseIntegrationTest(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
 
   /**
@@ -179,12 +181,12 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  auto t1 = std::make_unique<ClusterMemoryTest>();
+  auto t1 = std::make_unique<ClusterMemoryTestHelper>();
   size_t m1 = t1->ClusterMemoryHelper(1, true);
   EXPECT_LT(start_mem, m1);
   t1.reset(nullptr);
 
-  auto t2 = std::make_unique<ClusterMemoryTest>();
+  auto t2 = std::make_unique<ClusterMemoryTestHelper>();
   const size_t m1001 = t2->ClusterMemoryHelper(1001, true);
   EXPECT_LT(start_mem, m1001);
   size_t m_per_cluster = (m1001 - m1) / 1000;
