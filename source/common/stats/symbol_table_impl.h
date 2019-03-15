@@ -15,6 +15,7 @@
 #include "common/common/hash.h"
 #include "common/common/lock_guard.h"
 #include "common/common/non_copyable.h"
+#include "common/common/stack_array.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
@@ -36,67 +37,6 @@ constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65
 
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
-
-/**
- * Represents an 8-bit encoding of a vector of symbols, used as a transient
- * representation during encoding and prior to retained allocation.
- */
-class SymbolEncoding {
-public:
-  /**
-   * Before destructing SymbolEncoding, you must call moveToStorage. This
-   * transfers ownership, and in particular, the responsibility to call
-   * SymbolTable::clear() on all referenced symbols. If we ever wanted
-   * to be able to destruct a SymbolEncoding without transferring it
-   * we could add a clear(SymbolTable&) method.
-   */
-  ~SymbolEncoding();
-
-  /**
-   * Encodes a token into the vec.
-   *
-   * @param symbol the symbol to encode.
-   */
-  void addSymbol(Symbol symbol);
-
-  /**
-   * Encodes an entire string into the vec, on behalf of FakeSymbolTableImpl.
-   * TODO(jmarantz): delete this method when FakeSymbolTableImpl is deleted.
-   *
-   * @param str The string to encode.
-   */
-  void addStringForFakeSymbolTable(absl::string_view str);
-
-  /**
-   * Decodes a uint8_t array into a SymbolVec.
-   */
-  static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
-
-  /**
-   * Returns the number of bytes required to represent StatName as a uint8_t
-   * array, including the encoded size.
-   */
-  uint64_t bytesRequired() const { return size() + StatNameSizeEncodingBytes; }
-
-  /**
-   * Returns the number of uint8_t entries we collected while adding symbols.
-   */
-  uint64_t size() const { return vec_.size(); }
-
-  /**
-   * Moves the contents of the vector into an allocated array. The array
-   * must have been allocated with bytesRequired() bytes.
-   *
-   * @param array destination memory to receive the encoded bytes.
-   * @return uint64_t the number of bytes transferred.
-   */
-  uint64_t moveToStorage(SymbolTable::Storage array);
-
-  void swap(SymbolEncoding& src) { vec_.swap(src.vec_); }
-
-private:
-  std::vector<uint8_t> vec_;
-};
 
 /**
  * SymbolTableImpl manages a namespace optimized for stats, which are typically
@@ -130,21 +70,93 @@ private:
  */
 class SymbolTableImpl : public SymbolTable {
 public:
+  /**
+   * Intermediate representation for a stat-name. This helps store multiple names
+   * in a single packed allocation. First we encode each desired name, then sum
+   * their sizes for the single packed allocation. This is used to store
+   * MetricImpl's tags and tagExtractedName. Like StatName, we don't want to pay
+   * a vptr overhead per object, and the representation is shared between the
+   * SymbolTable implementations, so this is just a pre-declare.
+   */
+  class Encoding {
+  public:
+    /**
+     * Before destructing SymbolEncoding, you must call moveToStorage. This
+     * transfers ownership, and in particular, the responsibility to call
+     * SymbolTable::clear() on all referenced symbols. If we ever wanted
+     * to be able to destruct a SymbolEncoding without transferring it
+     * we could add a clear(SymbolTable&) method.
+     */
+    ~Encoding();
+
+    /**
+     * Encodes a token into the vec.
+     *
+     * @param symbol the symbol to encode.
+     */
+    void addSymbol(Symbol symbol);
+
+    /**
+     * Encodes an entire string into the vec, on behalf of FakeSymbolTableImpl.
+     * TODO(jmarantz): delete this method when FakeSymbolTableImpl is deleted.
+     *
+     * @param str The string to encode.
+     */
+    void addStringForFakeSymbolTable(absl::string_view str);
+
+    /**
+     * Decodes a uint8_t array into a SymbolVec.
+     */
+    static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
+
+    /**
+     * Returns the number of bytes required to represent StatName as a uint8_t
+     * array, including the encoded size.
+     */
+    uint64_t bytesRequired() const { return size() + StatNameSizeEncodingBytes; }
+
+    /**
+     * Returns the number of uint8_t entries we collected while adding symbols.
+     */
+    uint64_t size() const { return vec_.size(); }
+
+    /**
+     * Moves the contents of the vector into an allocated array. The array
+     * must have been allocated with bytesRequired() bytes.
+     *
+     * @param array destination memory to receive the encoded bytes.
+     * @return uint64_t the number of bytes transferred.
+     */
+    uint64_t moveToStorage(SymbolTable::Storage array);
+
+    void swap(Encoding& src) { vec_.swap(src.vec_); }
+
+  private:
+    std::vector<uint8_t> vec_;
+  };
+
   SymbolTableImpl();
   ~SymbolTableImpl() override;
 
   // SymbolTable
   std::string toString(const StatName& stat_name) const override;
-  SymbolEncoding encode(absl::string_view name) override;
   uint64_t numSymbols() const override;
   bool lessThan(const StatName& a, const StatName& b) const override;
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
   SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
 
+  void encode(absl::string_view name, Encoding& encoding);
+  void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override;
+
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
+
+  StoragePtr copyToBytes(absl::string_view name) override;
+
+  void callWithStringView(StatName stat_name,
+                          const std::function<void(absl::string_view)>& fn) const override;
 
 private:
   friend class StatName;
@@ -157,7 +169,7 @@ private:
     uint32_t ref_count_;
   };
 
-  // This must be called during both encode() and free().
+  // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
 
   /**
@@ -376,15 +388,7 @@ class StatNameList {
 public:
   ~StatNameList();
 
-  /**
-   * Populates the StatNameList from a list of encodings. This is not done at
-   * construction time to enable StatNameList to be instantiated directly in
-   * a class that doesn't have a live SymbolTable when it is constructed.
-   *
-   * @param encodings The list names to encode.
-   * @param symbol_table The symbol table in which to encode the names.
-   */
-  void populate(const std::vector<absl::string_view>& encodings, SymbolTable& symbol_table);
+  void moveStorageIntoList(SymbolTable::StoragePtr&& storage) { storage_ = std::move(storage); }
 
   /**
    * @return true if populate() has been called on this list.
@@ -411,7 +415,7 @@ public:
   void clear(SymbolTable& symbol_table);
 
 private:
-  std::unique_ptr<uint8_t[]> storage_;
+  SymbolTable::StoragePtr storage_;
 };
 
 // Helper class for constructing hash-tables with StatName keys.

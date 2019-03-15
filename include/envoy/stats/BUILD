@@ -31,6 +31,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "symbol_table_interface",
     hdrs = ["symbol_table.h"],
+    deps = [
+        "//source/common/common:hash_lib",
+    ],
 )
 
 envoy_cc_library(

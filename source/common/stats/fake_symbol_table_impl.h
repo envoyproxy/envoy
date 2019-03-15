@@ -49,7 +49,42 @@ namespace Stats {
  */
 class FakeSymbolTableImpl : public SymbolTable {
 public:
-  SymbolEncoding encode(absl::string_view name) override { return encodeHelper(name); }
+  // SymbolTable
+  void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override {
+    // This implementation of populateList is similar to
+    // SymboLableImpl::populateList. This variant is more efficient for
+    // FakeSymbolTableImpl, because it avoid "encoding" each name in names. The
+    // strings are laid out abutting each other with 2-byte length prefixes, so
+    // encoding isn't needed, and doing a dummy encoding step would cost one
+    // memory allocation per element, adding significant overhead as measured by
+    // thread_local_store_speed_test.
+
+    RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
+
+    // First encode all the names.
+    size_t total_size_bytes = 1 + num_names * StatNameSizeEncodingBytes;
+
+    for (int32_t i = 0; i < num_names; ++i) {
+      total_size_bytes += names[i].size();
+    }
+
+    // Now allocate the exact number of bytes required and move the encodings
+    // into storage.
+    auto storage = std::make_unique<uint8_t[]>(total_size_bytes);
+    uint8_t* p = &storage[0];
+    *p++ = num_names;
+    for (int32_t i = 0; i < num_names; ++i) {
+      auto& name = names[i];
+      size_t sz = name.size();
+      p = saveLengthToBytesReturningNext(sz, p);
+      if (!name.empty()) {
+        memcpy(p, name.data(), sz * sizeof(uint8_t));
+        p += sz;
+      }
+    }
+    ASSERT(p == &storage[0] + total_size_bytes);
+    list.moveStorageIntoList(std::move(storage));
+  }
 
   std::string toString(const StatName& stat_name) const override {
     return std::string(toStringView(stat_name));
@@ -75,22 +110,38 @@ public:
   void debugPrint() const override {}
 #endif
 
+  StoragePtr copyToBytes(absl::string_view name) override {
+    auto bytes = std::make_unique<uint8_t[]>(name.size() + StatNameSizeEncodingBytes);
+    uint8_t* buffer = saveLengthToBytesReturningNext(name.size(), bytes.get());
+    memcpy(buffer, name.data(), name.size());
+    return bytes;
+  }
+
+  void callWithStringView(StatName stat_name,
+                          const std::function<void(absl::string_view)>& fn) const override {
+    fn(toStringView(stat_name));
+  }
+
 private:
-  SymbolEncoding encodeHelper(absl::string_view name) const {
-    SymbolEncoding encoding;
-    encoding.addStringForFakeSymbolTable(name);
-    return encoding;
+  // Saves the specified length into the byte array, returning the next byte.
+  // There is no guarantee that bytes will be aligned, so we can't cast to a
+  // uint16_t* and assign, but must individually copy the bytes.
+  static uint8_t* saveLengthToBytesReturningNext(uint64_t length, uint8_t* bytes) {
+    ASSERT(length < StatNameMaxSize);
+    *bytes++ = length & 0xff;
+    *bytes++ = length >> 8;
+    return bytes;
   }
 
   absl::string_view toStringView(const StatName& stat_name) const {
     return {reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize()};
   }
 
-  SymbolTable::StoragePtr stringToStorage(absl::string_view name) const {
-    SymbolEncoding encoding = encodeHelper(name);
-    auto bytes = std::make_unique<uint8_t[]>(encoding.bytesRequired());
-    encoding.moveToStorage(bytes.get());
-    return bytes;
+  StoragePtr stringToStorage(absl::string_view name) const {
+    auto storage = std::make_unique<Storage>(name.size() + 2);
+    uint8_t* p = saveLengthToBytesReturningNext(name.size(), storage.get());
+    memcpy(p, name.data(), name.size());
+    return storage;
   }
 };
 
