@@ -357,18 +357,24 @@ void HostSetImpl::rebuildLocalityScheduler(
   }
 }
 
-absl::optional<uint32_t> HostSetImpl::chooseLocality() {
-  if (locality_scheduler_ == nullptr) {
+absl::optional<uint32_t> HostSetImpl::chooseLocality() { return chooseLocality(locality_scheduler_); }
+
+absl::optional<uint32_t> HostSetImpl::chooseDegradedLocality() { return chooseLocality(degraded_locality_scheduler_); }
+
+absl::optional<uint32_t> HostSetImpl::chooseLocality(
+    std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler) {
+  if (locality_scheduler == nullptr) {
     return {};
   }
-  const std::shared_ptr<LocalityEntry> locality = locality_scheduler_->pick();
+  const std::shared_ptr<LocalityEntry> locality = locality_scheduler->pick();
   // We don't build a schedule if there are no weighted localities, so we should always succeed.
   ASSERT(locality != nullptr);
   // If we picked it before, its weight must have been positive.
   ASSERT(locality->effective_weight_ > 0);
-  locality_scheduler_->add(locality->effective_weight_, locality);
+  locality_scheduler->add(locality->effective_weight_, locality);
   return locality->index_;
 }
+
 
 PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,

@@ -305,6 +305,7 @@ public:
   }
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseLocality() override;
+  absl::optional<uint32_t> chooseDegradedLocality() override;
   uint32_t priority() const override { return priority_; }
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
 
@@ -386,6 +387,8 @@ private:
       const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
       HostsPerLocalityConstSharedPtr all_hosts_per_locality,
       LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
+
+  static absl::optional<uint32_t> chooseLocality(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler);
 
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;

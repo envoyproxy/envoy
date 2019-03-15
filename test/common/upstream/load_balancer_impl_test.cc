@@ -632,6 +632,36 @@ TEST_P(RoundRobinLoadBalancerTest, Locality) {
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
 }
 
+TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80"),
+                                            makeTestHost(info_, "tcp://127.0.0.1:81"),
+                                            makeTestHost(info_, "tcp://127.0.0.1:84")}));
+  HostVectorSharedPtr healthy_hosts(new HostVector({(*hosts)[0]}));
+  HostVectorSharedPtr degraded_hosts(new HostVector({(*hosts)[1], (*hosts)[2]}));
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{(*hosts)[0]}, {(*hosts)[1], (*hosts)[2]}});
+  HostsPerLocalitySharedPtr healthy_hosts_per_locality =
+      makeHostsPerLocality({{(*hosts)[0]}, {}});
+  HostsPerLocalitySharedPtr degraded_hosts_per_locality =
+      makeHostsPerLocality({{}, {(*hosts)[1], (*hosts)[2]}});
+
+  hostSet().hosts_ = *hosts;
+  hostSet().healthy_hosts_ = *healthy_hosts;
+  hostSet().degraded_hosts_ = *degraded_hosts;
+  hostSet().hosts_per_locality_ = hosts_per_locality;
+  hostSet().healthy_hosts_per_locality_ = healthy_hosts_per_locality;
+  hostSet().degraded_hosts_per_locality_ = degraded_hosts_per_locality;
+  init(false);
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(50)).WillOnce(Return(0));
+  // Since we're split between healthy and degraded, the LB should call into both chooseLocality
+  // and chooseDegradedLocality.
+  EXPECT_CALL(hostSet(), chooseDegradedLocality()).WillOnce(Return(1));
+  EXPECT_EQ(hostSet().degraded_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_CALL(hostSet(), chooseLocality()).WillOnce(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+}
+
 TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", 2)};

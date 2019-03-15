@@ -301,6 +301,12 @@ public:
   virtual absl::optional<uint32_t> chooseLocality() PURE;
 
   /**
+   * @return next locality index to route to if performing locality weighted balancing
+   * against degraded hosts.
+   */
+  virtual absl::optional<uint32_t> chooseDegradedLocality() PURE;
+
+  /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
