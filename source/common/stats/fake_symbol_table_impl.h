@@ -70,7 +70,7 @@ public:
 
     // Now allocate the exact number of bytes required and move the encodings
     // into storage.
-    auto storage = std::make_unique<uint8_t[]>(total_size_bytes);
+    auto storage = std::make_unique<Storage>(total_size_bytes);
     uint8_t* p = &storage[0];
     *p++ = num_names;
     for (int32_t i = 0; i < num_names; ++i) {
@@ -111,7 +111,7 @@ public:
 #endif
 
   StoragePtr copyToBytes(absl::string_view name) override {
-    auto bytes = std::make_unique<uint8_t[]>(name.size() + StatNameSizeEncodingBytes);
+    auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
     uint8_t* buffer = saveLengthToBytesReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());
     return bytes;

@@ -298,7 +298,7 @@ void SymbolTableImpl::debugPrint() const {
 SymbolTable::StoragePtr SymbolTableImpl::copyToBytes(absl::string_view name) {
   Encoding encoding;
   encode(name, encoding);
-  auto bytes = std::make_unique<uint8_t[]>(encoding.bytesRequired());
+  auto bytes = std::make_unique<Storage>(encoding.bytesRequired());
   encoding.moveToStorage(bytes.get());
   return bytes;
 }
@@ -308,7 +308,7 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   uint64_t size = src.size();
-  bytes_ = std::make_unique<uint8_t[]>(size);
+  bytes_ = std::make_unique<SymbolTable::Storage>(size);
   src.copyToStorage(bytes_.get());
   table.incRefCount(statName());
 }
@@ -331,7 +331,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
   }
-  auto bytes = std::make_unique<uint8_t[]>(num_bytes + StatNameSizeEncodingBytes);
+  auto bytes = std::make_unique<Storage>(num_bytes + StatNameSizeEncodingBytes);
   uint8_t* p = saveLengthToBytesReturningNext(num_bytes, bytes.get());
   for (StatName stat_name : stat_names) {
     num_bytes = stat_name.dataSize();
@@ -357,7 +357,7 @@ void SymbolTableImpl::populateList(absl::string_view* names, int32_t num_names,
 
   // Now allocate the exact number of bytes required and move the encodings
   // into storage.
-  auto storage = std::make_unique<uint8_t[]>(total_size_bytes);
+  auto storage = std::make_unique<Storage>(total_size_bytes);
   uint8_t* p = &storage[0];
   *p++ = num_names;
   for (auto& encoding : encodings) {
