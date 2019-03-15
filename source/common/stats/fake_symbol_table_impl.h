@@ -52,7 +52,7 @@ public:
   // SymbolTable
   void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override {
     // This implementation of populateList is similar to
-    // SymboLableImpl::populateList. This variant is more efficient for
+    // SymbolTableImpl::populateList. This variant is more efficient for
     // FakeSymbolTableImpl, because it avoid "encoding" each name in names. The
     // strings are laid out abutting each other with 2-byte length prefixes, so
     // encoding isn't needed, and doing a dummy encoding step would cost one

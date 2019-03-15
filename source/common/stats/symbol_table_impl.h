@@ -422,7 +422,7 @@ private:
    *
    * [0] The number of elements in the list (must be < 256).
    * [1] low order 8 bits of the number of symbols in the first element.
-   * [2] high order 8 bits ofthe number of symbols in the first element.
+   * [2] high order 8 bits of the number of symbols in the first element.
    * [3...] the symbols in the first element.
    * ...
    *
