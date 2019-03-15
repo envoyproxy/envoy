@@ -129,7 +129,7 @@ public:
    * we migrate to using SymbolTableImpl, this interface will no longer
    * be helpful and can be removed. The reason it's useful now is that
    * it makes up, in part, for some extra runtime overhead that is spent
-   * on the SymbolTable abstraction and API, without getting any benefit
+   * on the SymbolTable abstraction and API, without getting full benefit
    * from the improved representation.
    *
    * @param stat_name The stat name.
