@@ -38,12 +38,14 @@ struct IsolatedScopeImpl : public Scope {
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
   Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   Histogram& histogram(const std::string& name) override {
     return parent_.histogram(prefix_ + name);
   }
   const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
   IsolatedStoreImpl& parent_;
+  NullGaugeImpl null_gauge_;
   const std::string prefix_;
 };
 

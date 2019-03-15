@@ -26,7 +26,8 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1,
-      ClusterCircuitBreakersStats{ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store))});
+      ClusterCircuitBreakersStats{
+          ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))});
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -64,7 +65,7 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   Stats::IsolatedStoreImpl store;
 
   auto stats = ClusterCircuitBreakersStats{
-      ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_BOOL_INDICATOR(store), POOL_GAUGE(store))};
+      ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))};
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, stats);
 

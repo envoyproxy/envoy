@@ -69,10 +69,10 @@ public:
         pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
 
   ~Http2ConnPoolImplTest() {
-    // Make sure all gauges are 0, except those in circuit_breakers which default
-    // to the resource max.
+    // Make sure all gauges are 0, except the circuit_breaker remaining resource
+    // gauges which default to the resource max.
     for (const Stats::GaugeSharedPtr& gauge : cluster_->stats_store_.gauges()) {
-      if (!absl::StrContains(gauge->name(), "circuit_breakers")) {
+      if (!absl::StrContains(gauge->name(), "remaining")) {
         EXPECT_EQ(0U, gauge->value());
       }
     }

@@ -47,9 +47,9 @@ public:
 private:
   struct ResourceImpl : public Resource {
     ResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
-                 Stats::BoolIndicator& circuit_breaker_open, Stats::Gauge& remaining)
-        : max_(max), runtime_(runtime), runtime_key_(runtime_key),
-          open_gauge_(circuit_breaker_open), remaining_(remaining) {
+                 Stats::Gauge& open_gauge, Stats::Gauge& remaining)
+        : max_(max), runtime_(runtime), runtime_key_(runtime_key), open_gauge_(open_gauge),
+          remaining_(remaining) {
       remaining_.set(max);
     }
     ~ResourceImpl() { ASSERT(current_ == 0); }

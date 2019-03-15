@@ -1873,6 +1873,47 @@ TEST_F(ClusterInfoImplTest, OneofExtensionProtocolOptionsForUnknownFilter) {
                             "Only one of typed_extension_protocol_options or "
                             "extension_protocol_options can be specified");
 }
+TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 1
+        max_pending_requests: 2
+        max_requests: 3
+        max_retries: 4
+        track_remaining: false
+      - priority: HIGH
+        max_connections: 1
+        max_pending_requests: 2
+        max_requests: 3
+        max_retries: 4
+        track_remaining: true
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  // The value of a remaining resource gauge will always be 0 for the default
+  // priority circuit breaker since track_remaining is false
+  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::Default).retries().inc();
+  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::Default).retries().dec();
+  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+
+  // This gauge will be correctly set since we have opted in to tracking remaining
+  // resource gauges in the high priority circuit breaker.
+  EXPECT_EQ(4U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::High).retries().inc();
+  EXPECT_EQ(3U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::High).retries().dec();
+  EXPECT_EQ(4U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+}
 
 class TestFilterConfigFactoryBase {
 public:

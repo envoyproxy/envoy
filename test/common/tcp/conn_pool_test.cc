@@ -160,10 +160,10 @@ public:
         conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
 
   ~TcpConnPoolImplTest() {
-    // Make sure all gauges are 0, except those in circuit_breakers which default
-    // to the resource max.
+    // Make sure all gauges are 0, except the circuit_breaker remaining resource
+    // gauges which default to the resource max.
     for (const Stats::GaugeSharedPtr& gauge : cluster_->stats_store_.gauges()) {
-      if (!absl::StrContains(gauge->name(), "circuit_breakers")) {
+      if (!absl::StrContains(gauge->name(), "remaining")) {
         EXPECT_EQ(0U, gauge->value());
       }
     }

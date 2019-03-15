@@ -199,6 +199,7 @@ private:
     }
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gauge(const std::string& name) override;
+    NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }

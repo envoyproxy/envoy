@@ -56,7 +56,6 @@ Version history
 * stats: added support for histograms in prometheus
 * stats: added usedonly flag to prometheus stats to only output metrics which have been
   updated at least once.
-* stats: added BoolIndicator stat type, converted the following 1-or-0 Gauges: control_plane.connected_state, cx_open, rq_pending_open, rq_open, rq_retry_open, runtime.admin_overrides_active, open_gauge, config.active, server.live.
 * stats: added gauges tracking remaining resources before circuit breakers open.
 * tap: added new alpha :ref:`HTTP tap filter <config_http_filters_tap>`.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
