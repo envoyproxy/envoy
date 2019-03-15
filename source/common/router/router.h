@@ -121,9 +121,7 @@ public:
     }
   }
 
-  ~FilterConfig() {
-    retry_.free(scope_.symbolTable());
-  }
+  ~FilterConfig() { retry_.free(scope_.symbolTable()); }
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
