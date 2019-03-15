@@ -141,10 +141,6 @@ Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::str
   return findByName(store.gauges(), name);
 }
 
-Stats::HistogramSharedPtr TestUtility::findHistogram(Stats::Store& store, const std::string& name) {
-  return findByName(store.histograms(), name);
-}
-
 Stats::BoolIndicatorSharedPtr TestUtility::findBoolIndicator(Stats::Store& store,
                                                              const std::string& name) {
   return findByName(store.boolIndicators(), name);

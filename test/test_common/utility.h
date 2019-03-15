@@ -166,14 +166,6 @@ public:
   static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
-   * Find a histogram in a stats store.
-   * @param store supplies the stats store.
-   * @param name supplies the name to search for.
-   * @return Stats::HistogramSharedPtr the gauge or nullptr if there is none.
-   */
-  static Stats::HistogramSharedPtr findHistogram(Stats::Store& store, const std::string& name);
-
-  /**
    * Find a bool in a stats store.
    * @param store supplies the stats store.
    * @param name supplies the name to search for.

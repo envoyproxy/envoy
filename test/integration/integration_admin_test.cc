@@ -465,7 +465,7 @@ public:
   }
   void makeRequest() {
     response_ = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
-                                                   downstreamProtocol(), version_, "host", "");
+                                                   downstreamProtocol(), version_);
     ASSERT_TRUE(response_->complete());
     EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   }

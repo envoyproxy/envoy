@@ -13,7 +13,6 @@
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -245,7 +244,6 @@ private:
 
 public:
   Event::DispatcherPtr dispatcher_;
-  // Api::ApiPtr api_;
 
   /**
    * Open a connection to Envoy, send a series of bytes, and return the
@@ -287,8 +285,6 @@ protected:
   uint32_t fake_upstreams_count_{1};
   spdlog::level::level_enum default_log_level_;
   IntegrationTestServerPtr test_server_;
-  // std::unique_ptr<Stats::IsolatedStoreImpl> stats_;
-
   // A map of keys to port names. Generally the names are pulled from the v2 listener name
   // but if a listener is created via ADS, it will be from whatever key is used with registerPort.
   TestEnvironment::PortMap port_map_;
