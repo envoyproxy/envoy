@@ -2,11 +2,11 @@
 
 #include <cstdint>
 #include <memory>
-#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats_options.h"
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -61,6 +61,12 @@ public:
    * maximum allowable object name length and stat suffix length.
    */
   virtual const Stats::StatsOptions& statsOptions() const PURE;
+
+  /**
+   * @return a reference to the symbol table.
+   */
+  virtual const SymbolTable& symbolTable() const PURE;
+  virtual SymbolTable& symbolTable() PURE;
 };
 
 } // namespace Stats

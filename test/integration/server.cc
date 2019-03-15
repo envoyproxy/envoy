@@ -158,9 +158,10 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
-  Server::HotRestartNopImpl restarter;
+  Stats::FakeSymbolTableImpl symbol_table;
+  Server::HotRestartNopImpl restarter(symbol_table);
   ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
+  Stats::HeapStatDataAllocator stats_allocator(symbol_table);
   Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,

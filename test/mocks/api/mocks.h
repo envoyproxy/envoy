@@ -15,6 +15,7 @@
 #endif
 
 #include "test/mocks/filesystem/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
@@ -31,6 +32,7 @@ public:
   Event::DispatcherPtr allocateDispatcher() override;
   Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;
   TimeSource& timeSource() override { return time_system_; }
+  Stats::Store& statsStore() override { return stats_store_; }
 
   MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
   MOCK_METHOD2(allocateDispatcher_,
@@ -41,6 +43,7 @@ public:
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {

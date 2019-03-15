@@ -13,6 +13,7 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
 
@@ -29,6 +30,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/global.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -413,7 +415,8 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
+  Envoy::Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
+  Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl(*symbol_table_);
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   DispatcherHelper dispatcher_helper_{*dispatcher_};

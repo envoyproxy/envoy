@@ -47,6 +47,11 @@ public:
    * @return a reference to the TimeSource
    */
   virtual TimeSource& timeSource() PURE;
+
+  /**
+   * @return a reference to the Stats::Store
+   */
+  virtual Stats::Store& statsStore() PURE;
 };
 
 typedef std::unique_ptr<Api> ApiPtr;
