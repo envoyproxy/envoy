@@ -34,7 +34,6 @@ size_t PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::size() const {
     size += pool_map->size();
   }
   return size;
-  ;
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
