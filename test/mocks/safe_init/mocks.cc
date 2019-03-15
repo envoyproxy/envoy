@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace SafeInit {
 
-using ::testing::InvokeWithoutArgs;
+using ::testing::Invoke;
 
 MockWatcher::MockWatcher(absl::string_view name) : WatcherImpl(name, {[this]() { ready(); }}) {}
 ::testing::internal::TypedExpectation<void()>& MockWatcher::expectReady() const {
@@ -15,7 +15,7 @@ MockTarget::MockTarget(absl::string_view name) : TargetImpl(name) {}
   return EXPECT_CALL(*this, initialize());
 }
 ::testing::internal::TypedExpectation<void()>& MockTarget::expectInitializeWillCallReady() {
-  return expectInitialize().WillOnce(InvokeWithoutArgs(this, &MockTarget::ready));
+  return expectInitialize().WillOnce(Invoke([this]() { ready(); }));
 }
 
 } // namespace SafeInit
