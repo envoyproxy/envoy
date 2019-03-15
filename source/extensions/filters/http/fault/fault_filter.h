@@ -200,7 +200,7 @@ private:
     const std::string DelayDurationKey = "fault.http.delay.fixed_duration_ms";
     const std::string AbortHttpStatusKey = "fault.http.abort.http_status";
     const std::string MaxActiveFaultsKey = "fault.http.max_active_faults";
-    const std::string ResponseRateLimitKey = "fault.http.rate_limit.response";
+    const std::string ResponseRateLimitKey = "fault.http.rate_limit.response_percent";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;

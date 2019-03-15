@@ -409,6 +409,7 @@ void StreamRateLimiter::onTokenTimer() {
             tokens_obtained, bytes_to_write);
 
   // Move the data to write into the output buffer with as little copying as possible.
+  // NOTE: This might be moving zero bytes, but that should work fine.
   data_to_write.move(buffer_, bytes_to_write);
 
   // If the buffer still contains data in it, we couldn't get enough tokens, so schedule the next

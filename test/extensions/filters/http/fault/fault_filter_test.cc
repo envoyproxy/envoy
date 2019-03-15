@@ -1006,7 +1006,7 @@ public:
     SetUpTest(fault);
 
     EXPECT_CALL(runtime_.snapshot_,
-                featureEnabled("fault.http.rate_limit.response",
+                featureEnabled("fault.http.rate_limit.response_percent",
                                Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
         .WillOnce(Return(enable_runtime));
     EXPECT_CALL(runtime_.snapshot_,

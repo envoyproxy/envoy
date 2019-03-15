@@ -71,7 +71,7 @@ fault.http.max_active_faults
   cause resource constraint issues. If not specified, the :ref:`max_active_faults
   <envoy_api_field_config.filter.http.fault.v2.HTTPFault.max_active_faults>` setting will be used.
 
-fault.http.rate_limit.response
+fault.http.rate_limit.response_percent
   % of requests which will have a response rate limit fault injected, if the filter is
   :ref:`configured <envoy_api_field_config.filter.http.fault.v2.HTTPFault.response_rate_limit>` to
   do so. Defaults to the value set in the :ref:`percentage
