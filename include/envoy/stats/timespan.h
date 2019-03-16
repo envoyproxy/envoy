@@ -52,7 +52,7 @@ private:
   const MonotonicTime start_;
 };
 
-typedef std::unique_ptr<Stats::CompletableTimespan> CompletableTimespanPtr;
+typedef std::unique_ptr<CompletableTimespan> CompletableTimespanPtr;
 
 } // namespace Stats
 } // namespace Envoy
