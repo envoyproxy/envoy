@@ -18,6 +18,7 @@ Version history
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * config: finish cluster warming only when a named response i.e. ClusterLoadAssignment associated to the cluster being warmed comes in the EDS response. This is a behavioural change from the current implementation where warming of cluster completes on missing load assignments also.
 * config: use Envoy cpuset size to set the default number or worker threads if :option:`--cpuset-threads` is enabled.
+* config: added support for :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`. The timeout is disabled by default.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
 * ext_authz: added support for buffering request body.
 * ext_authz: migrated from V2alpha to V2 and improved docs.
@@ -34,6 +35,8 @@ Version history
   <envoy_api_field_config.filter.http.fault.v2.HTTPFault.max_active_faults>` setting, as well as
   :ref:`statistics <config_http_filters_fault_injection_stats>` for the number of active faults
   and the number of faults the overflowed.
+* fault: add :ref:`response rate limit
+  <envoy_api_field_config.filter.http.fault.v2.HTTPFault.response_rate_limit>` fault injection.
 * governance: extending Envoy deprecation policy from 1 release (0-3 months) to 2 releases (3-6 months).
 * health check: expected response codes in http health checks are now :ref:`configurable <envoy_api_msg_core.HealthCheck.HttpHealthCheck>`.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
