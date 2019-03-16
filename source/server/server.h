@@ -34,7 +34,6 @@
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/types/optional.h"
