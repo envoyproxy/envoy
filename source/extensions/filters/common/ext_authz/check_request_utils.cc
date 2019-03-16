@@ -10,7 +10,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
-#include "common/common/stack_array.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/codes.h"
 #include "common/http/headers.h"
@@ -119,23 +118,9 @@ void CheckRequestUtils::setHttpRequest(
   // Set request body.
   const Buffer::Instance* buffer = sdfc->decodingBuffer();
   if (max_request_bytes > 0 && buffer != nullptr) {
-    const uint64_t length = std::min(buffer->length(), max_request_bytes);
     std::string data;
-    data.reserve(length);
-
-    const uint64_t num_slices = buffer->getRawSlices(nullptr, 0);
-    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-    buffer->getRawSlices(slices.begin(), num_slices);
-
-    for (const Buffer::RawSlice& slice : slices) {
-      if (slice.len_ + data.size() <= length) {
-        data.append(static_cast<char*>(slice.mem_), slice.len_);
-      } else {
-        data.append(static_cast<char*>(slice.mem_), length - data.size());
-        break;
-      }
-    }
-
+    data.resize(std::min(buffer->length(), max_request_bytes));
+    buffer->copyOut(0, data.size(), &data[0]);
     httpreq.set_body(std::move(data));
   }
 }
