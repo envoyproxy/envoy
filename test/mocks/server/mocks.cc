@@ -99,6 +99,9 @@ MockListenerComponentFactory::MockListenerComponentFactory()
 }
 MockListenerComponentFactory::~MockListenerComponentFactory() = default;
 
+MockServerLifecycleNotifier::MockServerLifecycleNotifier() = default;
+MockServerLifecycleNotifier::~MockServerLifecycleNotifier() = default;
+
 MockListenerManager::MockListenerManager() = default;
 MockListenerManager::~MockListenerManager() = default;
 
@@ -139,6 +142,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, hotRestart()).WillByDefault(ReturnRef(hot_restart_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
+  ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
@@ -171,6 +175,7 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
