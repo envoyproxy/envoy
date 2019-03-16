@@ -147,7 +147,7 @@ TEST_F(RouteMatcherTest, TestRoutes) {
     },
     {
       "name": "wildcard",
-      "domains": ["*.foo.com", "*-bar.baz.com"],
+      "domains": ["*.foo.com", "*-bar.baz.com", "foo.*", "foo-bar.*"],
       "routes": [
         {
           "prefix": "/",
@@ -157,7 +157,7 @@ TEST_F(RouteMatcherTest, TestRoutes) {
     },
     {
       "name": "wildcard2",
-      "domains": ["*.baz.com"],
+      "domains": ["*.baz.com", "www.foo.*"],
       "routes": [
         {
           "prefix": "/",
@@ -320,8 +320,16 @@ TEST_F(RouteMatcherTest, TestRoutes) {
             config.route(genHeaders("bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("instant-server",
             config.route(genHeaders(".foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("instant-server",
+  EXPECT_EQ("wildcard",
             config.route(genHeaders("foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("wildcard",
+            config.route(genHeaders("foo.org", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("wildcard2",
+            config.route(genHeaders("www.foo.org", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("wildcard",
+            config.route(genHeaders("foo.bar.org", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("wildcard",
+            config.route(genHeaders("foo-bar.org", "/", "GET"), 0)->routeEntry()->clusterName());
 
   // Regular Expression matching
   EXPECT_EQ("clock",
