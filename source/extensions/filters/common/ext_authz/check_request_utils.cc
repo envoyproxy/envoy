@@ -118,9 +118,9 @@ void CheckRequestUtils::setHttpRequest(
   // Set request body.
   const Buffer::Instance* buffer = sdfc->decodingBuffer();
   if (max_request_bytes > 0 && buffer != nullptr) {
-    std::string data;
-    data.resize(std::min(buffer->length(), max_request_bytes));
-    buffer->copyOut(0, data.size(), &data[0]);
+    const uint64_t length = std::min(buffer->length(), max_request_bytes);
+    std::string data(length, 0);
+    buffer->copyOut(0, length, &data[0]);
     httpreq.set_body(std::move(data));
   }
 }
