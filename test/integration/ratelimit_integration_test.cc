@@ -40,7 +40,7 @@ public:
       MessageUtil::loadFromYaml(base_filter_config_, proto_config_);
       proto_config_.set_failure_mode_deny(failure_mode_deny_);
       setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
-                       "ratelimit", fake_upstreams_.back()->localAddress());
+                     "ratelimit", fake_upstreams_.back()->localAddress());
 
       envoy::api::v2::listener::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.rate_limit");

@@ -9,7 +9,6 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit_impl.h"
-#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
 namespace Envoy {
@@ -28,12 +27,12 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
                                     context.runtime(), context.clusterManager()));
   const std::chrono::milliseconds timeout =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20));
-  
+
   return [proto_config, &context, timeout,
           config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Filter>(
-        config,
-        Filters::Common::RateLimit::rateLimitClient(context, proto_config.rate_limit_service().grpc_service(), timeout)));
+        config, Filters::Common::RateLimit::rateLimitClient(
+                    context, proto_config.rate_limit_service().grpc_service(), timeout)));
   };
 }
 
