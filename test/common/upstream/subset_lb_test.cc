@@ -198,7 +198,7 @@ public:
     host_set_.hosts_ = hosts;
     host_set_.hosts_per_locality_ = makeHostsPerLocality(std::move(hosts_per_locality));
 
-    host_set_.healthy_hosts_ = host_set_.healthy_hosts_;
+    host_set_.healthy_hosts_ = host_set_.hosts_;
     host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
     local_hosts_.reset(new HostVector());
