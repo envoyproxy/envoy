@@ -89,7 +89,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   case enumToInt(OpCodes::CREATE2):
   case enumToInt(OpCodes::CREATECONTAINER):
   case enumToInt(OpCodes::CREATETTL):
-    parseCreateRequest(data, offset, len, opcode);
+    parseCreateRequest(data, offset, len, static_cast<OpCodes>(opcode));
     break;
   case enumToInt(OpCodes::SETDATA):
     parseSetRequest(data, offset, len);
