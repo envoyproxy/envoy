@@ -29,7 +29,7 @@ const char* createFlagsToString(CreateFlags flags) {
     return "ephemeral_sequential";
   case CreateFlags::CONTAINER:
     return "container";
-  case CreateFlags::PESISTENT_WITH_TTL:
+  case CreateFlags::PERSISTENT_WITH_TTL:
     return "persistent_with_ttl";
   case CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL:
     return "persistent_sequential_with_ttl";
