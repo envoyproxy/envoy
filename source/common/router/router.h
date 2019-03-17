@@ -384,7 +384,7 @@ private:
                           Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
   void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
                           bool dropped);
-  void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest* upstream_request);
+  void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
   virtual RetryStatePtr createRetryState(const RetryPolicy& policy,
                                          Http::HeaderMap& request_headers,
@@ -394,17 +394,17 @@ private:
                                          Upstream::ResourcePriority priority) PURE;
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
-  bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest* upstream_request);
+  bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();
   void onGlobalTimeout();
-  void onPerTryTimeout(UpstreamRequest* upstream_request);
+  void onPerTryTimeout(UpstreamRequest& upstream_request);
   void onRequestComplete();
   void onResponseTimeout();
   void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
-                                    UpstreamRequest* upstream_request);
+                                    UpstreamRequest& upstream_request);
   // Handle an upstream request aborted due to a local timeout.
   void onSoftPerTryTimeout();
-  void onSoftPerTryTimeout(UpstreamRequest* upstream_request);
+  void onSoftPerTryTimeout(UpstreamRequest& upstream_request);
   void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag);
   // Handle an "aborted" upstream request, meaning we didn't see response
   // headers (e.g. due to a reset). Handles recording stats and responding
@@ -412,23 +412,26 @@ private:
   void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
                        absl::string_view body, bool dropped);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
-                         UpstreamRequest* upstream_request, bool end_stream);
-  void onUpstreamData(Buffer::Instance& data, UpstreamRequest* upstream_request, bool end_stream);
-  void onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest* upstream_request);
+                         UpstreamRequest& upstream_request, bool end_stream);
+  void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request, bool end_stream);
+  void onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest& upstream_request);
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
-  void onUpstreamComplete(UpstreamRequest* upstream_request);
+  void onUpstreamComplete(UpstreamRequest& upstream_request);
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
-                       UpstreamRequest* upstream_request);
-  void resetOtherUpstreams(UpstreamRequest* upstream_request);
+                       UpstreamRequest& upstream_request);
+  // Reset all in-flight upstream requests that do NOT match the passed argument. This is used
+  // if a "good" response comes back and we return downstream, so there is no point in waiting
+  // for the remaining upstream requests to return.
+  void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry();
-  bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest* upstream_request);
-  void updateOutlierDetection(Http::Code code, UpstreamRequest* upstream_request);
+  bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request);
+  void updateOutlierDetection(Http::Code code, UpstreamRequest& upstream_request);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
-                                   UpstreamRequest* upstream_request, bool end_stream);
+                                   UpstreamRequest& upstream_request, bool end_stream);
   TimeSource& timeSource() { return config_.timeSource(); }
   Http::Context& httpContext() { return config_.http_context_; }
 
