@@ -117,15 +117,32 @@ void ZooKeeperFilter::onGetDataRequest(const std::string& path, const bool watch
 }
 
 void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags flags,
-                                      const bool two) {
-  if (!two) {
+                                      const OpCodes opcode) {
+  switch (opcode) {
+  case OpCodes::CREATE:
     config_->stats_.create_rq_.inc();
     setDynamicMetadata(
         {{"opname", "create"}, {"path", path}, {"create_type", createFlagsToString(flags)}});
-  } else {
+    break;
+  case OpCodes::CREATE2:
     config_->stats_.create2_rq_.inc();
     setDynamicMetadata(
         {{"opname", "create2"}, {"path", path}, {"create_type", createFlagsToString(flags)}});
+    break;
+  case OpCodes::CREATECONTAINER:
+    config_->stats_.createcontainer_rq_.inc();
+    setDynamicMetadata({{"opname", "createcontainer"},
+                        {"path", path},
+                        {"create_type", createFlagsToString(flags)}});
+    break;
+  case OpCodes::CREATETTL:
+    config_->stats_.createttl_rq_.inc();
+    setDynamicMetadata(
+        {{"opname", "createttl"}, {"path", path}, {"create_type", createFlagsToString(flags)}});
+    break;
+  default:
+    throw EnvoyException(fmt::format("Unknown opcode: {}", opcode));
+    break;
   }
 }
 

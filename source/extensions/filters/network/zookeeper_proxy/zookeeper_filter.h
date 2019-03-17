@@ -28,6 +28,8 @@ namespace ZooKeeperProxy {
   COUNTER(getdata_rq)                                                   \
   COUNTER(create_rq)                                                    \
   COUNTER(create2_rq)                                                   \
+  COUNTER(createcontainer_rq)                                           \
+  COUNTER(createttl_rq)                                                 \
   COUNTER(setdata_rq)                                                   \
   COUNTER(getchildren_rq)                                               \
   COUNTER(getchildren2_rq)                                              \
@@ -101,7 +103,7 @@ public:
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;
   void onGetDataRequest(const std::string& path, bool watch) override;
-  void onCreateRequest(const std::string& path, CreateFlags flags, bool two) override;
+  void onCreateRequest(const std::string& path, CreateFlags flags, OpCodes opcode) override;
   void onSetRequest(const std::string& path) override;
   void onGetChildrenRequest(const std::string& path, bool watch, bool two) override;
   void onDeleteRequest(const std::string& path, int32_t version) override;

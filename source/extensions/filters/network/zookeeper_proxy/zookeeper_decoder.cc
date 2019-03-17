@@ -86,10 +86,10 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseGetDataRequest(data, offset, len);
     break;
   case enumToInt(OpCodes::CREATE):
-    parseCreateRequest(data, offset, len, false);
-    break;
   case enumToInt(OpCodes::CREATE2):
-    parseCreateRequest(data, offset, len, true);
+  case enumToInt(OpCodes::CREATECONTAINER):
+  case enumToInt(OpCodes::CREATETTL):
+    parseCreateRequest(data, offset, len, opcode);
     break;
   case enumToInt(OpCodes::SETDATA):
     parseSetRequest(data, offset, len);
@@ -206,7 +206,7 @@ void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) const {
 }
 
 void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len,
-                                     const bool two) {
+                                     OpCodes opcode) {
   ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + (3 * INT_LENGTH));
 
   const std::string path = BufferHelper::peekString(data, offset);
@@ -237,7 +237,7 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
     break;
   }
 
-  callbacks_.onCreateRequest(path, flags, two);
+  callbacks_.onCreateRequest(path, flags, opcode);
 }
 
 void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
