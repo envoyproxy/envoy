@@ -69,7 +69,7 @@ protected:
     uint64_t total_streams_{};
     Event::TimerPtr connect_timer_;
     bool upstream_ready_{};
-    Stats::CompletableTimespanPtr conn_length_;
+    Stats::TimespanPtr conn_length_;
     bool closed_with_active_rq_{};
   };
 
@@ -89,7 +89,7 @@ protected:
   void newClientStream(Http::StreamDecoder& response_decoder, ConnectionPool::Callbacks& callbacks);
   void onUpstreamReady();
 
-  Stats::CompletableTimespanPtr conn_connect_ms_;
+  Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
   ActiveClientPtr primary_client_;
   ActiveClientPtr draining_client_;

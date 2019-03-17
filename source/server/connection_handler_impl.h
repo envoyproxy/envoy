@@ -132,7 +132,7 @@ private:
 
     ActiveListener& listener_;
     Network::ConnectionPtr connection_;
-    Stats::CompletableTimespanPtr conn_length_;
+    Stats::TimespanPtr conn_length_;
   };
 
   /**

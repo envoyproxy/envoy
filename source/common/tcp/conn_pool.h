@@ -113,7 +113,7 @@ protected:
     Network::ClientConnectionPtr conn_;
     ConnectionPool::ConnectionStatePtr conn_state_;
     Event::TimerPtr connect_timer_;
-    Stats::CompletableTimespanPtr conn_length_;
+    Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;
     bool timed_out_;
   };
@@ -156,7 +156,7 @@ protected:
   std::list<ActiveConnPtr> busy_conns_;    // conns assigned
   std::list<PendingRequestPtr> pending_requests_;
   std::list<DrainedCb> drained_callbacks_;
-  Stats::CompletableTimespanPtr conn_connect_ms_;
+  Stats::TimespanPtr conn_connect_ms_;
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
 };
