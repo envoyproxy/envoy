@@ -17,6 +17,25 @@ constexpr uint32_t TIMEOUT_LENGTH = 4;
 constexpr uint32_t SESSION_LENGTH = 8;
 constexpr uint32_t MULTI_HEADER_LENGTH = 9;
 
+const char* createFlagsToString(CreateFlags flags) {
+  switch (flags) {
+  case CreateFlags::PERSISTENT:
+    return "persistent";
+  case CreateFlags::PERSISTENT_SEQUENTIAL:
+    return "persistent_sequential";
+  case CreateFlags::EPHEMERAL:
+    return "ephemeral";
+  case CreateFlags::EPHEMERAL_SEQUENTIAL:
+    return "ephemeral_sequential";
+  case CreateFlags::CONTAINER:
+    return "container";
+  case CreateFlags::PESISTENT_WITH_TTL:
+    return "persistent_with_ttl";
+  case CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL:
+    return "persistent_sequential_with_ttl";
+  }
+}
+
 void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   ENVOY_LOG(trace, "zookeeper_proxy: decoding {} bytes at offset {}", data.length(), offset);
 

@@ -56,24 +56,7 @@ enum class CreateFlags {
   PERSISTENT_SEQUENTIAL_WITH_TTL
 };
 
-const char* createFlagsToString(CreateFlags flags) {
-  switch (flags) {
-  case CreateFlags::PERSISTENT:
-    return "persistent";
-  case CreateFlags::PERSISTENT_SEQUENTIAL:
-    return "persistent_sequential";
-  case CreateFlags::EPHEMERAL:
-    return "ephemeral";
-  case CreateFlags::EPHEMERAL_SEQUENTIAL:
-    return "ephemeral_sequential";
-  case CreateFlags::CONTAINER:
-    return "container";
-  case CreateFlags::PESISTENT_WITH_TTL:
-    return "persistent_with_ttl";
-  case CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL:
-    return "persistent_sequential_with_ttl";
-  }
-}
+const char* createFlagsToString(CreateFlags flags);
 
 /**
  * General callbacks for dispatching decoded ZooKeeper messages to a sink.
