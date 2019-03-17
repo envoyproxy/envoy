@@ -34,7 +34,7 @@ public:
   size_t size() { return hash_set_.size(); }
 
 private:
-  absl::flat_hash_set<char*, ConstCharStarHash, ConstCharStarEqual> hash_set_;
+  absl::flat_hash_set<const char*, ConstCharStarHash, ConstCharStarEqual> hash_set_;
 };
 
 } // namespace Stats
