@@ -228,7 +228,7 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
     flags = CreateFlags::EPHEMERAL_SEQUENTIAL;
     break;
   case 2:
-    flags = CreateFlags::SEQUENTIAL;
+    flags = CreateFlags::PERSISTENT_SEQUENTIAL;
     break;
   case 1:
     flags = CreateFlags::EPHEMERAL;
