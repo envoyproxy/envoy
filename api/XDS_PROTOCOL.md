@@ -282,10 +282,10 @@ static_resources:
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
     upstream_connection_options:
+      # configure a TCP keep-alive to detect and reconnect to the admin
+      # server in the event of a TCP socket disconnection
       tcp_keepalive:
-        keepalive_probes: 3
-        keepalive_time: 30
-        keepalive_interval: 10
+        ...
 admin:
   ...
 
