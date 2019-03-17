@@ -46,6 +46,35 @@ enum class OpCodes {
 
 enum class WatcherType { CHILDREN = 1, DATA = 2, ANY = 3 };
 
+enum class CreateFlags {
+  PERSISTENT,
+  PERSISTENT_SEQUENTIAL,
+  EPHEMERAL,
+  EPHEMERAL_SEQUENTIAL,
+  CONTAINER,
+  PESISTENT_WITH_TTL,
+  PERSISTENT_SEQUENTIAL_WITH_TTL
+};
+
+const char* createFlagsToString(CreateFlags flags) {
+  switch (flags) {
+  case CreateFlags.PERSISTENT:
+    return "persistent";
+  case CreateFlags.PERSISTENT_SEQUENTIAL:
+    return "persistent_sequential";
+  case CreateFlags.EPHEMERAL:
+    return "ephemeral";
+  case CreateFlags.EPHEMERAL_SEQUENTIAL:
+    return "ephemeral_sequential";
+  case CreateFlags.CONTAINER:
+    return "container";
+  case CreateFlags.PESISTENT_WITH_TTL:
+    return "persistent_with_ttl";
+  case CreateFlags.PERSISTENT_SEQUENTIAL_WITH_TTL:
+    return "persistent_sequential_with_ttl";
+  }
+}
+
 /**
  * General callbacks for dispatching decoded ZooKeeper messages to a sink.
  */
@@ -59,8 +88,7 @@ public:
   virtual void onPing() PURE;
   virtual void onAuthRequest(const std::string& scheme) PURE;
   virtual void onGetDataRequest(const std::string& path, bool watch) PURE;
-  virtual void onCreateRequest(const std::string& path, bool ephemeral, bool sequence,
-                               bool two) PURE;
+  virtual void onCreateRequest(const std::string& path, CreateFlags flags, bool two) PURE;
   virtual void onSetRequest(const std::string& path) PURE;
   virtual void onGetChildrenRequest(const std::string& path, bool watch, bool two) PURE;
   virtual void onDeleteRequest(const std::string& path, int32_t version) PURE;

@@ -116,20 +116,16 @@ void ZooKeeperFilter::onGetDataRequest(const std::string& path, const bool watch
   setDynamicMetadata({{"opname", "getdata"}, {"path", path}, {"watch", watch ? "true" : "false"}});
 }
 
-void ZooKeeperFilter::onCreateRequest(const std::string& path, const bool ephemeral,
-                                      const bool sequence, const bool two) {
+void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags flags,
+                                      const bool two) {
   if (!two) {
     config_->stats_.create_rq_.inc();
-    setDynamicMetadata({{"opname", "create"},
-                        {"path", path},
-                        {"ephemeral", ephemeral ? "true" : "false"},
-                        {"sequence", sequence ? "true" : "false"}});
+    setDynamicMetadata(
+        {{"opname", "create"}, {"path", path}, {"create_type", createFlagsToString(flags)}});
   } else {
     config_->stats_.create2_rq_.inc();
-    setDynamicMetadata({{"opname", "create2"},
-                        {"path", path},
-                        {"ephemeral", ephemeral ? "true" : "false"},
-                        {"sequence", sequence ? "true" : "false"}});
+    setDynamicMetadata(
+        {{"opname", "create2"}, {"path", path}, {"create_type", createFlagsToString(flags)}});
   }
 }
 

@@ -101,7 +101,7 @@ public:
   void onPing() override;
   void onAuthRequest(const std::string& scheme) override;
   void onGetDataRequest(const std::string& path, bool watch) override;
-  void onCreateRequest(const std::string& path, bool ephemeral, bool sequence, bool two) override;
+  void onCreateRequest(const std::string& path, CreateFlags flags, bool two) override;
   void onSetRequest(const std::string& path) override;
   void onGetChildrenRequest(const std::string& path, bool watch, bool two) override;
   void onDeleteRequest(const std::string& path, int32_t version) override;

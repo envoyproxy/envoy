@@ -472,9 +472,8 @@ TEST_F(ZooKeeperFilterTest, CreateRequest) {
 
   Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", false, false);
 
-  expectSetDynamicMetadata(
-      {{"opname", "create"}, {"path", "/foo"}, {"ephemeral", "false"}, {"sequence", "false"}},
-      {{"bytes", "35"}});
+  expectSetDynamicMetadata({{"opname", "create"}, {"path", "/foo"}, {"create_type", "persistent"}},
+                           {{"bytes", "35"}});
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().create_rq_.value());
@@ -488,9 +487,8 @@ TEST_F(ZooKeeperFilterTest, CreateRequest2) {
   Buffer::OwnedImpl data =
       encodeCreateRequest("/foo", "bar", false, false, false, enumToInt(OpCodes::CREATE2));
 
-  expectSetDynamicMetadata(
-      {{"opname", "create2"}, {"path", "/foo"}, {"ephemeral", "false"}, {"sequence", "false"}},
-      {{"bytes", "35"}});
+  expectSetDynamicMetadata({{"opname", "create2"}, {"path", "/foo"}, {"create_type", "persistent"}},
+                           {{"bytes", "35"}});
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().create2_rq_.value());

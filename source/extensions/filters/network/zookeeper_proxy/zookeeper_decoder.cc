@@ -193,11 +193,30 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
   // Skip data.
   skipString(data, offset);
   skipAcls(data, offset);
-  const int32_t flags = BufferHelper::peekInt32(data, offset);
-  const bool ephemeral = (flags & 0x1) == 1;
-  const bool sequence = (flags & 0x2) == 2;
 
-  callbacks_.onCreateRequest(path, ephemeral, sequence, two);
+  CreateFlags flags = CreateFlags.PERSISTENT;
+  switch (BufferHelper::peekInt32(data, offset)) {
+  case 6:
+    flags = CreateFlags.PERSISTENT_SEQUENTIAL_WITH_TTL;
+    break;
+  case 5:
+    flags = CreateFlags.PERSISTENT_WITH_TTL;
+    break;
+  case 4:
+    flags = CreateFlags.CONTAINER;
+    break;
+  case 3:
+    flags = CreateFlags.EPHEMERAL_SEQUENTIAL;
+    break;
+  case 2:
+    flags = CreateFlags.SEQUENTIAL;
+    break;
+  case 1:
+    flags = CreateFlags.EPHEMERAL;
+    break;
+  }
+
+  callbacks_.onCreateRequest(path, flags, two);
 }
 
 void DecoderImpl::parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
