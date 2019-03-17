@@ -331,7 +331,7 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
 
     switch (type) {
     case enumToInt(OpCodes::CREATE):
-      parseCreateRequest(data, offset, len, false);
+      parseCreateRequest(data, offset, len, OpCodes::CREATE);
       break;
     case enumToInt(OpCodes::SETDATA):
       parseSetRequest(data, offset, len);
