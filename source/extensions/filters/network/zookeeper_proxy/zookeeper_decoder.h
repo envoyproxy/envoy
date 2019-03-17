@@ -58,19 +58,19 @@ enum class CreateFlags {
 
 const char* createFlagsToString(CreateFlags flags) {
   switch (flags) {
-  case CreateFlags.PERSISTENT:
+  case CreateFlags::PERSISTENT:
     return "persistent";
-  case CreateFlags.PERSISTENT_SEQUENTIAL:
+  case CreateFlags::PERSISTENT_SEQUENTIAL:
     return "persistent_sequential";
-  case CreateFlags.EPHEMERAL:
+  case CreateFlags::EPHEMERAL:
     return "ephemeral";
-  case CreateFlags.EPHEMERAL_SEQUENTIAL:
+  case CreateFlags::EPHEMERAL_SEQUENTIAL:
     return "ephemeral_sequential";
-  case CreateFlags.CONTAINER:
+  case CreateFlags::CONTAINER:
     return "container";
-  case CreateFlags.PESISTENT_WITH_TTL:
+  case CreateFlags::PESISTENT_WITH_TTL:
     return "persistent_with_ttl";
-  case CreateFlags.PERSISTENT_SEQUENTIAL_WITH_TTL:
+  case CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL:
     return "persistent_sequential_with_ttl";
   }
 }

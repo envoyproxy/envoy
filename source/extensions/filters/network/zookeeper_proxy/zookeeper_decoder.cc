@@ -194,25 +194,25 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
   skipString(data, offset);
   skipAcls(data, offset);
 
-  CreateFlags flags = CreateFlags.PERSISTENT;
+  CreateFlags flags = CreateFlags::PERSISTENT;
   switch (BufferHelper::peekInt32(data, offset)) {
   case 6:
-    flags = CreateFlags.PERSISTENT_SEQUENTIAL_WITH_TTL;
+    flags = CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL;
     break;
   case 5:
-    flags = CreateFlags.PERSISTENT_WITH_TTL;
+    flags = CreateFlags::PERSISTENT_WITH_TTL;
     break;
   case 4:
-    flags = CreateFlags.CONTAINER;
+    flags = CreateFlags::CONTAINER;
     break;
   case 3:
-    flags = CreateFlags.EPHEMERAL_SEQUENTIAL;
+    flags = CreateFlags::EPHEMERAL_SEQUENTIAL;
     break;
   case 2:
-    flags = CreateFlags.SEQUENTIAL;
+    flags = CreateFlags::SEQUENTIAL;
     break;
   case 1:
-    flags = CreateFlags.EPHEMERAL;
+    flags = CreateFlags::EPHEMERAL;
     break;
   }
 
