@@ -431,7 +431,7 @@ private:
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
-    Stats::CompletableTimespanPtr request_response_timespan_;
+    Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
     Event::TimerPtr stream_idle_timer_;
     // Per-stream request timeout.
@@ -488,7 +488,7 @@ private:
                                   // config in the hot path.
   ServerConnectionPtr codec_;
   std::list<ActiveStreamPtr> streams_;
-  std::unique_ptr<Stats::Timespan<std::chrono::milliseconds>> conn_length_;
+  Stats::TimespanPtr conn_length_;
   const Network::DrainDecision& drain_close_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;

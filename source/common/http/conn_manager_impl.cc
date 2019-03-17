@@ -96,8 +96,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Server::OverloadManager* overload_manager,
                                              TimeSource& time_source)
     : config_(config), stats_(config_.stats()),
-      conn_length_(new Stats::Timespan<std::chrono::milliseconds>(
-          stats_.named_.downstream_cx_length_ms_, time_source)),
+      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_, time_source)),
       drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
@@ -400,7 +399,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     : connection_manager_(connection_manager),
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(connection_manager.random_generator_.random()),
-      request_response_timespan_(new Stats::Timespan<std::chrono::milliseconds>(
+      request_response_timespan_(new Stats::Timespan(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();

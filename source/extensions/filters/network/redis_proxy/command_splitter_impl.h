@@ -46,22 +46,23 @@ public:
   COUNTER(total)                                                                                   \
   COUNTER(success)                                                                                 \
   COUNTER(error)                                                                                   \
-  HISTOGRAM(latency)                                                                               \
+  HISTOGRAM(latency)
 // clang-format on
 
 /**
  * Struct definition for all command stats. @see stats_macros.h
  */
 struct CommandStats {
-  ALL_COMMAND_STATS(GENERATE_COUNTER_STRUCT,GENERATE_HISTOGRAM_STRUCT)
+  ALL_COMMAND_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 class CommandHandler {
 public:
   virtual ~CommandHandler() {}
 
-  virtual SplitRequestPtr startRequest(const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
-                                       CommandStats& command_stats, TimeSource& time_source, bool latency_in_micros) PURE;
+  virtual SplitRequestPtr startRequest(const Common::Redis::RespValue& request,
+                                       SplitCallbacks& callbacks, CommandStats& command_stats,
+                                       TimeSource& time_source, bool latency_in_micros) PURE;
 };
 
 class CommandHandlerBase {
@@ -73,15 +74,17 @@ protected:
 
 class SplitRequestBase : public SplitRequest {
 protected:
-  static void onWrongNumberOfArguments(SplitCallbacks& callbacks, const Common::Redis::RespValue& request);
+  static void onWrongNumberOfArguments(SplitCallbacks& callbacks,
+                                       const Common::Redis::RespValue& request);
   void updateStats(const bool success);
 
   SplitRequestBase(CommandStats& command_stats, TimeSource& time_source, bool latency_in_micros)
       : command_stats_(command_stats) {
     if (latency_in_micros) {
-      command_latency_ = std::make_unique<Stats::Timespan<std::chrono::microseconds>>(command_stats_.latency_, time_source);
+      command_latency_ = std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
+          command_stats_.latency_, time_source);
     } else {
-      command_latency_ = std::make_unique<Stats::Timespan<std::chrono::milliseconds>>(command_stats_.latency_, time_source);
+      command_latency_ = std::make_unique<Stats::Timespan>(command_stats_.latency_, time_source);
     }
   }
   CommandStats& command_stats_;
@@ -116,12 +119,14 @@ protected:
  */
 class SimpleRequest : public SingleServerRequest {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
+                                const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
 private:
-  SimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool latency_in_micros)
+  SimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                bool latency_in_micros)
       : SingleServerRequest(callbacks, command_stats, time_source, latency_in_micros) {}
 };
 
@@ -130,12 +135,14 @@ private:
  */
 class EvalRequest : public SingleServerRequest {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
+                                const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
 private:
-  EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool latency_in_micros)
+  EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool latency_in_micros)
       : SingleServerRequest(callbacks, command_stats, time_source, latency_in_micros) {}
 };
 
@@ -152,7 +159,8 @@ public:
   void cancel() override;
 
 protected:
-  FragmentedRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool latency_in_micros)
+  FragmentedRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+                    bool latency_in_micros)
       : SplitRequestBase(command_stats, time_source, latency_in_micros), callbacks_(callbacks) {}
 
   struct PendingRequest : public ConnPool::PoolCallbacks {
@@ -185,12 +193,14 @@ protected:
  */
 class MGETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
+                                const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
 private:
-  MGETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool latency_in_micros)
+  MGETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool latency_in_micros)
       : FragmentedRequest(callbacks, command_stats, time_source, latency_in_micros) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
@@ -205,7 +215,8 @@ private:
  */
 class SplitKeysSumResultRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
+                                const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -227,12 +238,14 @@ private:
  */
 class MSETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool, const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
+                                const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
 private:
-  MSETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source, bool latency_in_micros)
+  MSETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool latency_in_micros)
       : FragmentedRequest(callbacks, command_stats, time_source, latency_in_micros) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
@@ -248,8 +261,10 @@ class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:
   CommandHandlerFactory(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
   SplitRequestPtr startRequest(const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
-                               CommandStats& command_stats, TimeSource& time_source, bool latency_in_micros) {
-    return RequestClass::create(conn_pool_, request, callbacks, command_stats, time_source, latency_in_micros);
+                               CommandStats& command_stats, TimeSource& time_source,
+                               bool latency_in_micros) {
+    return RequestClass::create(conn_pool_, request, callbacks, command_stats, time_source,
+                                latency_in_micros);
   }
 };
 

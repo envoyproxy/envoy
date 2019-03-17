@@ -29,9 +29,9 @@ public:
  * completed via complete() for it to be stored. If the timespan is deleted this will be treated as
  * a cancellation.
  */
-template <class TimeUnit> class Timespan : public CompletableTimespan {
+template <class TimeUnit> class TimespanWithUnit : public CompletableTimespan {
 public:
-  Timespan(Histogram& histogram, TimeSource& time_source)
+  TimespanWithUnit(Histogram& histogram, TimeSource& time_source)
       : time_source_(time_source), histogram_(histogram), start_(time_source.monotonicTime()) {}
 
   /**
@@ -52,6 +52,8 @@ private:
   const MonotonicTime start_;
 };
 
+typedef TimespanWithUnit<std::chrono::milliseconds> Timespan;
+typedef std::unique_ptr<Timespan> TimespanPtr;
 typedef std::unique_ptr<CompletableTimespan> CompletableTimespanPtr;
 
 } // namespace Stats

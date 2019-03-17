@@ -153,8 +153,8 @@ private:
                      public ThriftFilters::DecoderFilterCallbacks,
                      public ThriftFilters::FilterChainFactoryCallbacks {
     ActiveRpc(ConnectionManager& parent)
-        : parent_(parent), request_timer_(new Stats::Timespan<std::chrono::milliseconds>(
-                               parent_.stats_.request_time_ms_, parent_.time_source_)),
+        : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_,
+                                                              parent_.time_source_)),
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_), local_response_sent_{false}, pending_transport_end_{
                                                                                false} {
@@ -229,7 +229,7 @@ private:
     void onError(const std::string& what);
 
     ConnectionManager& parent_;
-    Stats::CompletableTimespanPtr request_timer_;
+    Stats::TimespanPtr request_timer_;
     uint64_t stream_id_;
     StreamInfo::StreamInfoImpl stream_info_;
     MessageMetadataSharedPtr metadata_;
