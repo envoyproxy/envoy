@@ -10,7 +10,6 @@ CharStarSet::~CharStarSet() {
   // elements of them (e.g. by deleting them), unless you know the container
   // internals well, 2-phase deletes like are more obviously correct.
   std::vector<std::unique_ptr<char[]>> keys(hash_set_.size());
-  keys.reserve(hash_set_.size());
   size_t i = 0;
   for (const char* p : hash_set_) {
     // The const_cast is necessary because hash_set_ is declared as a
