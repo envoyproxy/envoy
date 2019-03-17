@@ -34,6 +34,8 @@ const char* createFlagsToString(CreateFlags flags) {
   case CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL:
     return "persistent_sequential_with_ttl";
   }
+
+  return "unknown";
 }
 
 void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
