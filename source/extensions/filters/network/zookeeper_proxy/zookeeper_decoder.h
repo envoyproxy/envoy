@@ -115,7 +115,7 @@ private:
   void parseConnect(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
-  void parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, bool two);
+  void parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
   void skipAcls(Buffer::Instance& data, uint64_t& offset) const;
   void parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, bool two);
