@@ -56,5 +56,5 @@ message RateLimit {
   // specified, any calls to the rate limit service will immediately return
   // success.
   envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 7
-      [(validate.rules).duration.required = true];
+      [(validate.rules).message.required = true];
 }
