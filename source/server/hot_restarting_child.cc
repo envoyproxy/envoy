@@ -42,7 +42,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
   sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
-  RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
+  RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats),
                  "Hot restart parent did not respond as expected to get stats request.");
   return wrapped_reply;
 }
@@ -91,7 +91,23 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
   // Map from stat name *substrings* to special logic to use for combining stat values.
   const std::unordered_map<std::string, CombineLogic> combine_logic_exceptions{
       {".version", CombineLogic::NoImport},
-      {"connected_state", CombineLogic::BooleanOr},
+      {".connected_state", CombineLogic::BooleanOr},
+      {"server.live", CombineLogic::BooleanOr},
+      {"runtime.admin_overrides_active", CombineLogic::NoImport},
+      {"runtime.num_keys", CombineLogic::NoImport},
+      {"cluster_manager.active_clusters", CombineLogic::OnlyImportWhenUnused},
+      {"cluster_manager.warming_clusters", CombineLogic::OnlyImportWhenUnused},
+      {".membership_total", CombineLogic::OnlyImportWhenUnused},
+      {".membership_healthy", CombineLogic::OnlyImportWhenUnused},
+      {".membership_degraded", CombineLogic::OnlyImportWhenUnused},
+      {".max_host_weight", CombineLogic::OnlyImportWhenUnused},
+      {".total_principals", CombineLogic::OnlyImportWhenUnused},
+      {"listener_manager.total_listeners_draining", CombineLogic::NoImport},
+      {"listener_manager.total_listeners_warming", CombineLogic::OnlyImportWhenUnused},
+      {"listener_manager.total_listeners_active", CombineLogic::OnlyImportWhenUnused},
+      {"pressure", CombineLogic::OnlyImportWhenUnused},
+      {"server.concurrency", CombineLogic::OnlyImportWhenUnused},
+      {"server.hot_restart_epoch", CombineLogic::NoImport},
   };
   for (const auto& counter_proto : stats_proto.counters()) {
     uint64_t new_parent_value = counter_proto.value();
@@ -135,9 +151,6 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
       } else {
         gauge_ref.sub(old_parent_value - new_parent_value);
       }
-      break;
-    case CombineLogic::BooleanAnd:
-      gauge_ref.set(gauge_ref.value() != 0 && new_parent_value != 0 ? 1 : 0);
       break;
     case CombineLogic::BooleanOr:
       gauge_ref.set(gauge_ref.value() != 0 || new_parent_value != 0 ? 1 : 0);

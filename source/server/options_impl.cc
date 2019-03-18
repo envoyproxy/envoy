@@ -101,8 +101,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                     "traffic normally) or 'validate' (validate configs and exit).",
                                     false, "serve", "string", cmd);
   TCLAP::ValueArg<uint64_t> max_stats("", "max-stats",
-                                      "Deprecated and unused; please do not specify.",
-                                      false, 123, "uint64_t", cmd);
+                                      "Deprecated and unused; please do not specify.", false, 123,
+                                      "uint64_t", cmd);
   TCLAP::ValueArg<uint64_t> max_obj_name_len("", "max-obj-name-len",
                                              "Maximum name length for a field in the config "
                                              "(applies to listener name, route config name and"

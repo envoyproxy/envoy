@@ -201,7 +201,6 @@ private:
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
-  uint64_t numConnections();
   void startWorkers();
   void terminate();
   void notifyCallbacksForStage(Stage stage);

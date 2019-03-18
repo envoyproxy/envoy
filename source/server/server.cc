@@ -174,11 +174,6 @@ void InstanceImpl::flushStats() {
   });
 }
 
-void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
-  info.memory_allocated_ = Memory::Stats::totalCurrentlyAllocated();
-  info.num_connections_ = numConnections();
-}
-
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
 InstanceUtil::BootstrapVersion

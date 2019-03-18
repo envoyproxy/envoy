@@ -32,12 +32,27 @@ public:
   HotRestartingChildTest() : os_calls_injector_(InitOsCalls()), hot_restarting_child_(123, 456) {
     store_.counter("draculaer").inc();
     store_.gauge("whywassixafraidofseven").set(678);
-    store_.gauge("some.sort.of.version").set(12345);
   }
 
   Api::MockOsSysCalls* InitOsCalls() {
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(AnyNumber());
     return &os_sys_calls_;
+  }
+
+  void addGaugeProto(HotRestartMessage::Reply::Stats& stats, const std::string& name,
+                     uint64_t value) {
+    auto* gauge_proto = stats.mutable_gauges()->Add();
+    gauge_proto->set_name(name);
+    gauge_proto->set_type(SimpleMetric::GAUGE);
+    gauge_proto->set_value(value);
+  }
+
+  void addCounterProto(HotRestartMessage::Reply::Stats& stats, const std::string& name,
+                       uint64_t value) {
+    auto* counter_proto = stats.mutable_counters()->Add();
+    counter_proto->set_name(name);
+    counter_proto->set_type(SimpleMetric::COUNTER);
+    counter_proto->set_value(value);
   }
 
   Stats::IsolatedStoreImpl store_;
@@ -46,17 +61,10 @@ public:
   HotRestartingChild hot_restarting_child_;
 };
 
-TEST_F(HotRestartingChildTest, basicDefaultImport) {
+TEST_F(HotRestartingChildTest, basicDefaultAccumulationImport) {
   HotRestartMessage::Reply::Stats stats;
-  auto* gauge_proto = stats.mutable_gauges()->Add();
-  gauge_proto->set_name("whywassixafraidofseven");
-  gauge_proto->set_type(SimpleMetric::GAUGE);
-  gauge_proto->set_value(111);
-
-  auto* counter_proto = stats.mutable_counters()->Add();
-  counter_proto->set_name("draculaer");
-  counter_proto->set_type(SimpleMetric::COUNTER);
-  counter_proto->set_value(3);
+  addGaugeProto(stats, "whywassixafraidofseven", 111);
+  addCounterProto(stats, "draculaer", 3);
 
   hot_restarting_child_.mergeParentStats(store_, stats);
 
@@ -64,16 +72,10 @@ TEST_F(HotRestartingChildTest, basicDefaultImport) {
   EXPECT_EQ(4, store_.counter("draculaer").value());
 }
 
-TEST_F(HotRestartingChildTest, multipleImports) {
+TEST_F(HotRestartingChildTest, multipleImportsWithAccumulationLogic) {
   HotRestartMessage::Reply::Stats stats1;
-  auto* gauge_proto = stats1.mutable_gauges()->Add();
-  gauge_proto->set_name("whywassixafraidofseven");
-  gauge_proto->set_type(SimpleMetric::GAUGE);
-  gauge_proto->set_value(100);
-  auto* counter_proto = stats1.mutable_counters()->Add();
-  counter_proto->set_name("draculaer");
-  counter_proto->set_type(SimpleMetric::COUNTER);
-  counter_proto->set_value(2);
+  addGaugeProto(stats1, "whywassixafraidofseven", 100);
+  addCounterProto(stats1, "draculaer", 2);
   hot_restarting_child_.mergeParentStats(store_, stats1);
   // Initial combined values: 678+100 and 1+2.
   EXPECT_EQ(778, store_.gauge("whywassixafraidofseven").value());
@@ -81,14 +83,8 @@ TEST_F(HotRestartingChildTest, multipleImports) {
 
   // The parent's gauge drops by 1, and its counter increases by 1.
   HotRestartMessage::Reply::Stats stats2;
-  gauge_proto = stats2.mutable_gauges()->Add();
-  gauge_proto->set_name("whywassixafraidofseven");
-  gauge_proto->set_type(SimpleMetric::GAUGE);
-  gauge_proto->set_value(99);
-  counter_proto = stats2.mutable_counters()->Add();
-  counter_proto->set_name("draculaer");
-  counter_proto->set_type(SimpleMetric::COUNTER);
-  counter_proto->set_value(3);
+  addGaugeProto(stats2, "whywassixafraidofseven", 99);
+  addCounterProto(stats2, "draculaer", 3);
   hot_restarting_child_.mergeParentStats(store_, stats2);
   EXPECT_EQ(777, store_.gauge("whywassixafraidofseven").value());
   EXPECT_EQ(4, store_.counter("draculaer").value());
@@ -106,46 +102,125 @@ TEST_F(HotRestartingChildTest, multipleImports) {
   store_.gauge("whywassixafraidofseven").sub(5);
   store_.counter("draculaer").add(1);
   HotRestartMessage::Reply::Stats stats3;
-  gauge_proto = stats3.mutable_gauges()->Add();
-  gauge_proto->set_name("whywassixafraidofseven");
-  gauge_proto->set_type(SimpleMetric::GAUGE);
-  gauge_proto->set_value(104);
-  counter_proto = stats3.mutable_counters()->Add();
-  counter_proto->set_name("draculaer");
-  counter_proto->set_type(SimpleMetric::COUNTER);
-  counter_proto->set_value(4);
+  addGaugeProto(stats3, "whywassixafraidofseven", 104);
+  addCounterProto(stats3, "draculaer", 4);
   hot_restarting_child_.mergeParentStats(store_, stats3);
   EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
   EXPECT_EQ(10, store_.counter("draculaer").value());
 }
 
-// Tests that the substring ".version" excludes a parent stat from being imported, along
-// with any bool indicator with the default combination logic (which defaults to NoImport).
+// Stat names that have NoImport logic should leave the child gauge value alone upon import, even if
+// the child has that gauge undefined.
 TEST_F(HotRestartingChildTest, exclusionsNotImported) {
+  store_.gauge("some.sort.of.version").set(12345);
+
   HotRestartMessage::Reply::Stats stats;
-  auto* gauge_proto = stats.mutable_gauges()->Add();
-  gauge_proto->set_name("some.sort.of.version");
-  gauge_proto->set_type(SimpleMetric::GAUGE);
-  gauge_proto->set_value(2345678);
-  gauge_proto = stats.mutable_gauges()->Add();
-  gauge_proto->set_name("child.doesnt.have.this.version");
-  gauge_proto->set_type(SimpleMetric::GAUGE);
-  gauge_proto->set_value(111);
-  auto* indicator_proto = stats.mutable_indicators()->Add();
-  indicator_proto->set_name("my.connected_state");
-  indicator_proto->set_type(SimpleMetric::BOOL_INDICATOR);
-  indicator_proto->set_value(true);
-  indicator_proto = stats.mutable_indicators()->Add();
-  indicator_proto->set_name("my.absolutely_any_bool_indicator");
-  indicator_proto->set_type(SimpleMetric::BOOL_INDICATOR);
-  indicator_proto->set_value(true);
+  addGaugeProto(stats, "some.sort.of.version", 67890);
+  addGaugeProto(stats, "child.doesnt.have.this.version", 111);
 
+  // Check defined values are not changed, and undefined remain undefined.
   hot_restarting_child_.mergeParentStats(store_, stats);
-
   EXPECT_EQ(12345, store_.gauge("some.sort.of.version").value());
   EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version").used());
-  EXPECT_FALSE(store_.boolIndicator("my.connected_state").used());
-  EXPECT_FALSE(store_.boolIndicator("my.absolutely_any_bool_indicator").used());
+
+  // Check the "undefined remains undefined" behavior for a bunch of other names.
+  addGaugeProto(stats, "runtime.admin_overrides_active", 111);
+  addGaugeProto(stats, "runtime.num_keys", 111);
+  addGaugeProto(stats, "listener_manager.total_listeners_draining", 111);
+  addGaugeProto(stats, "server.hot_restart_epoch", 111);
+
+  hot_restarting_child_.mergeParentStats(store_, stats);
+  EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version").used());
+  EXPECT_FALSE(store_.gauge("runtime.admin_overrides_active").used());
+  EXPECT_FALSE(store_.gauge("runtime.num_keys").used());
+  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_draining").used());
+  EXPECT_FALSE(store_.gauge("server.hot_restart_epoch").used());
+}
+
+// The OnlyImportWhenUnused logic should overwrite an undefined gauge, but not a defined one.
+TEST_F(HotRestartingChildTest, onlyImportWhenUnused) {
+  HotRestartMessage::Reply::Stats stats;
+  addGaugeProto(stats, "cluster_manager.active_clusters", 33);
+  addGaugeProto(stats, "cluster_manager.warming_clusters", 33);
+  addGaugeProto(stats, "cluster.rds.membership_total", 33);
+  addGaugeProto(stats, "cluster.rds.membership_healthy", 33);
+  addGaugeProto(stats, "cluster.rds.membership_degraded", 33);
+  addGaugeProto(stats, "cluster.rds.max_host_weight", 33);
+  addGaugeProto(stats, "anything.total_principals", 33);
+  addGaugeProto(stats, "listener_manager.total_listeners_warming", 33);
+  addGaugeProto(stats, "listener_manager.total_listeners_active", 33);
+  addGaugeProto(stats, "some_sort_of_pressure", 33);
+  addGaugeProto(stats, "server.concurrency", 33);
+  // 33 is stored into the child's until-now-undefined gauges
+  hot_restarting_child_.mergeParentStats(store_, stats);
+  EXPECT_EQ(33, store_.gauge("cluster_manager.active_clusters").value());
+  EXPECT_EQ(33, store_.gauge("cluster_manager.warming_clusters").value());
+  EXPECT_EQ(33, store_.gauge("cluster.rds.membership_total").value());
+  EXPECT_EQ(33, store_.gauge("cluster.rds.membership_healthy").value());
+  EXPECT_EQ(33, store_.gauge("cluster.rds.membership_degraded").value());
+  EXPECT_EQ(33, store_.gauge("cluster.rds.max_host_weight").value());
+  EXPECT_EQ(33, store_.gauge("anything.total_principals").value());
+  EXPECT_EQ(33, store_.gauge("listener_manager.total_listeners_warming").value());
+  EXPECT_EQ(33, store_.gauge("listener_manager.total_listeners_active").value());
+  EXPECT_EQ(33, store_.gauge("some_sort_of_pressure").value());
+  EXPECT_EQ(33, store_.gauge("server.concurrency").value());
+  store_.gauge("cluster_manager.active_clusters").set(88);
+  store_.gauge("cluster_manager.warming_clusters").set(88);
+  store_.gauge("cluster.rds.membership_total").set(88);
+  store_.gauge("cluster.rds.membership_healthy").set(88);
+  store_.gauge("cluster.rds.membership_degraded").set(88);
+  store_.gauge("cluster.rds.max_host_weight").set(88);
+  store_.gauge("anything.total_principals").set(88);
+  store_.gauge("listener_manager.total_listeners_warming").set(88);
+  store_.gauge("listener_manager.total_listeners_active").set(88);
+  store_.gauge("some_sort_of_pressure").set(88);
+  store_.gauge("server.concurrency").set(88);
+  // Now that the child's gauges have been set to 88, merging the "33" values will make no change.
+  hot_restarting_child_.mergeParentStats(store_, stats);
+  EXPECT_EQ(88, store_.gauge("cluster_manager.active_clusters").value());
+  EXPECT_EQ(88, store_.gauge("cluster_manager.warming_clusters").value());
+  EXPECT_EQ(88, store_.gauge("cluster.rds.membership_total").value());
+  EXPECT_EQ(88, store_.gauge("cluster.rds.membership_healthy").value());
+  EXPECT_EQ(88, store_.gauge("cluster.rds.membership_degraded").value());
+  EXPECT_EQ(88, store_.gauge("cluster.rds.max_host_weight").value());
+  EXPECT_EQ(88, store_.gauge("anything.total_principals").value());
+  EXPECT_EQ(88, store_.gauge("listener_manager.total_listeners_warming").value());
+  EXPECT_EQ(88, store_.gauge("listener_manager.total_listeners_active").value());
+  EXPECT_EQ(88, store_.gauge("some_sort_of_pressure").value());
+  EXPECT_EQ(88, store_.gauge("server.concurrency").value());
+}
+
+// Tests that the substrings "connected_state" and "server.live" get OR'd.
+TEST_F(HotRestartingChildTest, booleanOr) {
+  store_.gauge("some.connected_state").set(0);
+  store_.gauge("server.live").set(0);
+
+  HotRestartMessage::Reply::Stats stats_with_value0;
+  addGaugeProto(stats_with_value0, "some.connected_state", 0);
+  addGaugeProto(stats_with_value0, "server.live", 0);
+  HotRestartMessage::Reply::Stats stats_with_value1;
+  addGaugeProto(stats_with_value1, "some.connected_state", 1);
+  addGaugeProto(stats_with_value1, "server.live", 1);
+
+  // 0 || 0 == 0
+  hot_restarting_child_.mergeParentStats(store_, stats_with_value0);
+  EXPECT_EQ(0, store_.gauge("some.connected_state").value());
+  EXPECT_EQ(0, store_.gauge("server.live").value());
+
+  // 0 || 1 == 1
+  hot_restarting_child_.mergeParentStats(store_, stats_with_value1);
+  EXPECT_EQ(1, store_.gauge("some.connected_state").value());
+  EXPECT_EQ(1, store_.gauge("server.live").value());
+
+  // 1 || 0 == 1
+  hot_restarting_child_.mergeParentStats(store_, stats_with_value0);
+  EXPECT_EQ(1, store_.gauge("some.connected_state").value());
+  EXPECT_EQ(1, store_.gauge("server.live").value());
+
+  // 1 || 1 == 1
+  hot_restarting_child_.mergeParentStats(store_, stats_with_value1);
+  EXPECT_EQ(1, store_.gauge("some.connected_state").value());
+  EXPECT_EQ(1, store_.gauge("server.live").value());
 }
 
 } // namespace

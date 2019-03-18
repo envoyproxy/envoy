@@ -47,7 +47,6 @@ message HotRestartMessage {
       // The parent's current values for various stats in its stats store.
       repeated envoy.admin.v2alpha.SimpleMetric counters = 3;
       repeated envoy.admin.v2alpha.SimpleMetric gauges = 4;
-      repeated envoy.admin.v2alpha.SimpleMetric indicators = 5;
     }
     oneof reply {
       // When this oneof is of the PassListenSocketReply type, there is a special
