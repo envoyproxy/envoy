@@ -76,7 +76,7 @@ public:
     return buffer;
   }
 
-  Buffer::OwnedImpl encodeBiggerThanLengthMessage const {
+  Buffer::OwnedImpl encodeBiggerThanLengthMessage() const {
     Buffer::OwnedImpl buffer;
 
     // We craft a delete request with a path that's longer than
