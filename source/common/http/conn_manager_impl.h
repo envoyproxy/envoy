@@ -151,6 +151,10 @@ private:
                            // be buffered until high watermark is reached.
     };
     IterationState iteration_state_;
+    // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
+    // hasn't parsed data and trailers. As a result, the filter iteration should start with the
+    // current filter instead of the next one. If true, filter iteration starts with the current
+    // filter. Otherwise, starts with the next filter in the chain.
     bool iterate_from_current_filter_;
     ActiveStream& parent_;
     bool headers_continued_ : 1;
@@ -317,8 +321,9 @@ private:
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
     void chargeStats(const HeaderMap& headers);
     std::list<ActiveStreamEncoderFilterPtr>::iterator
-    commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream,
-                       bool& check_iteration_state);
+    commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
+    std::list<ActiveStreamDecoderFilterPtr>::iterator
+    getDecodeStartFilter(ActiveStreamDecoderFilter* filter);
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addDecodedTrailers();
@@ -340,8 +345,8 @@ private:
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
-    // Returns true is filter has stopped iteration for all frame types. Otherwise, returns false.
-    // filter_streaming is the variable to indicate if stream stream is streaming.
+    // Returns true if filter has stopped iteration for all frame types. Otherwise, returns false.
+    // filter_streaming is the variable to indicate if stream is streaming.
     bool handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
                              bool& filter_streaming);
 
