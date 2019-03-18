@@ -50,8 +50,6 @@ configure and code each application independently. Envoy supports various types 
   at least one upstream connection, so this value should likely be no greater than
   :ref:`Cluster maximum connections <arch_overview_circuit_break_cluster_maximum_connections>`.
 
-
-
 Each circuit breaking limit is :ref:`configurable <config_cluster_manager_cluster_circuit_breakers>`
 and tracked on a per upstream cluster and per priority basis. This allows different components of
 the distributed system to be tuned independently and have different limits. The live state of these
