@@ -218,20 +218,25 @@ std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
 
 bool ThreadLocalStoreImpl::checkAndRememberRejection(const std::string& name,
-                                                     ConstCharStarHashSet* tls_rejected_stats) {
+                                                     SharedStringSet& central_rejected_stats,
+                                                     SharedStringSet* tls_rejected_stats) {
   if (stats_matcher_->acceptsAll()) {
     return false;
   }
 
-  const char* rejected_name = rejected_stats_.find(name);
-  if (rejected_name == nullptr) {
+  auto iter = central_rejected_stats.find(name.c_str());
+  SharedString rejected_name;
+  if (iter != central_rejected_stats.end()) {
+    rejected_name = iter->second;
+  } else {
     if (rejects(name)) {
-      rejected_name = rejected_stats_.insert(name);
+      rejected_name = std::make_shared<std::string>(name);
+      central_rejected_stats[rejected_name->c_str()] = rejected_name;
     }
   }
   if (rejected_name != nullptr) {
     if (tls_rejected_stats != nullptr) {
-      tls_rejected_stats->insert(rejected_name);
+      (*tls_rejected_stats)[rejected_name->c_str()] = rejected_name;
     }
     return true;
   }
@@ -241,8 +246,9 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(const std::string& name,
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-    MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache,
-    ConstCharStarHashSet* tls_rejected_stats, StatType& null_stat) {
+    SharedStringSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
+    StatMap<std::shared_ptr<StatType>>* tls_cache, SharedStringSet* tls_rejected_stats,
+    StatType& null_stat) {
 
   const char* stat_key = name.c_str();
 
@@ -274,7 +280,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   std::shared_ptr<StatType>* central_ref = nullptr;
   if (iter != central_cache_map.end()) {
     central_ref = &(iter->second);
-  } else if (parent_.checkAndRememberRejection(name, tls_rejected_stats)) {
+  } else if (parent_.checkAndRememberRejection(name, central_rejected_stats, tls_rejected_stats)) {
     // Note that again we do the name-rejection lookup on the untruncated name.
     return null_stat;
   } else {
@@ -335,7 +341,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
   StatMap<CounterSharedPtr>* tls_cache = nullptr;
-  ConstCharStarHashSet* tls_rejected_stats = nullptr;
+  SharedStringSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.counters_;
@@ -343,7 +349,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   }
 
   return safeMakeStat<Counter>(
-      final_name, central_cache_.counters_,
+      final_name, central_cache_.counters_, central_cache_.rejected_stats_,
       [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
          std::vector<Tag>&& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
@@ -383,7 +389,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   std::string final_name = prefix_ + name;
 
   StatMap<GaugeSharedPtr>* tls_cache = nullptr;
-  ConstCharStarHashSet* tls_rejected_stats = nullptr;
+  SharedStringSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.gauges_;
@@ -391,7 +397,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   }
 
   return safeMakeStat<Gauge>(
-      final_name, central_cache_.gauges_,
+      final_name, central_cache_.gauges_, central_cache_.rejected_stats_,
       [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
          std::vector<Tag>&& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
@@ -415,7 +421,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   std::string final_name = prefix_ + name;
 
   StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
-  ConstCharStarHashSet* tls_rejected_stats = nullptr;
+  SharedStringSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
     tls_cache = &entry.parent_histograms_;
@@ -434,7 +440,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   ParentHistogramImplSharedPtr* central_ref = nullptr;
   if (iter != central_cache_.histograms_.end()) {
     central_ref = &iter->second;
-  } else if (parent_.checkAndRememberRejection(final_name, tls_rejected_stats)) {
+  } else if (parent_.checkAndRememberRejection(final_name, central_cache_.rejected_stats_,
+                                               tls_rejected_stats)) {
     return null_histogram_;
   } else {
     std::vector<Tag> tags;

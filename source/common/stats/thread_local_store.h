@@ -9,7 +9,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
-#include "common/stats/char_star_set.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/source_impl.h"
@@ -175,6 +174,9 @@ private:
   friend class ThreadLocalStoreTestScope;
 
   template <class Stat> using StatMap = ConstCharStarHashMap<Stat>;
+  using SharedString = std::shared_ptr<std::string>;
+  using SharedStringSet =
+      absl::flat_hash_map<const char*, SharedString, ConstCharStarHash, ConstCharStarEqual>;
 
   struct TlsCacheEntry {
     StatMap<CounterSharedPtr> counters_;
@@ -188,26 +190,14 @@ private:
     // and it we need to take a global symbol-table lock to run. We keep
     // this char* map here in the TLS cache to avoid taking a lock to compute
     // rejection.
-    //
-    // To avoid duplicate copies of stats, this map references const char*
-    // values from ThreadLocalStore::rejected_stats_, which is implemented
-    // as a absl::flat_hash_map<char*>, so the keys will be stable and safe
-    // to reference from other threads even as the hash-map resizes.
-    //
-    // TODO(#6306): Note that once a stat or rejected name enters into the TLS
-    // Cache, it remains in memory forever. This will effectively leak memory as
-    // scopes are dynamically removed from the configuration. This could be
-    // resolved by (a) using weak_ptr in the TLS cache and (b) proactively
-    // cleaning up expired items in each thread periodically. Alternatively,
-    // when a scope is removed, we could post() a cleanup request to each
-    // thread's TLS cache.
-    ConstCharStarHashSet rejected_stats_;
+    SharedStringSet rejected_stats_;
   };
 
   struct CentralCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
+    SharedStringSet rejected_stats_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -245,10 +235,11 @@ private:
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType&
-    safeMakeStat(const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                 MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache,
-                 ConstCharStarHashSet* tls_rejected_stats, StatType& null_stat);
+    StatType& safeMakeStat(const std::string& name,
+                           StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                           SharedStringSet& central_rejected_stats_, MakeStatFn<StatType> make_stat,
+                           StatMap<std::shared_ptr<StatType>>* tls_cache,
+                           SharedStringSet* tls_rejected_stats, StatType& null_stat);
 
     static std::atomic<uint64_t> next_scope_id_;
 
@@ -282,8 +273,8 @@ private:
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
-  bool checkAndRememberRejection(const std::string& name, ConstCharStarHashSet* tls_rejected_stats)
-      EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  bool checkAndRememberRejection(const std::string& name, SharedStringSet& central_rejected_stats,
+                                 SharedStringSet* tls_rejected_stats);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
@@ -295,7 +286,6 @@ private:
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
-  CharStarSet rejected_stats_ GUARDED_BY(lock_); // See comment in TLSCacheEntry above.
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
