@@ -225,28 +225,7 @@ void DecoderImpl::parseCreateRequest(Buffer::Instance& data, uint64_t& offset, u
   skipString(data, offset);
   skipAcls(data, offset);
 
-  CreateFlags flags = CreateFlags::PERSISTENT;
-  switch (helper_.peekInt32(data, offset)) {
-  case 6:
-    flags = CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL;
-    break;
-  case 5:
-    flags = CreateFlags::PERSISTENT_WITH_TTL;
-    break;
-  case 4:
-    flags = CreateFlags::CONTAINER;
-    break;
-  case 3:
-    flags = CreateFlags::EPHEMERAL_SEQUENTIAL;
-    break;
-  case 2:
-    flags = CreateFlags::PERSISTENT_SEQUENTIAL;
-    break;
-  case 1:
-    flags = CreateFlags::EPHEMERAL;
-    break;
-  }
-
+  const CreateFlags flags = static_cast<CreateFlags>(helper_.peekInt32(data, offset));
   callbacks_.onCreateRequest(path, flags, opcode);
 }
 
