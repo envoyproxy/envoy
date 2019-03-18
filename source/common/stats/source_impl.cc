@@ -17,12 +17,6 @@ std::vector<GaugeSharedPtr>& SourceImpl::cachedGauges() {
   }
   return *gauges_;
 }
-std::vector<BoolIndicatorSharedPtr>& SourceImpl::cachedBoolIndicators() {
-  if (!bool_indicators_) {
-    bool_indicators_ = store_.boolIndicators();
-  }
-  return *bool_indicators_;
-}
 std::vector<ParentHistogramSharedPtr>& SourceImpl::cachedHistograms() {
   if (!histograms_) {
     histograms_ = store_.histograms();
@@ -33,7 +27,6 @@ std::vector<ParentHistogramSharedPtr>& SourceImpl::cachedHistograms() {
 void SourceImpl::clearCache() {
   counters_.reset();
   gauges_.reset();
-  bool_indicators_.reset();
   histograms_.reset();
 }
 

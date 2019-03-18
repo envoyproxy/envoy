@@ -120,6 +120,16 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   // File1 is not a boolean.
   EXPECT_EQ(false, snapshot->getBoolean("file1", value));
 
+  // Feature defaults.
+  // test_feature_true is explicitly set true in runtime_features.cc
+  EXPECT_EQ(true, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+  // test_feature_false is not in runtime_features.cc and so is false by default.
+  EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+
+  // Feature defaults via helper function.
+  EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+
   // Files with comments.
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
   EXPECT_EQ("/home#about-us", loader->snapshot().get("file6"));
@@ -250,22 +260,22 @@ void testNewOverrides(Loader& loader, Stats::Store& store) {
   // New string
   loader.mergeValues({{"foo", "bar"}});
   EXPECT_EQ("bar", loader.snapshot().get("foo"));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove new string
   loader.mergeValues({{"foo", ""}});
   EXPECT_EQ("", loader.snapshot().get("foo"));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 
   // New integer
   loader.mergeValues({{"baz", "42"}});
   EXPECT_EQ(42, loader.snapshot().getInteger("baz", 0));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove new integer
   loader.mergeValues({{"baz", ""}});
   EXPECT_EQ(0, loader.snapshot().getInteger("baz", 0));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 }
 
 TEST_F(DiskBackedLoaderImplTest, mergeValues) {
@@ -276,32 +286,32 @@ TEST_F(DiskBackedLoaderImplTest, mergeValues) {
   // Override string
   loader->mergeValues({{"file2", "new world"}});
   EXPECT_EQ("new world", loader->snapshot().get("file2"));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove overridden string
   loader->mergeValues({{"file2", ""}});
   EXPECT_EQ("world", loader->snapshot().get("file2"));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 
   // Override integer
   loader->mergeValues({{"file3", "42"}});
   EXPECT_EQ(42, loader->snapshot().getInteger("file3", 1));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove overridden integer
   loader->mergeValues({{"file3", ""}});
   EXPECT_EQ(2, loader->snapshot().getInteger("file3", 1));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 
   // Override override string
   loader->mergeValues({{"file1", "hello overridden override"}});
   EXPECT_EQ("hello overridden override", loader->snapshot().get("file1"));
-  EXPECT_TRUE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(1, store.gauge("runtime.admin_overrides_active").value());
 
   // Remove overridden override string
   loader->mergeValues({{"file1", ""}});
   EXPECT_EQ("hello override", loader->snapshot().get("file1"));
-  EXPECT_FALSE(store.boolIndicator("runtime.admin_overrides_active").value());
+  EXPECT_EQ(0, store.gauge("runtime.admin_overrides_active").value());
 }
 
 TEST(LoaderImplTest, All) {
@@ -338,6 +348,15 @@ TEST_F(DiskLayerTest, Loop) {
       DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
                 *api_),
       EnvoyException, "Walk recursion depth exceeded 16");
+}
+
+TEST(NoRuntime, FeatureEnabled) {
+  // Make sure the registry is not set up.
+  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
+
+  // Feature defaults should still work.
+  EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
 }
 
 } // namespace

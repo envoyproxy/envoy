@@ -116,14 +116,16 @@ public:
 
   HttpStream(ClientConnection& client, const TestHeaderMapImpl& request_headers, bool end_stream) {
     request_.encoder_ = &client.newStream(response_.decoder_);
-    ON_CALL(request_.stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
-      ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
-      resetStream();
-    }));
-    ON_CALL(response_.stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
-      ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
-      resetStream();
-    }));
+    ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
+        .WillByDefault(InvokeWithoutArgs([this] {
+          ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
+          resetStream();
+        }));
+    ON_CALL(response_.stream_callbacks_, onResetStream(_, _))
+        .WillByDefault(InvokeWithoutArgs([this] {
+          ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
+          resetStream();
+        }));
     ON_CALL(request_.decoder_, decodeHeaders_(_, true)).WillByDefault(InvokeWithoutArgs([this] {
       // The HTTP/1 codec needs this to cleanup any latent stream resources.
       response_.encoder_->getStream().resetStream(StreamResetReason::LocalReset);

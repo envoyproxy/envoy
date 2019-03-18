@@ -259,6 +259,10 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         *stream_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());
   }
   responseFlagsToAccessLogResponseFlags(*common_properties, stream_info);
+  if (!stream_info.upstreamTransportFailureReason().empty()) {
+    common_properties->set_upstream_transport_failure_reason(
+        stream_info.upstreamTransportFailureReason());
+  }
   if (stream_info.dynamicMetadata().filter_metadata_size() > 0) {
     common_properties->mutable_metadata()->MergeFrom(stream_info.dynamicMetadata());
   }

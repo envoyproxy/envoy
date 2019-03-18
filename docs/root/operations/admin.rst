@@ -25,6 +25,7 @@ modify different aspects of the server:
 
     admin:
       access_log_path: /tmp/admin_access.log
+      profile_path: /tmp/envoy.prof
       address:
         socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -135,7 +136,11 @@ modify different aspects of the server:
 
 .. http:post:: /cpuprofiler
 
-  Enable or disable the CPU profiler. Requires compiling with gperftools.
+  Enable or disable the CPU profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.
+
+.. http:post:: /heapprofiler
+
+  Enable or disable the Heap profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.
 
 .. _operations_admin_interface_healthcheck_fail:
 

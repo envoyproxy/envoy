@@ -96,6 +96,14 @@ The Envoy project provides reference gRPC implementations of EDS and
 in both `Java <https://github.com/envoyproxy/java-control-plane>`_
 and `Go <https://github.com/envoyproxy/go-control-plane>`_.
 
+.. _arch_overview_service_discovery_types_custom:
+
+Custom cluster
+^^^^^^^^^^^^^^
+
+Envoy also supports custom cluster discovery mechanism. Custom clusters are specified using
+:ref:`cluster_type field <envoy_api_field_Cluster.cluster_type>` on the cluster configuration.
+
 Generally active health checking is used in conjunction with the eventually consistent service
 discovery service data to making load balancing and routing decisions. This is discussed further in
 the following section.

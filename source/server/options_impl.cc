@@ -116,6 +116,10 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::SwitchArg cpuset_threads(
       "", "cpuset-threads", "Get the default # of worker threads from cpuset size", cmd, false);
 
+  TCLAP::ValueArg<bool> use_libevent_buffer("", "use-libevent-buffers",
+                                            "Use the original libevent buffer implementation",
+                                            false, true, "bool", cmd);
+
   cmd.setExceptionHandling(false);
   try {
     cmd.parse(argc, argv);
@@ -149,6 +153,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   mutex_tracing_enabled_ = enable_mutex_tracing.getValue();
 
+  libevent_buffer_enabled_ = use_libevent_buffer.getValue();
   cpuset_threads_ = cpuset_threads.getValue();
 
   log_level_ = default_log_level;
@@ -311,6 +316,6 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       service_cluster_(service_cluster), service_node_(service_node), service_zone_(service_zone),
       file_flush_interval_msec_(10000), drain_time_(600), parent_shutdown_time_(900),
       mode_(Server::Mode::Serve), hot_restart_disabled_(false), signal_handling_enabled_(true),
-      mutex_tracing_enabled_(false), cpuset_threads_(false) {}
+      mutex_tracing_enabled_(false), cpuset_threads_(false), libevent_buffer_enabled_(false) {}
 
 } // namespace Envoy

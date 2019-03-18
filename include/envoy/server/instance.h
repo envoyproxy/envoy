@@ -18,6 +18,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/hot_restart.h"
+#include "envoy/server/lifecycle_notifier.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/options.h"
 #include "envoy/server/overload_manager.h"
@@ -141,6 +142,11 @@ public:
    * @return Runtime::Loader& the singleton runtime loader for the server.
    */
   virtual Runtime::Loader& runtime() PURE;
+
+  /**
+   * @return ServerLifecycleNotifier& the singleton lifecycle notifier for the server.
+   */
+  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
 
   /**
    * Shutdown the server gracefully.

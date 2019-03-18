@@ -20,6 +20,7 @@
 
 #include "common/api/api_impl.h"
 #include "common/api/os_sys_calls_impl.h"
+#include "common/buffer/buffer_impl.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/utility.h"
 #include "common/common/version.h"
@@ -68,7 +69,8 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                           store),
       terminated_(false),
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
-                                                  : nullptr) {
+                                                  : nullptr),
+      main_thread_id_(std::this_thread::get_id()) {
   try {
     if (!options.logPath().empty()) {
       try {
@@ -126,7 +128,10 @@ void InstanceImpl::drainListeners() {
   drain_manager_->startDrainSequence(nullptr);
 }
 
-void InstanceImpl::failHealthcheck(bool fail) { server_stats_->live_.set(!fail); }
+void InstanceImpl::failHealthcheck(bool fail) {
+  // We keep liveness state in shared memory so the parent process sees the same state.
+  server_stats_->live_.set(!fail);
+}
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks,
                                        Stats::Source& source) {
@@ -169,7 +174,12 @@ void InstanceImpl::flushStats() {
   });
 }
 
-bool InstanceImpl::healthCheckFailed() { return !server_stats_->live_.value(); }
+void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
+  info.memory_allocated_ = Memory::Stats::totalCurrentlyAllocated();
+  info.num_connections_ = numConnections();
+}
+
+bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
 
 InstanceUtil::BootstrapVersion
 InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
@@ -225,6 +235,12 @@ void InstanceImpl::initialize(const Options& options,
             Registry::FactoryRegistry<
                 Configuration::UpstreamTransportSocketConfigFactory>::allFactoryNames());
 
+  // Enable the selected buffer implementation (old libevent evbuffer version or new native
+  // version) early in the initialization, before any buffers can be created.
+  Buffer::OwnedImpl::useOldImpl(options.libeventBufferEnabled());
+  ENVOY_LOG(info, "buffer implementation: {}",
+            Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
+
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());
   bootstrap_config_update_time_ = time_source_.systemTime();
@@ -236,8 +252,7 @@ void InstanceImpl::initialize(const Options& options,
 
   const std::string server_stats_prefix = "server.";
   server_stats_ = std::make_unique<ServerStats>(
-      ServerStats{ALL_SERVER_STATS(POOL_BOOL_INDICATOR_PREFIX(stats_store_, server_stats_prefix),
-                                   POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
+      ServerStats{ALL_SERVER_STATS(POOL_COUNTER_PREFIX(stats_store_, server_stats_prefix),
                                    POOL_GAUGE_PREFIX(stats_store_, server_stats_prefix))});
 
   server_stats_->concurrency_.set(options_.concurrency());
@@ -472,6 +487,7 @@ void InstanceImpl::run() {
   ENVOY_LOG(info, "starting main dispatch loop");
   auto watchdog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   watchdog->startWatchdog(*dispatcher_);
+  dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");
   guard_dog_->stopWatching(watchdog);
@@ -520,8 +536,10 @@ void InstanceImpl::terminate() {
 Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(); }
 
 void InstanceImpl::shutdown() {
+  ENVOY_LOG(info, "shutting down server instance");
   shutdown_ = true;
   restarter_.terminateParent();
+  notifyCallbacksForStage(Stage::ShutdownExit);
   dispatcher_->exit();
 }
 
@@ -536,6 +554,20 @@ void InstanceImpl::shutdownAdmin() {
 
   ENVOY_LOG(warn, "terminating parent process");
   restarter_.terminateParent();
+}
+
+void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {
+  stage_callbacks_[stage].push_back(callback);
+}
+
+void InstanceImpl::notifyCallbacksForStage(Stage stage) {
+  ASSERT(std::this_thread::get_id() == main_thread_id_);
+  auto it = stage_callbacks_.find(stage);
+  if (it != stage_callbacks_.end()) {
+    for (const StageCallback& callback : it->second) {
+      callback();
+    }
+  }
 }
 
 ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
