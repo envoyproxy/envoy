@@ -58,7 +58,6 @@ private:
 class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl();
-  explicit IsolatedStoreImpl(std::unique_ptr<SymbolTable> symbol_table);
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
@@ -82,6 +81,8 @@ public:
   }
 
 private:
+  IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
+
   std::unique_ptr<SymbolTable> symbol_table_storage_;
   SymbolTable& symbol_table_;
   HeapStatDataAllocator alloc_;
