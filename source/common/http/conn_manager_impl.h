@@ -322,6 +322,7 @@ private:
     void chargeStats(const HeaderMap& headers);
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
+    // Returns the decoder filter to start iteration with.
     std::list<ActiveStreamDecoderFilterPtr>::iterator
     getDecodeStartFilter(ActiveStreamDecoderFilter* filter);
     const Network::Connection* connection();

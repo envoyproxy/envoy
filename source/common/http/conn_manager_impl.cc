@@ -1629,6 +1629,9 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
     doHeaders(complete() && !bufferedData() && !trailers());
   }
 
+  // Resets the state to Continue if the filter has stopped iteration for all. Sets
+  // iterate_from_current_filter_ to true so in doData() and doTrailers() the filter iteration
+  // starts with the current filter instead of the next one.
   if (stoppedAll()) {
     allowIteration();
     iterate_from_current_filter_ = true;
