@@ -84,7 +84,8 @@ protected:
       command_latency_ = std::make_unique<Stats::TimespanWithUnit<std::chrono::microseconds>>(
           command_stats_.latency_, time_source);
     } else {
-      command_latency_ = std::make_unique<Stats::Timespan>(command_stats_.latency_, time_source);
+      command_latency_ = std::make_unique<Stats::TimespanWithUnit<std::chrono::milliseconds>>(
+          command_stats_.latency_, time_source);
     }
   }
   CommandStats& command_stats_;
