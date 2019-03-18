@@ -76,6 +76,23 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodeBiggerThanLengthMessage const {
+    Buffer::OwnedImpl buffer;
+
+    // We craft a delete request with a path that's longer than
+    // the declared message length.
+    buffer.writeBEInt<int32_t>(50);
+    buffer.writeBEInt<int32_t>(1000);
+    // Opcode.
+    buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::DELETE));
+    // Path.
+    addString(buffer, std::string(2 * 1024 * 1024, '*'));
+    // Version.
+    buffer.writeBEInt<int32_t>(version);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl encodePing() const {
     Buffer::OwnedImpl buffer;
 
@@ -414,6 +431,15 @@ TEST_F(ZooKeeperFilterTest, PacketTooBig) {
   initialize();
 
   Buffer::OwnedImpl data = encodeTooBigMessage();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, PacketBiggerThanLength) {
+  initialize();
+
+  Buffer::OwnedImpl data = encodeBiggerThanLengthMessage();
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());

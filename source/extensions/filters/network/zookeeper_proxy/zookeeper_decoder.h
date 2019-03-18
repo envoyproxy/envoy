@@ -104,7 +104,7 @@ typedef std::unique_ptr<Decoder> DecoderPtr;
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
   explicit DecoderImpl(DecoderCallbacks& callbacks, uint32_t max_packet_bytes)
-      : callbacks_(callbacks), max_packet_bytes_(max_packet_bytes) {}
+      : callbacks_(callbacks), max_packet_bytes_(max_packet_bytes), helper_(max_packet_bytes) {}
 
   // ZooKeeperProxy::Decoder
   void onData(Buffer::Instance& data) override;
@@ -135,6 +135,7 @@ private:
 
   DecoderCallbacks& callbacks_;
   const uint32_t max_packet_bytes_;
+  BufferHelper helper_;
 };
 
 } // namespace ZooKeeperProxy

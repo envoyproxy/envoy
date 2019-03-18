@@ -13,16 +13,30 @@ namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
 /**
- * Helpers for reading/writing ZooKeeper data from/to a buffer.
+ * Helper for extracting ZooKeeper data from a buffer.
+ *
+ * If at any point a peek is tried beyond max_len, an EnvoyException
+ * will be thrown. This is important to protect Envoy against malformed
+ * requests (e.g.: when the declared and actual length don't match).
  *
  * Note: ZooKeeper's protocol uses network byte ordering (big-endian).
  */
 class BufferHelper : public Logger::Loggable<Logger::Id::filter> {
 public:
-  static int32_t peekInt32(Buffer::Instance& buffer, uint64_t& offset);
-  static int64_t peekInt64(Buffer::Instance& buffer, uint64_t& offset);
-  static std::string peekString(Buffer::Instance& buffer, uint64_t& offset);
-  static bool peekBool(Buffer::Instance& buffer, uint64_t& offset);
+  BufferHelper(uint32_t max_len) : max_len_(max_len) {}
+
+  int32_t peekInt32(Buffer::Instance& buffer, uint64_t& offset);
+  int64_t peekInt64(Buffer::Instance& buffer, uint64_t& offset);
+  std::string peekString(Buffer::Instance& buffer, uint64_t& offset);
+  bool peekBool(Buffer::Instance& buffer, uint64_t& offset);
+  void add(uint32_t size) { current_ += size; }
+  void reset() { current_ = 0; }
+
+private:
+  void ensureMaxLen(uint32_t size);
+
+  uint32_t max_len_;
+  uint32_t current_{};
 };
 
 } // namespace ZooKeeperProxy
