@@ -158,6 +158,10 @@ on 127.0.0.1:5678 is provided below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
+      upstream_connection_options:
+        # configure a TCP keep-alive to detect and reconnect to the admin
+        # server in the event of a TCP socket half open connection
+        tcp_keepalive: {}
       load_assignment:
         cluster_name: xds_cluster
         endpoints:
@@ -171,6 +175,10 @@ on 127.0.0.1:5678 is provided below:
 Notice above that *xds_cluster* is defined to point Envoy at the management server. Even in
 an otherwise completely dynamic configurations, some static resources need to
 be defined to point Envoy at its xDS management server(s).
+
+It's important to set appropriate :ref:`TCP Keep-Alive options <envoy_api_msg_core.TcpKeepalive>`
+in the `tcp_keepalive` block. This will help detect TCP half open connections to the xDS management
+server and re-establish a full connection.
 
 In the above example, the EDS management server could then return a proto encoding of a
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`:
@@ -230,6 +238,10 @@ below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
+      upstream_connection_options:
+        # configure a TCP keep-alive to detect and reconnect to the admin
+        # server in the event of a TCP socket half open connection
+        tcp_keepalive: {}
       load_assignment:
         cluster_name: xds_cluster
         endpoints:
@@ -593,7 +605,7 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
    rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
    pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
-   
+
 .. _config_overview_v2_status:
 
 Status
