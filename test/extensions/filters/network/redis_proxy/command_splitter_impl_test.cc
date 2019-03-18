@@ -53,7 +53,8 @@ public:
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_};
+  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_,
+                         false};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -130,8 +131,8 @@ public:
     pool_callbacks_->onResponse(std::move(response1));
   }
 
-  ConnPool::PoolCallbacks* pool_callbacks_;
-  ConnPool::MockPoolRequest pool_request_;
+  Common::Redis::Client::PoolCallbacks* pool_callbacks_;
+  Common::Redis::Client::MockPoolRequest pool_request_;
 };
 
 TEST_P(RedisSingleServerRequestTest, Success) {
@@ -349,11 +350,11 @@ public:
     std::vector<Common::Redis::RespValue> tmp_expected_requests(num_gets);
     expected_requests_.swap(tmp_expected_requests);
     pool_callbacks_.resize(num_gets);
-    std::vector<ConnPool::MockPoolRequest> tmp_pool_requests(num_gets);
+    std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_gets);
     pool_requests_.swap(tmp_pool_requests);
     for (uint32_t i = 0; i < num_gets; i++) {
       makeBulkStringArray(expected_requests_[i], {"get", std::to_string(i)});
-      ConnPool::PoolRequest* request_to_use = nullptr;
+      Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
@@ -366,8 +367,8 @@ public:
   }
 
   std::vector<Common::Redis::RespValue> expected_requests_;
-  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
-  std::vector<ConnPool::MockPoolRequest> pool_requests_;
+  std::vector<Common::Redis::Client::PoolCallbacks*> pool_callbacks_;
+  std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
 };
 
 TEST_F(RedisMGETCommandHandlerTest, Normal) {
@@ -552,11 +553,11 @@ public:
     std::vector<Common::Redis::RespValue> tmp_expected_requests(num_sets);
     expected_requests_.swap(tmp_expected_requests);
     pool_callbacks_.resize(num_sets);
-    std::vector<ConnPool::MockPoolRequest> tmp_pool_requests(num_sets);
+    std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_sets);
     pool_requests_.swap(tmp_pool_requests);
     for (uint32_t i = 0; i < num_sets; i++) {
       makeBulkStringArray(expected_requests_[i], {"set", std::to_string(i), std::to_string(i)});
-      ConnPool::PoolRequest* request_to_use = nullptr;
+      Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
@@ -569,8 +570,8 @@ public:
   }
 
   std::vector<Common::Redis::RespValue> expected_requests_;
-  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
-  std::vector<ConnPool::MockPoolRequest> pool_requests_;
+  std::vector<Common::Redis::Client::PoolCallbacks*> pool_callbacks_;
+  std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
 };
 
 TEST_F(RedisMSETCommandHandlerTest, Normal) {
@@ -675,11 +676,11 @@ public:
     std::vector<Common::Redis::RespValue> tmp_expected_requests(num_commands);
     expected_requests_.swap(tmp_expected_requests);
     pool_callbacks_.resize(num_commands);
-    std::vector<ConnPool::MockPoolRequest> tmp_pool_requests(num_commands);
+    std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(num_commands);
     pool_requests_.swap(tmp_pool_requests);
     for (uint32_t i = 0; i < num_commands; i++) {
       makeBulkStringArray(expected_requests_[i], {GetParam(), std::to_string(i)});
-      ConnPool::PoolRequest* request_to_use = nullptr;
+      Common::Redis::Client::PoolRequest* request_to_use = nullptr;
       if (std::find(null_handle_indexes.begin(), null_handle_indexes.end(), i) ==
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
@@ -692,8 +693,8 @@ public:
   }
 
   std::vector<Common::Redis::RespValue> expected_requests_;
-  std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
-  std::vector<ConnPool::MockPoolRequest> pool_requests_;
+  std::vector<Common::Redis::Client::PoolCallbacks*> pool_callbacks_;
+  std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
 };
 
 TEST_P(RedisSplitKeysSumResultHandlerTest, Normal) {
@@ -768,6 +769,47 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NoUpstreamHostForAll) {
 INSTANTIATE_TEST_SUITE_P(
     RedisSplitKeysSumResultHandlerTest, RedisSplitKeysSumResultHandlerTest,
     testing::ValuesIn(Common::Redis::SupportedCommands::hashMultipleSumResultCommands()));
+
+class RedisSingleServerRequestWithLatencyMicrosTest : public RedisSingleServerRequestTest {
+public:
+  void makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request) {
+    EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Ref(request), _))
+        .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
+    handle_ = splitter_.makeRequest(request, callbacks_);
+  }
+
+  ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
+  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_,
+                         true};
+};
+
+TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {
+  InSequence s;
+
+  ToLowerTable table;
+  std::string lower_command(GetParam());
+  table.toLowerCase(lower_command);
+
+  Common::Redis::RespValue request;
+  makeBulkStringArray(request, {GetParam(), "hello"});
+  makeRequest("hello", request);
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10000));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
+};
+
+INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithLatencyMicrosTest,
+                         RedisSingleServerRequestWithLatencyMicrosTest,
+                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

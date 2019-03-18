@@ -17,8 +17,8 @@ public:
           const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // Event::TimeSystem
-  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& libevent) override {
-    return real_time_system_.createScheduler(libevent);
+  Event::SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
+    return real_time_system_.createScheduler(base_scheduler);
   }
 
   // TimeSource

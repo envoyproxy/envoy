@@ -1,3 +1,5 @@
+.. _arch_overview_initialization:
+
 Initialization
 ==============
 
@@ -22,3 +24,6 @@ accepting new connections.
 * After all of the previous steps have taken place, the listeners start accepting new connections.
   This flow ensures that during hot restart the new process is fully capable of accepting and
   processing new connections before the draining of the old process begins.
+
+All mentioned "waiting for one response" periods can be limited by setting corresponding
+:ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`.

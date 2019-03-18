@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Config {
 
-// Oversees communication for gRPC xDS implementations (parent to both regular xDS and incremental
+// Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
 template <class RequestProto, class ResponseProto, class RequestQueueItem>
@@ -49,6 +49,14 @@ public:
     drainRequests();
   }
 
+  void clearRequestQueue() {
+    control_plane_stats_.pending_requests_.sub(request_queue_.size());
+    // TODO(fredlas) when we have C++17: request_queue_ = {};
+    while (!request_queue_.empty()) {
+      request_queue_.pop();
+    }
+  }
+
   void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
     stream_ = async_client_->start(service_method_, *this);
@@ -58,7 +66,7 @@ public:
       setRetryTimer();
       return;
     }
-    control_plane_stats_.connected_state_.set(true);
+    control_plane_stats_.connected_state_.set(1);
     handleStreamEstablished();
   }
 
@@ -92,7 +100,7 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
     ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
     stream_ = nullptr;
-    control_plane_stats_.connected_state_.set(false);
+    control_plane_stats_.connected_state_.set(0);
     handleEstablishmentFailure();
     setRetryTimer();
   }
@@ -118,14 +126,13 @@ private:
   }
 
   bool checkRateLimitAllowsDrain() {
-    if (!rate_limiting_enabled_ || limit_request_->consume()) {
+    if (!rate_limiting_enabled_ || limit_request_->consume(1, false)) {
       return true;
     }
     ASSERT(drain_request_timer_ != nullptr);
     control_plane_stats_.rate_limit_enforced_.inc();
     // Enable the drain request timer.
-    drain_request_timer_->enableTimer(
-        std::chrono::milliseconds(limit_request_->nextTokenAvailableMs()));
+    drain_request_timer_->enableTimer(limit_request_->nextTokenAvailable());
     return false;
   }
 
@@ -135,8 +142,7 @@ private:
 
   ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
     const std::string control_plane_prefix = "control_plane.";
-    return {ALL_CONTROL_PLANE_STATS(POOL_BOOL_INDICATOR_PREFIX(scope, control_plane_prefix),
-                                    POOL_COUNTER_PREFIX(scope, control_plane_prefix),
+    return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
                                     POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
   }
 

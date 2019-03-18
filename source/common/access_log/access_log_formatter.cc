@@ -391,6 +391,14 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.subjectLocalCertificate();
         });
+  } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      if (!stream_info.upstreamTransportFailureReason().empty()) {
+        return stream_info.upstreamTransportFailureReason();
+      } else {
+        return UnspecifiedValueString;
+      }
+    };
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }

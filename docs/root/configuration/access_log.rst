@@ -28,7 +28,7 @@ Format Strings
 --------------
 
 Format strings are plain strings, specified using the ``format`` key. They may contain
-either command operators or other characters interpreted as a plain string. 
+either command operators or other characters interpreted as a plain string.
 The access log formatter does not make any assumptions about a new line separator, so one
 has to specified as part of the format string.
 See the :ref:`default format <config_access_log_default_format>` for an example.
@@ -78,7 +78,7 @@ For example, with the following format provided in the configuration:
       }
     }
   }
-  
+
 The following JSON object would be written to the log file:
 
 .. code-block:: json
@@ -227,6 +227,17 @@ The following command operators are supported:
 %UPSTREAM_LOCAL_ADDRESS%
   Local address of the upstream connection. If the address is an IP address it includes both
   address and port.
+
+.. _config_access_log_format_upstream_transport_failure_reason:
+
+%UPSTREAM_TRANSPORT_FAILURE_REASON%
+  HTTP
+    If upstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    reason from the transport socket. The format of this field depends on the configured upstream
+    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+
+  TCP
+    Not implemented ("-")
 
 %DOWNSTREAM_REMOTE_ADDRESS%
   Remote address of the downstream connection. If the address is an IP address it includes both

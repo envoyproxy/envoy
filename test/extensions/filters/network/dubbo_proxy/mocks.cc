@@ -28,8 +28,17 @@ MockDecoderEventHandler::MockDecoderEventHandler() {
 MockProtocolCallbacks::MockProtocolCallbacks() {}
 MockProtocolCallbacks::~MockProtocolCallbacks() {}
 
-MockProtocol::MockProtocol() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
+MockProtocol::MockProtocol() {
+  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, type()).WillByDefault(Return(type_));
+}
 MockProtocol::~MockProtocol() {}
+
+MockDeserializer::MockDeserializer() {
+  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, type()).WillByDefault(Return(type_));
+}
+MockDeserializer::~MockDeserializer() {}
 
 namespace DubboFilters {
 

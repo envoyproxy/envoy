@@ -17,6 +17,7 @@ void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
 }
 
 std::string TapSocket::protocol() const { return transport_socket_->protocol(); }
+absl::string_view TapSocket::failureReason() const { return transport_socket_->failureReason(); }
 
 bool TapSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
 

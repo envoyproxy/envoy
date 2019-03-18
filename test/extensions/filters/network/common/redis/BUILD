@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -15,7 +16,17 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_utils_lib",
+    hdrs = ["test_utils.h"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )
 
@@ -28,5 +39,22 @@ envoy_cc_test(
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "client_impl_test",
+    srcs = ["client_impl_test.cc"],
+    deps = [
+        ":redis_mocks",
+        ":test_utils_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/filters/network/common/redis:client_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:upstream_mocks",
     ],
 )

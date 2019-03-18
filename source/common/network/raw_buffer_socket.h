@@ -14,6 +14,7 @@ public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
+  absl::string_view failureReason() const override;
   bool canFlushClose() override { return true; }
   void closeSocket(Network::ConnectionEvent) override {}
   void onConnected() override;
