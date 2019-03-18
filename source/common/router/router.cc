@@ -558,11 +558,11 @@ void Filter::onResponseTimeout() {
       // If this upstream request already hit a "soft" timeout, then it
       // already recorded a timeout into outlier detection. Don't do it again.
       if (!upstream_request->outlier_detection_timeout_recorded_) {
-        updateOutlierDetection(timeout_response_code_, *upstream_request.get());
+        updateOutlierDetection(timeout_response_code_, *upstream_request);
       }
       upstream_request->resetStream();
 
-      chargeUpstreamAbort(timeout_response_code_, false, *upstream_request.get());
+      chargeUpstreamAbort(timeout_response_code_, false, *upstream_request);
     }
   }
 
