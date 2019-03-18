@@ -32,7 +32,6 @@ public:
   Event::DispatcherPtr allocateDispatcher() override;
   Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;
   TimeSource& timeSource() override { return time_system_; }
-  Stats::Store& statsStore() override { return stats_store_; }
 
   MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(Event::TimeSystem&));
   MOCK_METHOD2(allocateDispatcher_,
