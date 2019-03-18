@@ -554,7 +554,7 @@ TEST(HttpUtility, SendLocalReplyJsonConntentTypeRequest) {
                   data.toString());
       }));
   Utility::LocalReplyInfo info;
-  info.is_json_content_type = true;
+  info.has_json_content_type = true;
   Utility::sendLocalReply(info, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt);
 }

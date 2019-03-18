@@ -178,11 +178,11 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
 struct LocalReplyInfo {
   bool is_grpc{false};
   bool is_head_request{false};
-  bool is_json_content_type{false};
+  bool has_json_content_type{false};
 };
 
 /**
- * @return LocalReplyInfo An LocalReplyInfo populated from the
+ * @return LocalReplyInfo A populated LocalReplyInfo object from the
  * Http::HeaderMap& request_headers.
  */
 LocalReplyInfo generateLocalReplyInfo(const Http::HeaderMap& request_headers);

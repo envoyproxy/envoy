@@ -6,9 +6,8 @@ option java_outer_classname = "LocalReplyBodyProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.core.v2alpha";
 
-// [#protodoc-title:  core data]
-
-// Wrapper for local reply body data.
+// [#protodoc-title:  local reply body]
+// Used to wrap a local response, and then converted to json format to return.
 message LocalReplyBody {
-  string body = 3;
+  string body = 1;
 }
