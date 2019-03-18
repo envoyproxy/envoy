@@ -388,7 +388,8 @@ private:
       HostsPerLocalityConstSharedPtr all_hosts_per_locality,
       LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
 
-  static absl::optional<uint32_t> chooseLocality(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler);
+  static absl::optional<uint32_t>
+  chooseLocality(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler);
 
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;

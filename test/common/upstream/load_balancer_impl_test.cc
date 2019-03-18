@@ -640,8 +640,7 @@ TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
   HostVectorSharedPtr degraded_hosts(new HostVector({(*hosts)[1], (*hosts)[2]}));
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{(*hosts)[0]}, {(*hosts)[1], (*hosts)[2]}});
-  HostsPerLocalitySharedPtr healthy_hosts_per_locality =
-      makeHostsPerLocality({{(*hosts)[0]}, {}});
+  HostsPerLocalitySharedPtr healthy_hosts_per_locality = makeHostsPerLocality({{(*hosts)[0]}, {}});
   HostsPerLocalitySharedPtr degraded_hosts_per_locality =
       makeHostsPerLocality({{}, {(*hosts)[1], (*hosts)[2]}});
 

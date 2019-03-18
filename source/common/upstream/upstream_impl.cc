@@ -357,12 +357,16 @@ void HostSetImpl::rebuildLocalityScheduler(
   }
 }
 
-absl::optional<uint32_t> HostSetImpl::chooseLocality() { return chooseLocality(locality_scheduler_); }
+absl::optional<uint32_t> HostSetImpl::chooseLocality() {
+  return chooseLocality(locality_scheduler_);
+}
 
-absl::optional<uint32_t> HostSetImpl::chooseDegradedLocality() { return chooseLocality(degraded_locality_scheduler_); }
+absl::optional<uint32_t> HostSetImpl::chooseDegradedLocality() {
+  return chooseLocality(degraded_locality_scheduler_);
+}
 
-absl::optional<uint32_t> HostSetImpl::chooseLocality(
-    std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler) {
+absl::optional<uint32_t>
+HostSetImpl::chooseLocality(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler) {
   if (locality_scheduler == nullptr) {
     return {};
   }
@@ -374,7 +378,6 @@ absl::optional<uint32_t> HostSetImpl::chooseLocality(
   locality_scheduler->add(locality->effective_weight_, locality);
   return locality->index_;
 }
-
 
 PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
