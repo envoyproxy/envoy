@@ -92,9 +92,9 @@ public:
   /**
    * Called when a new connection is accepted.
    * @param socket supplies the socket that is moved into the callee.
-   * @param redirected is true when the socket was first accepted by another listener
-   * and is redirected to a new listener. The recipient should not redirect
-   * the socket any further.
+   * @param hand_off_restored_destination_connections is true when the socket was first accepted by
+   * another listener and is redirected to a new listener. The recipient should not redirect the
+   * socket any further.
    */
   virtual void onAccept(ConnectionSocketPtr&& socket,
                         bool hand_off_restored_destination_connections = true) PURE;
