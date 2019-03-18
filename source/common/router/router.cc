@@ -835,7 +835,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
         code_stats.chargeBasicResponseStat(cluster_->statsScope(), "retry.",
                                            static_cast<Http::Code>(response_code));
         upstream_host->stats().rq_error_.inc();
-        upstream_request.retried_ = true;
         return;
       } else if (retry_status == RetryStatus::NoOverflow) {
         callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
