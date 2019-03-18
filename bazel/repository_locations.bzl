@@ -82,9 +82,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "a5342629fe1b689eceb3be4d4f167b04c70a84b9d61cf8b555e968bc500bdb5a",
-        strip_prefix = "grpc-1.16.1",
-        urls = ["https://github.com/grpc/grpc/archive/v1.16.1.tar.gz"],
+        sha256 = "f869c648090e8bddaa1260a271b1089caccbe735bf47ac9cd7d44d35a02fb129",
+        strip_prefix = "grpc-1.19.1",
+        urls = ["https://github.com/grpc/grpc/archive/v1.19.1.tar.gz"],
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",

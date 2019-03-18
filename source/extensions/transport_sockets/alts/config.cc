@@ -85,7 +85,7 @@ createTransportSocketFactoryHelper(const Protobuf::Message& message, bool is_ups
     // Specifying target name as empty since TSI won't take care of validating peer identity
     // in this use case. The validation will be performed by TsiSocket with the validator.
     tsi_result status = alts_tsi_handshaker_create(
-        options.get(), target_name, handshaker_service.c_str(), is_upstream, &handshaker);
+        options.get(), target_name, handshaker_service.c_str(), is_upstream, nullptr, &handshaker);
     CHandshakerPtr handshaker_ptr{handshaker};
 
     if (status != TSI_OK) {
