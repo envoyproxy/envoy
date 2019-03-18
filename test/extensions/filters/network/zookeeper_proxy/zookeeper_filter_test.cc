@@ -88,7 +88,7 @@ public:
     // Path.
     addString(buffer, std::string(2 * 1024 * 1024, '*'));
     // Version.
-    buffer.writeBEInt<int32_t>(version);
+    buffer.writeBEInt<int32_t>(-1);
 
     return buffer;
   }
