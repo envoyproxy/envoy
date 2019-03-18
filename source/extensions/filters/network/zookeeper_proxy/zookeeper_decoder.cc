@@ -196,7 +196,7 @@ void DecoderImpl::parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, 
   callbacks_.onGetDataRequest(path, watch);
 }
 
-void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) const {
+void DecoderImpl::skipAcls(Buffer::Instance& data, uint64_t& offset) {
   const int32_t count = helper_.peekInt32(data, offset);
 
   for (int i = 0; i < count; ++i) {
@@ -393,13 +393,13 @@ void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset,
   }
 }
 
-void DecoderImpl::skipString(Buffer::Instance& data, uint64_t& offset) const {
+void DecoderImpl::skipString(Buffer::Instance& data, uint64_t& offset) {
   const int32_t slen = helper_.peekInt32(data, offset);
   offset += slen;
   helper_.add(slen);
 }
 
-void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) const {
+void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) {
   const int32_t count = helper_.peekInt32(data, offset);
 
   for (int i = 0; i < count; ++i) {

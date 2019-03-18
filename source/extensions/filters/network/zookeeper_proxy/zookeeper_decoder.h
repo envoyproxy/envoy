@@ -117,7 +117,7 @@ private:
   void parseAuthRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetDataRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseCreateRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
-  void skipAcls(Buffer::Instance& data, uint64_t& offset) const;
+  void skipAcls(Buffer::Instance& data, uint64_t& offset);
   void parseSetRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetChildrenRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, bool two);
   void parseDeleteRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
@@ -130,8 +130,8 @@ private:
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len, OpCodes opcode);
-  void skipString(Buffer::Instance& data, uint64_t& offset) const;
-  void skipStrings(Buffer::Instance& data, uint64_t& offset) const;
+  void skipString(Buffer::Instance& data, uint64_t& offset);
+  void skipStrings(Buffer::Instance& data, uint64_t& offset);
   void ensureMinLength(int32_t len, int32_t minlen) const;
   void ensureMaxLength(int32_t len) const;
 
