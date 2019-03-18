@@ -70,8 +70,8 @@ def flip_runtime_features():
 
 
 # Gather code and suggested email changes.
-(runtime_email, runtime_features_code) = flip_runtime_features()
-(deprecate_email, deprecate_code) = deprecate_proto()
+runtime_email, runtime_features_code = flip_runtime_features()
+deprecate_email, deprecate_code = deprecate_proto()
 
 email = ('The Envoy maintainer team is cutting the next Envoy release.  In the new release ' +
          runtime_email + deprecate_email)
