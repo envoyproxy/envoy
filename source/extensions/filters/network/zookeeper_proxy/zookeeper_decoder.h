@@ -44,7 +44,9 @@ enum class OpCodes {
   CREATETTL = 21,
   CLOSE = -11,
   SETAUTH = 100,
-  SETWATCHES = 101
+  SETWATCHES = 101,
+  GETEPHEMERALS = 103,
+  GETALLCHILDRENNUMBER = 104
 };
 
 enum class WatcherType { CHILDREN = 1, DATA = 2, ANY = 3 };
@@ -77,6 +79,8 @@ public:
   virtual void onCreateRequest(const std::string& path, CreateFlags flags, OpCodes opcode) PURE;
   virtual void onSetRequest(const std::string& path) PURE;
   virtual void onGetChildrenRequest(const std::string& path, bool watch, bool two) PURE;
+  virtual void onGetEphemeralsRequest(const std::string& path) PURE;
+  virtual void onGetAllChildrenNumberRequest(const std::string& path) PURE;
   virtual void onDeleteRequest(const std::string& path, int32_t version) PURE;
   virtual void onExistsRequest(const std::string& path, bool watch) PURE;
   virtual void onGetAclRequest(const std::string& path) PURE;
@@ -124,7 +128,6 @@ private:
   void parseExistsRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseGetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
-  void parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseMultiRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
   void parseReconfigRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
@@ -134,6 +137,7 @@ private:
   void skipStrings(Buffer::Instance& data, uint64_t& offset);
   void ensureMinLength(int32_t len, int32_t minlen) const;
   void ensureMaxLength(int32_t len) const;
+  std::string pathOnlyRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len);
 
   DecoderCallbacks& callbacks_;
   const uint32_t max_packet_bytes_;

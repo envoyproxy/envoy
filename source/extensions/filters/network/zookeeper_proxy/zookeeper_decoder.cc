@@ -117,7 +117,7 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     parseSetAclRequest(data, offset, len);
     break;
   case OpCodes::SYNC:
-    parseSyncRequest(data, offset, len);
+    callbacks_.onSyncRequest(pathOnlyRequest(data, offset, len));
     break;
   case OpCodes::CHECK:
     parseCheckRequest(data, offset, len);
@@ -136,6 +136,12 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
     break;
   case OpCodes::REMOVEWATCHES:
     parseXWatchesRequest(data, offset, len, OpCodes::REMOVEWATCHES);
+    break;
+  case OpCodes::GETEPHEMERALS:
+    callbacks_.onGetEphemeralsRequest(pathOnlyRequest(data, offset, len));
+    break;
+  case OpCodes::GETALLCHILDRENNUMBER:
+    callbacks_.onGetAllChildrenNumberRequest(pathOnlyRequest(data, offset, len));
     break;
   case OpCodes::CLOSE:
     callbacks_.onCloseRequest();
@@ -302,12 +308,9 @@ void DecoderImpl::parseSetAclRequest(Buffer::Instance& data, uint64_t& offset, u
   callbacks_.onSetAclRequest(path, version);
 }
 
-void DecoderImpl::parseSyncRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
+std::string DecoderImpl::pathOnlyRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {
   ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + INT_LENGTH);
-
-  const std::string path = helper_.peekString(data, offset);
-
-  callbacks_.onSyncRequest(path);
+  return helper_.peekString(data, offset);
 }
 
 void DecoderImpl::parseCheckRequest(Buffer::Instance& data, uint64_t& offset, uint32_t len) {

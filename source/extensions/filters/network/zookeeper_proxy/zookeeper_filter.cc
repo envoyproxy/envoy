@@ -219,6 +219,16 @@ void ZooKeeperFilter::onSetWatchesRequest() {
   setDynamicMetadata("opname", "setwatches");
 }
 
+void ZooKeeperFilter::onGetEphemeralsRequest(const std::string& path) {
+  config_->stats_.getephemerals_rq_.inc();
+  setDynamicMetadata({{"opname", "getephemerals"}, {"path", path}});
+}
+
+void ZooKeeperFilter::onGetAllChildrenNumberRequest(const std::string& path) {
+  config_->stats_.getallchildrennumber_rq_.inc();
+  setDynamicMetadata({{"opname", "getallchildrennumber"}, {"path", path}});
+}
+
 void ZooKeeperFilter::onCloseRequest() {
   config_->stats_.close_rq_.inc();
   setDynamicMetadata("opname", "close");

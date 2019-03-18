@@ -33,6 +33,8 @@ namespace ZooKeeperProxy {
   COUNTER(setdata_rq)                                                   \
   COUNTER(getchildren_rq)                                               \
   COUNTER(getchildren2_rq)                                              \
+  COUNTER(getephemerals_rq)                                             \
+  COUNTER(getallchildrennumber_rq)                                      \
   COUNTER(remove_rq)                                                    \
   COUNTER(exists_rq)                                                    \
   COUNTER(getacl_rq)                                                    \
@@ -117,6 +119,8 @@ public:
   void onSetWatchesRequest() override;
   void onCheckWatchesRequest(const std::string& path, int32_t type) override;
   void onRemoveWatchesRequest(const std::string& path, int32_t type) override;
+  void onGetEphemeralsRequest(const std::string& path) override;
+  void onGetAllChildrenNumberRequest(const std::string& path) override;
   void onCloseRequest() override;
 
   void doDecode(Buffer::Instance& buffer);

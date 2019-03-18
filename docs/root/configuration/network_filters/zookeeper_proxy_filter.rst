@@ -7,13 +7,7 @@ The ZooKeeper proxy filter decodes the client protocol for
 `Apache ZooKeeper <https://zookeeper.apache.org/>`_. It decodes the requests,
 responses and events in the payload. Most opcodes known in
 `ZooKeeper 3.5 <https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java>`_
-are supported.
-
-The unsupported ones are:
-
-* sasl
-* getEphemerals
-* getAllChildrenNumber
+are supported. The unsupported ones are related to SASL authentication.
 
 .. attention::
 

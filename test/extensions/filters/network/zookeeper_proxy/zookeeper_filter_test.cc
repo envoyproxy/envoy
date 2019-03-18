@@ -79,7 +79,7 @@ public:
   Buffer::OwnedImpl encodeBiggerThanLengthMessage() const {
     Buffer::OwnedImpl buffer;
 
-    // We craft a delete request with a path that's longer than
+    // Craft a delete request with a path that's longer than
     // the declared message length.
     buffer.writeBEInt<int32_t>(50);
     buffer.writeBEInt<int32_t>(1000);
@@ -628,6 +628,33 @@ TEST_F(ZooKeeperFilterTest, SyncRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().sync_rq_.value());
+  EXPECT_EQ(20UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, GetEphemeralsRequest) {
+  initialize();
+
+  Buffer::OwnedImpl data = encodePath("/foo", enumToIntSigned(OpCodes::GETEPHEMERALS));
+
+  expectSetDynamicMetadata({{"opname", "getephemerals"}, {"path", "/foo"}}, {{"bytes", "20"}});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1UL, config_->stats().getephemerals_rq_.value());
+  EXPECT_EQ(20UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, GetAllChildrenNumberRequest) {
+  initialize();
+
+  Buffer::OwnedImpl data = encodePath("/foo", enumToIntSigned(OpCodes::GETALLCHILDRENNUMBER));
+
+  expectSetDynamicMetadata({{"opname", "getallchildrennumber"}, {"path", "/foo"}},
+                           {{"bytes", "20"}});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1UL, config_->stats().getallchildrennumber_rq_.value());
   EXPECT_EQ(20UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
