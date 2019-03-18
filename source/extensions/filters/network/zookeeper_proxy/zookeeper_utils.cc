@@ -52,7 +52,7 @@ std::string BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset)
   return val;
 }
 
-void ensureMaxLen(const uint32_t size) {
+void BufferHelper::ensureMaxLen(const uint32_t size) {
   current_ += size;
 
   if (current_ > max_len_) {
