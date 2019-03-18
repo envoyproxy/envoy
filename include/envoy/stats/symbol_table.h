@@ -132,6 +132,9 @@ public:
    * on the SymbolTable abstraction and API, without getting full benefit
    * from the improved representation.
    *
+   * TODO(#6307): Remove this when the transition from FakeSymbolTableImpl to
+   * SymbolTableImpl is complete.
+   *
    * @param stat_name The stat name.
    * @param fn The function to call with the elaborated stat name as a string_view.
    */
@@ -164,6 +167,17 @@ private:
    */
   virtual void incRefCount(const StatName& stat_name) PURE;
 
+  /**
+   * Encodes 'name' into the symbol table, tokenizing. Bumps reference counts
+   * for referenced symbols. The caller must manage the storage, and is
+   * responsible for calling SymbolTable::free() to release the reference
+   * counts. Note that this method is private, but is called by friend classes
+   * StatNameStorage and StatNameList.
+   *
+   * @param name The name to encode.
+   * @return The encoded name, transferring ownership to the caller.
+   *
+   */
   virtual StoragePtr copyToBytes(absl::string_view name) PURE;
 };
 

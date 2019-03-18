@@ -71,12 +71,10 @@ using SymbolVec = std::vector<Symbol>;
 class SymbolTableImpl : public SymbolTable {
 public:
   /**
-   * Intermediate representation for a stat-name. This helps store multiple names
-   * in a single packed allocation. First we encode each desired name, then sum
-   * their sizes for the single packed allocation. This is used to store
-   * MetricImpl's tags and tagExtractedName. Like StatName, we don't want to pay
-   * a vptr overhead per object, and the representation is shared between the
-   * SymbolTable implementations, so this is just a pre-declare.
+   * Intermediate representation for a stat-name. This helps store multiple
+   * names in a single packed allocation. First we encode each desired name,
+   * then sum their sizes for the single packed allocation. This is used to
+   * store MetricImpl's tags and tagExtractedName.
    */
   class Encoding {
   public:
@@ -97,14 +95,6 @@ public:
     void addSymbol(Symbol symbol);
 
     /**
-     * Encodes an entire string into the vec, on behalf of FakeSymbolTableImpl.
-     * TODO(jmarantz): delete this method when FakeSymbolTableImpl is deleted.
-     *
-     * @param str The string to encode.
-     */
-    void addStringForFakeSymbolTable(absl::string_view str);
-
-    /**
      * Decodes a uint8_t array into a SymbolVec.
      */
     static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
@@ -113,12 +103,12 @@ public:
      * Returns the number of bytes required to represent StatName as a uint8_t
      * array, including the encoded size.
      */
-    uint64_t bytesRequired() const { return size() + StatNameSizeEncodingBytes; }
+    uint64_t bytesRequired() const { return dataBytesRequired() + StatNameSizeEncodingBytes; }
 
     /**
-     * Returns the number of uint8_t entries we collected while adding symbols.
+     * @return the number of uint8_t entries we collected while adding symbols.
      */
-    uint64_t size() const { return vec_.size(); }
+    uint64_t dataBytesRequired() const { return vec_.size(); }
 
     /**
      * Moves the contents of the vector into an allocated array. The array
@@ -128,8 +118,6 @@ public:
      * @return uint64_t the number of bytes transferred.
      */
     uint64_t moveToStorage(SymbolTable::Storage array);
-
-    void swap(Encoding& src) { vec_.swap(src.vec_); }
 
   private:
     std::vector<uint8_t> vec_;
@@ -145,18 +133,32 @@ public:
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
   SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
-
-  void encode(absl::string_view name, Encoding& encoding);
   void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override;
+  StoragePtr copyToBytes(absl::string_view name) override;
+  void callWithStringView(StatName stat_name,
+                          const std::function<void(absl::string_view)>& fn) const override;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
 
-  StoragePtr copyToBytes(absl::string_view name) override;
+  void encode(absl::string_view name, Encoding& encoding);
 
-  void callWithStringView(StatName stat_name,
-                          const std::function<void(absl::string_view)>& fn) const override;
+  /**
+   * Saves the specified length into the byte array, returning the next byte.
+   * There is no guarantee that bytes will be aligned, so we can't cast to a
+   * uint16_t* and assign, but must individually copy the bytes.
+   *
+   * @param length the length in bytes to write. Must be < StatNameMaxSize.
+   * @param bytes the pointer into which to write the length.
+   * @return the pointer to the next byte for writing the data.
+   */
+  static inline uint8_t* writeLengthReturningNext(uint64_t length, uint8_t* bytes) {
+    ASSERT(length < StatNameMaxSize);
+    *bytes++ = length & 0xff;
+    *bytes++ = length >> 8;
+    return bytes;
+  }
 
 private:
   friend class StatName;

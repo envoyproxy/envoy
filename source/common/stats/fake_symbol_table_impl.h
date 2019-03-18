@@ -44,7 +44,7 @@ namespace Stats {
  * that backs each StatName, so there is no sharing or memory savings, but also
  * no state associated with the SymbolTable, and thus no locks needed.
  *
- * TODO(jmarantz): delete this class once SymbolTable is fully deployed in the
+ * TODO(#6307): delete this class once SymbolTable is fully deployed in the
  * Envoy codebase.
  */
 class FakeSymbolTableImpl : public SymbolTable {
@@ -59,9 +59,13 @@ public:
     // memory allocation per element, adding significant overhead as measured by
     // thread_local_store_speed_test.
 
+    // We encode the number of names in a single byte, thus there must be less
+    // than 256 of them.
     RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
-    // First encode all the names.
+    // First encode all the names. The '1' here represents the number of
+    // names. The num_names * StatNameSizeEncodingBytes reserves space for the
+    // lengths of each name.
     size_t total_size_bytes = 1 + num_names * StatNameSizeEncodingBytes;
 
     for (int32_t i = 0; i < num_names; ++i) {
@@ -76,12 +80,17 @@ public:
     for (int32_t i = 0; i < num_names; ++i) {
       auto& name = names[i];
       size_t sz = name.size();
-      p = saveLengthToBytesReturningNext(sz, p);
+      p = SymbolTableImpl::writeLengthReturningNext(sz, p);
       if (!name.empty()) {
         memcpy(p, name.data(), sz * sizeof(uint8_t));
         p += sz;
       }
     }
+
+    // This assertion double-checks the arithmetic where we computed
+    // total_size_bytes. After appending all the encoded data into the
+    // allocated byte array, we should wind up with a pointer difference of
+    // total_size_bytes from the beginning of the allocation.
     ASSERT(p == &storage[0] + total_size_bytes);
     list.moveStorageIntoList(std::move(storage));
   }
@@ -112,7 +121,7 @@ public:
 
   StoragePtr copyToBytes(absl::string_view name) override {
     auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
-    uint8_t* buffer = saveLengthToBytesReturningNext(name.size(), bytes.get());
+    uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());
     return bytes;
   }
@@ -123,23 +132,13 @@ public:
   }
 
 private:
-  // Saves the specified length into the byte array, returning the next byte.
-  // There is no guarantee that bytes will be aligned, so we can't cast to a
-  // uint16_t* and assign, but must individually copy the bytes.
-  static uint8_t* saveLengthToBytesReturningNext(uint64_t length, uint8_t* bytes) {
-    ASSERT(length < StatNameMaxSize);
-    *bytes++ = length & 0xff;
-    *bytes++ = length >> 8;
-    return bytes;
-  }
-
   absl::string_view toStringView(const StatName& stat_name) const {
     return {reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize()};
   }
 
   StoragePtr stringToStorage(absl::string_view name) const {
     auto storage = std::make_unique<Storage>(name.size() + 2);
-    uint8_t* p = saveLengthToBytesReturningNext(name.size(), storage.get());
+    uint8_t* p = SymbolTableImpl::writeLengthReturningNext(name.size(), storage.get());
     memcpy(p, name.data(), name.size());
     return storage;
   }
