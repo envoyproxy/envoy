@@ -224,19 +224,19 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(const std::string& name,
     return false;
   }
 
-  auto iter = central_rejected_stats.find(name.c_str());
+  auto iter = central_rejected_stats.find(name);
   SharedString rejected_name;
   if (iter != central_rejected_stats.end()) {
-    rejected_name = iter->second;
+    rejected_name = *iter;
   } else {
     if (rejects(name)) {
       rejected_name = std::make_shared<std::string>(name);
-      central_rejected_stats[rejected_name->c_str()] = rejected_name;
+      central_rejected_stats.insert(rejected_name);
     }
   }
   if (rejected_name != nullptr) {
     if (tls_rejected_stats != nullptr) {
-      (*tls_rejected_stats)[rejected_name->c_str()] = rejected_name;
+      tls_rejected_stats->insert(rejected_name);
     }
     return true;
   }

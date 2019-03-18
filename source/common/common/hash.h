@@ -91,4 +91,35 @@ using ConstCharStarHashMap =
 using ConstCharStarHashSet =
     absl::flat_hash_set<const char*, ConstCharStarHash, ConstCharStarEqual>;
 
+using SharedString = std::shared_ptr<std::string>;
+
+struct HeterogeneousStringHash {
+  // Specifying is_transparent indicates to the library infrastructure that
+  // type-conversions should not be applied when calling find(), but instead
+  // pass the actual types of the contained and searched-for objects directly to
+  // these functors. See
+  // https://en.cppreference.com/w/cpp/utility/functional/less_void for an
+  // official reference, and https://abseil.io/tips/144 for a description of
+  // using it in the context of absl.
+  using is_transparent = void;
+
+  size_t operator()(absl::string_view a) const { return HashUtil::xxHash64(a); }
+  size_t operator()(const SharedString& a) const { return HashUtil::xxHash64(*a); }
+};
+
+struct HeterogeneousStringEqual {
+  // See description for HeterogeneousStringHash::is_transparent.
+  using is_transparent = void;
+
+  size_t operator()(absl::string_view a, absl::string_view b) const { return a == b; }
+  size_t operator()(const SharedString& a, const SharedString& b) const { return *a == *b; }
+  size_t operator()(absl::string_view a, const SharedString& b) const { return a == *b; }
+  size_t operator()(const SharedString& a, absl::string_view b) const { return *a == b; }
+};
+
+// We use heterogeneous hash/equal functors to do a find() without constructing
+// a shared_string, which would entail making a full copy of the stat name.
+using SharedStringSet =
+    absl::flat_hash_set<SharedString, HeterogeneousStringHash, HeterogeneousStringEqual>;
+
 } // namespace Envoy
