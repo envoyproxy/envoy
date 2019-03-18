@@ -30,7 +30,6 @@ private:
 
   enum class CombineLogic {
     Accumulate,
-    Maximum,
     OnlyImportWhenUnused,
     NoImport,
     BooleanAnd,

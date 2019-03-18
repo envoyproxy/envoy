@@ -42,11 +42,8 @@ std::unique_ptr<HotRestartMessage> HotRestartingChild::getParentStats() {
   sendHotRestartMessage(parent_address_, wrapped_request);
 
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
-  if (!replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kStats)) {
-    ENVOY_LOG(error, "Did not get a StatsReply for our StatsRequest. Will not merge stats from hot "
-                     "restart parent.");
-    return nullptr;
-  }
+  RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
+                 "Hot restart parent did not respond as expected to get stats request.");
   return wrapped_reply;
 }
 
@@ -71,7 +68,7 @@ void HotRestartingChild::shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo
 
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
   RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
-                 "Parent did not respond as expected to ShutdownParentAdmin.");
+                 "Hot restart parent did not respond as expected to ShutdownParentAdmin.");
   info.original_start_time_ = wrapped_reply->reply().shutdown_admin().original_start_time();
 }
 
@@ -91,9 +88,10 @@ void HotRestartingChild::terminateParent() {
 
 void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
                                           const HotRestartMessage::Reply::Stats& stats_proto) {
+  // Map from stat name *substrings* to special logic to use for combining stat values.
   const std::unordered_map<std::string, CombineLogic> combine_logic_exceptions{
       {".version", CombineLogic::NoImport},
-      // implied by default: {"connected_state", CombineLogic::NoImport},
+      {"connected_state", CombineLogic::BooleanOr},
   };
   for (const auto& counter_proto : stats_proto.counters()) {
     uint64_t new_parent_value = counter_proto.value();
@@ -102,40 +100,6 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
         found_value == parent_counter_values_.end() ? 0 : found_value->second;
     parent_counter_values_[counter_proto.name()] = new_parent_value;
     stats_store.counter(counter_proto.name()).add(new_parent_value - old_parent_value);
-  }
-
-  for (const auto& indicator_proto : stats_proto.indicators()) {
-    CombineLogic combine_logic = CombineLogic::NoImport;
-    for (auto exception : combine_logic_exceptions) {
-      if (indicator_proto.name().find(exception.first) != std::string::npos) {
-        combine_logic = exception.second;
-        break;
-      }
-    }
-    auto& indicator_ref = stats_store.boolIndicator(indicator_proto.name());
-    if (combine_logic == CombineLogic::NoImport) {
-      continue;
-    }
-    // If undefined, take parent's value unless explicitly told NoImport.
-    if (!indicator_ref.used()) {
-      indicator_ref.set(indicator_proto.value());
-      continue;
-    }
-    switch (combine_logic) {
-    case CombineLogic::OnlyImportWhenUnused:
-      // Already set above; nothing left to do.
-      break;
-    case CombineLogic::NoImport:
-    case CombineLogic::Maximum:
-    case CombineLogic::Accumulate:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    case CombineLogic::BooleanAnd:
-      indicator_ref.set(indicator_ref.value() && indicator_proto.value());
-      break;
-    case CombineLogic::BooleanOr:
-      indicator_ref.set(indicator_ref.value() || indicator_proto.value());
-      break;
-    }
   }
 
   for (const auto& gauge_proto : stats_proto.gauges()) {
@@ -164,8 +128,6 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
       // Already set above; nothing left to do.
       break;
     case CombineLogic::NoImport:
-    case CombineLogic::BooleanAnd:
-    case CombineLogic::BooleanOr:
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     case CombineLogic::Accumulate:
       if (new_parent_value > old_parent_value) {
@@ -174,10 +136,11 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
         gauge_ref.sub(old_parent_value - new_parent_value);
       }
       break;
-    case CombineLogic::Maximum:
-      if (new_parent_value > gauge_ref.value()) {
-        gauge_ref.set(new_parent_value);
-      }
+    case CombineLogic::BooleanAnd:
+      gauge_ref.set(gauge_ref.value() != 0 && new_parent_value != 0 ? 1 : 0);
+      break;
+    case CombineLogic::BooleanOr:
+      gauge_ref.set(gauge_ref.value() != 0 || new_parent_value != 0 ? 1 : 0);
       break;
     }
   }
