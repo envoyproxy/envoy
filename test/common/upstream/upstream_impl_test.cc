@@ -2175,7 +2175,7 @@ public:
 // When no locality weights belong to the host set, there's an empty pick.
 TEST_F(HostSetImplLocalityTest, Empty) {
   EXPECT_EQ(nullptr, host_set_.localityWeights());
-  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+  EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When no hosts are healthy we should fail to select a locality
@@ -2186,7 +2186,7 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(HostSetImpl::updateHostsParams(hosts, hosts_per_locality), locality_weights,
                         {}, {}, absl::nullopt);
-  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+  EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When a locality has zero hosts, it should be treated as if it has zero healthy.
@@ -2199,8 +2199,8 @@ TEST_F(HostSetImplLocalityTest, EmptyLocality) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
   // Verify that we are not RRing between localities.
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
 }
 
 // When all locality weights are zero we should fail to select a locality.
@@ -2211,7 +2211,7 @@ TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {});
-  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+  EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When all locality weights are the same we have unweighted RR behavior.
@@ -2223,12 +2223,12 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
 }
 
 // When locality weights differ, we have weighted RR behavior.
@@ -2239,12 +2239,12 @@ TEST_F(HostSetImplLocalityTest, Weighted) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
 }
 
 // Localities with no weight assignment are never picked.
@@ -2256,12 +2256,12 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
 }
 
 // Gentle failover between localities as health diminishes.
@@ -2288,7 +2288,7 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
   const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {
     uint32_t count[2] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
-      const uint32_t locality_index = host_set_.chooseLocality().value();
+      const uint32_t locality_index = host_set_.chooseHealthyLocality().value();
       ASSERT_LT(locality_index, 2);
       ++count[locality_index];
     }
@@ -2332,7 +2332,7 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
                          locality_weights, {}, {}, absl::nullopt);
     uint32_t cnts[] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
-      absl::optional<uint32_t> locality_index = host_set.chooseLocality();
+      absl::optional<uint32_t> locality_index = host_set.chooseHealthyLocality();
       if (!locality_index.has_value()) {
         // It's possible locality scheduler is nullptr (when factor is 0).
         continue;

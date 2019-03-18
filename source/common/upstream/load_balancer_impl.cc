@@ -542,7 +542,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   if (host_availability == HostAvailability::Degraded) {
     locality = host_set.chooseDegradedLocality();
   } else {
-    locality = host_set.chooseLocality();
+    locality = host_set.chooseHealthyLocality();
   }
 
   if (locality.has_value()) {

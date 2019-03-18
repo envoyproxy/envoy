@@ -296,9 +296,10 @@ public:
   virtual LocalityWeightsConstSharedPtr localityWeights() const PURE;
 
   /**
-   * @return next locality index to route to if performing locality weighted balancing.
+   * @return next locality index to route to if performing locality weighted balancing
+   * against healthy hosts.
    */
-  virtual absl::optional<uint32_t> chooseLocality() PURE;
+  virtual absl::optional<uint32_t> chooseHealthyLocality() PURE;
 
   /**
    * @return next locality index to route to if performing locality weighted balancing

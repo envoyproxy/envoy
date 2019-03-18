@@ -357,7 +357,7 @@ void HostSetImpl::rebuildLocalityScheduler(
   }
 }
 
-absl::optional<uint32_t> HostSetImpl::chooseLocality() {
+absl::optional<uint32_t> HostSetImpl::chooseHealthyLocality() {
   return chooseLocality(locality_scheduler_);
 }
 
