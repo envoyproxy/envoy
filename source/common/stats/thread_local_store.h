@@ -171,9 +171,16 @@ public:
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
-  friend class ThreadLocalStoreTestScope;
-
   template <class Stat> using StatMap = ConstCharStarHashMap<Stat>;
+
+  // We use an absl::flat_hash_map to implement what's conceptually a set of
+  // shared strings. This structure enables us to do a find() without
+  // constructing a shared_string, which would entail making a full copy of the
+  // stat name.
+  //
+  // Note: in the context of https://github.com/envoyproxy/envoy/pull/6161 the
+  // key will likely change from const char* to absl::string_view, which can be
+  // constructed without allocation from FakeSymbolTableImpl.
   using SharedString = std::shared_ptr<std::string>;
   using SharedStringSet =
       absl::flat_hash_map<const char*, SharedString, ConstCharStarHash, ConstCharStarEqual>;
