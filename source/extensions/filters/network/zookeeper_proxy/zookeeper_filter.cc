@@ -2,6 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 
@@ -141,7 +142,7 @@ void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags
         {{"opname", "createttl"}, {"path", path}, {"create_type", createFlagsToString(flags)}});
     break;
   default:
-    throw EnvoyException(fmt::format("Unknown opcode: {}", enumToInt(opcode)));
+    throw EnvoyException(fmt::format("Unknown opcode: {}", enumToIntSigned(opcode)));
     break;
   }
 }

@@ -57,18 +57,18 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   //       However, some client implementations might expose setWatches
   //       as a regular data request, so we support that as well.
   const int32_t xid = BufferHelper::peekInt32(data, offset);
-  switch (xid) {
-  case enumToIntSigned(XidCodes::CONNECT_XID):
+  switch (static_cast<XidCodes>(xid)) {
+  case XidCodes::CONNECT_XID:
     parseConnect(data, offset, len);
     return;
-  case enumToIntSigned(XidCodes::PING_XID):
+  case XidCodes::PING_XID:
     offset += OPCODE_LENGTH;
     callbacks_.onPing();
     return;
-  case enumToIntSigned(XidCodes::AUTH_XID):
+  case XidCodes::AUTH_XID:
     parseAuthRequest(data, offset, len);
     return;
-  case enumToIntSigned(XidCodes::SET_WATCHES_XID):
+  case XidCodes::SET_WATCHES_XID:
     offset += OPCODE_LENGTH;
     parseSetWatchesRequest(data, offset, len);
     return;
@@ -81,59 +81,59 @@ void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   // must happen every 1/3 of the negotiated session timeout, to keep
   // the session alive.
   const int32_t opcode = BufferHelper::peekInt32(data, offset);
-  switch (opcode) {
-  case enumToInt(OpCodes::GETDATA):
+  switch (static_cast<OpCodes>(opcode)) {
+  case OpCodes::GETDATA:
     parseGetDataRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::CREATE):
-  case enumToInt(OpCodes::CREATE2):
-  case enumToInt(OpCodes::CREATECONTAINER):
-  case enumToInt(OpCodes::CREATETTL):
+  case OpCodes::CREATE:
+  case OpCodes::CREATE2:
+  case OpCodes::CREATECONTAINER:
+  case OpCodes::CREATETTL:
     parseCreateRequest(data, offset, len, static_cast<OpCodes>(opcode));
     break;
-  case enumToInt(OpCodes::SETDATA):
+  case OpCodes::SETDATA:
     parseSetRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::GETCHILDREN):
+  case OpCodes::GETCHILDREN:
     parseGetChildrenRequest(data, offset, len, false);
     break;
-  case enumToInt(OpCodes::GETCHILDREN2):
+  case OpCodes::GETCHILDREN2:
     parseGetChildrenRequest(data, offset, len, true);
     break;
-  case enumToInt(OpCodes::DELETE):
+  case OpCodes::DELETE:
     parseDeleteRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::EXISTS):
+  case OpCodes::EXISTS:
     parseExistsRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::GETACL):
+  case OpCodes::GETACL:
     parseGetAclRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::SETACL):
+  case OpCodes::SETACL:
     parseSetAclRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::SYNC):
+  case OpCodes::SYNC:
     parseSyncRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::CHECK):
+  case OpCodes::CHECK:
     parseCheckRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::MULTI):
+  case OpCodes::MULTI:
     parseMultiRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::RECONFIG):
+  case OpCodes::RECONFIG:
     parseReconfigRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::SETWATCHES):
+  case OpCodes::SETWATCHES:
     parseSetWatchesRequest(data, offset, len);
     break;
-  case enumToInt(OpCodes::CHECKWATCHES):
+  case OpCodes::CHECKWATCHES:
     parseXWatchesRequest(data, offset, len, OpCodes::CHECKWATCHES);
     break;
-  case enumToInt(OpCodes::REMOVEWATCHES):
+  case OpCodes::REMOVEWATCHES:
     parseXWatchesRequest(data, offset, len, OpCodes::REMOVEWATCHES);
     break;
-  case enumToIntSigned(OpCodes::CLOSE):
+  case OpCodes::CLOSE:
     callbacks_.onCloseRequest();
     break;
   default:
@@ -320,7 +320,7 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
   ensureMinLength(len, XID_LENGTH + OPCODE_LENGTH + MULTI_HEADER_LENGTH);
 
   while (true) {
-    const int32_t type = BufferHelper::peekInt32(data, offset);
+    const int32_t opcode = BufferHelper::peekInt32(data, offset);
     const bool done = BufferHelper::peekBool(data, offset);
     // Ignore error field.
     BufferHelper::peekInt32(data, offset);
@@ -329,19 +329,18 @@ void DecoderImpl::parseMultiRequest(Buffer::Instance& data, uint64_t& offset, ui
       break;
     }
 
-    switch (type) {
-    case enumToInt(OpCodes::CREATE):
+    switch (static_cast<OpCodes>(opcode)) {
+    case OpCodes::CREATE:
       parseCreateRequest(data, offset, len, OpCodes::CREATE);
       break;
-    case enumToInt(OpCodes::SETDATA):
+    case OpCodes::SETDATA:
       parseSetRequest(data, offset, len);
       break;
-    case enumToInt(OpCodes::CHECK):
+    case OpCodes::CHECK:
       parseCheckRequest(data, offset, len);
       break;
     default:
-      // Should not happen.
-      throw EnvoyException("Unknown type within a transaction");
+      throw EnvoyException(fmt::format("Unknown opcode within a transaction: {}", opcode));
     }
   }
 

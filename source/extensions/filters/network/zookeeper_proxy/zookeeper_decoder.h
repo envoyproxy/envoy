@@ -4,7 +4,6 @@
 #include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/enum_to_int.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
