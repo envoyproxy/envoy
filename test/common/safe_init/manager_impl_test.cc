@@ -15,7 +15,7 @@ void expectUninitialized(const Manager& m) { EXPECT_EQ(Manager::State::Uninitial
 void expectInitializing(const Manager& m) { EXPECT_EQ(Manager::State::Initializing, m.state()); }
 void expectInitialized(const Manager& m) { EXPECT_EQ(Manager::State::Initialized, m.state()); }
 
-TEST(ManagerTest, AddImmediateTargetsWhenUninitialized) {
+TEST(SafeInitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -37,7 +37,7 @@ TEST(ManagerTest, AddImmediateTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TEST(ManagerTest, AddAsyncTargetsWhenUninitialized) {
+TEST(SafeInitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -67,7 +67,7 @@ TEST(ManagerTest, AddAsyncTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TEST(ManagerTest, AddMixedTargetsWhenUninitialized) {
+TEST(SafeInitManagerImplTest, AddMixedTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -93,7 +93,7 @@ TEST(ManagerTest, AddMixedTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TEST(ManagerTest, AddImmediateTargetWhenInitializing) {
+TEST(SafeInitManagerImplTest, AddImmediateTargetWhenInitializing) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -121,60 +121,7 @@ TEST(ManagerTest, AddImmediateTargetWhenInitializing) {
   expectInitialized(m);
 }
 
-TEST(ManagerTest, AddWhenInitialized) {
-  InSequence s;
-
-  ManagerImpl m("test");
-  expectUninitialized(m);
-
-  // initializing an empty manager should finish immediately
-  MockWatcher w;
-  w.expectReady();
-  m.initialize(w);
-  expectInitialized(m);
-
-  // adding a target should fail
-  MockTarget t("t");
-  EXPECT_DEATH(m.add(t), "attempted to add target t to initialized init manager test");
-}
-
-TEST(ManagerTest, InitializeWhenInitializing) {
-  InSequence s;
-
-  ManagerImpl m("test");
-  expectUninitialized(m);
-
-  MockTarget t("t");
-  m.add(t);
-
-  MockWatcher w;
-
-  // initialization should begin
-  t.expectInitialize();
-  m.initialize(w);
-  expectInitializing(m);
-
-  // re-initializing should fail
-  EXPECT_DEATH(m.initialize(w), "attempted to initialize init manager test twice");
-}
-
-TEST(ManagerTest, InitializeWhenInitialized) {
-  InSequence s;
-
-  ManagerImpl m("test");
-  expectUninitialized(m);
-
-  // initializing an empty manager should finish immediately
-  MockWatcher w;
-  w.expectReady();
-  m.initialize(w);
-  expectInitialized(m);
-
-  // re-initializing should fail
-  EXPECT_DEATH(m.initialize(w), "attempted to initialize init manager test twice");
-}
-
-TEST(ManagerTest, UnavailableTarget) {
+TEST(SafeInitManagerImplTest, UnavailableTarget) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -195,7 +142,7 @@ TEST(ManagerTest, UnavailableTarget) {
   expectInitialized(m);
 }
 
-TEST(ManagerTest, UnavailableManager) {
+TEST(SafeInitManagerImplTest, UnavailableManager) {
   InSequence s;
 
   MockTarget t("t");
@@ -218,7 +165,7 @@ TEST(ManagerTest, UnavailableManager) {
   t.ready();
 }
 
-TEST(ManagerTest, UnavailableWatcher) {
+TEST(SafeInitManagerImplTest, UnavailableWatcher) {
   InSequence s;
 
   ManagerImpl m("test");

@@ -7,15 +7,7 @@ namespace SafeInit {
 
 ManagerImpl::ManagerImpl(absl::string_view name)
     : name_(fmt::format("init manager {}", name)), state_(State::Uninitialized), count_(0),
-      watcher_(name_, [this]() {
-        // Watcher for callbacks from each target. If there are no uninitialized targets remaining
-        // when called by a target, that means it was the last. Signal `ready` to the handle we
-        // saved in `initialize`.
-        if (--count_ == 0) {
-          state_ = State::Initialized;
-          watcher_handle_->ready();
-        }
-      }) {}
+      watcher_(name_, std::bind(&ManagerImpl::onTargetReady, this)) {}
 
 Manager::State ManagerImpl::state() const { return state_; }
 
@@ -37,15 +29,13 @@ void ManagerImpl::add(const Target& target) {
     return;
   case State::Initialized:
     // If the manager has already completed initialization, consider this a programming error.
-    RELEASE_ASSERT(false,
-                   fmt::format("attempted to add {} to initialized {}", target.name(), name_));
+    ASSERT(false, fmt::format("attempted to add {} to initialized {}", target.name(), name_));
   }
 }
 
 void ManagerImpl::initialize(const Watcher& watcher) {
   // If the manager is already initializing or initialized, consider this a programming error.
-  RELEASE_ASSERT(state_ == State::Uninitialized,
-                 fmt::format("attempted to initialize {} twice", name_));
+  ASSERT(state_ == State::Uninitialized, fmt::format("attempted to initialize {} twice", name_));
 
   // Create a handle to notify when initialization is complete.
   watcher_handle_ = watcher.createHandle(name_);
@@ -53,30 +43,36 @@ void ManagerImpl::initialize(const Watcher& watcher) {
   if (count_ == 0) {
     // If we have no targets, initialization trivially completes. This can happen, and is fine.
     ENVOY_LOG(debug, "{} contains no targets", name_);
-    state_ = State::Initialized;
-    watcher_handle_->ready();
+    ready();
   } else {
     // If we have some targets, start initialization...
     ENVOY_LOG(debug, "{} initializing", name_);
     state_ = State::Initializing;
 
-    // Attempt to initialize each target...
+    // Attempt to initialize each target. If a target is unavailable, treat it as though it
+    // completed immediately.
     for (const auto& target_handle : target_handles_) {
-      // If a target is unavailable, treat it as though it had never been added: decrement the
-      // count of uninitialized targets, and if there are none remaining, signal `ready` to the
-      // handle saved above.
       if (!target_handle->initialize(watcher_)) {
-        if (--count_ == 0) {
-          state_ = State::Initialized;
-          watcher_handle_->ready();
-        };
+        onTargetReady();
       }
     }
-
-    // When we've finished telling all targets to `initialize`, we no longer use them for anything,
-    // so we can drop the references.
-    target_handles_.clear();
   }
+}
+
+void ManagerImpl::onTargetReady() {
+  // If there are no remaining targets and one mysteriously calls us back, this manager is haunted.
+  ASSERT(count_ != 0, fmt::format("{} called back by target after initialization complete"));
+
+  // If there are no uninitialized targets remaining when called back by a target, that means it was
+  // the last. Signal `ready` to the handle we saved in `initialize`.
+  if (--count_ == 0) {
+    ready();
+  }
+}
+
+void ManagerImpl::ready() {
+  state_ = State::Initialized;
+  watcher_handle_->ready();
 }
 
 } // namespace SafeInit

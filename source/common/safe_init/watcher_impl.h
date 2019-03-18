@@ -9,6 +9,9 @@
 namespace Envoy {
 namespace SafeInit {
 
+// A watcher is just a glorified callback function.
+using WatcherFn = std::function<void()>;
+
 /**
  * A WatcherHandleImpl functions as a weak reference to a Watcher. It is how a TargetImpl safely
  * notifies a ManagerImpl that it has initialized, and likewise it's how ManagerImpl safely tells
@@ -19,7 +22,7 @@ class WatcherHandleImpl : public WatcherHandle, Logger::Loggable<Logger::Id::ini
 private:
   friend class WatcherImpl;
   WatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
-                    std::weak_ptr<std::function<void()>> fn);
+                    std::weak_ptr<WatcherFn> fn);
 
 public:
   // SafeInit::WatcherHandle
@@ -28,13 +31,13 @@ public:
 private:
   // Name of the handle (either the name of the target calling the manager, or the name of the
   // manager calling the client)
-  std::string handle_name_;
+  const std::string handle_name_;
 
   // Name of the watcher (either the name of the manager, or the name of the client)
-  std::string name_;
+  const std::string name_;
 
   // The watcher's callback function, only called if the weak pointer can be "locked"
-  std::weak_ptr<std::function<void()>> fn_;
+  const std::weak_ptr<WatcherFn> fn_;
 };
 
 /**
@@ -48,7 +51,7 @@ public:
    * @param name a human-readable watcher name, for logging / debugging
    * @param fn a callback function to invoke when `ready` is called on the handle
    */
-  WatcherImpl(absl::string_view name, std::function<void()> fn);
+  WatcherImpl(absl::string_view name, WatcherFn fn);
   ~WatcherImpl() override;
 
   // SafeInit::Watcher
@@ -57,10 +60,10 @@ public:
 
 private:
   // Human-readable name for logging
-  std::string name_;
+  const std::string name_;
 
   // The callback function, called via WatcherHandleImpl by either the target or the manager
-  std::shared_ptr<std::function<void()>> fn_;
+  const std::shared_ptr<WatcherFn> fn_;
 };
 
 } // namespace SafeInit

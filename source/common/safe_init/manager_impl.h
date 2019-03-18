@@ -36,8 +36,11 @@ public:
   void initialize(const Watcher& watcher) override;
 
 private:
+  void onTargetReady();
+  void ready();
+
   // Human-readable name for logging
-  std::string name_;
+  const std::string name_;
 
   // Current state
   State state_;
@@ -49,7 +52,7 @@ private:
   WatcherHandlePtr watcher_handle_;
 
   // Watcher to receive ready notifications from each target
-  WatcherImpl watcher_;
+  const WatcherImpl watcher_;
 
   // All registered targets
   std::list<TargetHandlePtr> target_handles_;

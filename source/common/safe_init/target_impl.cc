@@ -3,8 +3,10 @@
 namespace Envoy {
 namespace SafeInit {
 
+using std::placeholders::_1;
+
 TargetHandleImpl::TargetHandleImpl(absl::string_view handle_name, absl::string_view name,
-                                   std::weak_ptr<std::function<void(WatcherHandlePtr)>> fn)
+                                   std::weak_ptr<TargetFn> fn)
     : handle_name_(handle_name), name_(name), fn_(std::move(fn)) {}
 
 bool TargetHandleImpl::initialize(const Watcher& watcher) const {
@@ -24,13 +26,7 @@ bool TargetHandleImpl::initialize(const Watcher& watcher) const {
 
 TargetImpl::TargetImpl(absl::string_view name)
     : name_(fmt::format("target {}", name)),
-      fn_(std::make_shared<std::function<void(WatcherHandlePtr)>>(
-          [this](WatcherHandlePtr watcher_handle) {
-            // Initialization callback: save the ManagerImpl's watcher handle we were given and
-            // start initialization.
-            watcher_handle_ = std::move(watcher_handle);
-            initialize();
-          })) {}
+      fn_(std::make_shared<TargetFn>(std::bind(&TargetImpl::onInitialize, this, _1))) {}
 
 TargetImpl::~TargetImpl() { ENVOY_LOG(debug, "{} destroyed", name_); }
 
@@ -38,8 +34,8 @@ absl::string_view TargetImpl::name() const { return name_; }
 
 TargetHandlePtr TargetImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
-  return std::unique_ptr<TargetHandle>(new TargetHandleImpl(
-      handle_name, name_, std::weak_ptr<std::function<void(WatcherHandlePtr)>>(fn_)));
+  return std::unique_ptr<TargetHandle>(
+      new TargetHandleImpl(handle_name, name_, std::weak_ptr<TargetFn>(fn_)));
 }
 
 bool TargetImpl::ready() {
@@ -51,6 +47,11 @@ bool TargetImpl::ready() {
     return result;
   }
   return false;
+}
+
+void TargetImpl::onInitialize(WatcherHandlePtr watcher_handle) {
+  watcher_handle_ = std::move(watcher_handle);
+  initialize();
 }
 
 } // namespace SafeInit

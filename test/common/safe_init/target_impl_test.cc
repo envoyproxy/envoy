@@ -11,12 +11,12 @@ namespace {
 // Note that the "mock" objects under scrutiny here are actually the real TargetImpl and
 // WatcherImpl, just subclassed for use in tests. See test/mocks/safe_init/mocks.h for details.
 
-TEST(TargetImplTest, Name) {
+TEST(SafeInitTargetImplTest, Name) {
   MockTarget target;
   EXPECT_EQ("target mock", target.name());
 }
 
-TEST(TargetImplTest, InitializeWhenAvailable) {
+TEST(SafeInitTargetImplTest, InitializeWhenAvailable) {
   InSequence s;
 
   MockTarget target;
@@ -35,7 +35,7 @@ TEST(TargetImplTest, InitializeWhenAvailable) {
   EXPECT_FALSE(target.ready());
 }
 
-TEST(TargetImplTest, InitializeWhenUnavailable) {
+TEST(SafeInitTargetImplTest, InitializeWhenUnavailable) {
   MockWatcher watcher;
   TargetHandlePtr handle;
   {
@@ -48,7 +48,7 @@ TEST(TargetImplTest, InitializeWhenUnavailable) {
   EXPECT_FALSE(handle->initialize(watcher));
 }
 
-TEST(TargetImplTest, ReadyWhenWatcherUnavailable) {
+TEST(SafeInitTargetImplTest, ReadyWhenWatcherUnavailable) {
   MockTarget target;
   {
     MockWatcher watcher;

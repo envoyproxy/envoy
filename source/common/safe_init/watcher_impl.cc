@@ -4,7 +4,7 @@ namespace Envoy {
 namespace SafeInit {
 
 WatcherHandleImpl::WatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
-                                     std::weak_ptr<std::function<void()>> fn)
+                                     std::weak_ptr<WatcherFn> fn)
     : handle_name_(handle_name), name_(name), fn_(std::move(fn)) {}
 
 bool WatcherHandleImpl::ready() const {
@@ -21,8 +21,8 @@ bool WatcherHandleImpl::ready() const {
   }
 }
 
-WatcherImpl::WatcherImpl(absl::string_view name, std::function<void()> fn)
-    : name_(name), fn_(std::make_shared<std::function<void()>>(std::move(fn))) {}
+WatcherImpl::WatcherImpl(absl::string_view name, WatcherFn fn)
+    : name_(name), fn_(std::make_shared<WatcherFn>(std::move(fn))) {}
 
 WatcherImpl::~WatcherImpl() { ENVOY_LOG(debug, "{} destroyed", name_); }
 
@@ -31,7 +31,7 @@ absl::string_view WatcherImpl::name() const { return name_; }
 WatcherHandlePtr WatcherImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique because WatcherHandleImpl ctor is private
   return std::unique_ptr<WatcherHandle>(
-      new WatcherHandleImpl(handle_name, name_, std::weak_ptr<std::function<void()>>(fn_)));
+      new WatcherHandleImpl(handle_name, name_, std::weak_ptr<WatcherFn>(fn_)));
 }
 
 } // namespace SafeInit

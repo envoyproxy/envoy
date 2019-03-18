@@ -9,6 +9,9 @@
 namespace Envoy {
 namespace SafeInit {
 
+// A target is just a glorified callback function that accepts a watcher handle.
+using TargetFn = std::function<void(WatcherHandlePtr)>;
+
 /**
  * A TargetHandleImpl functions as a weak reference to a TargetImpl. It is how a ManagerImpl safely
  * tells a target to `initialize` with no guarantees about the target's lifetime.
@@ -17,7 +20,7 @@ class TargetHandleImpl : public TargetHandle, Logger::Loggable<Logger::Id::init>
 private:
   friend class TargetImpl;
   TargetHandleImpl(absl::string_view handle_name, absl::string_view name,
-                   std::weak_ptr<std::function<void(WatcherHandlePtr)>> fn);
+                   std::weak_ptr<TargetFn> fn);
 
 public:
   // SafeInit::TargetHandle
@@ -25,13 +28,13 @@ public:
 
 private:
   // Name of the handle (almost always the name of the ManagerImpl calling the target)
-  std::string handle_name_;
+  const std::string handle_name_;
 
   // Name of the target
-  std::string name_;
+  const std::string name_;
 
   // The target's callback function, only called if the weak pointer can be "locked"
-  std::weak_ptr<std::function<void(WatcherHandlePtr)>> fn_;
+  const std::weak_ptr<TargetFn> fn_;
 };
 
 /**
@@ -62,22 +65,24 @@ public:
   virtual void initialize() PURE;
 
   /**
-   * Signal to the init manager that this target has finished initializing. This should ideally
-   * only be called once, after `initialize` was called. Calling it before initialization begins
-   * or after it has already been called before will have no effect.
+   * Signal to the init manager that this target has finished initializing. This is safe to call
+   * any time. Calling it before initialization begins or after initialization has already ended
+   * will have no effect.
    * @return true if the init manager received this call, false otherwise.
    */
   bool ready();
 
 private:
+  void onInitialize(WatcherHandlePtr watcher_handle);
+
   // Human-readable name for logging
-  std::string name_;
+  const std::string name_;
 
   // Handle to the ManagerImpl's internal watcher, to call when this target is initialized
   WatcherHandlePtr watcher_handle_;
 
   // The callback function, called via TargetHandleImpl by the manager
-  std::shared_ptr<std::function<void(WatcherHandlePtr)>> fn_;
+  const std::shared_ptr<TargetFn> fn_;
 };
 
 } // namespace SafeInit

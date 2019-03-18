@@ -9,12 +9,12 @@ namespace {
 // Note that the MockWatcher under scrutiny here is actually a real WatcherImpl, just subclassed for
 // use in tests. See test/mocks/safe_init/mocks.h for details.
 
-TEST(WatcherImplTest, Name) {
+TEST(SafeInitWatcherImplTest, Name) {
   MockWatcher watcher;
   EXPECT_EQ("mock watcher", watcher.name());
 }
 
-TEST(WatcherImplTest, ReadyWhenAvailable) {
+TEST(SafeInitWatcherImplTest, ReadyWhenAvailable) {
   MockWatcher watcher;
 
   // notifying the watcher through its handle should invoke ready().
@@ -22,7 +22,7 @@ TEST(WatcherImplTest, ReadyWhenAvailable) {
   EXPECT_TRUE(watcher.createHandle("test")->ready());
 }
 
-TEST(WatcherImplTest, ReadyWhenUnavailable) {
+TEST(SafeInitWatcherImplTest, ReadyWhenUnavailable) {
   WatcherHandlePtr handle;
   {
     MockWatcher watcher;
