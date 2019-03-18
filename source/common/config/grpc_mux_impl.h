@@ -28,7 +28,7 @@ public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Runtime::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings);
+              const RateLimitSettings& rate_limit_settings, Server::ConfigTracker& config_tracker);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -43,6 +43,8 @@ public:
   void handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
   void handleStreamEstablished() override;
   void handleEstablishmentFailure() override;
+
+  ProtobufTypes::MessagePtr dumpControlPlaneConfig() const;
 
 private:
   void setRetryTimer();
@@ -85,10 +87,18 @@ private:
     bool subscribed_{};
   };
 
+  // ControlPlane with which Envoy is connected to.
+  struct ControlPlane {
+    std::string control_plane_identifier_;
+  };
+
   const LocalInfo::LocalInfo& local_info_;
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
+  ControlPlane control_plane_;
+  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  TimeSource& time_source_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

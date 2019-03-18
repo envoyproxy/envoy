@@ -2,6 +2,8 @@
 
 #include <unordered_set>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -12,10 +14,12 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
-                         const RateLimitSettings& rate_limit_settings)
+                         const RateLimitSettings& rate_limit_settings, Server::ConfigTracker& config_tracker)
     : GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse, std::string>(
           std::move(async_client), service_method, random, dispatcher, scope, rate_limit_settings),
-      local_info_(local_info) {
+      local_info_(local_info), config_tracker_entry_(config_tracker.add("control_plane", [this] { return dumpControlPlaneConfig(); })),
+      time_source_(dispatcher.timeSource())
+       {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -123,6 +127,7 @@ void GrpcMuxImpl::handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryRespon
     // violation
     return;
   }
+  control_plane_.control_plane_identifier_ = message->control_plane().identifier();
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.
     api_state_[type_url].request_.set_response_nonce(message->nonce());
@@ -204,6 +209,12 @@ void GrpcMuxImpl::handleEstablishmentFailure() {
       watch->callbacks_.onConfigUpdateFailed(nullptr);
     }
   }
+}
+
+ProtobufTypes::MessagePtr GrpcMuxImpl::dumpControlPlaneConfig() const {
+  auto config_dump = std::make_unique<envoy::admin::v2alpha::ControlPlaneConfigDump>();
+  config_dump->mutable_control_plane()->set_identifier(control_plane_.control_plane_identifier_);
+  return config_dump;
 }
 
 } // namespace Config

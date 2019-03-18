@@ -42,7 +42,7 @@ public:
       const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
       Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
       Stats::Scope& scope, const std::string& rest_method, const std::string& grpc_method,
-      Api::Api& api) {
+      Api::Api& api, Server::ConfigTracker& config_tracker) {
     std::unique_ptr<Subscription<ResourceType>> result;
     SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {
@@ -78,7 +78,7 @@ public:
             dispatcher, random,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats,
             scope, Utility::parseRateLimitSettings(api_config_source),
-            Utility::configSourceInitialFetchTimeout(config)));
+            Utility::configSourceInitialFetchTimeout(config), api, config_tracker));
         break;
       case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
         Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);

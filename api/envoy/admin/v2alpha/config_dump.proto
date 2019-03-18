@@ -9,6 +9,7 @@ option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 import "envoy/api/v2/cds.proto";
 import "envoy/api/v2/lds.proto";
 import "envoy/api/v2/rds.proto";
+import "envoy/api/v2/core/base.proto";
 import "envoy/config/bootstrap/v2/bootstrap.proto";
 
 import "google/protobuf/any.proto";
@@ -177,4 +178,10 @@ message RoutesConfigDump {
 
   // The dynamically loaded route configs.
   repeated DynamicRouteConfig dynamic_route_configs = 3 [(gogoproto.nullable) = false];
+}
+
+// This message describes the control plane configuration that Envoy is currently connected to. 
+message ControlPlaneConfigDump {
+  // The control plane that Envoy is currently connected to.
+  envoy.api.v2.core.ControlPlane control_plane = 1 [(gogoproto.nullable) = false];
 }

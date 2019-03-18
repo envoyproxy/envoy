@@ -216,7 +216,7 @@ ClusterManagerImpl::ClusterManagerImpl(
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_,
-        Envoy::Config::Utility::parseRateLimitSettings(bootstrap.dynamic_resources().ads_config()));
+        Envoy::Config::Utility::parseRateLimitSettings(bootstrap.dynamic_resources().ads_config()), admin.getConfigTracker());
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
@@ -1249,7 +1249,7 @@ ClusterSharedPtr ProdClusterManagerFactory::clusterFromProto(
 CdsApiPtr ProdClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                                                ClusterManager& cm) {
   return CdsApiImpl::create(cds_config, cm, main_thread_dispatcher_, random_, local_info_, stats_,
-                            api_);
+                            api_, admin_.getConfigTracker());
 }
 
 } // namespace Upstream

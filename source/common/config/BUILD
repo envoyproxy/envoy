@@ -179,6 +179,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
     ],
 )
 

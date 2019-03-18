@@ -10,6 +10,7 @@ api_proto_library_internal(
         "//envoy/api/v2:cds",
         "//envoy/api/v2:lds",
         "//envoy/api/v2:rds",
+        "//envoy/api/v2/core:base",
         "//envoy/config/bootstrap/v2:bootstrap",
     ],
 )

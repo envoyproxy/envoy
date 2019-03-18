@@ -98,7 +98,6 @@ message DiscoveryResponse {
   // required for non-stream based xDS implementations.
   string nonce = 5;
 
-  // [#not-implemented-hide:]
   // The control plane instance that sent the response.
   core.ControlPlane control_plane = 6;
 }
