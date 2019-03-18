@@ -10,7 +10,7 @@ MockWatcher::MockWatcher(absl::string_view name) : WatcherImpl(name, {[this]() {
   return EXPECT_CALL(*this, ready());
 }
 
-MockTarget::MockTarget(absl::string_view name) : TargetImpl(name) {}
+MockTarget::MockTarget(absl::string_view name) : TargetImpl(name, {[this]() { initialize(); }}) {}
 ::testing::internal::TypedExpectation<void()>& MockTarget::expectInitialize() {
   return EXPECT_CALL(*this, initialize());
 }

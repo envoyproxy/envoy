@@ -28,9 +28,9 @@ public:
 };
 
 /**
- * MockTarget is a real TargetImpl, subclassed to implement `initialize` as a mock method that you
- * can set expectations on in tests. Tests should never want a target with a different behavior than
- * the real implementation.
+ * MockTarget is a real TargetImpl, subclassed to add a mock `initialize` method that you can set
+ * expectations on in tests. Tests should never want a target with a different behavior than the
+ * real implementation.
  */
 class MockTarget : public TargetImpl {
 public:

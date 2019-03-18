@@ -9,8 +9,11 @@
 namespace Envoy {
 namespace SafeInit {
 
-// A watcher is just a glorified callback function.
-using WatcherFn = std::function<void()>;
+/**
+ * A watcher is just a glorified callback function, called by a target or a manager when
+ * initialization completes.
+ */
+using ReadyFn = std::function<void()>;
 
 /**
  * A WatcherHandleImpl functions as a weak reference to a Watcher. It is how a TargetImpl safely
@@ -22,7 +25,7 @@ class WatcherHandleImpl : public WatcherHandle, Logger::Loggable<Logger::Id::ini
 private:
   friend class WatcherImpl;
   WatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
-                    std::weak_ptr<WatcherFn> fn);
+                    std::weak_ptr<ReadyFn> fn);
 
 public:
   // SafeInit::WatcherHandle
@@ -37,13 +40,13 @@ private:
   const std::string name_;
 
   // The watcher's callback function, only called if the weak pointer can be "locked"
-  const std::weak_ptr<WatcherFn> fn_;
+  const std::weak_ptr<ReadyFn> fn_;
 };
 
 /**
  * A WatcherImpl is an entity that listens for notifications that either an initialization target or
  * all targets registered with a manager have initialized. It can only be invoked through a
- * WatcherHandleImpl. Typical usage is as a data member, initialized with a lambda.
+ * WatcherHandleImpl.
  */
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::init> {
 public:
@@ -51,7 +54,7 @@ public:
    * @param name a human-readable watcher name, for logging / debugging
    * @param fn a callback function to invoke when `ready` is called on the handle
    */
-  WatcherImpl(absl::string_view name, WatcherFn fn);
+  WatcherImpl(absl::string_view name, ReadyFn fn);
   ~WatcherImpl() override;
 
   // SafeInit::Watcher
@@ -63,7 +66,7 @@ private:
   const std::string name_;
 
   // The callback function, called via WatcherHandleImpl by either the target or the manager
-  const std::shared_ptr<WatcherFn> fn_;
+  const std::shared_ptr<ReadyFn> fn_;
 };
 
 } // namespace SafeInit
