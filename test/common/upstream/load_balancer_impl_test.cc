@@ -653,8 +653,8 @@ TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
   init(false);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(50)).WillOnce(Return(0));
-  // Since we're split between healthy and degraded, the LB should call into both chooseHealthyLocality
-  // and chooseDegradedLocality.
+  // Since we're split between healthy and degraded, the LB should call into both
+  // chooseHealthyLocality and chooseDegradedLocality.
   EXPECT_CALL(hostSet(), chooseDegradedLocality()).WillOnce(Return(1));
   EXPECT_EQ(hostSet().degraded_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
