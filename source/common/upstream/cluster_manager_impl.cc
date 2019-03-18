@@ -1132,7 +1132,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 
   // Inherit socket options from downstream connection, if set.
-  std::vector<uint8_t> hash_key = {uint8_t(protocol), uint8_t(priority)};
+  std::vector<uint8_t> hash_key = {uint8_t(protocol)};
 
   // Use downstream connection socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with

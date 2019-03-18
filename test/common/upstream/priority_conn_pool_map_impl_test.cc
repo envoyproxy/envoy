@@ -43,7 +43,7 @@ protected:
   std::shared_ptr<NiceMock<MockHost>> host_ = std::make_shared<NiceMock<MockHost>>();
 };
 
-// Show that we return a non-null value, and that we ask invoke the default resource manager
+// Show that we return a non-null value, and that we invoke the default resource manager
 TEST_F(PriorityConnPoolMapImplTest, DefaultPriorityProxiedThrough) {
   TestMapPtr test_map = makeTestMap();
 
@@ -57,7 +57,7 @@ TEST_F(PriorityConnPoolMapImplTest, DefaultPriorityProxiedThrough) {
   EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::High)).Times(AnyNumber());
 }
 
-// Show that we return a non-null value, and that we ask invoke the high resource manager
+// Show that we return a non-null value, and that we invoke the high resource manager
 TEST_F(PriorityConnPoolMapImplTest, HighPriorityProxiedThrough) {
   TestMapPtr test_map = makeTestMap();
 
@@ -81,7 +81,7 @@ TEST_F(PriorityConnPoolMapImplTest, TestSizeForSinglePriority) {
   EXPECT_EQ(test_map->size(), 2);
 }
 
-TEST_F(PriorityConnPoolMapImplTest, TestSizeForMultuplePriorities) {
+TEST_F(PriorityConnPoolMapImplTest, TestSizeForMultiplePriorities) {
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());
