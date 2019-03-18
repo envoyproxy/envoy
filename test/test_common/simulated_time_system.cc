@@ -25,6 +25,7 @@ public:
   // Timer
   void disableTimer() override;
   void enableTimer(const std::chrono::milliseconds& duration) override;
+  bool enabled() override { return armed_; }
 
   void setTime(MonotonicTime time) { time_ = time; }
 

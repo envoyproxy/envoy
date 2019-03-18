@@ -33,7 +33,9 @@ typedef HttpSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> HttpEdsSubsc
 
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  HttpSubscriptionTestHarness()
+  HttpSubscriptionTestHarness() : HttpSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
+
+  HttpSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
@@ -45,7 +47,7 @@ public:
     }));
     subscription_ = std::make_unique<HttpEdsSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_, stats_);
+        std::chrono::milliseconds(1000), *method_descriptor_, stats_, init_fetch_timeout);
   }
 
   ~HttpSubscriptionTestHarness() {
@@ -136,6 +138,21 @@ public:
     timerTick();
   }
 
+  void expectConfigUpdateFailed() override {
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+  }
+
+  void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
+    init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+  }
+
+  void expectDisableInitFetchTimeoutTimer() override {
+    EXPECT_CALL(*init_timeout_timer_, disableTimer());
+  }
+
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+
   void timerTick() {
     expectSendMessage(cluster_names_, version_);
     timer_cb_();
@@ -156,6 +173,7 @@ public:
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Event::MockTimer* init_timeout_timer_;
 };
 
 } // namespace Config

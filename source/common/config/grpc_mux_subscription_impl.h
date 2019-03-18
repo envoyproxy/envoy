@@ -21,14 +21,25 @@ class GrpcMuxSubscriptionImpl : public Subscription<ResourceType>,
                                 GrpcMuxCallbacks,
                                 Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux, SubscriptionStats stats)
+  GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux, SubscriptionStats stats, Event::Dispatcher& dispatcher,
+                          std::chrono::milliseconds init_fetch_timeout)
       : grpc_mux_(grpc_mux), stats_(stats),
-        type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())) {}
+        type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
+        dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout) {}
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
              SubscriptionCallbacks<ResourceType>& callbacks) override {
     callbacks_ = &callbacks;
+
+    if (init_fetch_timeout_.count() > 0) {
+      init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
+        ENVOY_LOG(warn, "gRPC config: initial fetch timed out for {}", type_url_);
+        callbacks_->onConfigUpdateFailed(nullptr);
+      });
+      init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
+    }
+
     watch_ = grpc_mux_.subscribe(type_url_, resources, *this);
     // The attempt stat here is maintained for the purposes of having consistency between ADS and
     // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
@@ -44,6 +55,7 @@ public:
   // Config::GrpcMuxCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override {
+    disableInitFetchTimeoutTimer();
     Protobuf::RepeatedPtrField<ResourceType> typed_resources;
     std::transform(resources.cbegin(), resources.cend(),
                    Protobuf::RepeatedPtrFieldBackInserter(&typed_resources),
@@ -62,6 +74,7 @@ public:
   }
 
   void onConfigUpdateFailed(const EnvoyException* e) override {
+    disableInitFetchTimeoutTimer();
     // TODO(htuch): Less fragile signal that this is failure vs. reject.
     if (e == nullptr) {
       stats_.update_failure_.inc();
@@ -79,11 +92,21 @@ public:
   }
 
 private:
+  void disableInitFetchTimeoutTimer() {
+    if (init_fetch_timeout_timer_) {
+      init_fetch_timeout_timer_->disableTimer();
+      init_fetch_timeout_timer_.reset();
+    }
+  }
+
   GrpcMux& grpc_mux_;
   SubscriptionStats stats_;
   const std::string type_url_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
   GrpcMuxWatchPtr watch_{};
+  Event::Dispatcher& dispatcher_;
+  std::chrono::milliseconds init_fetch_timeout_;
+  Event::TimerPtr init_fetch_timeout_timer_;
 };
 
 } // namespace Config

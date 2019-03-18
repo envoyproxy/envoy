@@ -40,12 +40,14 @@ public:
                         Event::Dispatcher& dispatcher,
                         const Protobuf::MethodDescriptor& service_method,
                         Runtime::RandomGenerator& random, Stats::Scope& scope,
-                        const RateLimitSettings& rate_limit_settings, SubscriptionStats stats)
+                        const RateLimitSettings& rate_limit_settings, SubscriptionStats stats,
+                        std::chrono::milliseconds init_fetch_timeout)
       : GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse,
                    ResourceNameDiff>(std::move(async_client), service_method, random, dispatcher,
                                      scope, rate_limit_settings),
         type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
-        local_info_(local_info), stats_(stats) {
+        local_info_(local_info), stats_(stats), dispatcher_(dispatcher),
+        init_fetch_timeout_(init_fetch_timeout) {
     request_.set_type_url(type_url_);
     request_.mutable_node()->MergeFrom(local_info_.node());
   }
@@ -134,6 +136,7 @@ public:
   void handleResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override {
     ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
               message->system_version_info());
+    disableInitFetchTimeoutTimer();
 
     request_.set_response_nonce(message->nonce());
 
@@ -167,6 +170,7 @@ public:
   }
 
   void handleEstablishmentFailure() override {
+    disableInitFetchTimeoutTimer();
     stats_.update_failure_.inc();
     ENVOY_LOG(debug, "delta update for {} failed", type_url_);
     stats_.update_attempt_.inc();
@@ -177,6 +181,15 @@ public:
   void start(const std::vector<std::string>& resources,
              SubscriptionCallbacks<ResourceType>& callbacks) override {
     callbacks_ = &callbacks;
+
+    if (init_fetch_timeout_.count() > 0) {
+      init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
+        ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
+        callbacks_->onConfigUpdateFailed(nullptr);
+      });
+      init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
+    }
+
     establishNewStream();
     subscribe(resources);
     // The attempt stat here is maintained for the purposes of having consistency between ADS and
@@ -191,6 +204,12 @@ public:
   }
 
 private:
+  void disableInitFetchTimeoutTimer() {
+    if (init_fetch_timeout_timer_) {
+      init_fetch_timeout_timer_->disableTimer();
+      init_fetch_timeout_timer_.reset();
+    }
+  }
   // A map from resource name to per-resource version.
   std::unordered_map<std::string, std::string> resources_;
   // The keys of resources_. Only tracked separately because std::map does not provide an iterator
@@ -207,6 +226,9 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 
   SubscriptionStats stats_;
+  Event::Dispatcher& dispatcher_;
+  std::chrono::milliseconds init_fetch_timeout_;
+  Event::TimerPtr init_fetch_timeout_timer_;
 };
 
 } // namespace Config
