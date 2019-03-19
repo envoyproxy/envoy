@@ -165,6 +165,13 @@ public:
 
     return Memory::Stats::totalCurrentlyAllocated();
   }
+
+  static size_t computeMemory(int num_clusters) {
+    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+    ClusterMemoryTestHelper helper(num_clusters, true);
+    size_t memory = helper.ClusterMemoryHelper(num_clusters, true);
+    EXPECT_LT(start_mem, memory);
+  }
 };
 class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {};
 
@@ -181,15 +188,12 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  auto t1 = std::make_unique<ClusterMemoryTestHelper>();
-  size_t m1 = t1->ClusterMemoryHelper(1, true);
-  EXPECT_LT(start_mem, m1);
-  t1.reset(nullptr);
-
-  auto t2 = std::make_unique<ClusterMemoryTestHelper>();
-  const size_t m1001 = t2->ClusterMemoryHelper(1001, true);
-  EXPECT_LT(start_mem, m1001);
+  const size_t m1 = ClusterMemoryTestHelper::computeMemory(1);
+  const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1001);
   const size_t m_per_cluster = (m1001 - m1) / 1000;
+
+  EXPECT_LT(start_mem, m1);
+  EXPECT_LT(start_mem, m1001);
 // As of 2019/03/13, m_per_cluster = 56404 (libstdc++), 52249 (libc++).
 #ifdef _LIBCPP_VERSION
   EXPECT_LT(m_per_cluster, 53000);
