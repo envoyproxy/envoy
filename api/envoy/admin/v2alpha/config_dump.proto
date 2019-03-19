@@ -188,6 +188,6 @@ message ControlPlaneConfigDump {
   // The control plane that Envoy is currently connected to.
   envoy.api.v2.core.ControlPlane control_plane = 1 [(gogoproto.nullable) = false];
 
-  // The timestamp when the ControlPlance information was last updated.
+  // The timestamp when the ControlPlane information was last updated.
   google.protobuf.Timestamp last_updated = 2;
 }
