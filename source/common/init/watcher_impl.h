@@ -2,12 +2,12 @@
 
 #include <functional>
 
-#include "envoy/safe_init/watcher.h"
+#include "envoy/init/watcher.h"
 
 #include "common/common/logger.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 
 /**
  * A watcher is just a glorified callback function, called by a target or a manager when
@@ -28,7 +28,7 @@ private:
                     std::weak_ptr<ReadyFn> fn);
 
 public:
-  // SafeInit::WatcherHandle
+  // Init::WatcherHandle
   bool ready() const override;
 
 private:
@@ -57,7 +57,7 @@ public:
   WatcherImpl(absl::string_view name, ReadyFn fn);
   ~WatcherImpl() override;
 
-  // SafeInit::Watcher
+  // Init::Watcher
   absl::string_view name() const override;
   WatcherHandlePtr createHandle(absl::string_view handle_name) const override;
 
@@ -69,5 +69,5 @@ private:
   const std::shared_ptr<ReadyFn> fn_;
 };
 
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

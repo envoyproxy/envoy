@@ -1,14 +1,14 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/safe_init/target.h"
-#include "envoy/safe_init/watcher.h"
+#include "envoy/init/target.h"
+#include "envoy/init/watcher.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 
 /**
- * SafeInit::Manager coordinates initialization of one or more "targets." A typical flow would be:
+ * Init::Manager coordinates initialization of one or more "targets." A typical flow would be:
  *
  *   - One or more initialization targets are registered with a manager using `add`.
  *   - The manager is told to `initialize` all its targets, given a Watcher to notify when all
@@ -21,14 +21,14 @@ namespace SafeInit {
  * Since there are several entities involved in this flow -- the owner of the manager, the targets
  * registered with the manager, and the manager itself -- it may be difficult or impossible in some
  * cases to guarantee that their lifetimes line up correctly to avoid use-after-free errors. The
- * interface design here in SafeInit allows implementations to avoid the issue:
+ * interface design here in Init allows implementations to avoid the issue:
  *
  *   - A Target can only be initialized via a TargetHandle, which acts as a weak reference.
  *     Attempting to initialize a destroyed Target via its handle has no ill effects.
  *   - Likewise, a Watcher can only be notified that initialization was complete via a
  *     WatcherHandle, which acts as a weak reference as well.
  *
- * See target.h and watcher.h, as well as implementation in source/common/safe_init for details.
+ * See target.h and watcher.h, as well as implementation in source/common/init for details.
  */
 struct Manager {
   virtual ~Manager() = default;
@@ -75,5 +75,5 @@ struct Manager {
   virtual void initialize(const Watcher& watcher) PURE;
 };
 
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

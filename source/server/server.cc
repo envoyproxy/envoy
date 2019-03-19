@@ -55,7 +55,13 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
                            Filesystem::Instance& file_system)
-    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
+    : init_watcher_("InstanceImpl",
+                    [this]() {
+                      if (!shutdown_) {
+                        startWorkers();
+                      }
+                    }),
+      secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
       options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system)),
@@ -412,8 +418,8 @@ uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnectio
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-                     InitManagerImpl& init_manager, OverloadManager& overload_manager,
-                     std::function<void()> workers_start_cb) {
+                     Init::Manager& init_manager, const Init::Watcher& init_watcher,
+                     OverloadManager& overload_manager) {
 
   // Setup signals.
   if (options.signalHandlingEnabled()) {
@@ -445,7 +451,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // this can fire immediately if all clusters have already initialized. Also note that we need
   // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
   // starts.
-  cm.setInitializedCb([&instance, &init_manager, &cm, workers_start_cb]() {
+  cm.setInitializedCb([&instance, &init_manager, &init_watcher, &cm]() {
     if (instance.isShutdown()) {
       return;
     }
@@ -456,16 +462,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
-
-    // Note: the lambda below should not capture "this" since the RunHelper object may
-    // have been destructed by the time it gets executed.
-    init_manager.initialize([&instance, workers_start_cb]() {
-      if (instance.isShutdown()) {
-        return;
-      }
-
-      workers_start_cb();
-    });
+    init_manager.initialize(init_watcher);
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
@@ -477,8 +474,8 @@ void InstanceImpl::run() {
   // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
   // we save it as a member variable.
   run_helper_ = std::make_unique<RunHelper>(*this, options_, *dispatcher_, clusterManager(),
-                                            access_log_manager_, init_manager_, overloadManager(),
-                                            [this]() -> void { startWorkers(); });
+                                            access_log_manager_, init_manager_, init_watcher_,
+                                            overloadManager());
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");

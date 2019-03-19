@@ -3,17 +3,17 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
-#include "envoy/safe_init/watcher.h"
+#include "envoy/init/watcher.h"
 
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 
 /**
  * A TargetHandle functions as a weak reference to a Target. It is how an implementation of
- * SafeInit::Manager would safely tell a target to `initialize` with no guarantees about the
- * target's lifetime. Typical usage (outside of SafeInit::ManagerImpl) does not require touching
+ * Init::Manager would safely tell a target to `initialize` with no guarantees about the
+ * target's lifetime. Typical usage (outside of Init::ManagerImpl) does not require touching
  * TargetHandles at all.
  */
 struct TargetHandle {
@@ -48,5 +48,5 @@ struct Target {
   virtual TargetHandlePtr createHandle(absl::string_view name) const PURE;
 };
 
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

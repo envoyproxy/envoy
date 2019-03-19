@@ -639,7 +639,7 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
   server_info.set_version(VersionInfo::version());
 
   switch (server_.initManager().state()) {
-  case Init::Manager::State::NotInitialized:
+  case Init::Manager::State::Uninitialized:
     server_info.set_state(envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING);
     break;
   case Init::Manager::State::Initializing:

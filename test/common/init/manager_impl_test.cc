@@ -1,6 +1,6 @@
-#include "common/safe_init/manager_impl.h"
+#include "common/init/manager_impl.h"
 
-#include "test/mocks/safe_init/mocks.h"
+#include "test/mocks/init/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -8,14 +8,14 @@ using ::testing::InSequence;
 using ::testing::InvokeWithoutArgs;
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 namespace {
 
 void expectUninitialized(const Manager& m) { EXPECT_EQ(Manager::State::Uninitialized, m.state()); }
 void expectInitializing(const Manager& m) { EXPECT_EQ(Manager::State::Initializing, m.state()); }
 void expectInitialized(const Manager& m) { EXPECT_EQ(Manager::State::Initialized, m.state()); }
 
-TEST(SafeInitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
+TEST(InitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -37,7 +37,7 @@ TEST(SafeInitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TEST(SafeInitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
+TEST(InitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -67,7 +67,7 @@ TEST(SafeInitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TEST(SafeInitManagerImplTest, AddMixedTargetsWhenUninitialized) {
+TEST(InitManagerImplTest, AddMixedTargetsWhenUninitialized) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -93,7 +93,7 @@ TEST(SafeInitManagerImplTest, AddMixedTargetsWhenUninitialized) {
   expectInitialized(m);
 }
 
-TEST(SafeInitManagerImplTest, AddImmediateTargetWhenInitializing) {
+TEST(InitManagerImplTest, AddImmediateTargetWhenInitializing) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -121,7 +121,7 @@ TEST(SafeInitManagerImplTest, AddImmediateTargetWhenInitializing) {
   expectInitialized(m);
 }
 
-TEST(SafeInitManagerImplTest, UnavailableTarget) {
+TEST(InitManagerImplTest, UnavailableTarget) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -142,7 +142,7 @@ TEST(SafeInitManagerImplTest, UnavailableTarget) {
   expectInitialized(m);
 }
 
-TEST(SafeInitManagerImplTest, UnavailableManager) {
+TEST(InitManagerImplTest, UnavailableManager) {
   InSequence s;
 
   ExpectableTargetImpl t("t");
@@ -165,7 +165,7 @@ TEST(SafeInitManagerImplTest, UnavailableManager) {
   t.ready();
 }
 
-TEST(SafeInitManagerImplTest, UnavailableWatcher) {
+TEST(InitManagerImplTest, UnavailableWatcher) {
   InSequence s;
 
   ManagerImpl m("test");
@@ -190,5 +190,5 @@ TEST(SafeInitManagerImplTest, UnavailableWatcher) {
 }
 
 } // namespace
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

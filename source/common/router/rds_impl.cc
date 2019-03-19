@@ -60,6 +60,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : route_config_name_(rds.route_config_name()),
+      init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
+                   [this]() { subscription_->start({route_config_name_}, *this); }),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
@@ -77,7 +79,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
   // If we get destroyed during initialization, make sure we signal that we "initialized".
-  runInitializeCallbackIfAny();
+  init_target_.ready();
 
   // The ownership of RdsRouteConfigProviderImpl is shared among all HttpConnectionManagers that
   // hold a shared_ptr to it. The RouteConfigProviderManager holds weak_ptrs to the
@@ -93,7 +95,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(const ResourceVector& resources,
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
     stats_.update_empty_.inc();
-    runInitializeCallbackIfAny();
+    init_target_.ready();
     return;
   }
   if (resources.size() != 1) {
@@ -119,25 +121,17 @@ void RdsRouteConfigSubscription::onConfigUpdate(const ResourceVector& resources,
     }
   }
 
-  runInitializeCallbackIfAny();
+  init_target_.ready();
 }
 
 void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
-  runInitializeCallbackIfAny();
+  init_target_.ready();
 }
 
 void RdsRouteConfigSubscription::registerInitTarget(Init::Manager& init_manager) {
-  init_manager.registerTarget(*this,
-                              fmt::format("RdsRouteConfigSubscription {}", route_config_name_));
-}
-
-void RdsRouteConfigSubscription::runInitializeCallbackIfAny() {
-  if (initialize_callback_) {
-    initialize_callback_();
-    initialize_callback_ = nullptr;
-  }
+  init_manager.add(init_target_);
 }
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(

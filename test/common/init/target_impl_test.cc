@@ -1,19 +1,19 @@
-#include "test/mocks/safe_init/mocks.h"
+#include "test/mocks/init/mocks.h"
 
 #include "gtest/gtest.h"
 
 using ::testing::InSequence;
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 namespace {
 
-TEST(SafeInitTargetImplTest, Name) {
+TEST(InitTargetImplTest, Name) {
   ExpectableTargetImpl target;
   EXPECT_EQ("target test", target.name());
 }
 
-TEST(SafeInitTargetImplTest, InitializeWhenAvailable) {
+TEST(InitTargetImplTest, InitializeWhenAvailable) {
   InSequence s;
 
   ExpectableTargetImpl target;
@@ -32,7 +32,7 @@ TEST(SafeInitTargetImplTest, InitializeWhenAvailable) {
   EXPECT_FALSE(target.ready());
 }
 
-TEST(SafeInitTargetImplTest, InitializeWhenUnavailable) {
+TEST(InitTargetImplTest, InitializeWhenUnavailable) {
   ExpectableWatcherImpl watcher;
   TargetHandlePtr handle;
   {
@@ -45,7 +45,7 @@ TEST(SafeInitTargetImplTest, InitializeWhenUnavailable) {
   EXPECT_FALSE(handle->initialize(watcher));
 }
 
-TEST(SafeInitTargetImplTest, ReadyWhenWatcherUnavailable) {
+TEST(InitTargetImplTest, ReadyWhenWatcherUnavailable) {
   ExpectableTargetImpl target;
   {
     ExpectableWatcherImpl watcher;
@@ -61,5 +61,5 @@ TEST(SafeInitTargetImplTest, ReadyWhenWatcherUnavailable) {
 }
 
 } // namespace
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

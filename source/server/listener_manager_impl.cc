@@ -168,6 +168,12 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
       workers_started_(workers_started), hash_(hash),
       dynamic_init_manager_(fmt::format("Listener {}", name)),
+      init_watcher_("ListenerImpl",
+                    [this]() -> void {
+                      if (!initialize_canceled_) {
+                        parent_.onListenerWarmed(*this);
+                      }
+                    }),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
@@ -631,11 +637,7 @@ void ListenerImpl::initialize() {
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // with initialize_canceled_.
   if (workers_started_) {
-    dynamic_init_manager_.initialize([this]() -> void {
-      if (!initialize_canceled_) {
-        parent_.onListenerWarmed(*this);
-      }
-    });
+    dynamic_init_manager_.initialize(init_watcher_);
   }
 }
 
