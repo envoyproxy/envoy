@@ -23,7 +23,10 @@ envoy_cc_library(
     hdrs = ["string_utils.h"],
     external_deps = ["abseil_str_format"],
     visibility = ["//visibility:public"],
-    deps = ["//source/common/common:assert_lib"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
+    ],
 )
 
 envoy_cc_library(

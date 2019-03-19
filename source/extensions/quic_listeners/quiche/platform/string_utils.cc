@@ -14,22 +14,13 @@
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 
 namespace quiche {
 
 void Base64Encode(const uint8_t* data, size_t data_len, std::string* output) {
-  absl::Base64Escape(std::string(reinterpret_cast<const char*>(data), data_len), output);
-  // Remove padding.
-  size_t len = output->size();
-  if (len >= 2) {
-    if ((*output)[len - 1] == '=') {
-      len--;
-      if ((*output)[len - 1] == '=') {
-        len--;
-      }
-      output->resize(len);
-    }
-  }
+  *output =
+      Envoy::Base64::encode(reinterpret_cast<const char*>(data), data_len, /*add_padding=*/false);
 }
 
 std::string HexDump(absl::string_view data) {
