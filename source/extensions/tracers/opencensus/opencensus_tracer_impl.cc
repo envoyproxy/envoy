@@ -89,8 +89,9 @@ StartSpanHelper(const std::string& name, bool traced, const Http::HeaderMap& req
     }
     }
     // First header found wins.
-    if (found)
+    if (found) {
       break;
+    }
   }
 
   // Honor Envoy's tracing decision.
