@@ -20,12 +20,13 @@ public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
+  absl::string_view failureReason() const override;
   bool canFlushClose() override;
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
-  const Ssl::Connection* ssl() const override;
+  const Ssl::ConnectionInfo* ssl() const override;
 
 private:
   SocketTapConfigSharedPtr config_;

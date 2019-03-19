@@ -310,7 +310,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 void ConnectionManagerImpl::resetAllStreams() {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case.
-    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination);
+    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
   }
 }
 
@@ -419,6 +419,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   // prevents surprises for logging code in edge cases.
   stream_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
+
+  stream_info_.setDownstreamSslConnection(connection_manager_.read_callbacks_->connection().ssl());
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
@@ -1442,7 +1444,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
+void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl::string_view) {
   // NOTE: This function gets called in all of the following cases:
   //       1) We TX an app level reset
   //       2) The codec TX a codec level reset
@@ -1734,6 +1736,11 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::In
   parent_.addDecodedData(*this, data, streaming);
 }
 
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
+  parent_.decodeData(this, data, end_stream);
+}
+
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encode100ContinueHeaders(
@@ -1848,6 +1855,11 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data,
                                                                       bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
+  parent_.encodeData(this, data, end_stream);
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {

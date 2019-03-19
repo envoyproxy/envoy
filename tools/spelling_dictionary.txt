@@ -149,6 +149,7 @@ NBF
 NDEBUG
 NGHTTP
 NOLINT
+NOLINTNEXTLINE
 NS
 NUL
 Nilsson
@@ -183,6 +184,7 @@ RCU
 RDN
 RDS
 RDWR
+REIMPLEMENT
 REQ
 RFC
 RHS
@@ -258,6 +260,7 @@ WS
 Welford's
 Werror
 XDS
+xDSes
 XFCC
 XFF
 XM
@@ -362,6 +365,7 @@ deflateInit
 deletable
 deleter
 delim
+deque
 dereference
 dereferences
 dereferencing
@@ -440,6 +444,7 @@ gregs
 gzip
 hacky
 handshaker
+hd
 hdr
 healths
 healthz
@@ -519,6 +524,7 @@ mem
 memcpy
 midp
 milli
+misconfiguration
 misconfigured
 mixin
 mkdir
@@ -617,6 +623,7 @@ reparse
 reperform
 repicked
 repo
+reservable
 resize
 resized
 resizes
@@ -633,6 +640,7 @@ sanitization
 sanitizer
 scala
 scalability
+sched
 schemas
 serializable
 serializer
@@ -694,6 +702,7 @@ uint
 un
 unary
 unconfigurable
+unconfigured
 uncontended
 undef
 undegraded
@@ -714,6 +723,7 @@ unordered
 unowned
 unparented
 unpause
+unpopulated
 unprotect
 unref
 unreferenced

@@ -217,10 +217,37 @@ public:
    *
    * It is an error to call this method in any other case.
    *
+   * See also injectDecodedDataToFilterChain() for a different way of passing data to further
+   * filters and also how the two methods are different.
+   *
    * @param data Buffer::Instance supplies the data to be decoded.
    * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
+
+  /**
+   * Decode data directly to subsequent filters in the filter chain. This method is used in
+   * advanced cases in which a filter needs full control over how subsequent filters view data,
+   * and does not want to make use of HTTP connection manager buffering. Using this method allows
+   * a filter to buffer data (or not) and then periodically inject data to subsequent filters,
+   * indicating end_stream at an appropriate time. This can be used to implement rate limiting,
+   * periodic data emission, etc.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's decodeData() call.
+   *
+   * When using this callback, filters should generally only return
+   * FilterDataStatus::StopIterationNoBuffer from their decodeData() call, since use of this method
+   * indicates that a filter does not wish to participate in standard HTTP connection manager
+   * buffering and continuation and will perform any necessary buffering and continuation on its
+   * own.
+   *
+   * This callback is different from addDecodedData() in that the specified data and end_stream
+   * status will be propagated directly to further filters in the filter chain. This is different
+   * from addDecodedData() where data is added to the HTTP connection manager's buffered data with
+   * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   */
+  virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
@@ -469,10 +496,37 @@ public:
    *
    * It is an error to call this method in any other case.
    *
+   * See also injectEncodedDataToFilterChain() for a different way of passing data to further
+   * filters and also how the two methods are different.
+   *
    * @param data Buffer::Instance supplies the data to be encoded.
    * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
+
+  /**
+   * Encode data directly to subsequent filters in the filter chain. This method is used in
+   * advanced cases in which a filter needs full control over how subsequent filters view data,
+   * and does not want to make use of HTTP connection manager buffering. Using this method allows
+   * a filter to buffer data (or not) and then periodically inject data to subsequent filters,
+   * indicating end_stream at an appropriate time. This can be used to implement rate limiting,
+   * periodic data emission, etc.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's encodeData() call.
+   *
+   * When using this callback, filters should generally only return
+   * FilterDataStatus::StopIterationNoBuffer from their encodeData() call, since use of this method
+   * indicates that a filter does not wish to participate in standard HTTP connection manager
+   * buffering and continuation and will perform any necessary buffering and continuation on its
+   * own.
+   *
+   * This callback is different from addEncodedData() in that the specified data and end_stream
+   * status will be propagated directly to further filters in the filter chain. This is different
+   * from addEncodedData() where data is added to the HTTP connection manager's buffered data with
+   * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   */
+  virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
@@ -517,7 +571,7 @@ public:
  */
 class StreamEncoderFilter : public StreamFilterBase {
 public:
-  /*
+  /**
    * Called with 100-continue headers.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters

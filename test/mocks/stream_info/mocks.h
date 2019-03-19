@@ -24,6 +24,7 @@ public:
   MOCK_CONST_METHOD0(startTimeMonotonic, MonotonicTime());
   MOCK_CONST_METHOD0(lastDownstreamRxByteReceived, absl::optional<std::chrono::nanoseconds>());
   MOCK_METHOD0(onLastDownstreamRxByteReceived, void());
+  MOCK_METHOD1(setUpstreamTiming, void(const UpstreamTiming&));
   MOCK_CONST_METHOD0(firstUpstreamTxByteSent, absl::optional<std::chrono::nanoseconds>());
   MOCK_METHOD0(onFirstUpstreamTxByteSent, void());
   MOCK_CONST_METHOD0(lastUpstreamTxByteSent, absl::optional<std::chrono::nanoseconds>());
@@ -38,7 +39,6 @@ public:
   MOCK_METHOD0(onLastDownstreamTxByteSent, void());
   MOCK_METHOD0(onRequestComplete, void());
   MOCK_CONST_METHOD0(requestComplete, absl::optional<std::chrono::nanoseconds>());
-  MOCK_METHOD0(resetUpstreamTimings, void());
   MOCK_METHOD1(addBytesReceived, void(uint64_t));
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
   MOCK_CONST_METHOD0(protocol, absl::optional<Http::Protocol>());
@@ -61,6 +61,8 @@ public:
                      const Network::Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setDownstreamRemoteAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(downstreamRemoteAddress, const Network::Address::InstanceConstSharedPtr&());
+  MOCK_METHOD1(setDownstreamSslConnection, void(const Ssl::ConnectionInfo*));
+  MOCK_CONST_METHOD0(downstreamSslConnection, const Ssl::ConnectionInfo*());
   MOCK_CONST_METHOD0(routeEntry, const Router::RouteEntry*());
   MOCK_METHOD0(dynamicMetadata, envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(dynamicMetadata, const envoy::api::v2::core::Metadata&());
@@ -71,6 +73,8 @@ public:
   MOCK_CONST_METHOD0(filterState, const FilterState&());
   MOCK_METHOD1(setRequestedServerName, void(const absl::string_view));
   MOCK_CONST_METHOD0(requestedServerName, const std::string&());
+  MOCK_METHOD1(setUpstreamTransportFailureReason, void(absl::string_view));
+  MOCK_CONST_METHOD0(upstreamTransportFailureReason, const std::string&());
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
@@ -94,7 +98,9 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  const Ssl::ConnectionInfo* downstream_connection_info_{};
   std::string requested_server_name_;
+  std::string upstream_transport_failure_reason_;
 };
 
 } // namespace StreamInfo

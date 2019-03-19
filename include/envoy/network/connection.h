@@ -184,7 +184,8 @@ public:
   /**
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual const Ssl::Connection* ssl() const PURE;
+  // TODO(snowp): Remove this in favor of StreamInfo::downstreamSslConnection.
+  virtual const Ssl::ConnectionInfo* ssl() const PURE;
 
   /**
    * @return requested server name (e.g. SNI in TLS), if any.
@@ -261,6 +262,12 @@ public:
    * @return std::chrono::milliseconds The delayed close timeout value.
    */
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
+
+  /**
+   * @return std::string the failure reason of the underlying transport socket, if no failure
+   *         occurred an empty string is returned.
+   */
+  virtual absl::string_view transportFailureReason() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

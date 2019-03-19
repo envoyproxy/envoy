@@ -1593,7 +1593,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   auto uri = ssl_socket->uriSanLocalCertificate();
-  EXPECT_EQ(uri, "spiffe://lyft.com/test-team");
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // EXTERNAL TLS client without "http/1.1" ALPN - using 3nd filter chain.
   filter_chain = findFilterChain(1234, true, "8.8.8.8", true, "", true, "tls", true, {}, true,
@@ -1653,7 +1653,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   auto uri = ssl_socket->uriSanLocalCertificate();
-  EXPECT_EQ(uri, "spiffe://lyft.com/test-team");
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to port 8080 - using 2nd filter chain.
   filter_chain = findFilterChain(8080, true, "127.0.0.1", true, "", true, "tls", true, {}, true,
@@ -1685,7 +1685,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   uri = ssl_socket->uriSanLocalCertificate();
-  EXPECT_EQ(uri, "spiffe://lyft.com/test-team");
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinationIPMatch) {
@@ -1734,7 +1734,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   auto uri = ssl_socket->uriSanLocalCertificate();
-  EXPECT_EQ(uri, "spiffe://lyft.com/test-team");
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // IPv4 client connects to exact IP match - using 2nd filter chain.
   filter_chain = findFilterChain(1234, true, "192.168.0.1", true, "", true, "tls", true, {}, true,
@@ -1766,7 +1766,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
   transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   uri = ssl_socket->uriSanLocalCertificate();
-  EXPECT_EQ(uri, "spiffe://lyft.com/test-team");
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNamesMatch) {
@@ -1824,7 +1824,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
   auto ssl_socket =
       dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
   auto uri = ssl_socket->uriSanLocalCertificate();
-  EXPECT_EQ(uri, "spiffe://lyft.com/test-team");
+  EXPECT_EQ(uri[0], "spiffe://lyft.com/test-team");
 
   // TLS client with exact SNI match - using 2nd filter chain.
   filter_chain = findFilterChain(1234, true, "127.0.0.1", true, "server1.example.com", true, "tls",

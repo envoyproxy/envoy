@@ -35,6 +35,7 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
+        "//test/common/runtime:utility_lib",
     ],
 )
 
@@ -158,19 +159,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_infrastructure_library(
-    name = "test_base",
-    hdrs = ["test_base.h"],
-    deps = [
-        "//test/test_common:global_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "test_base_test",
-    srcs = ["test_base_test.cc"],
-)
-
 envoy_cc_test_library(
     name = "test_time_lib",
     srcs = ["test_time.cc"],
@@ -209,6 +197,7 @@ envoy_cc_test(
     deps = [
         ":simulated_time_system_lib",
         ":utility_lib",
+        "//source/common/event:libevent_scheduler_lib",
     ],
 )
 

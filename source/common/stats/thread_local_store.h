@@ -171,19 +171,28 @@ public:
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
-  template <class Stat> using StatMap = CharStarHashMap<Stat>;
+  template <class Stat> using StatMap = ConstCharStarHashMap<Stat>;
 
   struct TlsCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<TlsHistogramSharedPtr> histograms_;
     StatMap<ParentHistogramSharedPtr> parent_histograms_;
+
+    // We keep a TLS cache of rejected stat names. This costs memory, but
+    // reduces runtime overhead running the matcher. Moreover, once symbol
+    // tables are integrated, rejection will need the fully elaborated string,
+    // and it we need to take a global symbol-table lock to run. We keep
+    // this char* map here in the TLS cache to avoid taking a lock to compute
+    // rejection.
+    SharedStringSet rejected_stats_;
   };
 
   struct CentralCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
+    SharedStringSet rejected_stats_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -221,9 +230,11 @@ private:
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType&
-    safeMakeStat(const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                 MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache);
+    StatType& safeMakeStat(const std::string& name,
+                           StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                           SharedStringSet& central_rejected_stats_, MakeStatFn<StatType> make_stat,
+                           StatMap<std::shared_ptr<StatType>>* tls_cache,
+                           SharedStringSet* tls_rejected_stats, StatType& null_stat);
 
     static std::atomic<uint64_t> next_scope_id_;
 
@@ -254,8 +265,11 @@ private:
   void mergeInternal(PostMergeCb mergeCb);
   absl::string_view truncateStatNameIfNeeded(absl::string_view name);
   bool rejects(const std::string& name) const;
+  bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
+  bool checkAndRememberRejection(const std::string& name, SharedStringSet& central_rejected_stats,
+                                 SharedStringSet* tls_rejected_stats);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
