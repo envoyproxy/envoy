@@ -53,8 +53,7 @@ public:
   }
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
-  // added to the passed 'resources' argument, relative to resources_. Updates resources_ to
-  // 'resources'.
+  // added to the passed 'resources' argument, relative to resource_versions_.
   void buildAndQueueDiscoveryRequest(const std::vector<std::string>& resources) {
     ResourceNameDiff diff;
     std::set_difference(resources.begin(), resources.end(), resource_names_.begin(),
@@ -63,12 +62,10 @@ public:
                         resources.end(), std::inserter(diff.removed_, diff.removed_.begin()));
 
     for (const auto& added : diff.added_) {
-      resources_[added] = EmptyVersion;
-      resource_names_.insert(added);
+      insertOrUpdateResourceVersion(added, EmptyVersion);
     }
     for (const auto& removed : diff.removed_) {
-      resources_.erase(removed);
-      resource_names_.erase(removed);
+      eraseResourceVersion(removed);
     }
     queueDiscoveryRequest(diff);
   }
@@ -124,14 +121,14 @@ public:
                       const std::string& version_info) {
     callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
     for (const auto& resource : added_resources) {
-      resources_[resource.name()] = resource.version();
+      insertOrUpdateResourceVersion(resource.name(), resource.version());
     }
     // If a resource is gone, there is no longer a meaningful version for it that makes sense to
     // provide to the server upon stream reconnect: either it will continue to not exist, in which
     // case saying nothing is fine, or the server will bring back something new, which we should
     // receive regardless (which is the logic that not specifying a version will get you).
     for (const auto& resource_name : removed_resources) {
-      resources_.erase(resource_name);
+      eraseResourceVersion(resource_name);
     }
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
@@ -168,7 +165,7 @@ public:
     clearRequestQueue();
 
     request_.Clear();
-    for (auto const& resource : resources_) {
+    for (auto const& resource : resource_versions_) {
       (*request_.mutable_initial_resource_versions())[resource.first] = resource.second;
     }
     request_.set_type_url(type_url_);
@@ -217,10 +214,21 @@ private:
       init_fetch_timeout_timer_.reset();
     }
   }
+
+  // Use these helpers to avoid forgetting to update both at once.
+  void insertOrUpdateResourceVersion(const std::string& key, const std::string& val) {
+    resource_versions_[key] = val;
+    resource_names_.insert(key);
+  }
+  void eraseResourceVersion(const std::string& key) {
+    resource_versions_.erase(key);
+    resource_names_.erase(key);
+  }
+
   // A map from resource name to per-resource version.
-  std::unordered_map<std::string, std::string> resources_;
-  // The keys of resources_. Only tracked separately because std::map does not provide an iterator
-  // into just its keys, e.g. for use in std::set_difference.
+  std::unordered_map<std::string, std::string> resource_versions_;
+  // The keys of resource_versions_. Only tracked separately because std::map does not provide an
+  // iterator into just its keys, e.g. for use in std::set_difference.
   std::unordered_set<std::string> resource_names_;
   const std::string type_url_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
