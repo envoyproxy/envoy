@@ -126,6 +126,13 @@ public:
     for (const auto& resource : added_resources) {
       resources_[resource.name()] = resource.version();
     }
+    // If a resource is gone, there is no longer a meaningful version for it that makes sense to
+    // provide to the server upon stream reconnect: either it will continue to not exist, in which
+    // case saying nothing is fine, or the server will bring back something new, which we should
+    // receive regardless (which is the logic that not specifying a version will get you).
+    for (const auto& resource_name : removed_resources) {
+      resources_.erase(resource_name);
+    }
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
     stats_.version_.set(HashUtil::xxHash64(version_info));
