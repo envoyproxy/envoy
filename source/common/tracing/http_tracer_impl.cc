@@ -154,8 +154,7 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
 
   if (nullptr != stream_info.upstreamHost()) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster,
-                stream_info.upstreamHost()->cluster().name());
+    span.setTag(Tracing::Tags::get().UpstreamCluster, stream_info.upstreamHost()->cluster().name());
   }
 
   // Post response data.
