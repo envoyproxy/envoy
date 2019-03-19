@@ -104,9 +104,11 @@ message AttributeContext {
     // The HTTP request size in bytes. If unknown, it must be -1.
     int64 size = 9;
 
-    // The network protocol used with the request, as enumerated by
-    // `source/common/http/headers.h:ProtocolStrings`, such as "HTTP/1.0", "HTTP/1.1", or
-    // "HTTP/2".
+    // The network protocol used with the request, such as "HTTP/1.0", "HTTP/1.1", or "HTTP/2".
+    //
+    // See `headers.h:ProtocolStrings
+    // <https://github.com/envoyproxy/envoy/blob/master/source/common/http/headers.h>`_ for a
+    // list of all possible values.
     string protocol = 10;
   }
 
