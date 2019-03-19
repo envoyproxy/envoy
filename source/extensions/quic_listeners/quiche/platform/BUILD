@@ -19,19 +19,11 @@ envoy_package()
 
 envoy_cc_library(
     name = "string_utils_lib",
-    srcs = [
-        "string_utils.cc",
-    ],
-    hdrs = [
-        "string_utils.h",
-    ],
-    external_deps = [
-        "abseil_str_format",
-    ],
+    srcs = ["string_utils.cc"],
+    hdrs = ["string_utils.h"],
+    external_deps = ["abseil_str_format"],
     visibility = ["//visibility:public"],
-    deps = [
-        "//source/common/common:assert_lib",
-    ],
+    deps = ["//source/common/common:assert_lib"],
 )
 
 envoy_cc_library(
@@ -147,12 +139,11 @@ envoy_cc_library(
         "ssl",
     ],
     visibility = ["//visibility:public"],
-    deps =
-        envoy_select_quiche([
-            ":string_utils_lib",
-            "//source/common/filesystem:filesystem_lib",
-            "//source/common/http:utility_lib",
-        ]),
+    deps = envoy_select_quiche([
+        ":string_utils_lib",
+        "//source/common/filesystem:filesystem_lib",
+        "//source/common/http:utility_lib",
+    ]),
 )
 
 envoy_cc_library(

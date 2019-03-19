@@ -233,9 +233,7 @@ envoy_cc_test(
         "@envoy",
     ),
     repository = "@envoy",
-    deps = [
-        ":http2_platform",
-    ],
+    deps = [":http2_platform"],
 )
 
 envoy_cc_test(
@@ -247,9 +245,7 @@ envoy_cc_test(
         "@envoy",
     ),
     repository = "@envoy",
-    deps = [
-        ":spdy_platform",
-    ],
+    deps = [":spdy_platform"],
 )
 
 envoy_cc_test(
