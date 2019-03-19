@@ -1803,7 +1803,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCal
     DownstreamWatermarkCallbacks& watermark_callbacks) {
   // This is called exactly once per stream, by the router filter. Therefore we
   // expect the same callbacks to not be registered twice.
-  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(), &watermark_callbacks) == parent_.watermark_callbacks_.end());
+  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
+                   &watermark_callbacks) == parent_.watermark_callbacks_.end());
   parent_.watermark_callbacks_.emplace(parent_.watermark_callbacks_.end(), &watermark_callbacks);
   for (uint32_t i = 0; i < parent_.high_watermark_count_; ++i) {
     watermark_callbacks.onAboveWriteBufferHighWatermark();
@@ -1811,7 +1812,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCal
 }
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(), &watermark_callbacks) != parent_.watermark_callbacks_.end());
+  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
+                   &watermark_callbacks) != parent_.watermark_callbacks_.end());
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
 
