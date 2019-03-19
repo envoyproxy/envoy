@@ -1,5 +1,3 @@
-#include "extensions/filters/network/kafka/serialization.h"
-
 #include "test/extensions/filters/network/kafka/serialization_utilities.h"
 
 namespace Envoy {

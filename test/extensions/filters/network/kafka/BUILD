@@ -16,6 +16,7 @@ envoy_cc_test_library(
     name = "serialization_utilities_lib",
     hdrs = ["serialization_utilities.h"],
     deps = [
+        "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/kafka:serialization_lib",
     ],
 )
@@ -67,8 +68,28 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "request_codec_test",
-    srcs = ["request_codec_test.cc"],
+    name = "request_codec_unit_test",
+    srcs = ["request_codec_unit_test.cc"],
+    extension_name = "envoy.filters.network.kafka",
+    deps = [
+        "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "request_codec_integration_test",
+    srcs = ["request_codec_integration_test.cc"],
+    extension_name = "envoy.filters.network.kafka",
+    deps = [
+        "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "request_codec_request_integration_test",
+    srcs = ["request_codec_request_integration_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
@@ -92,10 +113,13 @@ genrule(
         "@kafka_produce_request_spec//file",
         "@kafka_fetch_request_spec//file",
     ],
-    outs = ["requests_test.cc"],
+    outs = [
+        "requests_test.cc",
+        "request_codec_request_integration_test.cc",
+    ],
     cmd = """
         ./$(location //source/extensions/filters/network/kafka:kafka_code_generator) generate-test \
-        $(location requests_test.cc) \
+        $(location requests_test.cc) $(location request_codec_request_integration_test.cc) \
         $(location @kafka_produce_request_spec//file) $(location @kafka_fetch_request_spec//file)
     """,
     tools = [

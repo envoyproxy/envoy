@@ -38,12 +38,15 @@ class AbstractRequest : public Message {
 public:
   AbstractRequest(const RequestHeader& request_header) : request_header_{request_header} {};
 
-protected:
+  /**
+   * Request's header
+   */
   const RequestHeader request_header_;
 };
 
 /**
  * Concrete request that carries data particular to given request type
+ * (can be considered a container)
  */
 template <typename RequestData> class ConcreteRequest : public AbstractRequest {
 public:

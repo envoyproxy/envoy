@@ -14,7 +14,7 @@ def main():
   COMMAND : 'generate-source', to generate source files
             'generate-test', to generate test files
   OUTPUT_FILES : if generate-source: location of 'requests.h' and 'kafka_request_resolver.cc',
-                 if generate-test: location of 'requests_test.cc'
+                 if generate-test: location of 'requests_test.cc', 'request_codec_request_integration_test.cc'
   INPUT_FILES: Kafka protocol json files to be processed
 
   Kafka spec files are provided at https://github.com/apache/kafka/tree/2.2.0-rc0/clients/src/main/resources/common/message and in Kafka clients jar file
@@ -23,11 +23,13 @@ def main():
     - kafka_request_resolver.cc - resolver that binds api_key & api_version to parsers from requests.h
   When generating test code, it creates:
     - requests_test.cc - serialization/deserialization tests for kafka structures
+    - request_codec_request_integration_test.cc - integration test for all request operations using the codec API
 
   Templates used are:
   - to create 'requests.h': requests_h.j2, complex_type_template.j2, request_parser.j2
   - to create 'kafka_request_resolver.cc': kafka_request_resolver_cc.j2
   - to create 'requests_test.cc': requests_test_cc.j2
+  - to create 'request_codec_request_integration_test.cc' - request_codec_request_integration_test_cc.j2
   """
 
   import sys
@@ -40,7 +42,8 @@ def main():
     input_files = sys.argv[4:]
   elif 'generate-test' == command:
     requests_test_cc_file = os.path.abspath(sys.argv[2])
-    input_files = sys.argv[3:]
+    request_codec_request_integration_test_cc_file = os.path.abspath(sys.argv[3])
+    input_files = sys.argv[4:]
   else:
     raise ValueError('invalid command: ' + command)
 
@@ -76,24 +79,30 @@ def main():
       requests_h_contents += request_parsers_template.render(complex_type=request)
 
     # full file with headers, namespace declaration etc.
-    requests_header_template = RenderingHelper.get_template('requests_h.j2')
-    contents = requests_header_template.render(contents=requests_h_contents)
+    template = RenderingHelper.get_template('requests_h.j2')
+    contents = template.render(contents=requests_h_contents)
 
     with open(requests_h_file, 'w') as fd:
       fd.write(contents)
 
-    kafka_request_resolver_template = RenderingHelper.get_template('kafka_request_resolver_cc.j2')
-    contents = kafka_request_resolver_template.render(request_types=requests)
+    template = RenderingHelper.get_template('kafka_request_resolver_cc.j2')
+    contents = template.render(request_types=requests)
 
     with open(kafka_request_resolver_cc_file, 'w') as fd:
       fd.write(contents)
 
   # test code
   if 'generate-test' == command:
-    requests_test_template = RenderingHelper.get_template('requests_test_cc.j2')
-    contents = requests_test_template.render(request_types=requests)
+    template = RenderingHelper.get_template('requests_test_cc.j2')
+    contents = template.render(request_types=requests)
 
     with open(requests_test_cc_file, 'w') as fd:
+      fd.write(contents)
+
+    template = RenderingHelper.get_template('request_codec_request_integration_test_cc.j2')
+    contents = template.render(request_types=requests)
+
+    with open(request_codec_request_integration_test_cc_file, 'w') as fd:
       fd.write(contents)
 
 
@@ -185,7 +194,7 @@ class FieldList:
   def constructor_signature(self):
     """
     Return constructor signature
-    Mutliple versions of the same structure can have identical signatures (due to version bumps in Kafka)
+    Multiple versions of the same structure can have identical signatures (due to version bumps in Kafka)
     """
     parameter_spec = map(lambda x: x.parameter_declaration(self.version), self.used_fields())
     return ', '.join(parameter_spec)

@@ -10,13 +10,24 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+class RequestStartParserFactory : public InitialParserFactory {
+
+  ParserSharedPtr create(const RequestParserResolver& parser_resolver) const override {
+    return std::make_shared<RequestStartParser>(parser_resolver);
+  }
+};
+
+const InitialParserFactory& InitialParserFactory::getDefaultInstance() {
+  CONSTRUCT_ON_FIRST_USE(RequestStartParserFactory);
+}
+
 // convert buffer to slices and pass them to `doParse`
 void RequestDecoder::onData(Buffer::Instance& data) {
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   data.getRawSlices(slices.begin(), num_slices);
   for (const Buffer::RawSlice& slice : slices) {
-    doParse(current_parser_, slice);
+    doParse(slice);
   }
 }
 
@@ -25,18 +36,20 @@ void RequestDecoder::onData(Buffer::Instance& data) {
  * - forward data to current parser
  * - receive parser response:
  * -- if still waiting, do nothing
- * -- if next parser, replace parser, and keep feeding, if still have data
+ * -- if next parser, replace current parser, and keep feeding, if still have data
  * -- if parser message:
  * --- notify callbacks
- * --- replace parser with new start parser, as we are going to parse another request
+ * --- replace current parser with new start parser, as we are going to parse another request
  */
-void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& slice) {
+void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
   const char* bytes = reinterpret_cast<const char*>(slice.mem_);
   absl::string_view data = {bytes, slice.len_};
 
   while (!data.empty()) {
-    ParseResponse result = parser->parse(data);
-    // this loop guarantees that parsers consuming 0 bytes also get processed
+
+    // feed the data to the parser
+    ParseResponse result = current_parser_->parse(data);
+    // this loop guarantees that parsers consuming 0 bytes also get processed in this invocation
     while (result.hasData()) {
       if (!result.next_parser_) {
 
@@ -46,12 +59,16 @@ void RequestDecoder::doParse(ParserSharedPtr& parser, const Buffer::RawSlice& sl
           callback->onMessage(result.message_);
         }
 
-        // we finished parsing this request, start anew
-        parser = std::make_shared<RequestStartParser>(parser_resolver_);
+        // as we finished parsing this request, re-initialize the parser
+        current_parser_ = factory_.create(parser_resolver_);
       } else {
-        parser = result.next_parser_;
+
+        // the next parser that's supposed to consume the rest of payload was given
+        current_parser_ = result.next_parser_;
       }
-      result = parser->parse(data);
+
+      // keep parsing the data
+      result = current_parser_->parse(data);
     }
   }
 }
