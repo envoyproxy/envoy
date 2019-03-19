@@ -631,7 +631,9 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 // once on given stat name.
 class RememberStatsMatcherTest : public testing::TestWithParam<bool> {
 public:
-  RememberStatsMatcherTest() : store_(options_, heap_alloc_), scope_(store_.createScope("scope.")) {
+  RememberStatsMatcherTest()
+      : heap_alloc_(symbol_table_), store_(options_, heap_alloc_),
+        scope_(store_.createScope("scope.")) {
     if (GetParam()) {
       store_.initializeThreading(main_thread_dispatcher_, tls_);
     }
@@ -726,6 +728,7 @@ public:
     };
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
