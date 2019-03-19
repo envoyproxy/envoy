@@ -34,10 +34,11 @@ const std::vector<MessageSharedPtr>& CapturingRequestCallback::getCaptured() con
   return captured_;
 }
 
+// other request types are tested in (generated) 'request_codec_request_integration_test.cc'
 TEST_F(RequestDecoderTest, shouldProduceAbortedMessageOnUnknownData) {
   // given
   // api keys have values below 100, so the messages generated in this loop should not be recognized
-  const int16_t base_api_key = 0;
+  const int16_t base_api_key = 100;
   std::vector<RequestHeader> sent_headers;
   for (int16_t i = 0; i < 1000; ++i) {
     const int16_t api_key = static_cast<int16_t>(base_api_key + i);

@@ -110,8 +110,7 @@ envoy_extension_cc_test(
 genrule(
     name = "requests_test_generator",
     srcs = [
-        "@kafka_produce_request_spec//file",
-        "@kafka_fetch_request_spec//file",
+        "@kafka_source//:request_protocol_files",
     ],
     outs = [
         "requests_test.cc",
@@ -120,7 +119,7 @@ genrule(
     cmd = """
         ./$(location //source/extensions/filters/network/kafka:kafka_code_generator) generate-test \
         $(location requests_test.cc) $(location request_codec_request_integration_test.cc) \
-        $(location @kafka_produce_request_spec//file) $(location @kafka_fetch_request_spec//file)
+        $(SRCS)
     """,
     tools = [
         "//source/extensions/filters/network/kafka:kafka_code_generator",

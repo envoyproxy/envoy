@@ -47,8 +47,7 @@ envoy_cc_library(
 genrule(
     name = "kafka_generated_source",
     srcs = [
-        "@kafka_produce_request_spec//file",
-        "@kafka_fetch_request_spec//file",
+        "@kafka_source//:request_protocol_files",
     ],
     outs = [
         "requests.h",
@@ -57,7 +56,7 @@ genrule(
     cmd = """
       ./$(location :kafka_code_generator) generate-source \
         $(location requests.h) $(location kafka_request_resolver.cc) \
-        $(location @kafka_produce_request_spec//file) $(location @kafka_fetch_request_spec//file)
+        $(SRCS)
     """,
     tools = [
         ":kafka_code_generator",

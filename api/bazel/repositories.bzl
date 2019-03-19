@@ -1,4 +1,3 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
@@ -32,15 +31,10 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
         build_file_content = OPENCENSUSTRACE_BUILD_CONTENT,
     )
-    http_file(
-        name = "kafka_produce_request_spec",
-        sha256 = "e035f70a136ef5a5ef2ff17b52dc10f2eae4ac596639689f5584054909d5816f",
-        urls = ["https://raw.githubusercontent.com/apache/kafka/2.2/clients/src/main/resources/common/message/ProduceRequest.json"],
-    )
-    http_file(
-        name = "kafka_fetch_request_spec",
-        sha256 = "9209b68fe0295818071c2f644363cf71e6443eb61f8e9d2636412876c5e2bae8",
-        urls = ["https://raw.githubusercontent.com/apache/kafka/2.2/clients/src/main/resources/common/message/FetchRequest.json"],
+    envoy_http_archive(
+        name = "kafka_source",
+        locations = REPOSITORY_LOCATIONS,
+        build_file_content = KAFKASOURCE_BUILD_CONTENT,
     )
 
 GOOGLEAPIS_BUILD_CONTENT = """
@@ -295,4 +289,16 @@ go_proto_library(
     proto = ":trace_model",
     visibility = ["//visibility:public"],
 )
+"""
+
+KAFKASOURCE_BUILD_CONTENT = """
+
+filegroup(
+    name = "request_protocol_files",
+    srcs = glob([
+        "*Request.json",
+    ]),
+    visibility = ["//visibility:public"],
+)
+
 """
