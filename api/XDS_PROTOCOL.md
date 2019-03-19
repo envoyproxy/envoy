@@ -350,8 +350,8 @@ Resources are identified by a resource name or an alias. Aliases of a resource, 
 will be returned in the name field in the resource of a DeltaDiscoveryResponse. Envoy can send either an alias or the resource name in the resource_names_subscribe field in order to subscribe to a resource.
 
 #### Unsubscribing from Resources
-Envoy will keep track of a per resource reference count internally. This count will keep track of the total number of aliases/resource names that are currently subscribed to. When the reference count reaches zero, 
-Envoy will send a DeltaDiscoveryRequest containing the resource name of the resource to unsusbcribe from in the resource_names_unsubscribe field.
+Envoy will keep track of a per resource reference count internally. This count will keep track of the total number of aliases/resource names that are currently subscribed to. When the reference count reaches zero,
+Envoy will send a DeltaDiscoveryRequest containing the resource name of the resource to unsubscribe from in the resource_names_unsubscribe field.
 
 ## REST-JSON polling subscriptions
 
