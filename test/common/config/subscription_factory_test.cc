@@ -11,6 +11,7 @@
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -37,7 +38,7 @@ public:
     return SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::ClusterLoadAssignment>(
         config, local_info_, dispatcher_, cm_, random_, stats_store_,
         "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints", *api_);
+        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints", *api_, config_tracker_);
   }
 
   Upstream::MockClusterManager cm_;
@@ -48,6 +49,7 @@ public:
   Stats::MockIsolatedStatsStore stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Api::ApiPtr api_;
+  NiceMock<Server::MockConfigTracker> config_tracker_;
 };
 
 class SubscriptionFactoryTestApiConfigSource
