@@ -30,8 +30,11 @@ message ConfigDump {
   //
   // * *bootstrap*: :ref:`BootstrapConfigDump <envoy_api_msg_admin.v2alpha.BootstrapConfigDump>`
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`
+  // * *control plane*:  :ref:`ControlPlaneConfigDump
+  // <envoy_api_msg_admin.v2alpha.ControlPlaneConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v2alpha.RoutesConfigDump>`
+
   repeated google.protobuf.Any configs = 1 [(gogoproto.nullable) = false];
 }
 
@@ -180,8 +183,11 @@ message RoutesConfigDump {
   repeated DynamicRouteConfig dynamic_route_configs = 3 [(gogoproto.nullable) = false];
 }
 
-// This message describes the control plane configuration that Envoy is currently connected to. 
+// This message describes the control plane configuration that Envoy is currently connected to.
 message ControlPlaneConfigDump {
   // The control plane that Envoy is currently connected to.
   envoy.api.v2.core.ControlPlane control_plane = 1 [(gogoproto.nullable) = false];
+
+  // The timestamp when the ControlPlance information was last updated.
+  google.protobuf.Timestamp last_updated = 2;
 }

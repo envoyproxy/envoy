@@ -13,6 +13,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -46,7 +47,7 @@ public:
     }));
     subscription_ = std::make_unique<GrpcEdsSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, stats_, stats_store_, rate_limit_settings_, init_fetch_timeout);
+        *method_descriptor_, stats_, stats_store_, rate_limit_settings_, init_fetch_timeout, config_tracker_);
   }
 
   ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
@@ -162,6 +163,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
+  NiceMock<Server::MockConfigTracker> config_tracker_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned

@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
@@ -16,6 +17,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -47,7 +49,7 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_);
+        random_, stats_, rate_limit_settings_, config_tracker_);
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
@@ -55,7 +57,7 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, custom_rate_limit_settings);
+        random_, stats_, custom_rate_limit_settings, config_tracker_);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -90,6 +92,7 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
+  NiceMock<Server::MockConfigTracker> config_tracker_;
 };
 
 class GrpcMuxImplTest : public GrpcMuxImplTestBase {
@@ -176,6 +179,45 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
   expectSendMessage("foo", {"zz", "z", "x", "y"}, "");
   grpc_mux_->resume("foo");
   grpc_mux_->pause("foo");
+}
+
+// Validate that controlplane config dump is generated correctly.
+TEST_F(GrpcMuxImplTest, DumpControlPlaneConfig) {
+  const std::string expected_config_dump = R"EOF({
+   "control_plane": {
+     "identifier": "control_plane_1"
+   }
+}
+)EOF";
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
+  auto foo_sub = grpc_mux_->subscribe(type_url, {"x", "y"}, foo_callbacks);
+
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {"x", "y"}, "");
+  grpc_mux_->start();
+
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->mutable_control_plane()->set_identifier("control_plane_1");
+  response->set_type_url(type_url);
+  response->set_version_info("1");
+
+  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1")).Times(0);
+  expectSendMessage(type_url, {"x", "y"}, "1");
+  grpc_mux_->onReceiveMessage(std::move(response));
+
+  expectSendMessage(type_url, {}, "1");
+
+  Protobuf::util::MessageDifferencer message_differencer;
+  message_differencer.set_scope(Protobuf::util::MessageDifferencer::Scope::PARTIAL);
+
+  envoy::admin::v2alpha::ControlPlaneConfigDump control_plane_config_dump;
+  MessageUtil::loadFromJson(expected_config_dump, control_plane_config_dump);
+  EXPECT_TRUE(
+      message_differencer.Compare(control_plane_config_dump, *grpc_mux_->dumpControlPlaneConfig()));
 }
 
 // Validate behavior when type URL mismatches occur.
@@ -614,7 +656,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_),
+          random_, stats_, rate_limit_settings_, config_tracker_),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -627,7 +669,7 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_),
+          random_, stats_, rate_limit_settings_, config_tracker_),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

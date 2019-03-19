@@ -10,6 +10,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -55,7 +56,7 @@ protected:
     EXPECT_CALL(*mock_cluster_.info_, addedViaApi());
     EXPECT_CALL(mock_cluster_, info()).Times(AnyNumber());
     EXPECT_CALL(*mock_cluster_.info_, type());
-    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_);
+    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_, config_tracker_);
     resetCdsInitializedCb();
 
     expectRequest();
@@ -178,6 +179,7 @@ protected:
   Http::AsyncClient::Callbacks* callbacks_{};
   ReadyWatcher initialized_;
   Api::ApiPtr api_;
+  NiceMock<Server::MockConfigTracker> config_tracker_;
 };
 
 // Negative test for protoc-gen-validate constraints.
@@ -295,7 +297,7 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   envoy::api::v2::core::ConfigSource cds_config;
   Config::Utility::translateCdsConfig(*config, cds_config);
   EXPECT_THROW(
-      CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_),
+      CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_, config_tracker_),
       EnvoyException);
 }
 

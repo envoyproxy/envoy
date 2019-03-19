@@ -19,13 +19,13 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, Init::Manager& init_manager,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                       ListenerManager& lm, Api::Api& api)
+                       ListenerManager& lm, Api::Api& api, Server::ConfigTracker& config_tracker)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm) {
   subscription_ =
       Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Listener>(
           lds_config, local_info, dispatcher, cm, random, *scope_,
           "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
-          "envoy.api.v2.ListenerDiscoveryService.StreamListeners", api);
+          "envoy.api.v2.ListenerDiscoveryService.StreamListeners", api, config_tracker);
   Config::Utility::checkLocalInfo("lds", local_info);
   init_manager.registerTarget(*this, "LDS");
 }

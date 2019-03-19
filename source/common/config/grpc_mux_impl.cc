@@ -14,12 +14,13 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
-                         const RateLimitSettings& rate_limit_settings, Server::ConfigTracker& config_tracker)
+                         const RateLimitSettings& rate_limit_settings,
+                         Server::ConfigTracker& config_tracker)
     : GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse, std::string>(
           std::move(async_client), service_method, random, dispatcher, scope, rate_limit_settings),
-      local_info_(local_info), config_tracker_entry_(config_tracker.add("control_plane", [this] { return dumpControlPlaneConfig(); })),
-      time_source_(dispatcher.timeSource())
-       {
+      local_info_(local_info), config_tracker_entry_(config_tracker.add(
+                                   "control_plane", [this] { return dumpControlPlaneConfig(); })),
+      time_source_(dispatcher.timeSource()) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -127,7 +128,12 @@ void GrpcMuxImpl::handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryRespon
     // violation
     return;
   }
-  control_plane_.control_plane_identifier_ = message->control_plane().identifier();
+
+  if (message->has_control_plane()) {
+    control_plane_.control_plane_identifier_ = message->control_plane().identifier();
+    control_plane_.last_updated_ = time_source_.systemTime();
+  }
+
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.
     api_state_[type_url].request_.set_response_nonce(message->nonce());
@@ -214,6 +220,8 @@ void GrpcMuxImpl::handleEstablishmentFailure() {
 ProtobufTypes::MessagePtr GrpcMuxImpl::dumpControlPlaneConfig() const {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::ControlPlaneConfigDump>();
   config_dump->mutable_control_plane()->set_identifier(control_plane_.control_plane_identifier_);
+  TimestampUtil::systemClockToTimestamp(control_plane_.last_updated_,
+                                        *(config_dump->mutable_last_updated()));
   return config_dump;
 }
 

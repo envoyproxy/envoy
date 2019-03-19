@@ -90,6 +90,7 @@ private:
   // ControlPlane with which Envoy is connected to.
   struct ControlPlane {
     std::string control_plane_identifier_;
+    SystemTime last_updated_;
   };
 
   const LocalInfo::LocalInfo& local_info_;

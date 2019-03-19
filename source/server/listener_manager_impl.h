@@ -49,7 +49,7 @@ public:
     return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.dispatcher(),
                                         server_.random(), server_.initManager(),
                                         server_.localInfo(), server_.stats(),
-                                        server_.listenerManager(), server_.api());
+                                        server_.listenerManager(), server_.api(), server_.admin().getConfigTracker());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,

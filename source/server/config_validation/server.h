@@ -104,7 +104,7 @@ public:
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
     return std::make_unique<LdsApiImpl>(lds_config, clusterManager(), dispatcher(), random(),
                                         initManager(), localInfo(), stats(), listenerManager(),
-                                        api());
+                                        api(), admin().getConfigTracker());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,

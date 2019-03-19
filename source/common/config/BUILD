@@ -206,6 +206,7 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/server:config_tracker_interface",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )

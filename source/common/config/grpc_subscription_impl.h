@@ -4,6 +4,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/server/config_tracker.h"
 
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_mux_subscription_impl.h"
