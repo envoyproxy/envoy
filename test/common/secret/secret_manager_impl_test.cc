@@ -161,12 +161,14 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
   Stats::IsolatedStoreImpl stats;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::MockAdmin> admin;
   EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, random()).WillOnce(ReturnRef(random));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(secret_context, admin()).WillOnce(ReturnRef(admin));
 
   auto secret_provider =
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);

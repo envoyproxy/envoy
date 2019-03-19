@@ -3673,12 +3673,14 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   NiceMock<Runtime::MockRandomGenerator> random;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::MockAdmin> admin;
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
   EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
   EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context, admin()).WillOnce(ReturnRef(admin));
 
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   auto sds_secret_configs =
@@ -3713,12 +3715,14 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   NiceMock<Runtime::MockRandomGenerator> random;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::MockAdmin> admin;
   EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
   EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
   EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+  EXPECT_CALL(factory_context, admin()).WillOnce(ReturnRef(admin));
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   auto sds_secret_configs =
