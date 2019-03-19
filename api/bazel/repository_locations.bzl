@@ -4,8 +4,8 @@ BAZEL_SKYLIB_SHA256 = "2c62d8cd4ab1e65c08647eb4afe38f51591f43f7f0885e7769832fa13
 GOGOPROTO_RELEASE = "1.2.1"
 GOGOPROTO_SHA256 = "99e423905ba8921e86817607a5294ffeedb66fdd4a85efce5eb2848f715fdb3a"
 
-OPENCENSUS_PROTO_GIT_SHA = "85674de74598a61991045c1ac36af551029b89c8"  # Mar 1, 2019
-OPENCENSUS_PROTO_SHA256 = "b8d939f6fea08f692816ffd771b16ebb24373f8393b037934f8055bb98d160ae"
+OPENCENSUS_PROTO_GIT_SHA = "d5d80953a8c2ff4633087af6933cd152678434bb"  # Mar 18, 2019
+OPENCENSUS_PROTO_SHA256 = "a4e87a1da21d1b3a16674332c3ee6e2689d52f3532e2ff8cb4a626c8bcdabcfc"
 
 PGV_RELEASE = "0.0.13"
 PGV_SHA256 = "dce6c8a43849d2abe4d5e40f16e9a476bca6b7a47e128db4458a52d748f4a5eb"
@@ -43,13 +43,9 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "client_model-" + PROMETHEUS_GIT_SHA,
         urls = ["https://github.com/prometheus/client_model/archive/" + PROMETHEUS_GIT_SHA + ".tar.gz"],
     ),
-    io_opencensus_trace = dict(
-        # TODO: Revert this after https://github.com/census-instrumentation/opencensus-proto/pull/194 is merged.
-        #sha256 = OPENCENSUS_PROTO_SHA256,
-        #strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src",
-        #urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_PROTO_GIT_SHA + ".tar.gz"],
-        urls = ["https://github.com/g-easy/opencensus-proto/archive/py.zip"],
-        strip_prefix = "opencensus-proto-py/src",
-        sha256 = "2594ee18375c3829abe746681c98a826af730cbf1c92aaffbb82c2efaf4ef756",
+    opencensus_proto = dict(
+        sha256 = OPENCENSUS_PROTO_SHA256,
+        strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src",
+        urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_PROTO_GIT_SHA + ".tar.gz"],
     ),
 )
