@@ -392,8 +392,8 @@ GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.stat_prefix_ + " egress",
                                          parent.timeSource().systemTime());
-  current_span_->setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, parent.stat_prefix_);
-  current_span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
+  current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.stat_prefix_);
+  current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 }
 
 void GoogleAsyncRequestImpl::initialize(bool buffer_body_for_retry) {
@@ -405,7 +405,7 @@ void GoogleAsyncRequestImpl::initialize(bool buffer_body_for_retry) {
 }
 
 void GoogleAsyncRequestImpl::cancel() {
-  current_span_->setTag(Tracing::Tags::get().STATUS, Tracing::Tags::get().CANCELED);
+  current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
   current_span_->finishSpan();
   this->resetStream();
 }
@@ -429,13 +429,13 @@ ProtobufTypes::MessagePtr GoogleAsyncRequestImpl::createEmptyResponse() {
 
 void GoogleAsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                            const std::string& message) {
-  current_span_->setTag(Tracing::Tags::get().GRPC_STATUS_CODE, std::to_string(status));
+  current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
 
   if (status != Grpc::Status::GrpcStatus::Ok) {
-    current_span_->setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(status, message, *current_span_);
   } else if (response_ == nullptr) {
-    current_span_->setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
   } else {
     callbacks_.onSuccessUntyped(std::move(response_), *current_span_);
