@@ -20,7 +20,8 @@ public:
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats,
                        Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
-                       std::chrono::milliseconds init_fetch_timeout, Server::ConfigTracker& config_tracker)
+                       std::chrono::milliseconds init_fetch_timeout,
+                       Server::ConfigTracker& config_tracker)
       : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
                   rate_limit_settings, config_tracker),
         grpc_mux_subscription_(grpc_mux_, stats, dispatcher, init_fetch_timeout) {}

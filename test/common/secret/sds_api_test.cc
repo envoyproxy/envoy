@@ -116,9 +116,10 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  CertificateValidationContextSdsApi sds_api(
-      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_, config_tracker_);
+  CertificateValidationContextSdsApi sds_api(server.localInfo(), server.dispatcher(),
+                                             server.random(), server.stats(),
+                                             server.clusterManager(), init_manager, config_source,
+                                             "abc.com", []() {}, *api_, config_tracker_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -167,9 +168,10 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  CertificateValidationContextSdsApi sds_api(
-      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_, config_tracker_);
+  CertificateValidationContextSdsApi sds_api(server.localInfo(), server.dispatcher(),
+                                             server.random(), server.stats(),
+                                             server.clusterManager(), init_manager, config_source,
+                                             "abc.com", []() {}, *api_, config_tracker_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =

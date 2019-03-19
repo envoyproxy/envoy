@@ -56,7 +56,8 @@ protected:
     EXPECT_CALL(*mock_cluster_.info_, addedViaApi());
     EXPECT_CALL(mock_cluster_, info()).Times(AnyNumber());
     EXPECT_CALL(*mock_cluster_.info_, type());
-    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_, config_tracker_);
+    cds_ = CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_,
+                              config_tracker_);
     resetCdsInitializedCb();
 
     expectRequest();
@@ -296,9 +297,9 @@ TEST_F(CdsApiImplTest, InvalidOptions) {
   local_info_.node_.set_id("");
   envoy::api::v2::core::ConfigSource cds_config;
   Config::Utility::translateCdsConfig(*config, cds_config);
-  EXPECT_THROW(
-      CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_, config_tracker_),
-      EnvoyException);
+  EXPECT_THROW(CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_,
+                                  config_tracker_),
+               EnvoyException);
 }
 
 TEST_F(CdsApiImplTest, Basic) {

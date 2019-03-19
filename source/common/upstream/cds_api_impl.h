@@ -25,7 +25,7 @@ public:
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                           Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                           const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                          Api::Api& api,Server::ConfigTracker& config_tracker);
+                          Api::Api& api, Server::ConfigTracker& config_tracker);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}, *this); }
@@ -47,7 +47,8 @@ public:
 private:
   CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
              Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api,Server::ConfigTracker& config_tracker);
+             const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Api::Api& api,
+             Server::ConfigTracker& config_tracker);
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;

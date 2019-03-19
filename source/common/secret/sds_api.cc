@@ -19,7 +19,7 @@ SdsApi::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispat
                Api::Api& api, Server::ConfigTracker& config_tracker)
     : local_info_(local_info), dispatcher_(dispatcher), random_(random), stats_(stats),
       cluster_manager_(cluster_manager), sds_config_(sds_config), sds_config_name_(sds_config_name),
-      secret_hash_(0), clean_up_(destructor_cb), api_(api),config_tracker_(config_tracker) {
+      secret_hash_(0), clean_up_(destructor_cb), api_(api), config_tracker_(config_tracker) {
   Config::Utility::checkLocalInfo("sds", local_info_);
   // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
   // can be chained together to behave as one init_manager. In that way, we let
