@@ -224,15 +224,8 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                                           ssl_context_manager_, added_via_api_, cm, local_info,
                                           dispatcher, random, singleton_manager, tls, api});
 
-  for (const auto& host : cluster.hosts()) {
-    hosts_->emplace_back(
-        new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
-                     envoy::api::v2::core::Metadata::default_instance(), 1,
-                     envoy::api::v2::core::Locality().default_instance(),
-                     envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0,
-                     envoy::api::v2::core::HealthStatus::UNKNOWN));
-  }
   initialize([] {});
+  update(cluster);
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -269,12 +262,6 @@ void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manag
 
 void HdsCluster::initialize(std::function<void()> callback) {
   initialization_complete_callback_ = callback;
-  for (const auto& host : *hosts_) {
-    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
-
-  priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, HostsPerLocalityImpl::empty()),
-                            {}, *hosts_, {}, absl::nullopt);
 }
 
 void HdsCluster::update(const envoy::api::v2::Cluster& cluster) {
@@ -293,6 +280,8 @@ void HdsCluster::update(const envoy::api::v2::Cluster& cluster) {
                      envoy::api::v2::core::Locality().default_instance(),
                      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0,
                      envoy::api::v2::core::HealthStatus::UNKNOWN)};
+
+    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
 
     if (updated_hosts.count(host->address()->asString())) {
       continue;
@@ -325,6 +314,7 @@ void HdsCluster::update(const envoy::api::v2::Cluster& cluster) {
 
   removed_hosts = std::move(*current_hosts);
   hosts_ = std::move(final_hosts);
+  all_hosts_ = std::move(updated_hosts);
 
   if (!added_hosts.empty() || !removed_hosts.empty()) {
     priority_set_.updateHosts(0, HostSetImpl::partitionHosts(hosts_, HostsPerLocalityImpl::empty()),
