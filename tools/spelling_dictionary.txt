@@ -149,6 +149,7 @@ NBF
 NDEBUG
 NGHTTP
 NOLINT
+NOLINTNEXTLINE
 NS
 NUL
 Nilsson
@@ -364,6 +365,7 @@ deflateInit
 deletable
 deleter
 delim
+deque
 dereference
 dereferences
 dereferencing
@@ -621,6 +623,7 @@ reparse
 reperform
 repicked
 repo
+reservable
 resize
 resized
 resizes
@@ -720,6 +723,7 @@ unordered
 unowned
 unparented
 unpause
+unpopulated
 unprotect
 unref
 unreferenced

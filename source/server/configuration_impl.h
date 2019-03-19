@@ -21,8 +21,6 @@
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
-
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -128,7 +126,6 @@ private:
   std::chrono::milliseconds watchdog_megamiss_timeout_;
   std::chrono::milliseconds watchdog_kill_timeout_;
   std::chrono::milliseconds watchdog_multikill_timeout_;
-  Extensions::Filters::Common::RateLimit::ClientFactoryPtr ratelimit_client_factory_;
 };
 
 /**

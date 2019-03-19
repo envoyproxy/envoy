@@ -101,7 +101,7 @@ public:
 
   void setup(bool ssl, const std::string& server_name, bool tracing = true) {
     if (ssl) {
-      ssl_connection_ = std::make_unique<Ssl::MockConnection>();
+      ssl_connection_ = std::make_unique<Ssl::MockConnectionInfo>();
     }
 
     server_name_ = server_name;
@@ -289,7 +289,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  std::unique_ptr<Ssl::MockConnection> ssl_connection_;
+  std::unique_ptr<Ssl::MockConnectionInfo> ssl_connection_;
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_{test_time_.timeSystem()};
   MockStream stream_;
@@ -1080,6 +1080,55 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogWithInvalidRequest) {
   }));
 
   Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
+  setup(true, "");
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(filter);
+        callbacks.addAccessLogHandler(handler);
+      }));
+
+  EXPECT_CALL(*handler, log(_, _, _, _))
+      .WillOnce(Invoke([](const HeaderMap*, const HeaderMap*, const HeaderMap*,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_TRUE(stream_info.responseCode());
+        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+        EXPECT_NE(nullptr, stream_info.downstreamLocalAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamDirectRemoteAddress());
+        EXPECT_NE(nullptr, stream_info.downstreamSslConnection());
+        EXPECT_NE(nullptr, stream_info.routeEntry());
+      }));
+
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":method", "GET"},
+                              {":authority", "host"},
+                              {":path", "/"},
+                              {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+
+    HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+    filter->callbacks_->encodeHeaders(std::move(response_headers), false);
+
+    HeaderMapPtr response_trailers{new TestHeaderMapImpl{{"x-trailer", "1"}}};
+    filter->callbacks_->encodeTrailers(std::move(response_trailers));
+
+    data.drain(4);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 }
 
