@@ -613,16 +613,15 @@ template <class Value> struct TrieLookupTable {
         result = current;
       }
 
-      // TODO(maximebedard): this could be optimized
       // https://github.com/facebook/mcrouter/blob/master/mcrouter/lib/fbi/cpp/Trie-inl.h#L126-L143
       current = current->entries_[c].get();
       if (current == nullptr) {
-        break;
+        return result ? result->value_ : nullptr;
       }
 
       key++;
     }
-    return result ? result->value_ : nullptr;
+    return current ? current->value_ : result->value_;
   }
 
   TrieEntry<Value> root_;

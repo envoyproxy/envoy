@@ -831,18 +831,23 @@ TEST(DateFormatter, FromTimeSameWildcard) {
 TEST(TrieLookupTable, LongestPrefix) {
   TrieLookupTable<const char*> trie;
   trie.add("foo", "a");
+  trie.add("bar", "ignored by the following element with the same key");
   trie.add("bar", "b");
   trie.add("baro", "c");
 
   EXPECT_EQ("a", trie.find("foo"));
+  EXPECT_EQ("a", trie.findPrefix("foo"));
   EXPECT_EQ("a", trie.findPrefix("foosball"));
 
   EXPECT_EQ("b", trie.find("bar"));
+  EXPECT_EQ("b", trie.findPrefix("bar"));
   EXPECT_EQ("b", trie.findPrefix("baritone"));
   EXPECT_EQ("c", trie.findPrefix("barometer"));
 
   EXPECT_EQ(nullptr, trie.find("toto"));
   EXPECT_EQ(nullptr, trie.findPrefix("toto"));
+  EXPECT_EQ(nullptr, trie.find(" "));
+  EXPECT_EQ(nullptr, trie.findPrefix(" "));
 }
 
 } // namespace Envoy
