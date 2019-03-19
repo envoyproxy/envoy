@@ -44,21 +44,20 @@ public:
 private:
   struct ResourceImpl : public Resource {
     ResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key,
-                 Stats::BoolIndicator& circuit_breaker_open)
-        : max_(max), runtime_(runtime), runtime_key_(runtime_key),
-          circuit_breaker_open_(circuit_breaker_open) {}
+                 Stats::Gauge& open_gauge)
+        : max_(max), runtime_(runtime), runtime_key_(runtime_key), open_gauge_(open_gauge) {}
     ~ResourceImpl() { ASSERT(current_ == 0); }
 
     // Upstream::Resource
     bool canCreate() override { return current_ < max(); }
     void inc() override {
       current_++;
-      circuit_breaker_open_.set(!canCreate());
+      open_gauge_.set(canCreate() ? 0 : 1);
     }
     void dec() override {
       ASSERT(current_ > 0);
       current_--;
-      circuit_breaker_open_.set(!canCreate());
+      open_gauge_.set(canCreate() ? 0 : 1);
     }
     uint64_t max() override { return runtime_.snapshot().getInteger(runtime_key_, max_); }
 
@@ -68,10 +67,11 @@ private:
     const std::string runtime_key_;
 
     /**
-     * The live circuit breaker state: false when the circuit breaker is closed,
-     * true when open.
+     * A gauge to notify the live circuit breaker state. The gauge is set to 0
+     * to notify that the circuit breaker is closed, or to 1 to notify that it
+     * is open.
      */
-    Stats::BoolIndicator& circuit_breaker_open_;
+    Stats::Gauge& open_gauge_;
   };
 
   ResourceImpl connections_;

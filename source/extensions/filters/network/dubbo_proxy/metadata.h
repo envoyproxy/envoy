@@ -8,7 +8,7 @@
 #include "common/common/empty_string.h"
 #include "common/http/header_map_impl.h"
 
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
+#include "extensions/filters/network/dubbo_proxy/message.h"
 
 #include "absl/types/optional.h"
 

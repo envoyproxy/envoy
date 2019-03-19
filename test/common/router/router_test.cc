@@ -2051,7 +2051,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 }
 
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
-  Ssl::MockConnection ssl_connection;
+  Ssl::MockConnectionInfo ssl_connection;
   enableRedirects();
 
   sendRequest();

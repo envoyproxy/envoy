@@ -35,7 +35,7 @@ public:
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Envoy::Network::MockReadFilterCallbacks> net_callbacks_;
   NiceMock<Envoy::Network::MockConnection> connection_;
-  NiceMock<Envoy::Ssl::MockConnection> ssl_;
+  NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
 };
 
@@ -79,8 +79,9 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
-  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return("source"));
-  EXPECT_CALL(ssl_, uriSanLocalCertificate()).WillOnce(Return("destination"));
+  EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
 
   Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> context_extensions;
   context_extensions["key"] = "value";

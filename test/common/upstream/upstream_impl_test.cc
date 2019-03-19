@@ -866,6 +866,23 @@ TEST(HostImplTest, HealthFlags) {
   EXPECT_EQ(Host::Health::Unhealthy, host->health());
 }
 
+// Test that it's not possible to do a HostDescriptionImpl with a unix
+// domain socket host and a health check config with non-zero port.
+// This is a regression test for oss-fuzz issue
+// https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=11095
+TEST(HostImplTest, HealthPipeAddress) {
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig config;
+        config.set_port_value(8000);
+        HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("unix://foo"),
+                                  envoy::api::v2::core::Metadata::default_instance(),
+                                  envoy::api::v2::core::Locality().default_instance(), config, 1);
+      },
+      EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
+}
+
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 TEST_F(StaticClusterImplTest, InitialHosts) {

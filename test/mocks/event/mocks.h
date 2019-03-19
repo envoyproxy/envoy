@@ -125,11 +125,21 @@ public:
   MockTimer(MockDispatcher* dispatcher);
   ~MockTimer();
 
+  void invokeCallback() {
+    EXPECT_TRUE(enabled_);
+    enabled_ = false;
+    callback_();
+  }
+
   // Timer
   MOCK_METHOD0(disableTimer, void());
   MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
+  MOCK_METHOD0(enabled, bool());
 
-  Event::TimerCb callback_;
+  bool enabled_{};
+  Event::TimerCb callback_; // TODO(mattklein123): This should be private and only called via
+                            // invoke callback to clear enabled_, but that will break too many
+                            // tests and can be done later.
 };
 
 class MockSignalEvent : public SignalEvent {

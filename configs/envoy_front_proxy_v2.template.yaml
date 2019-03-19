@@ -54,6 +54,10 @@
           config:
             domain: envoy_front
             request_type: external
+            rate_limit_service:
+              grpc_service:
+                envoy_grpc:
+                  cluster_name: ratelimit
         - name: envoy.router
           config: {}
         add_user_agent: true
@@ -127,10 +131,6 @@ cluster_manager:
   outlier_detection:
     event_log_path: /var/log/envoy/outlier_events.log
 flags_path: /etc/envoy/flags
-rate_limit_service:
- grpc_service:
-   envoy_grpc:
-     cluster_name: ratelimit
 tracing:
   http:
     name: envoy.lightstep

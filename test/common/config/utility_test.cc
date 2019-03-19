@@ -80,6 +80,18 @@ TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
   EXPECT_EQ(1234, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
+TEST(UtilityTest, ConfigSourceDefaultInitFetchTimeout) {
+  envoy::api::v2::core::ConfigSource config_source;
+  EXPECT_EQ(0, Utility::configSourceInitialFetchTimeout(config_source).count());
+}
+
+TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
+  envoy::api::v2::core::ConfigSource config_source;
+  config_source.mutable_initial_fetch_timeout()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(654));
+  EXPECT_EQ(654, Utility::configSourceInitialFetchTimeout(config_source).count());
+}
+
 TEST(UtilityTest, TranslateApiConfigSource) {
   envoy::api::v2::core::ApiConfigSource api_config_source_rest_legacy;
   Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000,

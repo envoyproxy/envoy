@@ -19,14 +19,14 @@ namespace {
 
 TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<Stats::MockBoolIndicator> bool_indicator;
+  NiceMock<Stats::MockGauge> gauge;
   NiceMock<Stats::MockStore> store;
 
-  ON_CALL(store, boolIndicator(_)).WillByDefault(ReturnRef(bool_indicator));
+  ON_CALL(store, gauge(_)).WillByDefault(ReturnRef(gauge));
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1,
-      ClusterCircuitBreakersStats{ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_BOOL_INDICATOR(store))});
+      ClusterCircuitBreakersStats{ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store))});
 
   EXPECT_CALL(
       runtime.snapshot_,

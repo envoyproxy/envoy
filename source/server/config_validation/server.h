@@ -75,6 +75,7 @@ public:
   void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Init::Manager& initManager() override { return init_manager_; }
+  ServerLifecycleNotifier& lifecycleNotifier() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Runtime::RandomGenerator& random() override { return random_generator_; }

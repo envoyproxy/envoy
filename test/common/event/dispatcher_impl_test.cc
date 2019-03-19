@@ -156,6 +156,7 @@ TEST_F(DispatcherImplTest, Timer) {
         }
         cv_.notifyOne();
       });
+      EXPECT_FALSE(timer->enabled());
     }
     cv_.notifyOne();
   });
@@ -169,6 +170,17 @@ TEST_F(DispatcherImplTest, Timer) {
   while (!work_finished_) {
     cv_.wait(mu_);
   }
+}
+
+TEST(TimerImplTest, TimerEnabledDisabled) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher());
+  Event::TimerPtr timer = dispatcher->createTimer([] {});
+  EXPECT_FALSE(timer->enabled());
+  timer->enableTimer(std::chrono::milliseconds(0));
+  EXPECT_TRUE(timer->enabled());
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(timer->enabled());
 }
 
 } // namespace

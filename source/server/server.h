@@ -34,7 +34,6 @@
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/types/optional.h"
@@ -46,22 +45,22 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_SERVER_STATS(BOOL_INDICATOR, COUNTER, GAUGE)                                           \
-  BOOL_INDICATOR(live)                                                                             \
-  COUNTER(debug_assertion_failures)                                                                \
+#define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
+  GAUGE(uptime)                                                                                    \
   GAUGE(concurrency)                                                                               \
-  GAUGE(days_until_first_cert_expiring)                                                            \
-  GAUGE(hot_restart_epoch)                                                                         \
   GAUGE(memory_allocated)                                                                          \
   GAUGE(memory_heap_size)                                                                          \
+  GAUGE(live)                                                                                      \
   GAUGE(parent_connections)                                                                        \
   GAUGE(total_connections)                                                                         \
-  GAUGE(uptime)                                                                                    \
-  GAUGE(version)
+  GAUGE(version)                                                                                   \
+  GAUGE(days_until_first_cert_expiring)                                                            \
+  GAUGE(hot_restart_epoch)                                                                         \
+  COUNTER(debug_assertion_failures)
 // clang-format on
 
 struct ServerStats {
-  ALL_SERVER_STATS(GENERATE_BOOL_INDICATOR_STRUCT, GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -136,7 +135,9 @@ private:
 /**
  * This is the actual full standalone server which stitches together various common components.
  */
-class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
+class InstanceImpl : Logger::Loggable<Logger::Id::main>,
+                     public Instance,
+                     public ServerLifecycleNotifier {
 public:
   /**
    * @throw EnvoyException if initialization fails.
@@ -166,6 +167,7 @@ public:
   void getParentStats(HotRestart::GetParentStatsInfo& info) override;
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
+  ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
@@ -190,6 +192,9 @@ public:
     return config_.statsFlushInterval();
   }
 
+  // ServerLifecycleNotifier
+  void registerCallback(Stage stage, StageCallback callback) override;
+
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
@@ -199,6 +204,7 @@ private:
   uint64_t numConnections();
   void startWorkers();
   void terminate();
+  void notifyCallbacksForStage(Stage stage);
 
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
@@ -252,6 +258,8 @@ private:
   Envoy::MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
+  const std::thread::id main_thread_id_;
+  std::unordered_map<Stage, std::vector<StageCallback>> stage_callbacks_;
 };
 
 } // namespace Server
