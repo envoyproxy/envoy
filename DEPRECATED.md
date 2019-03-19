@@ -13,6 +13,10 @@ A logged warning is expected for each deprecated item that is in deprecation win
   Set the `filter_enabled` field instead.
 * Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
 google.protobuf.Struct in google.protobuf.Any.
+* Use of the `type` field in the `FaultDelay` message (found in
+  [fault.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto))
+  has been deprecated. It was never used and setting it has no effect. It will be removed in the
+  following release.
 
 ## Version 1.9.0 (Dec 20, 2018)
 
