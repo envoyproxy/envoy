@@ -360,7 +360,6 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
-  Stats::SymbolTable& symbolTable() override { return stats_store_.symbolTable(); }
   TimeSource& timeSource() override { return time_system_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
