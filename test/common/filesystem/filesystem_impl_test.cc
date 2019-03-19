@@ -241,7 +241,7 @@ TEST_F(FileSystemImplTest, WriteAfterClose) {
   EXPECT_TRUE(bool_result2.rc_);
   const Api::IoCallSizeResult size_result = file->write(" new data");
   EXPECT_EQ(-1, size_result.rc_);
-  EXPECT_EQ(IoFileError::IoErrorCode::BadHandle, size_result.err_->getErrorCode());
+  EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, size_result.err_->getErrorCode());
   EXPECT_EQ("Bad file descriptor", size_result.err_->getErrorDetails());
 }
 

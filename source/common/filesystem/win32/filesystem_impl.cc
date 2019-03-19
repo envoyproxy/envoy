@@ -41,11 +41,6 @@ void FileImplWin32::openFile() {
 }
 
 ssize_t FileImplWin32::writeFile(absl::string_view buffer) {
-  if (fd_ == -1) {
-    errno = EBADF;
-    return -1;
-  }
-
   return ::_write(fd_, buffer.data(), buffer.size());
 }
 
