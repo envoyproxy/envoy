@@ -83,8 +83,8 @@ bool HexDecodeToUInt32(absl::string_view data, uint32_t* out) {
   }
 
   // Pad with leading zeros.
-  std::string data_padded(8u, '0');
-  memcpy(&data_padded[8u - data.size()], data.data(), data.size());
+  std::string data_padded(data.data(), data.size());
+  data_padded.insert(0, 8u - data.size(), '0');
 
   std::string byte_string = absl::HexStringToBytes(data_padded);
 

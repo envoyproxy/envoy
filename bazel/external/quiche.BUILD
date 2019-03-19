@@ -68,15 +68,11 @@ cc_library(
         # "quiche/http2/platform/api/http2_reconstruct_object.h",
         # "quiche/http2/platform/api/http2_test_helpers.h",
     ] + envoy_select_quiche(
-        [
-            "quiche/http2/platform/api/http2_string_utils.h",
-        ],
+        ["quiche/http2/platform/api/http2_string_utils.h"],
         "@envoy",
     ),
     visibility = ["//visibility:public"],
-    deps = [
-        "@envoy//source/extensions/quic_listeners/quiche/platform:http2_platform_impl_lib",
-    ],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:http2_platform_impl_lib"],
 )
 
 cc_library(
@@ -94,25 +90,17 @@ cc_library(
         # TODO: uncomment the following files as implementations are added.
         # "quiche/spdy/platform/api/spdy_flags.h",
     ] + envoy_select_quiche(
-        [
-            "quiche/spdy/platform/api/spdy_string_utils.h",
-        ],
+        ["quiche/spdy/platform/api/spdy_string_utils.h"],
         "@envoy",
     ),
     visibility = ["//visibility:public"],
-    deps = [
-        "@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib",
-    ],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib"],
 )
 
 cc_library(
     name = "quic_platform",
-    srcs = [
-        "quiche/quic/platform/api/quic_mutex.cc",
-    ] + envoy_select_quiche(
-        [
-            "quiche/quic/platform/api/quic_hostname_utils.cc",
-        ],
+    srcs = ["quiche/quic/platform/api/quic_mutex.cc"] + envoy_select_quiche(
+        ["quiche/quic/platform/api/quic_hostname_utils.cc"],
         "@envoy",
     ),
     hdrs = [
@@ -120,9 +108,7 @@ cc_library(
         "quiche/quic/platform/api/quic_mutex.h",
         "quiche/quic/platform/api/quic_str_cat.h",
     ] + envoy_select_quiche(
-        [
-            "quiche/quic/platform/api/quic_hostname_utils.h",
-        ],
+        ["quiche/quic/platform/api/quic_hostname_utils.h"],
         "@envoy",
     ),
     visibility = ["//visibility:public"],
@@ -134,13 +120,9 @@ cc_library(
 
 cc_library(
     name = "quic_platform_export",
-    hdrs = [
-        "quiche/quic/platform/api/quic_export.h",
-    ],
+    hdrs = ["quiche/quic/platform/api/quic_export.h"],
     visibility = ["//visibility:public"],
-    deps = [
-        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_export_impl_lib",
-    ],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_export_impl_lib"],
 )
 
 cc_library(
@@ -205,31 +187,21 @@ cc_library(
     name = "quic_platform_sleep",
     hdrs = ["quiche/quic/platform/api/quic_sleep.h"],
     visibility = ["//visibility:public"],
-    deps = [
-        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_sleep_impl_lib",
-    ],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_sleep_impl_lib"],
 )
 
 cc_library(
     name = "quic_time_lib",
-    srcs = [
-        "quiche/quic/core/quic_time.cc",
-    ],
-    hdrs = [
-        "quiche/quic/core/quic_time.h",
-    ],
+    srcs = ["quiche/quic/core/quic_time.cc"],
+    hdrs = ["quiche/quic/core/quic_time.h"],
     visibility = ["//visibility:public"],
-    deps = [
-        ":quic_platform",
-    ],
+    deps = [":quic_platform"],
 )
 
 envoy_cc_test(
     name = "http2_platform_test",
     srcs = envoy_select_quiche(
-        [
-            "quiche/http2/platform/api/http2_string_utils_test.cc",
-        ],
+        ["quiche/http2/platform/api/http2_string_utils_test.cc"],
         "@envoy",
     ),
     repository = "@envoy",
@@ -239,9 +211,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "spdy_platform_test",
     srcs = envoy_select_quiche(
-        [
-            "quiche/spdy/platform/api/spdy_string_utils_test.cc",
-        ],
+        ["quiche/spdy/platform/api/spdy_string_utils_test.cc"],
         "@envoy",
     ),
     repository = "@envoy",
@@ -257,7 +227,5 @@ envoy_cc_test(
         "quiche/quic/platform/api/quic_text_utils_test.cc",
     ],
     repository = "@envoy",
-    deps = [
-        ":quic_platform",
-    ],
+    deps = [":quic_platform"],
 )
