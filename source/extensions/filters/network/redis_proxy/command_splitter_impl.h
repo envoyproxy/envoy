@@ -240,6 +240,7 @@ public:
   static SplitRequestPtr create(Router& router, const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
+
 private:
   MSETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
               bool latency_in_micros)
@@ -258,8 +259,10 @@ class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:
   CommandHandlerFactory(Router& router) : CommandHandlerBase(router) {}
   SplitRequestPtr startRequest(const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
-                               CommandStats& command_stats, TimeSource& time_source, bool latency_in_micros) {
-    return RequestClass::create(router_, request, callbacks, command_stats, time_source, latency_in_micros);
+                               CommandStats& command_stats, TimeSource& time_source,
+                               bool latency_in_micros) {
+    return RequestClass::create(router_, request, callbacks, command_stats, time_source,
+                                latency_in_micros);
   }
 };
 

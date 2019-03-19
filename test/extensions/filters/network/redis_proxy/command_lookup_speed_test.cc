@@ -68,7 +68,8 @@ public:
   Router* router_{new NullRouterImpl()};
   Stats::IsolatedStoreImpl store_;
   Event::SimulatedTimeSystem time_system_;
-  CommandSplitter::InstanceImpl splitter_{RouterPtr{router_}, store_, "redis.foo.", time_system_, false};
+  CommandSplitter::InstanceImpl splitter_{RouterPtr{router_}, store_, "redis.foo.", time_system_,
+                                          false};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };

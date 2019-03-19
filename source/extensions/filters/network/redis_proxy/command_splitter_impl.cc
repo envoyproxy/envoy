@@ -89,7 +89,8 @@ SplitRequestPtr EvalRequest::create(Router& router,
     return nullptr;
   }
 
-  std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
+  std::unique_ptr<EvalRequest> request_ptr{
+      new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
   request_ptr->handle_ =
       router.makeRequest(incoming_request.asArray()[3].asString(), incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
@@ -335,7 +336,6 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
     }
   }
 }
-
 
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                            TimeSource& time_source, bool latency_in_micros)
