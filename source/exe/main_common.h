@@ -5,6 +5,7 @@
 
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
@@ -64,7 +65,7 @@ public:
 
 protected:
   const Envoy::OptionsImpl& options_;
-
+  Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
 

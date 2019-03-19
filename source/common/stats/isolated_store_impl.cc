@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/common/utility.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/utility.h"
 
@@ -13,7 +14,16 @@ namespace Envoy {
 namespace Stats {
 
 IsolatedStoreImpl::IsolatedStoreImpl()
-    : counters_([this](const std::string& name) -> CounterSharedPtr {
+    : IsolatedStoreImpl(std::make_unique<FakeSymbolTableImpl>()) {}
+
+IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table)
+    : IsolatedStoreImpl(*symbol_table) {
+  symbol_table_storage_ = std::move(symbol_table);
+}
+
+IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
+    : symbol_table_(symbol_table), alloc_(symbol_table_),
+      counters_([this](const std::string& name) -> CounterSharedPtr {
         std::string tag_extracted_name = name;
         std::vector<Tag> tags;
         return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
@@ -42,6 +52,8 @@ struct IsolatedScopeImpl : public Scope {
     return parent_.histogram(prefix_ + name);
   }
   const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
+  const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
+  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
   IsolatedStoreImpl& parent_;
   const std::string prefix_;

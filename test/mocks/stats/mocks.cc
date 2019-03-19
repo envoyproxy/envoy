@@ -1,5 +1,9 @@
 #include "mocks.h"
 
+#include <memory>
+
+#include "common/stats/fake_symbol_table_impl.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -81,7 +85,8 @@ MockStore::MockStore() {
 }
 MockStore::~MockStore() {}
 
-MockIsolatedStatsStore::MockIsolatedStatsStore() {}
+MockIsolatedStatsStore::MockIsolatedStatsStore()
+    : IsolatedStoreImpl(Test::Global<Stats::FakeSymbolTableImpl>::get()) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
 
 MockStatsMatcher::MockStatsMatcher() {}

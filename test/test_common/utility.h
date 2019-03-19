@@ -21,6 +21,7 @@
 #include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/printers.h"
@@ -475,14 +476,15 @@ public:
     }
   };
 
-  explicit TestAllocator(const StatsOptions& stats_options)
-      : RawStatDataAllocator(mutex_, hash_set_, stats_options),
+  TestAllocator(const StatsOptions& stats_options, SymbolTable& symbol_table)
+      : RawStatDataAllocator(mutex_, hash_set_, stats_options, symbol_table),
         block_memory_(std::make_unique<uint8_t[]>(
             RawStatDataSet::numBytes(block_hash_options_, stats_options))),
         hash_set_(block_hash_options_, true /* init */, block_memory_.get(), stats_options) {}
   ~TestAllocator() { EXPECT_EQ(0, hash_set_.size()); }
 
 private:
+  FakeSymbolTableImpl symbol_table_;
   Thread::MutexBasicLockable mutex_;
   TestBlockMemoryHashSetOptions block_hash_options_;
   std::unique_ptr<uint8_t[]> block_memory_;
@@ -491,7 +493,7 @@ private:
 
 class MockedTestAllocator : public TestAllocator {
 public:
-  MockedTestAllocator(const StatsOptions& stats_options);
+  MockedTestAllocator(const StatsOptions& stats_options, SymbolTable& symbol_table);
   virtual ~MockedTestAllocator();
 
   MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));

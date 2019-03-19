@@ -36,7 +36,7 @@ namespace Stats {
 class StatsThreadLocalStoreTest : public testing::Test {
 public:
   void SetUp() override {
-    alloc_ = std::make_unique<MockedTestAllocator>(options_);
+    alloc_ = std::make_unique<MockedTestAllocator>(options_, symbol_table_);
     resetStoreWithAlloc(*alloc_);
   }
 
@@ -45,6 +45,7 @@ public:
     store_->addSink(sink_);
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -75,7 +76,7 @@ class HistogramTest : public testing::Test {
 public:
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
-  HistogramTest() : alloc_(options_) {}
+  HistogramTest() : alloc_(options_, symbol_table_) {}
 
   void SetUp() override {
     store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc_);
@@ -168,6 +169,7 @@ public:
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
   MOCK_METHOD1(free, void(RawStatData& data));
 
+  FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -767,6 +769,8 @@ TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) { testAcceptsAll(lookupHis
 
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
 public:
+  HeapStatsThreadLocalStoreTest() : heap_alloc_(symbol_table_) {}
+
   void SetUp() override {
     resetStoreWithAlloc(heap_alloc_);
     // Note: we do not call StatsThreadLocalStoreTest::SetUp here as that
@@ -1089,13 +1093,15 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
 
 class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
 protected:
-  TruncatingAllocTest() : test_alloc_(options_), long_name_(options_.maxNameLength() + 1, 'A') {}
+  TruncatingAllocTest()
+      : test_alloc_(options_, symbol_table_), long_name_(options_.maxNameLength() + 1, 'A') {}
 
   void SetUp() override {
     store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
     // Do not call superclass SetUp.
   }
 
+  FakeSymbolTableImpl symbol_table_;
   TestAllocator test_alloc_;
   std::string long_name_;
 };

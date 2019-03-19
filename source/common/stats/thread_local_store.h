@@ -148,6 +148,8 @@ public:
   Histogram& histogram(const std::string& name) override {
     return default_scope_->histogram(name);
   };
+  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
+  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
@@ -206,6 +208,8 @@ private:
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(prefix_ + name);
     }
+    const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
+    SymbolTable& symbolTable() override { return parent_.symbolTable(); }
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gauge(const std::string& name) override;
     Histogram& histogram(const std::string& name) override;
