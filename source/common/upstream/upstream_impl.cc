@@ -305,7 +305,7 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
   degraded_hosts_per_locality_ = std::move(update_hosts_params.degraded_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
 
-  rebuildLocalityScheduler(locality_scheduler_, locality_entries_, *healthy_hosts_per_locality_,
+  rebuildLocalityScheduler(healthy_locality_scheduler_, healthy_locality_entries_, *healthy_hosts_per_locality_,
                            *healthy_hosts_, hosts_per_locality_, locality_weights_,
                            overprovisioning_factor_);
   rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
@@ -358,15 +358,15 @@ void HostSetImpl::rebuildLocalityScheduler(
 }
 
 absl::optional<uint32_t> HostSetImpl::chooseHealthyLocality() {
-  return chooseLocality(locality_scheduler_);
+  return chooseLocality(healthy_locality_scheduler_.get());
 }
 
 absl::optional<uint32_t> HostSetImpl::chooseDegradedLocality() {
-  return chooseLocality(degraded_locality_scheduler_);
+  return chooseLocality(degraded_locality_scheduler_.get());
 }
 
 absl::optional<uint32_t>
-HostSetImpl::chooseLocality(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler) {
+HostSetImpl::chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler) {
   if (locality_scheduler == nullptr) {
     return {};
   }
