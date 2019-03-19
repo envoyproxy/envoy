@@ -29,7 +29,7 @@ public:
   int64_t peekInt64(Buffer::Instance& buffer, uint64_t& offset);
   std::string peekString(Buffer::Instance& buffer, uint64_t& offset);
   bool peekBool(Buffer::Instance& buffer, uint64_t& offset);
-  void add(uint32_t size) { current_ += size; }
+  void skip(uint32_t len, uint64_t& offset);
   void reset() { current_ = 0; }
 
 private:

@@ -52,6 +52,11 @@ std::string BufferHelper::peekString(Buffer::Instance& buffer, uint64_t& offset)
   return val;
 }
 
+void BufferHelper::skip(const uint32_t len, uint64_t& offset) {
+  offset += len;
+  current_ += len;
+}
+
 void BufferHelper::ensureMaxLen(const uint32_t size) {
   current_ += size;
 

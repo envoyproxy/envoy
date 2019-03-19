@@ -377,8 +377,7 @@ void DecoderImpl::parseXWatchesRequest(Buffer::Instance& data, uint64_t& offset,
 
 void DecoderImpl::skipString(Buffer::Instance& data, uint64_t& offset) {
   const int32_t slen = helper_.peekInt32(data, offset);
-  offset += slen;
-  helper_.add(slen);
+  helper_.skip(slen, offset);
 }
 
 void DecoderImpl::skipStrings(Buffer::Instance& data, uint64_t& offset) {
