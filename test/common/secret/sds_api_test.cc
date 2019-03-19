@@ -96,7 +96,7 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
-  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), *api_, config_tracker_);
+  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -139,7 +139,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
-  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret(), *api_, config_tracker_);
+  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret(), *api_);
   const std::string ca_cert =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
@@ -206,7 +206,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   default_cvc.add_verify_certificate_hash(default_verify_certificate_hash);
   envoy::api::v2::auth::CertificateValidationContext merged_cvc = default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
-  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc, *api_, config_tracker_);
+  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc, *api_);
   // Verify that merging CertificateValidationContext applies logical OR to bool
   // field.
   EXPECT_TRUE(cvc_config.allowExpiredCertificate());
@@ -254,7 +254,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {}, *api_);
+                               "abc.com", []() {}, *api_, config_tracker_);
 
   std::string yaml =
       R"EOF(
