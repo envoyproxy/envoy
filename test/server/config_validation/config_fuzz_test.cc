@@ -32,7 +32,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
 
   try {
     validateConfig(options, Network::Address::InstanceConstSharedPtr(), component_factory,
-                   Thread::threadFactoryForTest());
+                   Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
   }
