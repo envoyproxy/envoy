@@ -39,6 +39,13 @@ const char* createFlagsToString(CreateFlags flags) {
 void DecoderImpl::decode(Buffer::Instance& data, uint64_t& offset) {
   ENVOY_LOG(trace, "zookeeper_proxy: decoding {} bytes at offset {}", data.length(), offset);
 
+  // Reset the helper's cursor, to ensure the current message stays within the
+  // allowed max length, even when it's different than the declared length
+  // by the message.
+  //
+  // Note: we need to keep two cursors — offset and helper_'s internal one — because
+  //       a buffer may contain multiple messages, so offset is global and helper_'s
+  //       internal cursor is reset for each individual message.
   helper_.reset();
 
   // Check message length.
