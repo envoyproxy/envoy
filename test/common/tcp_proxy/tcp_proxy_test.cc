@@ -20,6 +20,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/host.h"
@@ -935,6 +936,25 @@ TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
+}
+
+// Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and
+// %DOWNSTREAM_LOCAL_ADDRESS% are correctly logged.
+TEST_F(TcpProxyTest, AccessLogPeerUriSan) {
+  filter_callbacks_.connection_.local_address_ =
+      Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
+  filter_callbacks_.connection_.remote_address_ =
+      Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
+
+  const std::vector<std::string> uriSan{"someSan"};
+  Ssl::MockConnectionInfo mockConnectionInfo;
+  EXPECT_CALL(mockConnectionInfo, uriSanPeerCertificate()).WillOnce(Return(uriSan));
+  EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillRepeatedly(Return(&mockConnectionInfo));
+
+  setup(1, accessLogConfig("%DOWNSTREAM_PEER_URI_SAN%"));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "someSan");
 }
 
 // Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and

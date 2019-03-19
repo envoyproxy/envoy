@@ -323,3 +323,28 @@ The following command operators are supported:
   TCP
     String value set on ssl connection socket for Server Name Indication (SNI)
 
+%DOWNSTREAM_LOCAL_URI_SAN%
+  HTTP
+    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
+  TCP
+    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_URI_SAN%
+  HTTP
+    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+  TCP
+    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_LOCAL_SUBJECT%
+  HTTP
+    The subject present in the local certificate used to establish the downstream TLS connection.
+  TCP
+    The subject present in the local certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_SUBJECT%
+  HTTP
+    The subject present in the peer certificate used to establish the downstream TLS connection.
+  TCP
+    The subject present in the peer certificate used to establish the downstream TLS connection.
+
+
