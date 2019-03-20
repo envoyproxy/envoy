@@ -374,16 +374,39 @@ public:
         }));
   }
 
-  void testCreate(CreateFlags flags) {
+  void testCreate(CreateFlags flags, const OpCodes opcode = OpCodes::CREATE) {
     initialize();
-    Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", flags);
+    Buffer::OwnedImpl data =
+        encodeCreateRequest("/foo", "bar", flags, false, enumToIntSigned(opcode));
+    std::string opname = "create";
+
+    switch (opcode) {
+    case OpCodes::CREATECONTAINER:
+      opname = "createcontainer";
+      break;
+    case OpCodes::CREATETTL:
+      opname = "createttl";
+      break;
+    }
 
     expectSetDynamicMetadata(
-        {{"opname", "create"}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
+        {{"opname", opname}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
         {{"bytes", "35"}});
 
     EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
-    EXPECT_EQ(1UL, config_->stats().create_rq_.value());
+
+    switch (opcode) {
+    case OpCodes::CREATE:
+      EXPECT_EQ(1UL, config_->stats().create_rq_.value());
+      break;
+    case OpCodes::CREATECONTAINER:
+      EXPECT_EQ(1UL, config_->stats().createcontainer_rq_.value());
+      break;
+    case OpCodes::CREATETTL:
+      EXPECT_EQ(1UL, config_->stats().createttl_rq_.value());
+      break;
+    }
+
     EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
     EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
   }
@@ -513,9 +536,13 @@ TEST_F(ZooKeeperFilterTest, CreateRequestEphemeralSequential) {
   testCreate(CreateFlags::EPHEMERAL_SEQUENTIAL);
 }
 
-TEST_F(ZooKeeperFilterTest, CreateRequestContainer) { testCreate(CreateFlags::CONTAINER); }
+TEST_F(ZooKeeperFilterTest, CreateRequestContainer) {
+  testCreate(CreateFlags::CONTAINER, OpCodes::CREATECONTAINER);
+}
 
-TEST_F(ZooKeeperFilterTest, CreateRequestTTL) { testCreate(CreateFlags::PERSISTENT_WITH_TTL); }
+TEST_F(ZooKeeperFilterTest, CreateRequestTTL) {
+  testCreate(CreateFlags::PERSISTENT_WITH_TTL, OpCodes::CREATETTL);
+}
 
 TEST_F(ZooKeeperFilterTest, CreateRequestTTLSequential) {
   testCreate(CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL);
