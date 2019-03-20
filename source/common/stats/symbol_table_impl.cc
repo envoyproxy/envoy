@@ -111,7 +111,7 @@ SymbolTableImpl::~SymbolTableImpl() {
 // TODO(ambuc): There is a possible performance optimization here for avoiding
 // the encoding of IPs / numbers if they appear in stat names. We don't want to
 // waste time symbolizing an integer as an integer, if we can help it.
-void SymbolTableImpl::encode(const absl::string_view name, Encoding& encoding) {
+void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding& encoding) {
   if (name.empty()) {
     return;
   }
@@ -286,16 +286,16 @@ void SymbolTableImpl::debugPrint() const {
 }
 #endif
 
-SymbolTable::StoragePtr SymbolTableImpl::copyToBytes(absl::string_view name) {
+SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
   Encoding encoding;
-  encode(name, encoding);
+  addTokensToEncoding(name, encoding);
   auto bytes = std::make_unique<Storage>(encoding.bytesRequired());
   encoding.moveToStorage(bytes.get());
   return bytes;
 }
 
 StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
-    : bytes_(table.copyToBytes(name)) {}
+    : bytes_(table.encode(name)) {}
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   uint64_t size = src.size();
@@ -342,7 +342,7 @@ void SymbolTableImpl::populateList(absl::string_view* names, int32_t num_names,
   STACK_ARRAY(encodings, Encoding, num_names);
   for (int32_t i = 0; i < num_names; ++i) {
     Encoding& encoding = encodings[i];
-    encode(names[i], encoding);
+    addTokensToEncoding(names[i], encoding);
     total_size_bytes += encoding.bytesRequired();
   }
 

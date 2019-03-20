@@ -134,15 +134,13 @@ public:
   void incRefCount(const StatName& stat_name) override;
   SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
   void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override;
-  StoragePtr copyToBytes(absl::string_view name) override;
+  StoragePtr encode(absl::string_view name) override;
   void callWithStringView(StatName stat_name,
                           const std::function<void(absl::string_view)>& fn) const override;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
-
-  void encode(absl::string_view name, Encoding& encoding);
 
   /**
    * Saves the specified length into the byte array, returning the next byte.
@@ -201,8 +199,19 @@ private:
    */
   absl::string_view fromSymbol(Symbol symbol) const EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  // Stages a new symbol for use. To be called after a successful insertion.
+  /**
+   * Stages a new symbol for use. To be called after a successful insertion.
+   */
   void newSymbol();
+
+  /**
+   * Tokenizes name, finds or allocates symbols for each token, and adds them
+   * to encoding.
+   *
+   * @param name The name to tokenize.
+   * @param encoding The encoding to write to.
+   */
+  void addTokensToEncoding(absl::string_view name, Encoding& encoding);
 
   Symbol monotonicCounter() {
     Thread::LockGuard lock(lock_);

@@ -104,6 +104,7 @@ public:
   }
   void free(const StatName&) override {}
   void incRefCount(const StatName&) override {}
+  StoragePtr encode(absl::string_view name) override { return encodeHelper(name); }
   SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {
@@ -112,19 +113,12 @@ public:
         strings.push_back(str);
       }
     }
-    return stringToStorage(absl::StrJoin(strings, "."));
+    return encodeHelper(absl::StrJoin(strings, "."));
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override {}
 #endif
-
-  StoragePtr copyToBytes(absl::string_view name) override {
-    auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
-    uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
-    memcpy(buffer, name.data(), name.size());
-    return bytes;
-  }
 
   void callWithStringView(StatName stat_name,
                           const std::function<void(absl::string_view)>& fn) const override {
@@ -136,11 +130,11 @@ private:
     return {reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize()};
   }
 
-  StoragePtr stringToStorage(absl::string_view name) const {
-    auto storage = std::make_unique<Storage>(name.size() + 2);
-    uint8_t* p = SymbolTableImpl::writeLengthReturningNext(name.size(), storage.get());
-    memcpy(p, name.data(), name.size());
-    return storage;
+  StoragePtr encodeHelper(absl::string_view name) const {
+    auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
+    uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
+    memcpy(buffer, name.data(), name.size());
+    return bytes;
   }
 };
 

@@ -93,9 +93,9 @@ public:
    * decode/encode into the elaborated form, and does not require locking the
    * SymbolTable.
    *
-   * The caveat is that this representation does not bump reference counts on
-   * the referenced Symbols in the SymbolTable, so it's only valid as long for
-   * the lifetime of the joined StatNames.
+   * Note that this method does not bump reference counts on the referenced
+   * Symbols in the SymbolTable, so it's only valid as long for the lifetime of
+   * the joined StatNames.
    *
    * This is intended for use doing cached name lookups of scoped stats, where
    * the scope prefix and the names to combine it with are already in StatName
@@ -146,11 +146,15 @@ private:
   friend class StatNameStorage;
   friend class StatNameList;
 
+  // The following methods are private, but are called by friend classes
+  // StatNameStorage and StatNameList, which must be friendly with SymbolTable
+  // in order to manage the reference-counted symbols they own.
+
   /**
    * Since SymbolTable does manual reference counting, a client of SymbolTable
    * must manually call free(symbol_vec) when it is freeing the backing store
    * for a StatName. This way, the symbol table will grow and shrink
-   * dynamically, instead of being write-only.
+   * dynamically, instead of being write-only
    *
    * @param stat_name the stat name.
    */
@@ -168,17 +172,15 @@ private:
   virtual void incRefCount(const StatName& stat_name) PURE;
 
   /**
-   * Encodes 'name' into the symbol table, tokenizing. Bumps reference counts
-   * for referenced symbols. The caller must manage the storage, and is
-   * responsible for calling SymbolTable::free() to release the reference
-   * counts. Note that this method is private, but is called by friend classes
-   * StatNameStorage and StatNameList.
+   * Encodes 'name' into the symbol table. Bumps reference counts for referenced
+   * symbols. The caller must manage the storage, and is responsible for calling
+   * SymbolTable::free() to release the reference counts.
    *
    * @param name The name to encode.
    * @return The encoded name, transferring ownership to the caller.
    *
    */
-  virtual StoragePtr copyToBytes(absl::string_view name) PURE;
+  virtual StoragePtr encode(absl::string_view name) PURE;
 };
 
 using SharedSymbolTable = std::shared_ptr<SymbolTable>;
