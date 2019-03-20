@@ -44,17 +44,19 @@ To build this sandbox example, and start the example apps run the following comm
     envoy/examples/zipkin-tracing
     $ docker-compose up --build -d
     $ docker-compose ps
-            Name                       Command               State      Ports
-    -------------------------------------------------------------------------------------------------------------
-    zipkintracing_service1_1      /bin/sh -c /usr/local/bin/ ... Up       80/tcp
-    zipkintracing_service2_1      /bin/sh -c /usr/local/bin/ ... Up       80/tcp
-    zipkintracing_front-envoy_1   /bin/sh -c /usr/local/bin/ ... Up       0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+
+                Name                          Command               State                            Ports
+    -------------------------------------------------------------------------------------------------------------------------------
+    zipkin-tracing_front-envoy_1   /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+    zipkin-tracing_service1_1      /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 80/tcp
+    zipkin-tracing_service2_1      /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 80/tcp
+    zipkin-tracing_zipkin_1        /busybox/sh run.sh               Up      9410/tcp, 0.0.0.0:9411->9411/tcp
 
 **Step 2: Generate some load**
 
 You can now send a request to service1 via the front-envoy as follows::
 
-    $ curl -v $(docker-machine ip default):8000/trace/1
+    $ curl -v localhost:8000/trace/1
     *   Trying 192.168.99.100...
     * Connected to 192.168.99.100 (192.168.99.100) port 8000 (#0)
     > GET /trace/1 HTTP/1.1
@@ -67,8 +69,7 @@ You can now send a request to service1 via the front-envoy as follows::
     < content-length: 89
     < x-envoy-upstream-service-time: 1
     < server: envoy
-    < date: Fri, 26 Aug 2016 19:39:19 GMT
-    < x-envoy-protocol-version: HTTP/1.1
+    < date: Fri, 26 Aug 2018 19:39:19 GMT
     <
     Hello from behind Envoy (service 1)! hostname: f26027f1ce28 resolvedhostname: 172.19.0.6
     * Connection #0 to host 192.168.99.100 left intact
@@ -76,7 +77,6 @@ You can now send a request to service1 via the front-envoy as follows::
 **Step 3: View the traces in Zipkin UI**
 
 Point your browser to http://localhost:9411 . You should see the Zipkin dashboard.
-If this ip address is incorrect, you can find the correct one by running: ``$ docker-machine ip default``.
 Set the service to "front-proxy" and set the start time to a few minutes before
 the start of the test (step 2) and hit enter. You should see traces from the front-proxy.
 Click on a trace to explore the path taken by the request from front-proxy to service1
