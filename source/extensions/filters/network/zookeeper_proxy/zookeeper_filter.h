@@ -107,7 +107,7 @@ public:
   void onGetDataRequest(const std::string& path, bool watch) override;
   void onCreateRequest(const std::string& path, CreateFlags flags, OpCodes opcode) override;
   void onSetRequest(const std::string& path) override;
-  void onGetChildrenRequest(const std::string& path, bool watch, bool two) override;
+  void onGetChildrenRequest(const std::string& path, bool watch, bool v2) override;
   void onDeleteRequest(const std::string& path, int32_t version) override;
   void onExistsRequest(const std::string& path, bool watch) override;
   void onGetAclRequest(const std::string& path) override;

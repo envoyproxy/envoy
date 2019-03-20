@@ -119,32 +119,32 @@ void ZooKeeperFilter::onGetDataRequest(const std::string& path, const bool watch
 
 void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags flags,
                                       const OpCodes opcode) {
+  std::string opname;
+
   switch (opcode) {
   case OpCodes::CREATE:
+    opname = "create";
     config_->stats_.create_rq_.inc();
-    setDynamicMetadata(
-        {{"opname", "create"}, {"path", path}, {"create_type", createFlagsToString(flags)}});
     break;
   case OpCodes::CREATE2:
+    opname = "create2";
     config_->stats_.create2_rq_.inc();
-    setDynamicMetadata(
-        {{"opname", "create2"}, {"path", path}, {"create_type", createFlagsToString(flags)}});
     break;
   case OpCodes::CREATECONTAINER:
+    opname = "createcontainer";
     config_->stats_.createcontainer_rq_.inc();
-    setDynamicMetadata({{"opname", "createcontainer"},
-                        {"path", path},
-                        {"create_type", createFlagsToString(flags)}});
     break;
   case OpCodes::CREATETTL:
+    opname = "createttl";
     config_->stats_.createttl_rq_.inc();
-    setDynamicMetadata(
-        {{"opname", "createttl"}, {"path", path}, {"create_type", createFlagsToString(flags)}});
     break;
   default:
     throw EnvoyException(fmt::format("Unknown opcode: {}", enumToIntSigned(opcode)));
     break;
   }
+
+  setDynamicMetadata(
+      {{"opname", opname}, {"path", path}, {"create_type", createFlagsToString(flags)}});
 }
 
 void ZooKeeperFilter::onSetRequest(const std::string& path) {
@@ -153,16 +153,17 @@ void ZooKeeperFilter::onSetRequest(const std::string& path) {
 }
 
 void ZooKeeperFilter::onGetChildrenRequest(const std::string& path, const bool watch,
-                                           const bool two) {
-  if (!two) {
-    config_->stats_.getchildren_rq_.inc();
-    setDynamicMetadata(
-        {{"opname", "getchildren"}, {"path", path}, {"watch", watch ? "true" : "false"}});
-  } else {
+                                           const bool v2) {
+  std::string opname = "getchildren";
+
+  if (v2) {
     config_->stats_.getchildren2_rq_.inc();
-    setDynamicMetadata(
-        {{"opname", "getchildren2"}, {"path", path}, {"watch", watch ? "true" : "false"}});
+    opname = "getchildren2";
+  } else {
+    config_->stats_.getchildren_rq_.inc();
   }
+
+  setDynamicMetadata({{"opname", opname}, {"path", path}, {"watch", watch ? "true" : "false"}});
 }
 
 void ZooKeeperFilter::onDeleteRequest(const std::string& path, const int32_t version) {

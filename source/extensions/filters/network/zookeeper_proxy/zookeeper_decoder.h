@@ -78,7 +78,7 @@ public:
   virtual void onGetDataRequest(const std::string& path, bool watch) PURE;
   virtual void onCreateRequest(const std::string& path, CreateFlags flags, OpCodes opcode) PURE;
   virtual void onSetRequest(const std::string& path) PURE;
-  virtual void onGetChildrenRequest(const std::string& path, bool watch, bool two) PURE;
+  virtual void onGetChildrenRequest(const std::string& path, bool watch, bool v2) PURE;
   virtual void onGetEphemeralsRequest(const std::string& path) PURE;
   virtual void onGetAllChildrenNumberRequest(const std::string& path) PURE;
   virtual void onDeleteRequest(const std::string& path, int32_t version) PURE;
