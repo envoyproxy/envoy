@@ -189,8 +189,8 @@ public:
   }
 
   Buffer::OwnedImpl
-  encodeCreateRequest(const std::string& path, const std::string& data, const bool ephemeral,
-                      const bool sequence, const bool txn = false,
+  encodeCreateRequest(const std::string& path, const std::string& data, const CreateFlags flags,
+                      const bool txn = false,
                       const int32_t opcode = enumToIntSigned(OpCodes::CREATE)) const {
     Buffer::OwnedImpl buffer;
 
@@ -207,14 +207,7 @@ public:
     // Acls.
     buffer.writeBEInt<int32_t>(0);
     // Flags.
-    int flags = 0;
-    if (ephemeral) {
-      flags &= 0x1;
-    }
-    if (sequence) {
-      flags &= 0x2;
-    }
-    buffer.writeBEInt<int32_t>(flags);
+    buffer.writeBEInt<int32_t>(static_cast<int32_t>(flags));
 
     return buffer;
   }
@@ -381,6 +374,20 @@ public:
         }));
   }
 
+  void testCreate(CreateFlags flags) {
+    initialize();
+    Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", flags);
+
+    expectSetDynamicMetadata(
+        {{"opname", "create"}, {"path", "/foo"}, {"create_type", createFlagsToString(flags)}},
+        {{"bytes", "35"}});
+
+    EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+    EXPECT_EQ(1UL, config_->stats().create_rq_.value());
+    EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
+    EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+  }
+
   ZooKeeperFilterConfigSharedPtr config_;
   std::unique_ptr<ZooKeeperFilter> filter_;
   Stats::IsolatedStoreImpl scope_;
@@ -494,25 +501,31 @@ TEST_F(ZooKeeperFilterTest, GetDataRequest) {
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
 
-TEST_F(ZooKeeperFilterTest, CreateRequest) {
-  initialize();
+TEST_F(ZooKeeperFilterTest, CreateRequestPersistent) { testCreate(CreateFlags::PERSISTENT); }
 
-  Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", false, false);
+TEST_F(ZooKeeperFilterTest, CreateRequestPersistentSequential) {
+  testCreate(CreateFlags::PERSISTENT_SEQUENTIAL);
+}
 
-  expectSetDynamicMetadata({{"opname", "create"}, {"path", "/foo"}, {"create_type", "persistent"}},
-                           {{"bytes", "35"}});
+TEST_F(ZooKeeperFilterTest, CreateRequestEphemeral) { testCreate(CreateFlags::EPHEMERAL); }
 
-  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
-  EXPECT_EQ(1UL, config_->stats().create_rq_.value());
-  EXPECT_EQ(35UL, config_->stats().request_bytes_.value());
-  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+TEST_F(ZooKeeperFilterTest, CreateRequestEphemeralSequential) {
+  testCreate(CreateFlags::EPHEMERAL_SEQUENTIAL);
+}
+
+TEST_F(ZooKeeperFilterTest, CreateRequestContainer) { testCreate(CreateFlags::CONTAINER); }
+
+TEST_F(ZooKeeperFilterTest, CreateRequestTTL) { testCreate(CreateFlags::PERSISTENT_WITH_TTL); }
+
+TEST_F(ZooKeeperFilterTest, CreateRequestTTLSequential) {
+  testCreate(CreateFlags::PERSISTENT_SEQUENTIAL_WITH_TTL);
 }
 
 TEST_F(ZooKeeperFilterTest, CreateRequest2) {
   initialize();
 
-  Buffer::OwnedImpl data =
-      encodeCreateRequest("/foo", "bar", false, false, false, enumToIntSigned(OpCodes::CREATE2));
+  Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", CreateFlags::PERSISTENT, false,
+                                               enumToIntSigned(OpCodes::CREATE2));
 
   expectSetDynamicMetadata({{"opname", "create2"}, {"path", "/foo"}, {"create_type", "persistent"}},
                            {{"bytes", "35"}});
@@ -675,8 +688,8 @@ TEST_F(ZooKeeperFilterTest, CheckRequest) {
 TEST_F(ZooKeeperFilterTest, MultiRequest) {
   initialize();
 
-  Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", false, false, true);
-  Buffer::OwnedImpl create2 = encodeCreateRequest("/bar", "1", false, false, true);
+  Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", CreateFlags::PERSISTENT, true);
+  Buffer::OwnedImpl create2 = encodeCreateRequest("/bar", "1", CreateFlags::PERSISTENT, true);
   Buffer::OwnedImpl check1 = encodePathVersion("/foo", 100, enumToIntSigned(OpCodes::CHECK), true);
   Buffer::OwnedImpl set1 = encodeSetRequest("/bar", "2", -1, true);
 
