@@ -233,9 +233,6 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   bazel build @com_github_gcovr_gcovr//:gcovr.par
   export GCOVR="${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par"
 
-  export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
-  export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
-
   # Reduce the amount of memory and number of cores Bazel tries to use to
   # prevent it from launching too many subprocesses. This should prevent the
   # system from running out of memory and killing tasks. See discussion on
