@@ -37,23 +37,13 @@ Network::FilterStatus ZooKeeperFilter::onWrite(Buffer::Instance&, bool) {
 Network::FilterStatus ZooKeeperFilter::onNewConnection() { return Network::FilterStatus::Continue; }
 
 void ZooKeeperFilter::doDecode(Buffer::Instance& buffer) {
-  // Clear dynamic metadata.
-  envoy::api::v2::core::Metadata& dynamic_metadata =
-      read_callbacks_->connection().streamInfo().dynamicMetadata();
-  auto& metadata =
-      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy];
-  metadata.mutable_fields()->clear();
+  clearDynamicMetadata();
 
   if (!decoder_) {
     decoder_ = createDecoder(*this);
   }
 
-  try {
-    decoder_->onData(buffer);
-  } catch (EnvoyException& e) {
-    ENVOY_LOG(info, "zookeeper_proxy: decoding error: {}", e.what());
-    config_->stats_.decoder_error_.inc();
-  }
+  decoder_->onData(buffer);
 }
 
 DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks) {
@@ -62,6 +52,14 @@ DecoderPtr ZooKeeperFilter::createDecoder(DecoderCallbacks& callbacks) {
 
 void ZooKeeperFilter::setDynamicMetadata(const std::string& key, const std::string& value) {
   setDynamicMetadata({{key, value}});
+}
+
+void ZooKeeperFilter::clearDynamicMetadata() {
+  envoy::api::v2::core::Metadata& dynamic_metadata =
+      read_callbacks_->connection().streamInfo().dynamicMetadata();
+  auto& metadata =
+      (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy];
+  metadata.mutable_fields()->clear();
 }
 
 void ZooKeeperFilter::setDynamicMetadata(

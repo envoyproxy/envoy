@@ -127,6 +127,7 @@ public:
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
   void setDynamicMetadata(const std::string& key, const std::string& value);
   void setDynamicMetadata(const std::vector<std::pair<const std::string, const std::string>>& data);
+  void clearDynamicMetadata();
 
 private:
   Network::ReadFilterCallbacks* read_callbacks_{};
