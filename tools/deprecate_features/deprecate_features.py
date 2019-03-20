@@ -30,13 +30,18 @@ def deprecate_proto():
         filenames_and_fields.discard(tuple([match.group(1), match.group(2)]))
 
   # Finally sort out the code to add to runtime_features.cc and a canned email for envoy-announce.
-  code = ''
-  email = '\nThe following deprecated configuration fields will be disallowed by default:\n'
+  code_snippets = []
+  email_snippets = []
   for (filename, field) in filenames_and_fields:
-    code += ('    "envoy.deprecated_features.' + filename + ':' + field + '",\n')
-    email += (field + ' from ' + filename + '\n')
+    code_snippets.append('    "envoy.deprecated_features.' + filename + ':' + field + '",\n')
+    email_snippets.append(field + ' from ' + filename + '\n')
+  code = ''.join(code_snippets)
+  email = ''
+  if email_snippets:
+    email = ('\nThe following deprecated configuration fields will be disallowed by default:\n' +
+             ''.join(email_snippets))
 
-  return (email, code)
+  return email, code
 
 
 # Sorts out the list of features which should be default enabled and returns a tuple of
@@ -60,13 +65,17 @@ def flip_runtime_features():
   features_to_flip.remove('envoy.reloadable_features.my_feature_name')
   features_to_flip.remove('envoy.reloadable_features.test_feature_true')
 
-  code = ''
-  email = 'the following features will be defaulted to true:\n'
+  code_snippets = []
+  email_snippets = []
   for (feature) in features_to_flip:
-    code += ('    "' + feature + '",\n')
-    email += (feature + '\n')
+    code_snippets.append('    "' + feature + '",\n')
+    email_snippets.append(feature + '\n')
+  code = ''.join(code_snippets)
+  email = ''
+  if email_snippets:
+    email = 'the following features will be defaulted to true:\n' + ''.join(email_snippets)
 
-  return (email, code)
+  return email, code
 
 
 # Gather code and suggested email changes.
