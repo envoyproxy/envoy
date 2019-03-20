@@ -113,6 +113,7 @@ config:
     nanos: 0
 )EOF";
 
+// TODO(#6327) cleaner approach to testing with static config.
 std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
   return fmt::format(
       R"EOF(

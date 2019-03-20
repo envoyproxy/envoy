@@ -196,7 +196,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   // the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
 
-  // Even with cluster_1 is gone, a request for cluster_2 should be fine.
+  // Even with cluster_1 gone, a request for cluster_2 should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
@@ -307,7 +307,7 @@ TEST_P(DeltaCdsIntegrationTest, TwoClusters) {
   // the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
 
-  // Even with cluster_1 is gone, a request for cluster_2 should be fine.
+  // Even with cluster_1 gone, a request for cluster_2 should be fine.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
   cleanupUpstreamAndDownstream();
   codec_client_->waitForDisconnect();
