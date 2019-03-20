@@ -36,7 +36,6 @@ An example basic invocation to build a developer version of the Envoy static bin
 ```
 
 The build image defaults to `envoyproxy/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment.
-```
 
 In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before invoking the build.
 
@@ -70,6 +69,13 @@ For a debug version of the Envoy binary you can run:
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
+To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/master/bazel#advanced-caching-setup) add the http_remote_cache endpoint to
+the BAZEL_BUILD_OPTIONS environment variable
+
+```bash
+BAZEL_BUILD_OPTIONS='--remote_http_cache=http://127.0.0.1:28080' ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release'
+```
+
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 * `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang.
@@ -89,6 +95,7 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `fix_format`&mdash; run and enforce `clang-format-6.0` and `buildifier` on entire source tree.
 * `check_spelling`&mdash; run `misspell` on entire project.
 * `fix_spelling`&mdash; run and enforce `misspell` on entire project.
+* `check_spelling_pedantic`&mdash; run `aspell` on C++ and proto comments.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 # Testing changes to the build image as a developer
@@ -108,11 +115,11 @@ IMAGE_NAME="envoyproxy/envoy-build-${DISTRO}" IMAGE_ID=my_tag ./ci/run_envoy_doc
 
 This build the Ubuntu based `envoyproxy/envoy-build-ubuntu` image, and the final call will run against your local copy of the build image.
 
-# MacOS Build Flow
+# macOS Build Flow
 
-The MacOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/envoy) workflow.
+The macOS CI build is part of the [CircleCI](https://circleci.com/gh/envoyproxy/envoy) workflow.
 Dependencies are installed by the `ci/mac_ci_setup.sh` script, via [Homebrew](https://brew.sh),
-which is pre-installed on the CircleCI MacOS image. The dependencies are cached are re-installed
+which is pre-installed on the CircleCI macOS image. The dependencies are cached are re-installed
 on every build. The `ci/mac_ci_steps.sh` script executes the specific commands that
 build and test Envoy.
 

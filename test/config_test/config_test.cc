@@ -5,7 +5,6 @@
 #include <string>
 
 #include "common/common/fmt.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "server/config_validation/server.h"
@@ -15,6 +14,7 @@
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -26,15 +26,16 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrEq;
+using testing::StrNe;
 
 namespace Envoy {
 namespace ConfigTest {
-
 namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
-OptionsImpl asConfigYaml(const OptionsImpl& src) {
-  return Envoy::Server::createTestOptionsImpl("", Filesystem::fileReadToEnd(src.configPath()),
+OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
+  return Envoy::Server::createTestOptionsImpl("", api.fileSystem().fileReadToEnd(src.configPath()),
                                               src.localAddressIpVersion());
 }
 
@@ -43,22 +44,28 @@ OptionsImpl asConfigYaml(const OptionsImpl& src) {
 class ConfigTest {
 public:
   ConfigTest(const OptionsImpl& options)
-      : api_(Api::createApiForTest(stats_store_)), options_(options) {
+      : api_(Api::createApiForTest(time_system_)), options_(options) {
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, random()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
-    ON_CALL(server_.api_, fileReadToEnd("lightstep_access_token"))
+    ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
+    ON_CALL(file_system_, fileReadToEnd(StrEq("/etc/envoy/lightstep_access_token")))
         .WillByDefault(Return("access_token"));
+    ON_CALL(file_system_, fileReadToEnd(StrNe("/etc/envoy/lightstep_access_token")))
+        .WillByDefault(Invoke([&](const std::string& file) -> std::string {
+          return api_->fileSystem().fileReadToEnd(file);
+        }));
 
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_);
+    Server::InstanceUtil::loadBootstrapConfig(bootstrap, options_, *api_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
     Server::Configuration::MainImpl main_config;
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-        server_.runtime(), server_.stats(), server_.threadLocal(), server_.random(),
-        server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(), server_.localInfo(),
-        server_.secretManager(), *api_, server_.httpContext());
+        server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
+        server_.random(), server_.dnsResolver(), ssl_context_manager_, server_.dispatcher(),
+        server_.localInfo(), server_.secretManager(), *api_, server_.httpContext(),
+        server_.accessLogManager(), server_.singletonManager(), time_system_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -91,7 +98,7 @@ public:
     server_.thread_local_.shutdownThread();
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
@@ -99,43 +106,37 @@ public:
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Server::MockListenerComponentFactory> component_factory_;
   NiceMock<Server::MockWorkerFactory> worker_factory_;
-  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_,
-                                                server_.timeSystem()};
+  Server::ListenerManagerImpl listener_manager_{server_, component_factory_, worker_factory_};
   Runtime::RandomGeneratorImpl random_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  NiceMock<Filesystem::MockInstance> file_system_;
 };
 
 void testMerge() {
+  Api::ApiPtr api = Api::createApiForTest();
+
   const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
   OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v2.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  Server::InstanceUtil::loadBootstrapConfig(bootstrap, options);
+  Server::InstanceUtil::loadBootstrapConfig(bootstrap, options, *api);
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
-}
-
-void testIncompatibleMerge() {
-  const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
-  OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v1.yaml", overlay,
-                                                    Network::Address::IpVersion::v6));
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  EXPECT_THROW_WITH_MESSAGE(Server::InstanceUtil::loadBootstrapConfig(bootstrap, options),
-                            EnvoyException,
-                            "V1 config (detected) with --config-yaml is not supported");
 }
 
 uint32_t run(const std::string& directory) {
   uint32_t num_tested = 0;
+  Api::ApiPtr api = Api::createApiForTest();
   for (const std::string& filename : TestUtility::listFiles(directory, false)) {
+    ENVOY_LOG_MISC(info, "testing {}.\n", filename);
     OptionsImpl options(
         Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
     ConfigTest test1(options);
-    // Config flag --config-yaml is only supported for v2 configs.
     envoy::config::bootstrap::v2::Bootstrap bootstrap;
-    if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options) ==
+    if (Server::InstanceUtil::loadBootstrapConfig(bootstrap, options, *api) ==
         Server::InstanceUtil::BootstrapVersion::V2) {
-      ConfigTest test2(asConfigYaml(options));
+      ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
+      ConfigTest test2(asConfigYaml(options, *api));
     }
     num_tested++;
   }

@@ -14,33 +14,30 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
+#include "common/event/libevent_scheduler.h"
 #include "common/event/signal_impl.h"
+#include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/udp_listener_impl.h"
 
 #include "event2/event.h"
 
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(TimeSystem& time_system, Api::Api& api)
-    : DispatcherImpl(time_system, Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory},
-                     api) {
-  // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
-  RELEASE_ASSERT(Libevent::Global::initialized(), "");
-}
+DispatcherImpl::DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system)
+    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
 
-DispatcherImpl::DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory,
-                               Api::Api& api)
-    : api_(api), time_system_(time_system), buffer_factory_(std::move(factory)),
-      base_(event_base_new()), scheduler_(time_system_.createScheduler(base_)),
+DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
+                               Event::TimeSystem& time_system)
+    : api_(api), buffer_factory_(std::move(factory)),
+      scheduler_(time_system.createScheduler(base_scheduler_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {
-  RELEASE_ASSERT(Libevent::Global::initialized(), "");
-}
+      current_to_delete_(&to_delete_1_) {}
 
 DispatcherImpl::~DispatcherImpl() {}
 
@@ -119,6 +116,12 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
                                                         hand_off_restored_destination_connections)};
 }
 
+Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
+                                                       Network::UdpListenerCallbacks& cb) {
+  ASSERT(isThreadSafe());
+  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb)};
+}
+
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   ASSERT(isThreadSafe());
   return scheduler_->createTimer(cb);
@@ -133,7 +136,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   }
 }
 
-void DispatcherImpl::exit() { event_base_loopexit(base_.get(), nullptr); }
+void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
 
 SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
@@ -162,7 +165,11 @@ void DispatcherImpl::run(RunType type) {
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
 
-  event_base_loop(base_.get(), type == RunType::NonBlock ? EVLOOP_NONBLOCK : 0);
+  if (type == RunType::NonBlock) {
+    base_scheduler_.nonBlockingLoop();
+  } else {
+    base_scheduler_.blockingLoop();
+  }
 }
 
 void DispatcherImpl::runPostCallbacks() {

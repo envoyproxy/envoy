@@ -87,6 +87,22 @@ private:
   std::regex regex_;
 };
 
+class LowerCaseStringMatcher : public ValueMatcher {
+public:
+  LowerCaseStringMatcher(const envoy::type::matcher::StringMatcher& matcher)
+      : matcher_(toLowerCase(matcher)) {}
+
+  bool match(const absl::string_view value) const;
+
+  bool match(const ProtobufWkt::Value& value) const override;
+
+private:
+  envoy::type::matcher::StringMatcher
+  toLowerCase(const envoy::type::matcher::StringMatcher& matcher);
+
+  const StringMatcher matcher_;
+};
+
 class ListMatcher : public ValueMatcher {
 public:
   ListMatcher(const envoy::type::matcher::ListMatcher& matcher);

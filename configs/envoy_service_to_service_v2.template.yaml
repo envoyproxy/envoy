@@ -41,7 +41,6 @@
         - name: envoy.buffer
           config:
            max_request_bytes: 5242880
-           max_request_time: 120s
         - name: envoy.router
           config: {}
         access_log:
@@ -110,7 +109,7 @@ static_resources:
           route_config:
             name: local_route
             virtual_hosts:
-            {% for service, options in internal_virtual_hosts.iteritems() %}
+            {% for service, options in internal_virtual_hosts.items() %}
             - name: {{ service }}
               domains:
               - {{ service }}
@@ -150,6 +149,10 @@ static_resources:
           - name: envoy.rate_limit
             config:
               domain: envoy_service_to_service
+              rate_limit_service:
+                 grpc_service:
+                    envoy_grpc:
+                       cluster_name: ratelimit
           - name: envoy.grpc_http1_bridge
             config: {}
           - name: envoy.router
@@ -204,6 +207,10 @@ static_resources:
           - name: envoy.rate_limit
             config:
               domain: envoy_service_to_service
+              rate_limit_service:
+                 grpc_service:
+                    envoy_grpc:
+                       cluster_name: ratelimit
           - name: envoy.grpc_http1_bridge
             config: {}
           - name: envoy.router
@@ -282,7 +289,7 @@ static_resources:
               {% endif %}
   {% if (mongos_servers|length > 0) or (mongos_servers|length == 0 and not loop.last ) %}{% endif -%}
   {% endfor -%}
-  {% for key, value in mongos_servers.iteritems() -%}
+  {% for key, value in mongos_servers.items() -%}
   - name : "{{ value['address'] }}"
     address:
       socket_address:
@@ -311,7 +318,7 @@ static_resources:
       {% endif %}
   {% endfor -%}
   clusters:
-  {% for service, options in internal_virtual_hosts.iteritems() -%}
+  {% for service, options in internal_virtual_hosts.items() -%}
   - {{ helper.internal_cluster_definition(service, options)|indent(2)}}
   {% endfor -%}
   {% for mapping in external_virtual_hosts -%}
@@ -342,7 +349,7 @@ static_resources:
         protocol: {{ host['protocol'] }}
   {% endfor -%}
   {% endfor -%}
-  {% for key, value in mongos_servers.iteritems() -%}
+  {% for key, value in mongos_servers.items() -%}
   - name: mongo_{{ key }}
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -452,6 +459,7 @@ static_resources:
 dynamic_resources:
   cds_config:
     api_config_source:
+      api_type: REST
       cluster_names:
       - cds_cluster
       refresh_delay: 30s
@@ -468,10 +476,6 @@ tracing:
     config:
       access_token_file: "/etc/envoy/lightstep_access_token"
       collector_cluster: lightstep_saas
-rate_limit_service:
-  grpc_service:
-    envoy_grpc:
-      cluster_name: ratelimit
 runtime:
   symlink_root: "/srv/runtime_data/current"
   subdirectory: envoy

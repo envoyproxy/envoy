@@ -69,9 +69,7 @@ FileAccessLogFactory::convertJsonFormatToMap(ProtobufWkt::Struct json_format) {
 /**
  * Static registration for the file access log. @see RegisterFactory.
  */
-static Registry::RegisterFactory<FileAccessLogFactory,
-                                 Server::Configuration::AccessLogInstanceFactory>
-    register_;
+REGISTER_FACTORY(FileAccessLogFactory, Server::Configuration::AccessLogInstanceFactory);
 
 } // namespace File
 } // namespace AccessLoggers

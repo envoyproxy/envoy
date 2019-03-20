@@ -48,7 +48,9 @@ public:
   /* The host is currently marked as unhealthy by EDS. */                        \
   m(FAILED_EDS_HEALTH, 0x04)                                                     \
   /* The host is currently marked as degraded through active health checking. */ \
-  m(DEGRADED_ACTIVE_HC, 0x08)
+  m(DEGRADED_ACTIVE_HC, 0x08)                                                    \
+  /* The host is currently marked as degraded by EDS. */                         \
+  m(DEGRADED_EDS_HEALTH, 0x10)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -164,12 +166,14 @@ public:
   virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
 
   /**
-   * @return the current load balancing weight of the host, in the range 1-100.
+   * @return the current load balancing weight of the host, in the range 1-128 (see
+   * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */
   virtual uint32_t weight() const PURE;
 
   /**
-   * Set the current load balancing weight of the host, in the range 1-100.
+   * Set the current load balancing weight of the host, in the range 1-128 (see
+   * envoy.api.v2.endpoint.Endpoint.load_balancing_weight).
    */
   virtual void weight(uint32_t new_weight) PURE;
 
@@ -297,32 +301,6 @@ public:
   virtual absl::optional<uint32_t> chooseLocality() PURE;
 
   /**
-   * Parameter class for updateHosts.
-   */
-  struct UpdateHostsParams {
-    HostVectorConstSharedPtr hosts;
-    HostVectorConstSharedPtr healthy_hosts;
-    HostVectorConstSharedPtr degraded_hosts;
-    HostsPerLocalityConstSharedPtr hosts_per_locality;
-    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
-    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
-  };
-
-  /**
-   * Updates the hosts in a given host set.
-   *
-   * @param update_hosts_param supplies the list of hosts and hosts per localitiy.
-   * @param locality_weights supplies a map from locality to associated weight.
-   * @param hosts_added supplies the hosts added since the last update.
-   * @param hosts_removed supplies the hosts removed since the last update.
-   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
-   */
-  virtual void updateHosts(UpdateHostsParams&& update_host_params,
-                           LocalityWeightsConstSharedPtr locality_weights,
-                           const HostVector& hosts_added, const HostVector& hosts_removed,
-                           absl::optional<uint32_t> overprovisioning_factor) PURE;
-
-  /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
@@ -341,14 +319,19 @@ typedef std::unique_ptr<HostSet> HostSetPtr;
  */
 class PrioritySet {
 public:
+  typedef std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>
+      MemberUpdateCb;
+
   typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
                              const HostVector& hosts_removed)>
-      MemberUpdateCb;
+      PriorityUpdateCb;
 
   virtual ~PrioritySet() {}
 
   /**
    * Install a callback that will be invoked when any of the HostSets in the PrioritySet changes.
+   * hosts_added and hosts_removed will only be populated when a host is added or completely removed
+   * from the PrioritySet.
    * This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
@@ -357,17 +340,91 @@ public:
   virtual Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
-   * Returns the host sets for this priority set, ordered by priority.
-   * The first element in the vector is the host set for priority 0, and so on.
+   * Install a callback that will be invoked when a host set changes. Triggers when any change
+   * happens to the hosts within the host set. If hosts are added/removed from the host set, the
+   * added/removed hosts will be passed to the callback.
    *
-   * @return std::vector<HostSetPtr>& the host sets for this priority set.
+   * @param callback supplies the callback to invoke.
+   * @return Common::CallbackHandle* a handle which can be used to unregister the callback.
    */
-  virtual std::vector<HostSetPtr>& hostSetsPerPriority() PURE;
+  virtual Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
 
   /**
    * @return const std::vector<HostSetPtr>& the host sets, ordered by priority.
    */
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
+
+  /**
+   * Parameter class for updateHosts.
+   */
+  struct UpdateHostsParams {
+    HostVectorConstSharedPtr hosts;
+    HostVectorConstSharedPtr healthy_hosts;
+    HostVectorConstSharedPtr degraded_hosts;
+    HostsPerLocalityConstSharedPtr hosts_per_locality;
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
+  };
+
+  /**
+   * Updates the hosts in a given host set.
+   *
+   * @param priority the priority of the host set to update.
+   * @param update_hosts_param supplies the list of hosts and hosts per locality.
+   * @param locality_weights supplies a map from locality to associated weight.
+   * @param hosts_added supplies the hosts added since the last update.
+   * @param hosts_removed supplies the hosts removed since the last update.
+   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   */
+  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+                           LocalityWeightsConstSharedPtr locality_weights,
+                           const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<uint32_t> overprovisioning_factor) PURE;
+
+  /**
+   * Callback provided during batch updates that can be used to update hosts.
+   */
+  class HostUpdateCb {
+  public:
+    virtual ~HostUpdateCb() {}
+    /**
+     * Updates the hosts in a given host set.
+     *
+     * @param priority the priority of the host set to update.
+     * @param update_hosts_param supplies the list of hosts and hosts per locality.
+     * @param locality_weights supplies a map from locality to associated weight.
+     * @param hosts_added supplies the hosts added since the last update.
+     * @param hosts_removed supplies the hosts removed since the last update.
+     * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+     */
+    virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+                             LocalityWeightsConstSharedPtr locality_weights,
+                             const HostVector& hosts_added, const HostVector& hosts_removed,
+                             absl::optional<uint32_t> overprovisioning_factor) PURE;
+  };
+
+  /**
+   * Callback that provides the mechanism for performing batch host updates for a PrioritySet.
+   */
+  class BatchUpdateCb {
+  public:
+    virtual ~BatchUpdateCb() {}
+
+    /**
+     * Performs a batch host update. Implementors should use the provided callback to update hosts
+     * in the PrioritySet.
+     */
+    virtual void batchUpdate(HostUpdateCb& host_update_cb) PURE;
+  };
+
+  /**
+   * Allows updating hosts for multiple priorities at once, deferring the MemberUpdateCb from
+   * triggering until all priorities have been updated. The resulting callback will take into
+   * account hosts moved from one priority to another.
+   *
+   * @param callback callback to use to add hosts.
+   */
+  virtual void batchHostUpdate(BatchUpdateCb& callback) PURE;
 };
 
 /**
@@ -389,6 +446,7 @@ public:
   COUNTER  (lb_subsets_removed)                                                                    \
   COUNTER  (lb_subsets_selected)                                                                   \
   COUNTER  (lb_subsets_fallback)                                                                   \
+  COUNTER  (lb_subsets_fallback_panic)                                                             \
   COUNTER  (original_dst_host_invalid)                                                             \
   COUNTER  (upstream_cx_total)                                                                     \
   GAUGE    (upstream_cx_active)                                                                    \
@@ -435,10 +493,13 @@ public:
   COUNTER  (upstream_flow_control_resumed_reading_total)                                           \
   COUNTER  (upstream_flow_control_backed_up_total)                                                 \
   COUNTER  (upstream_flow_control_drained_total)                                                   \
+  COUNTER  (upstream_internal_redirect_failed_total)                                               \
+  COUNTER  (upstream_internal_redirect_succeeded_total)                                            \
   COUNTER  (bind_errors)                                                                           \
   GAUGE    (max_host_weight)                                                                       \
   COUNTER  (membership_change)                                                                     \
   GAUGE    (membership_healthy)                                                                    \
+  GAUGE    (membership_degraded)                                                                   \
   GAUGE    (membership_total)                                                                      \
   COUNTER  (retry_or_shadow_abandoned)                                                             \
   COUNTER  (update_attempt)                                                                        \
@@ -686,6 +747,11 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+  /**
+   * @return eds cluster service_name of the cluster.
+   */
+  virtual absl::optional<std::string> eds_service_name() const PURE;
 
 protected:
   /**

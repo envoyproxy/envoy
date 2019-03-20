@@ -17,12 +17,13 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_manager_impl.h"
+#include "common/common/assert.h"
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/context_impl.h"
+#include "common/memory/heap_shrinker.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
-#include "common/ssl/context_manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
 #include "server/configuration_impl.h"
@@ -33,7 +34,7 @@
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -44,7 +45,7 @@ namespace Server {
  * All server wide stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_SERVER_STATS(GAUGE)                                                                    \
+#define ALL_SERVER_STATS(COUNTER, GAUGE)                                                           \
   GAUGE(uptime)                                                                                    \
   GAUGE(concurrency)                                                                               \
   GAUGE(memory_allocated)                                                                          \
@@ -54,11 +55,12 @@ namespace Server {
   GAUGE(total_connections)                                                                         \
   GAUGE(version)                                                                                   \
   GAUGE(days_until_first_cert_expiring)                                                            \
-  GAUGE(hot_restart_epoch)
+  GAUGE(hot_restart_epoch)                                                                         \
+  COUNTER(debug_assertion_failures)
 // clang-format on
 
 struct ServerStats {
-  ALL_SERVER_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_SERVER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -84,7 +86,7 @@ public:
  */
 class InstanceUtil : Logger::Loggable<Logger::Id::main> {
 public:
-  enum class BootstrapVersion { V1, V2 };
+  enum class BootstrapVersion { V2 };
 
   /**
    * Default implementation of runtime loader creation used in the real server and in most
@@ -105,10 +107,11 @@ public:
    * @param bootstrap supplies the bootstrap to fill.
    * @param config_path supplies the config path.
    * @param v2_only supplies whether to attempt v1 fallback.
+   * @param api reference to the Api object
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                              Options& options);
+                                              const Options& options, Api::Api& api);
 };
 
 /**
@@ -117,7 +120,7 @@ public:
  */
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
-  RunHelper(Instance& instance, Options& options, Event::Dispatcher& dispatcher,
+  RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
             Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
             InitManagerImpl& init_manager, OverloadManager& overload_manager,
             std::function<void()> workers_start_cb);
@@ -130,14 +133,16 @@ private:
 };
 
 /**
- * This is the actual full standalone server which stiches together various common components.
+ * This is the actual full standalone server which stitches together various common components.
  */
-class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
+class InstanceImpl : Logger::Loggable<Logger::Id::main>,
+                     public Instance,
+                     public ServerLifecycleNotifier {
 public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Options& options, Event::TimeSystem& time_system,
+  InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -162,6 +167,7 @@ public:
   void getParentStats(HotRestart::GetParentStatsInfo& info) override;
   HotRestart& hotRestart() override { return restarter_; }
   Init::Manager& initManager() override { return init_manager_; }
+  ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
   Envoy::MutexTracer* mutexTracer() override { return mutex_tracer_; }
@@ -173,47 +179,61 @@ public:
   void shutdownAdmin() override;
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   bool healthCheckFailed() override;
-  Options& options() override { return options_; }
+  const Options& options() override { return options_; }
   time_t startTimeCurrentEpoch() override { return start_time_; }
   time_t startTimeFirstEpoch() override { return original_start_time_; }
   Stats::Store& stats() override { return stats_store_; }
   Http::Context& httpContext() override { return http_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
-  Event::TimeSystem& timeSystem() override { return time_system_; }
+  TimeSource& timeSource() override { return time_source_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();
   }
 
+  // ServerLifecycleNotifier
+  void registerCallback(Stage stage, StageCallback callback) override;
+
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
-  void initialize(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();
   void terminate();
+  void notifyCallbacksForStage(Stage stage);
 
+  // init_manager_ must come before any member that participates in initialization, and destructed
+  // only after referencing members are gone, since initialization continuation can potentially
+  // occur at any point during member lifetime.
+  InitManagerImpl init_manager_{"Server"};
+  // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
+  // only after these members can no longer reference it, since:
+  // - There may be active filter chains referencing it in listener_manager_.
+  // - There may be active clusters referencing it in config_.cluster_manager_.
+  // - There may be active connections referencing it.
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   bool shutdown_;
-  Options& options_;
-  Event::TimeSystem& time_system_;
+  const Options& options_;
+  TimeSource& time_source_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
   Stats::StoreRoot& stats_store_;
   std::unique_ptr<ServerStats> server_stats_;
+  Assert::ActionRegistrationPtr assert_action_registration_;
   ThreadLocal::Instance& thread_local_;
   Api::ApiPtr api_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<AdminImpl> admin_;
   Singleton::ManagerPtr singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
-  Runtime::LoaderPtr runtime_loader_;
-  std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
+  std::unique_ptr<Extensions::TransportSockets::Tls::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
@@ -224,7 +244,6 @@ private:
   DrainManagerPtr drain_manager_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Upstream::ClusterManagerFactory> cluster_manager_factory_;
-  InitManagerImpl init_manager_;
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
@@ -238,6 +257,9 @@ private:
   std::unique_ptr<RunHelper> run_helper_;
   Envoy::MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
+  std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
+  const std::thread::id main_thread_id_;
+  std::unordered_map<Stage, std::vector<StageCallback>> stage_callbacks_;
 };
 
 } // namespace Server

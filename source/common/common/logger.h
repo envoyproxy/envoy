@@ -36,10 +36,12 @@ namespace Logger {
   FUNCTION(http)                 \
   FUNCTION(http2)                \
   FUNCTION(hystrix)              \
+  FUNCTION(init)                 \
   FUNCTION(lua)                  \
   FUNCTION(main)                 \
   FUNCTION(misc)                 \
   FUNCTION(mongo)                \
+  FUNCTION(quic)                 \
   FUNCTION(pool)                 \
   FUNCTION(rbac)                 \
   FUNCTION(redis)                \
@@ -47,6 +49,7 @@ namespace Logger {
   FUNCTION(runtime)              \
   FUNCTION(stats)                \
   FUNCTION(secret)               \
+  FUNCTION(tap)                  \
   FUNCTION(testing)              \
   FUNCTION(thrift)               \
   FUNCTION(tracing)              \
@@ -77,7 +80,9 @@ public:
     off = spdlog::level::off
   } levels;
 
-  std::string levelString() const { return spdlog::level::level_names[logger_->level()]; }
+  spdlog::string_view_t levelString() const {
+    return spdlog::level::level_string_views[logger_->level()];
+  }
   std::string name() const { return logger_->name(); }
   void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
   spdlog::level::level_enum level() const { return logger_->level(); }
@@ -182,7 +187,7 @@ private:
 
 /**
  * Defines a scope for the logging system with the specified lock and log level.
- * This is equivalalent to setLogLevel, setLogFormat, and setLock, which can be
+ * This is equivalent to setLogLevel, setLogFormat, and setLock, which can be
  * called individually as well, e.g. to set the log level without changing the
  * lock or format.
  *

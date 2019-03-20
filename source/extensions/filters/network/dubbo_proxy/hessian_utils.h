@@ -35,6 +35,9 @@ public:
   static void readNull(Buffer::Instance& buffer);
   static std::chrono::milliseconds readDate(Buffer::Instance& buffer);
   static std::string readByte(Buffer::Instance& buffer);
+
+  static size_t writeString(Buffer::Instance& buffer, absl::string_view str);
+  static size_t writeInt(Buffer::Instance& buffer, uint8_t value);
 };
 
 } // namespace DubboProxy

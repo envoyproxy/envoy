@@ -5,15 +5,27 @@
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
+#include "test/mocks/server/mocks.h"
+#include "test/proto/deprecated.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-TEST(UtilityTest, convertPercentNaN) {
+class ProtobufUtilityTest : public testing::Test {
+protected:
+  ProtobufUtilityTest() : api_(Api::createApiForTest()) {}
+
+  Api::ApiPtr api_;
+};
+
+TEST_F(ProtobufUtilityTest, convertPercentNaN) {
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
@@ -22,7 +34,84 @@ TEST(UtilityTest, convertPercentNaN) {
                EnvoyException);
 }
 
-TEST(UtilityTest, RepeatedPtrUtilDebugString) {
+namespace ProtobufPercentHelper {
+
+TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
+  { // 0/100 (default)
+    envoy::type::FractionalPercent percent;
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 0));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 1000));
+  }
+  { // 5/100
+    envoy::type::FractionalPercent percent;
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 100));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 104));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 105));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 204));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000));
+  }
+  { // 75/100
+    envoy::type::FractionalPercent percent;
+    percent.set_numerator(75);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 5));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 74));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 80));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 100));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 104));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 105));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 200));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 274));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 280));
+  }
+  { // 5/10000
+    envoy::type::FractionalPercent percent;
+    percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 9000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 10000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 10004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10005));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 20004));
+  }
+  { // 5/MILLION
+    envoy::type::FractionalPercent percent;
+    percent.set_denominator(envoy::type::FractionalPercent::MILLION);
+    percent.set_numerator(5);
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 5));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 9000));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10000));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 10005));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 900005));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 900000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000000));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 1000004));
+    EXPECT_FALSE(evaluateFractionalPercent(percent, 1000005));
+    EXPECT_TRUE(evaluateFractionalPercent(percent, 2000004));
+  }
+}
+
+} // namespace ProtobufPercentHelper
+
+TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
@@ -31,7 +120,7 @@ TEST(UtilityTest, RepeatedPtrUtilDebugString) {
   EXPECT_EQ("[value: 10\n, value: 20\n]", RepeatedPtrUtil::debugString(repeated));
 }
 
-TEST(UtilityTest, DowncastAndValidate) {
+TEST_F(ProtobufUtilityTest, DowncastAndValidate) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   bootstrap.mutable_runtime();
   EXPECT_THROW(MessageUtil::validate(bootstrap), ProtoValidationException);
@@ -40,7 +129,7 @@ TEST(UtilityTest, DowncastAndValidate) {
       ProtoValidationException);
 }
 
-TEST(UtilityTest, LoadBinaryProtoFromFile) {
+TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   bootstrap.mutable_cluster_manager()
       ->mutable_upstream_bind_config()
@@ -51,22 +140,22 @@ TEST(UtilityTest, LoadBinaryProtoFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  MessageUtil::loadFromFile(filename, proto_from_file);
+  MessageUtil::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
-TEST(UtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
+TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb", source_duration.SerializeAsString());
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
   EXPECT_THROW_WITH_MESSAGE(
-      MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
+      MessageUtil::loadFromFile(filename, proto_from_file, *api_), EnvoyException,
       "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap) has unknown fields");
 }
 
-TEST(UtilityTest, LoadTextProtoFromFile) {
+TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   bootstrap.mutable_cluster_manager()
       ->mutable_upstream_bind_config()
@@ -79,28 +168,29 @@ TEST(UtilityTest, LoadTextProtoFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  MessageUtil::loadFromFile(filename, proto_from_file);
+  MessageUtil::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
-TEST(UtilityTest, LoadTextProtoFromFile_Failure) {
+TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file, *api_),
+                            EnvoyException,
                             "Unable to parse file \"" + filename +
                                 "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
 }
 
-TEST(UtilityTest, KeyValueStruct) {
+TEST_F(ProtobufUtilityTest, KeyValueStruct) {
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   EXPECT_EQ(obj.fields_size(), 1);
   EXPECT_EQ(obj.fields().at("test_key").kind_case(), ProtobufWkt::Value::KindCase::kStringValue);
   EXPECT_EQ(obj.fields().at("test_key").string_value(), "test_value");
 }
 
-TEST(UtilityTest, ValueUtilEqual_NullValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_NullValues) {
   ProtobufWkt::Value v1, v2;
   v1.set_null_value(ProtobufWkt::NULL_VALUE);
   v2.set_null_value(ProtobufWkt::NULL_VALUE);
@@ -112,7 +202,7 @@ TEST(UtilityTest, ValueUtilEqual_NullValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, other));
 }
 
-TEST(UtilityTest, ValueUtilEqual_StringValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_StringValues) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_string_value("s");
   v2.set_string_value("s");
@@ -122,7 +212,7 @@ TEST(UtilityTest, ValueUtilEqual_StringValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v3));
 }
 
-TEST(UtilityTest, ValueUtilEqual_NumberValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_NumberValues) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_number_value(1.0);
   v2.set_number_value(1.0);
@@ -132,7 +222,7 @@ TEST(UtilityTest, ValueUtilEqual_NumberValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v3));
 }
 
-TEST(UtilityTest, ValueUtilEqual_BoolValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_BoolValues) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_bool_value(true);
   v2.set_bool_value(true);
@@ -142,7 +232,7 @@ TEST(UtilityTest, ValueUtilEqual_BoolValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v3));
 }
 
-TEST(UtilityTest, ValueUtilEqual_StructValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_StructValues) {
   ProtobufWkt::Value string_val1, string_val2, bool_val;
 
   string_val1.set_string_value("s1");
@@ -166,7 +256,7 @@ TEST(UtilityTest, ValueUtilEqual_StructValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v4));
 }
 
-TEST(UtilityTest, ValueUtilEqual_ListValues) {
+TEST_F(ProtobufUtilityTest, ValueUtilEqual_ListValues) {
   ProtobufWkt::Value v1, v2, v3, v4;
   v1.mutable_list_value()->add_values()->set_string_value("s");
   v1.mutable_list_value()->add_values()->set_bool_value(true);
@@ -184,14 +274,14 @@ TEST(UtilityTest, ValueUtilEqual_ListValues) {
   EXPECT_FALSE(ValueUtil::equal(v1, v4));
 }
 
-TEST(UtilityTest, ValueUtilHash) {
+TEST_F(ProtobufUtilityTest, ValueUtilHash) {
   ProtobufWkt::Value v;
   v.set_string_value("s1");
 
   EXPECT_NE(ValueUtil::hash(v), 0);
 }
 
-TEST(UtilityTest, HashedValue) {
+TEST_F(ProtobufUtilityTest, HashedValue) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_string_value("s");
   v2.set_string_value("s");
@@ -206,7 +296,7 @@ TEST(UtilityTest, HashedValue) {
   EXPECT_EQ(hv1, copy);
 }
 
-TEST(UtilityTest, HashedValueStdHash) {
+TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_string_value("s");
   v2.set_string_value("s");
@@ -224,7 +314,7 @@ TEST(UtilityTest, HashedValueStdHash) {
   EXPECT_NE(set.find(hv3), set.end());
 }
 
-TEST(UtilityTest, AnyConvertWrongType) {
+TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
@@ -233,7 +323,7 @@ TEST(UtilityTest, AnyConvertWrongType) {
                           EnvoyException, "Unable to unpack .*");
 }
 
-TEST(UtilityTest, AnyConvertWrongFields) {
+TEST_F(ProtobufUtilityTest, AnyConvertWrongFields) {
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   ProtobufWkt::Any source_any;
   source_any.PackFrom(obj);
@@ -243,7 +333,7 @@ TEST(UtilityTest, AnyConvertWrongFields) {
                             "Protobuf message (type google.protobuf.Timestamp) has unknown fields");
 }
 
-TEST(UtilityTest, JsonConvertSuccess) {
+TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Duration dest_duration;
@@ -251,7 +341,7 @@ TEST(UtilityTest, JsonConvertSuccess) {
   EXPECT_EQ(42, dest_duration.seconds());
 }
 
-TEST(UtilityTest, JsonConvertUnknownFieldSuccess) {
+TEST_F(ProtobufUtilityTest, JsonConvertUnknownFieldSuccess) {
   MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
@@ -259,7 +349,7 @@ TEST(UtilityTest, JsonConvertUnknownFieldSuccess) {
   MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Strict;
 }
 
-TEST(UtilityTest, JsonConvertFail) {
+TEST_F(ProtobufUtilityTest, JsonConvertFail) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(-281474976710656);
   ProtobufWkt::Duration dest_duration;
@@ -269,7 +359,7 @@ TEST(UtilityTest, JsonConvertFail) {
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3665.
-TEST(UtilityTest, JsonConvertCamelSnake) {
+TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   // Make sure we use a field eligible for snake/camel case translation.
   bootstrap.mutable_cluster_manager()->set_local_cluster_name("foo");
@@ -286,7 +376,7 @@ TEST(UtilityTest, JsonConvertCamelSnake) {
                        .string_value());
 }
 
-TEST(UtilityTest, YamlLoadFromStringFail) {
+TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   // Verify loadFromYaml can parse valid YAML string.
   MessageUtil::loadFromYaml("node: { id: node1 }", bootstrap);
@@ -303,6 +393,34 @@ TEST(UtilityTest, YamlLoadFromStringFail) {
   EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYaml("- node: { id: node1 }", bootstrap),
                           EnvoyException,
                           "Unable to parse JSON as proto.*Root element must be a message.*");
+}
+
+TEST_F(ProtobufUtilityTest, GetFlowYamlStringFromMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  EXPECT_EQ("{flags_path: foo}", MessageUtil::getYamlStringFromMessage(bootstrap, false, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  EXPECT_EQ("flags_path: foo", MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromRecursiveMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  bootstrap.mutable_node();
+  bootstrap.mutable_static_resources()->add_listeners()->set_name("http");
+
+  const std::string expected_yaml = R"EOF(
+node:
+  {}
+static_resources:
+  listeners:
+    - name: http
+flags_path: foo)EOF";
+  EXPECT_EQ(expected_yaml, "\n" + MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
 }
 
 TEST(DurationUtilTest, OutOfRange) {
@@ -328,7 +446,160 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-class TimestampUtilTest : public ::testing::Test, public ::testing::WithParamInterface<int64_t> {};
+class DeprecatedFieldsTest : public testing::Test {
+protected:
+  DeprecatedFieldsTest()
+      : loader_(new Runtime::ScopedLoaderSingleton(
+            Runtime::LoaderPtr{new Runtime::LoaderImpl(rand_, store_, tls_)})) {}
+
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::IsolatedStoreImpl store_;
+  Runtime::MockRandomGenerator rand_;
+  std::unique_ptr<Runtime::ScopedLoaderSingleton> loader_;
+};
+
+TEST_F(DeprecatedFieldsTest, NoCrashIfRuntimeMissing) {
+  loader_.reset();
+
+  envoy::test::deprecation_test::Base base;
+  base.set_not_deprecated("foo");
+  // Fatal checks for a non-deprecated field should cause no problem.
+  MessageUtil::checkForDeprecation(base);
+}
+
+TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
+  envoy::test::deprecation_test::Base base;
+  base.set_not_deprecated("foo");
+  // Fatal checks for a non-deprecated field should cause no problem.
+  MessageUtil::checkForDeprecation(base);
+}
+
+TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+  // Non-fatal checks for a deprecated field should log rather than throw an exception.
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
+                      MessageUtil::checkForDeprecation(base));
+}
+
+// Use of a deprecated and disallowed field should result in an exception.
+TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowed) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated_fatal("foo");
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
+}
+
+TEST_F(DeprecatedFieldsTest, IndividualFieldDisallowedWithRuntimeOverride) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated_fatal("foo");
+
+  // Make sure this is set up right.
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
+  // The config will be rejected, so the feature will not be used.
+  EXPECT_EQ(0, store_.gauge("runtime.deprecated_feature_use").value());
+
+  // Now create a new snapshot with this feature allowed.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", "TrUe "}});
+
+  // Now the same deprecation check should only trigger a warning.
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'",
+      MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+}
+
+TEST_F(DeprecatedFieldsTest, DisallowViaRuntime) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
+                      MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+
+  // Now create a new snapshot with this feature disallowed.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:is_deprecated", " false"}});
+
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::checkForDeprecation(base), ProtoValidationException,
+      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'");
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+}
+
+// Note that given how Envoy config parsing works, the first time we hit a
+// 'fatal' error and throw, we won't log future warnings. That said, this tests
+// the case of the warning occurring before the fatal error.
+TEST_F(DeprecatedFieldsTest, MixOfFatalAndWarnings) {
+  envoy::test::deprecation_test::Base base;
+  base.set_is_deprecated("foo");
+  base.set_is_deprecated_fatal("foo");
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'", {
+        EXPECT_THROW_WITH_REGEX(
+            MessageUtil::checkForDeprecation(base), ProtoValidationException,
+            "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
+      });
+}
+
+// Present (unused) deprecated messages should be detected as deprecated.
+TEST_F(DeprecatedFieldsTest, MessageDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_deprecated_message();
+  EXPECT_LOG_CONTAINS(
+      "warning", "Using deprecated option 'envoy.test.deprecation_test.Base.deprecated_message'",
+      MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
+}
+
+TEST_F(DeprecatedFieldsTest, InnerMessageDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_not_deprecated_message()->set_inner_not_deprecated("foo");
+  // Checks for a non-deprecated field shouldn't trigger warnings
+  EXPECT_LOG_NOT_CONTAINS("warning", "Using deprecated option",
+                          MessageUtil::checkForDeprecation(base));
+
+  base.mutable_not_deprecated_message()->set_inner_deprecated("bar");
+  // Checks for a deprecated sub-message should result in a warning.
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "Using deprecated option 'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
+      MessageUtil::checkForDeprecation(base));
+}
+
+// Check that repeated sub-messages get validated.
+TEST_F(DeprecatedFieldsTest, SubMessageDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.add_repeated_message();
+  base.add_repeated_message()->set_inner_deprecated("foo");
+  base.add_repeated_message();
+
+  // Fatal checks for a repeated deprecated sub-message should result in an exception.
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option "
+                      "'envoy.test.deprecation_test.Base.InnerMessage.inner_deprecated'",
+                      MessageUtil::checkForDeprecation(base));
+}
+
+// Check that deprecated repeated messages trigger
+TEST_F(DeprecatedFieldsTest, RepeatedMessageDeprecated) {
+  envoy::test::deprecation_test::Base base;
+  base.add_deprecated_repeated_message();
+
+  // Fatal checks for a repeated deprecated sub-message should result in an exception.
+  EXPECT_LOG_CONTAINS("warning",
+                      "Using deprecated option "
+                      "'envoy.test.deprecation_test.Base.deprecated_repeated_message'",
+                      MessageUtil::checkForDeprecation(base));
+}
+
+class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
 
 TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
   // Generate an input time_point<system_clock>,
@@ -347,20 +618,20 @@ TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
   EXPECT_EQ(time_original, time_reflected);
 }
 
-INSTANTIATE_TEST_CASE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
-                        ::testing::Values(-1000 * 60 * 60 * 24 * 7, // week
-                                          -1000 * 60 * 60 * 24,     // day
-                                          -1000 * 60 * 60,          // hour
-                                          -1000 * 60,               // minute
-                                          -1000,                    // second
-                                          -1,                       // millisecond
-                                          0,
-                                          1,                      // millisecond
-                                          1000,                   // second
-                                          1000 * 60,              // minute
-                                          1000 * 60 * 60,         // hour
-                                          1000 * 60 * 60 * 24,    // day
-                                          1000 * 60 * 60 * 24 * 7 // week
-                                          ));
+INSTANTIATE_TEST_SUITE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
+                         ::testing::Values(-1000 * 60 * 60 * 24 * 7, // week
+                                           -1000 * 60 * 60 * 24,     // day
+                                           -1000 * 60 * 60,          // hour
+                                           -1000 * 60,               // minute
+                                           -1000,                    // second
+                                           -1,                       // millisecond
+                                           0,
+                                           1,                      // millisecond
+                                           1000,                   // second
+                                           1000 * 60,              // minute
+                                           1000 * 60 * 60,         // hour
+                                           1000 * 60 * 60 * 24,    // day
+                                           1000 * 60 * 60 * 24 * 7 // week
+                                           ));
 
 } // namespace Envoy

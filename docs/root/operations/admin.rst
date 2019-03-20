@@ -25,6 +25,7 @@ modify different aspects of the server:
 
     admin:
       access_log_path: /tmp/admin_access.log
+      profile_path: /tmp/envoy.prof
       address:
         socket_address: { address: 127.0.0.1, port_value: 9901 }
 
@@ -67,8 +68,8 @@ modify different aspects of the server:
     - :ref:`circuit breakers<config_cluster_manager_cluster_circuit_breakers>` settings for all priority settings.
 
     - Information about :ref:`outlier detection<arch_overview_outlier_detection>` if a detector is installed. Currently
-      :ref:`success rate average<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average>`,
-      and :ref:`ejection threshold<arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold>`
+      :ref:`average success rate <envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_average_success_rate>`,
+      and :ref:`ejection threshold<envoy_api_field_data.cluster.v2alpha.OutlierEjectSuccessRate.cluster_success_rate_ejection_threshold>`
       are presented. Both of these values could be ``-1`` if there was not enough data to calculate them in the last
       :ref:`interval<envoy_api_field_cluster.OutlierDetection.interval>`.
 
@@ -135,7 +136,11 @@ modify different aspects of the server:
 
 .. http:post:: /cpuprofiler
 
-  Enable or disable the CPU profiler. Requires compiling with gperftools.
+  Enable or disable the CPU profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.
+
+.. http:post:: /heapprofiler
+
+  Enable or disable the Heap profiler. Requires compiling with gperftools. The output file can be configured by admin.profile_path.
 
 .. _operations_admin_interface_healthcheck_fail:
 
@@ -213,7 +218,8 @@ modify different aspects of the server:
         "restart_epoch": 0,
         "file_flush_interval": "10s",
         "drain_time": "600s",
-        "parent_shutdown_time": "900s"
+        "parent_shutdown_time": "900s",
+        "cpuset_threads": false
       },
       "uptime_current_epoch": "6s",
       "uptime_all_epochs": "6s"
@@ -310,8 +316,11 @@ explanation of the output.
   .. http:get:: /stats/prometheus
 
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
-  v0.0.4 format. This can be used to integrate with a Prometheus server. Currently, only counters and
-  gauges are output. Histograms will be output in a future update.
+  v0.0.4 format. This can be used to integrate with a Prometheus server.
+
+  You can optionally pass the `usedonly` URL query argument to only get statistics that
+  Envoy has updated (counters incremented at least once, gauges changed at least once,
+  and histograms added to at least once)
 
 .. _operations_admin_interface_runtime:
 
@@ -371,7 +380,7 @@ explanation of the output.
 
   This endpoint is intended to be used as the stream source for
   `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
-  a GET to this endpoint will trriger a stream of statistics from envoy in
+  a GET to this endpoint will trigger a stream of statistics from envoy in
   `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
   format, as expected by the Hystrix dashboard.
 
@@ -399,3 +408,11 @@ explanation of the output.
     set to '0'.
   * Latency information represents data since last flush.
     Mean latency is currently not available.
+
+.. http:post:: /tap
+
+  This endpoint is used for configuring an active tap session. It is only
+  available if a valid tap extension has been configured, and that extension has
+  been configured to accept admin configuration. See:
+
+  * :ref:`HTTP tap filter configuration <config_http_filters_tap_admin_handler>`

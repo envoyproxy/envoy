@@ -1,7 +1,6 @@
 #include "extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
 
 #include "common/common/assert.h"
-#include "common/filesystem/filesystem_impl.h"
 
 #include "absl/strings/numbers.h"
 
@@ -15,7 +14,7 @@ InjectedResourceMonitor::InjectedResourceMonitor(
         config,
     Server::Configuration::ResourceMonitorFactoryContext& context)
     : filename_(config.filename()), file_changed_(true),
-      watcher_(context.dispatcher().createFilesystemWatcher()) {
+      watcher_(context.dispatcher().createFilesystemWatcher()), api_(context.api()) {
   watcher_->addWatch(filename_, Filesystem::Watcher::Events::MovedTo,
                      [this](uint32_t) { onFileChanged(); });
 }
@@ -26,7 +25,7 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceMonitor::Callb
   if (file_changed_) {
     file_changed_ = false;
     try {
-      const std::string contents = Filesystem::fileReadToEnd(filename_);
+      const std::string contents = api_.fileSystem().fileReadToEnd(filename_);
       double pressure;
       if (absl::SimpleAtod(contents, &pressure)) {
         if (pressure < 0 || pressure > 1) {

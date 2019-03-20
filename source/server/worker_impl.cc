@@ -8,15 +8,13 @@
 #include "envoy/server/configuration.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/thread.h"
-
 #include "server/connection_handler_impl.h"
 
 namespace Envoy {
 namespace Server {
 
 WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager) {
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher(time_system_));
+  Event::DispatcherPtr dispatcher(api_.allocateDispatcher());
   return WorkerPtr{new WorkerImpl(
       tls_, hooks_, std::move(dispatcher),
       Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher)},
@@ -105,8 +103,7 @@ void WorkerImpl::threadRoutine(GuardDog& guard_dog) {
 
   // We must close all active connections before we actually exit the thread. This prevents any
   // destructors from running on the main thread which might reference thread locals. Destroying
-  // the handler does this as well as destroying the dispatcher which purges the delayed deletion
-  // list.
+  // the handler does this which additionally purges the dispatcher delayed deletion list.
   handler_.reset();
   tls_.shutdownThread();
   watchdog.reset();

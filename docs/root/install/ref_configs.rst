@@ -46,8 +46,8 @@ A few notes about the example configurations:
   to be running at `discovery.yourcompany.net`.
 * DNS for `yourcompany.net` is assumed to be setup for various things. Search the configuration
   templates for different instances of this.
-* Tracing is configured for `LightStep <http://lightstep.com/>`_. To
-  disable this or enable `Zipkin <http://zipkin.io>` or `Datadog <https://datadoghq.com>` tracing, delete or
+* Tracing is configured for `LightStep <https://lightstep.com/>`_. To
+  disable this or enable `Zipkin <https://zipkin.io>`_ or `Datadog <https://datadoghq.com>`_ tracing, delete or
   change the :ref:`tracing configuration <envoy_api_file_envoy/config/trace/v2/trace.proto>` accordingly.
 * The configuration demonstrates the use of a :ref:`global rate limiting service
   <arch_overview_rate_limit>`. To disable this delete the :ref:`rate limit configuration

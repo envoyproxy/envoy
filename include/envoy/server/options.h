@@ -80,12 +80,6 @@ public:
   virtual const std::string& configYaml() const PURE;
 
   /**
-   * @return bool whether the config should only be parsed as v2. If false, when a v2 parse fails,
-   *              a second attempt to parse the config as v1 will be made.
-   */
-  virtual bool v2ConfigOnly() const PURE;
-
-  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() const PURE;
@@ -179,6 +173,16 @@ public:
    * @return bool indicating whether mutex tracing functionality has been enabled.
    */
   virtual bool mutexTracingEnabled() const PURE;
+
+  /**
+   * @return whether to use the old libevent evbuffer-based Buffer implementation.
+   */
+  virtual bool libeventBufferEnabled() const PURE;
+
+  /**
+   * @return bool indicating whether cpuset size should determine the number of worker threads.
+   */
+  virtual bool cpusetThreadsEnabled() const PURE;
 
   /**
    * Converts the Options in to CommandLineOptions proto message defined in server_info.proto.

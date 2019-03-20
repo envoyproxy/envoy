@@ -38,9 +38,11 @@
 #include "common/filesystem/directory.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "test/mocks/stats/mocks.h"
 #include "gtest/gtest.h"
 
 using testing::GTEST_FLAG(random_seed);
@@ -96,23 +98,30 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
     return false;
   }
 
+  // Check whether the two buffers contain the same content. It is valid for the content
+  // to be arranged differently in the buffers. For example, lhs could have one slice
+  // containing 10 bytes while rhs has ten slices containing one byte each.
   uint64_t lhs_num_slices = lhs.getRawSlices(nullptr, 0);
   uint64_t rhs_num_slices = rhs.getRawSlices(nullptr, 0);
-  if (lhs_num_slices != rhs_num_slices) {
-    return false;
-  }
-
   STACK_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
   lhs.getRawSlices(lhs_slices.begin(), lhs_num_slices);
   STACK_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
   rhs.getRawSlices(rhs_slices.begin(), rhs_num_slices);
-  for (size_t i = 0; i < lhs_num_slices; i++) {
-    if (lhs_slices[i].len_ != rhs_slices[i].len_) {
-      return false;
-    }
-
-    if (0 != memcmp(lhs_slices[i].mem_, rhs_slices[i].mem_, lhs_slices[i].len_)) {
-      return false;
+  size_t rhs_slice = 0;
+  size_t rhs_offset = 0;
+  for (size_t lhs_slice = 0; lhs_slice < lhs_num_slices; lhs_slice++) {
+    for (size_t lhs_offset = 0; lhs_offset < lhs_slices[lhs_slice].len_; lhs_offset++) {
+      while (rhs_offset >= rhs_slices[rhs_slice].len_) {
+        rhs_slice++;
+        ASSERT(rhs_slice < rhs_num_slices);
+        rhs_offset = 0;
+      }
+      auto lhs_str = static_cast<const uint8_t*>(lhs_slices[lhs_slice].mem_);
+      auto rhs_str = static_cast<const uint8_t*>(rhs_slices[rhs_slice].mem_);
+      if (lhs_str[lhs_offset] != rhs_str[rhs_offset]) {
+        return false;
+      }
+      rhs_offset++;
     }
   }
 
@@ -225,15 +234,30 @@ void TestUtility::createSymlink(const std::string& target, const std::string& li
 }
 
 // static
-std::tm TestUtility::parseTimestamp(const std::string& format, const std::string& time_str) {
-  std::tm timestamp{};
-  std::istringstream text(time_str);
+absl::Time TestUtility::parseTime(const std::string& input, const std::string& input_format) {
+  absl::Time time;
+  std::string parse_error;
+  EXPECT_TRUE(absl::ParseTime(input_format, input, &time, &parse_error))
+      << " error \"" << parse_error << "\" from failing to parse timestamp \"" << input
+      << "\" with format string \"" << input_format << "\"";
+  return time;
+}
 
-  text >> std::get_time(&timestamp, format.c_str());
+// static
+std::string TestUtility::formatTime(const absl::Time input, const std::string& output_format) {
+  static const absl::TimeZone utc = absl::UTCTimeZone();
+  return absl::FormatTime(output_format, input, utc);
+}
 
-  EXPECT_FALSE(text.fail()) << " from failing to parse timestamp \"" << time_str
-                            << "\" with format string \"" << format << "\"";
-  return timestamp;
+// static
+std::string TestUtility::formatTime(const SystemTime input, const std::string& output_format) {
+  return TestUtility::formatTime(absl::FromChrono(input), output_format);
+}
+
+// static
+std::string TestUtility::convertTime(const std::string& input, const std::string& input_format,
+                                     const std::string& output_format) {
+  return TestUtility::formatTime(TestUtility::parseTime(input, input_format), output_format);
 }
 
 void ConditionalInitializer::setReady() {
@@ -261,9 +285,6 @@ void ConditionalInitializer::wait() {
     cv_.wait(mutex_);
   }
 }
-
-ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
-ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
 
 AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
     : link_(filename), new_link_(absl::StrCat(filename, ".new")),
@@ -381,11 +402,35 @@ ThreadFactory& threadFactoryForTest() {
 
 namespace Api {
 
+class TestImplProvider {
+protected:
+  Event::GlobalTimeSystem global_time_system_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> default_stats_store_;
+};
+
+class TestImpl : public TestImplProvider, public Impl {
+public:
+  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
+      : Impl(thread_factory, stats_store, global_time_system_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system)
+      : Impl(thread_factory, default_stats_store_, time_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory)
+      : Impl(thread_factory, default_stats_store_, global_time_system_) {}
+};
+
+ApiPtr createApiForTest() { return std::make_unique<TestImpl>(Thread::threadFactoryForTest()); }
+
 ApiPtr createApiForTest(Stats::Store& stat_store) {
-  return std::make_unique<Impl>(std::chrono::milliseconds(1000), Thread::threadFactoryForTest(),
-                                stat_store);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store);
+}
+
+ApiPtr createApiForTest(Event::TimeSystem& time_system) {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system);
+}
+
+ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
+  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system);
 }
 
 } // namespace Api
-
 } // namespace Envoy

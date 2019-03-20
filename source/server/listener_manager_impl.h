@@ -46,9 +46,10 @@ public:
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
-    return std::make_unique<LdsApiImpl>(
-        lds_config, server_.clusterManager(), server_.dispatcher(), server_.random(),
-        server_.initManager(), server_.localInfo(), server_.stats(), server_.listenerManager());
+    return std::make_unique<LdsApiImpl>(lds_config, server_.clusterManager(), server_.dispatcher(),
+                                        server_.random(), server_.initManager(),
+                                        server_.localInfo(), server_.stats(),
+                                        server_.listenerManager(), server_.api());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -61,6 +62,7 @@ public:
     return createListenerFilterFactoryList_(filters, context);
   }
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
+                                              Network::Address::SocketType socket_type,
                                               const Network::Socket::OptionsSharedPtr& options,
                                               bool bind_to_port) override;
   DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
@@ -102,7 +104,7 @@ struct ListenerManagerStats {
 class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
-                      WorkerFactory& worker_factory, TimeSource& time_source);
+                      WorkerFactory& worker_factory);
 
   void onListenerWarmed(ListenerImpl& listener);
 
@@ -122,7 +124,6 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
-  TimeSource& time_source_;
   ListenerComponentFactory& factory_;
 
 private:
@@ -227,6 +228,7 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
+  Network::Address::SocketType socketType() const { return socket_type_; }
   const envoy::api::v2::Listener& config() { return config_; }
   const Network::SocketSharedPtr& getSocket() const { return socket_; }
   void debugLog(const std::string& message);
@@ -255,7 +257,6 @@ public:
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  bool reverseWriteFilterOrder() const override { return reverse_write_filter_order_; }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
@@ -279,7 +280,7 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
-  TimeSource& timeSource() override { return parent_.time_source_; }
+  TimeSource& timeSource() override { return api().timeSource(); }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =
@@ -295,6 +296,10 @@ public:
     Network::Socket::appendOptions(listen_socket_options_, options);
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
+  Api::Api& api() override { return parent_.server_.api(); }
+  ServerLifecycleNotifier& lifecycleNotifier() override {
+    return parent_.server_.lifecycleNotifier();
+  }
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -386,6 +391,7 @@ private:
 
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;
+  Network::Address::SocketType socket_type_;
   Network::SocketSharedPtr socket_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
@@ -394,7 +400,6 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
   const std::string name_;
-  const bool reverse_write_filter_order_;
   const bool modifiable_;
   const bool workers_started_;
   const uint64_t hash_;

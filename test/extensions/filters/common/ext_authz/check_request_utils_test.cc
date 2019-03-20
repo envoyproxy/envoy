@@ -20,6 +20,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
+namespace {
 
 class CheckRequestUtilsTest : public testing::Test {
 public:
@@ -40,7 +41,7 @@ public:
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
 TEST_F(CheckRequestUtilsTest, BasicTcp) {
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   EXPECT_CALL(net_callbacks_, connection()).Times(2).WillRepeatedly(ReturnRef(connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
@@ -52,7 +53,7 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
 // Verify that createHttpCheck's dependencies are invoked when it's called.
 TEST_F(CheckRequestUtilsTest, BasicHttp) {
   Http::HeaderMapImpl headers;
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
@@ -70,7 +71,7 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   Http::TestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                           {":path", "/bar"}};
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2::CheckRequest request;
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillRepeatedly(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillRepeatedly(ReturnRef(addr_));
@@ -93,6 +94,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_EQ("value", request.attributes().context_extensions().at("key"));
 }
 
+} // namespace
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

@@ -25,6 +25,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -69,7 +70,7 @@ namespace Envoy {
 /*
   Macro to use instead of EXPECT_DEATH when stderr is produced by a logger.
   It temporarily installs stderr sink and restores the original logger sink after the test
-  completes and sdterr_sink object goes of of scope.
+  completes and stderr_sink object goes of of scope.
   EXPECT_DEATH(statement, regex) test passes when statement causes crash and produces error message
   matching regex. Test fails when statement does not crash or it crashes but message does not
   match regex. If a message produced during crash is redirected away from strerr, the test fails.
@@ -108,9 +109,9 @@ class TestUtility {
 public:
   /**
    * Compare 2 HeaderMaps.
-   * @param lhs supplies HeaderMaps 1.
-   * @param rhs supplies HeaderMaps 2.
-   * @return TRUE if the HeaderMapss are equal, ignoring the order of the
+   * @param lhs supplies HeaderMap 1.
+   * @param rhs supplies HeaderMap 2.
+   * @return TRUE if the HeaderMaps are equal, ignoring the order of the
    * headers, false if not.
    */
   static bool headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs, const Http::HeaderMap& rhs);
@@ -119,7 +120,8 @@ public:
    * Compare 2 buffers.
    * @param lhs supplies buffer 1.
    * @param rhs supplies buffer 2.
-   * @return TRUE if the buffers are equal, false if not.
+   * @return TRUE if the buffers contain equal content
+   *         (i.e., if lhs.toString() == rhs.toString()), false if not.
    */
   static bool buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs);
 
@@ -127,7 +129,7 @@ public:
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.
-   * @param seed seeds pseudo-random number genarator (default = 0).
+   * @param seed seeds pseudo-random number generator (default = 0).
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                              uint64_t seed = 0);
@@ -256,9 +258,9 @@ public:
   /**
    * Returns a "novel" IPv4 loopback address, if available.
    * For many tests, we want a loopback address other than 127.0.0.1 where possible. For some
-   * platforms such as OSX, only 127.0.0.1 is available for IPv4 loopback.
+   * platforms such as macOS, only 127.0.0.1 is available for IPv4 loopback.
    *
-   * @return string 127.0.0.x , where x is "1" for OSX and "9" otherwise.
+   * @return string 127.0.0.x , where x is "1" for macOS and "9" otherwise.
    */
   static std::string getIpv4Loopback() {
 #ifdef __APPLE__
@@ -284,7 +286,7 @@ public:
   // Tests using this will be of the form IpVersions/SslSocketTest.HalfClose/IPv4
   // instead of IpVersions/SslSocketTest.HalfClose/1
   static std::string
-  ipTestParamsToString(const testing::TestParamInfo<Network::Address::IpVersion>& params) {
+  ipTestParamsToString(const ::testing::TestParamInfo<Network::Address::IpVersion>& params) {
     return params.param == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6";
   }
 
@@ -304,13 +306,50 @@ public:
     return result;
   }
 
-  static std::tm parseTimestamp(const std::string& format, const std::string& time_str);
+  static absl::Time parseTime(const std::string& input, const std::string& input_format);
+  static std::string formatTime(const absl::Time input, const std::string& output_format);
+  static std::string formatTime(const SystemTime input, const std::string& output_format);
+  static std::string convertTime(const std::string& input, const std::string& input_format,
+                                 const std::string& output_format);
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 
   static void renameFile(const std::string& old_name, const std::string& new_name);
   static void createDirectory(const std::string& name);
   static void createSymlink(const std::string& target, const std::string& link);
+
+  /**
+   * Return a prefix string matcher.
+   * @param string prefix.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createPrefixMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_prefix(str);
+    return matcher;
+  }
+
+  /**
+   * Return an exact string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createExactMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_exact(str);
+    return matcher;
+  }
+
+  /**
+   * Return a regex string matcher.
+   * @param string exact.
+   * @return Object StringMatcher.
+   */
+  static const envoy::type::matcher::StringMatcher createRegexMatcher(std::string str) {
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_regex(str);
+    return matcher;
+  }
 };
 
 /**
@@ -351,15 +390,6 @@ private:
   Thread::CondVar cv_;
   Thread::MutexBasicLockable mutex_;
   bool ready_{false};
-};
-
-class ScopedFdCloser {
-public:
-  ScopedFdCloser(int fd);
-  ~ScopedFdCloser();
-
-private:
-  int fd_;
 };
 
 /**
@@ -475,7 +505,10 @@ ThreadFactory& threadFactoryForTest();
 } // namespace Thread
 
 namespace Api {
+ApiPtr createApiForTest();
 ApiPtr createApiForTest(Stats::Store& stat_store);
+ApiPtr createApiForTest(Event::TimeSystem& time_system);
+ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {

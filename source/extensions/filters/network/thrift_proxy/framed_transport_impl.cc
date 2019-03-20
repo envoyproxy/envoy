@@ -53,8 +53,7 @@ public:
 /**
  * Static registration for the framed transport. @see RegisterFactory.
  */
-static Registry::RegisterFactory<FramedTransportConfigFactory, NamedTransportConfigFactory>
-    register_;
+REGISTER_FACTORY(FramedTransportConfigFactory, NamedTransportConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

@@ -21,12 +21,13 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+namespace {
 
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
-  typedef Grpc::MockAsyncStream MockAccessLogStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>
-      AccessLogCallbacks;
+  using MockAccessLogStream = Grpc::MockAsyncStream;
+  using AccessLogCallbacks =
+      Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>;
 
   GrpcAccessLogStreamerImplTest() {
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
@@ -115,7 +116,7 @@ public:
 class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     access_log_ =
         std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, streamer_);
@@ -306,6 +307,7 @@ http_logs:
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
+    stream_info.upstream_transport_failure_reason_ = "TLS error";
 
     Http::TestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -325,6 +327,7 @@ http_logs:
           port_value: 0
       start_time:
         seconds: 3600
+      upstream_transport_failure_reason: "TLS error"
     request:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
@@ -442,10 +445,13 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
           ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
   common_access_log_expected.mutable_response_flags()->set_rate_limit_service_error(true);
   common_access_log_expected.mutable_response_flags()->set_downstream_connection_termination(true);
+  common_access_log_expected.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
+  common_access_log_expected.mutable_response_flags()->set_stream_idle_timeout(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
 
+} // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
 } // namespace Extensions

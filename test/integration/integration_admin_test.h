@@ -2,18 +2,14 @@
 
 #include "common/json/json_loader.h"
 
-#include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-class IntegrationAdminTest : public HttpIntegrationTest,
-                             public testing::TestWithParam<Network::Address::IpVersion> {
+class IntegrationAdminTest : public HttpProtocolIntegrationTest {
 public:
-  IntegrationAdminTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
-
   void initialize() override {
     config_helper_.addFilter(ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER);
     HttpIntegrationTest::initialize();

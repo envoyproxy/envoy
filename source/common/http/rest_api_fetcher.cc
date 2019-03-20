@@ -12,20 +12,6 @@
 namespace Envoy {
 namespace Http {
 
-RestApiFetcher::RestApiFetcher(Upstream::ClusterManager& cm,
-                               const envoy::api::v2::core::ApiConfigSource& api_config_source,
-                               Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random)
-    : RestApiFetcher(cm, api_config_source.cluster_names()[0], dispatcher, random,
-                     Config::Utility::apiConfigSourceRefreshDelay(api_config_source),
-                     Config::Utility::apiConfigSourceRequestTimeout(api_config_source)) {
-  UNREFERENCED_PARAMETER(api_config_source);
-  // The ApiType must be REST_LEGACY for xDS implementations that call this constructor.
-  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  // TODO(htuch): Add support for multiple clusters, #1170.
-  ASSERT(api_config_source.cluster_names().size() == 1);
-  ASSERT(api_config_source.has_refresh_delay());
-}
-
 RestApiFetcher::RestApiFetcher(Upstream::ClusterManager& cm, const std::string& remote_cluster_name,
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                std::chrono::milliseconds refresh_interval,

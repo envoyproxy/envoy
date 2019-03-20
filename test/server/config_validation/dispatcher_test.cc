@@ -19,14 +19,14 @@
 namespace Envoy {
 
 // Define fixture which allocates ValidationDispatcher.
-class ConfigValidation : public ::testing::TestWithParam<Network::Address::IpVersion> {
+class ConfigValidation : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   ConfigValidation() {
     Event::Libevent::Global::initialize();
 
-    validation_ = std::make_unique<Api::ValidationImpl>(
-        std::chrono::milliseconds(1000), Thread::threadFactoryForTest(), stats_store_);
-    dispatcher_ = validation_->allocateDispatcher(test_time_.timeSystem());
+    validation_ = std::make_unique<Api::ValidationImpl>(Thread::threadFactoryForTest(),
+                                                        stats_store_, test_time_.timeSystem());
+    dispatcher_ = validation_->allocateDispatcher();
   }
 
   DangerousDeprecatedTestTime test_time_;
@@ -61,8 +61,8 @@ TEST_F(ConfigValidation, SharedDnsResolver) {
   EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, ConfigValidation,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ConfigValidation,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy

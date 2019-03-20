@@ -43,20 +43,14 @@ envoy_cc_library(
     srcs = ["filesystem_impl.cc"],
     hdrs = ["filesystem_impl.h"],
     deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/api:os_sys_calls_interface",
-        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/filesystem:filesystem_interface",
-        "//source/common/api:os_sys_calls_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:thread_lib",
     ],
 )
 
 envoy_cc_library(
     name = "watcher_lib",
     srcs = select({
-        "@bazel_tools//tools/osx:darwin": [
+        "//bazel:apple": [
             "kqueue/watcher_impl.cc",
         ],
         "//conditions:default": [
@@ -64,7 +58,7 @@ envoy_cc_library(
         ],
     }),
     hdrs = select({
-        "@bazel_tools//tools/osx:darwin": [
+        "//bazel:apple": [
             "kqueue/watcher_impl.h",
         ],
         "//conditions:default": [
@@ -75,7 +69,7 @@ envoy_cc_library(
         "event",
     ],
     strip_include_prefix = select({
-        "@bazel_tools//tools/osx:darwin": "kqueue",
+        "//bazel:apple": "kqueue",
         "//conditions:default": "inotify",
     }),
     deps = [

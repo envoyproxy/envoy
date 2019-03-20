@@ -1,7 +1,6 @@
 #pragma once
 
 #include <netinet/in.h>
-#include <netinet/ip.h>
 #include <sys/socket.h>
 
 #include "envoy/network/listen_socket.h"

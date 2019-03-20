@@ -99,7 +99,7 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
 
 class RateLimitConfiguration : public testing::Test {
 public:
-  void SetUpTest(const std::string json) {
+  void setupTest(const std::string& json) {
     envoy::api::v2::RouteConfiguration route_config;
     auto json_object_ptr = Json::Factory::loadFromString(json);
     Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config,
@@ -146,7 +146,7 @@ TEST_F(RateLimitConfiguration, NoApplicableRateLimit) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   EXPECT_EQ(0U, config_->route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
@@ -173,7 +173,7 @@ TEST_F(RateLimitConfiguration, NoRateLimitPolicy) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry();
   EXPECT_EQ(0U, route_->rateLimitPolicy().getApplicableRateLimit(0).size());
@@ -207,7 +207,7 @@ TEST_F(RateLimitConfiguration, TestGetApplicationRateLimit) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry();
   EXPECT_FALSE(route_->rateLimitPolicy().empty());
@@ -250,7 +250,7 @@ TEST_F(RateLimitConfiguration, TestVirtualHost) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   route_ = config_->route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry();
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
@@ -311,7 +311,7 @@ TEST_F(RateLimitConfiguration, Stages) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   route_ = config_->route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry();
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
@@ -345,7 +345,7 @@ TEST_F(RateLimitConfiguration, Stages) {
 
 class RateLimitPolicyEntryTest : public testing::Test {
 public:
-  void SetUpTest(const std::string json) {
+  void setupTest(const std::string& json) {
     rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(parseRateLimitFromJson(json));
     descriptors_.clear();
   }
@@ -370,7 +370,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitPolicyEntryMembers) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   EXPECT_EQ(2UL, rate_limit_entry_->stage());
   EXPECT_EQ("no_ratelimit", rate_limit_entry_->disableKey());
@@ -387,7 +387,7 @@ TEST_F(RateLimitPolicyEntryTest, RemoteAddress) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_,
                                          default_remote_address_);
@@ -407,7 +407,7 @@ TEST_F(RateLimitPolicyEntryTest, PipeAddress) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   Network::Address::PipeInstance pipe_address("/hello");
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_, pipe_address);
@@ -425,7 +425,7 @@ TEST_F(RateLimitPolicyEntryTest, SourceService) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
                                          default_remote_address_);
@@ -445,7 +445,7 @@ TEST_F(RateLimitPolicyEntryTest, DestinationService) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
                                          default_remote_address_);
@@ -467,7 +467,7 @@ TEST_F(RateLimitPolicyEntryTest, RequestHeaders) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
@@ -489,7 +489,7 @@ TEST_F(RateLimitPolicyEntryTest, RequestHeadersNoMatch) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header,
@@ -509,7 +509,7 @@ TEST_F(RateLimitPolicyEntryTest, RateLimitKey) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header_,
                                          default_remote_address_);
@@ -536,7 +536,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatch) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
@@ -563,7 +563,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchNoMatch) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
@@ -590,7 +590,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersNotPresent) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "not_same_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
@@ -618,7 +618,7 @@ TEST_F(RateLimitPolicyEntryTest, HeaderValueMatchHeadersPresent) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
   Http::TestHeaderMapImpl header{{"x-header-name", "test_value"}};
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "", header, default_remote_address_);
@@ -639,7 +639,7 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActions) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
                                          default_remote_address_);
@@ -671,7 +671,7 @@ TEST_F(RateLimitPolicyEntryTest, CompoundActionsNoDescriptor) {
   }
   )EOF";
 
-  SetUpTest(json);
+  setupTest(json);
 
   rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", header_,
                                          default_remote_address_);

@@ -10,7 +10,9 @@ maximize the chances of your PR being merged.
   changes any user-facing behavior. We will use the GitHub issue to discuss the feature and come to
   agreement. This is to prevent your time being wasted, as well as ours. The GitHub review process
   for major features is also important so that [organizations with commit access](OWNERS.md) can
-  come to agreement on design.
+  come to agreement on design. If it is appropriate to write a design document, the document must
+  be hosted either in the GitHub tracking issue, or linked to from the issue and hosted in a
+  world-readable location.
 * Specifically, if the goal is to add a new [extension](REPO_LAYOUT.md#sourceextensions-layout),
   please read the [extension policy](GOVERNANCE.md#extension-addition-policy).
 * Small patches and bug fixes don't need prior communication.
@@ -27,10 +29,21 @@ maximize the chances of your PR being merged.
   etc.), and CLI switches. We will also try to not change behavioral semantics
   (e.g., HTTP header processing order), though this is harder to outright
   guarantee.
-* We reserve the right to deprecate configuration, and at the beginning of the following release
-  cycle remove the deprecated configuration. For example, all deprecations between 1.3.0 and
-  1.4.0 will be deleted soon AFTER 1.4.0 is tagged and released (at the beginning of the 1.5.0
-  release cycle).
+* We reserve the right to deprecate configuration, after two release cycles. For example, all
+  deprecations between 1.3.0 and 1.4.0 will be deleted soon AFTER 1.5.0 is tagged and released
+  (at the beginning of the 1.6.0 release cycle). This results in a three to six month window for
+  migrating from deprecated code paths to new code paths.
+* Unless the community and Envoy maintainer team agrees on an exception, during the
+  first release cycle after a feature has been deprecated, use of that feature
+  will cause a logged warning, and incrementing the
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
+  runtime.deprecated_feature_use stat.
+  During the second release cycle, use of the deprecated configuration will
+  cause a configuration load failure, unless the feature in question is
+  explicitly overridden in
+  [runtime](https://www.envoyproxy.io/docs/envoy/latest/configuration/runtime#config-runtime)
+  config. Finally during the third release cycle the code and configuration will be removed
+  entirely.
 * This policy means that organizations deploying master should have some time to get ready for
   breaking changes, but we make no guarantees about the length of time.
 * The breaking change policy also applies to source level extensions (e.g., filters). Code that
@@ -61,8 +74,9 @@ maximize the chances of your PR being merged.
 * For configuration deprecations that are not covered by the above semantic
   replacement policy, any deprecation will only take place after
   community consultation on mailing lists, Slack and GitHub, over the period of
-  a minimum of two Envoy release cycles (~6 months). This includes where a
-  feature is outright deleted with no replacement.
+  a minimum of two Envoy release cycles (~6 months). Cases where a feature is
+  outright deleted with no replacement will get an additional two Envoy release
+  cycles (~12 months) before removal.
 
 # Release cadence
 
@@ -123,6 +137,61 @@ maximize the chances of your PR being merged.
   [envoy-filter-example](https://github.com/envoyproxy/envoy-filter-example) (for example making a new
   branch so that CI can pass) it is your responsibility to follow through with merging those
   changes back to master once the CI dance is done.
+* If your PR is a high risk change, the reviewer may ask that you runtime guard
+  it. See the section on runtime guarding below.
+
+
+# Runtime guarding
+
+Some high risk changes in Envoy are deemed worthy of runtime guarding. Instead of just replacing
+old code with new code, both code paths are supported for between one Envoy release (if it is
+guarded due to performance concerns) and a full deprecation cycle (if it is a high risk behavioral
+change).
+
+The canonical way to runtime guard a feature is
+```
+if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name")) {
+  [new code path]
+} else {
+  [old_code_path]
+}
+```
+Runtime guarded features named with the "envoy.reloadable_features." prefix must be safe to flip
+true or false on running Envoy instances. In some situations it may make more sense to
+latch the value in a member variable on class creation, for example:
+
+```
+bool use_new_code_path_ =
+    Runtime::runtimeFeatureEnabled("envoy.reloadable_features.my_feature_name")
+```
+
+This should only be done if the lifetime of the object in question is relatively short compared to
+the lifetime of most Envoy instances, i.e. latching state on creation of the
+Http::ConnectionManagerImpl or all Network::ConnectionImpl classes, to ensure that the new behavior
+will be exercised as the runtime value is flipped, and that the old behavior will trail off over
+time.
+
+Runtime guarded features may either set true (running the new code by default) in the initial PR,
+after a testing interval, or during the next release cycle, at the PR author's and reviewing
+maintainer's discretion. Generally all runtime guarded features will be set true when a
+release is cut, and the old code path will be deprecated at that time. Runtime features
+are set true by default by inclusion in
+[source/common/runtime/runtime_features.h](https://github.com/envoyproxy/envoy/blob/master/source/common/runtime/runtime_features.h)
+
+There are four suggested options for testing new runtime features:
+
+1. Create a per-test Runtime::LoaderSingleton as done in [DeprecatedFieldsTest.IndividualFieldDisallowedWithRuntimeOverride](https://github.com/envoyproxy/envoy/blob/master/test/common/protobuf/utility_test.cc)
+2. Create a [parameterized test](https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#how-to-write-value-parameterized-tests)
+   where the set up of the test sets the new runtime value explicitly to
+   GetParam() as outlined in (1).
+3. Set up integration tests with custom runtime defaults as documented in the
+   [integration test README](https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md)
+4. Run a given unit test with the new runtime value explicitly set true as done
+   for [runtime_flag_override_test](https://github.com/envoyproxy/envoy/blob/master/test/common/runtime/BUILD) 
+
+Runtime code is held to the same standard as regular Envoy code, so both the old
+path and the new should have 100% coverage both with the feature defaulting true
+and false.
 
 # PR review policy for maintainers
 
@@ -166,7 +235,7 @@ The sign-off is a simple line at the end of the explanation for the
 patch, which certifies that you wrote it or otherwise have the right to
 pass it on as an open-source patch. The rules are pretty simple: if you
 can certify the below (from
-[developercertificate.org](http://developercertificate.org/)):
+[developercertificate.org](https://developercertificate.org/)):
 
 ```
 Developer Certificate of Origin
@@ -225,7 +294,7 @@ git config --add alias.c "commit -s"
 ## Fixing DCO
 
 If your PR fails the DCO check, it's necessary to fix the entire commit history in the PR. Best
-practice is to [squash](http://gitready.com/advanced/2009/02/10/squashing-commits-with-rebase.html)
+practice is to [squash](https://gitready.com/advanced/2009/02/10/squashing-commits-with-rebase.html)
 the commit history to a single commit, append the DCO sign-off as described above, and [force
 push](https://git-scm.com/docs/git-push#git-push---force). For example, if you have 2 commits in
 your history:

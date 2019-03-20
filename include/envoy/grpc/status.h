@@ -5,6 +5,8 @@ namespace Grpc {
 
 class Status {
 public:
+  // If this enum is changed, then the std::unordered_map in Envoy::Grpc::Utility::nameToGrpcStatus
+  // located at: //source/common/access_log/grpc/status.cc must also be changed.
   enum GrpcStatus {
     // The RPC completed successfully.
     Ok = 0,

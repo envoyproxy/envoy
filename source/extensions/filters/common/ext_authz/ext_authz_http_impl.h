@@ -1,8 +1,10 @@
 #pragma once
 
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
+#include "common/common/matchers.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -12,7 +14,108 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>> HeaderKeyValueVector;
+class Matcher;
+typedef std::shared_ptr<Matcher> MatcherSharedPtr;
+
+/**
+ *  Matchers describe the rules for matching authorization request and response headers.
+ */
+class Matcher {
+public:
+  virtual ~Matcher() {}
+
+  /**
+   * Returns whether or not the header key matches the rules of the matcher.
+   *
+   * @param key supplies the header key to be evaluated.
+   */
+  virtual bool matches(absl::string_view key) const PURE;
+};
+
+class HeaderKeyMatcher : public Matcher {
+public:
+  HeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>&& list);
+
+  bool matches(absl::string_view key) const override;
+
+private:
+  const std::vector<Matchers::LowerCaseStringMatcher> matchers_;
+};
+
+class NotHeaderKeyMatcher : public Matcher {
+public:
+  NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMatcher>&& list);
+
+  bool matches(absl::string_view key) const override;
+
+private:
+  const HeaderKeyMatcher matcher_;
+};
+
+/**
+ * HTTP client configuration for the HTTP authorization (ext_authz) filter.
+ */
+class ClientConfig {
+public:
+  ClientConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config, uint32_t timeout,
+               absl::string_view path_prefix);
+
+  /**
+   * Returns the name of the authorization cluster.
+   */
+  const std::string& cluster() { return cluster_name_; }
+
+  /**
+   * Returns the authorization request path prefix.
+   */
+  const std::string& pathPrefix() { return path_prefix_; }
+
+  /**
+   * Returns authorization request timeout.
+   */
+  const std::chrono::milliseconds& timeout() const { return timeout_; }
+
+  /**
+   * Returns a list of matchers used for selecting the request headers that should be sent to the
+   * authorization server.
+   */
+  const MatcherSharedPtr& requestHeaderMatchers() const { return request_header_matchers_; }
+
+  /**
+   * Returns a list of matchers used for selecting the authorization response headers that
+   * should be send back to the client.
+   */
+  const MatcherSharedPtr& clientHeaderMatchers() const { return client_header_matchers_; }
+
+  /**
+   *  Returns a list of matchers used for selecting the authorization response headers that
+   * should be send to an the upstream server.
+   */
+  const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }
+
+  /**
+   * @return List of headers that will be add to the authorization request.
+   */
+  const Http::LowerCaseStrPairVector& headersToAdd() const { return authorization_headers_to_add_; }
+
+private:
+  static MatcherSharedPtr toRequestMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
+  static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
+  static MatcherSharedPtr
+  toUpstreamMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
+  static Http::LowerCaseStrPairVector
+  toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>&);
+
+  const MatcherSharedPtr request_header_matchers_;
+  const MatcherSharedPtr client_header_matchers_;
+  const MatcherSharedPtr upstream_header_matchers_;
+  const Http::LowerCaseStrPairVector authorization_headers_to_add_;
+  const std::string cluster_name_;
+  const std::chrono::milliseconds timeout_;
+  const std::string path_prefix_;
+};
+
+typedef std::shared_ptr<ClientConfig> ClientConfigSharedPtr;
 
 /**
  * This client implementation is used when the Ext_Authz filter needs to communicate with an
@@ -25,33 +128,22 @@ class RawHttpClientImpl : public Client,
                           public Http::AsyncClient::Callbacks,
                           Logger::Loggable<Logger::Id::config> {
 public:
-  explicit RawHttpClientImpl(const std::string& cluster_name,
-                             Upstream::ClusterManager& cluster_manager,
-                             const absl::optional<std::chrono::milliseconds>& timeout,
-                             const std::string& path_prefix,
-                             const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers,
-                             const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
-                             const HeaderKeyValueVector& authorization_headers_to_add);
+  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config);
   ~RawHttpClientImpl();
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks,
-             const envoy::service::auth::v2alpha::CheckRequest& request, Tracing::Span&) override;
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
+             Tracing::Span&) override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::MessagePtr&& message) override;
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
 private:
-  ResponsePtr messageToResponse(Http::MessagePtr message);
-  const std::string cluster_name_;
-  const std::string path_prefix_;
-  const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers_;
-  const Http::LowerCaseStrUnorderedSet& allowed_request_headers_;
-  const HeaderKeyValueVector& authorization_headers_to_add_;
-  absl::optional<std::chrono::milliseconds> timeout_;
+  ResponsePtr toResponse(Http::MessagePtr message);
   Upstream::ClusterManager& cm_;
+  ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
 };

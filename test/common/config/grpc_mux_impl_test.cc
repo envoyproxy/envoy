@@ -18,6 +18,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -37,11 +38,9 @@ namespace {
 
 // We test some mux specific stuff below, other unit test coverage for singleton use of GrpcMuxImpl
 // is provided in [grpc_]subscription_impl_test.cc.
-class GrpcMuxImplTest : public testing::Test {
+class GrpcMuxImplTestBase : public testing::Test {
 public:
-  GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(time_system_);
-  }
+  GrpcMuxImplTestBase() : async_client_(new Grpc::MockAsyncClient()) {}
 
   void setup() {
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
@@ -88,10 +87,14 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
-  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
+};
+
+class GrpcMuxImplTest : public GrpcMuxImplTestBase {
+public:
+  Event::SimulatedTimeSystem time_system_;
 };
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
@@ -138,6 +141,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("baz", {"z"}, "");
   grpc_mux_->start();
 
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_)).Times(3);
   EXPECT_CALL(random_, random());
   ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
   EXPECT_CALL(*timer, enableTimer(_));
@@ -265,9 +269,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
     envoy::api::v2::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(load_assignment);
-    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                            const std::string&) { EXPECT_TRUE(resources.empty()); }));
+    EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1")).Times(0);
     EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
         .WillOnce(
             Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -325,13 +327,58 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   expectSendMessage(type_url, {}, "2");
 }
 
+// Validate behavior when we have multiple watchers that send empty updates.
+TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
+  setup();
+  InSequence s;
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
+  auto foo_sub = grpc_mux_->subscribe(type_url, {"x", "y"}, foo_callbacks);
+
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {"x", "y"}, "");
+  grpc_mux_->start();
+
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->set_type_url(type_url);
+  response->set_version_info("1");
+
+  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1")).Times(0);
+  expectSendMessage(type_url, {"x", "y"}, "1");
+  grpc_mux_->onReceiveMessage(std::move(response));
+
+  expectSendMessage(type_url, {}, "1");
+}
+
+// Validate behavior when we have Single Watcher that sends Empty updates.
+TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
+  setup();
+  const std::string& type_url = Config::TypeUrl::get().Cluster;
+  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
+  auto foo_sub = grpc_mux_->subscribe(type_url, {}, foo_callbacks);
+
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {}, "");
+  grpc_mux_->start();
+
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->set_type_url(type_url);
+  response->set_version_info("1");
+  // Validate that onConfigUpdate is called with empty resources.
+  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
+      .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                          const std::string&) { EXPECT_TRUE(resources.empty()); }));
+  expectSendMessage(type_url, {}, "1");
+  grpc_mux_->onReceiveMessage(std::move(response));
+}
+
 // Exactly one test requires a mock time system to provoke behavior that cannot
 // easily be achieved with a SimulatedTimeSystem.
-class GrpcMuxImplTestWithMockTimeSystem : public GrpcMuxImplTest {
-protected:
-  GrpcMuxImplTestWithMockTimeSystem() { dispatcher_.setTimeSystem(mock_time_system_); }
-
-  MockTimeSystem mock_time_system_;
+class GrpcMuxImplTestWithMockTimeSystem : public GrpcMuxImplTestBase {
+public:
+  Event::DelegatingTestTimeSystem<MockTimeSystem> mock_time_system_;
 };
 
 //  Verifies that rate limiting is not enforced with defaults.
@@ -347,7 +394,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
   }));
 
   // Validate that rate limiter is not created.
-  EXPECT_CALL(mock_time_system_, monotonicTime()).Times(0);
+  EXPECT_CALL(*mock_time_system_, monotonicTime()).Times(0);
 
   setup();
 
@@ -397,7 +444,7 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
         drain_request_timer = new Event::MockTimer();
         return drain_request_timer;
       }));
-  EXPECT_CALL(mock_time_system_, monotonicTime())
+  EXPECT_CALL(*mock_time_system_, monotonicTime())
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
   RateLimitSettings custom_rate_limit_settings;
@@ -489,9 +536,12 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
   // Validate that drain requests call when there are multiple requests in queue.
   time_system_.setMonotonicTime(std::chrono::seconds(10));
   drain_timer_cb();
+
+  // Check that the pending_requests stat is updated with the queue drain.
+  EXPECT_EQ(0, stats_.counter("control_plane.pending_requests").value());
 }
 
-//  Verifies that a messsage with no resources is accepted.
+//  Verifies that a message with no resources is accepted.
 TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   setup();
 

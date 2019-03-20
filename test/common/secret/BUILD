@@ -12,7 +12,7 @@ envoy_cc_test(
     name = "secret_manager_impl_test",
     srcs = ["secret_manager_impl_test.cc"],
     data = [
-        "//test/common/ssl/test_data:certs",
+        "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     deps = [
         "//source/common/secret:sds_api_lib",
@@ -30,7 +30,7 @@ envoy_cc_test(
     name = "sds_api_test",
     srcs = ["sds_api_test.cc"],
     data = [
-        "//test/common/ssl/test_data:certs",
+        "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     deps = [
         "//source/common/secret:sds_api_lib",

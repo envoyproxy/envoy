@@ -78,10 +78,10 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
   etc.
 * **Host selection retry plugins**: Envoy can be configured to apply additional logic to the host
   selection logic when selecting hosts for retries. Specifying a
-  :ref:`retry host predicate <envoy_api_field_route.RouteAction.RetryPolicy.retry_host_predicate>`
+  :ref:`retry host predicate <envoy_api_field_route.RetryPolicy.retry_host_predicate>`
   allows for reattempting host selection when certain hosts are selected (e.g. when an already
   attempted host is selected), while a
-  :ref:`retry prioririty <envoy_api_field_route.RouteAction.RetryPolicy.retry_priority>` can be
+  :ref:`retry priority <envoy_api_field_route.RetryPolicy.retry_priority>` can be
   configured to adjust the priority load used when selecting a priority for retries.
 
 Note that retries may be disabled depending on the contents of the :ref:`x-envoy-overloaded

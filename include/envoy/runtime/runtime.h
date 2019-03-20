@@ -9,6 +9,9 @@
 #include "envoy/common/pure.h"
 #include "envoy/type/percent.pb.h"
 
+#include "common/common/assert.h"
+#include "common/singleton/threadsafe_singleton.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -46,6 +49,7 @@ public:
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
     absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
+    absl::optional<bool> bool_value_;
   };
 
   typedef std::unordered_map<std::string, Entry> EntryMap;
@@ -70,6 +74,21 @@ public:
   };
 
   typedef std::unique_ptr<const OverrideLayer> OverrideLayerConstPtr;
+
+  // Returns true if a deprecated feature is allowed.
+  //
+  // Fundamentally, deprecated features are boolean values.
+  // They are allowed by default or with explicit configuration to "true" via runtime configuration.
+  // They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
+  // configuration of "false" in runtime config.
+  virtual bool deprecatedFeatureEnabled(const std::string& key) const PURE;
+
+  // Returns true if a runtime feature is enabled.
+  //
+  // Runtime features are used to easily allow switching between old and new code paths for high
+  // risk changes. The intent is for the old code path to be short lived - the old code path is
+  // deprecated as the feature is defaulted true, and removed with the following Envoy release.
+  virtual bool runtimeFeatureEnabled(const std::string& key) const PURE;
 
   /**
    * Test if a feature is enabled using the built in random generator. This is done by generating
@@ -201,7 +220,17 @@ public:
   virtual void mergeValues(const std::unordered_map<std::string, std::string>& values) PURE;
 };
 
-typedef std::unique_ptr<Loader> LoaderPtr;
+using LoaderPtr = std::unique_ptr<Loader>;
+
+// To make the runtime generally accessible, we make use of the dreaded
+// singleton class. For Envoy, the runtime will be created and cleaned up by the
+// Server::InstanceImpl initialize() and destructor, respectively.
+//
+// This makes it possible for call sites to easily make use of runtime values to
+// determine if a given feature is on or off, as well as various deprecated configuration
+// protos being enabled or disabled by default.
+using LoaderSingleton = InjectableSingleton<Loader>;
+using ScopedLoaderSingleton = ScopedInjectableLoader<Loader>;
 
 } // namespace Runtime
 } // namespace Envoy

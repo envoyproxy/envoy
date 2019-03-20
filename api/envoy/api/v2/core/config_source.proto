@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
+option java_outer_classname = "ConfigSourceProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2.core";
+
 import "envoy/api/v2/core/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
@@ -19,17 +23,25 @@ option (gogoproto.equal_all) = true;
 message ApiConfigSource {
   // APIs may be fetched via either REST or gRPC.
   enum ApiType {
-    // REST-JSON legacy corresponds to the v1 API.
-    REST_LEGACY = 0 [deprecated = true];
+    // Ideally this would be 'reserved 0' but one can't reserve the default
+    // value. Instead we throw an exception if this is ever used.
+    UNSUPPORTED_REST_LEGACY = 0 [deprecated = true];
     // REST-JSON v2 API. The `canonical JSON encoding
     // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for
     // the v2 protos is used.
     REST = 1;
     // gRPC v2 API.
     GRPC = 2;
+    // Using the delta xDS gRPC service, i.e. DeltaDiscovery{Request,Response}
+    // rather than Discovery{Request,Response}. Rather than sending Envoy the entire state
+    // with every update, the xDS server only sends what has changed since the last update.
+    //
+    // DELTA_GRPC is not yet entirely implemented! Initially, only CDS is available.
+    // Do not use for other xDSes. TODO(fredlas) update/remove this warning when appropriate.
+    DELTA_GRPC = 3;
   }
   ApiType api_type = 1 [(validate.rules).enum.defined_only = true];
-  // Cluster names should be used only with REST_LEGACY/REST. If > 1
+  // Cluster names should be used only with REST. If > 1
   // cluster is defined, clusters will be cycled through if any kind of failure
   // occurs.
   //
@@ -63,7 +75,7 @@ message AggregatedConfigSource {
 
 // Rate Limit settings to be applied for discovery requests made by Envoy.
 message RateLimitSettings {
-  // Maximum number of tokens to be used for rate limting discovery request calls. If not set, a
+  // Maximum number of tokens to be used for rate limiting discovery request calls. If not set, a
   // default value of 100 will be used.
   google.protobuf.UInt32Value max_tokens = 1;
 
@@ -99,4 +111,14 @@ message ConfigSource {
     // source in the bootstrap configuration is used.
     AggregatedConfigSource ads = 3;
   }
+
+  // Optional initialization timeout.
+  // When this timeout is specified, Envoy will wait no longer than the specified time for first
+  // config response on this xDS subscription during the :ref:`initialization process
+  // <arch_overview_initialization>`. After reaching the timeout, Envoy will move to the next
+  // initialization phase, even if the first config is not delivered yet. The timer is activated
+  // when the xDS API subscription starts, and is disarmed on first config update or on error. 0
+  // means no timeout - Envoy will wait indefinitely for the first xDS config (unless another
+  // timeout applies). Default 0.
+  google.protobuf.Duration initial_fetch_timeout = 4;
 }

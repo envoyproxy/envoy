@@ -320,6 +320,9 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override {
     return doTrailers(response_stream_wrapper_, trailers);
   };
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_.callbacks_ = &callbacks;
   };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
@@ -31,7 +32,7 @@ namespace Config {
  */
 class ApiTypeValues {
 public:
-  const std::string RestLegacy{"REST_LEGACY"};
+  const std::string UnsupportedRestLegacy{"REST_LEGACY"};
   const std::string Rest{"REST"};
   const std::string Grpc{"GRPC"};
 };
@@ -60,7 +61,7 @@ public:
   /**
    * Extract typed resources from a DiscoveryResponse.
    * @param response reference to DiscoveryResponse.
-   * @return Protobuf::RepatedPtrField<ResourceType> vector of typed resources in response.
+   * @return Protobuf::RepeatedPtrField<ResourceType> vector of typed resources in response.
    */
   template <class ResourceType>
   static Protobuf::RepeatedPtrField<ResourceType>
@@ -102,6 +103,14 @@ public:
    */
   static std::chrono::milliseconds
   apiConfigSourceRequestTimeout(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+
+  /**
+   * Extract initial_fetch_timeout as a std::chrono::milliseconds from
+   * envoy::api::v2::core::ConfigSource. If request_timeout isn't set in the config source, a
+   * default value of 0s will be returned.
+   */
+  static std::chrono::milliseconds
+  configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSource& config_source);
 
   /**
    * Populate an envoy::api::v2::core::ApiConfigSource.
@@ -147,8 +156,9 @@ public:
   /**
    * Check the existence of a path for a filesystem subscription. Throws on error.
    * @param path the path to validate.
+   * @param api reference to the Api object
    */
-  static void checkFilesystemSubscriptionBackingPath(const std::string& path);
+  static void checkFilesystemSubscriptionBackingPath(const std::string& path, Api::Api& api);
 
   /**
    * Check the grpc_services and cluster_names for API config sanity. Throws on error.
@@ -177,14 +187,6 @@ public:
   static void checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterInfoMap& clusters,
       const envoy::api::v2::core::ApiConfigSource& api_config_source);
-
-  /**
-   * Convert a v1 SDS JSON config to v2 EDS envoy::api::v2::core::ConfigSource.
-   * @param json_config source v1 SDS JSON config.
-   * @param eds_config destination v2 EDS envoy::api::v2::core::ConfigSource.
-   */
-  static void translateEdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::core::ConfigSource& eds_config);
 
   /**
    * Convert a v1 CDS JSON config to v2 CDS envoy::api::v2::core::ConfigSource.
@@ -267,52 +269,8 @@ public:
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
 
-    if (enclosing_message.has_config()) {
-      MessageUtil::jsonConvert(enclosing_message.config(), *config);
-    }
+    translateOpaqueConfig(enclosing_message.typed_config(), enclosing_message.config(), *config);
 
-    return config;
-  }
-
-  /**
-   * Translate a nested config into a route-specific proto message provided by
-   * the implementation factory.
-   * @param source Protobuf::Message containing the opaque config for the given factory's
-   *        route-local configuration.
-   * @param factory Server::Configuration::NamedHttpFilterConfigFactory implementation
-   * @return ProtobufTypes::MessagePtr the translated config
-   */
-  static ProtobufTypes::MessagePtr
-  translateToFactoryRouteConfig(const Protobuf::Message& source,
-                                Server::Configuration::NamedHttpFilterConfigFactory& factory) {
-    ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
-
-    // Fail in an obvious way if a plugin does not return a proto.
-    RELEASE_ASSERT(config != nullptr, "");
-
-    MessageUtil::jsonConvert(source, *config);
-    return config;
-  }
-
-  /**
-   * Translate a nested config into a protocol-specific options proto message provided by the
-   * implementation factory.
-   * @param source Protobuf::Message containing the opaque config for the given factory's
-   *        protocol specific configuration.
-   * @param factory Server::Configuration::NamedNetworkFilterConfigFactory implementation
-   * @return ProtobufTypes::MessagePtr the translated config
-   * @throws EnvoyException if the factory does not support protocol options
-   */
-  static ProtobufTypes::MessagePtr
-  translateToFactoryProtocolOptionsConfig(const Protobuf::Message& source, const std::string& name,
-                                          Server::Configuration::ProtocolOptionsFactory& factory) {
-    ProtobufTypes::MessagePtr config = factory.createEmptyProtocolOptionsProto();
-
-    if (config == nullptr) {
-      throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
-    }
-
-    MessageUtil::jsonConvert(source, *config);
     return config;
   }
 
@@ -360,6 +318,17 @@ public:
    */
   static envoy::api::v2::ClusterLoadAssignment
   translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
+
+  /**
+   * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
+   * message.
+   * @param typed_config opaque config packed in google.protobuf.Any
+   * @param config the deprecated google.protobuf.Struct config, empty struct if doesn't exist.
+   * @param out_proto the proto message instantiated by extensions
+   */
+  static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+                                    const ProtobufWkt::Struct& config,
+                                    Protobuf::Message& out_proto);
 };
 
 } // namespace Config

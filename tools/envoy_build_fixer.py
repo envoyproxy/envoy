@@ -2,6 +2,8 @@
 
 # Enforce license headers on Envoy BUILD files (maybe more later?)
 
+from __future__ import print_function
+
 import sys
 
 LICENSE_STRING = 'licenses(["notice"])  # Apache 2\n'
@@ -24,6 +26,9 @@ def FixBuild(path):
         if line != '\n':
           outlines.append('\n')
         first = False
+      if path.startswith('./bazel/external/'):
+        outlines.append(line)
+        continue
       if line.startswith('package(') and not path.endswith('bazel/BUILD') and not path.endswith(
           'ci/prebuilt/BUILD') and not path.endswith('bazel/osx/BUILD') and not path.endswith(
               'bazel/osx/crosstool/BUILD'):
@@ -60,5 +65,5 @@ if __name__ == '__main__':
     with open(sys.argv[2], 'w') as f:
       f.write(reorderd_source)
     sys.exit(0)
-  print 'Usage: %s <source file path> [<destination file path>]' % sys.argv[0]
+  print('Usage: %s <source file path> [<destination file path>]' % sys.argv[0])
   sys.exit(1)

@@ -97,7 +97,6 @@ void Filter::onDestroy() {
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   ASSERT(cluster_);
   state_ = State::Complete;
-
   using Filters::Common::ExtAuthz::CheckStatus;
 
   switch (response->status) {
@@ -107,7 +106,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   case CheckStatus::Error:
     cluster_->statsScope().counter("ext_authz.error").inc();
     break;
-
   case CheckStatus::Denied:
     cluster_->statsScope().counter("ext_authz.denied").inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),

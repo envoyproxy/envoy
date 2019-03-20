@@ -11,6 +11,7 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
+#include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
@@ -54,8 +55,51 @@ enum ResponseFlag {
   RateLimitServiceError = 0x2000,
   // If the stream was reset due to a downstream connection termination.
   DownstreamConnectionTermination = 0x4000,
+  // Exceeded upstream retry limit.
+  UpstreamRetryLimitExceeded = 0x8000,
+  // Request hit the stream idle timeout, triggering a 408.
+  StreamIdleTimeout = 0x10000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DownstreamConnectionTermination
+  LastFlag = StreamIdleTimeout
+};
+
+struct UpstreamTiming {
+  /**
+   * Sets the time when the first byte of the request was sent upstream.
+   */
+  void onFirstUpstreamTxByteSent(TimeSource& time_source) {
+    ASSERT(!first_upstream_tx_byte_sent_);
+    first_upstream_tx_byte_sent_ = time_source.monotonicTime();
+  }
+
+  /**
+   * Sets the time when the first byte of the response is received from upstream.
+   */
+  void onLastUpstreamTxByteSent(TimeSource& time_source) {
+    ASSERT(!last_upstream_tx_byte_sent_);
+    last_upstream_tx_byte_sent_ = time_source.monotonicTime();
+  }
+
+  /**
+   * Sets the time when the last byte of the response is received from upstream.
+   */
+  void onFirstUpstreamRxByteReceived(TimeSource& time_source) {
+    ASSERT(!first_upstream_rx_byte_received_);
+    first_upstream_rx_byte_received_ = time_source.monotonicTime();
+  }
+
+  /**
+   * Sets the time when the last byte of the request was sent upstream.
+   */
+  void onLastUpstreamRxByteReceived(TimeSource& time_source) {
+    ASSERT(!last_upstream_rx_byte_received_);
+    last_upstream_rx_byte_received_ = time_source.monotonicTime();
+  }
+
+  absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
+  absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
+  absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
 };
 
 /**
@@ -131,16 +175,18 @@ public:
   virtual void onLastDownstreamRxByteReceived() PURE;
 
   /**
+   * Sets the upstream timing information for this stream. This is useful for
+   * when multiple upstream requests are issued and we want to save timing
+   * information for the one that "wins".
+   */
+  virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
+
+  /**
    * @return the duration between the first byte of the request was sent upstream and the start of
    * the request. There may be a considerable delta between lastDownstreamByteReceived and this
    * value due to filters.
    */
   virtual absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const PURE;
-
-  /**
-   * Sets the time when the first byte of the request was sent upstream.
-   */
-  virtual void onFirstUpstreamTxByteSent() PURE;
 
   /**
    * @return the duration between the last byte of the request was sent upstream and the start of
@@ -149,32 +195,16 @@ public:
   virtual absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const PURE;
 
   /**
-   * Sets the time when the last byte of the request was sent upstream.
-   */
-  virtual void onLastUpstreamTxByteSent() PURE;
-
-  /**
    * @return the duration between the first byte of the response is received from upstream and the
    * start of the request.
    */
   virtual absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const PURE;
 
   /**
-   * Sets the time when the first byte of the response is received from upstream.
-   */
-  virtual void onFirstUpstreamRxByteReceived() PURE;
-
-  /**
    * @return the duration between the last byte of the response is received from upstream and the
    * start of the request.
    */
   virtual absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const PURE;
-
-  /**
-   * Sets the time when the last byte of the response is received from upstream.
-   */
-  virtual void onLastUpstreamRxByteReceived() PURE;
-
   /**
    * @return the duration between the first byte of the response is sent downstream and the start of
    * the request. There may be a considerable delta between lastUpstreamByteReceived and this value
@@ -209,11 +239,6 @@ public:
    * completed (i.e., when the request's ActiveStream is destroyed).
    */
   virtual void onRequestComplete() PURE;
-
-  /**
-   * Resets all timings related to the upstream in the event of a retry.
-   */
-  virtual void resetUpstreamTimings() PURE;
 
   /**
    * @param bytes_sent denotes the number of bytes to add to total sent bytes.
@@ -258,9 +283,9 @@ public:
   virtual bool healthCheck() const PURE;
 
   /**
-   * @param is_hc whether the request is a health check request or not.
+   * @param is_health_check whether the request is a health check request or not.
    */
-  virtual void healthCheck(bool is_hc) PURE;
+  virtual void healthCheck(bool is_health_check) PURE;
 
   /**
    * @param downstream_local_address sets the local address of the downstream connection. Note that
@@ -339,6 +364,17 @@ public:
    * @return SNI value for downstream host.
    */
   virtual const std::string& requestedServerName() const PURE;
+
+  /**
+   * @param failure_reason the upstream transport failure reason.
+   */
+  virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @return const std::string& the upstream transport failure reason, e.g. certificate validation
+   *         failed.
+   */
+  virtual const std::string& upstreamTransportFailureReason() const PURE;
 };
 
 } // namespace StreamInfo

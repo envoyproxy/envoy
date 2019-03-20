@@ -47,7 +47,7 @@ private:
    * Initialize the shared memory segment, depending on whether we should be the first running
    * envoy, or a host restarted envoy process.
    */
-  static SharedMemory& initialize(uint64_t stats_set_size, Options& options);
+  static SharedMemory& initialize(uint64_t stats_set_size, const Options& options);
 
   /**
    * Initialize a pthread mutex for process shared locking.
@@ -114,7 +114,7 @@ private:
  */
 class HotRestartImpl : public HotRestart, Logger::Loggable<Logger::Id::main> {
 public:
-  HotRestartImpl(Options& options);
+  HotRestartImpl(const Options& options);
 
   // Server::HotRestart
   void drainParentListeners() override;
@@ -206,7 +206,7 @@ private:
   static std::string versionHelper(uint64_t max_num_stats, const Stats::StatsOptions& stats_options,
                                    Stats::RawStatDataSet& stats_set);
 
-  Options& options_;
+  const Options& options_;
   BlockMemoryHashSetOptions stats_set_options_;
   SharedMemory& shmem_;
   std::unique_ptr<Stats::RawStatDataSet> stats_set_ GUARDED_BY(stat_lock_);

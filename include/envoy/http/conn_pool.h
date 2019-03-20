@@ -46,10 +46,11 @@ public:
   /**
    * Called when a pool error occurred and no connection could be acquired for making the request.
    * @param reason supplies the failure reason.
+   * @param transport_failure_reason supplies the details of the transport failure reason.
    * @param host supplies the description of the host that caused the failure. This may be nullptr
    *             if no host was involved in the failure (for example overflow).
    */
-  virtual void onPoolFailure(PoolFailureReason reason,
+  virtual void onPoolFailure(PoolFailureReason reason, absl::string_view transport_failure_reason,
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
@@ -94,6 +95,12 @@ public:
    * occurs.
    */
   virtual void drainConnections() PURE;
+
+  /**
+   * Determines whether the connection pool is actively processing any requests.
+   * @return true if the connection pool has any pending requests or any active requests.
+   */
+  virtual bool hasActiveConnections() const PURE;
 
   /**
    * Create a new stream on the pool.

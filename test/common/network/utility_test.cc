@@ -17,6 +17,7 @@
 
 namespace Envoy {
 namespace Network {
+namespace {
 
 TEST(NetworkUtility, Url) {
   EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
@@ -156,9 +157,9 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
 
-INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityGetLocalAddress,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
@@ -320,6 +321,29 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
   }
 }
 
+TEST(NetworkUtility, ProtobufAddressSocketType) {
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_socket_address();
+    EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
+  }
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_socket_address()->set_protocol(envoy::api::v2::core::SocketAddress::TCP);
+    EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
+  }
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_socket_address()->set_protocol(envoy::api::v2::core::SocketAddress::UDP);
+    EXPECT_EQ(Address::SocketType::Datagram, Utility::protobufAddressSocketType(proto_address));
+  }
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_pipe();
+    EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
+  }
+}
+
 TEST(PortRangeListTest, Errors) {
   {
     std::string port_range_str = "a1";
@@ -436,5 +460,6 @@ TEST(AbslUint128, TestByteOrder) {
   }
 }
 
+} // namespace
 } // namespace Network
 } // namespace Envoy

@@ -20,7 +20,7 @@
 // to nothing.
 //
 // See also: https://github.com/LLNL/Caliper -- it may be worth integrating with
-// that for added functionality, partiicularly around loops.
+// that for added functionality, particularly around loops.
 //
 // See also, for a much more comprehensive study in performance annotation:
 // https://labs.vmware.com/vmtj/methodology-for-performance-analysis-of-vmware-vsphere-under-tier-1-applications
@@ -60,7 +60,7 @@
 
 /**
  * Controls whether performances collection and reporting is thread safe. For now,
- * leaving this enabled for predictability across multiiple applications, on the assumption
+ * leaving this enabled for predictability across multiple applications, on the assumption
  * that an uncontended mutex lock has vanishingly small cost. In the future we may try
  * to make this system thread-unsafe if mutex contention disturbs the metrics.
  */

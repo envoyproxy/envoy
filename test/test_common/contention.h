@@ -23,12 +23,14 @@ public:
   /**
    * Generates at least once occurrence of mutex contention, as measured by tracer.
    */
-  static void generateContention(MutexTracerImpl& tracer);
+  void generateContention(MutexTracerImpl& tracer);
 
 private:
-  static Envoy::Thread::ThreadPtr launchThread(MutexTracerImpl& tracer, MutexBasicLockable* mu);
+  ThreadPtr launchThread(MutexTracerImpl& tracer);
+  void holdUntilContention(MutexTracerImpl& tracer);
 
-  static void holdUntilContention(MutexTracerImpl& tracer, MutexBasicLockable* mu);
+  MutexBasicLockable mutex_;
+  DangerousDeprecatedTestTime test_time_;
 };
 
 } // namespace TestUtil

@@ -23,7 +23,7 @@ MockHostSet::MockHostSet(uint32_t priority, uint32_t overprovisioning_factor)
   ON_CALL(*this, priority()).WillByDefault(Return(priority_));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
-  ON_CALL(*this, degradedHosts()).WillByDefault(ReturnRef(healthy_hosts_));
+  ON_CALL(*this, degradedHosts()).WillByDefault(ReturnRef(degraded_hosts_));
   ON_CALL(*this, hostsPerLocality()).WillByDefault(Invoke([this]() -> const HostsPerLocality& {
     return *hosts_per_locality_;
   }));
@@ -48,6 +48,10 @@ MockPrioritySet::MockPrioritySet() {
       .WillByDefault(Invoke([this](PrioritySet::MemberUpdateCb cb) -> Common::CallbackHandle* {
         return member_update_cb_helper_.add(cb);
       }));
+  ON_CALL(*this, addPriorityUpdateCb(_))
+      .WillByDefault(Invoke([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandle* {
+        return priority_update_cb_helper_.add(cb);
+      }));
 }
 
 MockPrioritySet::~MockPrioritySet() = default;
@@ -67,14 +71,13 @@ HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
 }
 void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                                          const HostVector& hosts_removed) {
-  member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
 }
 
 MockRetryPriority::~MockRetryPriority() = default;
 
 MockCluster::MockCluster() {
-  ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(priority_set_));
-  ON_CALL(testing::Const(*this), prioritySet()).WillByDefault(ReturnRef(priority_set_));
   ON_CALL(*this, info()).WillByDefault(Return(info_));
   ON_CALL(*this, initialize(_))
       .WillByDefault(Invoke([this](std::function<void()> callback) -> void {
@@ -84,6 +87,12 @@ MockCluster::MockCluster() {
 }
 
 MockCluster::~MockCluster() = default;
+
+MockClusterRealPrioritySet::MockClusterRealPrioritySet() = default;
+MockClusterRealPrioritySet::~MockClusterRealPrioritySet() = default;
+
+MockClusterMockPrioritySet::MockClusterMockPrioritySet() = default;
+MockClusterMockPrioritySet::~MockClusterMockPrioritySet() = default;
 
 MockLoadBalancer::MockLoadBalancer() { ON_CALL(*this, chooseHost(_)).WillByDefault(Return(host_)); }
 
@@ -141,6 +150,9 @@ MockClusterInfoFactory::~MockClusterInfoFactory() = default;
 
 MockRetryHostPredicate::MockRetryHostPredicate() = default;
 MockRetryHostPredicate::~MockRetryHostPredicate() = default;
+
+MockClusterManagerFactory::MockClusterManagerFactory() = default;
+MockClusterManagerFactory::~MockClusterManagerFactory() = default;
 
 } // namespace Upstream
 } // namespace Envoy

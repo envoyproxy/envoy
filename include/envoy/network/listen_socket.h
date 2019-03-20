@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+#include "envoy/network/io_handle.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -31,9 +32,28 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return fd the socket's file descriptor.
+   * Set the local address of the socket. On accepted sockets the local address defaults to the
+   * one at which the connection was received at, which is the same as the listener's address, if
+   * the listener is bound to a specific address.
+   *
+   * @param local_address the new local address.
    */
-  virtual int fd() const PURE;
+  virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
+
+  /**
+   * @return IoHandle for the underlying connection
+   */
+  virtual IoHandle& ioHandle() PURE;
+
+  /**
+   * @return const IoHandle for the underlying connection
+   */
+  virtual const IoHandle& ioHandle() const PURE;
+
+  /**
+   * @return the type (stream or datagram) of the socket.
+   */
+  virtual Address::SocketType socketType() const PURE;
 
   /**
    * Close the underlying socket.
@@ -143,19 +163,16 @@ public:
   virtual const Address::InstanceConstSharedPtr& remoteAddress() const PURE;
 
   /**
-   * Set the local address of the socket. On accepted sockets the local address defaults to the
+   * Restores the local address of the socket. On accepted sockets the local address defaults to the
    * one at which the connection was received at, which is the same as the listener's address, if
-   * the listener is bound to a specific address.
+   * the listener is bound to a specific address. Call this to restore the address to a value
+   * different from the one the socket was initially accepted at. This should only be called when
+   * restoring the original destination address of a connection redirected by iptables REDIRECT. The
+   * caller is responsible for making sure the new address is actually different.
    *
    * @param local_address the new local address.
-   * @param restored a flag marking the local address as being restored to a value that is
-   *        different from the one the socket was initially accepted at. This should only be set
-   *        to 'true' when restoring the original destination address of a connection redirected
-   *        by iptables REDIRECT. The caller is responsible for making sure the new address is
-   *        actually different when passing restored as 'true'.
    */
-  virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address,
-                               bool restored) PURE;
+  virtual void restoreLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
 
   /**
    * Set the remote address of the socket.

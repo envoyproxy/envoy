@@ -93,7 +93,7 @@ protected:
 
   void doResponseCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(StringUtil::atoull(headers.get_("content-length").c_str(), content_length));
     feedBuffer(content_length);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
@@ -106,11 +106,13 @@ protected:
 
   void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(StringUtil::atoull(headers.get_("content-length").c_str(), content_length));
     feedBuffer(content_length);
     Http::TestHeaderMapImpl continue_headers;
     EXPECT_EQ(Http::FilterHeadersStatus::Continue,
               filter_->encode100ContinueHeaders(continue_headers));
+    Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-encoding"));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));

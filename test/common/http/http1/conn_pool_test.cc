@@ -17,7 +17,6 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -36,6 +35,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Http {
 namespace Http1 {
+namespace {
 
 /**
  * A test version of ConnPoolImpl that allows for mocking beneath the codec clients.
@@ -47,7 +47,7 @@ public:
                       NiceMock<Event::MockTimer>* upstream_ready_timer)
       : ConnPoolImpl(dispatcher, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                      Upstream::ResourcePriority::Default, nullptr),
-        api_(Api::createApiForTest(stats_store_)), mock_dispatcher_(dispatcher),
+        api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_timer_(upstream_ready_timer) {}
 
   ~ConnPoolImplForTest() {
@@ -81,8 +81,7 @@ public:
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&mock_dispatcher_);
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
-    test_client.client_dispatcher_ =
-        std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem(), *api_);
+    test_client.client_dispatcher_ = api_->allocateDispatcher();
     Network::ClientConnectionPtr connection{test_client.connection_};
     test_client.codec_client_ = new CodecClientForTest(
         std::move(connection), test_client.codec_,
@@ -113,9 +112,7 @@ public:
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;
   std::vector<TestCodecClient> test_clients_;
@@ -424,7 +421,7 @@ TEST_F(Http1ConnPoolImplTest, DisconnectWhileBound) {
 
   // We should get a reset callback when the connection disconnects.
   Http::MockStreamCallbacks stream_callbacks;
-  EXPECT_CALL(stream_callbacks, onResetStream(StreamResetReason::ConnectionTermination));
+  EXPECT_CALL(stream_callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
   request_encoder.getStream().addCallbacks(stream_callbacks);
 
   // Kill the connection while it has an active request.
@@ -725,6 +722,49 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+TEST_F(Http1ConnPoolImplTest, NoActiveConnectionsByDefault) {
+  EXPECT_FALSE(conn_pool_.hasActiveConnections());
+}
+
+TEST_F(Http1ConnPoolImplTest, ActiveRequestHasActiveConnectionsTrue) {
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+
+  EXPECT_TRUE(conn_pool_.hasActiveConnections());
+
+  // cleanup
+  r1.completeResponse(false);
+  conn_pool_.drainConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnections) {
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  r1.completeResponse(false);
+
+  EXPECT_FALSE(conn_pool_.hasActiveConnections());
+
+  conn_pool_.drainConnections();
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
+  conn_pool_.expectClientCreate();
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::Pending);
+
+  EXPECT_TRUE(conn_pool_.hasActiveConnections());
+
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  r1.handle_->cancel();
+  conn_pool_.drainConnections();
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+} // namespace
 } // namespace Http1
 } // namespace Http
 } // namespace Envoy

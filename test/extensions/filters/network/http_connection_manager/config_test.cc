@@ -46,7 +46,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSystem()};
+  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
 };
 
@@ -152,6 +152,50 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(60, config.maxRequestHeadersKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 16
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(16, config.maxRequestHeadersKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 96
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(96, config.maxRequestHeadersKb());
+}
+
 // Validated that an explicit zero stream idle timeout disables.
 TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   const std::string yaml_string = R"EOF(
@@ -244,50 +288,6 @@ TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   EXPECT_CALL(context_.thread_local_, allocateSlot());
   Network::FilterFactoryCb cb1 = factory.createFilterFactory(*json_config, context_);
   Network::FilterFactoryCb cb2 = factory.createFilterFactory(*json_config, context_);
-}
-
-TEST(HttpConnectionManagerConfigUtilityTest, DetermineNextProtocol) {
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
-    Buffer::OwnedImpl data("");
-    EXPECT_EQ("hello", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("GET / HTTP/1.1");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
-    EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/2");
-    EXPECT_EQ("h2", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
-
-  {
-    Network::MockConnection connection;
-    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
-    Buffer::OwnedImpl data("PRI * HTTP/");
-    EXPECT_EQ("", HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data));
-  }
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
@@ -450,20 +450,6 @@ TEST_F(HttpConnectionManagerConfigTest, BadAccessLogNestedTypes) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
-}
-
-TEST_F(HttpConnectionManagerConfigTest, ReversedEncodeOrderConfig) {
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  route_config:
-    name: local_route
-  http_filters:
-  - name: envoy.router
-  )EOF";
-
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
-  EXPECT_TRUE(config.reverseEncodeOrder());
 }
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {

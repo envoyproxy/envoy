@@ -16,9 +16,7 @@ routing PRs, questions, etc. to the right place.
     connections, etc.).
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
-    (metadata, etc.), and OSX build.
-* Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
-  * TCP proxy, TLS, logging, and core networking (listeners, connections, etc.).
+    (metadata, etc.), and macOS build.
 
 # Maintainers
 
@@ -32,12 +30,15 @@ routing PRs, questions, etc. to the right place.
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
   * Stats, abseil, scalability, and performance.
+* Snow Pettersen ([snowp](https://github.com/snowp)) (snowp@squareup.com)
+  * Upstream, host/priority sets, load balancing, and retry plugins.
 
 # Emeritus maintainers
 
 * Constance Caramanolis ([ccaraman](https://github.com/ccaraman)) (ccaramanolis@lyft.com)
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
+* Greg Greenway ([ggreenway](https://github.com/ggreenway)) (greg.greenway@gmail.com, formerly ggreenway@apple.com)
 
 # Friends of Envoy
 

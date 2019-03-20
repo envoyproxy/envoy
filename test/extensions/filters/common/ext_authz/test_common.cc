@@ -14,7 +14,7 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
                                                envoy::type::StatusCode http_status_code,
                                                const std::string& body,
                                                const HeaderValueOptionVector& headers) {
-  auto response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
+  auto response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = response->mutable_status();
   status->set_code(response_status);
 
@@ -93,6 +93,11 @@ Http::MessagePtr TestCommon::makeMessageResponse(const HeaderValueOptionVector& 
   response->body() = std::make_unique<Buffer::OwnedImpl>(body);
   return response;
 };
+
+bool TestCommon::CompareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
+  return std::set<std::pair<Http::LowerCaseString, std::string>>(lhs.begin(), lhs.end()) ==
+         std::set<std::pair<Http::LowerCaseString, std::string>>(rhs.begin(), rhs.end());
+}
 
 } // namespace ExtAuthz
 } // namespace Common

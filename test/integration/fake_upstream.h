@@ -153,7 +153,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -264,7 +265,7 @@ public:
           callback_ready_event.notifyOne();
         });
     Event::TestTimeSystem& time_system =
-        dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSystem());
+        dynamic_cast<Event::TestTimeSystem&>(connection_.dispatcher().timeSource());
     Thread::CondVar::WaitStatus status = time_system.waitFor(lock_, callback_ready_event, timeout);
     if (status == Thread::CondVar::WaitStatus::Timeout) {
       return testing::AssertionFailure() << "Timed out while executing on dispatcher.";
@@ -401,10 +402,10 @@ public:
   enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
-                     Event::TestTimeSystem& time_system);
+                     Event::TestTimeSystem& time_system, uint32_t max_request_headers_kb);
 
   // By default waitForNewStream assumes the next event is a new stream and
-  // returns AssertionFaliure if an unexpected event occurs. If a caller truly
+  // returns AssertionFailure if an unexpected event occurs. If a caller truly
   // wishes to wait for a new stream, set ignore_spurious_events = true. Returns
   // the new stream via the stream argument.
   ABSL_MUST_USE_RESULT
@@ -414,7 +415,7 @@ public:
                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Http::ServerConnectionCallbacks
-  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
+  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
   void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
@@ -508,8 +509,14 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
                      public Network::FilterChainManager,
                      public Network::FilterChainFactory {
 public:
+  // Creates a fake upstream bound to the specified unix domain socket path.
   FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
                Event::TestTimeSystem& time_system);
+  // Creates a fake upstream bound to the specified |address|.
+  FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
+               FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
+               bool enable_half_close = false);
+  // Creates a fake upstream bound to INADDR_ANY and the specified |port|.
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
                Event::TestTimeSystem& time_system, bool enable_half_close = false);
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
@@ -523,7 +530,8 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
-                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
+                        uint32_t max_request_headers_kb = Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
@@ -584,7 +592,6 @@ private:
     Stats::Scope& listenerScope() override { return parent_.stats_store_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    bool reverseWriteFilterOrder() const override { return true; }
 
     FakeUpstream& parent_;
     std::string name_;

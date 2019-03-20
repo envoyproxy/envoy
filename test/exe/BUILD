@@ -4,23 +4,40 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_sh_test",
 )
 
 envoy_package()
 
-sh_test(
+envoy_sh_test(
+    name = "build_id_test",
+    srcs = ["build_id_test.sh"],
+    coverage = False,
+    data = [
+        "//bazel:raw_build_id.ldscript",
+        "//source/exe:envoy-static",
+    ],
+)
+
+envoy_sh_test(
     name = "envoy_static_test",
     srcs = ["envoy_static_test.sh"],
+    coverage = False,
     data = ["//source/exe:envoy-static"],
     # NOTE: In some environments, ASAN causes dynamic linking no matter what, so don't run this
     # test when doing ASAN.
     tags = ["no_asan"],
 )
 
-sh_test(
+envoy_sh_test(
     name = "version_out_test",
     srcs = ["version_out_test.sh"],
-    data = ["//source/exe:envoy-static"],
+    coverage = False,
+    data = [
+        "//:VERSION",
+        "//bazel:raw_build_id.ldscript",
+        "//source/exe:envoy-static",
+    ],
 )
 
 envoy_cc_test(

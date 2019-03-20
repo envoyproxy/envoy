@@ -28,6 +28,7 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
+namespace {
 
 class ClusterTestInfo {
 
@@ -82,7 +83,7 @@ public:
     cluster_info_->stats().upstream_rq_pending_overflow_.add(rejected_step);
   }
 
-  NiceMock<Upstream::MockCluster> cluster_;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster_;
   Upstream::MockClusterInfo* cluster_info_ = new NiceMock<Upstream::MockClusterInfo>();
   Upstream::ClusterInfoConstSharedPtr cluster_info_ptr_{cluster_info_};
 
@@ -136,7 +137,8 @@ public:
     return buffer;
   }
 
-  void addClusterToMap(const std::string& cluster_name, NiceMock<Upstream::MockCluster>& cluster) {
+  void addClusterToMap(const std::string& cluster_name,
+                       NiceMock<Upstream::MockClusterMockPrioritySet>& cluster) {
     cluster_map_.emplace(cluster_name, cluster);
     // Redefining since cluster_map_ is returned by value.
     ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
@@ -519,7 +521,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
 
   Http::HeaderMapImpl response_headers;
 
-  NiceMock<Server::Configuration::MockAdminStream> admin_stream_mock;
+  NiceMock<Server::MockAdminStream> admin_stream_mock;
   NiceMock<Network::MockConnection> connection_mock;
 
   auto addr_instance_ = Envoy::Network::Utility::parseInternetAddress("2.3.4.5", 123, false);
@@ -543,6 +545,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   EXPECT_THAT(access_control_allow_headers, HasSubstr("Accept"));
 }
 
+} // namespace
 } // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions

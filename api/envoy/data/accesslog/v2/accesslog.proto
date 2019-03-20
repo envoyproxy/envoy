@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.data.accesslog.v2;
 
+option java_outer_classname = "AccesslogProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.data.accesslog.v2";
+
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
@@ -10,6 +14,8 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 import "gogoproto/gogo.proto";
 import "validate/validate.proto";
+
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: gRPC access logs]
 // Envoy access logs describe incoming interaction with Envoy over a fixed
@@ -131,6 +137,12 @@ message AccessLogCommon {
   // that ID in this field and cross reference later. It can also be used to
   // determine if a canary endpoint was used or not.
   envoy.api.v2.core.Metadata metadata = 17;
+
+  // If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
+  // failure reason from the transport socket. The format of this field depends on the configured
+  // upstream transport socket. Common TLS failures are in
+  // :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  string upstream_transport_failure_reason = 18;
 }
 
 // Flags indicating occurrences during request/response processing.
@@ -185,12 +197,17 @@ message ResponseFlags {
   // Indicates if the request was deemed unauthorized and the reason for it.
   Unauthorized unauthorized_details = 13;
 
-  // [#not-implemented-hide:] Hide from docs.
   // Indicates that the request was rejected because there was an error in rate limit service.
   bool rate_limit_service_error = 14;
 
   // Indicates the stream was reset due to a downstream connection termination.
   bool downstream_connection_termination = 15;
+
+  // Indicates that the upstream retry limit was exceeded, resulting in a downstream error.
+  bool upstream_retry_limit_exceeded = 16;
+
+  // Indicates that the stream idle timeout was hit, resulting in a downstream 408.
+  bool stream_idle_timeout = 17;
 }
 
 // [#not-implemented-hide:]

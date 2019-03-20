@@ -239,7 +239,7 @@ const std::string Json::Schema::RDS_CONFIGURATION_SCHEMA(R"EOF(
       },
       "api_type" : {
         "type" : "string",
-        "enum" : ["REST_LEGACY", "REST", "GRPC"]
+        "enum" : ["REST", "GRPC"]
       }
     },
     "required" : ["cluster", "route_config_name"],
@@ -933,8 +933,7 @@ const std::string Json::Schema::BUFFER_HTTP_FILTER_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties" : {
-      "max_request_bytes" : {"type" : "integer"},
-      "max_request_time_s" : {"type" : "integer"}
+      "max_request_bytes" : {"type" : "integer"}
     },
     "required" : ["max_request_bytes"],
     "additionalProperties" : false
@@ -1156,7 +1155,7 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
           },
           "api_type" : {
             "type" : "string",
-            "enum" : ["REST_LEGACY", "REST", "GRPC"]
+            "enum" : ["REST", "GRPC"]
           }
         },
         "required" : ["cluster"],
@@ -1205,6 +1204,10 @@ const std::string Json::Schema::LDS_CONFIG_SCHEMA(R"EOF(
     "$schema": "http://json-schema.org/schema#",
     "type" : "object",
     "properties" : {
+      "api_type" : {
+        "type" : "string",
+        "enum" : ["REST", "GRPC"]
+      },
       "cluster" : {
         "type" : "string"
       },

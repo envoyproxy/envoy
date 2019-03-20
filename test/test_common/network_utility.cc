@@ -1,6 +1,6 @@
 #include "test/test_common/network_utility.h"
 
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <cstdint>
@@ -26,12 +26,11 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  const int fd = addr_port->socket(type);
-  ScopedFdCloser closer(fd);
+  IoHandlePtr io_handle = addr_port->socket(type);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
-  Api::SysCallIntResult result = addr_port->bind(fd);
+  Api::SysCallIntResult result = addr_port->bind(io_handle->fd());
   int err;
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
@@ -39,7 +38,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
     failing_fn = "bind";
   } else if (type == Address::SocketType::Stream) {
     // Try listening on the port also, if the type is TCP.
-    if (::listen(fd, 1) != 0) {
+    if (::listen(io_handle->fd(), 1) != 0) {
       err = errno;
       failing_fn = "listen";
     }
@@ -60,7 +59,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // If the port we bind is zero, then the OS will pick a free port for us (assuming there are
   // any), and we need to find out the port number that the OS picked so we can return it.
   if (addr_port->ip()->port() == 0) {
-    return Address::addressFromFd(fd);
+    return Address::addressFromFd(io_handle->fd());
   }
   return addr_port;
 }
@@ -119,6 +118,7 @@ Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion v
 }
 
 namespace {
+
 // There is no portable way to initialize sockaddr_in6 with a static initializer, do it with a
 // helper function instead.
 sockaddr_in6 sockaddrIn6Any() {
@@ -128,6 +128,7 @@ sockaddr_in6 sockaddrIn6Any() {
 
   return v6any;
 }
+
 } // namespace
 
 Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, bool v4_compat) {
@@ -149,29 +150,29 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 
 bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  const int fd = addr->socket(Address::SocketType::Stream);
-  if (0 != addr->bind(fd).rc_) {
+  IoHandlePtr io_handle = addr->socket(Address::SocketType::Stream);
+  if (0 != addr->bind(io_handle->fd()).rc_) {
     // Socket bind failed.
-    RELEASE_ASSERT(::close(fd) == 0, "");
+    RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
     return false;
   }
-  RELEASE_ASSERT(::close(fd) == 0, "");
+  RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
   return true;
 }
 
-std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
-                                                                     Address::SocketType type) {
+std::pair<Address::InstanceConstSharedPtr, Network::IoHandlePtr>
+bindFreeLoopbackPort(Address::IpVersion version, Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  const int fd = addr->socket(type);
-  Api::SysCallIntResult result = addr->bind(fd);
+  IoHandlePtr io_handle = addr->socket(type);
+  Api::SysCallIntResult result = addr->bind(io_handle->fd());
   if (0 != result.rc_) {
-    close(fd);
+    io_handle->close();
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
                                   addr->asString(), strerror(result.errno_), result.errno_);
     ADD_FAILURE() << msg;
     throw EnvoyException(msg);
   }
-  return std::make_pair(Address::addressFromFd(fd), fd);
+  return std::make_pair(Address::addressFromFd(io_handle->fd()), std::move(io_handle));
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }

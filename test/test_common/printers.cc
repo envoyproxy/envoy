@@ -36,4 +36,10 @@ void PrintTo(const Buffer::OwnedImpl& buffer, std::ostream* os) {
   PrintTo(dynamic_cast<const Buffer::Instance&>(buffer), os);
 }
 } // namespace Buffer
+
+namespace Network {
+namespace Address {
+void PrintTo(const Instance& address, std::ostream* os) { *os << address.asString(); }
+} // namespace Address
+} // namespace Network
 } // namespace Envoy

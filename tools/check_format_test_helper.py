@@ -5,10 +5,12 @@
 # docker. Normally this is run via check_format_test.sh, which
 # executes it in under docker.
 
+from __future__ import print_function
+
 import argparse
+import logging
 import os
 import shutil
-import logging
 import subprocess
 import sys
 
@@ -49,6 +51,9 @@ def runCheckFormat(operation, filename):
 
 def getInputFile(filename):
   infile = os.path.join(src, filename)
+  directory = os.path.dirname(filename)
+  if not directory == '' and not os.path.isdir(directory):
+    os.makedirs(directory)
   shutil.copyfile(infile, filename)
   return filename
 
@@ -58,6 +63,10 @@ def getInputFile(filename):
 # code.
 def fixFileHelper(filename):
   infile = os.path.join(src, filename)
+  directory = os.path.dirname(filename)
+  if not directory == '' and not os.path.isdir(directory):
+    os.makedirs(directory)
+
   shutil.copyfile(infile, filename)
   command, status, stdout = runCheckFormat("fix", getInputFile(filename))
   return (command, infile, filename, status, stdout)
@@ -69,12 +78,12 @@ def fixFileHelper(filename):
 def fixFileExpectingSuccess(file):
   command, infile, outfile, status, stdout = fixFileHelper(file)
   if status != 0:
-    print "FAILED:"
+    print("FAILED:")
     emitStdoutAsError(stdout)
     return 1
   status, stdout = runCommand('diff ' + outfile + ' ' + infile + '.gold')
   if status != 0:
-    print "FAILED:"
+    print("FAILED:")
     emitStdoutAsError(stdout)
     return 1
   return 0
@@ -186,6 +195,7 @@ if __name__ == "__main__":
   errors += checkUnfixableError("std_get_time.cc", "std::get_time")
   errors += checkUnfixableError("no_namespace_envoy.cc",
                                 "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+  errors += checkUnfixableError("bazel_tools.BUILD", "unexpected @bazel_tools reference")
   errors += checkUnfixableError("proto.BUILD", "unexpected direct external dependency on protobuf")
   errors += checkUnfixableError("proto_deps.cc", "unexpected direct dependency on google.protobuf")
   errors += checkUnfixableError("attribute_packed.cc", "Don't use __attribute__((packed))")
@@ -193,6 +203,17 @@ if __name__ == "__main__":
   errors += checkUnfixableError("elvis_operator.cc", "Don't use the '?:' operator")
   errors += checkUnfixableError("testing_test.cc",
                                 "Don't use 'using testing::Test;, elaborate the type instead")
+  errors += checkUnfixableError(
+      "serialize_as_string.cc",
+      "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
+  errors += checkUnfixableError(
+      "version_history.rst",
+      "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
+      "check_format.py")
+
+  errors += fixFileExpectingFailure(
+      "api/missing_package.proto",
+      "Unable to find package name for proto file: ./api/missing_package.proto")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
@@ -207,6 +228,7 @@ if __name__ == "__main__":
   errors += checkAndFixError("license.BUILD", "envoy_build_fixer check failed")
   errors += checkAndFixError("bad_envoy_build_sys_ref.BUILD", "Superfluous '@envoy//' prefix")
   errors += checkAndFixError("proto_format.proto", "clang-format check failed")
+  errors += checkAndFixError("api/java_options.proto", "Java proto option")
 
   errors += checkFileExpectingOK("real_time_source_override.cc")
   errors += checkFileExpectingOK("time_system_wait_for.cc")

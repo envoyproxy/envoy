@@ -370,7 +370,6 @@ void FilterJson::translateBufferFilter(
   json_config.validateSchema(Json::Schema::BUFFER_HTTP_FILTER_SCHEMA);
 
   JSON_UTIL_SET_INTEGER(json_config, proto_config, max_request_bytes);
-  JSON_UTIL_SET_DURATION_SECONDS(json_config, proto_config, max_request_time);
 }
 
 void FilterJson::translateLuaFilter(const Json::Object& json_config,
@@ -382,6 +381,9 @@ void FilterJson::translateLuaFilter(const Json::Object& json_config,
 void FilterJson::translateTcpProxy(
     const Json::Object& json_config,
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config) {
+  if (json_config.empty()) {
+    throw EnvoyException("tcp proxy config with deprecated_v1 requires a value field");
+  }
   json_config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
   JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);

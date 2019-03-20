@@ -9,7 +9,10 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"
+#include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/clusters/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -47,7 +50,7 @@ private:
                    parent.lbEndpoint().load_balancing_weight().value(),
                    parent.localityLbEndpoint().locality(),
                    parent.lbEndpoint().endpoint().health_check_config(),
-                   parent.localityLbEndpoint().priority()),
+                   parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           parent_(parent) {}
 
     // Upstream::Host
@@ -57,7 +60,7 @@ private:
 
     // Upstream::HostDescription
     // Override setting health check address, since for logical DNS the registered host has 0.0.0.0
-    // as its address (see mattklein123's comment in logical_dns_cluster.cc why this is),
+    // as its address (see @mattklein123's comment in logical_dns_cluster.cc why this is),
     // while the health check address needs the resolved address to do the health checking, so we
     // set it here.
     void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
@@ -152,6 +155,18 @@ private:
   Network::ActiveDnsQuery* active_dns_query_{};
   const LocalInfo::LocalInfo& local_info_;
   const envoy::api::v2::ClusterLoadAssignment load_assignment_;
+};
+
+class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
+public:
+  LogicalDnsClusterFactory()
+      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().LogicalDns) {}
+
+private:
+  ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

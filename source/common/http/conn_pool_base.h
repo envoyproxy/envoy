@@ -4,6 +4,8 @@
 
 #include "common/common/linked_object.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -37,7 +39,8 @@ protected:
   void onPendingRequestCancel(PendingRequest& request);
 
   // Fails all pending requests, calling onPoolFailure on the associated callbacks.
-  void purgePendingRequests(const Upstream::HostDescriptionConstSharedPtr& host_description);
+  void purgePendingRequests(const Upstream::HostDescriptionConstSharedPtr& host_description,
+                            absl::string_view failure_reason);
 
   // Must be implemented by sub class. Attempts to drain inactive clients.
   virtual void checkForDrained() PURE;

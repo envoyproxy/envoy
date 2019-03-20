@@ -32,7 +32,7 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
       decoder_callbacks_->route()->routeEntry()->virtualHost().corsPolicy(),
   }};
 
-  if (!enabled()) {
+  if (!enabled() && !shadowEnabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -46,8 +46,12 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  is_cors_request_ = true;
   config_->stats().origin_valid_.inc();
+  if (shadowEnabled() && !enabled()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  is_cors_request_ = true;
 
   const auto method = headers.Method();
   if (method == nullptr || method->value().c_str() != Http::Headers::get().MethodValues.Options) {
@@ -195,6 +199,15 @@ bool CorsFilter::allowCredentials() {
   for (const auto policy : policies_) {
     if (policy && policy->allowCredentials()) {
       return policy->allowCredentials().value();
+    }
+  }
+  return false;
+}
+
+bool CorsFilter::shadowEnabled() {
+  for (const auto policy : policies_) {
+    if (policy) {
+      return policy->shadowEnabled();
     }
   }
   return false;

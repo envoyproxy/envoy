@@ -1,6 +1,10 @@
 syntax = "proto3";
 
 package envoy.config.filter.fault.v2;
+
+option java_outer_classname = "FaultProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.fault.v2";
 option go_package = "v2";
 
 import "envoy/type/percent.proto";
@@ -38,6 +42,25 @@ message FaultDelay {
         [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
   }
 
-  // The percentage of operations/connection requests on which the delay will be injected.
-  envoy.type.FractionalPercent percentage = 4;
+  // The percentage of operations/connections/requests on which the delay will be injected.
+  type.FractionalPercent percentage = 4;
+}
+
+// Describes a rate limit to be applied.
+message FaultRateLimit {
+  // Describes a fixed/constant rate limit.
+  message FixedLimit {
+    // The limit supplied in KiB/s.
+    uint64 limit_kbps = 1 [(validate.rules).uint64.gte = 1];
+  }
+
+  oneof limit_type {
+    option (validate.required) = true;
+
+    // A fixed rate limit.
+    FixedLimit fixed_limit = 1;
+  }
+
+  // The percentage of operations/connections/requests on which the rate limit will be injected.
+  type.FractionalPercent percentage = 2;
 }

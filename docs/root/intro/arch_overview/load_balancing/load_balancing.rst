@@ -7,6 +7,7 @@ Load Balancing
   overview
   load_balancers
   priority
+  degraded
   locality_weight
   overprovisioning
   panic_threshold

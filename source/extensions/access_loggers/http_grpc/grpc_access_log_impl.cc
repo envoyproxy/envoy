@@ -87,7 +87,7 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x4000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x10000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -151,6 +151,14 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination)) {
     common_access_log.mutable_response_flags()->set_downstream_connection_termination(true);
   }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded)) {
+    common_access_log.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout)) {
+    common_access_log.mutable_response_flags()->set_stream_idle_timeout(true);
+  }
 }
 
 void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
@@ -169,7 +177,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   }
 
   if (filter_) {
-    if (!filter_->evaluate(stream_info, *request_headers)) {
+    if (!filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {
       return;
     }
   }
@@ -251,6 +259,10 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         *stream_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());
   }
   responseFlagsToAccessLogResponseFlags(*common_properties, stream_info);
+  if (!stream_info.upstreamTransportFailureReason().empty()) {
+    common_properties->set_upstream_transport_failure_reason(
+        stream_info.upstreamTransportFailureReason());
+  }
   if (stream_info.dynamicMetadata().filter_metadata_size() > 0) {
     common_properties->mutable_metadata()->MergeFrom(stream_info.dynamicMetadata());
   }

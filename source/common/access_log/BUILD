@@ -30,6 +30,8 @@ envoy_cc_library(
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 
@@ -37,6 +39,7 @@ envoy_cc_library(
     name = "access_log_lib",
     srcs = ["access_log_impl.cc"],
     hdrs = ["access_log_impl.h"],
+    external_deps = ["abseil_hash"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/filesystem:filesystem_interface",

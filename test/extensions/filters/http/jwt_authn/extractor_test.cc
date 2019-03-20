@@ -48,9 +48,9 @@ providers:
         value_prefix: AAABBB
 )";
 
-class ExtractorTest : public ::testing::Test {
+class ExtractorTest : public testing::Test {
 public:
-  void SetUp() {
+  void SetUp() override {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
     extractor_ = Extractor::create(config_);
   }
@@ -145,7 +145,7 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
 }
 
 // Test extracting token from the custom header: "prefix-header"
-// value prefix doesn't match. It has to be eitehr "AAA" or "AAABBB".
+// value prefix doesn't match. It has to be either "AAA" or "AAABBB".
 TEST_F(ExtractorTest, TestPrefixHeaderNotMatch) {
   auto headers = TestHeaderMapImpl{{"prefix-header", "jwt_token"}};
   auto tokens = extractor_->extract(headers);

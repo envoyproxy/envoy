@@ -12,7 +12,7 @@
 #include "common/http/codes.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Http {

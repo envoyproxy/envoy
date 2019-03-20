@@ -131,7 +131,7 @@ should be replaced by backslash-double-quote (\").
 The following keys are supported:
 
 1. ``By`` The Subject Alternative Name (URI type) of the current proxy's certificate.
-2. ``Hash`` The SHA 256 diguest of the current client certificate.
+2. ``Hash`` The SHA 256 digest of the current client certificate.
 3. ``Cert`` The entire client certificate in URL encoded PEM format.
 4. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
 5. ``URI`` The URI type Subject Alternative Name field of the current client certificate.
@@ -474,7 +474,7 @@ Custom request/response headers can be added to a request/response at the weight
 route, virtual host, and/or global route configuration level. See the
 :ref:`v2 <envoy_api_msg_RouteConfiguration>` API documentation.
 
-No *:*-prefixed pseudo-header may be modified via this mechanism. The *:path*
+No *:-prefixed* pseudo-header may be modified via this mechanism. The *:path*
 and *:authority* headers may instead be modified via mechanisms such as
 :ref:`prefix_rewrite <envoy_api_field_route.RouteAction.prefix_rewrite>` and
 :ref:`host_rewrite <envoy_api_field_route.RouteAction.host_rewrite>`.
@@ -533,7 +533,7 @@ Supported variable names are:
     Populates the header with values set on the stream info filterState() object. To be
     usable in custom request/response headers, these values must be of type
     Envoy::Router::StringAccessor. These values should be named in standard reverse DNS style,
-    identifying the organization that created the value and ending in a unique name for the data. 
+    identifying the organization that created the value and ending in a unique name for the data.
 
 %START_TIME%
     Request start time. START_TIME can be customized with specifiers as specified in

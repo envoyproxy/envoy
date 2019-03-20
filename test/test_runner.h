@@ -4,29 +4,103 @@
 #include "common/common/logger_delegates.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+#include "common/http/http2/codec_impl.h"
+#include "common/runtime/runtime_features.h"
 
+#include "test/common/runtime/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/global.h"
+#include "test/test_listener.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
+
+std::string findAndRemove(const std::regex& pattern, int& argc, char**& argv) {
+  std::smatch matched;
+  std::string return_value;
+  for (int i = 0; i < argc; ++i) {
+    if (return_value.empty()) {
+      std::string argument = std::string(argv[i]);
+      if (regex_search(argument, matched, pattern)) {
+        return_value = matched[1];
+        argc--;
+      }
+    }
+    if (!return_value.empty() && i < argc) {
+      argv[i] = argv[i + 1];
+    }
+  }
+  return return_value;
+}
+
+// This class is created iff a test is run with the special runtime override flag.
+class RuntimeManagingListener : public ::testing::EmptyTestEventListener {
+public:
+  RuntimeManagingListener(std::string& runtime_override) : runtime_override_(runtime_override) {}
+
+  // On each test start, edit RuntimeFeaturesDefaults with our custom runtime defaults.
+  void OnTestStart(const ::testing::TestInfo&) override {
+    if (!runtime_override_.empty()) {
+      if (!Runtime::RuntimeFeaturesPeer::addFeature(runtime_override_)) {
+        // If the entry was already in the hash map, don't remove it OnTestEnd.
+        runtime_override_.clear();
+      }
+    }
+  }
+
+  // As each test ends, clean up the RuntimeFeaturesDefaults state.
+  void OnTestEnd(const ::testing::TestInfo&) override {
+    if (!runtime_override_.empty()) {
+      Runtime::RuntimeFeaturesPeer::removeFeature(runtime_override_);
+    }
+  }
+  std::string runtime_override_;
+};
+
+} // namespace
+
 class TestRunner {
 public:
   static int RunTests(int argc, char** argv) {
     ::testing::InitGoogleMock(&argc, argv);
     Event::Libevent::Global::initialize();
+    Http::Http2::initializeNghttp2Logging();
+
+    // Add a test-listener so we can call a hook where we can do a quiescence
+    // check after each method. See
+    // https://github.com/google/googletest/blob/master/googletest/docs/advanced.md
+    // for details.
+    ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+    listeners.Append(new TestListener);
+
+    // Use the recommended, but not default, "threadsafe" style for the Death Tests.
+    // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
+    ::testing::FLAGS_gtest_death_test_style = "threadsafe";
 
     // Set gtest properties
-    // (https://github.com/google/googletest/blob/master/googletest/docs/AdvancedGuide.md#logging-additional-information),
+    // (https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#logging-additional-information),
     // they are available in the test XML.
     // TODO(htuch): Log these as well?
-    ::testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
-    ::testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
+    testing::Test::RecordProperty("TemporaryDirectory", TestEnvironment::temporaryDirectory());
+    testing::Test::RecordProperty("RunfilesDirectory", TestEnvironment::runfilesDirectory());
 
     TestEnvironment::setEnvVar("TEST_UDSDIR", TestEnvironment::unixDomainSocketDirectory(), 1);
+
+    // Before letting TestEnvironment latch argv and argc, remove any runtime override flag.
+    // This allows doing test overrides of Envoy runtime features without adding
+    // test flags to the Envoy production command line.
+    const std::regex PATTERN{"--runtime-feature-override-for-tests=(.*)", std::regex::optimize};
+    std::string runtime_override = findAndRemove(PATTERN, argc, argv);
+    if (!runtime_override.empty()) {
+      ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), info,
+                          "Running with runtime feature override {}", runtime_override);
+      // Set up a listener which will create a global runtime and set the feature
+      // to true for the duration of each test instance.
+      ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+      listeners.Append(new RuntimeManagingListener(runtime_override));
+    }
 
     TestEnvironment::initializeOptions(argc, argv);
     Thread::MutexBasicLockable lock;
@@ -42,16 +116,7 @@ public:
       file_logger = std::make_unique<Logger::FileSinkDelegate>(
           TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
     }
-    int exit_status = RUN_ALL_TESTS();
-
-    // Check that all singletons have been destroyed.
-    std::string active_singletons = Test::Globals::describeActiveSingletons();
-    if (!active_singletons.empty()) {
-      std::cerr << "\n\nFAIL: Active singletons exist:\n" << active_singletons << std::endl;
-      exit_status = EXIT_FAILURE;
-    }
-
-    return exit_status;
+    return RUN_ALL_TESTS();
   }
 };
 } // namespace Envoy

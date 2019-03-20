@@ -80,6 +80,8 @@ envoy_cc_test(
     srcs = envoy_select_google_grpc(["google_grpc_creds_test.cc"]),
     deps = [
         ":utility_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_grpc_creds_lib"]),
 )
 

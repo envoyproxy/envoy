@@ -31,12 +31,20 @@ public:
   void refresh(const histogram_t* new_histogram_ptr);
 
   // HistogramStatistics
-  std::string summary() const override;
+  std::string quantileSummary() const override;
+  std::string bucketSummary() const override;
   const std::vector<double>& supportedQuantiles() const override;
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
+  const std::vector<double>& supportedBuckets() const override;
+  const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
+  double sampleCount() const override { return sample_count_; }
+  double sampleSum() const override { return sample_sum_; }
 
 private:
   std::vector<double> computed_quantiles_;
+  std::vector<uint64_t> computed_buckets_;
+  double sample_count_;
+  double sample_sum_;
 };
 
 /**

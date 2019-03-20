@@ -50,11 +50,14 @@
         - name: envoy.buffer
           config:
             max_request_bytes: 5242880
-            max_request_time: 120s
         - name: envoy.rate_limit
           config:
             domain: envoy_front
             request_type: external
+            rate_limit_service:
+              grpc_service:
+                envoy_grpc:
+                  cluster_name: ratelimit
         - name: envoy.router
           config: {}
         add_user_agent: true
@@ -121,24 +124,13 @@ static_resources:
         address: collector-grpc.lightstep.com
         port_value: 443
     http2_protocol_options: {}
-  {% for service, options in clusters.iteritems() -%}
+  {% for service, options in clusters.items() -%}
   - {{ helper.internal_cluster_definition(service, options)|indent(2) }}
   {% endfor %}
-dynamic_resources:
-  deprecated_v1:
-    sds_config:
-      api_config_source:
-        cluster_names:
-        - sds
-        refresh_delay: 30s
 cluster_manager:
   outlier_detection:
     event_log_path: /var/log/envoy/outlier_events.log
 flags_path: /etc/envoy/flags
-rate_limit_service:
- grpc_service:
-   envoy_grpc:
-     cluster_name: ratelimit
 tracing:
   http:
     name: envoy.lightstep

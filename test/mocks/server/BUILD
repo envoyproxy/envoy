@@ -29,8 +29,8 @@ envoy_cc_mock(
         "//source/common/http:context_lib",
         "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
-        "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
@@ -43,6 +43,6 @@ envoy_cc_mock(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
     ],
 )

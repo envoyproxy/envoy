@@ -23,7 +23,7 @@ class HealthCheckerFactory : public Logger::Loggable<Logger::Id::health_checker>
 public:
   /**
    * Create a health checker.
-   * @param hc_config supplies the health check proto.
+   * @param health_check_config supplies the health check proto.
    * @param cluster supplies the owning cluster.
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
@@ -31,7 +31,7 @@ public:
    * @param event_logger supplies the event_logger.
    * @return a health checker.
    */
-  static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& hc_config,
+  static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& health_check_config,
                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
                                        Event::Dispatcher& dispatcher,
@@ -46,6 +46,20 @@ public:
   HttpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+
+  /**
+   * Utility class checking if given http status matches configured expectations.
+   */
+  class HttpStatusChecker {
+  public:
+    HttpStatusChecker(const Protobuf::RepeatedPtrField<envoy::type::Int64Range>& expected_statuses,
+                      uint64_t default_expected_status);
+
+    bool inRange(uint64_t http_status) const;
+
+  private:
+    std::vector<std::pair<uint64_t, uint64_t>> ranges_;
+  };
 
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
@@ -74,7 +88,8 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::StreamCallbacks
-    void onResetStream(Http::StreamResetReason reason) override;
+    void onResetStream(Http::StreamResetReason reason,
+                       absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
@@ -121,6 +136,7 @@ private:
   const std::string host_value_;
   absl::optional<std::string> service_name_;
   Router::HeaderParserPtr request_headers_parser_;
+  const HttpStatusChecker http_status_checker_;
 
 protected:
   const Http::CodecClient::Type codec_client_type_;
@@ -285,7 +301,8 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
     // Http::StreamCallbacks
-    void onResetStream(Http::StreamResetReason reason) override;
+    void onResetStream(Http::StreamResetReason reason,
+                       absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

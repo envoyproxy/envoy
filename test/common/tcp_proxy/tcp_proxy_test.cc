@@ -41,6 +41,7 @@ using testing::SaveArg;
 
 namespace Envoy {
 namespace TcpProxy {
+namespace {
 
 using ::Envoy::Network::UpstreamServerName;
 
@@ -51,6 +52,7 @@ Config constructConfigFromJson(const Json::Object& json,
   Envoy::Config::FilterJson::translateTcpProxy(json, tcp_proxy);
   return Config(tcp_proxy, context);
 }
+
 } // namespace
 
 TEST(ConfigTest, NoRouteConfig) {
@@ -272,7 +274,7 @@ TEST(ConfigTest, Routes) {
   }
 
   {
-    // hit route with destination_ip (2001:abcd/64")
+    // hit route with destination_ip ("2001:abcd/64")
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ =
         std::make_shared<Network::Address::Ipv6Instance>("2001:abcd:0:0:1::");
@@ -607,7 +609,8 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamTimeout) {
 
 // Test that only the configured number of connect attempts occur
 TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
+      accessLogConfig("%RESPONSE_FLAGS%");
   config.mutable_max_connect_attempts()->set_value(3);
   setup(3, config);
 
@@ -626,6 +629,9 @@ TEST_F(TcpProxyTest, ConnectAttemptsLimit) {
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   raiseEventUpstreamConnectFailed(2,
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
 // Test that the tcp proxy sends the correct notifications to the outlier detector
@@ -711,7 +717,7 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF");
+  EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
 TEST_F(TcpProxyTest, NoHost) {
@@ -786,7 +792,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF");
+  EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
@@ -1199,5 +1205,6 @@ TEST_F(TcpProxyRoutingTest, UpstreamServerName) {
   filter_->onNewConnection();
 }
 
+} // namespace
 } // namespace TcpProxy
 } // namespace Envoy

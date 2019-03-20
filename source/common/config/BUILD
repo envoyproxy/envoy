@@ -92,8 +92,40 @@ envoy_cc_library(
     srcs = ["datasource.cc"],
     hdrs = ["datasource.h"],
     deps = [
-        "//source/common/filesystem:filesystem_lib",
+        "//include/envoy/api:api_interface",
         "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "delta_subscription_lib",
+    hdrs = ["delta_subscription_impl.h"],
+    deps = [
+        ":grpc_stream_lib",
+        ":utility_lib",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:token_bucket_impl_lib",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "grpc_stream_lib",
+    hdrs = ["grpc_stream.h"],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:token_bucket_impl_lib",
+        "//source/common/protobuf",
     ],
 )
 
@@ -140,14 +172,12 @@ envoy_cc_library(
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
     deps = [
+        ":grpc_stream_lib",
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
-        "//include/envoy/grpc:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/common:token_bucket_impl_lib",
         "//source/common/protobuf",
     ],
 )
@@ -289,6 +319,7 @@ envoy_cc_library(
     name = "subscription_factory_lib",
     hdrs = ["subscription_factory.h"],
     deps = [
+        ":delta_subscription_lib",
         ":filesystem_subscription_lib",
         ":grpc_mux_subscription_lib",
         ":grpc_subscription_lib",
@@ -296,7 +327,6 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//source/common/filesystem:filesystem_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
@@ -330,7 +360,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
-        "//source/common/filesystem:filesystem_lib",
         "//source/common/grpc:common_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf",
@@ -351,5 +380,22 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "config_provider_lib",
+    srcs = ["config_provider_impl.cc"],
+    hdrs = ["config_provider_impl.h"],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/config:config_provider_interface",
+        "//include/envoy/config:config_provider_manager_interface",
+        "//include/envoy/init:init_interface",
+        "//include/envoy/server:admin_interface",
+        "//include/envoy/server:config_tracker_interface",
+        "//include/envoy/singleton:instance_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/protobuf",
     ],
 )

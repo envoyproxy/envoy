@@ -14,6 +14,7 @@
 #include "common/common/fmt.h"
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
+#include "common/http/conn_manager_utility.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
@@ -98,7 +99,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
-        &context.overloadManager(), context.dispatcher().timeSystem())});
+        &context.overloadManager(), context.dispatcher().timeSource())});
   };
 }
 
@@ -113,27 +114,8 @@ Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterF
 /**
  * Static registration for the HTTP connection manager filter.
  */
-static Registry::RegisterFactory<HttpConnectionManagerFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
-
-std::string
-HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& connection,
-                                                          const Buffer::Instance& data) {
-  if (!connection.nextProtocol().empty()) {
-    return connection.nextProtocol();
-  }
-
-  // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
-  // us the first few bytes of the HTTP/2 prefix since in all public cases we use SSL/ALPN. For
-  // internal cases this should practically never happen.
-  if (-1 != data.search(Http::Http2::CLIENT_MAGIC_PREFIX.c_str(),
-                        Http::Http2::CLIENT_MAGIC_PREFIX.size(), 0)) {
-    return Http::Http2::ALPN_STRING;
-  }
-
-  return "";
-}
+REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 InternalAddressConfig::InternalAddressConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
@@ -145,9 +127,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager)
-    : context_(context), reverse_encode_order_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                             config, bugfix_reverse_encode_order, true)),
-      stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
+    : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
@@ -158,6 +138,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
@@ -245,9 +227,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     uint64_t overall_sampling{
         PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, overall_sampling, 100, 100)};
 
-    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
-        Http::TracingConnectionManagerConfig{tracing_operation_name, request_headers_for_tags,
-                                             client_sampling, random_sampling, overall_sampling});
+    tracing_config_ =
+        std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
+            tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
+            overall_sampling, tracing_config.verbose()});
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -338,20 +321,15 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1:
-    return Http::ServerConnectionPtr{
-        new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
+    return std::make_unique<Http::Http1::ServerConnectionImpl>(
+        connection, callbacks, http1_settings_, maxRequestHeadersKb());
   case CodecType::HTTP2:
-    return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-        connection, callbacks, context_.scope(), http2_settings_)};
+    return std::make_unique<Http::Http2::ServerConnectionImpl>(
+        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
   case CodecType::AUTO:
-    if (HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data) ==
-        Http::Http2::ALPN_STRING) {
-      return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-          connection, callbacks, context_.scope(), http2_settings_)};
-    } else {
-      return Http::ServerConnectionPtr{
-          new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
-    }
+    return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
+                                                           context_.scope(), http1_settings_,
+                                                           http2_settings_, maxRequestHeadersKb());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

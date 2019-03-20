@@ -4,6 +4,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
+#include "common/singleton/manager_impl.h"
 #include "common/upstream/eds.h"
 
 #include "server/transport_socket_config_impl.h"
@@ -11,6 +12,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -24,10 +26,11 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 class EdsTest : public testing::Test {
 protected:
-  EdsTest() { resetCluster(); }
+  EdsTest() : api_(Api::createApiForTest(stats_)) { resetCluster(); }
 
   void resetCluster() {
     resetCluster(R"EOF(
@@ -39,6 +42,7 @@ protected:
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -49,7 +53,7 @@ protected:
     local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV2Yaml(yaml_config);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
+    Upstream::MockClusterMockPrioritySet cluster;
     cluster_map.emplace("eds", cluster);
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
@@ -58,7 +62,8 @@ protected:
         "cluster.{}.",
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
+        admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+        singleton_manager_, tls_, *api_);
     cluster_.reset(
         new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
@@ -73,6 +78,10 @@ protected:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::MockAdmin> admin_;
+  Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  Api::ApiPtr api_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {
@@ -124,6 +133,7 @@ protected:
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -222,6 +232,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
       eds_cluster_config:
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -329,6 +340,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
           {envoy::api::v2::core::HealthStatus::UNHEALTHY, Host::Health::Unhealthy},
           {envoy::api::v2::core::HealthStatus::DRAINING, Host::Health::Unhealthy},
           {envoy::api::v2::core::HealthStatus::TIMEOUT, Host::Health::Unhealthy},
+          {envoy::api::v2::core::HealthStatus::DEGRADED, Host::Health::Degraded},
       };
 
   int port = 80;
@@ -413,6 +425,35 @@ TEST_F(EdsTest, EndpointHealthStatus) {
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
     EXPECT_EQ(Host::Health::Healthy, hosts[0]->health());
   }
+
+  const auto rebuild_container = stats_.counter("cluster.name.update_no_rebuild").value();
+  // Now mark host 0 degraded via EDS, it should be degraded.
+  endpoints->mutable_lb_endpoints(0)->set_health_status(
+      envoy::api::v2::core::HealthStatus::DEGRADED);
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(Host::Health::Degraded, hosts[0]->health());
+  }
+
+  // We should rebuild the cluster since we went from healthy -> degraded.
+  EXPECT_EQ(rebuild_container, stats_.counter("cluster.name.update_no_rebuild").value());
+
+  // Now mark the host as having been degraded through active hc.
+  cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
+      Host::HealthFlag::DEGRADED_ACTIVE_HC);
+
+  // Now mark host 0 healthy via EDS, it should still be degraded.
+  endpoints->mutable_lb_endpoints(0)->set_health_status(
+      envoy::api::v2::core::HealthStatus::HEALTHY);
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(Host::Health::Degraded, hosts[0]->health());
+  }
+
+  // Since the host health didn't change, expect no rebuild.
+  EXPECT_EQ(rebuild_container + 1, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
 // Validate that onConfigUpdate() removes endpoints that are marked as healthy
@@ -428,6 +469,7 @@ TEST_F(EdsTest, EndpointRemoval) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -493,6 +535,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -580,6 +623,7 @@ TEST_F(EdsTest, EndpointMoved) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -755,6 +799,7 @@ TEST_F(EdsTest, EndpointLocalityWeights) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -874,7 +919,7 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
     EXPECT_EQ(2, hosts_per_locality.size());
   }
 
-  // Reset the ClusterLoadAssingment to only contain one of the locality per priority.
+  // Reset the ClusterLoadAssignment to only contain one of the locality per priority.
   // This should leave us with only one locality.
   cluster_load_assignment->clear_endpoints();
   add_hosts_to_locality("oceania", "koala", "ingsoc", 4, 0);
@@ -1243,6 +1288,7 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
         service_name: fare
         eds_config:
           api_config_source:
+            api_type: REST
             cluster_names:
             - eds
             refresh_delay: 1s
@@ -1422,5 +1468,6 @@ TEST_F(EdsTest, MalformedIP) {
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -69,17 +69,25 @@ public:
       const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
-        health_check_address_(health_check_config.port_value() == 0
-                                  ? dest_address
-                                  : Network::Utility::getAddressWithPort(
-                                        *dest_address, health_check_config.port_value())),
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
         locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
                                                    POOL_GAUGE(stats_store_))},
-        priority_(priority) {}
+        priority_(priority) {
+    if (health_check_config.port_value() != 0 &&
+        dest_address->type() != Network::Address::Type::Ip) {
+      // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
+      // for a pipe address is a misconfiguration. Throw an exception.
+      throw EnvoyException(
+          fmt::format("Invalid host configuration: non-zero port for non-IP address"));
+    }
+    health_check_address_ =
+        health_check_config.port_value() == 0
+            ? dest_address
+            : Network::Utility::getAddressWithPort(*dest_address, health_check_config.port_value());
+  }
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -162,10 +170,11 @@ public:
            const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
            const envoy::api::v2::core::Locality& locality,
            const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
-           uint32_t priority)
+           uint32_t priority, const envoy::api::v2::core::HealthStatus health_status)
       : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
                             priority),
         used_(true) {
+    setEdsHealthFlag(health_status);
     weight(initial_weight);
   }
 
@@ -206,7 +215,8 @@ public:
     }
 
     // Only possible option at this point is that the host is degraded.
-    ASSERT(health_flags_ == static_cast<uint32_t>(HealthFlag::DEGRADED_ACTIVE_HC));
+    ASSERT(healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC) ||
+           healthFlagGet(HealthFlag::DEGRADED_EDS_HEALTH));
     return Host::Health::Degraded;
   }
 
@@ -223,6 +233,8 @@ protected:
                    Network::TransportSocketOptionsSharedPtr transport_socket_options);
 
 private:
+  void setEdsHealthFlag(envoy::api::v2::core::HealthStatus health_status);
+
   std::atomic<uint64_t> health_flags_{};
   ActiveHealthFailureType active_health_failure_type_{};
   std::atomic<uint32_t> weight_;
@@ -271,20 +283,12 @@ public:
         hosts_(new HostVector()), healthy_hosts_(new HostVector()),
         degraded_hosts_(new HostVector()) {}
 
-  void updateHosts(UpdateHostsParams&& update_hosts_params,
-                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
-                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
-
   /**
    * Install a callback that will be invoked when the host set membership changes.
    * @param callback supplies the callback to invoke.
    * @return Common::CallbackHandle* the callback handle.
    */
-  typedef std::function<void(uint32_t priority, const HostVector& hosts_added,
-                             const HostVector& hosts_removed)>
-      MemberUpdateCb;
-  Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const {
+  Common::CallbackHandle* addPriorityUpdateCb(PrioritySet::PriorityUpdateCb callback) const {
     return member_update_cb_helper_.add(callback);
   }
 
@@ -305,22 +309,28 @@ public:
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
 
   // Utility methods for creating UpdateHostsParams.
-  static UpdateHostsParams updateHostsParams(HostVectorConstSharedPtr hosts,
-                                             HostsPerLocalityConstSharedPtr hosts_per_locality);
-  static UpdateHostsParams
+  static PrioritySet::UpdateHostsParams
+  updateHostsParams(HostVectorConstSharedPtr hosts,
+                    HostsPerLocalityConstSharedPtr hosts_per_locality);
+  static PrioritySet::UpdateHostsParams
   updateHostsParams(HostVectorConstSharedPtr hosts,
                     HostsPerLocalityConstSharedPtr hosts_per_locality,
                     HostVectorConstSharedPtr healthy_hosts,
                     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality);
-  static UpdateHostsParams
+  static PrioritySet::UpdateHostsParams
   updateHostsParams(HostVectorConstSharedPtr hosts,
                     HostsPerLocalityConstSharedPtr hosts_per_locality,
                     HostVectorConstSharedPtr healthy_hosts,
                     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                     HostVectorConstSharedPtr degraded_hosts,
                     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality);
-  static UpdateHostsParams partitionHosts(HostVectorConstSharedPtr hosts,
-                                          HostsPerLocalityConstSharedPtr hosts_per_locality);
+  static PrioritySet::UpdateHostsParams
+  partitionHosts(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality);
+
+  void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
+                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                   const HostVector& hosts_removed,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -328,8 +338,13 @@ protected:
   }
 
 private:
-  // Weight for a locality taking into account health status.
-  double effectiveLocalityWeight(uint32_t index) const;
+  // Weight for a locality taking into account health status using the provided eligible hosts per
+  // locality.
+  static double effectiveLocalityWeight(uint32_t index,
+                                        const HostsPerLocality& eligible_hosts_per_locality,
+                                        const HostsPerLocality& all_hosts_per_locality,
+                                        const LocalityWeights& locality_weights,
+                                        uint32_t overprovisioning_factor);
 
   uint32_t priority_;
   uint32_t overprovisioning_factor_;
@@ -351,8 +366,31 @@ private:
     const uint32_t index_;
     const double effective_weight_;
   };
+
+  // Rebuilds the provided locality scheduler with locality entries based on the locality weights
+  // and eligible hosts.
+  //
+  // @param locality_scheduler the locality scheduler to rebuild. Will be set to nullptr if no
+  // localities are eligible.
+  // @param locality_entries the vector that holds locality entries. Will be reset and populated
+  // with entries corresponding to the new scheduler.
+  // @param eligible_hosts_per_locality eligible hosts for this scheduler grouped by locality.
+  // @param eligible_hosts all eligible hosts for this scheduler.
+  // @param all_hosts_per_locality all hosts for this HostSet grouped by locality.
+  // @param locality_weights the weighting of each locality.
+  // @param overprovisioning_factor the overprovisioning factor to use when computing the effective
+  // weight of a locality.
+  static void rebuildLocalityScheduler(
+      std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
+      std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
+      const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
+      HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+      LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
+
   std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
+  std::vector<std::shared_ptr<LocalityEntry>> degraded_locality_entries_;
+  std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
 };
 
 typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
@@ -363,17 +401,28 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 
 class PrioritySetImpl : public PrioritySet {
 public:
+  PrioritySetImpl() : batch_update_(false) {}
   // From PrioritySet
   Common::CallbackHandle* addMemberUpdateCb(MemberUpdateCb callback) const override {
     return member_update_cb_helper_.add(callback);
   }
+  Common::CallbackHandle* addPriorityUpdateCb(PriorityUpdateCb callback) const override {
+    return priority_update_cb_helper_.add(callback);
+  }
   const std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() const override {
     return host_sets_;
   }
-  std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() override { return host_sets_; }
   // Get the host set for this priority level, creating it if necessary.
-  HostSet& getOrCreateHostSet(uint32_t priority,
-                              absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
+  const HostSet&
+  getOrCreateHostSet(uint32_t priority,
+                     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
+
+  void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
+                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+                   const HostVector& hosts_removed,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
+
+  void batchHostUpdate(BatchUpdateCb& callback) override;
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
@@ -382,18 +431,50 @@ protected:
     return std::make_unique<HostSetImpl>(priority, overprovisioning_factor);
   }
 
-private:
-  virtual void runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
-                                  const HostVector& hosts_removed) {
-    member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+protected:
+  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  }
+  virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
+                                           const HostVector& hosts_removed) {
+    priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
   }
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
+
+private:
   // TODO(mattklein123): Remove mutable.
+  mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
-      member_update_cb_helper_;
+      priority_update_cb_helper_;
+  bool batch_update_ : 1;
+
+  // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
+  // that have been added/removed throughout the batch update, and ensures that we properly manage
+  // the batch_update_ flag.
+  class BatchUpdateScope : public HostUpdateCb {
+  public:
+    explicit BatchUpdateScope(PrioritySetImpl& parent) : parent_(parent) {
+      ASSERT(!parent_.batch_update_);
+      parent_.batch_update_ = true;
+    }
+    ~BatchUpdateScope() { parent_.batch_update_ = false; }
+
+    virtual void updateHosts(uint32_t priority,
+                             PrioritySet::UpdateHostsParams&& update_hosts_params,
+                             LocalityWeightsConstSharedPtr locality_weights,
+                             const HostVector& hosts_added, const HostVector& hosts_removed,
+                             absl::optional<uint32_t> overprovisioning_factor) override;
+
+    std::unordered_set<HostSharedPtr> all_hosts_added_;
+    std::unordered_set<HostSharedPtr> all_hosts_removed_;
+
+  private:
+    PrioritySetImpl& parent_;
+    std::unordered_set<uint32_t> priorities_;
+  };
 };
 
 /**
@@ -464,6 +545,8 @@ public:
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
 
+  absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -506,6 +589,7 @@ private:
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
+  absl::optional<std::string> eds_service_name_;
 };
 
 /**
@@ -523,16 +607,9 @@ createTransportSocketFactory(const envoy::api::v2::Cluster& config,
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterSharedPtr
-  create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
-         ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-         Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-         AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
-  // From Upstream::Cluster
-  virtual PrioritySet& prioritySet() override { return priority_set_; }
-  virtual const PrioritySet& prioritySet() const override { return priority_set_; }
+  // Upstream::Cluster
+  PrioritySet& prioritySet() override { return priority_set_; }
+  const PrioritySet& prioritySet() const override { return priority_set_; }
 
   /**
    * Optionally set the health checker for the primary cluster. This is done after cluster
@@ -611,6 +688,8 @@ private:
   uint64_t pending_initialize_health_checks_{};
 };
 
+using ClusterImplBaseSharedPtr = std::shared_ptr<ClusterImplBase>;
+
 /**
  * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts
  * with its corresponding locality weight map. This is useful to store priorities/hosts/localities
@@ -618,7 +697,8 @@ private:
  */
 class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info);
+  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info,
+                       PrioritySet::HostUpdateCb* update_cb);
 
   // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
   void
@@ -633,14 +713,11 @@ public:
   registerHostForPriority(const std::string& hostname,
                           Network::Address::InstanceConstSharedPtr address,
                           const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                          const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
 
-  void
-  registerHostForPriority(const HostSharedPtr& host,
-                          const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                          const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+  void registerHostForPriority(
+      const HostSharedPtr& host,
+      const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint);
 
   void
   updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,
@@ -659,6 +736,7 @@ private:
   ClusterImplBase& parent_;
   PriorityState priority_state_;
   const envoy::api::v2::core::Node& local_info_node_;
+  PrioritySet::HostUpdateCb* update_cb_;
 };
 
 typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;

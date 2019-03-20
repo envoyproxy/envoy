@@ -18,9 +18,14 @@ public:
   virtual ~HistogramStatistics() {}
 
   /**
-   * Returns summary representation of the histogram.
+   * Returns quantile summary representation of the histogram.
    */
-  virtual std::string summary() const PURE;
+  virtual std::string quantileSummary() const PURE;
+
+  /**
+   * Returns bucket summary representation of the histogram.
+   */
+  virtual std::string bucketSummary() const PURE;
 
   /**
    * Returns supported quantiles.
@@ -31,6 +36,32 @@ public:
    * Returns computed quantile values during the period.
    */
   virtual const std::vector<double>& computedQuantiles() const PURE;
+
+  /**
+   * Returns supported buckets. Each value is the upper bound of the bucket
+   * with 0 as the implicit lower bound. For timers, these bucket thresholds
+   * are in milliseconds but the thresholds are applicable to all types of data.
+   */
+  virtual const std::vector<double>& supportedBuckets() const PURE;
+
+  /**
+   * Returns computed bucket values during the period. The vector contains an approximation
+   * of samples below each quantile bucket defined in supportedBuckets(). This vector is
+   * guaranteed to be the same length as supportedBuckets().
+   */
+  virtual const std::vector<uint64_t>& computedBuckets() const PURE;
+
+  /**
+   * Returns number of values during the period. This number may be an approximation
+   * of the number of samples in the histogram, it is not guaranteed that this will be
+   * 100% the number of samples observed.
+   */
+  virtual double sampleCount() const PURE;
+
+  /**
+   * Returns sum of all values during the period.
+   */
+  virtual double sampleSum() const PURE;
 };
 
 /**
@@ -76,9 +107,14 @@ public:
   virtual const HistogramStatistics& cumulativeStatistics() const PURE;
 
   /**
-   * Returns the summary representation.
+   * Returns the quantile summary representation.
    */
-  virtual const std::string summary() const PURE;
+  virtual const std::string quantileSummary() const PURE;
+
+  /**
+   * Returns the bucket summary representation.
+   */
+  virtual const std::string bucketSummary() const PURE;
 };
 
 typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;

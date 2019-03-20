@@ -151,7 +151,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
     std::string length_str = token.substr(end_request + 2);
     uint64_t length_value;
 
-    if (!StringUtil::atoul(length_str.c_str(), length_value)) {
+    if (!StringUtil::atoull(length_str.c_str(), length_value)) {
       throw EnvoyException(fmt::format("Length must be an integer, given: {}", length_str));
     }
 
@@ -346,6 +346,14 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       if (!stream_info.requestedServerName().empty()) {
         return stream_info.requestedServerName();
+      } else {
+        return UnspecifiedValueString;
+      }
+    };
+  } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      if (!stream_info.upstreamTransportFailureReason().empty()) {
+        return stream_info.upstreamTransportFailureReason();
       } else {
         return UnspecifiedValueString;
       }

@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/io_handle.h"
 #include "envoy/ssl/connection.h"
 
 #include "absl/types/optional.h"
@@ -48,9 +49,14 @@ public:
   virtual ~TransportSocketCallbacks() {}
 
   /**
-   * @return int the file descriptor associated with the connection.
+   * @return reference to the IoHandle associated with the connection.
    */
-  virtual int fd() const PURE;
+  virtual IoHandle& ioHandle() PURE;
+
+  /**
+   * @return const reference to the IoHandle associated with the connection.
+   */
+  virtual const IoHandle& ioHandle() const PURE;
 
   /**
    * @return Network::Connection& the connection interface.
@@ -100,6 +106,12 @@ public:
   virtual std::string protocol() const PURE;
 
   /**
+   * @return std::string the last failure reason occurred on the transport socket. If no failure
+   *         has been occurred the empty string is returned.
+   */
+  virtual absl::string_view failureReason() const PURE;
+
+  /**
    * @return bool whether the socket can be flushed and closed.
    */
   virtual bool canFlushClose() PURE;
@@ -111,7 +123,6 @@ public:
   virtual void closeSocket(Network::ConnectionEvent event) PURE;
 
   /**
-   *
    * @param buffer supplies the buffer to read to.
    * @return IoResult the result of the read action.
    */

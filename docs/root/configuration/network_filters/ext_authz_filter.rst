@@ -16,7 +16,7 @@ then the connection will be closed.
   authorized prior to rest of the filters processing the request.
 
 The content of the request that are passed to an authorization service is specified by
-:ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
+:ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
 
 .. _config_network_filters_ext_authz_network_configuration:
 
@@ -32,17 +32,25 @@ A sample filter configuration could be:
 
   filters:
     - name: envoy.ext_authz
-      stat_prefix: ext_authz
-      grpc_service:
-        envoy_grpc:
-          cluster_name: ext-authz
+      config:
+        stat_prefix: ext_authz
+        grpc_service:
+          envoy_grpc:
+            cluster_name: ext-authz
 
   clusters:
     - name: ext-authz
       type: static
       http2_protocol_options: {}
-      hosts:
-        - socket_address: { address: 127.0.0.1, port_value: 10003 }
+      load_assignment:
+        cluster_name: ext-authz
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 10003
 
 Statistics
 ----------

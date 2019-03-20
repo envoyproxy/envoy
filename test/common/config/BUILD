@@ -5,6 +5,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -86,6 +87,20 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "delta_subscription_test_harness",
+    hdrs = ["delta_subscription_test_harness.h"],
+    deps = [
+        ":subscription_test_harness",
+        "//source/common/config:delta_subscription_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
 envoy_cc_test(
     name = "http_subscription_impl_test",
     srcs = ["http_subscription_impl_test.cc"],
@@ -137,6 +152,7 @@ envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
     deps = [
+        ":delta_subscription_test_harness",
         ":filesystem_subscription_test_harness",
         ":grpc_subscription_test_harness",
         ":http_subscription_test_harness",
@@ -206,5 +222,23 @@ envoy_cc_test(
     srcs = ["filter_json_test.cc"],
     deps = [
         "//source/common/config:filter_json_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "dummy_config_proto",
+    srcs = ["dummy_config.proto"],
+)
+
+envoy_cc_test(
+    name = "config_provider_impl_test",
+    srcs = ["config_provider_impl_test.cc"],
+    deps = [
+        ":dummy_config_proto_cc",
+        "//source/common/config:config_provider_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )

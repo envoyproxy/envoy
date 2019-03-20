@@ -11,17 +11,15 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
-//#include "envoy/stats/stats_macros.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
 #include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
+#include "common/http/utility.h"
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
@@ -71,14 +69,19 @@ public:
 };
 
 /**
+ * Setup nghttp2 trace-level logging for when debugging.
+ */
+void initializeNghttp2Logging();
+
+/**
  * Base class for HTTP/2 client and server codecs.
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http2> {
 public:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                 const Http2Settings& http2_settings)
+                 const Http2Settings& http2_settings, const uint32_t max_request_headers_kb)
       : stats_{ALL_HTTP2_CODEC_STATS(POOL_COUNTER_PREFIX(stats, "http2."))},
-        connection_(connection),
+        connection_(connection), max_request_headers_kb_(max_request_headers_kb),
         per_stream_buffer_limit_(http2_settings.initial_stream_window_size_), dispatching_(false),
         raised_goaway_(false), pending_deferred_reset_(false) {}
 
@@ -187,11 +190,6 @@ protected:
     void pendingSendBufferHighWatermark();
     void pendingSendBufferLowWatermark();
 
-    // Max header size of 63K. This is arbitrary but makes it easier to test since nghttp2 doesn't
-    // appear to transmit headers greater than approximtely 64K (NGHTTP2_MAX_HEADERSLEN) for reasons
-    // I don't fully understand.
-    static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
-
     // Does any necessary WebSocket/Upgrade conversion, then passes the headers
     // to the decoder_.
     void decodeHeaders();
@@ -293,6 +291,7 @@ protected:
   nghttp2_session* session_{};
   CodecStats stats_;
   Network::Connection& connection_;
+  const uint32_t max_request_headers_kb_;
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
 
@@ -321,7 +320,8 @@ private:
 class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks& callbacks,
-                       Stats::Scope& stats, const Http2Settings& http2_settings);
+                       Stats::Scope& stats, const Http2Settings& http2_settings,
+                       const uint32_t max_request_headers_kb);
 
   // Http::ClientConnection
   Http::StreamEncoder& newStream(StreamDecoder& response_decoder) override;
@@ -341,7 +341,8 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Stats::Scope& scope, const Http2Settings& http2_settings);
+                       Stats::Scope& scope, const Http2Settings& http2_settings,
+                       const uint32_t max_request_headers_kb);
 
 private:
   // ConnectionImpl

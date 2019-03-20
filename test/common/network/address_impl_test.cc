@@ -1,10 +1,11 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -25,6 +26,7 @@ namespace Envoy {
 namespace Network {
 namespace Address {
 namespace {
+
 bool addressesEqual(const InstanceConstSharedPtr& a, const Instance& b) {
   if (a == nullptr || a->type() != Type::Ip || b.type() != Type::Ip) {
     return false;
@@ -51,41 +53,40 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  const int listen_fd = addr_port->socket(SocketType::Stream);
-  ASSERT_GE(listen_fd, 0) << addr_port->asString();
-  ScopedFdCloser closer1(listen_fd);
+  IoHandlePtr io_handle = addr_port->socket(SocketType::Stream);
+  ASSERT_GE(io_handle->fd(), 0) << addr_port->asString();
 
   // Check that IPv6 sockets accept IPv6 connections only.
   if (addr_port->ip()->version() == IpVersion::v6) {
     int socket_v6only = 0;
     socklen_t size_int = sizeof(socket_v6only);
-    ASSERT_GE(::getsockopt(listen_fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int), 0);
+    ASSERT_GE(::getsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int),
+              0);
     EXPECT_EQ(v6only, socket_v6only);
   }
 
   // Bind the socket to the desired address and port.
-  const Api::SysCallIntResult result = addr_port->bind(listen_fd);
+  const Api::SysCallIntResult result = addr_port->bind(io_handle->fd());
   ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
                            << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
   // require another thread.
-  ASSERT_EQ(::listen(listen_fd, 128), 0);
+  ASSERT_EQ(::listen(io_handle->fd(), 128), 0);
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    const int client_fd = addr_port->socket(SocketType::Stream);
-    ASSERT_GE(client_fd, 0) << addr_port->asString();
-    ScopedFdCloser closer2(client_fd);
+    IoHandlePtr client_handle = addr_port->socket(SocketType::Stream);
+    ASSERT_GE(client_handle->fd(), 0) << addr_port->asString();
 
     // Instance::socket creates a non-blocking socket, which that extends all the way to the
     // operation of ::connect(), so connect returns with errno==EWOULDBLOCK before the tcp
     // handshake can complete. For testing convenience, re-enable blocking on the socket
     // so that connect will wait for the handshake to complete.
-    makeFdBlocking(client_fd);
+    makeFdBlocking(client_handle->fd());
 
     // Connect to the server.
-    const Api::SysCallIntResult result = addr_port->connect(client_fd);
+    const Api::SysCallIntResult result = addr_port->connect(client_handle->fd());
     ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
@@ -104,9 +105,9 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 } // namespace
 
 class AddressImplSocketTest : public testing::TestWithParam<IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, AddressImplSocketTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AddressImplSocketTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AddressImplSocketTest, SocketBindAndConnect) {
   // Test listening on and connecting to an unused port with an IP loopback address.
@@ -116,6 +117,22 @@ TEST_P(AddressImplSocketTest, SocketBindAndConnect) {
 TEST(Ipv4CompatAddressImplSocktTest, SocketBindAndConnect) {
   if (TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v6)) {
     testSocketBindAndConnect(Network::Address::IpVersion::v6, false);
+  }
+}
+
+TEST(Ipv4InstanceTest, SockaddrToString) {
+  // Test addresses from various RFC 5735 reserved ranges
+  static const char* addresses[] = {"0.0.0.0",        "0.0.0.255",       "0.0.255.255",
+                                    "0.255.255.255",  "192.0.2.0",       "198.151.100.1",
+                                    "198.151.100.10", "198.151.100.100", "10.0.0.1",
+                                    "10.0.20.1",      "10.3.201.1",      "255.255.255.255"};
+
+  for (const auto address : addresses) {
+    sockaddr_in addr4;
+    addr4.sin_family = AF_INET;
+    EXPECT_EQ(1, inet_pton(AF_INET, address, &addr4.sin_addr));
+    addr4.sin_port = 0;
+    EXPECT_STREQ(address, Ipv4Instance::sockaddrToString(addr4).c_str());
   }
 }
 
@@ -310,11 +327,10 @@ TEST(PipeInstanceTest, BadAddress) {
 TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance address(path);
-    const int listen_fd = address.socket(SocketType::Stream);
-    ASSERT_GE(listen_fd, 0) << address.asString();
-    ScopedFdCloser closer(listen_fd);
+    IoHandlePtr io_handle = address.socket(SocketType::Stream);
+    ASSERT_GE(io_handle->fd(), 0) << address.asString();
 
-    const Api::SysCallIntResult result = address.bind(listen_fd);
+    const Api::SysCallIntResult result = address.bind(io_handle->fd());
     ASSERT_EQ(result.rc_, 0) << address.asString() << "\nerror: " << strerror(result.errno_)
                              << "\nerrno: " << result.errno_;
   };
@@ -324,7 +340,7 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
   bind_uds_socket(path); // after closing, second bind to the same path should succeed.
 }
 
-TEST(AddressFromSockAddr, IPv4) {
+TEST(AddressFromSockAddrDeathTest, IPv4) {
   sockaddr_storage ss;
   auto& sin = reinterpret_cast<sockaddr_in&>(ss);
 
@@ -343,7 +359,7 @@ TEST(AddressFromSockAddr, IPv4) {
   EXPECT_THROW(addressFromSockAddr(ss, sizeof(sockaddr_in)), EnvoyException);
 }
 
-TEST(AddressFromSockAddr, IPv6) {
+TEST(AddressFromSockAddrDeathTest, IPv6) {
   sockaddr_storage ss;
   auto& sin6 = reinterpret_cast<sockaddr_in6&>(ss);
 
@@ -367,7 +383,7 @@ TEST(AddressFromSockAddr, IPv6) {
             addressFromSockAddr(ss, sizeof(sockaddr_in6), true)->asString());
 }
 
-TEST(AddressFromSockAddr, Pipe) {
+TEST(AddressFromSockAddrDeathTest, Pipe) {
   sockaddr_storage ss;
   auto& sun = reinterpret_cast<sockaddr_un&>(ss);
   sun.sun_family = AF_UNIX;
@@ -396,18 +412,18 @@ TEST(AddressFromSockAddr, Pipe) {
 struct TestCase {
   enum InstanceType { Ipv4, Ipv6, Pipe };
 
-  TestCase() : type_(Ipv4), port_(0) {}
-  TestCase(enum InstanceType type, std::string address, uint32_t port)
-      : type_(type), address_(address), port_(port) {}
-  TestCase(const TestCase& rhs) : type_(rhs.type_), address_(rhs.address_), port_(rhs.port_) {}
+  TestCase() = default;
+  TestCase(enum InstanceType type, const std::string& address, uint32_t port)
+      : address_(address), type_(type), port_(port) {}
+  TestCase(const TestCase& rhs) : address_(rhs.address_), type_(rhs.type_), port_(rhs.port_) {}
 
   bool operator==(const TestCase& rhs) {
     return (type_ == rhs.type_ && address_ == rhs.address_ && port_ == rhs.port_);
   }
 
-  enum InstanceType type_;
   std::string address_;
-  uint32_t port_; // Ignored for Pipe
+  enum InstanceType type_ { Ipv4 };
+  uint32_t port_ = 0; // Ignored for Pipe
 };
 
 class MixedAddressTest : public testing::TestWithParam<::testing::tuple<TestCase, TestCase>> {
@@ -451,9 +467,9 @@ struct TestCase test_cases[] = {
     {TestCase::Ipv6, "01:023::00ef", 2},    {TestCase::Ipv6, "01:023::00ed", 1},
     {TestCase::Pipe, "/path/to/pipe/1", 0}, {TestCase::Pipe, "/path/to/pipe/2", 0}};
 
-INSTANTIATE_TEST_CASE_P(AddressCrossProduct, MixedAddressTest,
-                        ::testing::Combine(::testing::ValuesIn(test_cases),
-                                           ::testing::ValuesIn(test_cases)));
+INSTANTIATE_TEST_SUITE_P(AddressCrossProduct, MixedAddressTest,
+                         ::testing::Combine(::testing::ValuesIn(test_cases),
+                                            ::testing::ValuesIn(test_cases)));
 
 } // namespace Address
 } // namespace Network

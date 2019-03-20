@@ -80,10 +80,15 @@ Following cluster **example_jwks_cluster** is needed to fetch JWKS.
   cluster:
     name: example_jwks_cluster
     type: STRICT_DNS
-    hosts:
-      socket_address:
-        address: example.com
-        port_value: 80
+    load_assignment:
+      cluster_name: example_jwks_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: example.com
+                port_value: 80
 
 
 Inline JWKS config example

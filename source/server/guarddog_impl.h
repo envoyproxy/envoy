@@ -39,8 +39,7 @@ public:
    *
    * See the configuration documentation for details on the timeout settings.
    */
-  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-               Event::TimeSystem& time_system, Api::Api& api);
+  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api);
   ~GuardDogImpl();
 
   /**
@@ -77,7 +76,7 @@ private:
     bool megamiss_alerted_{};
   };
 
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
   const std::chrono::milliseconds miss_timeout_;
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;

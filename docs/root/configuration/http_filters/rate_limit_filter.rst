@@ -78,7 +78,7 @@ the following descriptor is generated:
 Statistics
 ----------
 
-The buffer filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
+The rate limit filter outputs statistics in the *cluster.<route target cluster>.ratelimit.* namespace.
 429 responses are emitted to the normal cluster :ref:`dynamic HTTP statistics
 <config_cluster_manager_cluster_stats_dynamic_http>`.
 

@@ -12,7 +12,7 @@
 #define IP6T_SO_ORIGINAL_DST 80
 #endif
 
-#include <netinet/ip.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <cstdint>
@@ -150,7 +150,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
     const auto ip_str = ip_address.substr(1, pos - 1);
     const auto port_str = ip_address.substr(pos + 2);
     uint64_t port64 = 0;
-    if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
+    if (port_str.empty() || !StringUtil::atoull(port_str.c_str(), port64, 10) || port64 > 65535) {
       throwWithMalformedIp(ip_address);
     }
     sockaddr_in6 sa6;
@@ -170,7 +170,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
   const auto ip_str = ip_address.substr(0, pos);
   const auto port_str = ip_address.substr(pos + 1);
   uint64_t port64 = 0;
-  if (port_str.empty() || !StringUtil::atoul(port_str.c_str(), port64, 10) || port64 > 65535) {
+  if (port_str.empty() || !StringUtil::atoull(port_str.c_str(), port64, 10) || port64 > 65535) {
     throwWithMalformedIp(ip_address);
   }
   sockaddr_in sa4;
@@ -194,7 +194,7 @@ void Utility::throwWithMalformedIp(const std::string& ip_address) {
 }
 
 // TODO(hennna): Currently getLocalAddress does not support choosing between
-// multiple interfaces and addresses not returned by getifaddrs. In additon,
+// multiple interfaces and addresses not returned by getifaddrs. In addition,
 // the default is to return a loopback address of type version. This function may
 // need to be updated in the future. Discussion can be found at Github issue #939.
 Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersion version) {
@@ -227,7 +227,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
     freeifaddrs(ifaddr);
   }
 
-  // If the local address is not found above, then return the loopback addresss by default.
+  // If the local address is not found above, then return the loopback address by default.
   if (ret == nullptr) {
     if (version == Address::IpVersion::v4) {
       ret.reset(new Address::Ipv4Instance("127.0.0.1"));
@@ -404,7 +404,7 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
     return nullptr;
   }
 #else
-  // TODO(zuercher): determine if connection redirection is possible under OS X (c.f. pfctl and
+  // TODO(zuercher): determine if connection redirection is possible under macOS (c.f. pfctl and
   // divert), and whether it's possible to find the learn destination address.
   UNREFERENCED_PARAMETER(fd);
   return nullptr;
@@ -498,6 +498,27 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
     auto* socket_address = proto_address.mutable_socket_address();
     socket_address->set_address(address.ip()->addressAsString());
     socket_address->set_port_value(address.ip()->port());
+  }
+}
+
+Address::SocketType
+Utility::protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address) {
+  switch (proto_address.address_case()) {
+  case envoy::api::v2::core::Address::kSocketAddress: {
+    auto protocol = proto_address.socket_address().protocol();
+    switch (protocol) {
+    case envoy::api::v2::core::SocketAddress::TCP:
+      return Address::SocketType::Stream;
+    case envoy::api::v2::core::SocketAddress::UDP:
+      return Address::SocketType::Datagram;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+  case envoy::api::v2::core::Address::kPipe:
+    return Address::SocketType::Stream;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

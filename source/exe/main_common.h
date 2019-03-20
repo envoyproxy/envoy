@@ -33,7 +33,7 @@ class MainCommonBase {
 public:
   // Consumer must guarantee that all passed references are alive until this object is
   // destructed.
-  MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
+  MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
                  Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                  Thread::ThreadFactory& thread_factory);
@@ -63,7 +63,7 @@ public:
                     const AdminRequestFn& handler);
 
 protected:
-  Envoy::OptionsImpl& options_;
+  const Envoy::OptionsImpl& options_;
 
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
@@ -84,6 +84,8 @@ class MainCommon {
 public:
   MainCommon(int argc, const char* const* argv);
   bool run() { return base_.run(); }
+  // Only tests have a legitimate need for this today.
+  Event::Dispatcher& dispatcherForTest() { return base_.server()->dispatcher(); }
 
   // Makes an admin-console request by path, calling handler() when complete.
   // The caller can initiate this from any thread, but it posts the request

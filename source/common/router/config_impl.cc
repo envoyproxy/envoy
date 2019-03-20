@@ -37,17 +37,35 @@
 
 namespace Envoy {
 namespace Router {
+namespace {
+
+InternalRedirectAction
+convertInternalRedirectAction(const envoy::api::v2::route::RouteAction& route) {
+  switch (route.internal_redirect_action()) {
+  case envoy::api::v2::route::RouteAction::PASS_THROUGH_INTERNAL_REDIRECT:
+    return InternalRedirectAction::PassThrough;
+  case envoy::api::v2::route::RouteAction::HANDLE_INTERNAL_REDIRECT:
+    return InternalRedirectAction::Handle;
+  default:
+    return InternalRedirectAction::PassThrough;
+  }
+}
+
+} // namespace
 
 std::string SslRedirector::newPath(const Http::HeaderMap& headers) const {
   return Http::Utility::createSslRedirectPath(headers);
 }
 
-RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
-  if (!config.has_retry_policy()) {
-    return;
-  }
+HedgePolicyImpl::HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge_policy)
+    : initial_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, initial_requests, 1)),
+      additional_request_chance_(hedge_policy.additional_request_chance()),
+      hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
-  const auto& retry_policy = config.retry_policy();
+HedgePolicyImpl::HedgePolicyImpl()
+    : initial_requests_(1), additional_request_chance_({}), hedge_on_per_try_timeout_(false) {}
+
+RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy) {
   per_try_timeout_ =
       std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
@@ -103,7 +121,9 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
   return factory.createRetryPriority(*retry_priority_config_.second, num_retries_);
 }
 
-CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
+CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
+                               Runtime::Loader& loader)
+    : config_(config), loader_(loader) {
   for (const auto& origin : config.allow_origin()) {
     allow_origin_.push_back(origin);
   }
@@ -117,7 +137,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
-  enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
+  legacy_enabled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true);
 }
 
 ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
@@ -305,7 +325,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       path_redirect_(route.redirect().path_redirect()),
       https_redirect_(route.redirect().https_redirect()),
       prefix_rewrite_redirect_(route.redirect().prefix_rewrite()),
-      strip_query_(route.redirect().strip_query()), retry_policy_(route.route()),
+      strip_query_(route.redirect().strip_query()),
+      hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
+      retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route())),
       rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
@@ -322,9 +344,11 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
       decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
-      direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
-      per_filter_configs_(route.per_filter_config(), factory_context),
-      time_system_(factory_context.dispatcher().timeSystem()) {
+      direct_response_body_(ConfigUtility::parseDirectResponseBody(route, factory_context.api())),
+      per_filter_configs_(route.typed_per_filter_config(), route.per_filter_config(),
+                          factory_context),
+      time_source_(factory_context.dispatcher().timeSource()),
+      internal_redirect_action_(convertInternalRedirectAction(route.route())) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -377,7 +401,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
        PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), include_vh_rate_limits, false));
 
   if (route.route().has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(route.route().cors());
+    cors_policy_ =
+        std::make_unique<CorsPolicyImpl>(route.route().cors(), factory_context.runtime());
   }
   for (const auto upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
@@ -477,7 +502,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
     return;
   }
 
-  std::string path = headers.Path()->value().c_str();
+  std::string path = std::string(headers.Path()->value().c_str(), headers.Path()->value().size());
   if (insert_envoy_original_path) {
     headers.insertEnvoyOriginalPath().value(*headers.Path());
   }
@@ -586,6 +611,40 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route)
   return ret;
 }
 
+HedgePolicyImpl RouteEntryImplBase::buildHedgePolicy(
+    const absl::optional<envoy::api::v2::route::HedgePolicy>& vhost_hedge_policy,
+    const envoy::api::v2::route::RouteAction& route_config) const {
+  // Route specific policy wins, if available.
+  if (route_config.has_hedge_policy()) {
+    return HedgePolicyImpl(route_config.hedge_policy());
+  }
+
+  // If not, we fall back to the virtual host policy if there is one.
+  if (vhost_hedge_policy) {
+    return HedgePolicyImpl(vhost_hedge_policy.value());
+  }
+
+  // Otherwise, an empty policy will do.
+  return HedgePolicyImpl();
+}
+
+RetryPolicyImpl RouteEntryImplBase::buildRetryPolicy(
+    const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
+    const envoy::api::v2::route::RouteAction& route_config) const {
+  // Route specific policy wins, if available.
+  if (route_config.has_retry_policy()) {
+    return RetryPolicyImpl(route_config.retry_policy());
+  }
+
+  // If not, we fallback to the virtual host policy if there is one.
+  if (vhost_retry_policy) {
+    return RetryPolicyImpl(vhost_retry_policy.value());
+  }
+
+  // Otherwise, an empty policy will do.
+  return RetryPolicyImpl();
+}
+
 DecoratorConstPtr RouteEntryImplBase::parseDecorator(const envoy::api::v2::route::Route& route) {
   DecoratorConstPtr ret;
   if (route.has_decorator()) {
@@ -681,7 +740,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
                                                       cluster.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
-      per_filter_configs_(cluster.per_filter_config(), factory_context) {
+      per_filter_configs_(cluster.typed_per_filter_config(), cluster.per_filter_config(),
+                          factory_context) {
   if (cluster.has_metadata_match()) {
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -803,7 +863,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
-      per_filter_configs_(virtual_host.per_filter_config(), factory_context),
+      per_filter_configs_(virtual_host.typed_per_filter_config(), virtual_host.per_filter_config(),
+                          factory_context),
       include_attempt_count_(virtual_host.include_request_attempt_count()) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
@@ -817,6 +878,14 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+
+  // Retry and Hedge policies must be set before routes, since they may use them.
+  if (virtual_host.has_retry_policy()) {
+    retry_policy_ = virtual_host.retry_policy();
+  }
+  if (virtual_host.has_hedge_policy()) {
+    hedge_policy_ = virtual_host.hedge_policy();
   }
 
   for (const auto& route : virtual_host.routes()) {
@@ -851,7 +920,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
   }
 
   if (virtual_host.has_cors()) {
-    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors());
+    cors_policy_ = std::make_unique<CorsPolicyImpl>(virtual_host.cors(), factory_context.runtime());
   }
 }
 
@@ -1014,21 +1083,42 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
                                                      config.response_headers_to_remove());
 }
 
+namespace {
+
+RouteSpecificFilterConfigConstSharedPtr
+createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
+                                const ProtobufWkt::Struct& config,
+                                Server::Configuration::FactoryContext& factory_context) {
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<
+      Server::Configuration::NamedHttpFilterConfigFactory>(name);
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, *proto_config);
+  return factory.createRouteSpecificFilterConfig(*proto_config, factory_context);
+}
+
+} // namespace
+
 PerFilterConfigs::PerFilterConfigs(
+    const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Any>& typed_configs,
     const Protobuf::Map<ProtobufTypes::String, ProtobufWkt::Struct>& configs,
     Server::Configuration::FactoryContext& factory_context) {
-  for (const auto& cfg : configs) {
-    const std::string& name = cfg.first;
-    const ProtobufWkt::Struct& struct_config = cfg.second;
+  if (!typed_configs.empty() && !configs.empty()) {
+    throw EnvoyException("Only one of typed_configs or configs can be specified");
+  }
 
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<
-        Server::Configuration::NamedHttpFilterConfigFactory>(name);
+  for (const auto& it : typed_configs) {
+    auto object = createRouteSpecificFilterConfig(
+        it.first, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
+    if (object != nullptr) {
+      configs_[it.first] = std::move(object);
+    }
+  }
 
-    auto object = factory.createRouteSpecificFilterConfig(
-        *Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory),
-        factory_context);
-    if (object) {
-      configs_[name] = object;
+  for (const auto& it : configs) {
+    auto object = createRouteSpecificFilterConfig(it.first, ProtobufWkt::Any::default_instance(),
+                                                  it.second, factory_context);
+    if (object != nullptr) {
+      configs_[it.first] = std::move(object);
     }
   }
 }

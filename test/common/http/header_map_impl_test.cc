@@ -23,6 +23,15 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(5U, string.size());
   }
 
+  // Static LowerCaseString operators
+  {
+    LowerCaseString banana("banana");
+    LowerCaseString lemon("lemon");
+    EXPECT_TRUE(banana < lemon);
+    EXPECT_TRUE(banana != lemon);
+    EXPECT_TRUE(banana == banana);
+  }
+
   // Static std::string constructor
   {
     std::string static_string("HELLO");
@@ -32,7 +41,7 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(5U, string.size());
   }
 
-  // Static move contructor
+  // Static move constructor
   {
     std::string static_string("HELLO");
     HeaderString string1(static_string);
@@ -705,7 +714,7 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
   }
 }
 
-TEST(HeaderMapImplTest, TestHeaderLengthChecks) {
+TEST(HeaderMapImplDeathTest, TestHeaderLengthChecks) {
   HeaderString value;
   value.setCopy("some;", 5);
   EXPECT_DEATH_LOG_TO_STDERR(value.append(nullptr, std::numeric_limits<uint32_t>::max()),

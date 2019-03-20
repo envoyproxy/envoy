@@ -4,6 +4,9 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -21,8 +24,8 @@ public:
   virtual bool peerCertificatePresented() const PURE;
 
   /**
-   * @return std::string the URI in the SAN feld of the local certificate. Returns "" if there is no
-   *         local certificate, or no SAN field, or no URI.
+   * @return std::string the URI in the SAN field of the local certificate. Returns "" if there is
+   *         no local certificate, or no SAN field, or no URI.
    **/
   virtual std::string uriSanLocalCertificate() const PURE;
 
@@ -63,6 +66,13 @@ public:
   virtual const std::string& urlEncodedPemEncodedPeerCertificate() const PURE;
 
   /**
+   * @return std::string the URL-encoded PEM-encoded representation of the full peer certificate
+   *         chain including the leaf certificate. Returns "" if there is no peer certificate or
+   *         encoding fails.
+   **/
+  virtual const std::string& urlEncodedPemEncodedPeerCertificateChain() const PURE;
+
+  /**
    * @return std::vector<std::string> the DNS entries in the SAN field of the peer certificate.
    *         Returns {} if there is no peer certificate, or no SAN field, or no DNS.
    **/
@@ -73,6 +83,18 @@ public:
    *         Returns {} if there is no local certificate, or no SAN field, or no DNS.
    **/
   virtual std::vector<std::string> dnsSansLocalCertificate() const PURE;
+
+  /**
+   * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be
+   *         considered valid from. Returns empty absl::optional if there is no peer certificate.
+   **/
+  virtual absl::optional<SystemTime> validFromPeerCertificate() const PURE;
+
+  /**
+   * @return absl::optional<SystemTime> the time that the peer certificate expires and should not be
+   *         considered valid after. Returns empty absl::optional if there is no peer certificate.
+   **/
+  virtual absl::optional<SystemTime> expirationPeerCertificate() const PURE;
 };
 
 } // namespace Ssl

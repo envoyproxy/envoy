@@ -263,20 +263,10 @@ public:
   virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
 
   /**
-   * Set the order of the write filters, indicating whether it is reversed to the filter chain
-   * config.
+   * @return std::string the failure reason of the underlying transport socket, if no failure
+   *         occurred an empty string is returned.
    */
-  // TODO(qiannawang): this method is deprecated and to be moved soon. See
-  // https://github.com/envoyproxy/envoy/pull/4889 for more details.
-  virtual void setWriteFilterOrder(bool reversed) PURE;
-
-  /**
-   * @return bool indicates whether write filters should be in the reversed order of the filter
-   *         chain config.
-   */
-  // TODO(qiannawang): this method is deprecated and to be moved soon. See
-  // https://github.com/envoyproxy/envoy/pull/4889 for more details.
-  virtual bool reverseWriteFilterOrder() const PURE;
+  virtual absl::string_view transportFailureReason() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

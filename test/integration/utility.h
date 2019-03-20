@@ -38,7 +38,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -121,7 +122,7 @@ public:
    * @param host supplies the host header to use for the request.
    * @param content_type supplies the content-type header to use for the request, if any.
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
-   *         remote easly disconnection.
+   *         remote early disconnection.
    */
   static BufferingStreamDecoderPtr
   makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr, const std::string& method,
@@ -135,20 +136,17 @@ public:
    * @param url supplies the request url.
    * @param body supplies the optional request body to send.
    * @param type supplies the codec to use for the request.
-   * @param version the IP addess version of the client and server.
+   * @param version the IP address version of the client and server.
    * @param host supplies the host header to use for the request.
    * @param content_type supplies the content-type header to use for the request, if any.
    * @return BufferingStreamDecoderPtr the complete request or a partial request if there was
-   *         remote easly disconnection.
+   *         remote early disconnection.
    */
   static BufferingStreamDecoderPtr
   makeSingleRequest(uint32_t port, const std::string& method, const std::string& url,
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion ip_version, const std::string& host = "host",
                     const std::string& content_type = "");
-
-  // TODO(jmarantz): this should be injectable.
-  static DangerousDeprecatedTestTime evil_singleton_test_time_;
 };
 
 // A set of connection callbacks which tracks connection state.

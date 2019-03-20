@@ -44,7 +44,7 @@ that prefer a uniform H2 mesh throughout, for example, for a deployment of the f
 
 [Client] ---- HTTP/1.1 ---- [Front Envoy] ---- HTTP/2 ---- [Sidecar Envoy ---- H1  ---- App]
 
-In this case, if a client is for example using WebSocket, we want the Websocket to arive at the
+In this case, if a client is for example using WebSocket, we want the Websocket to arrive at the
 upstream server functionally intact, which means it needs to traverse the HTTP/2 hop.
 
 This is accomplished via

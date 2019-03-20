@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+option java_outer_classname = "EdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2";
+
 option java_generic_services = true;
 
 import "envoy/api/v2/discovery.proto";
@@ -15,6 +19,7 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/wrappers.proto";
 
 option (gogoproto.equal_all) = true;
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: EDS]
 // Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
@@ -50,6 +55,9 @@ message ClusterLoadAssignment {
 
   // List of endpoints to load balance to.
   repeated endpoint.LocalityLbEndpoints endpoints = 2 [(gogoproto.nullable) = false];
+
+  // Map of named endpoints that can be referenced in LocalityLbEndpoints.
+  map<string, endpoint.Endpoint> named_endpoints = 5;
 
   // Load balancing policy settings.
   message Policy {

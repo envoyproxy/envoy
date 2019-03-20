@@ -24,6 +24,7 @@ envoy_cc_test(
     srcs = ["assert_test.cc"],
     deps = [
         "//source/common/common:assert_lib",
+        "//test/test_common:logging_lib",
     ],
 )
 
@@ -58,6 +59,12 @@ envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],
     deps = ["//source/common/common:cleanup_lib"],
+)
+
+envoy_cc_test(
+    name = "phantom_test",
+    srcs = ["phantom_test.cc"],
+    deps = ["//source/common/common:phantom"],
 )
 
 envoy_cc_test(

@@ -2,14 +2,17 @@
 
 #include <numeric>
 
+#include "envoy/api/api.h"
 #include "envoy/common/exception.h"
 #include "envoy/json/json_object.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/type/percent.pb.h"
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
+#include "common/singleton/const_singleton.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
@@ -55,6 +58,15 @@ namespace ProtobufPercentHelper {
 // This avoids a giant macro mess when trying to do asserts, casts, etc.
 uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value);
 uint64_t convertPercent(double percent, uint64_t max_value);
+
+/**
+ * Given a fractional percent chance of a given event occurring, evaluate to a yes/no decision
+ * based on a provided random value.
+ * @param percent the chance of a given event happening.
+ * @param random_value supplies a numerical value to use to evaluate the event.
+ * @return bool decision about whether the event should occur.
+ */
+bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value);
 
 /**
  * Convert a fractional percent denominator enum into an integer.
@@ -146,6 +158,17 @@ public:
     return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
   }
 
+  class FileExtensionValues {
+  public:
+    const std::string ProtoBinary = ".pb";
+    const std::string ProtoBinaryLengthDelimited = ".pb_length_delimited";
+    const std::string ProtoText = ".pb_text";
+    const std::string Json = ".json";
+    const std::string Yaml = ".yaml";
+  };
+
+  typedef ConstSingleton<FileExtensionValues> FileExtensions;
+
   static std::size_t hash(const Protobuf::Message& message) {
     // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
     // message doesn't hash to different values.
@@ -175,7 +198,18 @@ public:
   static void loadFromJsonEx(const std::string& json, Protobuf::Message& message,
                              ProtoUnknownFieldsMode proto_unknown_fields);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
-  static void loadFromFile(const std::string& path, Protobuf::Message& message);
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api);
+
+  /**
+   * Checks for use of deprecated fields in message and all sub-messages.
+   * @param message message to validate.
+   * @param loader optional a pointer to the runtime loader for live deprecation status.
+   * @throw ProtoValidationException if deprecated fields are used and listed
+   *    in disallowed_features in runtime_features.h
+   */
+  static void
+  checkForDeprecation(const Protobuf::Message& message,
+                      Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
@@ -185,6 +219,9 @@ public:
    * @throw ProtoValidationException if the message does not satisfy its type constraints.
    */
   template <class MessageType> static void validate(const MessageType& message) {
+    // Log warnings or throw errors if deprecated fields are in use.
+    checkForDeprecation(message);
+
     std::string err;
     if (!Validate(message, &err)) {
       throw ProtoValidationException(err, message);
@@ -242,6 +279,18 @@ public:
    * @param dest message.
    */
   static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest);
+
+  /**
+   * Extract YAML as string from a google.protobuf.Message.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @param block_print whether the returned JSON should be in block style rather than flow style.
+   * @param always_print_primitive_fields whether to include primitive fields set to their default
+   * values, e.g. an int32 set to 0 or a bool set to false.
+   * @return std::string of formatted YAML object.
+   */
+  static std::string getYamlStringFromMessage(const Protobuf::Message& message,
+                                              const bool block_print = true,
+                                              const bool always_print_primitive_fields = false);
 
   /**
    * Extract JSON as string from a google.protobuf.Message.

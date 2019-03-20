@@ -16,8 +16,15 @@ envoy_package()
 
 envoy_cc_library(
     name = "assert_lib",
+    srcs = ["assert.cc"],
     hdrs = ["assert.h"],
     deps = [":minimal_logger_lib"],
+)
+
+envoy_cc_library(
+    name = "debug_recursion_checker_lib",
+    hdrs = ["debug_recursion_checker.h"],
+    deps = [":assert_lib"],
 )
 
 envoy_cc_library(
@@ -81,6 +88,7 @@ envoy_basic_cc_library(
 
 envoy_cc_library(
     name = "hash_lib",
+    srcs = ["hash.cc"],
     hdrs = ["hash.h"],
     external_deps = ["xxhash"],
 )
@@ -132,7 +140,6 @@ envoy_cc_library(
         ":macros",
         ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/filesystem:filesystem_interface",
     ],
 )
 
@@ -160,6 +167,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "non_copyable",
     hdrs = ["non_copyable.h"],
+)
+
+envoy_cc_library(
+    name = "phantom",
+    hdrs = ["phantom.h"],
 )
 
 envoy_cc_library(

@@ -46,8 +46,8 @@ Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
     return {-1, ENOTSUP};
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.setsockopt(socket.fd(), optname.value().first, optname.value().second,
-                                value.data(), value.size());
+  return os_syscalls.setsockopt(socket.ioHandle().fd(), optname.value().first,
+                                optname.value().second, value.data(), value.size());
 }
 
 } // namespace Network

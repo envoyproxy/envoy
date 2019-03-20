@@ -28,8 +28,7 @@ Tracing::HttpTracerPtr DatadogTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the Datadog tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DatadogTracerFactory, Server::Configuration::TracerFactory>
-    register_;
+REGISTER_FACTORY(DatadogTracerFactory, Server::Configuration::TracerFactory);
 
 } // namespace Datadog
 } // namespace Tracers

@@ -22,9 +22,9 @@ envoy_py_test_binary(
 filegroup(
     name = "configs",
     srcs = [
-        "original-dst-cluster/proxy_config.json",
+        "original-dst-cluster/proxy_config.yaml",
     ] + select({
-        "@bazel_tools//tools/osx:darwin": [],
+        "//bazel:apple": [],
         "//conditions:default": ["freebind/freebind.yaml"],
     }),
 )

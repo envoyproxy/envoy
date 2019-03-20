@@ -39,3 +39,4 @@ Architecture overview
   scripting
   ext_authz_filter
   overload_manager
+  ip_transparency

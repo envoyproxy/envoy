@@ -40,6 +40,11 @@ public:
   virtual Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
 
   /**
+   * @return const Buffer::Instance* the fully buffered admin request if applicable.
+   */
+  virtual const Buffer::Instance* getRequestBody() const PURE;
+
+  /**
    * @return Http::HeaderMap& to be used by handler to parse header information sent with the
    * request.
    */
@@ -67,7 +72,7 @@ public:
 
   /**
    * Callback for admin URL handlers.
-   * @param path_and_query supplies the the path and query of the request URL.
+   * @param path_and_query supplies the path and query of the request URL.
    * @param response_headers enables setting of http headers (eg content-type, cache-control) in the
    * handler.
    * @param response supplies the buffer to fill in with the response body.
@@ -129,7 +134,7 @@ public:
    *
    * @param path_and_query the path and query of the admin URL.
    * @param method the HTTP method (POST or GET).
-   * @param response_headers populated the the response headers from executing the request,
+   * @param response_headers populated the response headers from executing the request,
    *     most notably content-type.
    * @param body populated with the response-body from the admin request.
    * @return Http::Code The HTTP response code from the admin request.

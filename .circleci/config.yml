@@ -4,22 +4,28 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:a734887ad06609cf0b3c023d38239bf3e79d3717
+      - image: envoyproxy/envoy-build:698009170e362f9ca0594f2b1927fbbee199bf98
     resource_class: xlarge
     working_directory: /source
 
 jobs:
    release:
      executor: ubuntu-build
+     environment:
+       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
-       - run: ci/do_circle_ci.sh bazel.release
+       - run:
+           command:
+             ci/do_circle_ci.sh bazel.release
+           no_output_timeout: 60m
        - setup_remote_docker
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    asan:
      executor: ubuntu-build
      steps:
@@ -30,7 +36,8 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.asan
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    tsan:
      executor: ubuntu-build
      steps:
@@ -38,7 +45,9 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
+
    compile_time_options:
      executor: ubuntu-build
      steps:
@@ -46,7 +55,8 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.compile_time_options
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    api:
      executor: ubuntu-build
      steps:
@@ -58,7 +68,8 @@ jobs:
              - "fb:f3:fe:be:1c:b2:ec:b6:25:f9:7b:a6:87:54:02:8c"
        - run: ci/api_mirror.sh
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    filter_example_mirror:
      executor: ubuntu-build
      steps:
@@ -96,10 +107,14 @@ jobs:
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
-       - run: ci/do_circle_ci.sh bazel.coverage
+       - run:
+           command:
+             ci/do_circle_ci.sh bazel.coverage
+           no_output_timeout: 60m
        - run: ci/coverage_publish.sh
        - store_artifacts:
-           path: /build/envoy/generated/coverage
+           path: /build/envoy/generated
+           destination: /
 
    clang_tidy:
      executor: ubuntu-build
@@ -121,9 +136,10 @@ jobs:
        - run: ci/do_circle_ci.sh check_format
        - run: ci/do_circle_ci.sh check_repositories
        - run: ci/do_circle_ci.sh check_spelling
+       - run: ci/do_circle_ci.sh check_spelling_pedantic
    build_image:
      docker:
-       - image: circleci/python:2.7
+       - image: circleci/python:3.7
          environment:
            # See comment in do_circle_ci.sh for why we do this.
            NUM_CPUS: 8
@@ -148,6 +164,8 @@ jobs:
    mac:
      macos:
        xcode: "9.3.0"
+     environment:
+       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: sudo ntpdate -vu time.apple.com
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken

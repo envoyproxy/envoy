@@ -10,6 +10,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -25,9 +26,24 @@
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Server {
+namespace {
+
+std::string toString(Network::Address::SocketType socket_type) {
+  switch (socket_type) {
+  case Network::Address::SocketType::Stream:
+    return "SocketType::Stream";
+  case Network::Address::SocketType::Datagram:
+    return "SocketType::Datagram";
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+} // namespace
 
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
@@ -82,32 +98,53 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
   return ret;
 }
 
-Network::SocketSharedPtr
-ProdListenerComponentFactory::createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                                                 const Network::Socket::OptionsSharedPtr& options,
-                                                 bool bind_to_port) {
+Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
+    Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
+    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
+  ASSERT(socket_type == Network::Address::SocketType::Stream ||
+         socket_type == Network::Address::SocketType::Datagram);
 
   // For each listener config we share a single socket among all threaded listeners.
   // First we try to get the socket from our parent if applicable.
   if (address->type() == Network::Address::Type::Pipe) {
+    if (socket_type != Network::Address::SocketType::Stream) {
+      // This could be implemented in the future, since Unix domain sockets
+      // support SOCK_DGRAM, but there would need to be a way to specify it in
+      // envoy.api.v2.core.Pipe.
+      throw EnvoyException(
+          fmt::format("socket type {} not supported for pipes", toString(socket_type)));
+    }
     const std::string addr = fmt::format("unix://{}", address->asString());
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
-    if (fd != -1) {
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
+    if (io_handle->isOpen()) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-      return std::make_shared<Network::UdsListenSocket>(fd, address);
+      return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
   }
 
-  const std::string addr = fmt::format("tcp://{}", address->asString());
+  const std::string scheme = (socket_type == Network::Address::SocketType::Stream)
+                                 ? Network::Utility::TCP_SCHEME
+                                 : Network::Utility::UDP_SCHEME;
+  const std::string addr = absl::StrCat(scheme, address->asString());
   const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
   if (fd != -1) {
     ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
-    return std::make_shared<Network::TcpListenSocket>(fd, address, options);
+    Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>(fd);
+    if (socket_type == Network::Address::SocketType::Stream) {
+      return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
+    } else {
+      return std::make_shared<Network::UdpListenSocket>(std::move(io_handle), address, options);
+    }
   }
-  return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
+  if (socket_type == Network::Address::SocketType::Stream) {
+    return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
+  } else {
+    return std::make_shared<Network::UdpListenSocket>(address, options, bind_to_port);
+  }
 }
 
 DrainManagerPtr
@@ -119,6 +156,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                            ListenerManagerImpl& parent, const std::string& name, bool modifiable,
                            bool workers_started, uint64_t hash)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
+      socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
@@ -127,10 +165,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      listener_tag_(parent_.factory_.nextListenerTag()), name_(name),
-      reverse_write_filter_order_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, bugfix_reverse_write_filter_order, true)),
-      modifiable_(modifiable), workers_started_(workers_started), hash_(hash),
+      listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
+      workers_started_(workers_started), hash_(hash),
+      dynamic_init_manager_(fmt::format("Listener {}", name)),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
@@ -231,9 +268,10 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         filter_chain_match.application_protocols().begin(),
         filter_chain_match.application_protocols().end());
     Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        parent_.server_.sslContextManager(), *listener_scope_, parent_.server_.clusterManager(),
-        parent_.server_.localInfo(), parent_.server_.dispatcher(), parent_.server_.random(),
-        parent_.server_.stats());
+        parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
+        parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
+        parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
+        parent_.server_.threadLocal(), parent_.server_.api());
     factory_context.setInitManager(initManager());
     addFilterChain(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
@@ -380,6 +418,15 @@ void ListenerImpl::addFilterChainForSourceTypes(
     SourceTypesArray& source_types_array,
     const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
     const Network::FilterChainSharedPtr& filter_chain) {
+  if (source_types_array[source_type] != nullptr) {
+    // We should never get here once all fields in FilterChainMatch are implemented. At this point,
+    // this can become an ASSERT. In principle, we could verify the various missing fields earlier,
+    // but best to have defense-in-depth here, since any mistake leads to potential
+    // heap-use-after-free when filter chains are unexpectedly destructed.
+    throw EnvoyException(fmt::format("error adding listener '{}': multiple filter chains with "
+                                     "effectively equivalent matching rules are defined",
+                                     address_->asString()));
+  }
   source_types_array[source_type] = filter_chain;
 }
 
@@ -626,9 +673,8 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
-                                         WorkerFactory& worker_factory, TimeSource& time_source)
-    : server_(server), time_source_(time_source), factory_(listener_factory),
-      stats_(generateStats(server.stats())),
+                                         WorkerFactory& worker_factory)
+    : server_(server), factory_(listener_factory), stats_(generateStats(server.stats())),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
@@ -774,6 +820,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
     new_listener->setSocket(draining_listener_socket
                                 ? draining_listener_socket
                                 : factory_.createListenSocket(new_listener->address(),
+                                                              new_listener->socketType(),
                                                               new_listener->listenSocketOptions(),
                                                               new_listener->bindToPort()));
     if (workers_started_) {
