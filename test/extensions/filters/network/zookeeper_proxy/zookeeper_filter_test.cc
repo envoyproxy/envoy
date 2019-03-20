@@ -194,11 +194,9 @@ public:
 
     buffer.writeBEInt<int32_t>(8 + path.length());
     buffer.writeBEInt<int32_t>(1000);
-    // Opcode.
     buffer.writeBEInt<int32_t>(opcode);
-    // Path.
-    buffer.writeBEInt<uint32_t>(str.length() * 2);
-    buffer.add(str);
+    buffer.writeBEInt<uint32_t>(path.length() * 2);
+    buffer.add(path);
 
     return buffer;
   }
