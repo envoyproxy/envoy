@@ -20,7 +20,7 @@ public:
   std::string name() override { return "com.googlesource.quiche"; }
 };
 
-Envoy::Registry::RegisterFactory<QuicheFlagProvider, Envoy::CommandLineFlagProvider> registered;
+REGISTER_FACTORY(QuicheFlagProvider, Envoy::CommandLineFlagProvider);
 
 } // namespace
 

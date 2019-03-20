@@ -41,7 +41,9 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:quic_platform_sleep",
-    ],
+    ] + envoy_select_quiche([
+        "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
+    ]),
 )
 
 envoy_cc_test(
