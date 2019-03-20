@@ -50,7 +50,7 @@ namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest() : alloc_(options_) {
+  AdminStatsTest() : alloc_(options_, symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, alloc_);
     store_->addSink(sink_);
   }
@@ -63,6 +63,7 @@ public:
                                   true /*pretty_print*/);
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::StatsOptionsImpl options_;
@@ -1260,6 +1261,8 @@ private:
 
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
+  PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
+
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     std::string tname = std::string(name);
     counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
@@ -1274,6 +1277,7 @@ protected:
     histograms_.push_back(histogram);
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   Stats::StatsOptionsImpl stats_options_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;

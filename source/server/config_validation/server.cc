@@ -18,14 +18,15 @@ namespace Envoy {
 namespace Server {
 
 bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory) {
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                    Filesystem::Instance& file_system) {
   Thread::MutexBasicLockable access_log_lock;
   Stats::IsolatedStoreImpl stats_store;
 
   try {
     Event::RealTimeSystem time_system;
     ValidationInstance server(options, time_system, local_address, stats_store, access_log_lock,
-                              component_factory, thread_factory);
+                              component_factory, thread_factory, file_system);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
     server.shutdown();
     return true;
@@ -39,9 +40,10 @@ ValidationInstance::ValidationInstance(const Options& options, Event::TimeSystem
                                        Stats::IsolatedStoreImpl& store,
                                        Thread::BasicLockable& access_log_lock,
                                        ComponentFactory& component_factory,
-                                       Thread::ThreadFactory& thread_factory)
+                                       Thread::ThreadFactory& thread_factory,
+                                       Filesystem::Instance& file_system)
     : options_(options), stats_store_(store),
-      api_(new Api::ValidationImpl(thread_factory, store, time_system)),
+      api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,

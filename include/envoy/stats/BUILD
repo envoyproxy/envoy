@@ -25,7 +25,10 @@ envoy_cc_library(
         "tag_extractor.h",
         "tag_producer.h",
     ],
-    deps = ["//include/envoy/common:interval_set_interface"],
+    deps = [
+        ":symbol_table_interface",
+        "//include/envoy/common:interval_set_interface",
+    ],
 )
 
 envoy_cc_library(

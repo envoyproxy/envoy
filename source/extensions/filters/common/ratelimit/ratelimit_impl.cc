@@ -89,17 +89,16 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   callbacks_ = nullptr;
 }
 
-GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
-                                 Grpc::AsyncClientManager& async_client_manager,
-                                 Stats::Scope& scope)
-    : config_(config) {
-  envoy::api::v2::core::GrpcService grpc_service;
-  grpc_service.MergeFrom(config_->grpc_service());
-  async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
-}
-
-ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
-  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
+ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
+                          const envoy::api::v2::core::GrpcService& grpc_service,
+                          const std::chrono::milliseconds timeout) {
+  // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
+  // requests.
+  const auto async_client_factory =
+      context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+          grpc_service, context.scope(), true);
+  return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
+      async_client_factory->create(), timeout);
 }
 
 } // namespace RateLimit

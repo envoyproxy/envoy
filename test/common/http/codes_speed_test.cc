@@ -10,6 +10,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "benchmark/benchmark.h"
@@ -19,6 +20,8 @@ namespace Http {
 
 class CodeUtilitySpeedTest {
 public:
+  CodeUtilitySpeedTest() : global_store_(symbol_table_), cluster_scope_(symbol_table_) {}
+
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
                    const std::string& request_vcluster_name = EMPTY_STRING,
@@ -51,6 +54,7 @@ public:
     code_stats_.chargeResponseTiming(info);
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;

@@ -71,6 +71,12 @@ fault.http.max_active_faults
   cause resource constraint issues. If not specified, the :ref:`max_active_faults
   <envoy_api_field_config.filter.http.fault.v2.HTTPFault.max_active_faults>` setting will be used.
 
+fault.http.rate_limit.response_percent
+  % of requests which will have a response rate limit fault injected, if the filter is
+  :ref:`configured <envoy_api_field_config.filter.http.fault.v2.HTTPFault.response_rate_limit>` to
+  do so. Defaults to the value set in the :ref:`percentage
+  <envoy_api_field_config.filter.fault.v2.FaultRateLimit.percentage>` field.
+
 *Note*, fault filter runtime settings for the specific downstream cluster
 override the default ones if present. The following are downstream specific
 runtime keys:
@@ -100,6 +106,7 @@ owning HTTP connection manager.
 
   delays_injected, Counter, Total requests that were delayed
   aborts_injected, Counter, Total requests that were aborted
+  response_rl_injected, Counter, "Total requests that had a response rate limit selected for injection (actually injection may not occur due to disconnect, reset, no body, etc.)"
   faults_overflow, Counter, Total number of faults that were not injected due to overflowing the :ref:`max_active_faults <envoy_api_field_config.filter.http.fault.v2.HTTPFault.max_active_faults>` setting
   active_faults, Gauge, Total number of faults active at the current time
   <downstream-cluster>.delays_injected, Counter, Total delayed requests for the given downstream cluster
