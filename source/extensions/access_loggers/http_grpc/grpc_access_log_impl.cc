@@ -187,7 +187,6 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
 
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
-  // TODO(mattklein123): Populate tls_properties field.
   auto* common_properties = log_entry->mutable_common_properties();
 
   if (stream_info.downstreamRemoteAddress() != nullptr) {
@@ -199,6 +198,28 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     Network::Utility::addressToProtobufAddress(
         *stream_info.downstreamLocalAddress(),
         *common_properties->mutable_downstream_local_address());
+  }
+  if (stream_info.downstreamSslConnection() != nullptr) {
+    auto* tls_properties = common_properties->mutable_tls_properties();
+
+    tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
+
+    auto* local_properties = tls_properties->mutable_local_certificate_properties();
+    for (const auto& uri_san : stream_info.downstreamSslConnection()->uriSanLocalCertificate()) {
+      auto* local_san = local_properties->add_subject_alt_name();
+      local_san->set_uri(uri_san);
+    }
+    local_properties->set_subject(stream_info.downstreamSslConnection()->subjectLocalCertificate());
+
+    auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
+    for (const auto& uri_san : stream_info.downstreamSslConnection()->uriSanPeerCertificate()) {
+      auto* peer_san = peer_properties->add_subject_alt_name();
+      peer_san->set_uri(uri_san);
+    }
+
+    peer_properties->set_subject(stream_info.downstreamSslConnection()->subjectPeerCertificate());
+
+    // TODO(snowp): Populate remaining tls_properties fields.
   }
   common_properties->mutable_start_time()->MergeFrom(
       Protobuf::util::TimeUtil::NanosecondsToTimestamp(

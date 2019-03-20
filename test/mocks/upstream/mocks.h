@@ -56,7 +56,8 @@ public:
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(degradedHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
-  MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
+  MOCK_METHOD0(chooseHealthyLocality, absl::optional<uint32_t>());
+  MOCK_METHOD0(chooseDegradedLocality, absl::optional<uint32_t>());
   MOCK_CONST_METHOD0(priority, uint32_t());
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
   void setOverprovisioningFactor(const uint32_t overprovisioning_factor) {

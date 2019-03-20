@@ -424,7 +424,7 @@ TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
 }
 
 TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
-  cluster_.resetResourceManager(0, 0, 0, 0);
+  cluster_.resetResourceManager(0, 0, 0, 0, 0);
 
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"}};
   setup(request_headers);

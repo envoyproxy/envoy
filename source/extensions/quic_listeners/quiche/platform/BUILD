@@ -18,6 +18,18 @@ envoy_package()
 # TODO: add build target for quic_platform_impl_lib
 
 envoy_cc_library(
+    name = "string_utils_lib",
+    srcs = ["string_utils.cc"],
+    hdrs = ["string_utils.h"],
+    external_deps = ["abseil_str_format"],
+    visibility = ["//visibility:private"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "http2_platform_impl_lib",
     hdrs = [
         "http2_arraysize_impl.h",
@@ -30,27 +42,42 @@ envoy_cc_library(
         "http2_ptr_util_impl.h",
         "http2_string_impl.h",
         "http2_string_piece_impl.h",
-    ],
+    ] + envoy_select_quiche([
+        "http2_bug_tracker_impl.h",
+        "http2_logging_impl.h",
+        "http2_string_utils_impl.h",
+    ]),
     external_deps = [
         "abseil_base",
         "abseil_optional",
+        "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
+    deps = envoy_select_quiche([
+        ":quic_platform_logging_impl_lib",
+        ":string_utils_lib",
+    ]),
 )
 
 envoy_cc_library(
     name = "quic_platform_export_impl_lib",
-    hdrs = [
-        "quic_export_impl.h",
-    ],
+    hdrs = ["quic_export_impl.h"],
     visibility = ["//visibility:public"],
 )
 
 envoy_cc_library(
+    name = "quic_platform_logging_impl_lib",
+    srcs = ["quic_logging_impl.cc"],
+    hdrs = [
+        "quic_bug_tracker_impl.h",
+        "quic_logging_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = ["//source/common/common:assert_lib"],
+)
+
+envoy_cc_library(
     name = "quic_platform_base_impl_lib",
-    srcs = envoy_select_quiche([
-        "quic_logging_impl.cc",
-    ]),
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
@@ -60,23 +87,24 @@ envoy_cc_library(
         "quic_estimate_memory_usage_impl.h",
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
+        "quic_flags_impl.h",
         "quic_iovec_impl.h",
+        "quic_ip_address_impl.h",
         "quic_map_util_impl.h",
         "quic_prefetch_impl.h",
         "quic_reference_counted_impl.h",
         "quic_ptr_util_impl.h",
         "quic_server_stats_impl.h",
-        "quic_string_impl.h",
         "quic_string_piece_impl.h",
-        "quic_test_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
+        "quic_expect_bug_impl.h",
         "quic_logging_impl.h",
-        "quic_mock_log_impl.h",
-        "quic_singleton_impl.h",
-        "quic_stack_trace_impl.h",
-        "quic_thread_impl.h",
         "quic_mem_slice_impl.h",
+        "quic_mock_log_impl.h",
+        "quic_stack_trace_impl.h",
+        "quic_test_impl.h",
+        "quic_thread_impl.h",
     ]),
     external_deps = [
         "abseil_base",
@@ -90,21 +118,21 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_googlesource_quiche//:quic_platform_export",
+        "@com_googlesource_quiche//:quic_buffer_allocator_lib",
+        "@com_googlesource_quiche//:quic_platform_ip_address_family",
     ] + envoy_select_quiche([
-        "//include/envoy/buffer:buffer_interface",
+        ":quic_platform_logging_impl_lib",
+        "//source/common/buffer:buffer_lib",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
-        "//source/common/singleton:threadsafe_singleton",
     ]),
 )
 
 envoy_cc_library(
     name = "quic_platform_impl_lib",
-    srcs = [
-        "quic_cert_utils_impl.cc",
-        "quic_text_utils_impl.cc",
-    ] + envoy_select_quiche([
+    srcs = ["quic_cert_utils_impl.cc"] + envoy_select_quiche([
+        "quic_file_utils_impl.cc",
         "quic_hostname_utils_impl.cc",
         "quic_test_output_impl.cc",
     ]),
@@ -112,12 +140,12 @@ envoy_cc_library(
         "quic_cert_utils_impl.h",
         "quic_mutex_impl.h",
         "quic_str_cat_impl.h",
-        "quic_string_utils_impl.h",
-        "quic_text_utils_impl.h",
     ] + envoy_select_quiche([
-        "quic_bug_tracker_impl.h",
+        "quic_file_utils_impl.h",
         "quic_hostname_utils_impl.h",
+        "quic_string_utils_impl.h",
         "quic_test_output_impl.h",
+        "quic_text_utils_impl.h",
     ]),
     external_deps = [
         "quiche_quic_platform_base",
@@ -128,18 +156,54 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = envoy_select_quiche([
+        ":string_utils_lib",
+        "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:utility_lib",
     ]),
 )
 
 envoy_cc_library(
+    name = "quic_mem_slice_span_impl_lib",
+    srcs =
+        envoy_select_quiche([
+            "quic_mem_slice_span_impl.cc",
+        ]),
+    hdrs = envoy_select_quiche([
+        "quic_mem_slice_span_impl.h",
+        "quic_test_mem_slice_vector_impl.h",
+    ]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_googlesource_quiche//:quic_platform_base",
+        "@com_googlesource_quiche//:quiche_quic_core",
+    ] + envoy_select_quiche([
+        "//include/envoy/buffer:buffer_interface",
+        "//source/common/common:stack_array",
+    ]),
+)
+
+envoy_cc_library(
+    name = "quic_mem_slice_storage_impl_lib",
+    srcs =
+        envoy_select_quiche([
+            "quic_mem_slice_storage_impl.cc",
+        ]),
+    hdrs = envoy_select_quiche([
+        "quic_mem_slice_storage_impl.h",
+    ]),
+    copts = ["-Wno-error=invalid-offsetof"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_googlesource_quiche//:quic_mem_slice_span_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_platform_sleep_impl_lib",
     hdrs = ["quic_sleep_impl.h"],
     visibility = ["//visibility:public"],
-    deps = [
-        "@com_googlesource_quiche//:quic_time_lib",
-    ],
+    deps = ["@com_googlesource_quiche//:quic_time_lib"],
 )
 
 envoy_cc_library(
@@ -151,18 +215,29 @@ envoy_cc_library(
         "spdy_estimate_memory_usage_impl.h",
         "spdy_export_impl.h",
         "spdy_macros_impl.h",
+        "spdy_mem_slice_impl.h",
         "spdy_ptr_util_impl.h",
         "spdy_string_impl.h",
         "spdy_string_piece_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
         "spdy_unsafe_arena_impl.h",
-    ],
+    ] + envoy_select_quiche([
+        "spdy_bug_tracker_impl.h",
+        "spdy_logging_impl.h",
+        "spdy_string_utils_impl.h",
+    ]),
     external_deps = [
         "abseil_base",
         "abseil_hash",
         "abseil_inlined_vector",
         "abseil_memory",
+        "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
+    deps = envoy_select_quiche([
+        ":quic_platform_logging_impl_lib",
+        ":string_utils_lib",
+        "//source/common/common:assert_lib",
+    ]),
 )

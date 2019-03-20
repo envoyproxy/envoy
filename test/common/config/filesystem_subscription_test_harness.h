@@ -7,6 +7,7 @@
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -33,7 +34,11 @@ public:
         api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         subscription_(*dispatcher_, path_, stats_, *api_) {}
 
-  ~FilesystemSubscriptionTestHarness() { EXPECT_EQ(0, ::unlink(path_.c_str())); }
+  ~FilesystemSubscriptionTestHarness() {
+    if (::access(path_.c_str(), F_OK) != -1) {
+      EXPECT_EQ(0, ::unlink(path_.c_str()));
+    }
+  }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
     std::ifstream config_file(path_);
@@ -72,7 +77,7 @@ public:
     file_json.pop_back();
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok());
+    MessageUtil::loadFromJson(file_json, response_pb);
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(
                     RepeatedProtoEq(
@@ -93,6 +98,23 @@ public:
     // The first attempt always fail unless there was a file there to begin with.
     SubscriptionTestHarness::verifyStats(attempt, success, rejected,
                                          failure + (file_at_start_ ? 0 : 1), version);
+  }
+
+  void expectConfigUpdateFailed() override {
+    // initial_fetch_timeout not implemented
+  }
+
+  void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
+    UNREFERENCED_PARAMETER(timeout);
+    // initial_fetch_timeout not implemented
+  }
+
+  void expectDisableInitFetchTimeoutTimer() override {
+    // initial_fetch_timeout not implemented
+  }
+
+  void callInitFetchTimeoutCb() override {
+    // initial_fetch_timeout not implemented
   }
 
   const std::string path_;

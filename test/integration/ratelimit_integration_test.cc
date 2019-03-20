@@ -35,18 +35,13 @@ public:
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ratelimit_cluster->set_name("ratelimit");
       ratelimit_cluster->mutable_http2_protocol_options();
-      if (rls_in_bootstrap_) {
-        setGrpcService(*bootstrap.mutable_rate_limit_service()->mutable_grpc_service(), "ratelimit",
-                       fake_upstreams_.back()->localAddress());
-      }
 
       // enhance rate limit filter config based on the configuration of test.
       MessageUtil::loadFromYaml(base_filter_config_, proto_config_);
       proto_config_.set_failure_mode_deny(failure_mode_deny_);
-      if (rls_in_filter_) {
-        setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
-                       "ratelimit", fake_upstreams_.back()->localAddress());
-      }
+      setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
+                     "ratelimit", fake_upstreams_.back()->localAddress());
+
       envoy::api::v2::listener::Filter ratelimit_filter;
       ratelimit_filter.set_name("envoy.rate_limit");
       ProtobufWkt::Struct ratelimit_config = ProtobufWkt::Struct();
@@ -182,8 +177,6 @@ public:
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
   bool failure_mode_deny_ = false;
-  bool rls_in_bootstrap_ = false;
-  bool rls_in_filter_ = true;
   envoy::config::filter::http::rate_limit::v2::RateLimit proto_config_{};
   const std::string base_filter_config_ = R"EOF(
     domain: some_domain
@@ -197,36 +190,10 @@ public:
   RatelimitFailureModeIntegrationTest() { failure_mode_deny_ = true; }
 };
 
-// Test that verifies rate limit service in bootstrap only.
-class RatelimitBootStrapOnlyIntegrationTest : public RatelimitIntegrationTest {
-public:
-  RatelimitBootStrapOnlyIntegrationTest() {
-    rls_in_bootstrap_ = true;
-    rls_in_filter_ = false;
-  }
-};
-
-// Test that verifies rate limit service in both filter and bootstrap.
-class RatelimitBootStrapIntegrationTest : public RatelimitIntegrationTest {
-public:
-  RatelimitBootStrapIntegrationTest() {
-    rls_in_bootstrap_ = true;
-    rls_in_filter_ = true;
-  }
-};
-
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitBootStrapOnlyIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, RatelimitBootStrapIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
-
-TEST_P(RatelimitBootStrapOnlyIntegrationTest, Ok) { basicFlow(); }
-
-TEST_P(RatelimitBootStrapIntegrationTest, Ok) { basicFlow(); }
 
 TEST_P(RatelimitIntegrationTest, Ok) { basicFlow(); }
 

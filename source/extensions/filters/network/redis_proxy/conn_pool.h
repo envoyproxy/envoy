@@ -36,7 +36,7 @@ public:
               Common::Redis::Client::PoolCallbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<Instance> InstancePtr;
+typedef std::shared_ptr<Instance> InstanceSharedPtr;
 
 } // namespace ConnPool
 } // namespace RedisProxy

@@ -30,17 +30,17 @@ public:
   MOCK_METHOD1(iterateContexts, void(std::function<void(const Context&)> callback));
 };
 
-class MockConnection : public Connection {
+class MockConnectionInfo : public ConnectionInfo {
 public:
-  MockConnection();
-  ~MockConnection();
+  MockConnectionInfo();
+  ~MockConnectionInfo();
 
   MOCK_CONST_METHOD0(peerCertificatePresented, bool());
-  MOCK_CONST_METHOD0(uriSanLocalCertificate, std::string());
+  MOCK_CONST_METHOD0(uriSanLocalCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(sha256PeerCertificateDigest, std::string&());
   MOCK_CONST_METHOD0(serialNumberPeerCertificate, std::string());
   MOCK_CONST_METHOD0(subjectPeerCertificate, std::string());
-  MOCK_CONST_METHOD0(uriSanPeerCertificate, std::string());
+  MOCK_CONST_METHOD0(uriSanPeerCertificate, std::vector<std::string>());
   MOCK_CONST_METHOD0(subjectLocalCertificate, std::string());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificate, std::string&());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificateChain, std::string&());

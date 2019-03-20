@@ -1,16 +1,20 @@
 #pragma once
 
+#ifndef WIN32
 #include <sys/ioctl.h>
 #include <sys/mman.h>   // for mode_t
 #include <sys/socket.h> // for sockaddr
 #include <sys/stat.h>
 #include <sys/uio.h> // for iovec
 
+#endif
+
 #include <memory>
 #include <string>
 
 #include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/platform.h"
 
 namespace Envoy {
 namespace Api {

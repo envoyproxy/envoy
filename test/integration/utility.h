@@ -100,8 +100,8 @@ private:
     Network::ConnectionEvent last_connection_event_;
   };
 
-  Api::ApiPtr api_;
   Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;

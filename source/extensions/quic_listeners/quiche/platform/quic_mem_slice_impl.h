@@ -1,9 +1,18 @@
-#include "common/common/assert.h"
-#include "envoy/buffer/buffer.h"
-#include "quiche/quic/core/quic_buffer_allocator.h"
+#pragma once
 
-#include <memory>
+// NOLINT(namespace-envoy)
+
+// This file is part of the QUICHE platform implementation, and is not to be
+// consumed or referenced directly by other Envoy code. It serves purely as a
+// porting layer for QUICHE.
+
 #include <iostream>
+#include <memory>
+
+#include "common/buffer/buffer_impl.h"
+#include "common/common/assert.h"
+
+#include "quiche/quic/core/quic_buffer_allocator.h"
 
 namespace quic {
 
@@ -15,94 +24,64 @@ public:
   // Constructs a QuicMemSliceImpl by let |allocator| allocate a data buffer of
   // |length|.
   QuicMemSliceImpl(QuicBufferAllocator* allocator, size_t length)
-      : raw_slice_(allocator->New(length), [allocator, length](auto slice){
-        ASSERT(slice != nullptr);
-        consumeSlice(slice, length, allocator, nullptr);
-      }),length_(length),
-        parent_(nullptr), allocator_(allocator) {
-          std::cerr << "construct mem slice " << this << " from allocator " << allocator <<  " slice =" << reinterpret_cast<size_t>(raw_slice_.get()) << "\n";
-        }
+      : length_(length), slice_(new Envoy::Buffer::OwnedImpl()) {
+    auto fragment = new Envoy::Buffer::BufferFragmentImpl(
+        allocator->New(length), length,
+        [allocator](const void* data, size_t, const Envoy::Buffer::BufferFragmentImpl* fragment) {
+          allocator->Delete(const_cast<char*>(static_cast<const char*>(data)));
+          delete fragment;
+        });
+    slice_->addBufferFragment(*fragment);
+  }
 
-  // Constructs a QuicMemSliceImpl from a RawSlice, |parent| points to the owner
-  // of |raw_slice|.
-  QuicMemSliceImpl(const Envoy::Buffer::RawSlice& raw_slice,
-                   std::shared_ptr<Envoy::Buffer::Instance> parent)
-      : raw_slice_(static_cast<char*>(raw_slice.mem_), [parent, len=raw_slice.len_](auto slice){ consumeSlice(slice, len, nullptr, std::move(parent));}),
+  // Constructs a QuicMemSliceImpl from a Buffer::Instance whose getRawSlices()
+  // reutrns only 1 slice.
+  QuicMemSliceImpl(std::shared_ptr<Envoy::Buffer::Instance> slice)
+      : length_(slice->length()), slice_(std::move(slice)) {
+    ASSERT(slice_->getRawSlices(nullptr, 0) == 1);
+  }
 
-        length_(raw_slice.len_), parent_(parent), allocator_(nullptr) {
-            std::cerr << "construct mem slice " << this << " from RawSlice " << reinterpret_cast<size_t>(raw_slice_.get()) << "\n";
-        }
-
-
-  QuicMemSliceImpl(const QuicMemSliceImpl& other) = default;
-  QuicMemSliceImpl& operator=(const QuicMemSliceImpl& other) = default;
+  QuicMemSliceImpl(const QuicMemSliceImpl& other) = delete;
+  QuicMemSliceImpl& operator=(const QuicMemSliceImpl& other) = delete;
 
   // Move constructors. |other| will not hold a reference to the data buffer
   // after this call completes.
-  QuicMemSliceImpl(QuicMemSliceImpl&& other) : raw_slice_(std::move(other.raw_slice_)), length_(other.length_), parent_(std::move(other.parent_)), allocator_(other.allocator_) {
+  QuicMemSliceImpl(QuicMemSliceImpl&& other)
+      : length_(other.length_), slice_(std::move(other.slice_)) {
     other.Reset();
-    std::cerr << "construct mem slice " << this << " by move from " << &other << " raw_slice = " << raw_slice_.get() << "\n";
   }
 
   QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) {
-    std::cerr << "move assignment to mem slice " << this << " from " << &other << " raw_slice_ = " << reinterpret_cast<size_t>(other.raw_slice_.get()) << "\n";
     if (this != &other) {
-      raw_slice_ = std::move(other.raw_slice_);
       length_ = other.length_;
-      parent_ = std::move(other.parent_);
-      allocator_ = other.allocator_;
+      slice_ = std::move(other.slice_);
       other.Reset();
     }
-    std::cerr << "allocator_ = " << allocator_ << "\n";
     return *this;
   }
 
-  ~QuicMemSliceImpl() {
-    std::cerr << "destruct mem slice " << this << " raw slice = " << reinterpret_cast<size_t>(raw_slice_.get()) << " allocator_ = " << allocator_ << "\n";
-      if (allocator_ != nullptr) {
-        std::cerr << "~QuicMemSliceImpl test allocator " << allocator_ << "\n";
-        allocator_->Delete(allocator_->New(10)); }
-
-  }
-
-  // Release the underlying reference. Further access the memory will result in
-  // undefined behavior.
   void Reset() {
-    // Release |raw_slice| before releasing |parent_|.
-    raw_slice_ = nullptr;
     length_ = 0;
-    parent_ = nullptr;
-    allocator_ = nullptr;
+    slice_ = nullptr;
   }
 
-  // Returns a char pointer to underlying data buffer.
+  // Returns a char pointer to the one and only slice in buffer.
   const char* data() const {
-    return static_cast<const char*>(raw_slice_.get());
+    if (slice_ == nullptr) {
+      return nullptr;
+    }
+    Envoy::Buffer::RawSlice out;
+    ASSERT(slice_->getRawSlices(&out, 1) == 1);
+    return static_cast<const char*>(out.mem_);
   }
 
-  // Returns the length of underlying data buffer.
-  size_t length() const { return length_; }
+  size_t length() const { return slice_ == nullptr ? 0 : slice_->length(); }
 
-  bool empty() const { return length_ == 0; }
+  bool empty() const { return length() == 0; }
 
 private:
-  static void consumeSlice(char* slice, size_t length, QuicBufferAllocator* allocator, std::shared_ptr<Envoy::Buffer::Instance> parent) {
-    if (parent == nullptr) {
-      ASSERT(allocator != nullptr);
-        std::cerr << "=========== consumeSlice: test allocator " << allocator << "\n";
-      allocator->Delete(allocator->New(10));
-        std::cerr <<  "Delete slice " << reinterpret_cast<size_t>(slice);
-      allocator->Delete(slice);
-      return;
-    }
-    parent->drain(length);
-  }
-
-  std::shared_ptr<char[]> raw_slice_;
   size_t length_;
-  // Either |parent_| or |allocator_| should be nullptr.
-  std::shared_ptr<Envoy::Buffer::Instance> parent_;
-  QuicBufferAllocator* allocator_;
+  std::shared_ptr<Envoy::Buffer::Instance> slice_;
 };
 
-}  // namespace quic
+} // namespace quic

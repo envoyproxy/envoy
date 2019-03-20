@@ -104,7 +104,7 @@ patches, understand exact mitigation steps, etc.
   to require early disclosure to distributors. Generally this Private Distributor Disclosure process
   should be reserved for remotely exploitable or privilege escalation issues. Otherwise, this
   process can be skipped.
-- The Fix Lead will email the patches to envoy-distributors-announce@googlegroups.com so
+- The Fix Lead will email the patches to cncf-envoy-distributors-announce@lists.cncf.io so
   distributors can prepare builds to be available to users on the day of the issue's announcement.
   Distributors should read about the [Private Distributors List](#private-distributors-list) to find
   out the requirements for being added to this list.
@@ -149,7 +149,7 @@ individuals to find out about security issues.
 
 ### Embargo Policy
 
-The information members receive on envoy-distributors-announce must not be made public, shared, nor
+The information members receive on cncf-envoy-distributors-announce must not be made public, shared, nor
 even hinted at anywhere beyond the need-to-know within your specific team except with the list's
 explicit approval. This holds true until the public disclosure date/time that was agreed upon by the
 list. Members of the list and others may not use the information for anything other than getting the
@@ -185,7 +185,7 @@ could be in the form of the following:
 
 ### Membership Criteria
 
-To be eligible for the envoy-distributors-announce mailing list, your
+To be eligible for the cncf-envoy-distributors-announce mailing list, your
 distribution should:
 
 1. Be an actively maintained distribution of Envoy components OR offer Envoy as a publicly
@@ -214,7 +214,7 @@ Here is a pseudo example:
 
 ```
 To: envoy-security@googlegroups.com
-Subject: Seven-Corp Membership to envoy-distributors-announce
+Subject: Seven-Corp Membership to cncf-envoy-distributors-announce
 
 Below are each criterion and why I think we, Seven-Corp, qualify.
 
