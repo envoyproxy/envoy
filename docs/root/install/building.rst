@@ -32,7 +32,20 @@ Pre-built binaries
 ------------------
 
 On every master commit we create a set of lightweight Docker images that contain the Envoy
-binary. We also tag the docker images with release versions when we do official releases.
+binary.
+
+* `envoyproxy/envoy-dev <https://hub.docker.com/r/envoyproxy/envoy-dev/tags/>`_: Release binary with
+  symbols stripped on top of an Ubuntu Xenial base.
+* `envoyproxy/envoy-alpine-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-dev/tags/>`_: Release
+  binary with symbols stripped on top of a **glibc** alpine base.
+* `envoyproxy/envoy-alpine-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug-dev/tags/>`_:
+  Release binary with debug symbols on top of a **glibc** alpine base.
+
+In the above *dev* repositories, the *latest* tag points to last Envoy SHA in master that passed
+tests.
+
+We also tag the docker images with release versions when we do official releases. These images can
+be found in different repositories for easier searching:
 
 * `envoyproxy/envoy <https://hub.docker.com/r/envoyproxy/envoy/tags/>`_: Release binary with
   symbols stripped on top of an Ubuntu Xenial base.
@@ -40,6 +53,8 @@ binary. We also tag the docker images with release versions when we do official 
   binary with symbols stripped on top of a **glibc** alpine base.
 * `envoyproxy/envoy-alpine-debug <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug/tags/>`_:
   Release binary with debug symbols on top of a **glibc** alpine base.
+
+In the above repositories, the *latest* tag points to the latest official release.
 
 We will consider producing additional binary types depending on community interest in helping with
 CI, packaging, etc. Please open an `issue <https://github.com/envoyproxy/envoy/issues>`_ in GitHub
