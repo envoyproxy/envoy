@@ -174,17 +174,23 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   initialize("test/server/node_bootstrap.yaml");
-  bool got_startup_notification = false, got_shutdown_notification = false;
-  server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
-                            [&got_startup_notification, this] {
-                              got_startup_notification = true;
-                              server_->shutdown();
-                            });
+  bool startup = false, shutdown = false, shutdown_with_completion = false;
+  server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&startup, this] {
+    startup = true;
+    server_->shutdown();
+  });
   server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
-                            [&got_shutdown_notification] { got_shutdown_notification = true; });
+                            [&shutdown] { shutdown = true; });
+  Event::Dispatcher& dispatcher = server_->dispatcher();
+  server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                            [&shutdown_with_completion, &dispatcher](Event::PostCb completion_cb) {
+                              shutdown_with_completion = true;
+                              dispatcher.post(completion_cb);
+                            });
   server_->run();
-  EXPECT_TRUE(got_startup_notification);
-  EXPECT_TRUE(got_shutdown_notification);
+  EXPECT_TRUE(startup);
+  EXPECT_TRUE(shutdown);
+  EXPECT_TRUE(shutdown_with_completion);
 }
 
 TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
