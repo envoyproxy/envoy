@@ -21,9 +21,9 @@ void LibeventScheduler::nonBlockingLoop() {
   // This is because libevent only supports level triggering on Windows, and so the write
   // event callbacks will trigger every time through the loop. Adding EVLOOP_ONCE ensures the
   // loop will run at most once
-  int flag = EVLOOP_NONBLOCK | EVLOOP_ONCE;
+  const int flag = EVLOOP_NONBLOCK | EVLOOP_ONCE;
 #else
-  int flag = EVLOOP_NONBLOCK;
+  const int flag = EVLOOP_NONBLOCK;
 #endif
   event_base_loop(libevent_.get(), flag);
 }
