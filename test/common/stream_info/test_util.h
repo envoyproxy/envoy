@@ -79,6 +79,14 @@ public:
     return downstream_remote_address_;
   }
 
+  void setDownstreamSslConnection(const Ssl::ConnectionInfo* connection_info) override {
+    downstream_connection_info_ = connection_info;
+  }
+
+  const Ssl::ConnectionInfo* downstreamSslConnection() const override {
+    return downstream_connection_info_;
+  }
+
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
   absl::optional<std::chrono::nanoseconds>
@@ -187,6 +195,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  const Ssl::ConnectionInfo* downstream_connection_info_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateImpl filter_state_{};

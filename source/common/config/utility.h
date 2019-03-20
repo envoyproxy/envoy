@@ -105,6 +105,14 @@ public:
   apiConfigSourceRequestTimeout(const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
+   * Extract initial_fetch_timeout as a std::chrono::milliseconds from
+   * envoy::api::v2::core::ConfigSource. If request_timeout isn't set in the config source, a
+   * default value of 0s will be returned.
+   */
+  static std::chrono::milliseconds
+  configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSource& config_source);
+
+  /**
    * Populate an envoy::api::v2::core::ApiConfigSource.
    * @param cluster supplies the cluster name for the ApiConfigSource.
    * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.

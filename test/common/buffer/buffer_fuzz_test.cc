@@ -273,7 +273,7 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     Buffer::RawSlice slices[1];
     const uint64_t slices_used = target_buffer.getRawSlices(slices, 1);
     if (linearize_size > 0) {
-      FUZZ_ASSERT(slices_used == 1);
+      FUZZ_ASSERT(slices_used >= 1);
       FUZZ_ASSERT(slices[0].len_ >= linearize_size);
     }
     break;

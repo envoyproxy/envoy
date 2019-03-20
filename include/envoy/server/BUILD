@@ -90,6 +90,7 @@ envoy_cc_library(
         ":admin_interface",
         ":drain_manager_interface",
         ":hot_restart_interface",
+        ":lifecycle_notifier_interface",
         ":listener_manager_interface",
         ":options_interface",
         "//include/envoy/access_log:access_log_interface",
@@ -144,6 +145,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         ":admin_interface",
+        ":lifecycle_notifier_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codes_interface",
@@ -164,6 +166,11 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
+)
+
+envoy_cc_library(
+    name = "lifecycle_notifier_interface",
+    hdrs = ["lifecycle_notifier.h"],
 )
 
 envoy_cc_library(

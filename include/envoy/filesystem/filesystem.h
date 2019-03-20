@@ -4,7 +4,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/os_sys_calls.h"
+#include "envoy/api/io_error.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
@@ -25,37 +26,31 @@ public:
    *
    * @return bool whether the open succeeded
    */
-  virtual Api::SysCallBoolResult open() PURE;
+  virtual Api::IoCallBoolResult open() PURE;
 
   /**
    * Write the buffer to the file. The file must be explicitly opened before writing.
    *
    * @return ssize_t number of bytes written, or -1 for failure
    */
-  virtual Api::SysCallSizeResult write(absl::string_view buffer) PURE;
+  virtual Api::IoCallSizeResult write(absl::string_view buffer) PURE;
 
   /**
    * Close the file.
    *
    * @return bool whether the close succeeded
    */
-  virtual Api::SysCallBoolResult close() PURE;
+  virtual Api::IoCallBoolResult close() PURE;
 
   /**
    * @return bool is the file open
    */
-  virtual bool isOpen() PURE;
+  virtual bool isOpen() const PURE;
 
   /**
    * @return string the file path
    */
-  virtual std::string path() PURE;
-
-  /**
-   * @return string a human-readable string describing the error code
-   * TODO(sesmith177) Use the IOError class after #5829 merges
-   */
-  virtual std::string errorToString(int error) PURE;
+  virtual std::string path() const PURE;
 };
 
 using FilePtr = std::unique_ptr<File>;
@@ -96,12 +91,6 @@ public:
    * Be aware, this is not most highly performing file reading method.
    */
   virtual std::string fileReadToEnd(const std::string& path) PURE;
-
-  /**
-   * @param path some filesystem path.
-   * @return SysCallStringResult containing the canonical path (see realpath(3)).
-   */
-  virtual Api::SysCallStringResult canonicalPath(const std::string& path) PURE;
 
   /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This

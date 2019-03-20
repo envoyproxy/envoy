@@ -157,17 +157,15 @@ public:
 // it with the right values at the right times.
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
-  MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  ClusterManagerFactory& factory, Stats::Store& stats,
-                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                                  Runtime::RandomGenerator& random,
-                                  const LocalInfo::LocalInfo& local_info,
-                                  AccessLog::AccessLogManager& log_manager,
-                                  Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
-                                  MockLocalHostsRemoved& local_hosts_removed)
+  MockedUpdatedClusterManagerImpl(
+      const envoy::config::bootstrap::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+      Server::Admin& admin, Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
+      MockLocalHostsRemoved& local_hosts_removed, Http::Context& http_context)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info,
-                               log_manager, main_thread_dispatcher, admin, api, http_context_),
+                               log_manager, main_thread_dispatcher, admin, api, http_context),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
@@ -181,7 +179,6 @@ protected:
     local_hosts_removed_.post(hosts_removed);
   }
 
-  Http::ContextImpl http_context_;
   MockLocalClusterUpdate& local_cluster_update_;
   MockLocalHostsRemoved& local_hosts_removed_;
 };
@@ -236,7 +233,7 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_,
-        local_cluster_update_, local_hosts_removed_);
+        local_cluster_update_, local_hosts_removed_, http_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,

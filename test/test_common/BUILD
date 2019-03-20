@@ -35,6 +35,7 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
+        "//test/common/runtime:utility_lib",
     ],
 )
 
@@ -102,11 +103,13 @@ envoy_cc_test_library(
         "//source/common/common:utility_lib",
         "//source/common/config:bootstrap_json_lib",
         "//source/common/filesystem:directory_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_options_lib",
         "//test/mocks/stats:stats_mocks",
@@ -196,6 +199,7 @@ envoy_cc_test(
     deps = [
         ":simulated_time_system_lib",
         ":utility_lib",
+        "//source/common/event:libevent_scheduler_lib",
     ],
 )
 
