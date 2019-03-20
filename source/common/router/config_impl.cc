@@ -349,6 +349,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                           factory_context),
       time_source_(factory_context.dispatcher().timeSource()),
       internal_redirect_action_(convertInternalRedirectAction(route.route())) {
+  ASSERT(route.has_route() || route.has_redirect() || route.has_direct_response());
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);

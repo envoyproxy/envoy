@@ -102,7 +102,7 @@ protected:
 class RouteMatcherTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteMatcherTest, TestRoutes) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -601,7 +601,7 @@ virtual_hosts:
 
 // Validates behavior of request_headers_to_add at router, vhost, and route action levels.
 TEST_F(RouteMatcherTest, TestAddRemoveRequestHeaders) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -1031,7 +1031,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, Priority) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
   domains:
@@ -1061,7 +1061,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, NoHostRewriteAndAutoRewrite) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
   domains:
@@ -1080,7 +1080,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, HeaderMatchedRouting) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
   domains:
@@ -1239,7 +1239,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, QueryParamMatchedRouting) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
   domains:
@@ -1367,7 +1367,7 @@ protected:
   RouterMatcherHashPolicyTest()
       : add_cookie_nop_(
             [](const std::string&, const std::string&, std::chrono::seconds) { return ""; }) {
-    const std::string yaml =R"EOF(
+    const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
   domains:
@@ -1812,7 +1812,7 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
 }
 
 TEST_F(RouteMatcherTest, ClusterHeader) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
   domains:
@@ -1860,7 +1860,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, ContentType) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
   domains:
@@ -1941,7 +1941,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, ShadowClusterNotFound) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -1965,7 +1965,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFound) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -1984,7 +1984,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundNotChecking) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -2002,7 +2002,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundNotCheckingViaConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 validate_clusters: false
 virtual_hosts:
 - name: www2
@@ -2102,7 +2102,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, Shadow) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -2202,7 +2202,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, Retry) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -2346,7 +2346,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, GrpcRetry) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -2566,7 +2566,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, TestBadDefaultConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -2593,7 +2593,7 @@ internal_only_headers:
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateDomainConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3074,7 +3074,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, ExclusiveRouteEntryOrDirectResponseEntry) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3110,7 +3110,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, ExclusiveWeightedClustersEntryOrDirectResponseEntry) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3354,7 +3354,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, ExclusiveWeightedClustersOrClusterConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3379,7 +3379,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, WeightedClustersMissingClusterList) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3397,7 +3397,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, WeightedClustersEmptyClustersList) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3461,7 +3461,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, TestWeightedClusterWithMissingWeights) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3484,7 +3484,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, TestWeightedClusterInvalidClusterName) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3591,7 +3591,7 @@ TEST(NullConfigImplTest, All) {
 class BadHttpRouteConfigurationsTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3609,7 +3609,7 @@ fake_entry: fake_type
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadVirtualHostConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3628,7 +3628,7 @@ virtual_hosts:
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3646,7 +3646,7 @@ virtual_hosts:
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPath) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3663,8 +3663,23 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
 }
 
+TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - "*"
+  routes:
+  - route:
+      cluster: www2
+  )EOF";
+
+  EXPECT_DEATH(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), ".*assert failure: has_regex.*");
+}
+
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3681,12 +3696,26 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
 }
 
-TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
-  const std::string yaml =R"EOF(
+TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoAction) {
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
   - "*"
+  routes:
+  - match:
+      prefix: "/api"
+  )EOF";
+  EXPECT_DEATH(
+    TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), ".*assert failure.*");
+}
+
+TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+ - "*"
   routes:
   - match:
       path: "/foo"
@@ -3701,7 +3730,7 @@ virtual_hosts:
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3720,7 +3749,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, TestOpaqueConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: default
   domains:
@@ -3749,7 +3778,7 @@ virtual_hosts:
 class RoutePropertyTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RoutePropertyTest, excludeVHRateLimits) {
-  std::string yaml =R"EOF(
+  std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -3918,7 +3947,7 @@ virtual_hosts:
 }
 
 TEST_F(RoutePropertyTest, TestVHostCorsLegacyConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: default
   domains:
@@ -3957,7 +3986,7 @@ virtual_hosts:
 }
 
 TEST_F(RoutePropertyTest, TestRouteCorsLegacyConfig) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: default
   domains:
@@ -3993,7 +4022,7 @@ virtual_hosts:
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: local_service
   domains:
@@ -4030,7 +4059,7 @@ virtual_hosts:
 class CustomRequestHeadersTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(CustomRequestHeadersTest, AddNewHeader) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
@@ -4067,7 +4096,7 @@ request_headers_to_add:
 }
 
 TEST_F(CustomRequestHeadersTest, CustomHeaderWrongFormat) {
-  const std::string yaml =R"EOF(
+  const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
   domains:
