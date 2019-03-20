@@ -1,4 +1,5 @@
 #include "extensions/filters/network/dubbo_proxy/hessian_deserializer_impl.h"
+#include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
@@ -86,6 +87,16 @@ TEST(HessianProtocolTest, deserializeRpcResult) {
     EXPECT_TRUE(result->hasException());
   }
 
+  {
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({
+        '\x91',                   // return type
+        0x04, 't', 'e', 's', 't', // return body
+    }));
+    auto result = deserializer.deserializeRpcResult(buffer, 4);
+    EXPECT_TRUE(result->hasException());
+  }
+
   // incorrect body size
   {
     Buffer::OwnedImpl buffer;
@@ -128,6 +139,29 @@ TEST(HessianProtocolTest, HessianDeserializerConfigFactory) {
       NamedDeserializerConfigFactory::getFactory(SerializationType::Hessian).createDeserializer();
   EXPECT_EQ(deserializer->name(), "hessian");
   EXPECT_EQ(deserializer->type(), SerializationType::Hessian);
+}
+
+TEST(HessianProtocolTest, serializeRpcResult) {
+  Buffer::OwnedImpl buffer;
+  std::string mock_response("invalid method name 'Add'");
+  RpcResponseType mock_response_type = RpcResponseType::ResponseWithException;
+  HessianDeserializerImpl deserializer;
+
+  deserializer.serializeRpcResult(buffer, mock_response, mock_response_type);
+
+  size_t hessian_int_size;
+  int type_value = HessianUtils::peekInt(buffer, &hessian_int_size);
+  EXPECT_EQ(static_cast<uint8_t>(mock_response_type), static_cast<uint8_t>(type_value));
+
+  size_t hessian_string_size;
+  std::string content = HessianUtils::peekString(buffer, &hessian_string_size, sizeof(uint8_t));
+  EXPECT_EQ(mock_response, content);
+
+  EXPECT_EQ(buffer.length(), hessian_int_size + hessian_string_size);
+
+  size_t body_size = mock_response.size() + sizeof(mock_response_type);
+  auto result = deserializer.deserializeRpcResult(buffer, body_size);
+  EXPECT_TRUE(result->hasException());
 }
 
 } // namespace DubboProxy

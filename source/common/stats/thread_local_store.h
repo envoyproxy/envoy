@@ -193,12 +193,21 @@ private:
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<TlsHistogramSharedPtr> histograms_;
     StatMap<ParentHistogramSharedPtr> parent_histograms_;
+
+    // We keep a TLS cache of rejected stat names. This costs memory, but
+    // reduces runtime overhead running the matcher. Moreover, once symbol
+    // tables are integrated, rejection will need the fully elaborated string,
+    // and it we need to take a global symbol-table lock to run. We keep
+    // this char* map here in the TLS cache to avoid taking a lock to compute
+    // rejection.
+    StatNameHashSet rejected_stats_;
   };
 
   struct CentralCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
+    SharedStatNameStorageSet rejected_stats_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -249,8 +258,10 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                           SharedStatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat,
-                           StatMap<std::shared_ptr<StatType>>* tls_cache);
+                           StatMap<std::shared_ptr<StatType>>* tls_cache,
+                           StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
@@ -276,13 +287,15 @@ private:
   };
 
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
-  void clearScopeFromCaches(uint64_t scope_id);
+  void clearScopeFromCaches(uint64_t scope_id, const Event::PostCb& clean_central_cache);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
   bool rejects(StatName name) const;
-  // absl::string_view truncateStatNameIfNeeded(absl::string_view name);
+  bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
+  bool checkAndRememberRejection(StatName name, SharedStatNameStorageSet& central_rejected_stats,
+                                 StatNameHashSet* tls_rejected_stats);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;

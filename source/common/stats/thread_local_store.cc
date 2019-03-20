@@ -66,10 +66,10 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
     }
   }
   for (StatName stat_name : remove_list) {
-    auto p = map.find(stat_name);
-    ASSERT(p != map.end());
-    list.push_back(p->second); // Save SharedPtr to the list to avoid invalidating refs to stat.
-    map.erase(p);
+    auto iter = map.find(stat_name);
+    ASSERT(iter != map.end());
+    list.push_back(iter->second); // Save SharedPtr to the list to avoid invalidating refs to stat.
+    map.erase(iter);
   }
 }
 
@@ -192,33 +192,70 @@ void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
   }
 }
 
+static void freeSharedStatNameStorageSet(SymbolTable& symbol_table,
+                                         SharedStatNameStorageSet& storage_set) {
+  // We must free() all symbols referenced in the set, otherwise the symbols
+  // will leak when the flat_hash_map superclass is destructed. They cannot
+  // self-destruct without an explicit free() as each individual StatNameStorage
+  // object does not have a reference to the symbol table, which would waste 8
+  // bytes per stat-name. So we must iterate over the set and free it. But we
+  // don't want to mutate objects while they are in a set, so we just copy them,
+  // which is easy because they are shared_ptr<StatNameStorage>.
+
+  size_t sz = storage_set.size();
+  STACK_ARRAY(storage, SharedStatNameStorage, sz);
+  size_t i = 0;
+  for (const SharedStatNameStorage& name : storage_set) {
+    storage[i++] = name;
+  }
+  storage_set.clear();
+
+  // Now that the associative container is clear, we can free all the referenced
+  // symbols.
+  for (i = 0; i < sz; ++i) {
+    storage[i]->free(symbol_table);
+  }
+}
+
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   Thread::LockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
 
+  // This is called directly from the ScopeImpl destructor, but we can't delay
+  // the destruction of scope->central_cache_.central_cache_.rejected_stats_
+  // to wait for all the TLS rejected_stats_ caches are destructed, as those
+  // reference elements of SharedStatNameStorageSet. So simply swap out the set
+  // contents into a local that we can hold onto until the TLS cache is cleared
+  // of all references.
+  auto rejected_stats = new SharedStatNameStorageSet;
+  rejected_stats->swap(scope->central_cache_.rejected_stats_);
+  const uint64_t scope_id = scope->scope_id_;
+  auto clean_central_cache = [this, rejected_stats]() {
+    freeSharedStatNameStorageSet(symbolTable(), *rejected_stats);
+    delete rejected_stats;
+  };
+
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    main_thread_dispatcher_->post(
-        [this, scope_id = scope->scope_id_]() -> void { clearScopeFromCaches(scope_id); });
+    main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {
+      clearScopeFromCaches(scope_id, clean_central_cache);
+    });
+  } else {
+    clean_central_cache();
   }
 }
 
-/*
-std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name,
-                                                 std::vector<Tag>& tags) const {
-  return tag_producer_->produceTags(name, tags);
-}
-*/
-
-void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
+void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
+                                                const Event::PostCb& clean_central_cache) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
     tls_->runOnAllThreads(
-        [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); });
+        [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); },
+        clean_central_cache);
   }
 }
 
@@ -269,10 +306,55 @@ private:
   std::string tag_extracted_name_;
 };
 
+bool ThreadLocalStoreImpl::checkAndRememberRejection(
+    StatName name, SharedStatNameStorageSet& central_rejected_stats,
+    StatNameHashSet* tls_rejected_stats) {
+  if (stats_matcher_->acceptsAll()) {
+    return false;
+  }
+
+  auto iter = central_rejected_stats.find(name);
+  SharedStatNameStorage rejected_name;
+  if (iter != central_rejected_stats.end()) {
+    rejected_name = *iter;
+  } else {
+    if (rejects(name)) {
+      rejected_name = std::make_shared<StatNameStorage>(name, symbolTable());
+      central_rejected_stats.insert(rejected_name);
+    }
+  }
+  if (rejected_name != nullptr) {
+    if (tls_rejected_stats != nullptr) {
+      tls_rejected_stats->insert(rejected_name->statName());
+    }
+    return true;
+  }
+  return false;
+}
+
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-    MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache) {
+    SharedStatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
+    StatMap<std::shared_ptr<StatType>>* tls_cache, StatNameHashSet* tls_rejected_stats,
+    StatType& null_stat) {
+
+  // const char* stat_key = name.c_str();
+
+  // We do name-rejections on the full name, prior to truncation.
+  if (tls_rejected_stats != nullptr &&
+      tls_rejected_stats->find(name) != tls_rejected_stats->end()) {
+    return null_stat;
+  }
+
+  /*
+  std::unique_ptr<std::string> truncation_buffer;
+  absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name_key);
+  if (truncated_name.size() < name.size()) {
+    truncation_buffer = std::make_unique<std::string>(std::string(truncated_name));
+    stat_key = truncation_buffer->c_str(); // must be nul-terminated.
+  }
+  */
 
   // If we have a valid cache entry, return it.
   if (tls_cache) {
@@ -285,10 +367,13 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   // We must now look in the central store so we must be locked. We grab a reference to the
   // central store location. It might contain nothing. In this case, we allocate a new stat.
   Thread::LockGuard lock(parent_.lock_);
-  auto p = central_cache_map.find(name);
+  auto iter = central_cache_map.find(name);
   std::shared_ptr<StatType>* central_ref = nullptr;
-  if (p != central_cache_map.end()) {
-    central_ref = &(p->second);
+  if (iter != central_cache_map.end()) {
+    central_ref = &(iter->second);
+  } else if (parent_.checkAndRememberRejection(name, central_rejected_stats, tls_rejected_stats)) {
+    // Note that again we do the name-rejection lookup on the untruncated name.
+    return null_stat;
   } else {
     TagExtraction extraction(parent_, name);
     // std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, extraction.truncatedStatName(),
@@ -315,6 +400,10 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 }
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
+  if (parent_.rejectsAll()) {
+    return parent_.null_counter_;
+  }
+
   // Determine the final name based on the prefix and the passed name.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
@@ -327,24 +416,23 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
   Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
   StatName final_stat_name(final_name.get());
 
-  if (parent_.rejects(final_stat_name)) {
-    return parent_.null_counter_;
-  }
-
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
   StatMap<CounterSharedPtr>* tls_cache = nullptr;
+  StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_;
+    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
+    tls_cache = &entry.counters_;
+    tls_rejected_stats = &entry.rejected_stats_;
   }
 
-  return safeMakeStat<Counter>(final_stat_name, central_cache_.counters_,
-                               [](StatDataAllocator& allocator, StatName name,
-                                  absl::string_view tag_extracted_name,
-                                  const std::vector<Tag>& tags) -> CounterSharedPtr {
-                                 return allocator.makeCounter(name, tag_extracted_name, tags);
-                               },
-                               tls_cache);
+  return safeMakeStat<Counter>(
+      final_stat_name, central_cache_.counters_, central_cache_.rejected_stats_,
+      [](StatDataAllocator& allocator, StatName name, absl::string_view tag_extracted_name,
+         const std::vector<Tag>& tags) -> CounterSharedPtr {
+        return allocator.makeCounter(name, tag_extracted_name, tags);
+      },
+      tls_cache, tls_rejected_stats, parent_.null_counter_);
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
@@ -364,38 +452,12 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 }
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name) {
-  // See comments in counterFromStatName(). There is no super clean way (via templates or otherwise)
-  // to share this code so I'm leaving it largely duplicated for now.
-  //
-  // Note that we can do map.find(final_name.c_str()), but we cannot do
-  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
-  // a temporary, and address sanitization errors would follow. Instead we must
-  // do a find() first, using that if it succeeds. If it fails, then after we
-  // construct the stat we can insert it into the required maps.
-  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
-  StatName final_stat_name(final_name.get());
-
-  if (parent_.rejects(final_stat_name)) {
+  if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
 
-  StatMap<GaugeSharedPtr>* tls_cache = nullptr;
-  if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_;
-  }
-
-  return safeMakeStat<Gauge>(final_stat_name, central_cache_.gauges_,
-                             [](StatDataAllocator& allocator, StatName name,
-                                absl::string_view tag_extracted_name,
-                                const std::vector<Tag>& tags) -> GaugeSharedPtr {
-                               return allocator.makeGauge(name, tag_extracted_name, tags);
-                             },
-                             tls_cache);
-}
-
-Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name) {
-  // See comments in counterFromStatName(). There is no super clean way (via templates or otherwise)
-  // to share this code so I'm leaving it largely duplicated for now.
+  // See comments in counter(). There is no super clean way (via templates or otherwise) to
+  // share this code so I'm leaving it largely duplicated for now.
   //
   // Note that we can do map.find(final_name.c_str()), but we cannot do
   // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
@@ -405,25 +467,62 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
   Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
   StatName final_stat_name(final_name.get());
 
-  if (parent_.rejects(final_stat_name)) {
+  StatMap<GaugeSharedPtr>* tls_cache = nullptr;
+  StatNameHashSet* tls_rejected_stats = nullptr;
+  if (!parent_.shutting_down_ && parent_.tls_) {
+    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
+    tls_cache = &entry.gauges_;
+    tls_rejected_stats = &entry.rejected_stats_;
+  }
+
+  return safeMakeStat<Gauge>(
+      final_stat_name, central_cache_.gauges_, central_cache_.rejected_stats_,
+      [](StatDataAllocator& allocator, StatName name, absl::string_view tag_extracted_name,
+         const std::vector<Tag>& tags) -> GaugeSharedPtr {
+        return allocator.makeGauge(name, tag_extracted_name, tags);
+      },
+      tls_cache, tls_rejected_stats, parent_.null_gauge_);
+}
+
+Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name) {
+  if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }
 
+  // See comments in counter(). There is no super clean way (via templates or otherwise) to
+  // share this code so I'm leaving it largely duplicated for now.
+  //
+  // Note that we can do map.find(final_name.c_str()), but we cannot do
+  // map[final_name.c_str()] as the char*-keyed maps would then save the pointer to
+  // a temporary, and address sanitization errors would follow. Instead we must
+  // do a find() first, using that if it succeeds. If it fails, then after we
+  // construct the stat we can insert it into the required maps.
+  Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
+  StatName final_stat_name(final_name.get());
+
   StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
+  StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_cache =
-        &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].parent_histograms_;
-    auto p = tls_cache->find(final_stat_name);
-    if (p != tls_cache->end()) {
-      return *p->second;
+    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
+    tls_cache = &entry.parent_histograms_;
+    auto iter = tls_cache->find(final_stat_name);
+    if (iter != tls_cache->end()) {
+      return *iter->second;
+    }
+    tls_rejected_stats = &entry.rejected_stats_;
+    if (tls_rejected_stats->find(final_stat_name) != tls_rejected_stats->end()) {
+      return parent_.null_histogram_;
     }
   }
 
   Thread::LockGuard lock(parent_.lock_);
-  auto p = central_cache_.histograms_.find(final_stat_name);
+  auto iter = central_cache_.histograms_.find(final_stat_name);
   ParentHistogramImplSharedPtr* central_ref = nullptr;
-  if (p != central_cache_.histograms_.end()) {
-    central_ref = &p->second;
+  if (iter != central_cache_.histograms_.end()) {
+    central_ref = &iter->second;
+  } else if (parent_.checkAndRememberRejection(final_stat_name, central_cache_.rejected_stats_,
+                                               tls_rejected_stats)) {
+    return parent_.null_histogram_;
   } else {
     TagExtraction extraction(parent_, final_stat_name);
     auto stat = std::make_shared<ParentHistogramImpl>(
@@ -440,18 +539,18 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name)
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
                                                          ParentHistogramImpl& parent) {
-  if (parent_.rejects(name)) {
-    return parent_.null_histogram_;
-  }
+  // tlsHistogram() is generally not called for a histogram that is rejected by
+  // the matcher, so no further rejection-checking is needed at this level.
+  // TlsHistogram inherits its reject/accept status from ParentHistogram.
 
   // See comments in counterFromStatName() which explains the logic here.
 
   StatMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_;
-    auto p = tls_cache->find(name);
-    if (p != tls_cache->end()) {
-      return *p->second;
+    auto iter = tls_cache->find(name);
+    if (iter != tls_cache->end()) {
+      return *iter->second;
     }
   }
 

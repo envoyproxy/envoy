@@ -464,5 +464,37 @@ struct StatNameLessThan {
   const SymbolTable& symbol_table_;
 };
 
+using SharedStatNameStorage = std::shared_ptr<StatNameStorage>;
+
+struct HeterogeneousStatNameHash {
+  // Specifying is_transparent indicates to the library infrastructure that
+  // type-conversions should not be applied when calling find(), but instead
+  // pass the actual types of the contained and searched-for objects directly to
+  // these functors. See
+  // https://en.cppreference.com/w/cpp/utility/functional/less_void for an
+  // official reference, and https://abseil.io/tips/144 for a description of
+  // using it in the context of absl.
+  using is_transparent = void;
+
+  size_t operator()(StatName a) const { return a.hash(); }
+  size_t operator()(const SharedStatNameStorage& a) const { return a->statName().hash(); }
+};
+
+struct HeterogeneousStatNameEqual {
+  // See description for HeterogeneousStatNameHash::is_transparent.
+  using is_transparent = void;
+
+  size_t operator()(StatName a, StatName b) const { return a == b; }
+  size_t operator()(const SharedStatNameStorage& a, const SharedStatNameStorage& b) const {
+    return a->statName() == b->statName();
+  }
+  size_t operator()(StatName a, const SharedStatNameStorage& b) const { return a == b->statName(); }
+  size_t operator()(const SharedStatNameStorage& a, StatName b) const { return a->statName() == b; }
+};
+
+using SharedStatNameStorageSet =
+    absl::flat_hash_set<SharedStatNameStorage, HeterogeneousStatNameHash,
+                        HeterogeneousStatNameEqual>;
+
 } // namespace Stats
 } // namespace Envoy

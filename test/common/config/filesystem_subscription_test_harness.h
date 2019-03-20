@@ -33,7 +33,11 @@ public:
         api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         subscription_(*dispatcher_, path_, stats_, *api_) {}
 
-  ~FilesystemSubscriptionTestHarness() { EXPECT_EQ(0, ::unlink(path_.c_str())); }
+  ~FilesystemSubscriptionTestHarness() {
+    if (::access(path_.c_str(), F_OK) != -1) {
+      EXPECT_EQ(0, ::unlink(path_.c_str()));
+    }
+  }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
     std::ifstream config_file(path_);
@@ -93,6 +97,23 @@ public:
     // The first attempt always fail unless there was a file there to begin with.
     SubscriptionTestHarness::verifyStats(attempt, success, rejected,
                                          failure + (file_at_start_ ? 0 : 1), version);
+  }
+
+  void expectConfigUpdateFailed() override {
+    // initial_fetch_timeout not implemented
+  }
+
+  void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
+    UNREFERENCED_PARAMETER(timeout);
+    // initial_fetch_timeout not implemented
+  }
+
+  void expectDisableInitFetchTimeoutTimer() override {
+    // initial_fetch_timeout not implemented
+  }
+
+  void callInitFetchTimeoutCb() override {
+    // initial_fetch_timeout not implemented
   }
 
   const std::string path_;

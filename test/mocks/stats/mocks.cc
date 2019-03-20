@@ -99,5 +99,8 @@ MockIsolatedStatsStore::MockIsolatedStatsStore()
     : IsolatedStoreImpl(Test::Global<Stats::FakeSymbolTableImpl>::get()) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() { IsolatedStoreImpl::clear(); }
 
+MockStatsMatcher::MockStatsMatcher() {}
+MockStatsMatcher::~MockStatsMatcher() {}
+
 } // namespace Stats
 } // namespace Envoy
