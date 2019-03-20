@@ -691,6 +691,8 @@ th
 thru
 tm
 tmp
+tokenize
+tokenizes
 tokenizing
 traceid
 trie
