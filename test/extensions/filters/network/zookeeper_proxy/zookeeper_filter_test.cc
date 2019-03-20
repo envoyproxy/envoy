@@ -531,8 +531,8 @@ TEST_F(ZooKeeperFilterTest, GetDataRequest) {
 TEST_F(ZooKeeperFilterTest, GetDataRequestEmptyPath) {
   initialize();
 
-  // It's valid in ZK to send an empty string as the path, which
-  // gets treated as /.
+  // It's valid to see an empty string as the path, which gets treated as /
+  // by the server.
   Buffer::OwnedImpl data = encodePathWatch("", true);
 
   expectSetDynamicMetadata({{"opname", "getdata"}, {"path", ""}, {"watch", "true"}},
