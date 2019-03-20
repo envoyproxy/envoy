@@ -50,4 +50,8 @@ message RedisProxy {
 
   // Network settings for the connection pool to the upstream cluster.
   ConnPoolSettings settings = 3 [(validate.rules).message.required = true];
+
+  // Indicates that latency stat should be computed in microseconds. By default it is computed in
+  // milliseconds.
+  bool latency_in_micros = 4;
 }

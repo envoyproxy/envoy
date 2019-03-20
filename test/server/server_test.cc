@@ -131,7 +131,7 @@ protected:
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
-        Thread::threadFactoryForTest());
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -148,7 +148,7 @@ protected:
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
-        Thread::threadFactoryForTest());
+        Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
   }
@@ -171,6 +171,21 @@ protected:
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
+  initialize("test/server/node_bootstrap.yaml");
+  bool got_startup_notification = false, got_shutdown_notification = false;
+  server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
+                            [&got_startup_notification, this] {
+                              got_startup_notification = true;
+                              server_->shutdown();
+                            });
+  server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                            [&got_shutdown_notification] { got_shutdown_notification = true; });
+  server_->run();
+  EXPECT_TRUE(got_startup_notification);
+  EXPECT_TRUE(got_shutdown_notification);
+}
 
 TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
   options_.service_cluster_name_ = "some_cluster_name";
@@ -342,7 +357,7 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
-          Thread::threadFactoryForTest())),
+          Thread::threadFactoryForTest(), Filesystem::fileSystemForTest())),
       EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
 }
 

@@ -158,14 +158,15 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
-  Server::HotRestartNopImpl restarter;
+  Stats::FakeSymbolTableImpl symbol_table;
+  Server::HotRestartNopImpl restarter(symbol_table);
   ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
+  Stats::HeapStatDataAllocator stats_allocator(symbol_table);
   Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                               access_log_lock, component_factory, std::move(random_generator), tls,
-                              Thread::threadFactoryForTest());
+                              Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
   // This is technically thread unsafe (assigning to a shared_ptr accessed
   // across threads), but because we synchronize below through serverReady(), the only
   // consumer on the main test thread in ~IntegrationTestServerImpl will not race.

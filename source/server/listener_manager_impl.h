@@ -297,6 +297,9 @@ public:
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
   Api::Api& api() override { return parent_.server_.api(); }
+  ServerLifecycleNotifier& lifecycleNotifier() override {
+    return parent_.server_.lifecycleNotifier();
+  }
 
   // Network::DrainDecision
   bool drainClose() const override;

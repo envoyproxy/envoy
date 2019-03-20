@@ -32,7 +32,9 @@ typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> GrpcEdsSubsc
 
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  GrpcSubscriptionTestHarness()
+  GrpcSubscriptionTestHarness() : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
+
+  GrpcSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()) {
@@ -44,7 +46,7 @@ public:
     }));
     subscription_ = std::make_unique<GrpcEdsSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, stats_, stats_store_, rate_limit_settings_);
+        *method_descriptor_, stats_, stats_store_, rate_limit_settings_, init_fetch_timeout);
   }
 
   ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
@@ -128,6 +130,21 @@ public:
     last_cluster_names_ = cluster_names;
   }
 
+  void expectConfigUpdateFailed() override {
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+  }
+
+  void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
+    init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+  }
+
+  void expectDisableInitFetchTimeoutTimer() override {
+    EXPECT_CALL(*init_timeout_timer_, disableTimer());
+  }
+
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
+
   std::string version_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Grpc::MockAsyncClient* async_client_;
@@ -144,6 +161,7 @@ public:
   std::vector<std::string> last_cluster_names_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
+  Event::MockTimer* init_timeout_timer_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned

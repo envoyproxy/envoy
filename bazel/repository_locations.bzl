@@ -5,10 +5,10 @@ REPOSITORY_LOCATIONS = dict(
     ),
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        sha256 = "de3fc9ff61e2fa736681b401ac94ea016f6ff522da419c312eca6aec60ad6f50",
-        strip_prefix = "boringssl-a7d9ef75919900bf4dca947ad3d5d03f0dee3f2a",
-        # chromium-72.0.3626.81
-        urls = ["https://github.com/google/boringssl/archive/a7d9ef75919900bf4dca947ad3d5d03f0dee3f2a.tar.gz"],
+        sha256 = "e11d2d62cd6c4e1b2e126500e1436a678574300f33f27974f2c7ef271be42727",
+        strip_prefix = "boringssl-debed9a4d8de5e282f672ffcd7e4a48a201ea78c",
+        # chromium-73.0.3683.75
+        urls = ["https://github.com/google/boringssl/archive/debed9a4d8de5e282f672ffcd7e4a48a201ea78c.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
@@ -236,8 +236,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/2bfc754a599cdbdb2a6875a515713648b92ddb97.tar.gz
-        sha256 = "218870c37ebf8d29d5015dc746884d621634e825931f81551b5779fc0ee27cee",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/2bfc754a599cdbdb2a6875a515713648b92ddb97.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/348de99ee1f13e6747da3695387a2c78610f5f62.tar.gz
+        sha256 = "927757ead6502e8decae24dc01df69d61d2c7abb0211e356a70265f248282189",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/348de99ee1f13e6747da3695387a2c78610f5f62.tar.gz"],
     ),
 )

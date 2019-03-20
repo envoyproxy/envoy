@@ -11,13 +11,27 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * An individual timespan that flushes its measured value (in milliseconds) to a histogram. The
- * initial time is captured on construction. A timespan must be completed via complete() for it to
- * be stored. If the timespan is deleted this will be treated as a cancellation.
+ * An abstraction of timespan which can be completed.
  */
-class Timespan {
+class CompletableTimespan {
 public:
-  Timespan(Histogram& histogram, TimeSource& time_source)
+  virtual ~CompletableTimespan() {}
+
+  /**
+   * Complete the timespan.
+   */
+  virtual void complete() PURE;
+};
+
+/**
+ * An individual timespan that flushes its measured value in time unit (e.g
+ * std::chrono::milliseconds). The initial time is captured on construction. A timespan must be
+ * completed via complete() for it to be stored. If the timespan is deleted this will be treated as
+ * a cancellation.
+ */
+template <class TimeUnit> class TimespanWithUnit : public CompletableTimespan {
+public:
+  TimespanWithUnit(Histogram& histogram, TimeSource& time_source)
       : time_source_(time_source), histogram_(histogram), start_(time_source.monotonicTime()) {}
 
   /**
@@ -26,11 +40,10 @@ public:
   void complete() { histogram_.recordValue(getRawDuration().count()); }
 
   /**
-   * Get duration since the creation of the span.
+   * Get duration in the time unit since the creation of the span.
    */
-  std::chrono::milliseconds getRawDuration() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(time_source_.monotonicTime() -
-                                                                 start_);
+  TimeUnit getRawDuration() {
+    return std::chrono::duration_cast<TimeUnit>(time_source_.monotonicTime() - start_);
   }
 
 private:
@@ -39,7 +52,9 @@ private:
   const MonotonicTime start_;
 };
 
+typedef TimespanWithUnit<std::chrono::milliseconds> Timespan;
 typedef std::unique_ptr<Timespan> TimespanPtr;
+typedef std::unique_ptr<CompletableTimespan> CompletableTimespanPtr;
 
 } // namespace Stats
 } // namespace Envoy

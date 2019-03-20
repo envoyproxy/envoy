@@ -26,4 +26,36 @@ TEST(headerMapEqualIgnoreOrder, NotEqual) {
   Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":authority", "host"}};
   EXPECT_FALSE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
 }
+
+TEST(buffersEqual, Aligned) {
+  Buffer::OwnedImpl buffer1, buffer2;
+  EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
+
+  buffer1.appendSliceForTest("hello");
+  EXPECT_FALSE(TestUtility::buffersEqual(buffer1, buffer2));
+  buffer2.appendSliceForTest("hello");
+  EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
+
+  buffer1.appendSliceForTest(", world");
+  EXPECT_FALSE(TestUtility::buffersEqual(buffer1, buffer2));
+  buffer2.appendSliceForTest(", world");
+  EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
+}
+
+TEST(buffersEqual, NonAligned) {
+  Buffer::OwnedImpl buffer1, buffer2;
+  EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
+
+  buffer1.appendSliceForTest("hello");
+  EXPECT_FALSE(TestUtility::buffersEqual(buffer1, buffer2));
+  buffer2.appendSliceForTest("hello");
+  EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
+
+  buffer1.appendSliceForTest(", ");
+  buffer1.appendSliceForTest("world");
+  EXPECT_FALSE(TestUtility::buffersEqual(buffer1, buffer2));
+  buffer2.appendSliceForTest(", world");
+  EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
+}
+
 } // namespace Envoy
