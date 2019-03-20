@@ -12,7 +12,6 @@
 #include <sstream>
 #include <string>
 
-#include "common/common/assert.h"
 #include "common/common/logger.h"
 
 #include "absl/base/optimization.h"
@@ -31,8 +30,8 @@
       logstream
 
 #define QUIC_LOG_IF_IMPL(severity, condition)                                                      \
-  QUIC_LOG_IMPL_INTERNAL((condition) && quic::IsLogLevelEnabled(quic::severity),                   \
-                         quic::QuicLogEmitter(quic::severity).stream())
+  QUIC_LOG_IMPL_INTERNAL((condition) && IsLogLevelEnabled(severity),                   \
+                         QuicLogEmitter(severity).stream())
 
 #define QUIC_LOG_IMPL(severity) QUIC_LOG_IF_IMPL(severity, true)
 
@@ -76,6 +75,17 @@
 #endif
 
 #define QUIC_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
+
+#define CHECK(condition)                          \
+  QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) \
+      << (::absl::logging_internal::CheckFailedMessage{#condition})
+
+#ifndef NDEBUG
+#define DCHECK(condition) CHECK(condition)
+#else
+#define DCHECK(condition) \
+  while (false && (condition)) {}
+#endif
 
 namespace quic {
 

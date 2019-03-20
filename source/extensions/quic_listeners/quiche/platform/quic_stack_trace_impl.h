@@ -8,11 +8,9 @@
 
 #include "server/backtrace.h"
 
-#include "quiche/quic/platform/api/quic_string.h"
-
 namespace quic {
 
-inline QuicString QuicStackTraceImpl() {
+inline std::string QuicStackTraceImpl() {
   Envoy::BackwardsTrace t;
   t.capture();
   std::ostringstream os;

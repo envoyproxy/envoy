@@ -16,14 +16,15 @@
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
+#include "quiche/quic/platform/api/quic_mem_slice.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
-#include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
@@ -92,13 +93,13 @@ TEST(QuicPlatformTest, QuicHostnameUtils) {
 }
 
 TEST(QuicPlatformTest, QuicUnorderedMap) {
-  quic::QuicUnorderedMap<quic::QuicString, int> umap;
+  quic::QuicUnorderedMap<std::string, int> umap;
   umap.insert({"foo", 2});
   EXPECT_EQ(2, umap["foo"]);
 }
 
 TEST(QuicPlatformTest, QuicUnorderedSet) {
-  quic::QuicUnorderedSet<quic::QuicString> uset({"foo", "bar"});
+  quic::QuicUnorderedSet<std::string> uset({"foo", "bar"});
   EXPECT_EQ(1, uset.count("bar"));
   EXPECT_EQ(0, uset.count("qux"));
 }
@@ -127,7 +128,7 @@ TEST(QuicPlatformTest, QuicEndian) {
 }
 
 TEST(QuicPlatformTest, QuicEstimateMemoryUsage) {
-  quic::QuicString s = "foo";
+  std::string s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, quic::QuicEstimateMemoryUsage(s));
 }
@@ -141,7 +142,7 @@ TEST(QuicPlatformTest, QuicMapUtil) {
   EXPECT_TRUE(quic::QuicContainsKey(umap, 2));
   EXPECT_FALSE(quic::QuicContainsKey(umap, 10));
 
-  quic::QuicUnorderedSet<quic::QuicString> uset({"foo", "bar"});
+  quic::QuicUnorderedSet<std::string> uset({"foo", "bar"});
   EXPECT_TRUE(quic::QuicContainsKey(uset, "foo"));
   EXPECT_FALSE(quic::QuicContainsKey(uset, "abc"));
 
@@ -195,13 +196,8 @@ TEST(QuicPlatformTest, QuicStackTraceTest) {
 
 TEST(QuicPlatformTest, QuicSleep) { quic::QuicSleep(quic::QuicTime::Delta::FromMilliseconds(20)); }
 
-TEST(QuicPlatformTest, QuicString) {
-  quic::QuicString s = "foo";
-  EXPECT_EQ('o', s[1]);
-}
-
 TEST(QuicPlatformTest, QuicStringPiece) {
-  quic::QuicString s = "bar";
+  std::string s = "bar";
   quic::QuicStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
 }
@@ -248,10 +244,10 @@ TEST(QuicPlatformTest, QuicUint128) {
 }
 
 TEST(QuicPlatformTest, QuicPtrUtil) {
-  auto p = quic::QuicMakeUnique<quic::QuicString>("abc");
+  auto p = quic::QuicMakeUnique<std::string>("abc");
   EXPECT_EQ("abc", *p);
 
-  p = quic::QuicWrapUnique(new quic::QuicString("aaa"));
+  p = quic::QuicWrapUnique(new std::string("aaa"));
   EXPECT_EQ("aaa", *p);
 }
 
@@ -455,6 +451,47 @@ TEST(QuicPlatformTest, QuicTestOutput) {
                       quic::QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
 
+<<<<<<< HEAD
+=======
+class QuicMemSliceTest : public QuicTest {
+public:
+  QuicMemSliceTest() {
+    slice_ = quic::QuicMemSlice(
+        quic::QuicMemSliceImpl(std::make_shared<Envoy::Buffer::OwnedImpl>(std::string(1024, 'a'))));
+    orig_data_ = slice_.data();
+    orig_length_ = slice_.length();
+    EXPECT_EQ(1024u, orig_length_);
+  }
+
+protected:
+  quic::QuicMemSlice slice_;
+  const char* orig_data_;
+  size_t orig_length_;
+};
+
+TEST_F(QuicMemSliceTest, Reset) {
+  slice_.Reset();
+  EXPECT_TRUE(slice_.empty());
+  EXPECT_EQ(nullptr, slice_.data());
+}
+
+TEST_F(QuicMemSliceTest, InvalidBuffer) {
+  std::string str(512, 'b');
+  // Fragment needs to out-live buffer.
+  Envoy::Buffer::BufferFragmentImpl fragment(
+      str.data(), str.length(),
+      [](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {});
+  auto buffer = std::make_shared<Envoy::Buffer::OwnedImpl>();
+  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer)}, "");
+  buffer->add(std::string(1024, 'a'));
+  quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer)};
+  // Adding a fragment will invalidate slice1.
+  buffer->addBufferFragment(fragment);
+  EXPECT_DEBUG_DEATH(slice1.data(), "");
+  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer)}, "");
+}
+
+>>>>>>> 604b6bb07... mem_slice_span
 } // namespace
 } // namespace Quiche
 } // namespace QuicListeners
