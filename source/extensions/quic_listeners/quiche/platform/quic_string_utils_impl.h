@@ -10,7 +10,8 @@
 
 namespace quic {
 
-template <typename... Args> inline void QuicStrAppendImpl(std::string* output, const Args&... args) {
+template <typename... Args>
+inline void QuicStrAppendImpl(std::string* output, const Args&... args) {
   absl::StrAppend(output, args...);
 }
 

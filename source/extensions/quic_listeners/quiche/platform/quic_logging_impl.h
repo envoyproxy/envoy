@@ -30,7 +30,7 @@
       logstream
 
 #define QUIC_LOG_IF_IMPL(severity, condition)                                                      \
-  QUIC_LOG_IMPL_INTERNAL((condition) && IsLogLevelEnabled(severity),                   \
+  QUIC_LOG_IMPL_INTERNAL((condition) && IsLogLevelEnabled(severity),                               \
                          QuicLogEmitter(severity).stream())
 
 #define QUIC_LOG_IMPL(severity) QUIC_LOG_IF_IMPL(severity, true)

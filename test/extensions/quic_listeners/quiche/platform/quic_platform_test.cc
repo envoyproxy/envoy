@@ -1,3 +1,11 @@
+#pragma once
+
+// NOLINT(namespace-envoy)
+
+// This file is part of the QUICHE platform implementation, and is not to be
+// consumed or referenced directly by other Envoy code. It serves purely as a
+// porting layer for QUICHE.
+
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
