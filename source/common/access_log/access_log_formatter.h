@@ -198,8 +198,10 @@ public:
   std::string format(const Http::HeaderMap&, const Http::HeaderMap&, const Http::HeaderMap&,
                      const StreamInfo::StreamInfo& stream_info) const override;
 
+  using FieldExtractor = std::function<std::string(const StreamInfo::StreamInfo&)>;
+
 private:
-  std::function<std::string(const StreamInfo::StreamInfo&)> field_extractor_;
+  FieldExtractor field_extractor_;
 };
 
 /**
