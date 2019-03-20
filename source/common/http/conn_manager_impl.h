@@ -99,13 +99,21 @@ private:
           parent_(parent), headers_continued_(false), continue_headers_continued_(false),
           end_stream_(false), dual_filter_(dual_filter) {}
 
+    // Functions in the following block are called after the filter finishes processing
+    // corresponding data. Those functions handle state updates and data storage (if needed)
+    // according to the status returned by filter's callback functions.
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
-    void commonHandleBufferData(Buffer::Instance& provided_data);
     bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                        bool& buffer_was_streaming);
     bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
-    void commonHandleDataAfterStopAll(Buffer::Instance& provided_data, bool& buffer_was_streaming);
+
+    // Buffers provided_data.
+    void commonHandleBufferData(Buffer::Instance& provided_data);
+
+    // If iteration has stopped for all frame types, calls this function to buffer the data before
+    // the filter processes data. The function also updates streaming state.
+    void commonBufferDataIfStopAll(Buffer::Instance& provided_data, bool& buffer_was_streaming);
 
     void commonContinue();
     virtual bool canContinue() PURE;
@@ -320,11 +328,14 @@ private:
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
     void chargeStats(const HeaderMap& headers);
+    // Returns the encoder filter to start iteration with. If the function is called from a filter
+    // that should always iterate from the next filter, sets always_start_next to be true.
     std::list<ActiveStreamEncoderFilterPtr>::iterator
-    commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
-    // Returns the decoder filter to start iteration with.
+    commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream, bool always_start_next);
+    // Returns the decoder filter to start iteration with. If the function is called from a filter
+    // that should always iterate from the next filter, sets always_start_next to be true.
     std::list<ActiveStreamDecoderFilterPtr>::iterator
-    getDecodeStartFilter(ActiveStreamDecoderFilter* filter);
+    commonDecodePrefix(ActiveStreamDecoderFilter* filter, bool always_start_next);
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addDecodedTrailers();
