@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/runtime/runtime_features.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Runtime {
