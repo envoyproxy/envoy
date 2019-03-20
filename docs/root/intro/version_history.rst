@@ -16,6 +16,7 @@ Version history
 * config: logging warnings when deprecated fields are in use.
 * config: removed deprecated --v2-config-only from command line config.
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
+* config: removed the deprecated_v1 config option from :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * config: finish cluster warming only when a named response i.e. ClusterLoadAssignment associated to the cluster being warmed comes in the EDS response. This is a behavioural change from the current implementation where warming of cluster completes on missing load assignments also.
 * config: use Envoy cpuset size to set the default number or worker threads if :option:`--cpuset-threads` is enabled.
