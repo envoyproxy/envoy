@@ -1,5 +1,7 @@
 #pragma once
 
+#include "extensions/quic_listeners/quiche/platform/string_utils.h"
+
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
@@ -54,9 +56,11 @@ public:
 
   static QuicString HexDecode(QuicStringPiece data) { return absl::HexStringToBytes(data); }
 
-  static void Base64Encode(const uint8_t* data, size_t data_len, QuicString* output);
+  static void Base64Encode(const uint8_t* data, size_t data_len, QuicString* output) {
+    return quiche::Base64Encode(data, data_len, output);
+  }
 
-  static QuicString HexDump(QuicStringPiece binary_data);
+  static QuicString HexDump(QuicStringPiece binary_data) { return quiche::HexDump(binary_data); }
 
   static bool ContainsUpperCase(QuicStringPiece data) {
     return std::any_of(data.begin(), data.end(), absl::ascii_isupper);

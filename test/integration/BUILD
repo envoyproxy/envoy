@@ -454,8 +454,10 @@ envoy_cc_test(
     srcs = ["stats_integration_test.cc"],
     deps = [
         ":integration_lib",
+        "//source/common/memory:stats_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
