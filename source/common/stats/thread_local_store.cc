@@ -192,31 +192,6 @@ void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
   }
 }
 
-static void freeSharedStatNameStorageSet(SymbolTable& symbol_table,
-                                         SharedStatNameStorageSet& storage_set) {
-  // We must free() all symbols referenced in the set, otherwise the symbols
-  // will leak when the flat_hash_map superclass is destructed. They cannot
-  // self-destruct without an explicit free() as each individual StatNameStorage
-  // object does not have a reference to the symbol table, which would waste 8
-  // bytes per stat-name. So we must iterate over the set and free it. But we
-  // don't want to mutate objects while they are in a set, so we just copy them,
-  // which is easy because they are shared_ptr<StatNameStorage>.
-
-  size_t sz = storage_set.size();
-  STACK_ARRAY(storage, SharedStatNameStorage, sz);
-  size_t i = 0;
-  for (const SharedStatNameStorage& name : storage_set) {
-    storage[i++] = name;
-  }
-  storage_set.clear();
-
-  // Now that the associative container is clear, we can free all the referenced
-  // symbols.
-  for (i = 0; i < sz; ++i) {
-    storage[i]->free(symbol_table);
-  }
-}
-
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   Thread::LockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
@@ -232,7 +207,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   rejected_stats->swap(scope->central_cache_.rejected_stats_);
   const uint64_t scope_id = scope->scope_id_;
   auto clean_central_cache = [this, rejected_stats]() {
-    freeSharedStatNameStorageSet(symbolTable(), *rejected_stats);
+    rejected_stats->free(symbolTable());
     delete rejected_stats;
   };
 
