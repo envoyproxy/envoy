@@ -18,7 +18,7 @@ TimerPtr LibeventScheduler::createTimer(const TimerCb& cb) {
 void LibeventScheduler::nonBlockingLoop() {
 #ifdef WIN32
   // On Windows, EVLOOP_NONBLOCK will cause the libevent event_base_loop to run forever.
-  // This is becase libevent only supports level triggering on Windows, and so the write
+  // This is because libevent only supports level triggering on Windows, and so the write
   // event callbacks will trigger every time through the loop. Adding EVLOOP_ONCE ensures the
   // loop will run at most once
   int flag = EVLOOP_NONBLOCK | EVLOOP_ONCE;
