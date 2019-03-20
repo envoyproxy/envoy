@@ -13,6 +13,7 @@
 
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats_options.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
 #include "common/common/block_memory_hash_set.h"

@@ -90,9 +90,10 @@ public:
   void parseResponse(const Http::Message& response) override {
     disableInitFetchTimeoutTimer();
     envoy::api::v2::DiscoveryResponse message;
-    const auto status = Protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
-    if (!status.ok()) {
-      ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
+    try {
+      MessageUtil::loadFromJson(response.bodyAsString(), message);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(warn, "REST config JSON conversion error: {}", e.what());
       handleFailure(nullptr);
       return;
     }

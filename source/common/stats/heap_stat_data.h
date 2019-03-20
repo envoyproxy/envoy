@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/hash.h"
 #include "common/common/thread.h"
