@@ -387,6 +387,8 @@ public:
     case OpCodes::CREATETTL:
       opname = "createttl";
       break;
+    default:
+      break;
     }
 
     expectSetDynamicMetadata(
@@ -404,6 +406,8 @@ public:
       break;
     case OpCodes::CREATETTL:
       EXPECT_EQ(1UL, config_->stats().createttl_rq_.value());
+      break;
+    default:
       break;
     }
 
@@ -520,6 +524,22 @@ TEST_F(ZooKeeperFilterTest, GetDataRequest) {
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(21UL, config_->stats().request_bytes_.value());
+  EXPECT_EQ(1UL, config_->stats().getdata_rq_.value());
+  EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, GetDataRequestEmptyPath) {
+  initialize();
+
+  // It's valid in ZK to send an empty string as the path, which
+  // gets treated as /.
+  Buffer::OwnedImpl data = encodePathWatch("", true);
+
+  expectSetDynamicMetadata({{"opname", "getdata"}, {"path", ""}, {"watch", "true"}},
+                           {{"bytes", "17"}});
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(17UL, config_->stats().request_bytes_.value());
   EXPECT_EQ(1UL, config_->stats().getdata_rq_.value());
   EXPECT_EQ(0UL, config_->stats().decoder_error_.value());
 }
