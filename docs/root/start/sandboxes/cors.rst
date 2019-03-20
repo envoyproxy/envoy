@@ -66,14 +66,14 @@ Terminal 2
   $ docker-compose up --build -d
   $ docker-compose ps
 
-          Name                         Command               State                            Ports
-----------------------------------------------------------------------------------------------------------------------------
-backend_backend-service_1   /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 80/tcp
-backend_front-envoy_1       /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8002->80/tcp, 0.0.0.0:8003->8001/tcp
+            Name                         Command               State                            Ports
+  ----------------------------------------------------------------------------------------------------------------------------
+  backend_backend-service_1   /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 80/tcp
+  backend_front-envoy_1       /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8002->80/tcp, 0.0.0.0:8003->8001/tcp
 
 **Step 3: Test Envoy's CORS capabilities**
 
-You can now open a browser to view your frontend service at http://localhost:8000`.
+You can now open a browser to view your frontend service at ``localhost:8000``.
 
 Results of the cross-origin request will be shown on the page under *Request Results*.
 Your browser's CORS enforcement logs can be found in the console.
@@ -90,7 +90,7 @@ For example:
 When Envoy runs, it can listen to ``admin`` requests if a port is configured. In the example
 configs, the backend admin is bound to port ``8003``.
 
-If you go to localhost:8003/stats you will be able to view
+If you go to ``localhost:8003/stats`` you will be able to view
 all of the Envoy stats for the backend. You should see the CORS stats for
 invalid and valid origins increment as you make requests from the frontend cluster.
 

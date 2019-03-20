@@ -194,7 +194,7 @@ statistics. For example inside ``frontenvoy`` we can get::
   $ docker-compose exec front-envoy /bin/bash
   root@e654c2c83277:/# curl localhost:8001/server_info
 
-  .. code-block:: json
+.. code-block:: json
 
   {
     "version": "3ba949a9cb5b0b1cccd61e76159969a49377fd7d/1.10.0-dev/Clean/RELEASE/BoringSSL",
@@ -229,6 +229,8 @@ statistics. For example inside ``frontenvoy`` we can get::
     "uptime_current_epoch": "401s",
     "uptime_all_epochs": "401s"
   }
+  
+.. code-block:: text
 
   root@e654c2c83277:/# curl localhost:8001/stats
   cluster.service1.external.upstream_rq_200: 7

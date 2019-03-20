@@ -42,6 +42,7 @@ To build this sandbox example, and start the example apps run the following comm
 
     $ pwd
     envoy/examples/zipkin-tracing
+    $ docker-compose pull
     $ docker-compose up --build -d
     $ docker-compose ps
 
