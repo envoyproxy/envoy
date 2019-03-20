@@ -57,9 +57,9 @@ envoy_cc_library(
         "abseil_optional",
     ],
     visibility = ["//visibility:public"],
-    deps = [
+    deps = envoy_select_quiche([
         ":flags_impl_lib",
-    ],
+    ]),
 )
 
 envoy_cc_library(
@@ -111,9 +111,9 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        ":flags_impl_lib",
         "@com_googlesource_quiche//:quic_platform_export",
     ] + envoy_select_quiche([
+        ":flags_impl_lib",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
@@ -188,7 +188,7 @@ envoy_cc_library(
         "abseil_memory",
     ],
     visibility = ["//visibility:public"],
-    deps = [
+    deps = envoy_select_quiche([
         ":flags_impl_lib",
-    ],
+    ]),
 )
