@@ -212,7 +212,7 @@ public:
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
   envoy::api::v2::core::Locality upstream_locality_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
@@ -2051,7 +2051,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 }
 
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
-  Ssl::MockConnection ssl_connection;
+  Ssl::MockConnectionInfo ssl_connection;
   enableRedirects();
 
   sendRequest();
@@ -3039,7 +3039,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(callbacks_, tracingConfig());
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
@@ -3070,7 +3070,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(callbacks_.active_span_, spawnChild_(_, "router fake_cluster egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(callbacks_, tracingConfig());
-  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
+  EXPECT_CALL(*child_span, setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy));
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});

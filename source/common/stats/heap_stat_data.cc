@@ -11,8 +11,6 @@ HeapStatData::HeapStatData(absl::string_view key) {
   StringUtil::strlcpy(name_, key.data(), key.size() + 1);
 }
 
-HeapStatDataAllocator::HeapStatDataAllocator() {}
-
 HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
 HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {

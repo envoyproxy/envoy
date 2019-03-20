@@ -188,7 +188,8 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       // Hands off connections redirected by iptables to the listener associated with the
       // original destination address. Pass 'hand_off_restored_destination_connections' as false to
       // prevent further redirection.
-      new_listener->onAccept(std::move(socket_), false);
+      new_listener->onAccept(std::move(socket_),
+                             false /* hand_off_restored_destination_connections */);
     } else {
       // Set default transport protocol if none of the listener filters did it.
       if (socket_->detectedTransportProtocol().empty()) {
