@@ -38,7 +38,7 @@ public:
     return {PostIoAction::Close, 0, false};
   }
   void onConnected() override {}
-  const Ssl::Connection* ssl() const override { return nullptr; }
+  const Ssl::ConnectionInfo* ssl() const override { return nullptr; }
 };
 } // namespace
 
@@ -252,15 +252,13 @@ bool SslSocket::peerCertificatePresented() const {
   return cert != nullptr;
 }
 
-std::string SslSocket::uriSanLocalCertificate() const {
+std::vector<std::string> SslSocket::uriSanLocalCertificate() const {
   // The cert object is not owned.
   X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
-    return "";
+    return {};
   }
-  // TODO(PiotrSikora): Figure out if returning only one URI is valid limitation.
-  const std::vector<std::string>& san_uris = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return (san_uris.size() > 0) ? san_uris[0] : "";
+  return Utility::getSubjectAltNames(*cert, GEN_URI);
 }
 
 std::vector<std::string> SslSocket::dnsSansLocalCertificate() const {
@@ -341,14 +339,12 @@ const std::string& SslSocket::urlEncodedPemEncodedPeerCertificateChain() const {
   return cached_url_encoded_pem_encoded_peer_cert_chain_;
 }
 
-std::string SslSocket::uriSanPeerCertificate() const {
+std::vector<std::string> SslSocket::uriSanPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
-    return "";
+    return {};
   }
-  // TODO(PiotrSikora): Figure out if returning only one URI is valid limitation.
-  const std::vector<std::string>& san_uris = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return (san_uris.size() > 0) ? san_uris[0] : "";
+  return Utility::getSubjectAltNames(*cert, GEN_URI);
 }
 
 std::vector<std::string> SslSocket::dnsSansPeerCertificate() const {

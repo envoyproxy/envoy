@@ -43,6 +43,9 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
 SERIALIZE_AS_STRING_WHITELIST = ('./test/common/protobuf/utility_test.cc',
                                  './test/common/grpc/codec_test.cc')
 
+# Files in these paths can use Protobuf::util::JsonStringToMessage
+JSON_STRING_TO_MESSAGE_WHITELIST = ('./source/common/protobuf/utility.cc')
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -222,6 +225,10 @@ def whitelistedForRealTime(file_path):
 
 def whitelistedForSerializeAsString(file_path):
   return file_path in SERIALIZE_AS_STRING_WHITELIST
+
+
+def whitelistedForJsonStringToMessage(file_path):
+  return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -430,6 +437,10 @@ def checkSourceLine(line, file_path, reportError):
     reportError(
         "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
     )
+  if not whitelistedForJsonStringToMessage(file_path) and 'JsonStringToMessage' in line:
+    # Centralize all usage of JSON parsing so it is easier to make changes in JSON parsing
+    # behavior.
+    reportError("Don't use Protobuf::util::JsonStringToMessage, use MessageUtil::loadFromJson.")
 
 
 def checkBuildLine(line, file_path, reportError):

@@ -420,6 +420,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   stream_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
 
+  stream_info_.setDownstreamSslConnection(connection_manager_.read_callbacks_->connection().ssl());
+
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(

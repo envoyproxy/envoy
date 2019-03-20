@@ -164,10 +164,8 @@ void FilterJson::translateHttpConnectionManager(
         "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +
         "}";
 
-    const auto status =
-        Protobuf::util::JsonStringToMessage(deprecated_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.
-    ASSERT(status.ok());
+    MessageUtil::loadFromJson(deprecated_config, *filter->mutable_config());
   }
 
   JSON_UTIL_SET_BOOL(json_config, proto_config, add_user_agent);

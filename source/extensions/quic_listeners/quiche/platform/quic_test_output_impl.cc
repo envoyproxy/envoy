@@ -36,7 +36,7 @@ void QuicRecordTestOutputToFile(const std::string& filename, QuicStringPiece dat
     output_dir += '/';
   }
 
-  Envoy::Filesystem::InstanceImpl file_system;
+  Envoy::Filesystem::InstanceImplPosix file_system;
   if (!file_system.directoryExists(output_dir)) {
     QUIC_LOG(ERROR) << "Directory does not exist while writing test output: " << output_dir;
     return;

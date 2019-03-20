@@ -31,8 +31,11 @@ TEST(Base64Test, SingleSliceBufferEncode) {
 TEST(Base64Test, EncodeString) {
   EXPECT_EQ("", Base64::encode("", 0));
   EXPECT_EQ("AAA=", Base64::encode("\0\0", 2));
+  EXPECT_EQ("AAA", Base64::encode("\0\0", 2, false));
   EXPECT_EQ("Zm9v", Base64::encode("foo", 3));
   EXPECT_EQ("Zm8=", Base64::encode("fo", 2));
+  EXPECT_EQ("Zg==", Base64::encode("f", 1));
+  EXPECT_EQ("Zg", Base64::encode("f", 1, false));
 }
 
 TEST(Base64Test, Decode) {

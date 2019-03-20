@@ -297,6 +297,11 @@ static_resources:
         port_value: <ADS management server port>
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
+    upstream_connection_options:
+      # configure a TCP keep-alive to detect and reconnect to the admin
+      # server in the event of a TCP socket disconnection
+      tcp_keepalive:
+        ...
 admin:
   ...
 

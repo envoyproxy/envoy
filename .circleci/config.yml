@@ -20,12 +20,26 @@ jobs:
            command:
              ci/do_circle_ci.sh bazel.release
            no_output_timeout: 60m
-       - setup_remote_docker
-       - run: ci/docker_push.sh
-       - run: ci/docker_tag.sh
+       - persist_to_workspace:
+           root: .
+           paths:
+             - build_release
+             - build_release_stripped
        - store_artifacts:
            path: /build/envoy/generated
            destination: /
+   docker:
+     docker:
+       - image: docker
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - attach_workspace:
+           at: .
+       - setup_remote_docker
+       - run: ci/docker_build.sh
+       - run: ci/docker_push.sh
+       - run: ci/docker_tag.sh
    asan:
      executor: ubuntu-build
      steps:
@@ -178,6 +192,11 @@ workflows:
   all:
     jobs:
       - release:
+          filters:
+            tags:
+              only: /^v.*/
+      - docker:
+          requires: [release]
           filters:
             tags:
               only: /^v.*/
