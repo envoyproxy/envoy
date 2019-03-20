@@ -76,17 +76,6 @@
 
 #define QUIC_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
 
-#define CHECK(condition)                          \
-  QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) \
-      << (::absl::logging_internal::CheckFailedMessage{#condition})
-
-#ifndef NDEBUG
-#define DCHECK(condition) CHECK(condition)
-#else
-#define DCHECK(condition) \
-  while (false && (condition)) {}
-#endif
-
 namespace quic {
 
 using QuicLogLevel = spdlog::level::level_enum;
