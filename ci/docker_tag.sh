@@ -11,9 +11,9 @@ then
     for BUILD_TYPE in "envoy" "envoy-alpine" "envoy-alpine-debug"; do
         docker pull envoyproxy/"$BUILD_TYPE"-dev:"$CIRCLE_SHA1"
         docker tag envoyproxy/"$BUILD_TYPE"-dev:"$CIRCLE_SHA1" envoyproxy/"$BUILD_TYPE":"$CIRCLE_TAG"
-        docker push envoyproxy/envoy:"$CIRCLE_TAG"
+        docker push envoyproxy/"$BUILD_TYPE":"$CIRCLE_TAG"
         docker tag envoyproxy/"$BUILD_TYPE"-dev:"$CIRCLE_SHA1" envoyproxy/"$BUILD_TYPE":latest
-        docker push envoyproxy/envoy:latest
+        docker push envoyproxy/"$BUILD_TYPE":latest
     done
 else
     echo 'Ignoring non-tag event for docker tag.'
