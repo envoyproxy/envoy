@@ -188,6 +188,21 @@ public:
     return buffer;
   }
 
+  Buffer::OwnedImpl encodePathLongerThanBuffer(const std::string& path,
+                                               const int32_t opcode) const {
+    Buffer::OwnedImpl buffer;
+
+    buffer.writeBEInt<int32_t>(8 + path.length());
+    buffer.writeBEInt<int32_t>(1000);
+    // Opcode.
+    buffer.writeBEInt<int32_t>(opcode);
+    // Path.
+    buffer.writeBEInt<uint32_t>(str.length() * 2);
+    buffer.add(str);
+
+    return buffer;
+  }
+
   Buffer::OwnedImpl
   encodeCreateRequest(const std::string& path, const std::string& data, const CreateFlags flags,
                       const bool txn = false,
@@ -483,6 +498,15 @@ TEST_F(ZooKeeperFilterTest, UnknownOpcode) {
   initialize();
 
   Buffer::OwnedImpl data = encodeUnknownOpcode();
+
+  EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
+}
+
+TEST_F(ZooKeeperFilterTest, BufferSmallerThanStringLength) {
+  initialize();
+
+  Buffer::OwnedImpl data = encodePathLongerThanBuffer("/foo", enumToIntSigned(OpCodes::SYNC));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
