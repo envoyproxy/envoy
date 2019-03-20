@@ -16,7 +16,6 @@
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
-#include "quiche/quic/platform/api/quic_mem_slice.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
@@ -24,7 +23,6 @@
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
-#include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
@@ -37,10 +35,7 @@ using testing::HasSubstr;
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
-namespace Envoy {
-namespace Extensions {
-namespace QuicListeners {
-namespace Quiche {
+namespace quic {
 namespace {
 
 TEST(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
@@ -416,7 +411,7 @@ TEST(QuicPlatformTest, QuicNotification) {
 
 TEST(QuicPlatformTest, QuicCertUtils) {
   bssl::UniquePtr<X509> x509_cert =
-      TransportSockets::Tls::readCertFromFile(TestEnvironment::substitute(
+      Envoy::Extensions::TransportSockets::Tls::readCertFromFile(Envoy::TestEnvironment::substitute(
           "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   // Encode X509 cert with DER encoding.
   unsigned char* der = nullptr;
@@ -451,49 +446,5 @@ TEST(QuicPlatformTest, QuicTestOutput) {
                       quic::QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
 
-<<<<<<< HEAD
-=======
-class QuicMemSliceTest : public QuicTest {
-public:
-  QuicMemSliceTest() {
-    slice_ = quic::QuicMemSlice(
-        quic::QuicMemSliceImpl(std::make_shared<Envoy::Buffer::OwnedImpl>(std::string(1024, 'a'))));
-    orig_data_ = slice_.data();
-    orig_length_ = slice_.length();
-    EXPECT_EQ(1024u, orig_length_);
-  }
-
-protected:
-  quic::QuicMemSlice slice_;
-  const char* orig_data_;
-  size_t orig_length_;
-};
-
-TEST_F(QuicMemSliceTest, Reset) {
-  slice_.Reset();
-  EXPECT_TRUE(slice_.empty());
-  EXPECT_EQ(nullptr, slice_.data());
-}
-
-TEST_F(QuicMemSliceTest, InvalidBuffer) {
-  std::string str(512, 'b');
-  // Fragment needs to out-live buffer.
-  Envoy::Buffer::BufferFragmentImpl fragment(
-      str.data(), str.length(),
-      [](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {});
-  auto buffer = std::make_shared<Envoy::Buffer::OwnedImpl>();
-  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer)}, "");
-  buffer->add(std::string(1024, 'a'));
-  quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer)};
-  // Adding a fragment will invalidate slice1.
-  buffer->addBufferFragment(fragment);
-  EXPECT_DEBUG_DEATH(slice1.data(), "");
-  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer)}, "");
-}
-
->>>>>>> 604b6bb07... mem_slice_span
 } // namespace
-} // namespace Quiche
-} // namespace QuicListeners
-} // namespace Extensions
-} // namespace Envoy
+} // namespace quic

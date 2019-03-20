@@ -61,6 +61,8 @@ private:
   std::vector<std::string> messages_;
 };
 
+} // namespace Envoy
+
 typedef std::pair<std::string, std::string> StringPair;
 
 typedef std::vector<StringPair> ExpectedLogMessages;
@@ -78,8 +80,8 @@ typedef std::vector<StringPair> ExpectedLogMessages;
 #define EXPECT_LOG_CONTAINS_ALL_OF(expected_messages, stmt)                                        \
   do {                                                                                             \
     ASSERT_FALSE(expected_messages.empty()) << "Expected messages cannot be empty.";               \
-    LogLevelSetter save_levels(spdlog::level::trace);                                              \
-    LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
+    Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                              \
+    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
     if (log_recorder.messages().empty()) {                                                         \
       FAIL() << "Expected message(s), but NONE was recorded.";                                     \
@@ -118,8 +120,8 @@ typedef std::vector<StringPair> ExpectedLogMessages;
 //   'warning', 'Received gRPC’
 #define EXPECT_LOG_NOT_CONTAINS(loglevel, substr, stmt)                                            \
   do {                                                                                             \
-    LogLevelSetter save_levels(spdlog::level::trace);                                              \
-    LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
+    Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                              \
+    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
     for (const std::string& message : log_recorder.messages()) {                                   \
       if ((message.find(substr) != std::string::npos) &&                                           \
@@ -154,11 +156,10 @@ typedef std::vector<StringPair> ExpectedLogMessages;
 //   [2018-04-12 05:51:00.246][7290192][trace][upstream] grpc_mux_impl.cc:80] Sending foo
 #define EXPECT_NO_LOGS(stmt)                                                                       \
   do {                                                                                             \
-    LogLevelSetter save_levels(spdlog::level::trace);                                              \
-    LogRecordingSink log_recorder(Logger::Registry::getSink());                                    \
+    Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                              \
+    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                                    \
     stmt;                                                                                          \
     const std::vector<std::string> logs = log_recorder.messages();                                 \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
   } while (false)
 
-} // namespace Envoy

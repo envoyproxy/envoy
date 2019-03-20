@@ -70,22 +70,19 @@ envoy_cc_library(
         "quic_estimate_memory_usage_impl.h",
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
-        "quic_flags_impl.h",
         "quic_iovec_impl.h",
-        "quic_ip_address_impl.h",
         "quic_map_util_impl.h",
         "quic_prefetch_impl.h",
         "quic_reference_counted_impl.h",
         "quic_ptr_util_impl.h",
         "quic_server_stats_impl.h",
-        "quic_socket_address_impl.h",
         "quic_string_piece_impl.h",
+        "quic_test_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
         "quic_logging_impl.h",
         "quic_mock_log_impl.h",
         "quic_stack_trace_impl.h",
-        "quic_test_impl.h",
         "quic_thread_impl.h",
     ]),
     external_deps = [
@@ -135,20 +132,6 @@ envoy_cc_library(
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:utility_lib",
     ]),
-)
-
-envoy_cc_library(
-    name = "quic_platform_mem_slice_span_impl_lib",
-    srcs =
-        envoy_select_quiche([
-            "quic_mem_slice_span_impl.cc",
-        ]),
-    hdrs = envoy_select_quiche([
-        "quic_mem_slice_span_impl.h",
-    ]),
-    deps = [
-        "@com_googlesource_quiche//:quiche_quic_core_base",
-    ],
 )
 
 envoy_cc_library(
