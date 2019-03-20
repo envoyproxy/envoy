@@ -2588,8 +2588,9 @@ internal_only_headers:
 - x-lyft-user-id
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
+  EXPECT_THROW(
+      TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException);
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateDomainConfig) {
@@ -2613,8 +2614,9 @@ virtual_hosts:
       cluster: www2_staging
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
+  EXPECT_THROW(
+      TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException);
 }
 
 // Test to detect if hostname matches are case-insensitive
@@ -3056,7 +3058,7 @@ virtual_hosts:
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
     }
     {
-      Http::TestHeaderMapImpl  headers =
+      Http::TestHeaderMapImpl headers =
           genRedirectHeaders("[fe80::1]:443", "/host_path_http", true, false);
       EXPECT_EQ("http://[fe80::2]/new_path",
                 config.route(headers, 0)->directResponseEntry()->newPath(headers));
@@ -3659,8 +3661,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(
-      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
@@ -3674,8 +3676,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_DEATH(
-      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), ".*assert failure: has_regex.*");
+  EXPECT_DEATH(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               ".*assert failure: has_regex.*");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
@@ -3692,8 +3694,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(
-      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoAction) {
@@ -3706,8 +3708,8 @@ virtual_hosts:
   - match:
       prefix: "/api"
   )EOF";
-  EXPECT_DEATH(
-    TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), ".*assert failure.*");
+  EXPECT_DEATH(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               ".*assert failure.*");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
@@ -3724,9 +3726,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(
-      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
-  ;
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
@@ -3744,8 +3745,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(
-      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(RouteMatcherTest, TestOpaqueConfig) {
