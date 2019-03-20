@@ -168,9 +168,10 @@ public:
 
   static size_t computeMemory(int num_clusters) {
     const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-    ClusterMemoryTestHelper helper(num_clusters, true);
+    ClusterMemoryTestHelper helper;
     size_t memory = helper.ClusterMemoryHelper(num_clusters, true);
     EXPECT_LT(start_mem, memory);
+    return memory;
   }
 };
 class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {};
