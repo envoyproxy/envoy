@@ -41,7 +41,7 @@ binary.
 * `envoyproxy/envoy-alpine-debug-dev <https://hub.docker.com/r/envoyproxy/envoy-alpine-debug-dev/tags/>`_:
   Release binary with debug symbols on top of a **glibc** alpine base.
 
-In the above *dev* repositories, the *latest* tag points to last Envoy SHA in master that passed
+In the above *dev* repositories, the *latest* tag points to the last Envoy SHA in master that passed
 tests.
 
 We also tag the docker images with release versions when we do official releases. These images can
