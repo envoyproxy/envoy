@@ -18,12 +18,15 @@ public:
   enum class Stage {
     /**
      * The server instance main thread is about to enter the dispatcher loop.
+     * Note: the server will not wait for callback completion.
      */
     Startup,
 
     /**
      * The server instance is being shutdown and the dispatcher is about to exit.
      * This provides listeners a last chance to run a callback on the main dispatcher.
+     * Note: the server will wait for callbacks that registered to take a completion
+     * before exiting the dispatcher loop.
      */
     ShutdownExit
   };
@@ -35,7 +38,8 @@ public:
    * that callback to the main dispatcher when they have finished processing of
    * the new lifecycle state. This is useful when the main dispatcher needs to
    * wait for registered callbacks to finish their work before continuing, eg.
-   * during server shutdown.
+   * during server shutdown. Note that whether or not the server will wait for
+   * callback completion depends on the specific stage (see comments above).
    */
   using StageCallback = std::function<void()>;
   using StageCallbackWithCompletion = std::function<void(Event::PostCb)>;

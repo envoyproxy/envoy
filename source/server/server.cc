@@ -533,13 +533,7 @@ void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");
   shutdown_ = true;
   restarter_.terminateParent();
-  auto completion_cb_count =
-      std::make_shared<std::atomic<int>>(stage_completable_callbacks_.size());
-  notifyCallbacksForStage(Stage::ShutdownExit, [this, completion_cb_count] {
-    if (--*completion_cb_count <= 0) {
-      dispatcher_->exit();
-    }
-  });
+  notifyCallbacksForStage(Stage::ShutdownExit, [this] { dispatcher_->exit(); });
 }
 
 void InstanceImpl::shutdownAdmin() {
@@ -574,8 +568,18 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
 
   auto it2 = stage_completable_callbacks_.find(stage);
   if (it2 != stage_completable_callbacks_.end()) {
+    ASSERT(!it2->second.empty());
+    // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
+    // have finished their work.
+    auto completion_cb_count = std::make_shared<int>(it2->second.size());
+    Event::PostCb wrapped_cb = [this, completion_cb, completion_cb_count] {
+      ASSERT(std::this_thread::get_id() == main_thread_id_);
+      if (--*completion_cb_count == 0) {
+        completion_cb();
+      }
+    };
     for (const StageCallbackWithCompletion& callback : it2->second) {
-      callback(completion_cb);
+      callback(wrapped_cb);
     }
   } else {
     completion_cb();
