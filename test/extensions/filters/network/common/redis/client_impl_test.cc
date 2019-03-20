@@ -14,6 +14,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 
+#include "absl/strings/match.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -46,9 +47,12 @@ public:
   ~RedisClientImplTest() {
     client_.reset();
 
-    // Make sure all gauges are 0.
+    // Make sure all gauges are 0, except the circuit_breaker remaining resource
+    // gauges which default to the resource max.
     for (const Stats::GaugeSharedPtr& gauge : host_->cluster_.stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
+      if (!absl::StrContains(gauge->name(), "remaining")) {
+        EXPECT_EQ(0U, gauge->value());
+      }
     }
     for (const Stats::GaugeSharedPtr& gauge : host_->stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
