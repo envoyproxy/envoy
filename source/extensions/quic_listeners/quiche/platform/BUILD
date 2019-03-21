@@ -64,8 +64,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_logging_impl_lib",
+    srcs = ["quic_logging_impl.cc"],
+    hdrs = [
+        "quic_bug_tracker_impl.h",
+        "quic_logging_impl.h",
+        "quic_mock_log_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = ["//source/common/common:assert_lib"],
+)
+
+envoy_cc_library(
     name = "quic_platform_base_impl_lib",
-    srcs = envoy_select_quiche(["quic_logging_impl.cc"]),
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
@@ -87,7 +98,6 @@ envoy_cc_library(
     ] + envoy_select_quiche([
         "quic_expect_bug_impl.h",
         "quic_logging_impl.h",
-        "quic_mock_log_impl.h",
         "quic_stack_trace_impl.h",
         "quic_test_impl.h",
         "quic_thread_impl.h",
@@ -103,6 +113,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = ["@com_googlesource_quiche//:quic_platform_export"] + envoy_select_quiche([
+        ":quic_platform_logging_impl_lib",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
@@ -120,7 +131,6 @@ envoy_cc_library(
         "quic_mutex_impl.h",
         "quic_str_cat_impl.h",
     ] + envoy_select_quiche([
-        "quic_bug_tracker_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_string_utils_impl.h",
         "quic_test_output_impl.h",
@@ -178,6 +188,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = envoy_select_quiche([
+        ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
     ]),

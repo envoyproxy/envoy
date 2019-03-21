@@ -39,9 +39,10 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "spdy_platform_test",
-    srcs = ["spdy_platform_test.cc"],
+    srcs = envoy_select_quiche(["spdy_platform_test.cc"]),
     external_deps = ["quiche_spdy_platform"],
     deps = [
+        "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
 )
