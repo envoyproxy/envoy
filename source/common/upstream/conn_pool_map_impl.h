@@ -7,13 +7,14 @@ namespace Upstream {
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 ConnPoolMap<KEY_TYPE, POOL_TYPE>::ConnPoolMap(Envoy::Event::Dispatcher& dispatcher,
-                                              HostConstSharedPtr host, ResourcePriority priority)
+                                              const HostConstSharedPtr& host,
+                                              ResourcePriority priority)
     : thread_local_dispatcher_(dispatcher), host_(host), priority_(priority) {}
 
 template <typename KEY_TYPE, typename POOL_TYPE> ConnPoolMap<KEY_TYPE, POOL_TYPE>::~ConnPoolMap() {
   // Explicitly clear things out for resource tracking purposes. Note that we call this rather than
   // clear because in this case we don't want to do a deferred delete.
-  clearActivePools();
+  clear();
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -27,13 +28,16 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
   if (pool_iter != active_pools_.end()) {
     return std::ref(*(pool_iter->second));
   }
-
+  Resource& connPoolResource = host_->cluster().resourceManager(priority_).connectionPools();
   // We need a new pool. Check if we have room.
-  if (!host_->cluster().resourceManager(priority_).connectionPools().canCreate()) {
+  if (!connPoolResource.canCreate()) {
     // We're full. Try to free up a pool. If we can't, bail out.
     if (!freeOnePool()) {
       return absl::nullopt;
     }
+
+    ASSERT(size() < connPoolResource.max(),
+           "Freeing a pool should reduce the size to below the max.");
 
     // TODO(klarose): Consider some simple hysteresis here. How can we prevent iterating over all
     // pools when we're at the limit every time we want to allocate a new one, even if most of the
@@ -44,7 +48,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
 
   // We have room for a new pool. Allocate one and let it know about any cached callbacks.
   auto new_pool = factory();
-  host_->cluster().resourceManager(priority_).connectionPools().inc();
+  connPoolResource.inc();
   for (const auto& cb : cached_callbacks_) {
     new_pool->addDrainedCallback(cb);
   }
@@ -63,7 +67,8 @@ template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL
   for (auto& pool_pair : active_pools_) {
     thread_local_dispatcher_.deferredDelete(std::move(pool_pair.second));
   }
-  clearActivePools();
+  host_->cluster().resourceManager(priority_).connectionPools().decBy(active_pools_.size());
+  active_pools_.clear();
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -97,19 +102,12 @@ bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::freeOnePool() {
 
   if (pool_iter != active_pools_.end()) {
     // We found one. Free it up, and let the caller know.
-    thread_local_dispatcher_.deferredDelete(std::move(pool_iter->second));
     active_pools_.erase(pool_iter);
     host_->cluster().resourceManager(priority_).connectionPools().dec();
     return true;
   }
 
   return false;
-}
-
-template <typename KEY_TYPE, typename POOL_TYPE>
-void ConnPoolMap<KEY_TYPE, POOL_TYPE>::clearActivePools() {
-  host_->cluster().resourceManager(priority_).connectionPools().decBy(active_pools_.size());
-  active_pools_.clear();
 }
 } // namespace Upstream
 } // namespace Envoy

@@ -8,7 +8,7 @@ namespace Upstream {
 
 template <typename KEY_TYPE, typename POOL_TYPE>
 PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::PriorityConnPoolMap(Envoy::Event::Dispatcher& dispatcher,
-                                                              HostConstSharedPtr host) {
+                                                              const HostConstSharedPtr& host) {
   for (size_t pool_map_index = 0; pool_map_index < NumResourcePriorities; ++pool_map_index) {
     ResourcePriority priority = static_cast<ResourcePriority>(pool_map_index);
     conn_pool_maps_[pool_map_index].reset(new ConnPoolMapType(dispatcher, host, priority));

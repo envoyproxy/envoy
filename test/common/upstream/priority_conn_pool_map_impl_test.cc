@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Return;
 using testing::SaveArg;
@@ -54,7 +53,7 @@ TEST_F(PriorityConnPoolMapImplTest, DefaultPriorityProxiedThrough) {
   EXPECT_TRUE(pool.has_value());
 
   // At this point, we may clean up/decrement by 0, etc, so allow any number.
-  EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::High)).Times(AnyNumber());
+  EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::High)).Times(AtLeast(1));
 }
 
 // Show that we return a non-null value, and that we invoke the high resource manager
@@ -68,11 +67,10 @@ TEST_F(PriorityConnPoolMapImplTest, HighPriorityProxiedThrough) {
   EXPECT_TRUE(pool.has_value());
 
   // At this point, we may clean up/decrement by 0, etc, so allow any number.
-  EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::Default)).Times(AnyNumber());
+  EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::Default)).Times(AtLeast(1));
 }
 
 TEST_F(PriorityConnPoolMapImplTest, TestSizeForSinglePriority) {
-
   TestMapPtr test_map = makeTestMap();
 
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());

@@ -18,7 +18,7 @@ public:
   using DrainedCb = typename ConnPoolMapType::DrainedCb;
   using OptPoolRef = typename ConnPoolMapType::OptPoolRef;
 
-  PriorityConnPoolMap(Event::Dispatcher& dispatcher, HostConstSharedPtr host);
+  PriorityConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host);
   ~PriorityConnPoolMap();
   /**
    * Returns an existing pool for the given priority and `key`, or creates a new one using

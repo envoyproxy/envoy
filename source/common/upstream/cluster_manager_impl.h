@@ -236,7 +236,7 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr host)
+      ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
           : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
       typedef PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance> ConnPools;
@@ -253,6 +253,7 @@ private:
       ConnPools pools_;
       uint64_t drains_remaining_{};
     };
+
 
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
     // is closed, this container removes itself from the container that owns it.

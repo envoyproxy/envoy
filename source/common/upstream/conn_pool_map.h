@@ -23,7 +23,8 @@ public:
   using DrainedCb = std::function<void()>;
   using OptPoolRef = absl::optional<std::reference_wrapper<POOL_TYPE>>;
 
-  ConnPoolMap(Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority);
+  ConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host,
+              ResourcePriority priority);
   ~ConnPoolMap();
   /**
    * Returns an existing pool for `key`, or creates a new one using `factory`. Note that it is
@@ -61,11 +62,6 @@ private:
    * @return false if no pool was freed.
    */
   bool freeOnePool();
-
-  /**
-   * Cleans up the active_pools_ map and updates resource tracking
-   **/
-  void clearActivePools();
 
   absl::flat_hash_map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;
   Event::Dispatcher& thread_local_dispatcher_;
