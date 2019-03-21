@@ -9,8 +9,6 @@ option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "validate/validate.proto";
 
 // [#protodoc-title: IP tagging]

@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["heap_stat_data.cc"],
     hdrs = ["heap_stat_data.h"],
     deps = [
+        ":metric_impl_lib",
         ":stat_data_allocator_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
@@ -42,6 +43,7 @@ envoy_cc_library(
     srcs = ["isolated_store_impl.cc"],
     hdrs = ["isolated_store_impl.h"],
     deps = [
+        ":fake_symbol_table_lib",
         ":histogram_lib",
         ":stats_lib",
         ":stats_options_lib",
@@ -54,6 +56,7 @@ envoy_cc_library(
     name = "metric_impl_lib",
     hdrs = ["metric_impl.h"],
     deps = [
+        ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
     ],
@@ -130,6 +133,7 @@ envoy_cc_library(
         "//include/envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:stack_array",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
     ],
@@ -202,4 +206,5 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    deps = [":symbol_table_lib"],
 )

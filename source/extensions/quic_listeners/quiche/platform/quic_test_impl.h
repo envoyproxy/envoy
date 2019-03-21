@@ -1,5 +1,9 @@
 #pragma once
 
+#include <string>
+
+#include "common/common/assert.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -18,3 +22,7 @@ class ScopedEnvironmentForThreadsImpl {};
 using QuicTestImpl = ::testing::Test;
 
 template <class T> using QuicTestWithParamImpl = ::testing::TestWithParam<T>;
+
+inline std::string QuicGetTestMemoryCachePathImpl() {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(mpwarres): implement
+}

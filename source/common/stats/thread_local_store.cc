@@ -26,7 +26,8 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
     : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
-      num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
+      num_last_resort_stats_(default_scope_->counter("stats.overflow")),
+      heap_allocator_(alloc.symbolTable()), source_(*this) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);

@@ -145,9 +145,12 @@ public:
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
   Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   Histogram& histogram(const std::string& name) override {
     return default_scope_->histogram(name);
   };
+  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
+  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
@@ -206,8 +209,11 @@ private:
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(prefix_ + name);
     }
+    const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
+    SymbolTable& symbolTable() override { return parent_.symbolTable(); }
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gauge(const std::string& name) override;
+    NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
@@ -286,6 +292,7 @@ private:
   Counter& num_last_resort_stats_;
   HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
+  NullGaugeImpl null_gauge_;
 
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats
