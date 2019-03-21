@@ -41,14 +41,14 @@ QuicLogEmitter::~QuicLogEmitter() {
 
   if (level_ == FATAL) {
 #ifdef NDEBUG
-    bool is_dfatal = false;
+    // Release mode.
+    abort();
 #else
-    bool is_dfatal = true;
-#endif
-
-    if (!(is_dfatal && g_dfatal_exit_disabled)) {
+    // Debug mode.
+    if (!g_dfatal_exit_disabled) {
       abort();
     }
+#endif
   }
 }
 
