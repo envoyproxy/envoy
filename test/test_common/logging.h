@@ -65,7 +65,7 @@ typedef std::pair<std::string, std::string> StringPair;
 
 typedef std::vector<StringPair> ExpectedLogMessages;
 
-// Below macro's specify Envoy:: before class names so that the macro can be used outside of
+// Below macros specify Envoy:: before class names so that the macro can be used outside of
 // namespace Envoy.
 
 // Validates that when stmt is executed, log messages containing substr and loglevel will be

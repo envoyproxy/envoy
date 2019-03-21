@@ -65,6 +65,7 @@ public:
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   Histogram& histogram(const std::string& name) override {
     Histogram& histogram = histograms_.get(name);
     return histogram;
@@ -90,6 +91,7 @@ private:
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
   const StatsOptionsImpl stats_options_;
+  NullGaugeImpl null_gauge_;
 };
 
 } // namespace Stats

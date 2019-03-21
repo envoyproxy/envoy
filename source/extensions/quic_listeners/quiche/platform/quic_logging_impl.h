@@ -17,8 +17,6 @@
 #include "absl/base/optimization.h"
 #include "absl/synchronization/mutex.h"
 
-// TODO(wub): Add CHECK/DCHECK and variants, which are not explicitly exposed by quic_logging.h.
-
 // If |condition| is true, use |logstream| to stream the log message and send it to spdlog.
 // If |condition| is false, |logstream| will not be instantiated.
 // The switch(0) is used to suppress a compiler warning on ambiguous "else".
@@ -75,6 +73,17 @@
 #endif
 
 #define QUIC_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
+
+#define CHECK(condition)                                                                           \
+  QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << "CHECK failed: " #condition "."
+
+#ifndef NDEBUG
+#define DCHECK(condition) CHECK(condition)
+#else
+#define DCHECK(condition)                                                                          \
+  while (false && (condition))                                                                     \
+  quic::NullLogStream().stream()
+#endif
 
 namespace quic {
 
