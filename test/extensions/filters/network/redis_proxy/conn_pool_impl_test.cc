@@ -14,7 +14,6 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 
-#include "absl/strings/match.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
