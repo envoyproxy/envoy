@@ -897,7 +897,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::clearContainer(
     HostSharedPtr old_host, ConnPoolsContainer& container) {
-  container.pools_->clear();
+  container.pools_->deferredClear();
   host_http_conn_pool_map_.erase(old_host);
 }
 

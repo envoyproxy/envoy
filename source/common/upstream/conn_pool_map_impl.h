@@ -12,8 +12,8 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::ConnPoolMap(Envoy::Event::Dispatcher& dispatch
     : thread_local_dispatcher_(dispatcher), host_(host), priority_(priority) {}
 
 template <typename KEY_TYPE, typename POOL_TYPE> ConnPoolMap<KEY_TYPE, POOL_TYPE>::~ConnPoolMap() {
-  // Explicitly clear things out for resource tracking purposes. Note that we call this rather than
-  // clear because in this case we don't want to do a deferred delete.
+  // Note that we do not want to use the deferred delete version here -- doing so leads to annoying
+  // dependency issues during shutdown.
   clear();
 }
 
@@ -64,11 +64,17 @@ size_t ConnPoolMap<KEY_TYPE, POOL_TYPE>::size() const {
 
 template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL_TYPE>::clear() {
   Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
+  unprotectedClear();
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::deferredClear() {
+  Common::AutoDebugRecursionChecker assert_not_in(recursion_checker_);
   for (auto& pool_pair : active_pools_) {
     thread_local_dispatcher_.deferredDelete(std::move(pool_pair.second));
   }
-  host_->cluster().resourceManager(priority_).connectionPools().decBy(active_pools_.size());
-  active_pools_.clear();
+
+  unprotectedClear();
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -109,5 +115,12 @@ bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::freeOnePool() {
 
   return false;
 }
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::unprotectedClear() {
+  host_->cluster().resourceManager(priority_).connectionPools().decBy(active_pools_.size());
+  active_pools_.clear();
+}
+
 } // namespace Upstream
 } // namespace Envoy
