@@ -35,7 +35,7 @@ MockClusterInfo::MockClusterInfo()
       transport_socket_factory_(new Network::RawBufferSocketFactory),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
       circuit_breakers_stats_(
-          ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default")),
+          ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1,
                                                           std::numeric_limits<uint64_t>::max(),
                                                           circuit_breakers_stats_)) {

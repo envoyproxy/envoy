@@ -48,6 +48,8 @@ build:clang-msan --define tcmalloc=disabled
 build:clang-msan --copt -fsanitize-memory-track-origins=2
 
 # Clang with libc++
+# TODO(cmluciano) fix and re-enable _LIBCPP_VERSION testing for TCMALLOC in Envoy::Stats::TestUtil::hasDeterministicMallocStats
+# and update stats_integration_test with appropriate m_per_cluster value
 build:libc++ --action_env=CC
 build:libc++ --action_env=CXX
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++

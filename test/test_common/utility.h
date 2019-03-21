@@ -351,6 +351,16 @@ public:
     matcher.set_regex(str);
     return matcher;
   }
+
+  /**
+   * Checks that passed gauges have a value of 0. Gauges can be omitted from
+   * this check by modifying the regex that matches gauge names in the
+   * implementation.
+   *
+   * @param vector of gauges to check.
+   * @return bool indicating that passed gauges not matching the omitted regex have a value of 0.
+   */
+  static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges);
 };
 
 /**

@@ -21,7 +21,6 @@ import "envoy/api/v2/lds.proto";
 import "envoy/config/trace/v2/trace.proto";
 import "envoy/config/metrics/v2/stats.proto";
 import "envoy/config/overload/v2alpha/overload.proto";
-import "envoy/config/ratelimit/v2/rls.proto";
 
 import "google/protobuf/duration.proto";
 
