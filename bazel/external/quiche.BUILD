@@ -148,7 +148,6 @@ cc_library(
         "quiche/quic/platform/api/quic_server_stats.h",
         "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_string_piece.h",
-        "quiche/quic/platform/api/quic_test.h",
         "quiche/quic/platform/api/quic_test_output.h",
         "quiche/quic/platform/api/quic_uint128.h",
         "quiche/quic/platform/api/quic_thread.h",
@@ -174,6 +173,7 @@ cc_library(
     ] + envoy_select_quiche(
         [
             "quiche/quic/platform/api/quic_string_utils.h",
+            "quiche/quic/platform/api/quic_test.h",
             "quiche/quic/platform/api/quic_text_utils.h",
         ],
         "@envoy",
