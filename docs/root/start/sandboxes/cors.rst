@@ -52,10 +52,10 @@ Terminal 1
   $ docker-compose up --build -d
   $ docker-compose ps
 
-            Name                          Command               State                            Ports
-  ------------------------------------------------------------------------------------------------------------------------------
-  frontend_front-envoy_1        /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
-  frontend_frontend-service_1   /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 80/tcp
+            Name                          Command              State                            Ports
+  ----------------------------------------------------------------------------------------------------------------------------
+  frontend_front-envoy_1        /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+  frontend_frontend-service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
 
 Terminal 2
 
@@ -66,10 +66,10 @@ Terminal 2
   $ docker-compose up --build -d
   $ docker-compose ps
 
-            Name                         Command               State                            Ports
-  ----------------------------------------------------------------------------------------------------------------------------
-  backend_backend-service_1   /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 80/tcp
-  backend_front-envoy_1       /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8002->80/tcp, 0.0.0.0:8003->8001/tcp
+            Name                         Command             State                            Ports
+  --------------------------------------------------------------------------------------------------------------------------
+  backend_backend-service_1   /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
+  backend_front-envoy_1       /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8002->80/tcp, 0.0.0.0:8003->8001/tcp
 
 **Step 3: Test Envoy's CORS capabilities**
 

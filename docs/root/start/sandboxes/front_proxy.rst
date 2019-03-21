@@ -47,11 +47,11 @@ or ``git clone https://github.com/envoyproxy/envoy.git``::
     $ docker-compose up --build -d
     $ docker-compose ps
 
-            Name                         Command               State                            Ports
-  ----------------------------------------------------------------------------------------------------------------------------
-  front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
-  front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 80/tcp
-  front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ...   Up      10000/tcp, 80/tcp
+            Name                         Command             State                            Ports
+  --------------------------------------------------------------------------------------------------------------------------
+  front-proxy_front-envoy_1   /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+  front-proxy_service1_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
+  front-proxy_service2_1      /bin/sh -c /usr/local/bin/ ... Up      10000/tcp, 80/tcp
 
 **Step 3: Test Envoy's routing capabilities**
 
