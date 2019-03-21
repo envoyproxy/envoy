@@ -14,6 +14,7 @@
 #include "server/hot_restart_nop_impl.h"
 #include "server/options_impl.h"
 
+#include "test/common/runtime/utility.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
@@ -151,6 +152,16 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   }
   createAndRunEnvoyServer(options, time_system_, Network::Utility::getLocalAddress(version), *this,
                           lock, *this, std::move(random_generator));
+}
+
+void IntegrationTestServer::onRuntimeCreated() {
+  // Override runtime values to by default allow all disallowed features.
+  //
+  // Per #6288 we explicitly want to allow end to end testing of disallowed features until the code
+  // is removed from Envoy.
+  //
+  // This will revert as the runtime is torn down with the test Envoy server.
+  Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed();
 }
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
