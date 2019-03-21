@@ -12,6 +12,8 @@ Version history
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails.
 * build: releases are built with GCC-7 and linked with LLD.
+* build: dev docker images :ref:`have been split <install_binaries>` from tagged images for easier
+  discoverability in Docker Hub. Additionally, we now build images for point releases.
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
 * config: logging warnings when deprecated fields are in use.
 * config: removed deprecated --v2-config-only from command line config.
