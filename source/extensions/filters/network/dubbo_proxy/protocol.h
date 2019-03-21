@@ -57,7 +57,7 @@ typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
  */
 class ProtocolCallbacks {
 public:
-  virtual ~ProtocolCallbacks() {}
+  virtual ~ProtocolCallbacks() = default;
   virtual void onRequestMessage(RequestMessagePtr&& req) PURE;
   virtual void onResponseMessage(ResponseMessagePtr&& res) PURE;
 };
@@ -73,30 +73,14 @@ public:
     size_t header_size_ = 0;
     bool is_heartbeat_ = false;
   };
-  virtual ~Protocol() {}
-  Protocol() {}
+  virtual ~Protocol() = default;
+  Protocol() = default;
   virtual const std::string& name() const PURE;
 
   /**
    * @return ProtocolType the protocol type
    */
   virtual ProtocolType type() const PURE;
-
-  /*
-   * This interface will be deprecated,
-   * it is reserved for the purpose of compatibility with the existing Filter implementation,
-   * this interface will be deleted after the new Filter implementation code is submitted.
-   *
-   * decodes the dubbo protocol message, potentially invoking callbacks.
-   * If successful, the message is removed from the buffer.
-   *
-   * @param buffer the currently buffered dubbo data.
-   * @param context save the meta data of current messages
-   * @return bool true if a complete message was successfully consumed, false if more data
-   *                 is required.
-   * @throws EnvoyException if the data is not valid for this protocol.
-   */
-  virtual bool decode(Buffer::Instance& buffer, Context* context) PURE;
 
   /*
    * decodes the dubbo protocol message, potentially invoking callbacks.
@@ -131,18 +115,7 @@ typedef std::unique_ptr<Protocol> ProtocolPtr;
  */
 class NamedProtocolConfigFactory {
 public:
-  virtual ~NamedProtocolConfigFactory() {}
-
-  /**
-   * This interface will be deprecated,
-   * it is reserved for the purpose of compatibility with the existing Filter implementation,
-   * this interface will be deleted after the new Filter implementation code is submitted.
-   *
-   * Create a particular Dubbo protocol.
-   * @param callbacks the callbacks to be notified of protocol decodes.
-   * @return protocol instance pointer.
-   */
-  virtual ProtocolPtr createProtocol(ProtocolCallbacks& callbacks) PURE;
+  virtual ~NamedProtocolConfigFactory() = default;
 
   /**
    * Create a particular Dubbo protocol.
@@ -171,10 +144,6 @@ public:
  * ProtocolFactoryBase provides a template for a trivial NamedProtocolConfigFactory.
  */
 template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
-  ProtocolPtr createProtocol(ProtocolCallbacks& callbacks) override {
-    return std::make_unique<ProtocolImpl>(&callbacks);
-  }
-
   ProtocolPtr createProtocol() override { return std::make_unique<ProtocolImpl>(); }
 
   std::string name() override { return name_; }

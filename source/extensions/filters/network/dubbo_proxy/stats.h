@@ -16,6 +16,7 @@ namespace DubboProxy {
 // clang-format off
 #define ALL_DUBBO_FILTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                          \
   COUNTER(request)                                                                                 \
+  COUNTER(request_exception)                                                                       \
   COUNTER(request_twoway)                                                                          \
   COUNTER(request_oneway)                                                                          \
   COUNTER(request_event)                                                                           \
@@ -27,6 +28,9 @@ namespace DubboProxy {
   COUNTER(response_success)                                                                        \
   COUNTER(response_error)                                                                          \
   COUNTER(response_exception)                                                                      \
+  COUNTER(local_response_success)                                                                  \
+  COUNTER(local_response_error)                                                                    \
+  COUNTER(local_response_exception)                                                                \
   COUNTER(response_decoding_error)                                                                 \
   COUNTER(cx_destroy_local_with_active_rq)                                                         \
   COUNTER(cx_destroy_remote_with_active_rq)                                                        \
