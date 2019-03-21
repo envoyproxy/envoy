@@ -346,12 +346,22 @@ resources to avoid resending them over the network.
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
 
 #### Resource names
-Resources are identified by a resource name or an alias. Aliases of a resource, if present, can be identified by the alias field in the resource of a DeltaDiscoveryResponse. The resource name
-will be returned in the name field in the resource of a DeltaDiscoveryResponse. Envoy can send either an alias or the resource name in the resource_names_subscribe field in order to subscribe to a resource.
+Resources are identified by a resource name or an alias. Aliases of a resource, if present, can be
+identified by the alias field in the resource of a `DeltaDiscoveryResponse`. The resource name will
+be returned in the name field in the resource of a `DeltaDiscoveryResponse`.
+
+#### Subscribing to Resources
+Envoy can send either an alias or the name of a resource in the `resource_names_subscribe` field of
+a `DeltaDiscoveryRequest` in order to subscribe to a resource. Envoy should check both the names and
+aliases of resources in order to determine whether the entity in question has been subscribed to.
 
 #### Unsubscribing from Resources
-Envoy will keep track of a per resource reference count internally. This count will keep track of the total number of aliases/resource names that are currently subscribed to. When the reference count reaches zero,
-Envoy will send a DeltaDiscoveryRequest containing the resource name of the resource to unsubscribe from in the resource_names_unsubscribe field.
+Envoy will keep track of a per resource reference count internally. This count will keep track of the
+total number of aliases/resource names that are currently subscribed to. When the reference count
+reaches zero, Envoy will send a `DeltaDiscoveryRequest` containing the resource name of the resource
+to unsubscribe from in the `resource_names_unsubscribe` field. When Envoy unsubscribes from a resource,
+it should check for both the resource name and all aliases and appropriately update all resources
+that reference either.
 
 ## REST-JSON polling subscriptions
 
