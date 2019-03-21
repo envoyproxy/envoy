@@ -61,11 +61,12 @@ private:
   std::vector<std::string> messages_;
 };
 
-} // namespace Envoy
-
 typedef std::pair<std::string, std::string> StringPair;
 
 typedef std::vector<StringPair> ExpectedLogMessages;
+
+// Below macro's specify Envoy:: before class names so that the macro can be used outside of
+// namespace Envoy.
 
 // Validates that when stmt is executed, log messages containing substr and loglevel will be
 // emitted. Failure message e.g.,
@@ -86,8 +87,8 @@ typedef std::vector<StringPair> ExpectedLogMessages;
     if (log_recorder.messages().empty()) {                                                         \
       FAIL() << "Expected message(s), but NONE was recorded.";                                     \
     }                                                                                              \
-    ExpectedLogMessages failed_expectations;                                                       \
-    for (const StringPair& expected : expected_messages) {                                         \
+    Envoy::ExpectedLogMessages failed_expectations;                                                \
+    for (const Envoy::StringPair& expected : expected_messages) {                                  \
       const auto log_message =                                                                     \
           std::find_if(log_recorder.messages().begin(), log_recorder.messages().end(),             \
                        [&expected](const std::string& message) {                                   \
@@ -142,7 +143,7 @@ typedef std::vector<StringPair> ExpectedLogMessages;
 //    'warning', 'Too many sendDiscoveryRequest calls for baz’
 #define EXPECT_LOG_CONTAINS(loglevel, substr, stmt)                                                \
   do {                                                                                             \
-    const ExpectedLogMessages message{{loglevel, substr}};                                         \
+    const Envoy::ExpectedLogMessages message{{loglevel, substr}};                                  \
     EXPECT_LOG_CONTAINS_ALL_OF(message, stmt);                                                     \
   } while (false)
 
@@ -162,3 +163,5 @@ typedef std::vector<StringPair> ExpectedLogMessages;
     const std::vector<std::string> logs = log_recorder.messages();                                 \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
   } while (false)
+
+} // namespace Envoy
