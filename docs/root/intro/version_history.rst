@@ -8,13 +8,17 @@ Version history
 * access log: added a new flag for stream idle timeout.
 * access log: added a new field for upstream transport failure reason in :ref:`file access logger<config_access_log_format_upstream_transport_failure_reason>` and
   :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.AccessLogCommon.upstream_transport_failure_reason>` for HTTP access logs.
+* access log: added new fields for downstream x509 information (URI sans and subject) to file and gRPC access logger.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
 * buffer: fix vulnerabilities when allocation fails.
 * build: releases are built with GCC-7 and linked with LLD.
+* build: dev docker images :ref:`have been split <install_binaries>` from tagged images for easier
+  discoverability in Docker Hub. Additionally, we now build images for point releases.
 * config: added support of using google.protobuf.Any in opaque configs for extensions.
 * config: logging warnings when deprecated fields are in use.
 * config: removed deprecated --v2-config-only from command line config.
 * config: removed deprecated_v1 sds_config from :ref:`Bootstrap config <config_overview_v2_bootstrap>`.
+* config: removed the deprecated_v1 config option from :ref:`ring hash <envoy_api_msg_Cluster.RingHashLbConfig>`.
 * config: removed REST_LEGACY as a valid :ref:`ApiType <envoy_api_field_core.ApiConfigSource.api_type>`.
 * config: finish cluster warming only when a named response i.e. ClusterLoadAssignment associated to the cluster being warmed comes in the EDS response. This is a behavioural change from the current implementation where warming of cluster completes on missing load assignments also.
 * config: use Envoy cpuset size to set the default number or worker threads if :option:`--cpuset-threads` is enabled.
@@ -44,10 +48,12 @@ Version history
 * http: added modifyDecodingBuffer/modifyEncodingBuffer to allow modifying the buffered request/response data.
 * performance: new buffer implementation (disabled by default; to test it, add "--use-libevent-buffers 0" to the command-line arguments when starting Envoy).
 * http: added encodeComplete/decodeComplete. These are invoked at the end of the stream, after all data has been encoded/decoded respectively. Default implementation is a no-op.
+* ratelimit: removed deprecated rate limit configuration from bootstrap.
 * redis: added :ref:`hashtagging <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_hashtagging>` to guarantee a given key's upstream.
 * redis: added :ref:`latency stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * redis: migrate hash function for host selection to `MurmurHash2 <https://sites.google.com/site/murmurhash>`_ from std::hash. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
+* redis: added :ref:`latency_in_micros <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.latency_in_micros>` to specify the redis commands stats time unit in microseconds.
 * router: added ability to configure a :ref:`retry policy <envoy_api_msg_route.RetryPolicy>` at the
   virtual host level.
 * router: added reset reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:`
@@ -56,6 +62,7 @@ Version history
 * stats: added support for histograms in prometheus
 * stats: added usedonly flag to prometheus stats to only output metrics which have been
   updated at least once.
+* stats: added gauges tracking remaining resources before circuit breakers open.
 * tap: added new alpha :ref:`HTTP tap filter <config_http_filters_tap>`.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 * upstream: add hash_function to specify the hash function for :ref:`ring hash<envoy_api_msg_Cluster.RingHashLbConfig>` as either xxHash or `murmurHash2 <https://sites.google.com/site/murmurhash>`_. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.

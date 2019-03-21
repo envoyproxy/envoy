@@ -430,16 +430,7 @@ message Cluster {
     // :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>`.
     google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64.lte = 8388608];
 
-    // [#not-implemented-hide:] Hide from docs.
-    message DeprecatedV1 {
-      // Defaults to false, meaning that `xxHash <https://github.com/Cyan4973/xxHash>`_
-      // is to hash hosts onto the ketama ring.
-      google.protobuf.BoolValue use_std_hash = 1;
-    }
-
-    // Deprecated settings from v1 config.
-    // [#not-implemented-hide:] Hide from docs.
-    DeprecatedV1 deprecated_v1 = 2 [deprecated = true];
+    reserved 2;
 
     // The hash function used to hash hosts onto the ketama ring.
     enum HashFunction {

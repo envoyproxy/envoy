@@ -46,6 +46,11 @@ message CircuitBreakers {
     // The maximum number of parallel retries that Envoy will allow to the
     // upstream cluster. If not specified, the default is 3.
     google.protobuf.UInt32Value max_retries = 5;
+
+    // If track_remaining is true, then stats will be published that expose
+    // the number of resources remaining until the circuit breakers open. If
+    // not specified, the default is false.
+    bool track_remaining = 6;
   }
 
   // If multiple :ref:`Thresholds<envoy_api_msg_cluster.CircuitBreakers.Thresholds>`

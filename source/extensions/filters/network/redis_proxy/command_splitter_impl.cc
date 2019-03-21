@@ -37,7 +37,7 @@ void SplitRequestBase::updateStats(const bool success) {
   } else {
     command_stats_.error_.inc();
   }
-  command_latency_ms_->complete();
+  command_latency_->complete();
 }
 
 SingleServerRequest::~SingleServerRequest() { ASSERT(!handle_); }
@@ -62,9 +62,9 @@ void SingleServerRequest::cancel() {
 SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
                                       const Common::Redis::RespValue& incoming_request,
                                       SplitCallbacks& callbacks, CommandStats& command_stats,
-                                      TimeSource& time_source) {
+                                      TimeSource& time_source, bool latency_in_micros) {
   std::unique_ptr<SimpleRequest> request_ptr{
-      new SimpleRequest(callbacks, command_stats, time_source)};
+      new SimpleRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[1].asString(),
                                                incoming_request, *request_ptr);
@@ -79,7 +79,7 @@ SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
 SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
                                     const Common::Redis::RespValue& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source) {
+                                    TimeSource& time_source, bool latency_in_micros) {
 
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
   // Ensure there are at least three args to the command or it cannot be hashed.
@@ -89,7 +89,8 @@ SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
     return nullptr;
   }
 
-  std::unique_ptr<EvalRequest> request_ptr{new EvalRequest(callbacks, command_stats, time_source)};
+  std::unique_ptr<EvalRequest> request_ptr{
+      new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
   request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[3].asString(),
                                                incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
@@ -125,8 +126,9 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
 SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
                                     const Common::Redis::RespValue& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source) {
-  std::unique_ptr<MGETRequest> request_ptr{new MGETRequest(callbacks, command_stats, time_source)};
+                                    TimeSource& time_source, bool latency_in_micros) {
+  std::unique_ptr<MGETRequest> request_ptr{
+      new MGETRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
   request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -196,13 +198,14 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
                                     const Common::Redis::RespValue& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source) {
+                                    TimeSource& time_source, bool latency_in_micros) {
   if ((incoming_request.asArray().size() - 1) % 2 != 0) {
     onWrongNumberOfArguments(callbacks, incoming_request);
     command_stats.error_.inc();
     return nullptr;
   }
-  std::unique_ptr<MSETRequest> request_ptr{new MSETRequest(callbacks, command_stats, time_source)};
+  std::unique_ptr<MSETRequest> request_ptr{
+      new MSETRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
   request_ptr->num_pending_responses_ = (incoming_request.asArray().size() - 1) / 2;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -271,9 +274,9 @@ SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
                                                   const Common::Redis::RespValue& incoming_request,
                                                   SplitCallbacks& callbacks,
                                                   CommandStats& command_stats,
-                                                  TimeSource& time_source) {
+                                                  TimeSource& time_source, bool latency_in_micros) {
   std::unique_ptr<SplitKeysSumResultRequest> request_ptr{
-      new SplitKeysSumResultRequest(callbacks, command_stats, time_source)};
+      new SplitKeysSumResultRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
   request_ptr->num_pending_responses_ = incoming_request.asArray().size() - 1;
   request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
@@ -335,12 +338,13 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
 }
 
 InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
-                           const std::string& stat_prefix, TimeSource& time_source)
+                           const std::string& stat_prefix, TimeSource& time_source,
+                           bool latency_in_micros)
     : conn_pool_(std::move(conn_pool)), simple_command_handler_(*conn_pool_),
       eval_command_handler_(*conn_pool_), mget_handler_(*conn_pool_), mset_handler_(*conn_pool_),
       split_keys_sum_result_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source) {
+      latency_in_micros_(latency_in_micros), time_source_(time_source) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, simple_command_handler_);
   }
@@ -400,7 +404,7 @@ SplitRequestPtr InstanceImpl::makeRequest(const Common::Redis::RespValue& reques
   ENVOY_LOG(debug, "redis: splitting '{}'", request.toString());
   handler->command_stats_.total_.inc();
   SplitRequestPtr request_ptr = handler->handler_.get().startRequest(
-      request, callbacks, handler->command_stats_, time_source_);
+      request, callbacks, handler->command_stats_, time_source_, latency_in_micros_);
   return request_ptr;
 }
 
