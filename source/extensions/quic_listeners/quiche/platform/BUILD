@@ -42,7 +42,12 @@ envoy_cc_library(
         "http2_ptr_util_impl.h",
         "http2_string_impl.h",
         "http2_string_piece_impl.h",
-    ] + envoy_select_quiche(["http2_string_utils_impl.h"]),
+    ] + envoy_select_quiche([
+        "http2_bug_tracker_impl.h",
+        "http2_logging_impl.h",
+        "http2_mock_log_impl.h",
+        "http2_string_utils_impl.h",
+    ]),
     external_deps = [
         "abseil_base",
         "abseil_optional",
@@ -80,6 +85,7 @@ envoy_cc_library(
         "quic_string_piece_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
+        "quic_expect_bug_impl.h",
         "quic_logging_impl.h",
         "quic_mock_log_impl.h",
         "quic_stack_trace_impl.h",
@@ -158,7 +164,11 @@ envoy_cc_library(
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
         "spdy_unsafe_arena_impl.h",
-    ] + envoy_select_quiche(["spdy_string_utils_impl.h"]),
+    ] + envoy_select_quiche([
+        "spdy_bug_tracker_impl.h",
+        "spdy_logging_impl.h",
+        "spdy_string_utils_impl.h",
+    ]),
     external_deps = [
         "abseil_base",
         "abseil_hash",

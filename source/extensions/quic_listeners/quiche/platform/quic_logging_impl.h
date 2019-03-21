@@ -133,6 +133,9 @@ inline bool IsVerboseLogEnabled(int verbosity) {
   return IsLogLevelEnabled(INFO) && verbosity <= GetVerbosityLogThreshold();
 }
 
+bool IsDFatalExitDisabled();
+void SetDFatalExitDisabled(bool is_disabled);
+
 // QuicLogSink is used to capture logs emitted from the QUIC_LOG... macros.
 class QuicLogSink {
 public:
