@@ -3,8 +3,6 @@
 namespace Envoy {
 namespace SafeInit {
 
-using std::placeholders::_1;
-
 TargetHandleImpl::TargetHandleImpl(absl::string_view handle_name, absl::string_view name,
                                    std::weak_ptr<InternalInitalizeFn> fn)
     : handle_name_(handle_name), name_(name), fn_(std::move(fn)) {}
@@ -45,7 +43,7 @@ bool TargetImpl::ready() {
   if (watcher_handle_) {
     // If we have a handle for the ManagerImpl's watcher, signal it and then reset so it can't be
     // accidentally signaled again.
-    bool result = watcher_handle_->ready();
+    const bool result = watcher_handle_->ready();
     watcher_handle_.reset();
     return result;
   }

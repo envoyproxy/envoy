@@ -7,7 +7,7 @@ namespace SafeInit {
 
 ManagerImpl::ManagerImpl(absl::string_view name)
     : name_(fmt::format("init manager {}", name)), state_(State::Uninitialized), count_(0),
-      watcher_(name_, std::bind(&ManagerImpl::onTargetReady, this)) {}
+      watcher_(name_, [this]() { onTargetReady(); }) {}
 
 Manager::State ManagerImpl::state() const { return state_; }
 
