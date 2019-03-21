@@ -528,14 +528,19 @@ public:
 // clang-format on
 
 /**
- * Cluster circuit breakers stats.
+ * Cluster circuit breakers stats. Open circuit breaker stats and remaining resource stats
+ * can be handled differently by passing in different macros.
  */
 // clang-format off
-#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GAUGE)                                                  \
-  GAUGE (cx_open)                                                                                  \
-  GAUGE (rq_pending_open)                                                                          \
-  GAUGE (rq_open)                                                                                  \
-  GAUGE (rq_retry_open)
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                            \
+  OPEN_GAUGE      (cx_open)                                                                        \
+  OPEN_GAUGE      (rq_pending_open)                                                                \
+  OPEN_GAUGE      (rq_open)                                                                        \
+  OPEN_GAUGE      (rq_retry_open)                                                                  \
+  REMAINING_GAUGE (remaining_cx)                                                                   \
+  REMAINING_GAUGE (remaining_pending)                                                              \
+  REMAINING_GAUGE (remaining_rq)                                                                   \
+  REMAINING_GAUGE (remaining_retries)
 // clang-format on
 
 /**
@@ -556,7 +561,7 @@ struct ClusterLoadReportStats {
  * Struct definition for cluster circuit breakers stats. @see stats_macros.h
  */
 struct ClusterCircuitBreakersStats {
-  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
