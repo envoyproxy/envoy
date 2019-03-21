@@ -85,9 +85,10 @@ message RedisProxy {
     string catch_all_cluster = 3;
   }
 
-  // List of **unique** prefixes used to separate keys from different workloads to different clusters. Envoy
-  // will always favor the longest match first in case of overlap. A catch-all cluster can be used to forward
-  // commands to when there is no match. Time complexity of the lookups are in O(min(longest key prefix, key length)).
+  // List of **unique** prefixes used to separate keys from different workloads to different
+  // clusters. Envoy will always favor the longest match first in case of overlap. A catch-all
+  // cluster can be used to forward commands to when there is no match. Time complexity of the
+  // lookups are in O(min(longest key prefix, key length)).
   //
   // Example:
   //

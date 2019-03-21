@@ -190,15 +190,15 @@ TEST(PrefixRoutesTest, DuplicatePrefix) {
   }
 
   EXPECT_THROW(
-  {
-    try {
-      PrefixRoutes router(prefix_routes, std::move(upstreams));
-    } catch (const EnvoyException& ex) {
-      EXPECT_STREQ("prefix `ab` already exists.", ex.what());
-      throw;
-    }
-  },
-  EnvoyException);
+      {
+        try {
+          PrefixRoutes router(prefix_routes, std::move(upstreams));
+        } catch (const EnvoyException& ex) {
+          EXPECT_STREQ("prefix `ab` already exists.", ex.what());
+          throw;
+        }
+      },
+      EnvoyException);
 }
 
 } // namespace RedisProxy
