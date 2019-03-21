@@ -45,6 +45,9 @@
 // TODO(wub): Implement QUIC_LOG_FIRST_N_IMPL.
 #define QUIC_LOG_FIRST_N_IMPL(severity, n) QUIC_LOG_IMPL(severity)
 
+// TODO(wub): Implement QUIC_LOG_EVERY_N_IMPL.
+#define QUIC_LOG_EVERY_N_IMPL(severity, n) QUIC_LOG_IMPL(severity)
+
 // TODO(wub): Implement QUIC_LOG_EVERY_N_SEC_IMPL.
 #define QUIC_LOG_EVERY_N_SEC_IMPL(severity, seconds) QUIC_LOG_IMPL(severity)
 
@@ -64,6 +67,7 @@
 #define QUIC_DLOG_IMPL(severity) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DLOG_INFO_IS_ON_IMPL() 0
+#define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_COMPILED_OUT_LOG()
 #define QUIC_NOTREACHED_IMPL()
 #else
 // Debug build
@@ -72,6 +76,7 @@
 #define QUIC_DLOG_IMPL(severity) QUIC_LOG_IMPL(severity)
 #define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_LOG_IF_IMPL(severity, condition)
 #define QUIC_DLOG_INFO_IS_ON_IMPL() QUIC_LOG_INFO_IS_ON_IMPL()
+#define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_LOG_EVERY_N_IMPL(severity, n)
 #define QUIC_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
 #endif
 

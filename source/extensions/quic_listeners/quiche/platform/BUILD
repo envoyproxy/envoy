@@ -45,7 +45,6 @@ envoy_cc_library(
     ] + envoy_select_quiche([
         "http2_bug_tracker_impl.h",
         "http2_logging_impl.h",
-        "http2_mock_log_impl.h",
         "http2_string_utils_impl.h",
     ]),
     external_deps = [
@@ -54,7 +53,10 @@ envoy_cc_library(
         "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
-    deps = envoy_select_quiche([":string_utils_lib"]),
+    deps = envoy_select_quiche([
+        ":quic_platform_logging_impl_lib",
+        ":string_utils_lib",
+    ]),
 )
 
 envoy_cc_library(
@@ -69,7 +71,6 @@ envoy_cc_library(
     hdrs = [
         "quic_bug_tracker_impl.h",
         "quic_logging_impl.h",
-        "quic_mock_log_impl.h",
     ],
     visibility = ["//visibility:public"],
     deps = ["//source/common/common:assert_lib"],
@@ -98,6 +99,7 @@ envoy_cc_library(
     ] + envoy_select_quiche([
         "quic_expect_bug_impl.h",
         "quic_logging_impl.h",
+        "quic_mock_log_impl.h",
         "quic_stack_trace_impl.h",
         "quic_test_impl.h",
         "quic_thread_impl.h",

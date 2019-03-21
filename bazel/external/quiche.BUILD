@@ -59,7 +59,6 @@ cc_library(
         "quiche/http2/platform/api/http2_flag_utils.h",
         "quiche/http2/platform/api/http2_logging.h",
         "quiche/http2/platform/api/http2_macros.h",
-        "quiche/http2/platform/api/http2_mock_log.h",
         "quiche/http2/platform/api/http2_optional.h",
         "quiche/http2/platform/api/http2_ptr_util.h",
         "quiche/http2/platform/api/http2_string.h",
