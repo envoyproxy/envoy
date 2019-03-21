@@ -115,6 +115,8 @@ public:
     }
   }
 
+  envoy::api::v2::DeltaDiscoveryRequest stateOfRequest() const { return request_; }
+
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -220,6 +222,7 @@ private:
     resource_versions_[key] = val;
     resource_names_.insert(key);
   }
+
   void eraseResourceVersion(const std::string& key) {
     resource_versions_.erase(key);
     resource_names_.erase(key);
