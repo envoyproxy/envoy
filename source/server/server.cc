@@ -554,6 +554,7 @@ void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {
 }
 
 void InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
+  ASSERT(stage == Stage::ShutdownExit);
   stage_completable_callbacks_[stage].push_back(callback);
 }
 
