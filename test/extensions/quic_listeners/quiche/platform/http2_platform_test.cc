@@ -56,7 +56,7 @@ TEST(Http2PlatformTest, Http2Log) {
   HTTP2_LOG(INFO) << "INFO log may not show up by default.";
   HTTP2_LOG(ERROR) << "ERROR log should show up by default.";
 
-  // VLOGs are only emitted if INFO is enabled and verbosity level is high enough.
+  // VLOG are only emitted if INFO is enabled and verbosity level is high enough.
   HTTP2_VLOG(1) << "VLOG(1)";
 
   HTTP2_DLOG(INFO) << "DLOG(INFO)";

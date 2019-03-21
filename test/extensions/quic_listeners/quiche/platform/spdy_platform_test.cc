@@ -69,7 +69,7 @@ TEST(SpdyPlatformTest, SpdyLog) {
   SPDY_LOG(INFO) << "INFO log may not show up by default.";
   SPDY_LOG(ERROR) << "ERROR log should show up by default.";
 
-  // VLOGs are only emitted if INFO is enabled and verbosity level is high enough.
+  // VLOG is only emitted if INFO is enabled and verbosity level is high enough.
   SPDY_VLOG(1) << "VLOG(1)";
 
   SPDY_DLOG(INFO) << "DLOG(INFO)";
