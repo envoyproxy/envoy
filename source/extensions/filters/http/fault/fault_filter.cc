@@ -145,7 +145,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::HeaderMap& request_hea
   }
 
   absl::optional<uint64_t> rate_kbps = fault_settings_->responseRateLimit()->rateKbps(
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().ThrottleResponseThroughput));
+      request_headers.get(Filters::Common::Fault::HeaderNames::get().ThroughputResponse));
   if (!rate_kbps.has_value()) {
     return;
   }
@@ -221,7 +221,7 @@ FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
 
   // See if the delay provider has a default delay, if not there is no delay.
   auto config_duration = fault_settings_->requestDelay()->duration(
-      request_headers.get(Filters::Common::Fault::HeaderNames::get().ThrottleRequestLatency));
+      request_headers.get(Filters::Common::Fault::HeaderNames::get().DelayRequest));
   if (!config_duration.has_value()) {
     return ret;
   }

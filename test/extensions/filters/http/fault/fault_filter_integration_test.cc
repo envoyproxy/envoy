@@ -99,8 +99,8 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
                                           {":path", "/test/long/url"},
                                           {":scheme", "http"},
                                           {":authority", "host"},
-                                          {"x-envoy-throttle-request-latency", "200"},
-                                          {"x-envoy-throttle-response-throughput", "1"}};
+                                          {"x-envoy-fault-delay-request", "200"},
+                                          {"x-envoy-fault-throughput-response", "1"}};
   const auto current_time = simTime().monotonicTime();
   IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();

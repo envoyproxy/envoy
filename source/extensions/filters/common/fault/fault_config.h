@@ -13,8 +13,8 @@ namespace Fault {
 
 class HeaderNameValues {
 public:
-  const Http::LowerCaseString ThrottleRequestLatency{"x-envoy-throttle-request-latency"};
-  const Http::LowerCaseString ThrottleResponseThroughput{"x-envoy-throttle-response-throughput"};
+  const Http::LowerCaseString DelayRequest{"x-envoy-fault-delay-request"};
+  const Http::LowerCaseString ThroughputResponse{"x-envoy-fault-throughput-response"};
 };
 
 typedef ConstSingleton<HeaderNameValues> HeaderNames;

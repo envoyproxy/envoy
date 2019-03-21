@@ -29,16 +29,16 @@ Configuration
 
 .. _config_http_filters_fault_injection_http_header:
 
-HTTP header fault configuration
--------------------------------
+Controlling fault injection via HTTP headers
+--------------------------------------------
 
 The fault filter has the capability to allow fault configuration to be specified by the caller.
 This is useful in certain scenarios in which it is desired to allow the client to specify its own
 fault configuration. The currently supported header controls are:
 
-* Request delay configuration via the *x-envoy-throttle-request-latency* header. The header value
+* Request delay configuration via the *x-envoy-fault-delay-request* header. The header value
   should be an integer that specifies the number of milliseconds to throttle the latency for.
-* Response rate limit configuration via the *x-envoy-throttle-response-throughput* header. The
+* Response rate limit configuration via the *x-envoy-fault-throughput-response* header. The
   header value should be an integer that specified the limit in KiB/s and must be > 0.
 
 .. attention::

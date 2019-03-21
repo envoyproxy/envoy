@@ -20,9 +20,8 @@ TEST(FaultConfigTest, FaultDelayHeaderConfig) {
   EXPECT_EQ(absl::nullopt, config.duration(nullptr));
 
   // Header with bad data.
-  Http::TestHeaderMapImpl bad_headers{{"x-envoy-throttle-request-latency", "abc"}};
-  EXPECT_EQ(absl::nullopt,
-            config.duration(bad_headers.get(HeaderNames::get().ThrottleRequestLatency)));
+  Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-delay-request", "abc"}};
+  EXPECT_EQ(absl::nullopt, config.duration(bad_headers.get(HeaderNames::get().DelayRequest)));
 }
 
 TEST(FaultConfigTest, FaultRateLimitHeaderConfig) {
@@ -34,14 +33,13 @@ TEST(FaultConfigTest, FaultRateLimitHeaderConfig) {
   EXPECT_EQ(absl::nullopt, config.rateKbps(nullptr));
 
   // Header with bad data.
-  Http::TestHeaderMapImpl bad_headers{{"x-envoy-throttle-response-throughput", "abc"}};
-  EXPECT_EQ(absl::nullopt,
-            config.rateKbps(bad_headers.get(HeaderNames::get().ThrottleResponseThroughput)));
+  Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-throughput-response", "abc"}};
+  EXPECT_EQ(absl::nullopt, config.rateKbps(bad_headers.get(HeaderNames::get().ThroughputResponse)));
 
   // Header with zero.
-  Http::TestHeaderMapImpl zero_headers{{"x-envoy-throttle-response-throughput", "0"}};
+  Http::TestHeaderMapImpl zero_headers{{"x-envoy-fault-throughput-response", "0"}};
   EXPECT_EQ(absl::nullopt,
-            config.rateKbps(zero_headers.get(HeaderNames::get().ThrottleResponseThroughput)));
+            config.rateKbps(zero_headers.get(HeaderNames::get().ThroughputResponse)));
 }
 
 } // namespace
