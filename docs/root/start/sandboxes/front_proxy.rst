@@ -6,7 +6,7 @@ Front Proxy
 To get a flavor of what Envoy has to offer as a front proxy, we are releasing a
 `docker compose <https://docs.docker.com/compose/>`_ sandbox that deploys a front
 envoy and a couple of services (simple flask apps) colocated with a running
-service envoy. The three containers will be deployed inside a virtual network
+service Envoy. The three containers will be deployed inside a virtual network
 called ``envoymesh``.
 
 Below you can see a graphic showing the docker compose deployment:
@@ -14,20 +14,20 @@ Below you can see a graphic showing the docker compose deployment:
 .. image:: /_static/docker_compose_v0.1.svg
   :width: 100%
 
-All incoming requests are routed via the front envoy, which is acting as a reverse proxy sitting on
+All incoming requests are routed via the front Envoy, which is acting as a reverse proxy sitting on
 the edge of the ``envoymesh`` network. Port ``80`` is mapped to  port ``8000`` by docker compose
 (see :repo:`/examples/front-proxy/docker-compose.yml`). Moreover, notice
-that all  traffic routed by the front envoy to the service containers is actually routed to the
-service envoys (routes setup in :repo:`/examples/front-proxy/front-envoy.yaml`). In turn the service
+that all  traffic routed by the front Envoy to the service containers is actually routed to the
+service Envoys (routes setup in :repo:`/examples/front-proxy/front-envoy.yaml`). In turn the service
 envoys route the  request to the flask app via the loopback address (routes setup in
 :repo:`/examples/front-proxy/service-envoy.yaml`). This setup
-illustrates the advantage of running service envoys  collocated with your services: all requests are
-handled by the service envoy, and efficiently routed to your services.
+illustrates the advantage of running service Envoys  collocated with your services: all requests are
+handled by the service Envoy, and efficiently routed to your services.
 
 Running the Sandbox
 ~~~~~~~~~~~~~~~~~~~
 
-The following documentation runs through the setup of an envoy cluster organized
+The following documentation runs through the setup of an Envoy cluster organized
 as is described in the image above.
 
 **Step 1: Install Docker**
@@ -38,7 +38,7 @@ A simple way to achieve this is via the `Docker Toolbox <https://www.docker.com/
 
 **Step 2: Clone the Envoy repo, and start all of our containers**
 
-If you have not cloned the envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
+If you have not cloned the Envoy repo, clone it with ``git clone git@github.com:envoyproxy/envoy``
 or ``git clone https://github.com/envoyproxy/envoy.git``::
 
     $ pwd
@@ -97,19 +97,19 @@ For service2::
     Hello from behind Envoy (service 2)! hostname: 92f4a3737bbc resolvedhostname: 172.19.0.2
     * Connection #0 to host 192.168.99.100 left intact
 
-Notice that each request, while sent to the front envoy, was correctly routed
+Notice that each request, while sent to the front Envoy, was correctly routed
 to the respective application.
 
 **Step 4: Test Envoy's load balancing capabilities**
 
-Now let's scale up our service1 nodes to demonstrate the clustering abilities
-of envoy.::
+Now let's scale up our service1 nodes to demonstrate the load balancing abilities
+of Envoy.::
 
     $ docker-compose scale service1=3
     Creating and starting example_service1_2 ... done
     Creating and starting example_service1_3 ... done
 
-Now if we send a request to service1 multiple times, the front envoy will load balance the
+Now if we send a request to service1 multiple times, the front Envoy will load balance the
 requests by doing a round robin of the three service1 machines::
 
     $ curl -v localhost:8000/service/1
@@ -185,7 +185,7 @@ enter the ``front-envoy`` container, and ``curl`` for services locally::
 
 **Step 6: enter containers and curl admin**
 
-When envoy runs it also attaches an ``admin`` to your desired port. In the example
+When Envoy runs it also attaches an ``admin`` to your desired port. In the example
 configs the admin is bound to port ``8001``. We can ``curl`` it to gain useful information.
 For example you can ``curl`` ``/server_info`` to get information about the
 envoy version you are running. Additionally you can ``curl`` ``/stats`` to get
