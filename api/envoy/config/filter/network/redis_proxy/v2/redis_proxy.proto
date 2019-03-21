@@ -64,7 +64,7 @@ message RedisProxy {
   message PrefixRoutes {
     message Route {
       // String prefix that must match the beginning of the keys. Envoy will always favor the
-      // longest matches.
+      // longest match.
       string prefix = 1 [(validate.rules).string.min_bytes = 1];
 
       // Indicates if the prefix needs to be removed from the key when forwarded.
@@ -85,11 +85,9 @@ message RedisProxy {
     string catch_all_cluster = 3;
   }
 
-  // List of prefixes used to separate keys from different workloads to different clusters. Envoy
-  // will always favor the longest matches first. Prefixes are stored in a Trie and are accessed
-  // using a LIFO, thus identical prefixes will always resolve to the last entry inserted. A
-  // catch-all cluster can be used to forward commands to when there is no match. Time complexity of
-  // the lookups are in O(min(longest key prefix, key length)).
+  // List of **unique** prefixes used to separate keys from different workloads to different clusters. Envoy
+  // will always favor the longest match first in case of overlap. A catch-all cluster can be used to forward
+  // commands to when there is no match. Time complexity of the lookups are in O(min(longest key prefix, key length)).
   //
   // Example:
   //
@@ -97,12 +95,15 @@ message RedisProxy {
   //
   //    prefix_routes:
   //      routes:
-  //        - prefix: "abc" # this prefix will be overwritten by the next entry
+  //        - prefix: "ab"
   //          cluster: "cluster_a"
   //        - prefix: "abc"
   //          cluster: "cluster_b"
+  //        # uniqueness constraint is not respected if the next 2 lines are uncommented.
+  //        # - prefix: "abc"
+  //        #   cluster: "cluster_c"
   //        - prefix: "a"
-  //          cluster: "cluster_c"
+  //          cluster: "cluster_d"
   //
   // See the :ref:`configuration section
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on

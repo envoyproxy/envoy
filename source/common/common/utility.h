@@ -568,8 +568,9 @@ template <class Value> struct TrieLookupTable {
    * Adds an entry to the Trie at the given Key.
    * @param key the key used to add the entry.
    * @param value the value to be associated with the key.
+   * @return false when a value already exists for the given key.
    */
-  void add(const char* key, Value value) {
+  bool add(const char* key, Value value) {
     TrieEntry<Value>* current = &root_;
     while (uint8_t c = *key) {
       if (!current->entries_[c]) {
@@ -578,7 +579,11 @@ template <class Value> struct TrieLookupTable {
       current = current->entries_[c].get();
       key++;
     }
+    if (current->value_) {
+      return false;
+    }
     current->value_ = value;
+    return true;
   }
 
   /**

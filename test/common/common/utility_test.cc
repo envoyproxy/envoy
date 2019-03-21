@@ -830,10 +830,10 @@ TEST(DateFormatter, FromTimeSameWildcard) {
 
 TEST(TrieLookupTable, LongestPrefix) {
   TrieLookupTable<const char*> trie;
-  trie.add("foo", "a");
-  trie.add("bar", "ignored by the following element with the same key");
-  trie.add("bar", "b");
-  trie.add("baro", "c");
+  EXPECT_TRUE(trie.add("foo", "a"));
+  EXPECT_TRUE(trie.add("bar", "b"));
+  EXPECT_FALSE(trie.add("bar", "this key is already used"));
+  EXPECT_TRUE(trie.add("baro", "c"));
 
   EXPECT_EQ("a", trie.find("foo"));
   EXPECT_EQ("a", trie.findPrefix("foo"));

@@ -1,4 +1,5 @@
 #include "extensions/filters/network/redis_proxy/router_impl.h"
+#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,11 +21,14 @@ PrefixRoutes::PrefixRoutes(
       to_lower_table_.toLowerCase(copy);
     }
 
-    prefix_lookup_table_.add(copy.c_str(), std::make_shared<Prefix>(Prefix{
+    auto success = prefix_lookup_table_.add(copy.c_str(), std::make_shared<Prefix>(Prefix{
                                                route.prefix(),
                                                route.remove_prefix(),
                                                upstreams_.at(route.cluster()),
                                            }));
+    if (!success) {
+      throw EnvoyException(fmt::format("prefix `{}` already exists.", route.prefix()));
+    }
   }
 }
 

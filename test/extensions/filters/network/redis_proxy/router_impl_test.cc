@@ -175,6 +175,32 @@ TEST(PrefixRoutesTest, DifferentPrefixesSameUpstream) {
   EXPECT_EQ(nullptr, router.makeRequest("also_route_to_b:bar", value, callbacks));
 }
 
+TEST(PrefixRoutesTest, DuplicatePrefix) {
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+  upstreams.emplace("this_will_throw", std::make_shared<ConnPool::MockInstance>());
+
+  auto prefix_routes = createPrefixRoutes();
+
+  {
+    auto* route = prefix_routes.mutable_routes()->Add();
+    route->set_prefix("ab");
+    route->set_cluster("this_will_throw");
+  }
+
+  EXPECT_THROW(
+  {
+    try {
+      PrefixRoutes router(prefix_routes, std::move(upstreams));
+    } catch (const EnvoyException& ex) {
+      EXPECT_STREQ("prefix `ab` already exists.", ex.what());
+      throw;
+    }
+  },
+  EnvoyException);
+}
+
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions
