@@ -26,6 +26,8 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
     ],
 )
 

@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/api/v2/route/route.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/config/metadata.h"
@@ -86,6 +88,7 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::RouteConfiguration route_config;
   MessageUtil::loadFromYaml(yaml, route_config);
+  MessageUtil::validate(route_config);
   return route_config;
 }
 
@@ -3676,8 +3679,7 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_DEATH(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               ".*assert failure: has_regex.*");
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
@@ -3708,8 +3710,7 @@ virtual_hosts:
   - match:
       prefix: "/api"
   )EOF";
-  EXPECT_DEATH(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               ".*assert failure.*");
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
@@ -4918,13 +4919,13 @@ virtual_hosts:
       - match: { regex: "/regex"}
         route:
           cluster: some-cluster
-          idle_timeout: 0s
+          idle_timeout: 1s
   )EOF";
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeout), factory_context_, true);
   Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ(0, route_entry->idleTimeout().value().count());
+  EXPECT_EQ(1000, route_entry->idleTimeout().value().count());
 }
 
 TEST_F(RouteConfigurationV2, ExplicitIdleTimeout) {
