@@ -2660,7 +2660,7 @@ TEST_F(RouteMatcherTest, DirectResponse) {
   const auto pathname =
       TestEnvironment::writeStringToFileForTest("direct_response_body", "Example text 3");
 
-  static const std::string v2_yaml = R"EOF(
+  static const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:
   - name: www2
@@ -2803,279 +2803,274 @@ virtual_hosts:
       direct_response:
         status: 200
         body: { filename: )EOF" + pathname +
-                                     R"EOF(}
+                                  R"EOF(}
     - match: { prefix: / }
       route: { cluster: www2 }
   )EOF";
 
-  auto testConfig = [](const ConfigImpl& config) {
-    EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
-      EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", false, false);
-      EXPECT_EQ("https://www.lyft.com/foo",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-      EXPECT_EQ(nullptr, config.route(headers, 0)->decorator());
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);
-      EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, false);
-      EXPECT_EQ("https://api.lyft.com/foo",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/host", false, false);
-      EXPECT_EQ("http://new.lyft.com/host",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/path", true, false);
-      EXPECT_EQ("https://redirect.lyft.com/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/host_path", true, false);
-      EXPECT_EQ("https://new.lyft.com/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("direct.example.com", "/gone", true, false);
-      EXPECT_EQ(Http::Code::Gone, config.route(headers, 0)->directResponseEntry()->responseCode());
-      EXPECT_EQ("Example text 1", config.route(headers, 0)->directResponseEntry()->responseBody());
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("direct.example.com", "/error", true, false);
-      EXPECT_EQ(Http::Code::InternalServerError,
-                config.route(headers, 0)->directResponseEntry()->responseCode());
-      EXPECT_EQ("Example text 2", config.route(headers, 0)->directResponseEntry()->responseBody());
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("direct.example.com", "/no_body", true, false);
-      EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
-      EXPECT_TRUE(config.route(headers, 0)->directResponseEntry()->responseBody().empty());
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("direct.example.com", "/static", true, false);
-      EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
-      EXPECT_EQ("Example text 3", config.route(headers, 0)->directResponseEntry()->responseBody());
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("direct.example.com", "/other", true, false);
-      EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/https", false, false);
-      EXPECT_EQ("https://redirect.lyft.com/https",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/host_https", false, false);
-      EXPECT_EQ("https://new.lyft.com/host_https",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/path_https", false, false);
-      EXPECT_EQ("https://redirect.lyft.com/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/host_path_https", false, false);
-      EXPECT_EQ("https://new.lyft.com/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/port", false, false);
-      EXPECT_EQ("http://redirect.lyft.com:8080/port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com:8080", "/port", false, false);
-      EXPECT_EQ("http://redirect.lyft.com:8181/port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/host_port", false, false);
-      EXPECT_EQ("http://new.lyft.com:8080/host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com", "/scheme_host_port", false, false);
-      EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com:80", "/ws", true, false);
-      EXPECT_EQ("ws://redirect.lyft.com:80/ws",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com:80", "/host_path_https", false, false);
-      EXPECT_EQ("https://new.lyft.com/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com:80", "/scheme_host_port", false, false);
-      EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com:443", "/ws", false, false);
-      EXPECT_EQ("ws://redirect.lyft.com:443/ws",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com:443", "/host_path_http", true, false);
-      EXPECT_EQ("http://new.lyft.com/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("redirect.lyft.com:443", "/scheme_host_port", true, false);
-      EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1", "/port", false, false);
-      EXPECT_EQ("http://10.0.0.1:8080/port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:8080", "/port", false, false);
-      EXPECT_EQ("http://10.0.0.1:8181/port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1", "/host_port", false, false);
-      EXPECT_EQ("http://20.0.0.2:8080/host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("10.0.0.1", "/scheme_host_port", false, false);
-      EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:80", "/ws", true, false);
-      EXPECT_EQ("ws://10.0.0.1:80/ws",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("10.0.0.1:80", "/host_path_https", false, false);
-      EXPECT_EQ("https://20.0.0.2/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("10.0.0.1:80", "/scheme_host_port", false, false);
-      EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:443", "/ws", false, false);
-      EXPECT_EQ("ws://10.0.0.1:443/ws",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("10.0.0.1:443", "/host_path_http", true, false);
-      EXPECT_EQ("http://20.0.0.2/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("10.0.0.1:443", "/scheme_host_port", true, false);
-      EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]", "/port", false, false);
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+  EXPECT_EQ(nullptr, config.route(genRedirectHeaders("www.foo.com", "/foo", true, true), 0));
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", true, true);
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("www.lyft.com", "/foo", false, false);
+    EXPECT_EQ("https://www.lyft.com/foo",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+    EXPECT_EQ(nullptr, config.route(headers, 0)->decorator());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, true);
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("api.lyft.com", "/foo", false, false);
+    EXPECT_EQ("https://api.lyft.com/foo",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host", false, false);
+    EXPECT_EQ("http://new.lyft.com/host",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("redirect.lyft.com", "/path", true, false);
+    EXPECT_EQ("https://redirect.lyft.com/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host_path", true, false);
+    EXPECT_EQ("https://new.lyft.com/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("direct.example.com", "/gone", true, false);
+    EXPECT_EQ(Http::Code::Gone, config.route(headers, 0)->directResponseEntry()->responseCode());
+    EXPECT_EQ("Example text 1", config.route(headers, 0)->directResponseEntry()->responseBody());
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("direct.example.com", "/error", true, false);
+    EXPECT_EQ(Http::Code::InternalServerError,
+              config.route(headers, 0)->directResponseEntry()->responseCode());
+    EXPECT_EQ("Example text 2", config.route(headers, 0)->directResponseEntry()->responseBody());
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("direct.example.com", "/no_body", true, false);
+    EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
+    EXPECT_TRUE(config.route(headers, 0)->directResponseEntry()->responseBody().empty());
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("direct.example.com", "/static", true, false);
+    EXPECT_EQ(Http::Code::OK, config.route(headers, 0)->directResponseEntry()->responseCode());
+    EXPECT_EQ("Example text 3", config.route(headers, 0)->directResponseEntry()->responseBody());
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("direct.example.com", "/other", true, false);
+    EXPECT_EQ(nullptr, config.route(headers, 0)->directResponseEntry());
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/https", false, false);
+    EXPECT_EQ("https://redirect.lyft.com/https",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host_https", false, false);
+    EXPECT_EQ("https://new.lyft.com/host_https",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/path_https", false, false);
+    EXPECT_EQ("https://redirect.lyft.com/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host_path_https", false, false);
+    EXPECT_EQ("https://new.lyft.com/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/port", false, false);
+    EXPECT_EQ("http://redirect.lyft.com:8080/port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com:8080", "/port", false, false);
+    EXPECT_EQ("http://redirect.lyft.com:8181/port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/host_port", false, false);
+    EXPECT_EQ("http://new.lyft.com:8080/host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com", "/scheme_host_port", false, false);
+    EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com:80", "/ws", true, false);
+    EXPECT_EQ("ws://redirect.lyft.com:80/ws",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com:80", "/host_path_https", false, false);
+    EXPECT_EQ("https://new.lyft.com/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com:80", "/scheme_host_port", false, false);
+    EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com:443", "/ws", false, false);
+    EXPECT_EQ("ws://redirect.lyft.com:443/ws",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com:443", "/host_path_http", true, false);
+    EXPECT_EQ("http://new.lyft.com/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("redirect.lyft.com:443", "/scheme_host_port", true, false);
+    EXPECT_EQ("ws://new.lyft.com:8080/scheme_host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1", "/port", false, false);
+    EXPECT_EQ("http://10.0.0.1:8080/port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:8080", "/port", false, false);
+    EXPECT_EQ("http://10.0.0.1:8181/port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1", "/host_port", false, false);
+    EXPECT_EQ("http://20.0.0.2:8080/host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("10.0.0.1", "/scheme_host_port", false, false);
+    EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:80", "/ws", true, false);
+    EXPECT_EQ("ws://10.0.0.1:80/ws",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("10.0.0.1:80", "/host_path_https", false, false);
+    EXPECT_EQ("https://20.0.0.2/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("10.0.0.1:80", "/scheme_host_port", false, false);
+    EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("10.0.0.1:443", "/ws", false, false);
+    EXPECT_EQ("ws://10.0.0.1:443/ws",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("10.0.0.1:443", "/host_path_http", true, false);
+    EXPECT_EQ("http://20.0.0.2/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("10.0.0.1:443", "/scheme_host_port", true, false);
+    EXPECT_EQ("ws://20.0.0.2:8080/scheme_host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]", "/port", false, false);
 
-      EXPECT_EQ("http://[fe80::1]:8080/port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:8080", "/port", false, false);
-      EXPECT_EQ("http://[fe80::1]:8181/port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]", "/host_port", false, false);
-      EXPECT_EQ("http://[fe80::2]:8080/host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("[fe80::1]", "/scheme_host_port", false, false);
-      EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:80", "/ws", true, false);
-      EXPECT_EQ("ws://[fe80::1]:80/ws",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("[fe80::1]:80", "/host_path_https", false, false);
-      EXPECT_EQ("https://[fe80::2]/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("[fe80::1]:80", "/scheme_host_port", false, false);
-      EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:443", "/ws", false, false);
-      EXPECT_EQ("ws://[fe80::1]:443/ws",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("[fe80::1]:443", "/host_path_http", true, false);
-      EXPECT_EQ("http://[fe80::2]/new_path",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-    {
-      Http::TestHeaderMapImpl headers =
-          genRedirectHeaders("[fe80::1]:443", "/scheme_host_port", true, false);
-      EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
-                config.route(headers, 0)->directResponseEntry()->newPath(headers));
-    }
-  };
-
-  TestConfigImpl v2_yaml_config(parseRouteConfigurationFromV2Yaml(v2_yaml), factory_context_, true);
-  testConfig(v2_yaml_config);
+    EXPECT_EQ("http://[fe80::1]:8080/port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:8080", "/port", false, false);
+    EXPECT_EQ("http://[fe80::1]:8181/port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]", "/host_port", false, false);
+    EXPECT_EQ("http://[fe80::2]:8080/host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("[fe80::1]", "/scheme_host_port", false, false);
+    EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:80", "/ws", true, false);
+    EXPECT_EQ("ws://[fe80::1]:80/ws",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("[fe80::1]:80", "/host_path_https", false, false);
+    EXPECT_EQ("https://[fe80::2]/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("[fe80::1]:80", "/scheme_host_port", false, false);
+    EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genRedirectHeaders("[fe80::1]:443", "/ws", false, false);
+    EXPECT_EQ("ws://[fe80::1]:443/ws",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("[fe80::1]:443", "/host_path_http", true, false);
+    EXPECT_EQ("http://[fe80::2]/new_path",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
+  {
+    Http::TestHeaderMapImpl headers =
+        genRedirectHeaders("[fe80::1]:443", "/scheme_host_port", true, false);
+    EXPECT_EQ("ws://[fe80::2]:8080/scheme_host_port",
+              config.route(headers, 0)->directResponseEntry()->newPath(headers));
+  }
 }
 
 TEST_F(RouteMatcherTest, ExclusiveRouteEntryOrDirectResponseEntry) {
@@ -4921,13 +4916,11 @@ virtual_hosts:
       - match: { regex: "/regex"}
         route:
           cluster: some-cluster
-          idle_timeout: 1s
+          idle_timeout: 0s
   )EOF";
 
-  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeout), factory_context_, true);
-  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
-  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ(1000, route_entry->idleTimeout().value().count());
+  EXPECT_THROW_WITH_REGEX(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeout), EnvoyException,
+                          "value must be greater than \" \"0s");
 }
 
 TEST_F(RouteConfigurationV2, ExplicitIdleTimeout) {
