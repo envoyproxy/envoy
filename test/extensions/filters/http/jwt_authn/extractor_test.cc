@@ -4,6 +4,9 @@
 
 #include "test/test_common/utility.h"
 
+#include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/extensions/filters/http/jwt_authn/test_common.h"
+
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using Envoy::Http::TestHeaderMapImpl;
@@ -46,6 +49,16 @@ providers:
     from_headers:
       - name: prefix-header
         value_prefix: AAABBB
+  provider7:
+    issuer: issuer7
+    from_headers:
+      - name: prefix-header
+        value_prefix: CCCDDD
+  provider8:
+    issuer: issuer8
+    from_headers:
+      - name: prefix-header
+        value_prefix: '"CCCDDD"'
 )";
 
 class ExtractorTest : public testing::Test {
@@ -96,6 +109,22 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer4"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
+
+  // Test token remove
+  tokens[0]->removeJwt(headers);
+  EXPECT_FALSE(headers.Authorization());
+}
+
+// Test extracting JWT as Bearer token from the default header location: "Authorization" -
+// using an actual (correctly-formatted) JWT:
+TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
+  auto headers = TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+
+  // Only the issue1 is using default header location.
+  EXPECT_EQ(tokens[0]->token(), GoodToken);
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer1"));
 
   // Test token remove
   tokens[0]->removeJwt(headers);
@@ -166,6 +195,54 @@ TEST_F(ExtractorTest, TestPrefixHeaderMatch) {
   // Match issuer 6 with map key as: prefix-header + AAABBB which is after AAA
   EXPECT_TRUE(tokens[1]->isIssuerSpecified("issuer6"));
   EXPECT_EQ(tokens[1]->token(), "jwt_token");
+
+  // Test token remove
+  tokens[0]->removeJwt(headers);
+  EXPECT_FALSE(headers.get(Http::LowerCaseString("prefix-header")));
+}
+
+// Test extracting token from the custom header: "prefix-header"
+// The value is found after the "CCCDDD", then between the '=' and the ','.
+TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch1) {
+  auto headers = TestHeaderMapImpl{{"prefix-header", "preamble CCCDDD=jwt_token,extra=more"}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+
+  // Match issuer 7 with map key as: prefix-header + CCCDDD
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer7"));
+  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+
+  // Test token remove
+  tokens[0]->removeJwt(headers);
+  EXPECT_FALSE(headers.get(Http::LowerCaseString("prefix-header")));
+}
+
+TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
+  auto headers = TestHeaderMapImpl{{"prefix-header", "CCCDDD=\"and0X3Rva2Vu\",comment=\"fish tag\""}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+
+  // Match issuer 7 with map key as: prefix-header + AAA
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer7"));
+  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu");
+
+  // Test token remove
+  tokens[0]->removeJwt(headers);
+  EXPECT_FALSE(headers.get(Http::LowerCaseString("prefix-header")));
+}
+
+TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
+  auto headers = TestHeaderMapImpl{{"prefix-header", "creds={\"authLevel\": \"20\", \"CCCDDD\": \"and0X3Rva2Vu\"}"}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 2);
+
+  // Match issuer 8 with map key as: prefix-header + "CCCDDD"
+  EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer8"));
+  EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu");
+
+  // Match issuer 7 with map key as: prefix-header + CCCDDD
+  EXPECT_TRUE(tokens[1]->isIssuerSpecified("issuer7"));
+  EXPECT_EQ(tokens[1]->token(), "and0X3Rva2Vu");
 
   // Test token remove
   tokens[0]->removeJwt(headers);
