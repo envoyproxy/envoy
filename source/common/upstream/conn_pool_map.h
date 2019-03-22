@@ -63,6 +63,11 @@ private:
    */
   bool freeOnePool();
 
+  /**
+   * Cleans up the active_pools_ map and updates resource tracking
+   **/
+  void clearActivePools();
+
   absl::flat_hash_map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;
   Event::Dispatcher& thread_local_dispatcher_;
   std::vector<DrainedCb> cached_callbacks_;

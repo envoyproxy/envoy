@@ -12,9 +12,11 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::ConnPoolMap(Envoy::Event::Dispatcher& dispatch
     : thread_local_dispatcher_(dispatcher), host_(host), priority_(priority) {}
 
 template <typename KEY_TYPE, typename POOL_TYPE> ConnPoolMap<KEY_TYPE, POOL_TYPE>::~ConnPoolMap() {
-  // Explicitly clear things out for resource tracking purposes. Note that we call this rather than
-  // clear because in this case we don't want to do a deferred delete.
-  clear();
+  // Clean up the pools to ensure resource tracking is kept up to date. Note that we do not call
+  // `clear()` here to avoid doing a deferred delete. This triggers some unwanted race conditions
+  // on shutdown where deleted resources end up putting stuff on the deferred delete list after the
+  // worker threads have shut down.
+  clearActivePools();
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -33,6 +35,8 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
   if (!connPoolResource.canCreate()) {
     // We're full. Try to free up a pool. If we can't, bail out.
     if (!freeOnePool()) {
+      // TODO(klarose): Add some explicit counters for failure cases here, similar to the other
+      // circuit breakers.
       return absl::nullopt;
     }
 
@@ -67,8 +71,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> void ConnPoolMap<KEY_TYPE, POOL
   for (auto& pool_pair : active_pools_) {
     thread_local_dispatcher_.deferredDelete(std::move(pool_pair.second));
   }
-  host_->cluster().resourceManager(priority_).connectionPools().decBy(active_pools_.size());
-  active_pools_.clear();
+  clearActivePools();
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
@@ -108,6 +111,12 @@ bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::freeOnePool() {
   }
 
   return false;
+}
+
+template <typename KEY_TYPE, typename POOL_TYPE>
+void ConnPoolMap<KEY_TYPE, POOL_TYPE>::clearActivePools() {
+  host_->cluster().resourceManager(priority_).connectionPools().decBy(active_pools_.size());
+  active_pools_.clear();
 }
 } // namespace Upstream
 } // namespace Envoy
