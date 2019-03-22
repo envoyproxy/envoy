@@ -293,6 +293,7 @@ TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
   cluster_->resetResourceManager(1, 1, 1024, 1);
 
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
+  EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
 
   NiceMock<Http::MockStreamDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
@@ -307,6 +308,7 @@ TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
   EXPECT_EQ(nullptr, handle2);
 
   EXPECT_EQ(1U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
 
   handle->cancel();
 
@@ -315,6 +317,7 @@ TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_overflow_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
 }
 
 /**

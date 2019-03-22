@@ -90,9 +90,10 @@ void ConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
-  host_->cluster().stats().upstream_rq_total_.inc();
-  host_->stats().rq_total_.inc();
   if (!ready_clients_.empty()) {
+    host_->cluster().stats().upstream_rq_total_.inc();
+    host_->stats().rq_total_.inc();
+
     ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_clients_.front()->codec_client_);
     attachRequestToClient(*busy_clients_.front(), response_decoder, callbacks);
@@ -105,6 +106,9 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     if (!can_create_connection) {
       host_->cluster().stats().upstream_cx_overflow_.inc();
     }
+
+    host_->cluster().stats().upstream_rq_total_.inc();
+    host_->stats().rq_total_.inc();
 
     // If we have no connections at all, make one no matter what so we don't starve.
     if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) || can_create_connection) {
