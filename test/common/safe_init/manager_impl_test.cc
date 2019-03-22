@@ -21,13 +21,13 @@ TEST(SafeInitManagerImplTest, AddImmediateTargetsWhenUninitialized) {
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  MockTarget t1("t1");
+  ExpectableTargetImpl t1("t1");
   m.add(t1);
 
-  MockTarget t2("t2");
+  ExpectableTargetImpl t2("t2");
   m.add(t2);
 
-  MockWatcher w;
+  ExpectableWatcherImpl w;
 
   // initialization should complete immediately
   t1.expectInitializeWillCallReady();
@@ -43,13 +43,13 @@ TEST(SafeInitManagerImplTest, AddAsyncTargetsWhenUninitialized) {
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  MockTarget t1("t1");
+  ExpectableTargetImpl t1("t1");
   m.add(t1);
 
-  MockTarget t2("t2");
+  ExpectableTargetImpl t2("t2");
   m.add(t2);
 
-  MockWatcher w;
+  ExpectableWatcherImpl w;
 
   // initialization should begin
   t1.expectInitialize();
@@ -73,13 +73,13 @@ TEST(SafeInitManagerImplTest, AddMixedTargetsWhenUninitialized) {
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  MockTarget t1("t1");
+  ExpectableTargetImpl t1("t1");
   m.add(t1);
 
-  MockTarget t2("t2");
+  ExpectableTargetImpl t2("t2");
   m.add(t2);
 
-  MockWatcher w;
+  ExpectableWatcherImpl w;
 
   // initialization should begin, and first target will initialize immediately
   t1.expectInitializeWillCallReady();
@@ -99,10 +99,10 @@ TEST(SafeInitManagerImplTest, AddImmediateTargetWhenInitializing) {
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  MockTarget t1("t1");
+  ExpectableTargetImpl t1("t1");
   m.add(t1);
 
-  MockWatcher w;
+  ExpectableWatcherImpl w;
 
   // initialization should begin
   t1.expectInitialize();
@@ -110,7 +110,7 @@ TEST(SafeInitManagerImplTest, AddImmediateTargetWhenInitializing) {
   expectInitializing(m);
 
   // adding an immediate target shouldn't finish initialization
-  MockTarget t2("t2");
+  ExpectableTargetImpl t2("t2");
   t2.expectInitializeWillCallReady();
   m.add(t2);
   expectInitializing(m);
@@ -129,12 +129,12 @@ TEST(SafeInitManagerImplTest, UnavailableTarget) {
 
   // add a target and destroy it
   {
-    MockTarget t("t");
+    ExpectableTargetImpl t("t");
     m.add(t);
     t.expectInitialize().Times(0);
   }
 
-  MockWatcher w;
+  ExpectableWatcherImpl w;
 
   // initialization should complete despite the destroyed target
   w.expectReady();
@@ -145,8 +145,8 @@ TEST(SafeInitManagerImplTest, UnavailableTarget) {
 TEST(SafeInitManagerImplTest, UnavailableManager) {
   InSequence s;
 
-  MockTarget t("t");
-  MockWatcher w;
+  ExpectableTargetImpl t("t");
+  ExpectableWatcherImpl w;
 
   {
     ManagerImpl m("test");
@@ -171,11 +171,11 @@ TEST(SafeInitManagerImplTest, UnavailableWatcher) {
   ManagerImpl m("test");
   expectUninitialized(m);
 
-  MockTarget t("t");
+  ExpectableTargetImpl t("t");
   m.add(t);
 
   {
-    MockWatcher w;
+    ExpectableWatcherImpl w;
 
     // initialization should begin before destroying the watcher
     t.expectInitialize();

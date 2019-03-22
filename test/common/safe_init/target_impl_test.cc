@@ -8,19 +8,16 @@ namespace Envoy {
 namespace SafeInit {
 namespace {
 
-// Note that the "mock" objects under scrutiny here are actually the real TargetImpl and
-// WatcherImpl, just subclassed for use in tests. See test/mocks/safe_init/mocks.h for details.
-
 TEST(SafeInitTargetImplTest, Name) {
-  MockTarget target;
-  EXPECT_EQ("target mock", target.name());
+  ExpectableTargetImpl target;
+  EXPECT_EQ("target test", target.name());
 }
 
 TEST(SafeInitTargetImplTest, InitializeWhenAvailable) {
   InSequence s;
 
-  MockTarget target;
-  MockWatcher watcher;
+  ExpectableTargetImpl target;
+  ExpectableWatcherImpl watcher;
 
   // initializing the target through its handle should invoke initialize()...
   target.expectInitialize();
@@ -36,10 +33,10 @@ TEST(SafeInitTargetImplTest, InitializeWhenAvailable) {
 }
 
 TEST(SafeInitTargetImplTest, InitializeWhenUnavailable) {
-  MockWatcher watcher;
+  ExpectableWatcherImpl watcher;
   TargetHandlePtr handle;
   {
-    MockTarget target;
+    ExpectableTargetImpl target;
 
     // initializing the target after it's been destroyed should do nothing.
     handle = target.createHandle("test");
@@ -49,9 +46,9 @@ TEST(SafeInitTargetImplTest, InitializeWhenUnavailable) {
 }
 
 TEST(SafeInitTargetImplTest, ReadyWhenWatcherUnavailable) {
-  MockTarget target;
+  ExpectableTargetImpl target;
   {
-    MockWatcher watcher;
+    ExpectableWatcherImpl watcher;
 
     // initializing the target through its handle should invoke initialize()...
     target.expectInitialize();

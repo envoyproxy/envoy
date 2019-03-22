@@ -11,13 +11,13 @@ namespace Envoy {
 namespace SafeInit {
 
 /**
- * MockWatcher is a real WatcherImpl, subclassed to add a mock `ready` method that you can set
- * expectations on in tests. Tests should never want a watcher with different behavior than the
+ * ExpectableWatcherImpl is a real WatcherImpl, subclassed to add a mock `ready` method that you can
+ * set expectations on in tests. Tests should never want a watcher with different behavior than the
  * real implementation.
  */
-class MockWatcher : public WatcherImpl {
+class ExpectableWatcherImpl : public WatcherImpl {
 public:
-  MockWatcher(absl::string_view name = "mock watcher");
+  ExpectableWatcherImpl(absl::string_view name = "test");
   MOCK_CONST_METHOD0(ready, void());
 
   /**
@@ -28,13 +28,13 @@ public:
 };
 
 /**
- * MockTarget is a real TargetImpl, subclassed to add a mock `initialize` method that you can set
- * expectations on in tests. Tests should never want a target with a different behavior than the
- * real implementation.
+ * ExpectableTargetImpl is a real TargetImpl, subclassed to add a mock `initialize` method that you
+ * can set expectations on in tests. Tests should never want a target with a different behavior than
+ * the real implementation.
  */
-class MockTarget : public TargetImpl {
+class ExpectableTargetImpl : public TargetImpl {
 public:
-  MockTarget(absl::string_view name = "mock");
+  ExpectableTargetImpl(absl::string_view name = "test");
   MOCK_METHOD0(initialize, void());
 
   /**
@@ -50,6 +50,12 @@ public:
   ::testing::internal::TypedExpectation<void()>& expectInitializeWillCallReady();
 };
 
+/**
+ * MockManager is a typical mock. In many cases, it won't be necessary to mock any of its methods.
+ * In cases where its `add` and `initialize` methods are actually called in a test, it's usually
+ * sufficient to mock `add` by saving the target argument locally, and to mock `initialize` by
+ * invoking the saved target with the watcher argument.
+ */
 struct MockManager : Manager {
   MOCK_CONST_METHOD0(state, Manager::State());
   MOCK_METHOD1(add, void(const Target&));

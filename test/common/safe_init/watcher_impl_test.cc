@@ -6,16 +6,13 @@ namespace Envoy {
 namespace SafeInit {
 namespace {
 
-// Note that the MockWatcher under scrutiny here is actually a real WatcherImpl, just subclassed for
-// use in tests. See test/mocks/safe_init/mocks.h for details.
-
 TEST(SafeInitWatcherImplTest, Name) {
-  MockWatcher watcher;
-  EXPECT_EQ("mock watcher", watcher.name());
+  ExpectableWatcherImpl watcher;
+  EXPECT_EQ("test", watcher.name());
 }
 
 TEST(SafeInitWatcherImplTest, ReadyWhenAvailable) {
-  MockWatcher watcher;
+  ExpectableWatcherImpl watcher;
 
   // notifying the watcher through its handle should invoke ready().
   watcher.expectReady();
@@ -25,7 +22,7 @@ TEST(SafeInitWatcherImplTest, ReadyWhenAvailable) {
 TEST(SafeInitWatcherImplTest, ReadyWhenUnavailable) {
   WatcherHandlePtr handle;
   {
-    MockWatcher watcher;
+    ExpectableWatcherImpl watcher;
 
     // notifying the watcher after it's been destroyed should do nothing.
     handle = watcher.createHandle("test");
