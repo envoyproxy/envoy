@@ -37,16 +37,23 @@ Common::Redis::Client::PoolRequest*
 PrefixRoutes::makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                           Common::Redis::Client::PoolCallbacks& callbacks) {
 
-  std::string copy(key);
+  PrefixPtr value = nullptr;
   if (case_insensitive_) {
+    std::string copy(key);
     to_lower_table_.toLowerCase(copy);
+    value = prefix_lookup_table_.findPrefix(copy.c_str());
+  } else {
+    value = prefix_lookup_table_.findPrefix(key.c_str());
   }
-
-  auto value = prefix_lookup_table_.findPrefix(copy.c_str());
 
   if (value != nullptr) {
     // TODO: remove_prefix
-    value->upstream->makeRequest(key, request, callbacks);
+    absl::string_view view(key);
+    if (value->remove_prefix) {
+      view.remove_prefix(value->prefix.length());
+    }
+    std::string str(view);
+    value->upstream->makeRequest(str, request, callbacks);
   } else if (catch_all_upstream_ != nullptr) {
     catch_all_upstream_.value()->makeRequest(key, request, callbacks);
   }

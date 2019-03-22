@@ -107,31 +107,30 @@ TEST(PrefixRoutesTest, CaseUnsensitivePrefix) {
   EXPECT_EQ(nullptr, router.makeRequest("AB:bar", value, callbacks));
 }
 
-// TODO(maximebedard)
-// TEST(PrefixRoutesTest, StrippedPrefix) {
-//   auto upstream_a = std::make_shared<ConnPool::MockInstance>();
+TEST(PrefixRoutesTest, RemovePrefix) {
+  auto upstream_a = std::make_shared<ConnPool::MockInstance>();
 
-//   Upstreams upstreams;
-//   upstreams.emplace("fake_clusterA", upstream_a);
-//   upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
+  Upstreams upstreams;
+  upstreams.emplace("fake_clusterA", upstream_a);
+  upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
 
-//   auto prefix_routes = createPrefixRoutes();
+  auto prefix_routes = createPrefixRoutes();
 
-//   {
-//     auto* route = prefix_routes.mutable_routes()->Add();
-//     route->set_prefix("abc");
-//     route->set_cluster("fake_clusterA");
-//     route->set_preserve_prefix(false);
-//   }
+  {
+    auto* route = prefix_routes.mutable_routes()->Add();
+    route->set_prefix("abc");
+    route->set_cluster("fake_clusterA");
+    route->set_remove_prefix(true);
+  }
 
-//   EXPECT_CALL(*upstream_a, makeRequest(Eq(":bar"), _, _));
+  EXPECT_CALL(*upstream_a, makeRequest(Eq(":bar"), _, _));
 
-//   PrefixRoutes router(prefix_routes, std::move(upstreams));
-//   Common::Redis::RespValue value;
-//   Common::Redis::Client::MockPoolCallbacks callbacks;
+  PrefixRoutes router(prefix_routes, std::move(upstreams));
+  Common::Redis::RespValue value;
+  Common::Redis::Client::MockPoolCallbacks callbacks;
 
-//   EXPECT_EQ(nullptr, router.makeRequest("abc:bar", value, callbacks));
-// }
+  EXPECT_EQ(nullptr, router.makeRequest("abc:bar", value, callbacks));
+}
 
 TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
   auto upstream_b = std::make_shared<ConnPool::MockInstance>();
