@@ -23,6 +23,9 @@ namespace Envoy {
 namespace Config {
 namespace {
 
+// When the xDS server informs Envoy that a resource is gone, that resource should be removed from
+// the initial versions map that Envoy sends upon stream reconnect. A resource name we are
+// interested in but have not gotten any version of should also not be in that map.
 TEST(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockRandomGenerator> random;
@@ -41,39 +44,51 @@ TEST(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
           "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints"),
       random, stats_store, rate_limit_settings, stats, std::chrono::milliseconds(123));
 
-  subscription.start({"name1", "name2"}, callbacks);
+  // Envoy is interested in three resources: name1, name2, and name3.
+  subscription.start({"name1", "name2", "name3"}, callbacks);
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added;
-  auto* resource = added.Add();
+  // The xDS server's first update includes items for name1 and 2, but not 3.
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add1_2;
+  auto* resource = add1_2.Add();
   resource->set_name("name1");
   resource->set_version("version1A");
-  resource = added.Add();
+  resource = add1_2.Add();
   resource->set_name("name2");
   resource->set_version("version2A");
-  subscription.onConfigUpdate(added, {}, "debugversion1");
+  subscription.onConfigUpdate(add1_2, {}, "debugversion1");
   subscription.handleStreamEstablished();
-  envoy::api::v2::DeltaDiscoveryRequest cur_request = subscription.stateOfRequest();
+  envoy::api::v2::DeltaDiscoveryRequest cur_request = subscription.internalRequestStateForTest();
   EXPECT_EQ("version1A", cur_request.initial_resource_versions().at("name1"));
   EXPECT_EQ("version2A", cur_request.initial_resource_versions().at("name2"));
-
-  Protobuf::RepeatedPtrField<std::string> removed1;
-  *removed1.Add() = "name1";
-  subscription.onConfigUpdate({}, removed1, "debugversion2");
-  subscription.handleStreamEstablished();
-  cur_request = subscription.stateOfRequest();
   EXPECT_EQ(cur_request.initial_resource_versions().end(),
-            cur_request.initial_resource_versions().find("name1"));
-  EXPECT_EQ("version2A", cur_request.initial_resource_versions().at("name2"));
+            cur_request.initial_resource_versions().find("name3"));
 
-  Protobuf::RepeatedPtrField<std::string> removed2;
-  *removed2.Add() = "name2";
-  subscription.onConfigUpdate({}, removed2, "debugversion3");
+  // The next update updates 1, removes 2, and adds 3. The map should then have 1 and 3.
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add1_3;
+  resource = add1_3.Add();
+  resource->set_name("name1");
+  resource->set_version("version1B");
+  resource = add1_3.Add();
+  resource->set_name("name3");
+  resource->set_version("version3A");
+  Protobuf::RepeatedPtrField<std::string> remove2;
+  *remove2.Add() = "name2";
+  subscription.onConfigUpdate(add1_3, remove2, "debugversion2");
   subscription.handleStreamEstablished();
-  cur_request = subscription.stateOfRequest();
-  EXPECT_EQ(cur_request.initial_resource_versions().end(),
-            cur_request.initial_resource_versions().find("name1"));
+  cur_request = subscription.internalRequestStateForTest();
+  EXPECT_EQ("version1B", cur_request.initial_resource_versions().at("name1"));
   EXPECT_EQ(cur_request.initial_resource_versions().end(),
             cur_request.initial_resource_versions().find("name2"));
+  EXPECT_EQ("version3A", cur_request.initial_resource_versions().at("name3"));
+
+  // The next update removes 1 and 3. The map should be empty.
+  Protobuf::RepeatedPtrField<std::string> remove1_3;
+  *remove1_3.Add() = "name1";
+  *remove1_3.Add() = "name3";
+  subscription.onConfigUpdate({}, remove1_3, "debugversion3");
+  subscription.handleStreamEstablished();
+  cur_request = subscription.internalRequestStateForTest();
+  EXPECT_TRUE(cur_request.initial_resource_versions().empty());
 }
 
 } // namespace

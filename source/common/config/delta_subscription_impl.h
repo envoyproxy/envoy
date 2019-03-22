@@ -115,7 +115,7 @@ public:
     }
   }
 
-  envoy::api::v2::DeltaDiscoveryRequest stateOfRequest() const { return request_; }
+  envoy::api::v2::DeltaDiscoveryRequest internalRequestStateForTest() const { return request_; }
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
@@ -168,7 +168,10 @@ public:
 
     request_.Clear();
     for (auto const& resource : resource_versions_) {
-      (*request_.mutable_initial_resource_versions())[resource.first] = resource.second;
+      // See comment on resource_versions_ declaration for why we need this if.
+      if (!resource.second.empty()) {
+        (*request_.mutable_initial_resource_versions())[resource.first] = resource.second;
+      }
     }
     request_.set_type_url(type_url_);
     request_.mutable_node()->MergeFrom(local_info_.node());
@@ -228,7 +231,13 @@ private:
     resource_names_.erase(key);
   }
 
-  // A map from resource name to per-resource version.
+  // A map from resource name to per-resource version. Entries having EmptyVersion (which is just
+  // the empty string) are those which we are interested in, but have not gotten any version of from
+  // the server. We need these placeholders to know what to include in a delta discovery request:
+  // imagine we have lost interest in a resource the server never sent us. We need to inform the
+  // server that we no longer care, and if we didn't have an entry in resource_versions_ we wouldn't
+  // know to. On the other hand, when resource_versions_ is used to populate
+  // initial_resource_versions in a stream reconnect, we must leave these out.
   std::unordered_map<std::string, std::string> resource_versions_;
   // The keys of resource_versions_. Only tracked separately because std::map does not provide an
   // iterator into just its keys, e.g. for use in std::set_difference.
