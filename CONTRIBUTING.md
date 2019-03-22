@@ -52,8 +52,10 @@ maximize the chances of your PR being merged.
   features might need rate limiting for logging this). We make no guarantees about code or deployments
   that rely on undocumented behavior.
 * All deprecations/breaking changes will be clearly listed in [DEPRECATED.md](DEPRECATED.md).
-* All deprecations/breaking changes will be announced to the
-  [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list.
+* High risk deprecations//breaking changes may be announced to the
+  [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
+  it is expected the multi-phase warn-by-default/fail-by-default is sufficient to warn users to move
+  away from deprecated features.
 * Protobuf configuration in an alpha namespace, e.g. `v2alpha`, do not have any
   restrictions on breaking changes. They may be freely modified, together with
   their respective features.
