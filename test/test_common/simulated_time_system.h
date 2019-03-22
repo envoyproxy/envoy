@@ -56,11 +56,15 @@ public:
    */
   void setSystemTime(const SystemTime& system_time);
 
+  bool sleepTillNextTimer();
+  void settle();
+
   static bool hasInstance();
 
 private:
   class SimulatedScheduler;
   class Alarm;
+  friend class Alarm;
   struct CompareAlarms {
     bool operator()(const Alarm* a, const Alarm* b) const;
   };
@@ -81,8 +85,9 @@ private:
   int64_t nextIndex();
 
   // Adds/removes an alarm.
-  void addAlarm(Alarm*, const std::chrono::milliseconds& duration);
-  void removeAlarm(Alarm*);
+  void addAlarmLockHeld(Alarm*, const std::chrono::milliseconds& duration)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeAlarmLockHeld(Alarm*) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Keeps track of how many alarms have been activated but not yet called,
   // which helps waitFor() determine when to give up and declare a timeout.
@@ -116,6 +121,9 @@ public:
   template <class Duration> void setSystemTime(const Duration& duration) {
     setSystemTime(SystemTime(duration));
   }
+
+  bool sleepTillNextTimer() { return timeSystem().sleepTillNextTimer(); }
+  void settle() { timeSystem().settle(); }
 };
 
 // Class encapsulating a SimulatedTimeSystem, intended for integration tests.

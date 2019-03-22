@@ -47,7 +47,7 @@ public:
    */
   int loopIntervalForTest() const { return loop_interval_.count(); }
   void forceCheckForTest() {
-    exit_event_.notifyAll();
+    loop_timer_->enableTimer(std::chrono::milliseconds(0));
     Thread::LockGuard guard(exit_lock_);
     force_checked_event_.wait(exit_lock_);
   }
@@ -58,12 +58,11 @@ public:
 
 private:
   void threadRoutine();
-  /**
-   * @return True if we should continue, false if signalled to stop.
-   */
-  bool waitOrDetectStop();
-  void start(Api::Api& api) EXCLUSIVE_LOCKS_REQUIRED(exit_lock_);
+  void waitOrDetectStop();
+  void start(Api::Api& api);
+  void step();
   void stop();
+  void stopCallback();
   // Per the C++ standard it is OK to use these in ctor initializer as long as
   // it is after kill and multikill timeout values are initialized.
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
@@ -87,8 +86,12 @@ private:
   std::vector<WatchedDog> watched_dogs_ GUARDED_BY(wd_lock_);
   Thread::MutexBasicLockable wd_lock_;
   Thread::ThreadPtr thread_;
+  Event::DispatcherPtr dispatcher_;
+  Event::TimerPtr loop_timer_;
+  Event::TimerPtr exit_timer_;
+  //Event::TimerPtr wakeup_timer_;
   Thread::MutexBasicLockable exit_lock_;
-  Thread::CondVar exit_event_;
+  //Thread::CondVar exit_event_;
   bool run_thread_ GUARDED_BY(exit_lock_);
   Thread::CondVar force_checked_event_;
 };

@@ -29,9 +29,28 @@ class GuardDogTestBase : public testing::Test {
 protected:
   GuardDogTestBase() : api_(Api::createApiForTest(stats_store_, time_system_)) {}
 
+  void sleep(const Event::TimeSystem::Duration& duration) {
+    time_system_.sleep(duration);
+    //time_system_.settle();
+
+    /*
+    MonotonicTime current_time = time_system_.monotonicTime();
+    const MonotonicTime end_time = current_time + duration;
+    while (current_time < end_time) {
+      if (time_system_.sleepTillNextTimer()) {
+        guard_dog_->forceCheckForTest();
+      } else {
+        time_system_.sleep(end_time - current_time);
+      }
+      current_time = time_system_.monotonicTime();
+    }
+    */
+  }
+
   Event::SimulatedTimeSystem time_system_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
+  std::unique_ptr<GuardDogImpl> guard_dog_;
 };
 
 /**
@@ -46,6 +65,18 @@ protected:
   GuardDogDeathTest()
       : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500) {}
 
+  /*
+    config_kill_.wd_miss_ = std::chrono::milliseconds(1000);
+    config_kill_.wd_megamiss_ = std::chrono::milliseconds(1000);
+    config_kill_.wd_kill_ = std::chrono::milliseconds(100);
+    config_kill_.wd_multikill_ = std::chrono::milliseconds(1000);
+
+    config_multikill_.wd_miss_ = std::chrono::milliseconds(1000);
+    config_multikill_.wd_megamiss_ = std::chrono::milliseconds(1000);
+    config_multikill_.wd_kill_ = std::chrono::milliseconds(1000);
+    config_multikill_.wd_multikill_ = std::chrono::milliseconds(500);
+  */
+
   /**
    * This does everything but the final forceCheckForTest() that should cause
    * death for the single kill case.
@@ -55,7 +86,7 @@ protected:
     guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_kill_, *api_);
     unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
     guard_dog_->forceCheckForTest();
-    time_system_.sleep(std::chrono::milliseconds(500));
+    sleep(std::chrono::milliseconds(99));  // 1 ms shy of death.
   }
 
   /**
@@ -69,13 +100,13 @@ protected:
     guard_dog_->forceCheckForTest();
     auto second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
     guard_dog_->forceCheckForTest();
-    time_system_.sleep(std::chrono::milliseconds(501));
+    sleep(std::chrono::milliseconds(499));  // 1 ms shy of multi-death.
+
   }
 
   NiceMock<Configuration::MockMain> config_kill_;
   NiceMock<Configuration::MockMain> config_multikill_;
   NiceMock<Stats::MockStore> fakestats_;
-  std::unique_ptr<GuardDogImpl> guard_dog_;
   WatchDogSharedPtr unpet_dog_;
   WatchDogSharedPtr second_dog_;
 };
@@ -88,16 +119,19 @@ TEST_F(GuardDogDeathTest, KillDeathTest) {
   // Is it German for "The Function"? Almost...
   auto die_function = [&]() -> void {
     SetupForDeath();
+    sleep(std::chrono::milliseconds(401));  // 400 ms past death.
     guard_dog_->forceCheckForTest();
   };
+
   // Why do it this way? Any threads must be started inside the death test
   // statement and this is the easiest way to accomplish that.
   EXPECT_DEATH(die_function(), "");
 }
 
+//!
 TEST_F(GuardDogAlmostDeadTest, KillNoFinalCheckTest) {
-  // This does everything the death test does except the final force check that
-  // should actually result in dying. The death test does not verify that there
+  // This does everything the death test does, except allow enough time to
+  // expire to reach the death panic. The death test does not verify that there
   // was not a crash *before* the expected line, so this test checks that.
   SetupForDeath();
 }
@@ -105,33 +139,36 @@ TEST_F(GuardDogAlmostDeadTest, KillNoFinalCheckTest) {
 TEST_F(GuardDogDeathTest, MultiKillDeathTest) {
   auto die_function = [&]() -> void {
     SetupForMultiDeath();
+    sleep(std::chrono::milliseconds(2));  // 1 ms past multi-death.
     guard_dog_->forceCheckForTest();
   };
   EXPECT_DEATH(die_function(), "");
 }
 
+//!
 TEST_F(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {
-  // This does everything the death test does except the final force check that
+  // This does everything the death test does not except the final force check that
   // should actually result in dying. The death test does not verify that there
   // was not a crash *before* the expected line, so this test checks that.
   SetupForMultiDeath();
 }
 
+//!
 TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
   // there is no death. The positive case is covered in MultiKillDeathTest.
   InSequence s;
-  GuardDogImpl gd(fakestats_, config_multikill_, *api_);
-  auto unpet_dog = gd.createWatchDog(api_->threadFactory().currentThreadId());
-  auto pet_dog = gd.createWatchDog(api_->threadFactory().currentThreadId());
+  guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_multikill_, *api_);
+  auto unpet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
+  auto pet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   // This part "waits" 600 milliseconds while one dog is touched every 100, and
   // the other is not. 600ms is over the threshold of 500ms for multi-kill but
   // only one is nonresponsive, so there should be no kill (single kill
   // threshold of 1s is not reached).
   for (int i = 0; i < 6; i++) {
-    time_system_.sleep(std::chrono::milliseconds(100));
+    sleep(std::chrono::milliseconds(100));
     pet_dog->touch();
-    gd.forceCheckForTest();
+    guard_dog_->forceCheckForTest();
   }
 }
 
@@ -146,38 +183,38 @@ protected:
 TEST_F(GuardDogMissTest, MissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  GuardDogImpl gd(stats_store_, config_miss_, *api_);
+  guard_dog_ = std::make_unique<GuardDogImpl>(stats_store_, config_miss_, *api_);
   // We'd better start at 0:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
-  auto unpet_dog = gd.createWatchDog(api_->threadFactory().currentThreadId());
+  auto unpet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   // At 300ms we shouldn't have hit the timeout yet:
-  time_system_.sleep(std::chrono::milliseconds(300));
-  gd.forceCheckForTest();
+  sleep(std::chrono::milliseconds(300));
+  guard_dog_->forceCheckForTest();
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
   // This should push it past the 500ms limit:
-  time_system_.sleep(std::chrono::milliseconds(250));
-  gd.forceCheckForTest();
+  sleep(std::chrono::milliseconds(250));
+  guard_dog_->forceCheckForTest();
   EXPECT_EQ(1UL, stats_store_.counter("server.watchdog_miss").value());
-  gd.stopWatching(unpet_dog);
+  guard_dog_->stopWatching(unpet_dog);
   unpet_dog = nullptr;
 }
 
 TEST_F(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  GuardDogImpl gd(stats_store_, config_mega_, *api_);
-  auto unpet_dog = gd.createWatchDog(api_->threadFactory().currentThreadId());
+  guard_dog_ = std::make_unique<GuardDogImpl>(stats_store_, config_mega_, *api_);
+  auto unpet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   // We'd better start at 0:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_mega_miss").value());
   // This shouldn't be enough to increment the stat:
-  time_system_.sleep(std::chrono::milliseconds(499));
-  gd.forceCheckForTest();
+  sleep(std::chrono::milliseconds(499));
+  guard_dog_->forceCheckForTest();
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_mega_miss").value());
   // Just 2ms more will make it greater than 500ms timeout:
-  time_system_.sleep(std::chrono::milliseconds(2));
-  gd.forceCheckForTest();
+  sleep(std::chrono::milliseconds(2));
+  guard_dog_->forceCheckForTest();
   EXPECT_EQ(1UL, stats_store_.counter("server.watchdog_mega_miss").value());
-  gd.stopWatching(unpet_dog);
+  guard_dog_->stopWatching(unpet_dog);
   unpet_dog = nullptr;
 }
 
@@ -185,71 +222,71 @@ TEST_F(GuardDogMissTest, MissCountTest) {
   // This tests a flake discovered in the MissTest where real timeout or
   // spurious condition_variable wakeup causes the counter to get incremented
   // more than it should be.
-  GuardDogImpl gd(stats_store_, config_miss_, *api_);
-  auto sometimes_pet_dog = gd.createWatchDog(api_->threadFactory().currentThreadId());
+  guard_dog_ = std::make_unique<GuardDogImpl>(stats_store_, config_miss_, *api_);
+  auto sometimes_pet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   // These steps are executed once without ever touching the watchdog.
   // Then the last step is to touch the watchdog and repeat the steps.
   // This verifies that the behavior is reset back to baseline after a touch.
   for (unsigned long i = 0; i < 2; i++) {
     EXPECT_EQ(i, stats_store_.counter("server.watchdog_miss").value());
     // This shouldn't be enough to increment the stat:
-    time_system_.sleep(std::chrono::milliseconds(499));
-    gd.forceCheckForTest();
+    sleep(std::chrono::milliseconds(499));
+    guard_dog_->forceCheckForTest();
     EXPECT_EQ(i, stats_store_.counter("server.watchdog_miss").value());
     // And if we force re-execution of the loop it still shouldn't be:
-    gd.forceCheckForTest();
+    guard_dog_->forceCheckForTest();
     EXPECT_EQ(i, stats_store_.counter("server.watchdog_miss").value());
     // Just 2ms more will make it greater than 500ms timeout:
-    time_system_.sleep(std::chrono::milliseconds(2));
-    gd.forceCheckForTest();
+    sleep(std::chrono::milliseconds(2));
+    guard_dog_->forceCheckForTest();
     EXPECT_EQ(i + 1, stats_store_.counter("server.watchdog_miss").value());
     // Spurious wakeup, we should still only have one miss counted.
-    gd.forceCheckForTest();
+    guard_dog_->forceCheckForTest();
     EXPECT_EQ(i + 1, stats_store_.counter("server.watchdog_miss").value());
     // When we finally touch the dog we should get one more increment once the
     // timeout value expires:
     sometimes_pet_dog->touch();
   }
-  time_system_.sleep(std::chrono::milliseconds(1000));
+  sleep(std::chrono::milliseconds(1000));
   sometimes_pet_dog->touch();
   // Make sure megamiss still works:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_mega_miss").value());
-  time_system_.sleep(std::chrono::milliseconds(1500));
-  gd.forceCheckForTest();
+  sleep(std::chrono::milliseconds(1500));
+  guard_dog_->forceCheckForTest();
   EXPECT_EQ(1UL, stats_store_.counter("server.watchdog_mega_miss").value());
 
-  gd.stopWatching(sometimes_pet_dog);
+  guard_dog_->stopWatching(sometimes_pet_dog);
   sometimes_pet_dog = nullptr;
 }
 
 TEST_F(GuardDogTestBase, StartStopTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(0, 0, 0, 0);
-  GuardDogImpl gd(stats, config, *api_);
+  guard_dog_ = std::make_unique<GuardDogImpl>(stats, config, *api_);
 }
 
 TEST_F(GuardDogTestBase, LoopIntervalNoKillTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(40, 50, 0, 0);
-  GuardDogImpl gd(stats, config, *api_);
-  EXPECT_EQ(gd.loopIntervalForTest(), 40);
+  guard_dog_ = std::make_unique<GuardDogImpl>(stats, config, *api_);
+  EXPECT_EQ(guard_dog_->loopIntervalForTest(), 40);
 }
 
 TEST_F(GuardDogTestBase, LoopIntervalTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
-  GuardDogImpl gd(stats, config, *api_);
-  EXPECT_EQ(gd.loopIntervalForTest(), 90);
+  guard_dog_ = std::make_unique<GuardDogImpl>(stats, config, *api_);
+  EXPECT_EQ(guard_dog_->loopIntervalForTest(), 90);
 }
 
 TEST_F(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
-  GuardDogImpl gd(stats, config, *api_);
-  auto watched_dog = gd.createWatchDog(api_->threadFactory().currentThreadId());
+  guard_dog_ = std::make_unique<GuardDogImpl>(stats, config, *api_);
+  auto watched_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   EXPECT_EQ(watched_dog->threadId().debugString(),
             api_->threadFactory().currentThreadId()->debugString());
-  gd.stopWatching(watched_dog);
+  guard_dog_->stopWatching(watched_dog);
 }
 
 // If this test fails it is because the std::chrono::steady_clock::duration type has become

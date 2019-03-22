@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "server/guarddog_impl.h"
 
 #include <chrono>
@@ -32,6 +34,10 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       }()),
       watchdog_miss_counter_(stats_scope.counter("server.watchdog_miss")),
       watchdog_megamiss_counter_(stats_scope.counter("server.watchdog_mega_miss")),
+      dispatcher_(api.allocateDispatcher()),
+      loop_timer_(dispatcher_->createTimer([this]() { this->step(); })),
+      exit_timer_(dispatcher_->createTimer([this]() { this->stopCallback(); })),
+      //wakeup_timer_(dispatcher_->createTimer([this]() { this->step(); })),
       run_thread_(true) {
   start(api);
 }
@@ -39,47 +45,71 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::threadRoutine() {
-  do {
-    const auto now = time_source_.monotonicTime();
-    bool seen_one_multi_timeout(false);
-    Thread::LockGuard guard(wd_lock_);
-    for (auto& watched_dog : watched_dogs_) {
-      const auto ltt = watched_dog.dog_->lastTouchTime();
-      const auto delta = now - ltt;
-      if (watched_dog.last_alert_time_ && watched_dog.last_alert_time_.value() < ltt) {
-        watched_dog.miss_alerted_ = false;
-        watched_dog.megamiss_alerted_ = false;
-      }
-      if (delta > miss_timeout_) {
-        if (!watched_dog.miss_alerted_) {
-          watchdog_miss_counter_.inc();
-          watched_dog.last_alert_time_ = ltt;
-          watched_dog.miss_alerted_ = true;
-        }
-      }
-      if (delta > megamiss_timeout_) {
-        if (!watched_dog.megamiss_alerted_) {
-          watchdog_megamiss_counter_.inc();
-          watched_dog.last_alert_time_ = ltt;
-          watched_dog.megamiss_alerted_ = true;
-        }
-      }
-      if (killEnabled() && delta > kill_timeout_) {
-        PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
-                          watched_dog.dog_->threadId().debugString()));
-      }
-      if (multikillEnabled() && delta > multi_kill_timeout_) {
-        if (seen_one_multi_timeout) {
-
-          PANIC(fmt::format(
-              "GuardDog: multiple threads ({},...) stuck for more than watchdog_multikill_timeout",
-              watched_dog.dog_->threadId().debugString()));
-        } else {
-          seen_one_multi_timeout = true;
-        }
+  while (true) {
+    {
+      Thread::LockGuard guard(exit_lock_);
+      if (!run_thread_) {
+        return;
       }
     }
-  } while (waitOrDetectStop());
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+}
+
+void GuardDogImpl::step() {
+  {
+    Thread::LockGuard guard(exit_lock_);
+    if (!run_thread_) {
+      return;
+    }
+  }
+
+  const auto now = time_source_.monotonicTime();
+
+  std::chrono::milliseconds now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      now - MonotonicTime());
+  std::cerr << "step() @ " << now_ms.count() << std::endl;
+
+  bool seen_one_multi_timeout(false);
+  Thread::LockGuard guard(wd_lock_);
+  for (auto& watched_dog : watched_dogs_) {
+    const auto ltt = watched_dog.dog_->lastTouchTime();
+    const auto delta = now - ltt;
+    if (watched_dog.last_alert_time_ && watched_dog.last_alert_time_.value() < ltt) {
+      watched_dog.miss_alerted_ = false;
+      watched_dog.megamiss_alerted_ = false;
+    }
+    if (delta > miss_timeout_) {
+      if (!watched_dog.miss_alerted_) {
+        watchdog_miss_counter_.inc();
+        watched_dog.last_alert_time_ = ltt;
+        watched_dog.miss_alerted_ = true;
+      }
+    }
+    if (delta > megamiss_timeout_) {
+      if (!watched_dog.megamiss_alerted_) {
+        watchdog_megamiss_counter_.inc();
+        watched_dog.last_alert_time_ = ltt;
+        watched_dog.megamiss_alerted_ = true;
+      }
+    }
+    if (killEnabled() && delta > kill_timeout_) {
+      PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
+                        watched_dog.dog_->threadId().debugString()));
+    }
+    if (multikillEnabled() && delta > multi_kill_timeout_) {
+      if (seen_one_multi_timeout) {
+
+        PANIC(fmt::format(
+            "GuardDog: multiple threads ({},...) stuck for more than watchdog_multikill_timeout",
+            watched_dog.dog_->threadId().debugString()));
+      } else {
+        seen_one_multi_timeout = true;
+      }
+    }
+  }
+
+  waitOrDetectStop();
 }
 
 WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadIdPtr&& thread_id) {
@@ -111,9 +141,16 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
   }
 }
 
-bool GuardDogImpl::waitOrDetectStop() {
-  force_checked_event_.notifyAll();
-  Thread::LockGuard guard(exit_lock_);
+void GuardDogImpl::waitOrDetectStop() {
+  {
+    Thread::LockGuard guard(exit_lock_);
+    force_checked_event_.notifyAll();
+    if (!run_thread_) {
+      return;
+    }
+  }
+  loop_timer_->enableTimer(loop_interval_);
+
   // Spurious wakeups are OK without explicit handling. We'll just check
   // earlier than strictly required for that round.
 
@@ -130,25 +167,37 @@ bool GuardDogImpl::waitOrDetectStop() {
   // advancement of time, and thus be more robust. Another variation would be
   // to run this watchdog on the main-thread dispatcher, though such an approach
   // could not detect when the main-thread was stuck.
-  exit_event_.waitFor(exit_lock_, loop_interval_); // NO_CHECK_FORMAT(real_time)
+  //exit_event_.waitFor(exit_lock_, loop_interval_); // NO_CHECK_FORMAT(real_time)
 
-  return run_thread_;
+  //return run_thread_;
 }
 
 void GuardDogImpl::start(Api::Api& api) {
-  run_thread_ = true;
   thread_ = api.threadFactory().createThread([this]() -> void { threadRoutine(); });
+  loop_timer_->enableTimer(std::chrono::milliseconds(0));
 }
 
 void GuardDogImpl::stop() {
   {
     Thread::LockGuard guard(exit_lock_);
     run_thread_ = false;
-    exit_event_.notifyAll();
   }
+
+  //loop_timer_->disableTimer();
+  exit_timer_->enableTimer(std::chrono::milliseconds(0));
   if (thread_) {
     thread_->join();
     thread_.reset();
+  }
+}
+
+void GuardDogImpl::stopCallback() {
+  loop_timer_->disableTimer();
+  dispatcher_->exit();
+  {
+    Thread::LockGuard guard(exit_lock_);
+    run_thread_ = false;
+    force_checked_event_.notifyAll();
   }
 }
 
