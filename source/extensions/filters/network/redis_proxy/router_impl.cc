@@ -22,11 +22,13 @@ PrefixRoutes::PrefixRoutes(
       to_lower_table_.toLowerCase(copy);
     }
 
-    auto success = prefix_lookup_table_.add(copy.c_str(), std::make_shared<Prefix>(Prefix{
-                                                              route.prefix(),
-                                                              route.remove_prefix(),
-                                                              upstreams_.at(route.cluster()),
-                                                          }), false);
+    auto success = prefix_lookup_table_.add(copy.c_str(),
+                                            std::make_shared<Prefix>(Prefix{
+                                                route.prefix(),
+                                                route.remove_prefix(),
+                                                upstreams_.at(route.cluster()),
+                                            }),
+                                            false);
     if (!success) {
       throw EnvoyException(fmt::format("prefix `{}` already exists.", route.prefix()));
     }

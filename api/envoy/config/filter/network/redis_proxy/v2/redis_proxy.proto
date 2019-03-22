@@ -106,8 +106,8 @@ message RedisProxy {
   // * 'get abc:users' would retrive the key 'abc:users' from cluster_b.
   // * 'get ab:users' would retrive the key 'ab:users' from cluster_a.
   // * 'get z:users' would return a NoUpstreamHost error. A :ref:`catch-all
-  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` would
-  //   have retrived the key from that cluster instead.
+  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>`
+  //   would have retrived the key from that cluster instead.
   //
   // See the :ref:`configuration section
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
