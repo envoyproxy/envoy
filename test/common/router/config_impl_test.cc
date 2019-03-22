@@ -3679,7 +3679,8 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
@@ -3710,7 +3711,8 @@ virtual_hosts:
   - match:
       prefix: "/api"
   )EOF";
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException);
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
