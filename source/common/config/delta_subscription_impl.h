@@ -129,8 +129,14 @@ public:
     // provide to the server upon stream reconnect: either it will continue to not exist, in which
     // case saying nothing is fine, or the server will bring back something new, which we should
     // receive regardless (which is the logic that not specifying a version will get you).
+    //
+    // So, leave the version map entry present but blank. It will be left out of
+    // initial_resource_versions messages, but will remind us to explicitly tell the server "I'm
+    // cancelling my subscription" when we lose interest.
     for (const auto& resource_name : removed_resources) {
-      eraseResourceVersion(resource_name);
+      if (resource_names_.find(resource_name) != resource_names_.end()) {
+        insertOrUpdateResourceVersion(resource_name, EmptyVersion);
+      }
     }
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
