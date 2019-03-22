@@ -1,7 +1,5 @@
 #pragma once
 
-#include <sstream>
-
 #include "envoy/common/exception.h"
 
 #include "extensions/filters/network/kafka/message.h"
@@ -14,7 +12,7 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Represents fields that are present in every Kafka request message
+ * Represents fields that are present in every Kafka request message.
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
 struct RequestHeader {
@@ -30,8 +28,8 @@ struct RequestHeader {
 };
 
 /**
- * Abstract Kafka request
- * Contains data present in every request (the header with request key, version, etc.)
+ * Abstract Kafka request.
+ * Contains data present in every request (the header with request key, version, etc.).
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
 class AbstractRequest : public Message {
@@ -39,35 +37,34 @@ public:
   AbstractRequest(const RequestHeader& request_header) : request_header_{request_header} {};
 
   /**
-   * Request's header
+   * Request's header.
    */
   const RequestHeader request_header_;
 };
 
 /**
- * Concrete request that carries data particular to given request type
- * (can be considered a container)
+ * Concrete request that carries data particular to given request type.
  */
 template <typename RequestData> class ConcreteRequest : public AbstractRequest {
 public:
   /**
-   * Request header fields need to be initialized by user in case of newly created requests
+   * Request header fields need to be initialized by user in case of newly created requests.
    */
   ConcreteRequest(const RequestHeader& request_header, const RequestData& data)
       : AbstractRequest{request_header}, data_{data} {};
 
   /**
-   * Encodes given request into a buffer, with any extra configuration carried by the context
+   * Encodes given request into a buffer, with any extra configuration carried by the context.
    */
   size_t encode(Buffer::Instance& dst) const override {
     EncodingContext context{request_header_.api_version_};
     size_t written{0};
-    // encode request header
+    // Encode request header.
     written += context.encode(request_header_.api_key_, dst);
     written += context.encode(request_header_.api_version_, dst);
     written += context.encode(request_header_.correlation_id_, dst);
     written += context.encode(request_header_.client_id_, dst);
-    // encode request-specific data
+    // Encode request-specific data.
     written += context.encode(data_, dst);
     return written;
   }
@@ -82,15 +79,16 @@ private:
 
 /**
  * Request that did not have api_key & api_version that could be matched with any of
- * request-specific parsers
+ * request-specific parsers.
+ * Right now it acts as a placeholder only, and does not carry the request data.
  */
 class UnknownRequest : public AbstractRequest {
 public:
   UnknownRequest(const RequestHeader& request_header) : AbstractRequest{request_header} {};
 
-  // this isn't the prettiest, as we have thrown away the data
-  // TODO(adamkotwasinski) discuss capturing the data as-is, and simply putting it back
-  // this would add ability to forward unknown types of requests in cluster-proxy
+  /**
+   * It is impossible to encode unknown request, as it is only a placeholder.
+   */
   size_t encode(Buffer::Instance&) const override {
     throw EnvoyException("cannot serialize unknown request");
   }

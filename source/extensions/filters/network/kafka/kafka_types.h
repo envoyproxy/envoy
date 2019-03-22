@@ -12,22 +12,22 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Nullable string used by Kafka
+ * Nullable string used by Kafka.
  */
 typedef absl::optional<std::string> NullableString;
 
 /**
- * Bytes array used by Kafka
+ * Bytes array used by Kafka.
  */
 typedef std::vector<unsigned char> Bytes;
 
 /**
- * Nullable bytes array used by Kafka
+ * Nullable bytes array used by Kafka.
  */
 typedef absl::optional<Bytes> NullableBytes;
 
 /**
- * Kafka array of elements of type T
+ * Kafka array of elements of type T.
  */
 template <typename T> using NullableArray = absl::optional<std::vector<T>>;
 

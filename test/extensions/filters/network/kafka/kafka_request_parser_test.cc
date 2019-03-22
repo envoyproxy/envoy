@@ -28,7 +28,7 @@ public:
 
 protected:
   Buffer::OwnedImpl buffer_;
-  EncodingContext encoder_{-1}; // api_version is not used for request header
+  EncodingContext encoder_{-1}; // Context's api_version is not used when serializing request header.
 };
 
 class MockRequestParserResolver : public RequestParserResolver {
@@ -108,11 +108,11 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNext
 TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDuringFeeding) {
   // given
 
-  // throws during feeding
+  // This deserializer throws during feeding.
   class ThrowingRequestHeaderDeserializer : public RequestHeaderDeserializer {
   public:
     size_t feed(absl::string_view& data) override {
-      // move some pointers to simulate data consumption
+      // Move some pointers to simulate data consumption.
       data = {data.data() + FAILED_DESERIALIZER_STEP, data.size() - FAILED_DESERIALIZER_STEP};
       throw EnvoyException("feed");
     };
@@ -126,7 +126,7 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDur
 
   const MockRequestParserResolver parser_resolver;
 
-  const int32_t request_size = 1024; // there are still 1024 bytes to read to complete the request
+  const int32_t request_size = 1024; // There are still 1024 bytes to read to complete the request.
   RequestContextSharedPtr request_context{new RequestContext{request_size, {}}};
   RequestHeaderParser testee{parser_resolver, request_context,
                              std::make_unique<ThrowingRequestHeaderDeserializer>()};
@@ -150,11 +150,12 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDur
 
 TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerExceptionsDuringFeeding) {
   // given
-  // throws during feeding
+
+  // This deserializer throws during feeding.
   class ThrowingDeserializer : public Deserializer<int32_t> {
   public:
     size_t feed(absl::string_view&) override {
-      // move some pointers to simulate data consumption
+      // Move some pointers to simulate data consumption.
       throw EnvoyException("feed");
     };
 
@@ -180,7 +181,7 @@ TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerExceptionsDuringFee
   ASSERT_EQ(caught, true);
 }
 
-// deserializer that consumes FAILED_DESERIALIZER_STEP bytes and returns 0
+// This deserializer consumes FAILED_DESERIALIZER_STEP bytes and returns 0
 class SomeBytesDeserializer : public Deserializer<int32_t> {
 public:
   size_t feed(absl::string_view& data) override {
@@ -195,7 +196,7 @@ public:
 
 TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerClaimingItsReadyButLeavingData) {
   // given
-  const int32_t request_size = 1024; // there are still 1024 bytes to read to complete the request
+  const int32_t request_size = 1024; // There are still 1024 bytes to read to complete the request.
   RequestContextSharedPtr request_context{new RequestContext{request_size, {}}};
 
   RequestParser<int32_t, SomeBytesDeserializer> testee{request_context};

@@ -15,7 +15,7 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Context that is shared between parsers that are handling the same single message
+ * Context that is shared between parsers that are handling the same single message.
  */
 struct RequestContext {
   int32_t remaining_request_size_{0};
@@ -25,16 +25,16 @@ struct RequestContext {
 typedef std::shared_ptr<RequestContext> RequestContextSharedPtr;
 
 /**
- * Configuration object
- * Resolves the parser that will be responsible for consuming the request-specific data
- * In other words: provides (api_key, api_version) -> Parser function
+ * Request decoder configuration object.
+ * Resolves the parser that will be responsible for consuming the request-specific data.
+ * In other words: provides (api_key, api_version) -> Parser function.
  */
 class RequestParserResolver {
 public:
   virtual ~RequestParserResolver() = default;
 
   /**
-   * Creates a parser that is going to process data specific for given api_key & api_version
+   * Creates a parser that is going to process data specific for given api_key & api_version.
    * @param api_key request type
    * @param api_version request version
    * @param context context to be used by parser
@@ -44,13 +44,13 @@ public:
                                        RequestContextSharedPtr context) const;
 
   /**
-   * Return default resolver, that uses request's api key and version to provide a matching parser
+   * Return default resolver, that uses request's api key and version to provide a matching parser.
    */
   static const RequestParserResolver& getDefaultInstance();
 };
 
 /**
- * Request parser responsible for consuming request length and setting up context with this data
+ * Request parser responsible for consuming request length and setting up context with this data.
  * @see http://kafka.apache.org/protocol.html#protocol_common
  */
 class RequestStartParser : public Parser {
@@ -59,7 +59,7 @@ public:
       : parser_resolver_{parser_resolver}, context_{std::make_shared<RequestContext>()} {};
 
   /**
-   * Consumes 4 bytes (INT32) as request length and updates the context with that value
+   * Consumes 4 bytes (INT32) as request length and updates the context with that value.
    * @return RequestHeaderParser instance to process request header
    */
   ParseResponse parse(absl::string_view& data) override;
@@ -73,8 +73,8 @@ private:
 };
 
 /**
- * Deserializer that extracts request header (4 fields)
- * Can throw, as one of the fields (client-id) can throw (nullable string with invalid length)
+ * Deserializer that extracts request header (4 fields).
+ * Can throw, as one of the fields (client-id) can throw (nullable string with invalid length).
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
 class RequestHeaderDeserializer
@@ -85,25 +85,26 @@ class RequestHeaderDeserializer
 typedef std::unique_ptr<RequestHeaderDeserializer> RequestHeaderDeserializerPtr;
 
 /**
- * Parser responsible for computing request header and updating the context with data resolved
- * On a successful parse uses resolved data (api_key & api_version) to determine next parser.
+ * Parser responsible for extracting the request header and putting it into context.
+ * On a successful parse the resolved data (api_key & api_version) is used to determine the next
+ * parser.
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
 class RequestHeaderParser : public Parser {
 public:
-  // default constructor
+  // Default constructor.
   RequestHeaderParser(const RequestParserResolver& parser_resolver, RequestContextSharedPtr context)
       : RequestHeaderParser{parser_resolver, context,
                             std::make_unique<RequestHeaderDeserializer>()} {};
 
-  // visible for testing
+  // Constructor visible for testing (allows for initial parser injection).
   RequestHeaderParser(const RequestParserResolver& parser_resolver, RequestContextSharedPtr context,
                       RequestHeaderDeserializerPtr deserializer)
       : parser_resolver_{parser_resolver}, context_{context}, deserializer_{
                                                                   std::move(deserializer)} {};
 
   /**
-   * Uses data provided to compute request header
+   * Uses data provided to compute request header.
    * @return Parser instance responsible for processing rest of the message
    */
   ParseResponse parse(absl::string_view& data) override;
@@ -119,14 +120,14 @@ private:
 /**
  * Sentinel parser that is responsible for consuming message bytes for messages that had unsupported
  * api_key & api_version. It does not attempt to capture any data, just throws it away until end of
- * message
+ * message.
  */
 class SentinelParser : public Parser {
 public:
   SentinelParser(RequestContextSharedPtr context) : context_{context} {};
 
   /**
-   * Returns UnknownRequest
+   * Returns UnknownRequest. Ignores (jumps over) the data provided.
    */
   ParseResponse parse(absl::string_view& data) override;
 
@@ -137,9 +138,9 @@ private:
 };
 
 /**
- * Request parser uses a single deserializer to construct a request object
+ * Request parser uses a single deserializer to construct a request object.
  * This parser is responsible for consuming request-specific data (e.g. topic names) and always
- * returns a parsed message
+ * returns a parsed message.
  * @param RequestType request class
  * @param DeserializerType deserializer type corresponding to request class (should be subclass of
  * Deserializer<RequestType>)
@@ -147,27 +148,27 @@ private:
 template <typename RequestType, typename DeserializerType> class RequestParser : public Parser {
 public:
   /**
-   * Create a parser with given context
+   * Create a parser with given context.
    * @param context parse context containing request header
    */
   RequestParser(RequestContextSharedPtr context) : context_{context} {};
 
   /**
-   * Consume enough data to fill in deserializer and receive the parsed request
-   * Fill in request's header with data stored in context
+   * Consume enough data to fill in deserializer and receive the parsed request.
+   * Fill in request's header with data stored in context.
    */
   ParseResponse parse(absl::string_view& data) override {
     context_->remaining_request_size_ -= deserializer.feed(data);
 
     if (deserializer.ready()) {
       if (0 == context_->remaining_request_size_) {
-        // after a successful parse, there should be nothing left - we have consumed all the bytes
+        // After a successful parse, there should be nothing left - we have consumed all the bytes.
         MessageSharedPtr msg = std::make_shared<ConcreteRequest<RequestType>>(
             context_->request_header_, deserializer.get());
         return ParseResponse::parsedMessage(msg);
       } else {
-        // the message makes no sense, the deserializer that matches the schema consumed all
-        // necessary data, but there's still unconsumed bytes
+        // The message makes no sense, the deserializer that matches the schema consumed all
+        // necessary data, but there are still bytes in this message.
         return ParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
       }
     } else {

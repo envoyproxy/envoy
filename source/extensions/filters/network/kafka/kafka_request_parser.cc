@@ -25,8 +25,8 @@ ParseResponse RequestHeaderParser::parse(absl::string_view& data) {
   try {
     context_->remaining_request_size_ -= deserializer_->feed(data);
   } catch (const EnvoyException& e) {
-    // unable to compute request header, but we still need to consume rest of request (some of the
-    // data might have been consumed)
+    // We were unable to compute the request header, but we still need to consume rest of request
+    // (some of the data might have been consumed during this attempt).
     const int32_t consumed = static_cast<int32_t>(orig_data.size() - data.size());
     context_->remaining_request_size_ -= consumed;
     context_->request_header_ = {-1, -1, -1, absl::nullopt};

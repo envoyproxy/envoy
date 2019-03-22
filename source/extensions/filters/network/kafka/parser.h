@@ -18,9 +18,7 @@ class ParseResponse;
 
 /**
  * Parser is responsible for consuming data relevant to some part of a message, and then returning
- * the decision how the parsing should continue impl note: better name could be Consumer, but really
- * don't want to use that word considering that it's so prevalent in Kafka world; suggestions
- * welcome
+ * the decision how the parsing should continue.
  */
 class Parser : public Logger::Loggable<Logger::Id::kafka> {
 public:
@@ -28,7 +26,7 @@ public:
 
   /**
    * Submit data to be processed by parser, will consume as much data as it is necessary to reach
-   * the conclusion what should be the next parse step
+   * the conclusion what should be the next parse step.
    * @param data bytes to be processed, will be updated by parser if any have been consumed
    * @return parse status - decision what should be done with current parser (keep/replace)
    */
@@ -39,32 +37,32 @@ typedef std::shared_ptr<Parser> ParserSharedPtr;
 
 /**
  * Three-state holder representing one of:
- * - parser still needs data (`stillWaiting`)
+ * - parser still needs data (`stillWaiting`),
  * - parser is finished, and following parser should be used to process the rest of data
- * (`nextParser`)
- * - parser is finished, and fully-parsed message is attached (`parsedMessage`)
+ * (`nextParser`),
+ * - parser is finished, and fully-parsed message is attached (`parsedMessage`).
  */
 class ParseResponse {
 public:
   /**
-   * Constructs a response that states that parser still needs data and should not be replaced
+   * Constructs a response that states that parser still needs data and should not be replaced.
    */
   static ParseResponse stillWaiting() { return {nullptr, nullptr}; }
 
   /**
    * Constructs a response that states that parser is finished and should be replaced by given
-   * parser
+   * parser.
    */
   static ParseResponse nextParser(ParserSharedPtr next_parser) { return {next_parser, nullptr}; };
 
   /**
    * Constructs a response that states that parser is finished, the message is ready, and parsing
-   * can start anew for next message
+   * can start anew for next message.
    */
   static ParseResponse parsedMessage(MessageSharedPtr message) { return {nullptr, message}; };
 
   /**
-   * If response contains a next parser or the fully parsed message
+   * If response contains a next parser or the fully parsed message.
    */
   bool hasData() const { return (next_parser_ != nullptr) || (message_ != nullptr); }
 

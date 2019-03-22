@@ -1,9 +1,13 @@
 {#
-	Template for 'request_codec_request_integration_test.cc'
+  Template for 'request_codec_request_integration_test.cc'.
 
-	Provides integration tests using Kafka codec
-	The only thing happening in these tests is creation of messages, passing them to codec,
-	and verifying that received parsed values are the same as data send
+  Provides integration tests using Kafka codec.
+  The tests do the following:
+  - create the message,
+  - serialize the message into buffer,
+  - pass the buffer to the codec,
+  - capture messages received in callback,
+  - verify that captured messages are identical to the ones sent.
 #}
 #include "extensions/filters/network/kafka/request_codec.h"
 #include "extensions/filters/network/kafka/requests.h"
@@ -19,78 +23,78 @@ namespace Kafka {
 
 class RequestCodecIntegrationTest : public testing::Test {
 protected:
-	template <typename T> void putInBuffer(T arg);
+  template <typename T> void putInBuffer(T arg);
 
-	Buffer::OwnedImpl buffer_;
+  Buffer::OwnedImpl buffer_;
 };
 
 class CapturingRequestCallback : public RequestCallback {
 public:
-	virtual void onMessage(MessageSharedPtr request) override;
+  virtual void onMessage(MessageSharedPtr request) override;
 
-	const std::vector<MessageSharedPtr>& getCaptured() const;
+  const std::vector<MessageSharedPtr>& getCaptured() const;
 
 private:
-	std::vector<MessageSharedPtr> captured_;
+  std::vector<MessageSharedPtr> captured_;
 };
 
 typedef std::shared_ptr<CapturingRequestCallback> CapturingRequestCallbackSharedPtr;
 
 void CapturingRequestCallback::onMessage(MessageSharedPtr message) {
-	captured_.push_back(message);
+  captured_.push_back(message);
 }
 
 const std::vector<MessageSharedPtr>& CapturingRequestCallback::getCaptured() const {
-	return captured_;
+  return captured_;
 }
 
 {% for request_type in request_types %}
 
-// integration test for {{ request_type.name }} messages
+// Integration test for {{ request_type.name }} messages.
 
 TEST_F(RequestCodecIntegrationTest, shouldHandle{{ request_type.name }}Messages) {
-	// given
-	using Request = ConcreteRequest<{{ request_type.name }}>;
+  // given
+  using Request = ConcreteRequest<{{ request_type.name }}>;
 
-	std::vector<Request> sent;
-	int32_t correlation_id = 0;
+  std::vector<Request> sent;
+  int32_t correlation_id = 0;
 
-	{% for field_list in request_type.compute_field_lists() %}
-	for (int i = 0; i < 100; ++i ) {
-		const RequestHeader header = { {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, correlation_id++, "client-id" };
-		const {{ request_type.name }} data = { {{ field_list.example_value() }} };
-		const Request request = {header, data};
-		putInBuffer(request);
-		sent.push_back(request);
-	}
-	{% endfor %}
+  {% for field_list in request_type.compute_field_lists() %}
+  for (int i = 0; i < 100; ++i ) {
+    const RequestHeader header =
+      { {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, correlation_id++, "client-id" };
+    const {{ request_type.name }} data = { {{ field_list.example_value() }} };
+    const Request request = {header, data};
+    putInBuffer(request);
+    sent.push_back(request);
+  }
+  {% endfor %}
 
-	const InitialParserFactory& initial_parser_factory = InitialParserFactory::getDefaultInstance();
-	const RequestParserResolver& request_parser_resolver = RequestParserResolver::getDefaultInstance();
-	const CapturingRequestCallbackSharedPtr request_callback = std::make_shared<CapturingRequestCallback>();
+  const InitialParserFactory& initial_parser_factory = InitialParserFactory::getDefaultInstance();
+  const RequestParserResolver& request_parser_resolver = RequestParserResolver::getDefaultInstance();
+  const CapturingRequestCallbackSharedPtr request_callback = std::make_shared<CapturingRequestCallback>();
 
-	RequestDecoder testee{initial_parser_factory, request_parser_resolver, {request_callback}};
+  RequestDecoder testee{initial_parser_factory, request_parser_resolver, {request_callback}};
 
-	// when
-	testee.onData(buffer_);
+  // when
+  testee.onData(buffer_);
 
-	// then
-	const std::vector<MessageSharedPtr>& received = request_callback->getCaptured();
-	ASSERT_EQ(received.size(), sent.size());
+  // then
+  const std::vector<MessageSharedPtr>& received = request_callback->getCaptured();
+  ASSERT_EQ(received.size(), sent.size());
 
-	for (size_t i = 0; i < received.size(); ++i) {
-		const std::shared_ptr<Request> request = std::dynamic_pointer_cast<Request>(received[i]);
-		ASSERT_NE(request, nullptr);
-		ASSERT_EQ(*request, sent[i]);
-	}
+  for (size_t i = 0; i < received.size(); ++i) {
+    const std::shared_ptr<Request> request = std::dynamic_pointer_cast<Request>(received[i]);
+    ASSERT_NE(request, nullptr);
+    ASSERT_EQ(*request, sent[i]);
+  }
 }
 {% endfor %}
 
-// misc utilities
 template <typename T>
 void RequestCodecIntegrationTest::putInBuffer(const T arg) {
-	MessageEncoderImpl serializer{buffer_};
-	serializer.encode(arg);
+  MessageEncoderImpl serializer{buffer_};
+  serializer.encode(arg);
 }
 
 } // namespace Kafka

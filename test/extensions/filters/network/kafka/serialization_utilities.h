@@ -24,7 +24,7 @@ void assertStringViewIncrement(absl::string_view incremented, absl::string_view 
   ASSERT_EQ(incremented.size(), original.size() - difference);
 }
 
-// helper function
+// Helper function converting buffer to raw bytes.
 const char* getRawData(const Buffer::OwnedImpl& buffer) {
   uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
@@ -32,13 +32,13 @@ const char* getRawData(const Buffer::OwnedImpl& buffer) {
   return reinterpret_cast<const char*>((slices[0]).mem_);
 }
 
-// exactly what is says on the tin:
-// 1. serialize expected using Encoder
-// 2. deserialize byte array using testee deserializer
-// 3. verify result = expected
-// 4. verify that data pointer moved correct amount
-// 5. feed testee more data
-// 6. verify that nothing more was consumed
+// Exactly what is says on the tin:
+// 1. serialize expected using Encoder,
+// 2. deserialize byte array using testee deserializer,
+// 3. verify that testee is ready, and its result is equal to expected,
+// 4. verify that data pointer moved correct amount,
+// 5. feed testee more data,
+// 6. verify that nothing more was consumed (because the testee has been ready since step 3).
 template <typename BT, typename AT>
 void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
   // given
@@ -48,7 +48,7 @@ void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
   EncodingContext encoder{-1};
   const size_t written = encoder.encode(expected, buffer);
 
-  // tell parser that there is more data, it should never consume more than written
+  // Tell parser that there is more data, it should never consume more than written.
   const absl::string_view orig_data = {getRawData(buffer), 10 * written};
   absl::string_view data = orig_data;
 
@@ -69,9 +69,9 @@ void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
   assertStringViewIncrement(data, orig_data, consumed);
 }
 
-// does the same thing as the above test,
-// but instead of providing whole data at one, it provides it in N one-byte chunks
-// this verifies if deserializer keeps state properly (no overwrites etc.)
+// Does the same thing as the above test, but instead of providing whole data at one, it provides
+// it in N one-byte chunks.
+// This verifies if deserializer keeps state properly (no overwrites etc.).
 template <typename BT, typename AT>
 void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   // given
@@ -87,7 +87,7 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   absl::string_view data = orig_data;
   size_t consumed = 0;
   for (size_t i = 0; i < written; ++i) {
-    data = {data.data(), 1}; // consume data byte-by-byte
+    data = {data.data(), 1}; // Consume data byte-by-byte.
     size_t step = testee.feed(data);
     consumed += step;
     ASSERT_EQ(step, 1);
@@ -110,7 +110,7 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   ASSERT_EQ(more_data.size(), 1024);
 }
 
-// wrapper to run both tests
+// Wrapper to run both tests.
 template <typename BT, typename AT> void serializeThenDeserializeAndCheckEquality(AT expected) {
   serializeThenDeserializeAndCheckEqualityInOneGo<BT>(expected);
   serializeThenDeserializeAndCheckEqualityWithChunks<BT>(expected);

@@ -48,8 +48,8 @@ genrule(
     srcs = [],
     outs = ["serialization_composite_test.cc"],
     cmd = """
-        ./$(location //source/extensions/filters/network/kafka:serialization_composite_generator) generate-test \
-        $(location serialization_composite_test.cc)
+        ./$(location //source/extensions/filters/network/kafka:serialization_composite_generator) \
+        generate-test $(location serialization_composite_test.cc)
     """,
     tools = [
         "//source/extensions/filters/network/kafka:serialization_composite_generator",

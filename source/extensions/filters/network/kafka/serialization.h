@@ -22,11 +22,11 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Deserializer is a stateful entity that constructs a result of type T from bytes provided
- * It can be feed()-ed data until it is ready, filling the internal store
- * When ready(), it is safe to call get() to transform the internally stored bytes into result
+ * Deserializer is a stateful entity that constructs a result of type T from bytes provided.
+ * It can be feed()-ed data until it is ready, filling the internal store.
+ * When ready(), it is safe to call get() to transform the internally stored bytes into result.
  * Further feed()-ing should have no effect on a buffer (should return 0 and not move
- * buffer/remaining)
+ * provided pointer).
  * @param T type of deserialized data
  */
 template <typename T> class Deserializer {
@@ -36,29 +36,27 @@ public:
   /**
    * Submit data to be processed, will consume as much data as it is necessary.
    * If any bytes are consumed, then the provided string view is updated by stepping over consumed
-   * bytes.
-   * Invoking this method when deserializer is ready has no effect (consumes 0 bytes)
-   *
+   * bytes. Invoking this method when deserializer is ready has no effect (consumes 0 bytes).
    * @param data bytes to be processed, will be updated if any have been consumed
    * @return number of bytes consumed (equal to change in 'data')
    */
   virtual size_t feed(absl::string_view& data) PURE;
 
   /**
-   * Whether deserializer has consumed enough data to return result
+   * Whether deserializer has consumed enough data to return result.
    */
   virtual bool ready() const PURE;
 
   /**
-   * Returns the entity that is represented by bytes stored in this deserializer
-   * Should be only called when deserializer is ready
+   * Returns the entity that is represented by bytes stored in this deserializer.
+   * Should be only called when deserializer is ready.
    */
   virtual T get() const PURE;
 };
 
 /**
- * Generic integer deserializer (uses array of sizeof(T) bytes)
- * After all bytes are filled in, the value is converted from network byte-order and returned
+ * Generic integer deserializer (uses array of sizeof(T) bytes).
+ * After all bytes are filled in, the value is converted from network byte-order and returned.
  */
 template <typename T> class IntDeserializer : public Deserializer<T> {
 public:
@@ -87,7 +85,7 @@ protected:
 };
 
 /**
- * Integer deserializer for int8_t
+ * Integer deserializer for int8_t.
  */
 class Int8Deserializer : public IntDeserializer<int8_t> {
 public:
@@ -99,7 +97,7 @@ public:
 };
 
 /**
- * Integer deserializer for int16_t
+ * Integer deserializer for int16_t.
  */
 class Int16Deserializer : public IntDeserializer<int16_t> {
 public:
@@ -111,7 +109,7 @@ public:
 };
 
 /**
- * Integer deserializer for int32_t
+ * Integer deserializer for int32_t.
  */
 class Int32Deserializer : public IntDeserializer<int32_t> {
 public:
@@ -123,7 +121,7 @@ public:
 };
 
 /**
- * Integer deserializer for uint32_t
+ * Integer deserializer for uint32_t.
  */
 class UInt32Deserializer : public IntDeserializer<uint32_t> {
 public:
@@ -135,7 +133,7 @@ public:
 };
 
 /**
- * Integer deserializer for uint64_t
+ * Integer deserializer for uint64_t.
  */
 class Int64Deserializer : public IntDeserializer<int64_t> {
 public:
@@ -148,13 +146,10 @@ public:
 
 /**
  * Deserializer for boolean values
- * Uses a single int8 deserializers, and just checks != 0
- * impl note: could have been a subclass of IntDeserializer<int8_t> with a different get function,
- * but it makes it harder to understand
- *
- * Boolean value is stored in a byte.
- * Values 0 and 1 are used to represent false and true respectively.
+ * Uses a single int8 deserializer, and checks whether the results equals 0.
  * When reading a boolean value, any non-zero value is considered true.
+ * Impl note: could have been a subclass of IntDeserializer<int8_t> with a different get function,
+ * but it makes it harder to understand.
  */
 class BooleanDeserializer : public Deserializer<bool> {
 public:
@@ -171,8 +166,8 @@ private:
 };
 
 /**
- * Deserializer of string value
- * First reads length (INT16) and then allocates the buffer of given length
+ * Deserializer of string value.
+ * First reads length (INT16) and then allocates the buffer of given length.
  *
  * From documentation:
  * First the length N is given as an INT16.
@@ -182,12 +177,12 @@ private:
 class StringDeserializer : public Deserializer<std::string> {
 public:
   /**
-   * Can throw EnvoyException if given string length is not valid
+   * Can throw EnvoyException if given string length is not valid.
    */
   size_t feed(absl::string_view& data) override {
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
-      // break early: we still need to fill in length buffer
+      // Break early: we still need to fill in length buffer.
       return length_consumed;
     }
 
@@ -230,10 +225,10 @@ private:
 };
 
 /**
- * Deserializer of nullable string value
- * First reads length (INT16) and then allocates the buffer of given length
+ * Deserializer of nullable string value.
+ * First reads length (INT16) and then allocates the buffer of given length.
  * If length was -1, buffer allocation is omitted and deserializer is immediately ready (returning
- * null value)
+ * null value).
  *
  * From documentation:
  * For non-null strings, first the length N is given as an INT16.
@@ -243,12 +238,12 @@ private:
 class NullableStringDeserializer : public Deserializer<NullableString> {
 public:
   /**
-   * Can throw EnvoyException if given string length is not valid
+   * Can throw EnvoyException if given string length is not valid.
    */
   size_t feed(absl::string_view& data) override {
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
-      // break early: we still need to fill in length buffer
+      // Break early: we still need to fill in length buffer.
       return length_consumed;
     }
 
@@ -306,8 +301,8 @@ private:
 };
 
 /**
- * Deserializer of bytes value
- * First reads length (INT32) and then allocates the buffer of given length
+ * Deserializer of bytes value.
+ * First reads length (INT32) and then allocates the buffer of given length.
  *
  * From documentation:
  * First the length N is given as an INT32. Then N bytes follow.
@@ -315,12 +310,12 @@ private:
 class BytesDeserializer : public Deserializer<Bytes> {
 public:
   /**
-   * Can throw EnvoyException if given bytes length is not valid
+   * Can throw EnvoyException if given bytes length is not valid.
    */
   size_t feed(absl::string_view& data) override {
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
-      // break early: we still need to fill in length buffer
+      // Break early: we still need to fill in length buffer.
       return length_consumed;
     }
 
@@ -362,10 +357,10 @@ private:
 };
 
 /**
- * Deserializer of nullable bytes value
- * First reads length (INT32) and then allocates the buffer of given length
+ * Deserializer of nullable bytes value.
+ * First reads length (INT32) and then allocates the buffer of given length.
  * If length was -1, buffer allocation is omitted and deserializer is immediately ready (returning
- * null value)
+ * null value).
  *
  * From documentation:
  * For non-null values, first the length N is given as an INT32. Then N bytes follow.
@@ -374,12 +369,12 @@ private:
 class NullableBytesDeserializer : public Deserializer<NullableBytes> {
 public:
   /**
-   * Can throw EnvoyException if given bytes length is not valid
+   * Can throw EnvoyException if given bytes length is not valid.
    */
   size_t feed(absl::string_view& data) override {
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
-      // break early: we still need to fill in length buffer
+      // Break early: we still need to fill in length buffer.
       return length_consumed;
     }
 
@@ -439,11 +434,11 @@ private:
 };
 
 /**
- * Deserializer for array of objects of the same type
+ * Deserializer for array of objects of the same type.
  *
  * First reads the length of the array, then initializes N underlying deserializers of type
- * DeserializerType After the last of N deserializers is ready, the results of each of them are
- * gathered and put in a vector
+ * DeserializerType. After the last of N deserializers is ready, the results of each of them are
+ * gathered and put in a vector.
  * @param ResponseType result type returned by deserializer of type DeserializerType
  * @param DeserializerType underlying deserializer type
  *
@@ -456,13 +451,13 @@ template <typename ResponseType, typename DeserializerType>
 class ArrayDeserializer : public Deserializer<std::vector<ResponseType>> {
 public:
   /**
-   * Can throw EnvoyException if array length is invalid or if DeserializerType can throw
+   * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
    */
   size_t feed(absl::string_view& data) override {
 
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
-      // break early: we still need to fill in length buffer
+      // Break early: we still need to fill in length buffer.
       return length_consumed;
     }
 
@@ -516,11 +511,11 @@ private:
 };
 
 /**
- * Deserializer for nullable array of objects of the same type
+ * Deserializer for nullable array of objects of the same type.
  *
  * First reads the length of the array, then initializes N underlying deserializers of type
- * DeserializerType After the last of N deserializers is ready, the results of each of them are
- * gathered and put in a vector
+ * DeserializerType. After the last of N deserializers is ready, the results of each of them are
+ * gathered and put in a vector.
  * @param ResponseType result type returned by deserializer of type DeserializerType
  * @param DeserializerType underlying deserializer type
  *
@@ -533,13 +528,13 @@ template <typename ResponseType, typename DeserializerType>
 class NullableArrayDeserializer : public Deserializer<NullableArray<ResponseType>> {
 public:
   /**
-   * Can throw EnvoyException if array length is invalid or if DeserializerType can throw
+   * Can throw EnvoyException if array length is invalid or if underlying deserializer can throw.
    */
   size_t feed(absl::string_view& data) override {
 
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
-      // break early: we still need to fill in length buffer
+      // Break early: we still need to fill in length buffer.
       return length_consumed;
     }
 
@@ -605,34 +600,33 @@ private:
 };
 
 /**
- * Encodes provided argument in Kafka format
- * In case of primitive types, this is done explicitly as per spec
- * In case of composite types, this is done by calling 'encode' on provided argument
+ * Encodes provided argument in Kafka format.
+ * In case of primitive types, this is done explicitly as per specification.
+ * In case of composite types, this is done by calling 'encode' on provided argument.
  *
  * This object also carries extra information that is used while traversing the request
  * structure-tree during encoding (currently api_version, as different request versions serialize
- * differently)
+ * differently).
  */
-// TODO(adamkotwasinski) that class might be split into Request/ResponseEncodingContext
-// in future, but leaving it as it is now
+// TODO(adamkotwasinski) that class might be split into Request/ResponseEncodingContext in future
 class EncodingContext {
 public:
   EncodingContext(int16_t api_version) : api_version_{api_version} {};
 
   /**
-   * Encode given reference in a buffer
+   * Encode given reference in a buffer.
    * @return bytes written
    */
   template <typename T> size_t encode(const T& arg, Buffer::Instance& dst);
 
   /**
-   * Encode given array in a buffer
+   * Encode given array in a buffer.
    * @return bytes written
    */
   template <typename T> size_t encode(const std::vector<T>& arg, Buffer::Instance& dst);
 
   /**
-   * Encode given nullable array in a buffer
+   * Encode given nullable array in a buffer.
    * @return bytes written
    */
   template <typename T> size_t encode(const NullableArray<T>& arg, Buffer::Instance& dst);
@@ -645,15 +639,15 @@ private:
 
 /**
  * For non-primitive types, call `encode` on them, to delegate the serialization to the entity
- * itself
+ * itself.
  */
 template <typename T> inline size_t EncodingContext::encode(const T& arg, Buffer::Instance& dst) {
   return arg.encode(dst, *this);
 }
 
 /**
- * Template overload for int8_t
- * Encode a single byte
+ * Template overload for int8_t.
+ * Encode a single byte.
  */
 template <> inline size_t EncodingContext::encode(const int8_t& arg, Buffer::Instance& dst) {
   dst.add(&arg, sizeof(int8_t));
@@ -661,8 +655,8 @@ template <> inline size_t EncodingContext::encode(const int8_t& arg, Buffer::Ins
 }
 
 /**
- * Template overload for int16_t, int32_t, uint32_t, int64_t
- * Encode a N-byte integer, converting to network byte-order
+ * Template overload for int16_t, int32_t, uint32_t, int64_t.
+ * Encode a N-byte integer, converting to network byte-order.
  */
 #define ENCODE_NUMERIC_TYPE(TYPE, CONVERTER)                                                       \
   template <> inline size_t EncodingContext::encode(const TYPE& arg, Buffer::Instance& dst) {      \
@@ -677,8 +671,8 @@ ENCODE_NUMERIC_TYPE(uint32_t, htobe32);
 ENCODE_NUMERIC_TYPE(int64_t, htobe64);
 
 /**
- * Template overload for bool
- * Encode boolean as a single byte
+ * Template overload for bool.
+ * Encode boolean as a single byte.
  */
 template <> inline size_t EncodingContext::encode(const bool& arg, Buffer::Instance& dst) {
   int8_t val = arg;
@@ -687,8 +681,8 @@ template <> inline size_t EncodingContext::encode(const bool& arg, Buffer::Insta
 }
 
 /**
- * Template overload for std::string
- * Encode string as INT16 length + N bytes
+ * Template overload for std::string.
+ * Encode string as INT16 length + N bytes.
  */
 template <> inline size_t EncodingContext::encode(const std::string& arg, Buffer::Instance& dst) {
   int16_t string_length = arg.length();
@@ -698,8 +692,8 @@ template <> inline size_t EncodingContext::encode(const std::string& arg, Buffer
 }
 
 /**
- * Template overload for NullableString
- * Encode nullable string as INT16 length + N bytes (length = -1 for null)
+ * Template overload for NullableString.
+ * Encode nullable string as INT16 length + N bytes (length = -1 for null).
  */
 template <>
 inline size_t EncodingContext::encode(const NullableString& arg, Buffer::Instance& dst) {
@@ -712,8 +706,8 @@ inline size_t EncodingContext::encode(const NullableString& arg, Buffer::Instanc
 }
 
 /**
- * Template overload for Bytes
- * Encode byte array as INT32 length + N bytes
+ * Template overload for Bytes.
+ * Encode byte array as INT32 length + N bytes.
  */
 template <> inline size_t EncodingContext::encode(const Bytes& arg, Buffer::Instance& dst) {
   const int32_t data_length = arg.size();
@@ -723,8 +717,8 @@ template <> inline size_t EncodingContext::encode(const Bytes& arg, Buffer::Inst
 }
 
 /**
- * Template overload for NullableBytes
- * Encode nullable byte array as INT32 length + N bytes (length = -1 for null)
+ * Template overload for NullableBytes.
+ * Encode nullable byte array as INT32 length + N bytes (length = -1 for null value).
  */
 template <> inline size_t EncodingContext::encode(const NullableBytes& arg, Buffer::Instance& dst) {
   if (arg.has_value()) {
@@ -736,8 +730,8 @@ template <> inline size_t EncodingContext::encode(const NullableBytes& arg, Buff
 }
 
 /**
- * Encode nullable object array to T as INT32 length + N elements
- * Each element of type T then serializes itself on its own
+ * Encode nullable object array to T as INT32 length + N elements.
+ * Each element of type T then serializes itself on its own.
  */
 template <typename T>
 size_t EncodingContext::encode(const std::vector<T>& arg, Buffer::Instance& dst) {
@@ -746,8 +740,8 @@ size_t EncodingContext::encode(const std::vector<T>& arg, Buffer::Instance& dst)
 }
 
 /**
- * Encode nullable object array to T as INT32 length + N elements (length = -1 for null)
- * Each element of type T then serializes itself on its own
+ * Encode nullable object array to T as INT32 length + N elements (length = -1 for null value).
+ * Each element of type T then serializes itself on its own.
  */
 template <typename T>
 size_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& dst) {
@@ -756,8 +750,8 @@ size_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& ds
     const size_t header_length = encode(len, dst);
     size_t written{0};
     for (const T& el : *arg) {
-      // for each of array elements, resolve the correct method again
-      // elements could be primitives or complex types, so calling encode() on object won't work
+      // For each of array elements, resolve the correct method again.
+      // Elements could be primitives or complex types, so calling encode() on object won't work.
       written += encode(el, dst);
     }
     return header_length + written;

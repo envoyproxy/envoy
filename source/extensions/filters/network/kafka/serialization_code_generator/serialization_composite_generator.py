@@ -5,25 +5,25 @@ def main():
   """
   Serialization composite generator script
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  Generates main&test source code files for composite deserializers
-  The files are generated, as they are extremely repetitive (composite deserializer for 0..9 sub-deserializers)
+  Generates main&test source code files for composite deserializers.
+  The files are generated, as they are extremely repetitive (composite deserializer for 0..9 sub-deserializers).
 
   Usage:
-  serialization_composite_generator.py COMMAND LOCATION_OF_OUTPUT_FILE
+    serialization_composite_generator.py COMMAND LOCATION_OF_OUTPUT_FILE
   where:
-  COMMAND : 'generate-source', to generate source files
-            'generate-test', to generate test files
+  COMMAND : 'generate-source', to generate source files,
+            'generate-test', to generate test files.
   LOCATION_OF_OUTPUT_FILE : if generate-source: location of 'serialization_composite.h',
-                            if generate-test: location of 'serialization_composite_test.cc'
+                            if generate-test: location of 'serialization_composite_test.cc'.
 
   When generating source code, it creates:
-    - serialization_composite.h - header with declarations of CompositeDeserializerWith???Delegates classes
+    - serialization_composite.h - header with declarations of CompositeDeserializerWith???Delegates classes.
   When generating test code, it creates:
-    - serialization_composite_test.cc - tests for these classes
+    - serialization_composite_test.cc - tests for these classes.
 
   Templates used are:
-  - to create 'serialization_composite.h': serialization_composite_h.j2
-  - to create 'serialization_composite_test.cc': serialization_composite_test_cc.j2
+  - to create 'serialization_composite.h': serialization_composite_h.j2,
+  - to create 'serialization_composite_test.cc': serialization_composite_test_cc.j2.
   """
 
   import sys
@@ -40,17 +40,17 @@ def main():
   import re
   import json
 
-  # number of fields deserialized by each deserializer
+  # Number of fields deserialized by each deserializer class.
   field_counts = range(1, 10)
 
-  # main source code
+  # Generate main source code.
   if 'generate-source' == command:
     template = RenderingHelper.get_template('serialization_composite_h.j2')
     contents = template.render(counts=field_counts)
     with open(serialization_composite_h_file, 'w') as fd:
       fd.write(contents)
 
-  # test code
+  # Generate test code.
   if 'generate-test' == command:
     template = RenderingHelper.get_template('serialization_composite_test_cc.j2')
     contents = template.render(counts=field_counts)
@@ -60,7 +60,7 @@ def main():
 
 class RenderingHelper:
   """
-  Helper for jinja templates
+  Helper for jinja templates.
   """
 
   @staticmethod

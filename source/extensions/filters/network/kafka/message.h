@@ -12,14 +12,14 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Abstract message (that can be either request or response)
+ * Abstract message (that can be either request or response).
  */
 class Message {
 public:
   virtual ~Message() = default;
 
   /**
-   * Encode the contents of this message into a given buffer
+   * Encode the contents of this message into a given buffer.
    * @param dst buffer instance to keep serialized message
    */
   virtual size_t encode(Buffer::Instance& dst) const PURE;

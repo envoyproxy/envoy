@@ -1,6 +1,6 @@
 {#
-	Template for request serialization/deserialization tests
-	For every request, we want to check if it can be serialized and deserialized properly
+  Template for request serialization/deserialization tests.
+  For every request, we want to check if it can be serialized and deserialized properly.
 #}
 
 #include "extensions/filters/network/kafka/requests.h"
@@ -29,9 +29,9 @@ public:
 };
 
 /**
- * Helper method
- * Takes an instance of a request, serializes it, then deserializes it
- * This method gets executed for every request * version pair
+ * Helper method.
+ * Takes an instance of a request, serializes it, then deserializes it.
+ * This method gets executed for every request * version pair.
  */
 template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeserialize(T request) {
   MessageEncoderImpl serializer{buffer_};
@@ -49,14 +49,15 @@ template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeseria
 };
 
 {#
-	Concrete tests for each request_type and version (field_list)
-	Each request is naively constructed using some default values (put "string" as std::string, 32 as uint32_t, etc.)
+  Concrete tests for each request_type and version (field_list).
+  Each request is naively constructed using some default values (put "string" as std::string, 32 as uint32_t, etc.).
 #}
 {% for request_type in request_types %}{% for field_list in request_type.compute_field_lists() %}
 TEST_F(RequestDecoderTest, shouldParse{{ request_type.name }}V{{ field_list.version }}) {
   // given
   {{ request_type.name }} data = { {{ field_list.example_value() }} };
-  ConcreteRequest<{{ request_type.name }}> request = { { {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, 0, absl::nullopt }, data };
+  ConcreteRequest<{{ request_type.name }}> request = { {
+    {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, 0, absl::nullopt }, data };
 
   // when
   auto received = serializeAndDeserialize(request);

@@ -14,14 +14,14 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Callback invoked when request is successfully decoded
+ * Callback invoked when request is successfully decoded.
  */
 class RequestCallback {
 public:
   virtual ~RequestCallback() = default;
 
   /**
-   * Callback method invoked when request is successfully decoded
+   * Callback method invoked when request is successfully decoded.
    * @param request request that has been decoded
    */
   virtual void onMessage(MessageSharedPtr request) PURE;

@@ -11,7 +11,6 @@ namespace NetworkFilters {
 namespace Kafka {
 
 class RequestStartParserFactory : public InitialParserFactory {
-
   ParserSharedPtr create(const RequestParserResolver& parser_resolver) const override {
     return std::make_shared<RequestStartParser>(parser_resolver);
   }
@@ -21,8 +20,8 @@ const InitialParserFactory& InitialParserFactory::getDefaultInstance() {
   CONSTRUCT_ON_FIRST_USE(RequestStartParserFactory);
 }
 
-// convert buffer to slices and pass them to `doParse`
 void RequestDecoder::onData(Buffer::Instance& data) {
+  // Convert buffer to slices and pass them to `doParse`.
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
   data.getRawSlices(slices.begin(), num_slices);
@@ -33,13 +32,14 @@ void RequestDecoder::onData(Buffer::Instance& data) {
 
 /**
  * Main parse loop:
- * - forward data to current parser
+ * - forward data to current parser,
  * - receive parser response:
- * -- if still waiting, do nothing
- * -- if next parser, replace current parser, and keep feeding, if still have data
- * -- if parser message:
- * --- notify callbacks
- * --- replace current parser with new start parser, as we are going to parse another request
+ * -- if still waiting, do nothing (we wait for more data),
+ * -- if a parser is given, replace current parser with the new one, and it the rest of the data
+ * -- if a message is given:
+ * --- notify callbacks,
+ * --- replace current parser with new start parser, as we are going to start parsing the next
+ *     message.
  */
 void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
   const char* bytes = reinterpret_cast<const char*>(slice.mem_);
@@ -47,27 +47,27 @@ void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
 
   while (!data.empty()) {
 
-    // feed the data to the parser
+    // Feed the data to the parser.
     ParseResponse result = current_parser_->parse(data);
-    // this loop guarantees that parsers consuming 0 bytes also get processed in this invocation
+    // This loop guarantees that parsers consuming 0 bytes also get processed in this invocation.
     while (result.hasData()) {
       if (!result.next_parser_) {
 
-        // next parser is not present, so we have finished parsing a message
+        // Next parser is not present, so we have finished parsing a message.
         MessageSharedPtr message = result.message_;
         for (auto& callback : callbacks_) {
           callback->onMessage(result.message_);
         }
 
-        // as we finished parsing this request, re-initialize the parser
+        // As we finished parsing this request, re-initialize the parser.
         current_parser_ = factory_.create(parser_resolver_);
       } else {
 
-        // the next parser that's supposed to consume the rest of payload was given
+        // The next parser that's supposed to consume the rest of payload was given.
         current_parser_ = result.next_parser_;
       }
 
-      // keep parsing the data
+      // Keep parsing the data.
       result = current_parser_->parse(data);
     }
   }
@@ -75,13 +75,13 @@ void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
 
 void MessageEncoderImpl::encode(const Message& message) {
   Buffer::OwnedImpl data_buffer;
-  // TODO(adamkotwasinski) precompute the size instead of using temporary
-  // also, when we have 'computeSize' method, then we can push encoding request's size into
+  // TODO(adamkotwasinski) Precompute the size instead of using temporary buffer.
+  // When we have the 'computeSize' method, then we can push encoding request's size into
   // Request::encode
-  int32_t data_len = message.encode(data_buffer); // encode data computing data length
+  int32_t data_len = message.encode(data_buffer); // Encode data and compute data length.
   EncodingContext encoder{-1};
-  encoder.encode(data_len, output_); // encode data length into result
-  output_.add(data_buffer);          // copy data into result
+  encoder.encode(data_len, output_); // Encode data length into result.
+  output_.add(data_buffer);          // Copy encoded data into result.
 }
 
 } // namespace Kafka

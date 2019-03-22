@@ -72,7 +72,8 @@ TEST_F(RequestDecoderTest, shouldDoNothingIfParserNeverReturnsMessage) {
   // when
   testee.onData(buffer_);
 
-  // then - request_callback is not interacted with
+  // then
+  // There were no interactions with `request_callback`.
 }
 
 TEST_F(RequestDecoderTest, shouldUseNewParserAsResponse) {
@@ -93,7 +94,8 @@ TEST_F(RequestDecoderTest, shouldUseNewParserAsResponse) {
   // when
   testee.onData(buffer_);
 
-  // then - request_callback is not interacted with
+  // then
+  // There were no interactions with `request_callback`.
 }
 
 TEST_F(RequestDecoderTest, shouldReturnParsedMessageAndReinitialize) {
@@ -118,7 +120,8 @@ TEST_F(RequestDecoderTest, shouldReturnParsedMessageAndReinitialize) {
   // when
   testee.onData(buffer_);
 
-  // then - request_callback got notified only once
+  // then
+  // There was only one message sent to `request_callback`.
 }
 
 TEST_F(RequestDecoderTest, shouldInvokeParsersEvenIfTheyDoNotConsumeZeroBytes) {
@@ -150,10 +153,12 @@ TEST_F(RequestDecoderTest, shouldInvokeParsersEvenIfTheyDoNotConsumeZeroBytes) {
   // when
   testee.onData(buffer_);
 
-  // then - parser3 was given only empty data (size 0)
+  // then
+  // There was only one message sent to `request_callback`.
+  // After that, `parser3` was created and passed remaining data (that should have been empty).
 }
 
-// misc utilities
+// Helper function.
 template <typename T> void RequestDecoderTest::putInBuffer(T arg) {
   MessageEncoderImpl serializer{buffer_};
   serializer.encode(arg);

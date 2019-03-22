@@ -11,28 +11,28 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Kafka message decoder
+ * Kafka message decoder.
  */
 class MessageDecoder {
 public:
   virtual ~MessageDecoder() = default;
 
   /**
-   * Processes given buffer attempting to decode messages contained within
+   * Processes given buffer attempting to decode messages contained within.
    * @param data buffer instance
    */
   virtual void onData(Buffer::Instance& data) PURE;
 };
 
 /**
- * Kafka message encoder
+ * Kafka message encoder.
  */
 class MessageEncoder {
 public:
   virtual ~MessageEncoder() = default;
 
   /**
-   * Encodes given message
+   * Encodes given message.
    * @param message message to be encoded
    */
   virtual void encode(const Message& message) PURE;

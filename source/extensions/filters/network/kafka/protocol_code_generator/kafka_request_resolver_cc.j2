@@ -1,6 +1,6 @@
 {#
-	Template for 'kafka_request_resolver.cc'
-	Defines default Kafka request resolver, that uses request parsers in (also generated) 'requests.h'
+  Template for 'kafka_request_resolver.cc'.
+  Defines default Kafka request resolver, that uses request parsers in (also generated) 'requests.h'.
 #}
 #include "extensions/filters/network/kafka/requests.h"
 #include "extensions/filters/network/kafka/kafka_request_parser.h"
@@ -12,8 +12,9 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Creates a parser that corresponds to provided key and version
- * If corresponding parser cannot be found (what means a newer version of Kafka protocol), a sentinel parser is returned
+ * Creates a parser that corresponds to provided key and version.
+ * If corresponding parser cannot be found (what means a newer version of Kafka protocol), a sentinel parser is
+ * returned.
  * @param api_key Kafka request key
  * @param api_version Kafka request's version
  * @param context parse context
