@@ -26,7 +26,8 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
 
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1,
-      ClusterCircuitBreakersStats{ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store))});
+      ClusterCircuitBreakersStats{
+          ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))});
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -59,6 +60,52 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   EXPECT_FALSE(resource_manager.retries().canCreate());
 }
 
+TEST(ResourceManagerImplTest, RemainingResourceGauges) {
+  NiceMock<Runtime::MockLoader> runtime;
+  Stats::IsolatedStoreImpl store;
+
+  auto stats = ClusterCircuitBreakersStats{
+      ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))};
+  ResourceManagerImpl resource_manager(
+      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, stats);
+
+  // Test remaining_cx_ gauge
+  EXPECT_EQ(1U, resource_manager.connections().max());
+  EXPECT_EQ(1U, stats.remaining_cx_.value());
+  resource_manager.connections().inc();
+  EXPECT_EQ(0U, stats.remaining_cx_.value());
+  resource_manager.connections().dec();
+  EXPECT_EQ(1U, stats.remaining_cx_.value());
+
+  // Test remaining_pending_ gauge
+  EXPECT_EQ(2U, resource_manager.pendingRequests().max());
+  EXPECT_EQ(2U, stats.remaining_pending_.value());
+  resource_manager.pendingRequests().inc();
+  EXPECT_EQ(1U, stats.remaining_pending_.value());
+  resource_manager.pendingRequests().inc();
+  EXPECT_EQ(0U, stats.remaining_pending_.value());
+  resource_manager.pendingRequests().dec();
+  EXPECT_EQ(1U, stats.remaining_pending_.value());
+  resource_manager.pendingRequests().dec();
+  EXPECT_EQ(2U, stats.remaining_pending_.value());
+
+  // Test remaining_rq_ gauge
+  EXPECT_EQ(1U, resource_manager.requests().max());
+  EXPECT_EQ(1U, stats.remaining_rq_.value());
+  resource_manager.requests().inc();
+  EXPECT_EQ(0U, stats.remaining_rq_.value());
+  resource_manager.requests().dec();
+  EXPECT_EQ(1U, stats.remaining_rq_.value());
+
+  // Test remaining_retries_ gauge. Confirm that the value will not be negative
+  // despite having more retries than the configured max
+  EXPECT_EQ(0U, resource_manager.retries().max());
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
+  resource_manager.retries().inc();
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
+  resource_manager.retries().dec();
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -34,7 +34,6 @@
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/types/optional.h"
@@ -148,7 +147,7 @@ public:
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-               Thread::ThreadFactory& thread_factory);
+               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
 
   ~InstanceImpl() override;
 
@@ -200,7 +199,7 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory);
+                  ComponentFactory& component_factory, TestHooks& hooks);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();

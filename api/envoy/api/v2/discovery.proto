@@ -199,6 +199,10 @@ message Resource {
   // The resource's name, to distinguish it from others of the same type of resource.
   string name = 3;
 
+  // [#not-implemented-hide:]
+  // The aliases are a list of other names that this resource can go by.
+  repeated string aliases = 4;
+
   // The resource level version. It allows xDS to track the state of individual
   // resources.
   string version = 1;

@@ -23,6 +23,7 @@
 
 #include "common/http/context_impl.h"
 #include "common/secret/secret_manager_impl.h"
+#include "common/stats/fake_symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -209,6 +210,7 @@ public:
   MOCK_METHOD0(statsAllocator, Stats::StatDataAllocator&());
 
 private:
+  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::HeapStatDataAllocator stats_allocator_;
@@ -457,14 +459,13 @@ public:
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
-  Stats::IsolatedStoreImpl scope_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
-  Tracing::HttpNullTracer null_tracer_;
   Http::ContextImpl http_context_;
   testing::NiceMock<Api::MockApi> api_;
 };

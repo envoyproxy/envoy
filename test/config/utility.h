@@ -86,6 +86,13 @@ public:
   // a string for a squash filter which can be used with addFilter()
   static const std::string DEFAULT_SQUASH_FILTER;
 
+  // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
+  // api_type should be REST, GRPC, or DELTA_GRPC.
+  static std::string discoveredClustersBootstrap(const std::string& api_type);
+  // Builds a standard Cluster config fragment, with a single endpoint (at loopback:port).
+  static envoy::api::v2::Cluster buildCluster(const std::string& name, int port,
+                                              const std::string& ip_version);
+
   // Run the final config modifiers, and then set the upstream ports based on upstream connections.
   // This is the last operation run on |bootstrap_| before it is handed to Envoy.
   // Ports are assigned by looping through clusters, hosts, and addresses in the

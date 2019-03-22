@@ -15,6 +15,7 @@
 #endif
 
 #include "test/mocks/filesystem/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
@@ -41,6 +42,7 @@ public:
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {
