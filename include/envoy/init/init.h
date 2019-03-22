@@ -10,7 +10,8 @@ namespace Envoy {
 namespace Init {
 
 /**
- * A single initialization target.
+ * A single initialization target. Deprecated, use SafeInit::Target instead.
+ * TODO(mergeconflict): convert all Init::Target implementations to SafeInit::TargetImpl.
  */
 class Target {
 public:
@@ -25,7 +26,8 @@ public:
 };
 
 /**
- * A manager that initializes multiple targets.
+ * A manager that initializes multiple targets. Deprecated, use SafeInit::Manager instead.
+ * TODO(mergeconflict): convert all Init::Manager uses to SafeInit::Manager.
  */
 class Manager {
 public:
