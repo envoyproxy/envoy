@@ -7,7 +7,6 @@
 // porting layer for QUICHE.
 
 #include "quiche/quic/platform/api/quic_export.h"
-#include "quiche/quic/platform/api/quic_string.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
 
 namespace quic {
@@ -28,7 +27,7 @@ public:
   //  (3) Remove the trailing '.'.
   // WARNING: May mutate |hostname| in place.
   // NOTE(wub): Only (2) and (3) are implemented for now.
-  static QuicString NormalizeHostname(QuicStringPiece hostname);
+  static std::string NormalizeHostname(QuicStringPiece hostname);
 
 private:
   QuicHostnameUtilsImpl() = delete;
