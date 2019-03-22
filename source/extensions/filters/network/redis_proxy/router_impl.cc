@@ -26,7 +26,7 @@ PrefixRoutes::PrefixRoutes(
                                                               route.prefix(),
                                                               route.remove_prefix(),
                                                               upstreams_.at(route.cluster()),
-                                                          }));
+                                                          }), false);
     if (!success) {
       throw EnvoyException(fmt::format("prefix `{}` already exists.", route.prefix()));
     }

@@ -568,9 +568,10 @@ template <class Value> struct TrieLookupTable {
    * Adds an entry to the Trie at the given Key.
    * @param key the key used to add the entry.
    * @param value the value to be associated with the key.
+   * @param overwrite_existing will overwrite the value when the value for a given key already exists.
    * @return false when a value already exists for the given key.
    */
-  bool add(const char* key, Value value) {
+  bool add(const char* key, Value value, bool overwrite_existing = true) {
     TrieEntry<Value>* current = &root_;
     while (uint8_t c = *key) {
       if (!current->entries_[c]) {
@@ -579,7 +580,7 @@ template <class Value> struct TrieLookupTable {
       current = current->entries_[c].get();
       key++;
     }
-    if (current->value_) {
+    if (current->value_ && !overwrite_existing) {
       return false;
     }
     current->value_ = value;
