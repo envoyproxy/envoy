@@ -17,8 +17,6 @@ const int32_t FAILED_DESERIALIZER_STEP = 13;
 
 class BufferBasedTest : public testing::Test {
 public:
-  Buffer::OwnedImpl& buffer() { return buffer_; }
-
   const char* getBytes() {
     uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);
     STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
@@ -26,9 +24,18 @@ public:
     return reinterpret_cast<const char*>((slices[0]).mem_);
   }
 
+  template <typename T> size_t putIntoBuffer(const T arg) {
+    EncodingContext encoder_{-1}; // Context's api_version is not used when serializing primitives.
+    return encoder_.encode(arg, buffer_);
+  }
+
+  absl::string_view putGarbageIntoBuffer(size_t size = 10000) {
+    putIntoBuffer(Bytes(size));
+    return {getBytes(), size};
+  }
+
 protected:
   Buffer::OwnedImpl buffer_;
-  EncodingContext encoder_{-1}; // Context's api_version is not used when serializing request header.
 };
 
 class MockRequestParserResolver : public RequestParserResolver {
@@ -43,7 +50,7 @@ TEST_F(BufferBasedTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
   RequestStartParser testee{resolver};
 
   int32_t request_len = 1234;
-  encoder_.encode(request_len, buffer());
+  putIntoBuffer(request_len);
 
   const absl::string_view orig_data = {getBytes(), 1024};
   absl::string_view data = orig_data;
@@ -82,12 +89,12 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNext
   const int32_t correlation_id{10};
   const NullableString client_id{"aaa"};
   size_t header_len = 0;
-  header_len += encoder_.encode(api_key, buffer());
-  header_len += encoder_.encode(api_version, buffer());
-  header_len += encoder_.encode(correlation_id, buffer());
-  header_len += encoder_.encode(client_id, buffer());
+  header_len += putIntoBuffer(api_key);
+  header_len += putIntoBuffer(api_version);
+  header_len += putIntoBuffer(correlation_id);
+  header_len += putIntoBuffer(client_id);
 
-  const absl::string_view orig_data = {getBytes(), 100000};
+  const absl::string_view orig_data = putGarbageIntoBuffer();
   absl::string_view data = orig_data;
 
   // when
@@ -131,7 +138,7 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDur
   RequestHeaderParser testee{parser_resolver, request_context,
                              std::make_unique<ThrowingRequestHeaderDeserializer>()};
 
-  const absl::string_view orig_data = {getBytes(), 100000};
+  const absl::string_view orig_data = putGarbageIntoBuffer();
   absl::string_view data = orig_data;
 
   // when
@@ -167,7 +174,7 @@ TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerExceptionsDuringFee
   RequestContextSharedPtr request_context{new RequestContext{1024, {}}};
   RequestParser<int32_t, ThrowingDeserializer> testee{request_context};
 
-  absl::string_view data = {getBytes(), 100000};
+  absl::string_view data = putGarbageIntoBuffer();
 
   // when
   bool caught = false;
@@ -201,7 +208,7 @@ TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerClaimingItsReadyBut
 
   RequestParser<int32_t, SomeBytesDeserializer> testee{request_context};
 
-  const absl::string_view orig_data = {getBytes(), 100000};
+  const absl::string_view orig_data = putGarbageIntoBuffer();
   absl::string_view data = orig_data;
 
   // when
@@ -225,10 +232,7 @@ TEST_F(BufferBasedTest, SentinelParserShouldConsumeDataUntilEndOfRequest) {
   context->remaining_request_size_ = request_len;
   SentinelParser testee{context};
 
-  const Bytes garbage(request_len * 2);
-  encoder_.encode(garbage, buffer());
-
-  const absl::string_view orig_data = {getBytes(), request_len * 2};
+  const absl::string_view orig_data = putGarbageIntoBuffer(request_len * 2);
   absl::string_view data = orig_data;
 
   // when

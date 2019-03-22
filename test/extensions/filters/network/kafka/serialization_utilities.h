@@ -47,9 +47,11 @@ void serializeThenDeserializeAndCheckEqualityInOneGo(AT expected) {
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
   const size_t written = encoder.encode(expected, buffer);
+  // Insert garbage after serialized payload.
+  const size_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
   // Tell parser that there is more data, it should never consume more than written.
-  const absl::string_view orig_data = {getRawData(buffer), 10 * written};
+  const absl::string_view orig_data = {getRawData(buffer), written + garbage_size};
   absl::string_view data = orig_data;
 
   // when
@@ -80,8 +82,10 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   Buffer::OwnedImpl buffer;
   EncodingContext encoder{-1};
   const size_t written = encoder.encode(expected, buffer);
+  // Insert garbage after serialized payload.
+  const size_t garbage_size = encoder.encode(Bytes(10000), buffer);
 
-  const absl::string_view orig_data = {getRawData(buffer), written};
+  const absl::string_view orig_data = {getRawData(buffer), written + garbage_size};
 
   // when
   absl::string_view data = orig_data;
@@ -98,16 +102,17 @@ void serializeThenDeserializeAndCheckEqualityWithChunks(AT expected) {
   ASSERT_EQ(consumed, written);
   ASSERT_EQ(testee.ready(), true);
   ASSERT_EQ(testee.get(), expected);
-  assertStringViewIncrement(data, orig_data, consumed);
+
+  ASSERT_EQ(data.data(), orig_data.data() + consumed);
 
   // when - 2
-  absl::string_view more_data = {data.data(), 1024};
+  absl::string_view more_data = {data.data(), garbage_size};
   const size_t consumed2 = testee.feed(more_data);
 
   // then - 2 (nothing changes)
   ASSERT_EQ(consumed2, 0);
-  ASSERT_EQ(more_data.data(), orig_data.data() + consumed);
-  ASSERT_EQ(more_data.size(), 1024);
+  ASSERT_EQ(more_data.data(), data.data());
+  ASSERT_EQ(more_data.size(), garbage_size);
 }
 
 // Wrapper to run both tests.
