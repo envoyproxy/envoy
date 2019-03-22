@@ -33,16 +33,9 @@ TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(
-      {
-        try {
-          RedisProxyFilterConfigFactory().createFilterFactoryFromProto(config, context);
-        } catch (const EnvoyException& ex) {
-          EXPECT_STREQ("cannot configure a redis-proxy without any upstream", ex.what());
-          throw;
-        }
-      },
-      EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(config, context),
+      EnvoyException, "cannot configure a redis-proxy without any upstream");
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectJson) {

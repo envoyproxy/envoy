@@ -8,6 +8,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::Eq;
@@ -188,16 +189,9 @@ TEST(PrefixRoutesTest, DuplicatePrefix) {
     route->set_cluster("this_will_throw");
   }
 
-  EXPECT_THROW(
-      {
-        try {
-          PrefixRoutes router(prefix_routes, std::move(upstreams));
-        } catch (const EnvoyException& ex) {
-          EXPECT_STREQ("prefix `ab` already exists.", ex.what());
-          throw;
-        }
-      },
-      EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+    PrefixRoutes router(prefix_routes, std::move(upstreams)),
+    EnvoyException, "prefix `ab` already exists.")
 }
 
 } // namespace RedisProxy

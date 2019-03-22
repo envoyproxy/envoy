@@ -610,7 +610,7 @@ template <class Value> struct TrieLookupTable {
    * @param key the key used to find.
    * @return the value matching the longest prefix based on the key.
    */
-  Value findPrefix(const char* key) const {
+  Value findLongestPrefix(const char* key) const {
     const TrieEntry<Value>* current = &root_;
     const TrieEntry<Value>* result = nullptr;
     while (uint8_t c = *key) {

@@ -41,13 +41,12 @@ PrefixRoutes::makeRequest(const std::string& key, const Common::Redis::RespValue
   if (case_insensitive_) {
     std::string copy(key);
     to_lower_table_.toLowerCase(copy);
-    value = prefix_lookup_table_.findPrefix(copy.c_str());
+    value = prefix_lookup_table_.findLongestPrefix(copy.c_str());
   } else {
-    value = prefix_lookup_table_.findPrefix(key.c_str());
+    value = prefix_lookup_table_.findLongestPrefix(key.c_str());
   }
 
   if (value != nullptr) {
-    // TODO: remove_prefix
     absl::string_view view(key);
     if (value->remove_prefix) {
       view.remove_prefix(value->prefix.length());

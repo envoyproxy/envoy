@@ -26,7 +26,7 @@ message RedisProxy {
   // .. attention::
   //
   //   This field is deprecated. Use a :ref:`catch-all
-  //   route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>`
+  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>`
   //   instead.
   string cluster = 2 [deprecated = true];
 
@@ -71,7 +71,7 @@ message RedisProxy {
       bool remove_prefix = 2;
 
       // Upstream cluster to forward the command to.
-      string cluster = 3;
+      string cluster = 3 [(validate.rules).string.min_bytes = 1];
     }
 
     // List of prefix routes.
@@ -87,7 +87,7 @@ message RedisProxy {
 
   // List of **unique** prefixes used to separate keys from different workloads to different
   // clusters. Envoy will always favor the longest match first in case of overlap. A catch-all
-  // cluster can be used to forward commands to when there is no match. Time complexity of the
+  // cluster can be used to forward commands when there is no match. Time complexity of the
   // lookups are in O(min(longest key prefix, key length)).
   //
   // Example:
@@ -100,11 +100,14 @@ message RedisProxy {
   //          cluster: "cluster_a"
   //        - prefix: "abc"
   //          cluster: "cluster_b"
-  //        # next 2 lines will break uniqueness constraint
-  //        # - prefix: "abc"
-  //        #   cluster: "cluster_c"
-  //        - prefix: "a"
-  //          cluster: "cluster_d"
+  //
+  // When using the above routes, the following prefixes would be sent to:
+  //
+  // * 'get abc:users' would retrive the key 'abc:users' from cluster_b.
+  // * 'get ab:users' would retrive the key 'ab:users' from cluster_a.
+  // * 'get z:users' would return a NoUpstreamHost error. A :ref:`catch-all
+  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>` would
+  //   have retrived the key from that cluster instead.
   //
   // See the :ref:`configuration section
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on

@@ -43,13 +43,9 @@ private:
   typedef std::shared_ptr<Prefix> PrefixPtr;
 
   TrieLookupTable<PrefixPtr> prefix_lookup_table_;
-
   const ToLowerTable to_lower_table_;
-
   const bool case_insensitive_;
-
   Upstreams upstreams_;
-
   absl::optional<ConnPool::InstanceSharedPtr> catch_all_upstream_;
 };
 
