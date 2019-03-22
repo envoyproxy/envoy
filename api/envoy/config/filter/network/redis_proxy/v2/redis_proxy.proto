@@ -100,7 +100,7 @@ message RedisProxy {
   //          cluster: "cluster_a"
   //        - prefix: "abc"
   //          cluster: "cluster_b"
-  //        # uniqueness constraint is not respected if the next 2 lines are uncommented.
+  //        # next 2 lines will break uniqueness constraint
   //        # - prefix: "abc"
   //        #   cluster: "cluster_c"
   //        - prefix: "a"
