@@ -1252,6 +1252,13 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
+  std::shared_ptr<MockStreamEncoderFilter> filter(new NiceMock<MockStreamEncoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamEncoderFilter(filter);
+      }));
+
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* idle_timer = setUpTimer();
     EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
@@ -1265,27 +1272,27 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
     idle_timer->callback_();
   }));
 
-  setupFilterChain(0, 1);
+  // This should not be called as we don't have request headers.
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).Times(0);
 
-  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _));
-  EXPECT_CALL(*encoder_filters_[0], encodeData(_, _));
-  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
-  EXPECT_CALL(*encoder_filters_[0], onDestroy());
+  EXPECT_CALL(*filter, encodeHeaders(_, _))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        // Under heavy load it is possible that stream timeout will be reached before any headers
+        // were received. Envoy will create a local reply that will go through the encoder filter
+        // chain. We want to make sure that encoder filters get a null route object.
+        auto route = filter->callbacks_->route();
+        EXPECT_EQ(route.get(), nullptr);
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*filter, encodeData(_, _));
+  EXPECT_CALL(*filter, encodeComplete());
+  EXPECT_CALL(*filter, onDestroy());
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, _));
   EXPECT_CALL(response_encoder_, encodeData(_, _));
 
   Buffer::OwnedImpl fake_input;
   conn_manager_->onData(fake_input, false);
-
-  // This should not be called as we don't have request headers.
-  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).Times(0);
-
-  // Under heavy load it is possible that stream timeout will be reached before any headers were
-  // received. Envoy will create a local reply that will go through the encoder filter chain. We
-  // want to make sure that encoder filters get a null route object.
-  auto route = encoder_filters_[0]->callbacks_->route();
-  EXPECT_EQ(route.get(), nullptr);
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
