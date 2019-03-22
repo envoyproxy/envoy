@@ -360,13 +360,13 @@ TEST(QuicPlatformTest, QuicDLog) {
 TEST(QuicPlatformTest, QuicCHECK) {
   CHECK(1 == 1);
   CHECK(1 == 1) << " 1 == 1 is forever true.";
+
   EXPECT_DEBUG_DEATH({ DCHECK(false) << " Supposed to fail in debug mode."; },
                      "CHECK failed:.* Supposed to fail in debug mode.");
-
   EXPECT_DEBUG_DEATH({ DCHECK(false); }, "CHECK failed");
+
   EXPECT_DEATH({ CHECK(false) << " Supposed to fail in all modes."; },
                "CHECK failed:.* Supposed to fail in all modes.");
-
   EXPECT_DEATH({ CHECK(false); }, "CHECK failed");
 }
 
