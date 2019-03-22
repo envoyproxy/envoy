@@ -254,6 +254,7 @@ private:
       uint64_t drains_remaining_{};
     };
 
+
     // Holds an unowned reference to a connection, and watches for Closed events. If the connection
     // is closed, this container removes itself from the container that owns it.
     struct TcpConnContainer : public Network::ConnectionCallbacks, public Event::DeferredDeletable {

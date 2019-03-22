@@ -39,12 +39,6 @@ public:
   void clear();
 
   /**
-   * Destroys all mapped pools using the Deferred Delete mechanism. Resource counts are updated
-   * immediately.
-   */
-  void deferredClear();
-
-  /**
    * Adds a drain callback to all mapped pools. Any future mapped pools with have the callback
    * automatically added. Be careful with the callback. If it itself calls into `this`, modifying
    * the state of `this`, there is a good chance it will cause corruption due to the callback firing

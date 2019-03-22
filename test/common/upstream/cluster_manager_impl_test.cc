@@ -1688,6 +1688,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // drain callbacks, etc.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+
+  // At this point, the last two HTTP pools are cleaned up. Note that eventually the last two
+  // TCP pools will also be once they are migrated to the connection pool map infrastructure.:w
+  Mock::VerifyAndClearExpectations(&factory_.tls_.dispatcher_);
+  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(2);
   factory_.tls_.shutdownThread();
 }
 
@@ -1914,6 +1919,11 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   // drain callbacks, etc.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
+
+  // At this point, the last two HTTP pools are cleaned up. Note that eventually the remaing
+  // TCP pools will also be once they are migrated to the connection pool map infrastructure.:w
+  Mock::VerifyAndClearExpectations(&factory_.tls_.dispatcher_);
+  EXPECT_CALL(factory_.tls_.dispatcher_, deferredDelete_(_)).Times(2);
   factory_.tls_.shutdownThread();
 }
 

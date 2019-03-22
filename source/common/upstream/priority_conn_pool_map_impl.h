@@ -44,13 +44,6 @@ void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::clear() {
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::deferredClear() {
-  for (auto& pool_map : conn_pool_maps_) {
-    pool_map->deferredClear();
-  }
-}
-
-template <typename KEY_TYPE, typename POOL_TYPE>
 void PriorityConnPoolMap<KEY_TYPE, POOL_TYPE>::addDrainedCallback(const DrainedCb& cb) {
   for (auto& pool_map : conn_pool_maps_) {
     pool_map->addDrainedCallback(cb);

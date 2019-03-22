@@ -44,12 +44,6 @@ public:
   void clear();
 
   /**
-   * Destroys all mapped pools using the Deferred Delete mechanism. Resource counts are updated
-   * immediately.
-   */
-  void deferredClear();
-
-  /**
    * Adds a drain callback to all mapped pools. Any future mapped pools with have the callback
    * automatically added. Be careful with the callback. If it itself calls into `this`, modifying
    * the state of `this`, there is a good chance it will cause corruption due to the callback firing
@@ -68,12 +62,6 @@ private:
    * @return false if no pool was freed.
    */
   bool freeOnePool();
-
-  /**
-   * Main clear and related resource counting logic. Should be invoked with `recursion_checker_`
-   * held.
-   */
-  void unprotectedClear();
 
   absl::flat_hash_map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;
   Event::Dispatcher& thread_local_dispatcher_;

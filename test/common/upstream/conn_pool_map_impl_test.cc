@@ -203,13 +203,13 @@ TEST_F(ConnPoolMapImplTest, DrainConnectionsForwarded) {
   test_map->drainConnections();
 }
 
-TEST_F(ConnPoolMapImplTest, DeferredClearDefersDelete) {
+TEST_F(ConnPoolMapImplTest, ClearDefersDelete) {
   TestMapPtr test_map = makeTestMap();
 
   Http::ConnectionPool::Instance::DrainedCb cb1;
   test_map->getPool(1, getBasicFactory());
   test_map->getPool(2, getBasicFactory());
-  test_map->deferredClear();
+  test_map->clear();
 
   EXPECT_EQ(dispatcher_.to_delete_.size(), 2);
 }
