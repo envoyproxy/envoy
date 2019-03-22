@@ -11,7 +11,8 @@ namespace Server {
 
 /**
  * Implementation of Init::Manager for use during post cluster manager init / pre listening.
- * TODO(JimmyCYJ): Move InitManagerImpl into a new subdirectory in source/ called init/.
+ * Deprecated, use SafeInit::ManagerImpl instead.
+ * TODO(mergeconflict): convert all Init::ManagerImpl uses to SafeInit::ManagerImpl.
  */
 class InitManagerImpl : public Init::Manager, Logger::Loggable<Logger::Id::init> {
 public:
