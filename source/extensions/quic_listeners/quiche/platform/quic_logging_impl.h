@@ -12,7 +12,6 @@
 #include <sstream>
 #include <string>
 
-#include "common/common/assert.h"
 #include "common/common/logger.h"
 
 #include "absl/base/optimization.h"
