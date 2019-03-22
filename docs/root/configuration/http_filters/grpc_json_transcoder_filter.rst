@@ -144,6 +144,9 @@ gRPC or RESTful JSON requests to localhost:51051.
           - endpoint:
               address:
                 socket_address:
-                  address: docker.for.mac.localhost
+                  # WARNING: "docker.for.mac.localhost" has been deprecated from Docker v18.03.0.
+                  # If you're running an older version of Docker, please use "docker.for.mac.localhost" instead.
+                  # Reference: https://docs.docker.com/docker-for-mac/release-notes/#docker-community-edition-18030-ce-mac59-2018-03-26
+                  address: host.docker.internal
                   port_value: 50051
 
