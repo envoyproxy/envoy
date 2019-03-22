@@ -391,10 +391,10 @@ class Primitive(TypeSpecification):
   KAFKA_TYPE_TO_EXAMPLE_VALUE_FOR_TEST = {
       'string': '"string"',
       'bool': 'false',
-      'int8': '8',
-      'int16': '16',
-      'int32': '32',
-      'int64': '64ll',
+      'int8': 'static_cast<int8_t>(8)',
+      'int16': 'static_cast<int16_t>(16)',
+      'int32': 'static_cast<int32_t>(32)',
+      'int64': 'static_cast<int64_t>(64)',
       'bytes': 'Bytes({0, 1, 2, 3})',
   }
 
