@@ -108,7 +108,7 @@ static_resources:
             address:
               socket_address:
                 protocol: TCP
-                address: disccovery.yourcompany.net
+                address: discovery.yourcompany.net
                 port_value: 80
   - name: statsd
     type: STATIC
