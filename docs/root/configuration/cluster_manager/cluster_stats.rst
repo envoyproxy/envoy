@@ -152,6 +152,10 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
   rq_pending_open, Gauge, Whether the pending requests circuit breaker is closed (0) or open (1)
   rq_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
   rq_retry_open, Gauge, Whether the retry circuit breaker is closed (0) or open (1)
+  remaining_cx, Gauge, Number of remaining connections until the circuit breaker opens
+  remaining_pending, Gauge, Number of remaining pending requests until the circuit breaker opens
+  remaining_rq, Gauge, Number of remaining requests until the circuit breaker opens
+  remaining_retries, Gauge, Number of remaining retries until the circuit breaker opens
 
 .. _config_cluster_manager_cluster_stats_dynamic_http:
 

@@ -6,19 +6,15 @@ set -e
 
 if [ -n "$CIRCLE_TAG" ]
 then
-   docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+    docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
 
-   docker pull envoyproxy/envoy:"$CIRCLE_SHA1"
-   docker tag envoyproxy/envoy:"$CIRCLE_SHA1" envoyproxy/envoy:"$CIRCLE_TAG"
-   docker push envoyproxy/envoy:"$CIRCLE_TAG"
-
-   docker pull envoyproxy/envoy-alpine:"$CIRCLE_SHA1"
-   docker tag envoyproxy/envoy-alpine:"$CIRCLE_SHA1" envoyproxy/envoy-alpine:"$CIRCLE_TAG"
-   docker push envoyproxy/envoy-alpine:"$CIRCLE_TAG"
-
-   docker pull envoyproxy/envoy-alpine-debug:"$CIRCLE_SHA1"
-   docker tag envoyproxy/envoy-alpine-debug:"$CIRCLE_SHA1" envoyproxy/envoy-alpine-debug:"$CIRCLE_TAG"
-   docker push envoyproxy/envoy-alpine-debug:"$CIRCLE_TAG"
+    for BUILD_TYPE in "envoy" "envoy-alpine" "envoy-alpine-debug"; do
+        docker pull envoyproxy/"$BUILD_TYPE"-dev:"$CIRCLE_SHA1"
+        docker tag envoyproxy/"$BUILD_TYPE"-dev:"$CIRCLE_SHA1" envoyproxy/"$BUILD_TYPE":"$CIRCLE_TAG"
+        docker push envoyproxy/"$BUILD_TYPE":"$CIRCLE_TAG"
+        docker tag envoyproxy/"$BUILD_TYPE"-dev:"$CIRCLE_SHA1" envoyproxy/"$BUILD_TYPE":latest
+        docker push envoyproxy/"$BUILD_TYPE":latest
+    done
 else
-   echo 'Ignoring non-tag event for docker tag.'
+    echo 'Ignoring non-tag event for docker tag.'
 fi

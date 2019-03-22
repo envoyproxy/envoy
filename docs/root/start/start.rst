@@ -130,7 +130,7 @@ And finally, test it using::
 
   $ curl -v localhost:10000
 
-If you would like to use envoy with docker-compose you can overwrite the provided configuration file
+If you would like to use Envoy with docker-compose you can overwrite the provided configuration file
 by using a volume.
 
 .. code-block: yaml
