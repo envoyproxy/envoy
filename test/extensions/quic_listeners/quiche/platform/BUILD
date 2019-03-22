@@ -30,6 +30,8 @@ envoy_cc_test(
     ],
     external_deps = ["quiche_quic_platform"],
     deps = [
+        "//source/extensions/quic_listeners/quiche/platform:quic_epoll_impl_lib",
+        "//source/extensions/quic_listeners/quiche/platform:quiche_epoll_impl_lib",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",

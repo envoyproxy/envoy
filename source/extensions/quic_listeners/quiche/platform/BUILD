@@ -142,6 +142,38 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_epoll_impl_lib",
+    srcs = [
+        "quiche_epoll_impl.cc",
+        "quiche_fake_epoll_impl.cc",
+    ],
+    hdrs = [
+        "quiche_epoll_impl.h",
+        "quiche_fake_epoll_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [":quic_platform_base_impl_lib"],
+)
+
+envoy_cc_library(
+    name = "quic_epoll_impl_lib",
+    srcs = [
+        "quic_epoll_clock.cc",
+    ],
+    hdrs = [
+        "quic_epoll_clock.h",
+        "quic_epoll_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_base_impl_lib",
+        ":quiche_epoll_impl_lib",
+        "@com_googlesource_quiche//:quic_clock_lib",
+        "@com_googlesource_quiche//:quic_platform_base",
+    ],
+)
+
+envoy_cc_library(
     name = "spdy_platform_impl_lib",
     hdrs = [
         "spdy_arraysize_impl.h",

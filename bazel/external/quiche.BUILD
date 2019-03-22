@@ -132,6 +132,7 @@ cc_library(
         "quiche/quic/platform/api/quic_arraysize.h",
         "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
+        "quiche/quic/platform/api/quic_clock.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
         "quiche/quic/platform/api/quic_estimate_memory_usage.h",
@@ -152,7 +153,6 @@ cc_library(
         "quiche/quic/platform/api/quic_uint128.h",
         "quiche/quic/platform/api/quic_thread.h",
         # TODO: uncomment the following files as implementations are added.
-        # "quiche/quic/platform/api/quic_clock.h",
         # "quiche/quic/platform/api/quic_expect_bug.h",
         # "quiche/quic/platform/api/quic_file_utils.h",
         # "quiche/quic/platform/api/quic_flags.h",
@@ -198,6 +198,14 @@ cc_library(
     hdrs = ["quiche/quic/core/quic_time.h"],
     visibility = ["//visibility:public"],
     deps = [":quic_platform"],
+)
+
+cc_library(
+    name = "quic_clock_lib",
+    srcs = ["quiche/quic/platform/api/quic_clock.cc"],
+    hdrs = ["quiche/quic/platform/api/quic_clock.h"],
+    visibility = ["//visibility:public"],
+    deps = [":quic_time_lib"],
 )
 
 envoy_cc_test(
