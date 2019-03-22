@@ -1279,7 +1279,7 @@ TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdl
   Buffer::OwnedImpl fake_input;
   conn_manager_->onData(fake_input, false);
 
-  // This should not be called as we dont have request headers
+  // This should not be called as we don't have request headers
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).Times(0);
 
   // Under heavy load it is possible that stream timeout will be reached before any headers were
