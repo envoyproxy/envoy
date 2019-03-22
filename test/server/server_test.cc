@@ -14,6 +14,7 @@
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -126,11 +127,12 @@ protected:
       options_.config_path_ = TestEnvironment::temporaryFileSubstitute(
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
+    thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
     server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
@@ -143,11 +145,12 @@ protected:
         {{"health_check_timeout", fmt::format("{}", timeout).c_str()},
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
+    thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
     server_ = std::make_unique<InstanceImpl>(
         options_, test_time_.timeSystem(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
-        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+        std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists("/dev/null"));
@@ -160,7 +163,7 @@ protected:
   testing::NiceMock<MockOptions> options_;
   DefaultTestHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
-  ThreadLocal::InstanceImpl thread_local_;
+  std::unique_ptr<ThreadLocal::InstanceImpl> thread_local_;
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
@@ -173,18 +176,49 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
-  initialize("test/server/node_bootstrap.yaml");
-  bool got_startup_notification = false, got_shutdown_notification = false;
-  server_->registerCallback(ServerLifecycleNotifier::Stage::Startup,
-                            [&got_startup_notification, this] {
-                              got_startup_notification = true;
-                              server_->shutdown();
-                            });
-  server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
-                            [&got_shutdown_notification] { got_shutdown_notification = true; });
-  server_->run();
-  EXPECT_TRUE(got_startup_notification);
-  EXPECT_TRUE(got_shutdown_notification);
+  bool startup = false, shutdown = false, shutdown_with_completion = false;
+  absl::Notification started, shutdown_begin, completion_block, completion_done;
+
+  // Run the server in a separate thread so we can test different lifecycle stages.
+  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
+    initialize("test/server/node_bootstrap.yaml");
+    server_->registerCallback(ServerLifecycleNotifier::Stage::Startup, [&] {
+      startup = true;
+      started.Notify();
+    });
+    server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+      shutdown = true;
+      shutdown_begin.Notify();
+    });
+    server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                              [&](Event::PostCb completion_cb) {
+                                // Block till we're told to complete
+                                completion_block.WaitForNotification();
+                                shutdown_with_completion = true;
+                                server_->dispatcher().post(completion_cb);
+                                completion_done.Notify();
+                              });
+    server_->run();
+    server_ = nullptr;
+    thread_local_ = nullptr;
+  });
+
+  started.WaitForNotification();
+  EXPECT_TRUE(startup);
+  EXPECT_FALSE(shutdown);
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  shutdown_begin.WaitForNotification();
+  EXPECT_TRUE(shutdown);
+
+  // Expect the server to block waiting for the completion callback to be invoked
+  EXPECT_FALSE(completion_done.WaitForNotificationWithTimeout(absl::Seconds(1)));
+
+  completion_block.Notify();
+  completion_done.WaitForNotification();
+  EXPECT_TRUE(shutdown_with_completion);
+
+  server_thread->join();
 }
 
 TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
@@ -351,12 +385,13 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 // When there are no bootstrap CLI options, either for content or path, we can load the server with
 // an empty config.
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   EXPECT_THROW_WITH_MESSAGE(
       server_.reset(new InstanceImpl(
           options_, test_time_.timeSystem(),
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
-          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_,
+          std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), *thread_local_,
           Thread::threadFactoryForTest(), Filesystem::fileSystemForTest())),
       EnvoyException, "At least one of --config-path and --config-yaml should be non-empty");
 }

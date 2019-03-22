@@ -270,6 +270,7 @@ public:
   ~MockServerLifecycleNotifier();
 
   MOCK_METHOD2(registerCallback, void(Stage, StageCallback));
+  MOCK_METHOD2(registerCallback, void(Stage, StageCallbackWithCompletion));
 };
 
 class MockWorkerFactory : public WorkerFactory {
