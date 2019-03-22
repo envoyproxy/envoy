@@ -69,7 +69,7 @@ TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   EXPECT_CALL(async_stream_, sendMessage(_, _))
       .WillOnce([](const google::protobuf::Message& msg, bool) {
         auto sent_request = static_cast<const envoy::api::v2::DeltaDiscoveryRequest*>(&msg);
-        EXPECT_EQ("name4", sent_request->resource_names_subscribe()[0]);
+        EXPECT_THAT(sent_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
         EXPECT_THAT(sent_request->resource_names_unsubscribe(),
                     UnorderedElementsAre("name1", "name2", "name3"));
       });
