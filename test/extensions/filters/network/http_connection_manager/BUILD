@@ -17,7 +17,6 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.http_connection_manager",
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/router:config",
