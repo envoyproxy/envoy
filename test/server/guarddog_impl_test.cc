@@ -25,9 +25,34 @@ namespace Envoy {
 namespace Server {
 namespace {
 
+class DebugTestInterlock : public GuardDogImpl::TestInterlockHook {
+ public:
+  virtual void signalFromImpl(Thread::MutexBasicLockable& mutex, MonotonicTime time)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+    impl_reached_ = time;
+    impl_.notifyAll();
+  }
+
+  virtual void waitFromTest(Thread::MutexBasicLockable& mutex, MonotonicTime time)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+    while (impl_reached_ < time) {
+      impl_.wait(mutex);
+    }
+  }
+
+ private:
+  Thread::CondVar impl_;
+  MonotonicTime impl_reached_; // GUARDED_BY(mutex_) = false;
+};
+
 class GuardDogTestBase : public testing::Test {
 protected:
   GuardDogTestBase() : api_(Api::createApiForTest(stats_store_, time_system_)) {}
+
+  void initGuardDog(Stats::Scope& stats_scope, const Server::Configuration::Main& config) {
+    guard_dog_ = std::make_unique<GuardDogImpl>(stats_scope, config, *api_,
+                                                std::make_unique<DebugTestInterlock>());
+  }
 
   void sleep(const Event::TimeSystem::Duration& duration) {
     time_system_.sleep(duration);
@@ -83,7 +108,7 @@ protected:
    */
   void SetupForDeath() {
     InSequence s;
-    guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_kill_, *api_);
+    initGuardDog(fakestats_, config_kill_);
     unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
     guard_dog_->forceCheckForTest();
     sleep(std::chrono::milliseconds(99));  // 1 ms shy of death.
@@ -95,7 +120,7 @@ protected:
    */
   void SetupForMultiDeath() {
     InSequence s;
-    guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_multikill_, *api_);
+    initGuardDog(fakestats_, config_multikill_);
     auto unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
     guard_dog_->forceCheckForTest();
     auto second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
@@ -158,7 +183,7 @@ TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
   // there is no death. The positive case is covered in MultiKillDeathTest.
   InSequence s;
-  guard_dog_ = std::make_unique<GuardDogImpl>(fakestats_, config_multikill_, *api_);
+  initGuardDog(fakestats_, config_multikill_);
   auto unpet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   auto pet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   // This part "waits" 600 milliseconds while one dog is touched every 100, and
@@ -183,7 +208,7 @@ protected:
 TEST_F(GuardDogMissTest, MissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  guard_dog_ = std::make_unique<GuardDogImpl>(stats_store_, config_miss_, *api_);
+  initGuardDog(stats_store_, config_miss_);
   // We'd better start at 0:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_miss").value());
   auto unpet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
@@ -202,7 +227,7 @@ TEST_F(GuardDogMissTest, MissTest) {
 TEST_F(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  guard_dog_ = std::make_unique<GuardDogImpl>(stats_store_, config_mega_, *api_);
+  initGuardDog(stats_store_, config_mega_);
   auto unpet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   // We'd better start at 0:
   EXPECT_EQ(0UL, stats_store_.counter("server.watchdog_mega_miss").value());
@@ -222,7 +247,7 @@ TEST_F(GuardDogMissTest, MissCountTest) {
   // This tests a flake discovered in the MissTest where real timeout or
   // spurious condition_variable wakeup causes the counter to get incremented
   // more than it should be.
-  guard_dog_ = std::make_unique<GuardDogImpl>(stats_store_, config_miss_, *api_);
+  initGuardDog(stats_store_, config_miss_);
   auto sometimes_pet_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   // These steps are executed once without ever touching the watchdog.
   // Then the last step is to touch the watchdog and repeat the steps.
@@ -262,27 +287,27 @@ TEST_F(GuardDogMissTest, MissCountTest) {
 TEST_F(GuardDogTestBase, StartStopTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(0, 0, 0, 0);
-  guard_dog_ = std::make_unique<GuardDogImpl>(stats, config, *api_);
+  initGuardDog(stats, config);
 }
 
 TEST_F(GuardDogTestBase, LoopIntervalNoKillTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(40, 50, 0, 0);
-  guard_dog_ = std::make_unique<GuardDogImpl>(stats, config, *api_);
+  initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), 40);
 }
 
 TEST_F(GuardDogTestBase, LoopIntervalTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
-  guard_dog_ = std::make_unique<GuardDogImpl>(stats, config, *api_);
+  initGuardDog(stats, config);
   EXPECT_EQ(guard_dog_->loopIntervalForTest(), 90);
 }
 
 TEST_F(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Stats::MockStore> stats;
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
-  guard_dog_ = std::make_unique<GuardDogImpl>(stats, config, *api_);
+  initGuardDog(stats, config);
   auto watched_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
   EXPECT_EQ(watched_dog->threadId().debugString(),
             api_->threadFactory().currentThreadId()->debugString());

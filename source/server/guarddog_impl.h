@@ -33,12 +33,29 @@ namespace Server {
 class GuardDogImpl : public GuardDog {
 public:
   /**
+   * Defines a test interlock hook to enable tests to synchronize the guard-dog
+   * execution so they can probe current counter values. The default
+   * implementation that runs in produciton has empty methods, which are
+   * overridden in the implementation used during tests.
+   */
+  class TestInterlockHook {
+   public:
+    virtual ~TestInterlockHook() = default;
+    virtual void signalFromImpl(Thread::MutexBasicLockable&, MonotonicTime) {}
+    virtual void waitFromTest(Thread::MutexBasicLockable&, MonotonicTime) {}
+  };
+
+  /**
    * @param stats_scope Statistics scope to write watchdog_miss and
    * watchdog_mega_miss events into.
    * @param config Configuration object.
+   * @param api API pobject.a
+   * @param test_interlock a hook for enabling interlock with unit tests.
    *
    * See the configuration documentation for details on the timeout settings.
    */
+  GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api,
+               std::unique_ptr<TestInterlockHook>&& test_interlock);
   GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config, Api::Api& api);
   ~GuardDogImpl();
 
@@ -46,15 +63,25 @@ public:
    * Exposed for testing purposes only (but harmless to call):
    */
   int loopIntervalForTest() const { return loop_interval_.count(); }
+
+  /**
+   * Test hook to force a step() to catch up with the current simulated
+   * time. This is inlined so that it does not need to be present in the
+   * production binary.
+   */
   void forceCheckForTest() {
-    loop_timer_->enableTimer(std::chrono::milliseconds(0));
     Thread::LockGuard guard(exit_lock_);
-    force_checked_event_.wait(exit_lock_);
+    MonotonicTime now = time_source_.monotonicTime();
+    wakeupLockHeld(std::chrono::milliseconds(0));
+    test_interlock_hook_->waitFromTest(exit_lock_, now);
   }
 
   // Server::GuardDog
   WatchDogSharedPtr createWatchDog(Thread::ThreadIdPtr&& thread_id) override;
   void stopWatching(WatchDogSharedPtr wd) override;
+
+  // This is made visible to facilitate the test interlock implementation in guarddog_impl_test.cc.
+  Thread::MutexBasicLockable& exitLock() { return exit_lock_; }
 
 private:
   void threadRoutine();
@@ -62,11 +89,12 @@ private:
   void start(Api::Api& api);
   void step();
   void stop();
-  void stopCallback();
   // Per the C++ standard it is OK to use these in ctor initializer as long as
   // it is after kill and multikill timeout values are initialized.
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
+
+  void wakeupLockHeld(std::chrono::milliseconds ms) EXCLUSIVE_LOCKS_REQUIRED(exit_lock_);
 
   struct WatchedDog {
     WatchDogSharedPtr dog_;
@@ -75,7 +103,9 @@ private:
     bool megamiss_alerted_{};
   };
 
+  std::unique_ptr<TestInterlockHook> test_interlock_hook_;
   TimeSource& time_source_;
+  MonotonicTime step_time_; // Time at which step last occurred.
   const std::chrono::milliseconds miss_timeout_;
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;
@@ -89,11 +119,11 @@ private:
   Event::DispatcherPtr dispatcher_;
   Event::TimerPtr loop_timer_;
   Event::TimerPtr exit_timer_;
-  //Event::TimerPtr wakeup_timer_;
+  Event::TimerPtr wakeup_timer_;
   Thread::MutexBasicLockable exit_lock_;
-  //Thread::CondVar exit_event_;
+  Thread::CondVar exit_event_;
+  bool pending_ GUARDED_BY(exit_lock_);
   bool run_thread_ GUARDED_BY(exit_lock_);
-  Thread::CondVar force_checked_event_;
 };
 
 } // namespace Server
