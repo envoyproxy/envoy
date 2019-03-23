@@ -66,6 +66,19 @@ public:
   createStaticConfigProvider(const Protobuf::Message& config_proto,
                              Server::Configuration::FactoryContext& factory_context,
                              const OptionalArg& optarg) PURE;
+
+  /**
+   * Returns a ConfigProvider associated with a statically specified configuration. This is intended
+   * to be used when a set of configuration protos is required to build the full configuration.
+   * @param config_protos supplies a vector of configuration protos.
+   * @param factory_context is the context to use for the provider.
+   * @param optarg supplies an optional argument with data specific to the concrete class.
+   * @return ConfigProviderPtr a newly allocated static config provider.
+   */
+  virtual ConfigProviderPtr
+  createStaticConfigProvider(std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
+                             Server::Configuration::FactoryContext& factory_context,
+                             const OptionalArg& optarg) PURE;
 };
 
 } // namespace Config

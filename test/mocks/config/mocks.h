@@ -89,6 +89,11 @@ public:
                ConfigProviderPtr(const Protobuf::Message& config_proto,
                                  Server::Configuration::FactoryContext& factory_context,
                                  const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+  MOCK_METHOD3(
+      createStaticConfigProvider,
+      ConfigProviderPtr(std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
+                        Server::Configuration::FactoryContext& factory_context,
+                        const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
 };
 
 } // namespace Config

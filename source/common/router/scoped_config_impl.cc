@@ -5,7 +5,20 @@
 namespace Envoy {
 namespace Router {
 
-Router::ConfigConstSharedPtr ScopedConfigImpl::getRouterConfig(const Http::HeaderMap&) const {
+ScopedRouteInfoConstSharedPtr
+ScopedConfigManager::addOrUpdateRoutingScope(const envoy::api::v2::ScopedRouteConfiguration&,
+                                             const std::string&) {
+  return std::make_shared<ScopedRouteInfo>();
+}
+
+bool ScopedConfigManager::removeRoutingScope(const std::string&) { return true; }
+
+void ThreadLocalScopedConfigImpl::addOrUpdateRoutingScope(ScopedRouteInfoConstSharedPtr) {}
+
+void ThreadLocalScopedConfigImpl::removeRoutingScope(const std::string&) {}
+
+Router::ConfigConstSharedPtr
+ThreadLocalScopedConfigImpl::getRouterConfig(const Http::HeaderMap&) const {
   return std::make_shared<const NullConfigImpl>();
 }
 

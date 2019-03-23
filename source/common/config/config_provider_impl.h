@@ -100,18 +100,20 @@ public:
 
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return last_updated_; }
+  ApiType apiType() const override { return api_type_; }
 
-  ConfigProviderInstanceType type() const { return type_; }
+  ConfigProviderInstanceType instanceType() const { return instance_type_; }
 
 protected:
   ImmutableConfigProviderImplBase(Server::Configuration::FactoryContext& factory_context,
                                   ConfigProviderManagerImplBase& config_provider_manager,
-                                  ConfigProviderInstanceType type);
+                                  ConfigProviderInstanceType instance_type, ApiType api_type);
 
 private:
   SystemTime last_updated_;
   ConfigProviderManagerImplBase& config_provider_manager_;
-  ConfigProviderInstanceType type_;
+  ConfigProviderInstanceType instance_type_;
+  ApiType api_type_;
 };
 
 class MutableConfigProviderImplBase;
@@ -137,7 +139,7 @@ class ConfigSubscriptionInstanceBase : public Init::Target,
                                        protected Logger::Loggable<Logger::Id::config> {
 public:
   struct LastConfigInfo {
-    uint64_t last_config_hash_;
+    absl::optional<uint64_t> last_config_hash_;
     std::string last_config_version_;
   };
 
@@ -211,7 +213,17 @@ protected:
 
   void setLastUpdated() { last_updated_ = time_source_.systemTime(); }
 
+  void setLastConfigInfo(absl::optional<LastConfigInfo>&& config_info) {
+    config_info_ = std::move(config_info);
+  }
+
   void runInitializeCallbackIfAny();
+
+  /**
+   * TODO(AndresGuedez):
+   */
+  void
+  propagateDeltaConfigUpdate(std::function<void(ConfigProvider::ConfigConstSharedPtr)> updateFn);
 
 private:
   void registerInitTarget(Init::Manager& init_manager) { init_manager.registerTarget(*this); }
@@ -257,11 +269,10 @@ public:
 
   // Envoy::Config::ConfigProvider
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
-
-  // Envoy::Config::ConfigProvider
   ConfigConstSharedPtr getConfig() const override {
     return tls_->getTyped<ThreadLocalConfig>().config_;
   }
+  ApiType apiType() const override { return api_type_; }
 
   /**
    * Called when a new config proto is received via an xDS subscription.
@@ -271,6 +282,7 @@ public:
    * Note that this function is called _once_ across all shared config providers per xDS
    * subscription config update.
    * @param config_proto supplies the configuration proto.
+   * @param version_info supplies the version associated with the config.
    * @return ConfigConstSharedPtr the ConfigProvider::Config to share with other providers.
    */
   virtual ConfigConstSharedPtr onConfigProtoUpdate(const Protobuf::Message& config_proto) PURE;
@@ -280,7 +292,7 @@ public:
    * @param initial_config supplies an initial Envoy::Config::ConfigProvider::Config associated with
    *                       the underlying subscription.
    */
-  void initialize(const ConfigConstSharedPtr& initial_config) {
+  virtual void initialize(const ConfigConstSharedPtr& initial_config) {
     subscription_->bindConfigProvider(this);
     tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalConfig>(initial_config);
@@ -288,20 +300,41 @@ public:
   }
 
   /**
+   * TODO(AndresGuedez):
+   */
+  virtual void initialize(ThreadLocal::Slot::InitializeCb initializeCb) {
+    subscription_->bindConfigProvider(this);
+    tls_->set(initializeCb);
+  }
+
+  /**
    * Propagates a newly instantiated Envoy::Config::ConfigProvider::Config to all workers.
    * @param config supplies the newly instantiated config.
    */
-  void onConfigUpdate(const ConfigConstSharedPtr& config) {
+  virtual void onConfigUpdate(const ConfigConstSharedPtr& config) {
+    if (getConfig() == config) {
+      return;
+    }
     tls_->runOnAllThreads(
         [this, config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = config; });
   }
 
+  /**
+   * TODO(AndresGuedez):
+   */
+  virtual void onDeltaConfigUpdate(Envoy::Event::PostCb updateCb) {
+    tls_->runOnAllThreads(updateCb);
+  }
+
 protected:
   MutableConfigProviderImplBase(ConfigSubscriptionInstanceBaseSharedPtr&& subscription,
-                                Server::Configuration::FactoryContext& factory_context)
-      : subscription_(subscription), tls_(factory_context.threadLocal().allocateSlot()) {}
+                                Server::Configuration::FactoryContext& factory_context,
+                                ApiType api_type)
+      : subscription_(subscription), tls_(factory_context.threadLocal().allocateSlot()),
+        api_type_(api_type) {}
 
   const ConfigSubscriptionInstanceBaseSharedPtr& subscription() const { return subscription_; }
+  ThreadLocal::Slot* tls() const { return tls_.get(); }
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -313,6 +346,7 @@ private:
 
   ConfigSubscriptionInstanceBaseSharedPtr subscription_;
   ThreadLocal::SlotPtr tls_;
+  ApiType api_type_;
 };
 
 /**

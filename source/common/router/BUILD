@@ -94,13 +94,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "thread_local_scoped_config_lib",
+    hdrs = ["thread_local_scoped_config.h"],
+    deps = [
+        "//include/envoy/thread_local:thread_local_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "scoped_config_lib",
     srcs = ["scoped_config_impl.cc"],
     hdrs = ["scoped_config_impl.h"],
     deps = [
         ":config_lib",
+        ":thread_local_scoped_config_lib",
         "//include/envoy/router:scopes_interface",
         "@envoy_api//envoy/api/v2:srds_cc",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
 

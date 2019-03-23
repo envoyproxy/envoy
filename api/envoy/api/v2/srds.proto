@@ -104,111 +104,39 @@ service ScopedRoutesDiscoveryService {
 // which Envoy would fetch via RDS.
 //
 // [#comment:next free field: 4]
-message ScopedRouteConfigurationsSet {
-  // The name of the set of route configuration scopes. This will be the
-  // :ref:`scoped_routes_config_set_name
-  // <envoy_api_field_config.filter.network.http_connection_manager.v2.ScopedRds.scoped_routes_config_set_name>`
-  // set in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v2.ScopedRds`.
+
+// TODO(AndresGuedez):
+// Specifies a routing scope, which associates a :ref:`envoy_api_msg_RouteConfiguration`
+// (identified by its resource name) to a
+// :ref:`Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` which is matched against each
+// HTTP request.
+message ScopedRouteConfiguration {
+  // TODO(AndresGuedez):
+  // The name assigned to the routing scope.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Specifies the mechanism for constructing keys based on request attributes to match
-  // :ref:`scopes <envoy_api_field_ScopedRouteConfigurationsSet.scopes>` against.
-  //
-  // Upon receiving a request's headers, the Router will build a key using the algorithm specified
-  // by this message. This key will be used to look up a corresponding
-  // :ref:`Scope <envoy_api_msg_ScopedRouteConfigurationsSet.Scope>` in a table containing the set
-  // of :ref:`scopes <envoy_api_field_ScopedRouteConfigurationsSet.scopes>` in this message.
-  message ScopeKeyBuilder {
-    // Specifies the mechanism for constructing fragments which are composed into keys.
-    message FragmentBuilder {
-      // Specifies how the value of a header should be extracted.
-      // The following example maps the structure of a header to the fields in this message.
-      //
-      // .. code::
-      //
-      //    X-Header: a=b;c=d
-      //    |         || |
-      //    |         || \----> <element_separator>
-      //    |         ||
-      //    |         |\----> <element.separator>
-      //    |         |
-      //    |         \----> <element.key>
-      //    |
-      //    \----> <name>
-      //
-      //    Each 'a=b' key-value pair constitutes an 'element' of the header field.
-      message HeaderValueExtractor {
-        // The name of the header field to extract the value from.
-        string name = 1 [(validate.rules).string.min_bytes = 1];
-
-        // The element separator (e.g., ';' separates 'a;b;c;d').
-        string element_separator = 2;
-
-        // Specifies a header field's key value pair to match on.
-        message KvElement {
-          // The separator between key and value (e.g., '=' separates 'k=v;...').
-          string separator = 1;
-
-          // The key to match on.
-          string key = 2;
-        }
-
-        oneof extract_type {
-          // Specifies the index of the element to extract.
-          int32 index = 3;
-
-          // Specifies the key value pair to extract the value from.
-          KvElement element = 4;
-        }
-      }
-
+  // Specifies a key which is matched against the output of the
+  // :ref:`scope_key_builder<envoy_api_field_ScopedRouteConfigurationsSet.scope_key_builder>` to
+  // obtain the route_configuration_name/RouteConfiguration associated with the Scope. The
+  // matching is dependent on the order of the fragments contained in the Key.
+  message Key {
+    message Fragment {
       oneof type {
         option (validate.required) = true;
 
-        // Specifies how a header field's value should be extracted.
-        HeaderValueExtractor header_value_extractor = 1;
+        // A string to match against.
+        string string_key = 1;
       }
     }
 
-    // The constructed key consists of the ordered union of these fragments.
-    repeated FragmentBuilder fragments = 1 [(validate.rules).repeated .min_items = 1];
+    // The ordered set of fragments to match against.
+    repeated Fragment fragments = 1 [(validate.rules).repeated .min_items = 1];
   }
 
-  // The key construction mechanism.
-  ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message.required = true];
+  // The resource name to use for a :ref:`envoy_api_msg_DiscoveryRequest` to an RDS server to
+  // fetch the :ref:`envoy_api_msg_RouteConfiguration` associated with this scope.
+  string route_configuration_name = 2 [(validate.rules).string.min_bytes = 1];
 
-  // Specifies a routing scope, which associates a :ref:`envoy_api_msg_RouteConfiguration`
-  // (identified by its resource name) to a
-  // :ref:`Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` which is matched against each
-  // HTTP request.
-  message Scope {
-    // Specifies a key which is matched against the output of the
-    // :ref:`scope_key_builder<envoy_api_field_ScopedRouteConfigurationsSet.scope_key_builder>` to
-    // obtain the route_configuration_name/RouteConfiguration associated with the Scope. The
-    // matching is dependent on the order of the fragments contained in the Key.
-    message Key {
-      message Fragment {
-        oneof type {
-          option (validate.required) = true;
-
-          // A string to match against.
-          string string_key = 1;
-        }
-      }
-
-      // The ordered set of fragments to match against.
-      repeated Fragment fragments = 1 [(validate.rules).repeated .min_items = 1];
-    }
-
-    // The resource name to use for a :ref:`envoy_api_msg_DiscoveryRequest` to an RDS server to
-    // fetch the :ref:`envoy_api_msg_RouteConfiguration` associated with this scope.
-    string route_configuration_name = 1 [(validate.rules).string.min_bytes = 1];
-
-    // The key to match against.
-    Key key = 2 [(validate.rules).message.required = true];
-  }
-
-  // The set of scopes, containing :ref:`Key <envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>`
-  // to :ref:`envoy_api_msg_RouteConfiguration` mappings.
-  repeated Scope scopes = 3 [(validate.rules).repeated .min_items = 1];
+  // The key to match against.
+  Key key = 3 [(validate.rules).message.required = true];
 }

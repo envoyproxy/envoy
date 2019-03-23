@@ -26,6 +26,7 @@ public:
 
   // Envoy::Config::ConfigProvider
   const Protobuf::Message* getConfigProto() const override { return &config_proto_; }
+  const std::vector<const Protobuf::Message*> getConfigProtos() const override { return {}; }
 
   // Envoy::Config::ConfigProvider
   std::string getConfigVersion() const override { return ""; }
@@ -87,7 +88,7 @@ public:
   DummyDynamicConfigProvider(DummyConfigSubscriptionSharedPtr&& subscription,
                              ConfigConstSharedPtr initial_config,
                              Server::Configuration::FactoryContext& factory_context)
-      : MutableConfigProviderImplBase(std::move(subscription), factory_context),
+      : MutableConfigProviderImplBase(std::move(subscription), factory_context, ApiType::Full),
         subscription_(static_cast<DummyConfigSubscription*>(
             MutableConfigProviderImplBase::subscription().get())) {
     initialize(initial_config);
@@ -111,6 +112,7 @@ public:
     }
     return &subscription_->config_proto().value();
   }
+  const std::vector<const Protobuf::Message*> getConfigProtos() const override { return {}; }
 
   // Envoy::Config::ConfigProvider
   std::string getConfigVersion() const override { return ""; }
@@ -191,6 +193,12 @@ public:
         dynamic_cast<const test::common::config::DummyConfig&>(config_proto), factory_context,
         *this);
   }
+  ConfigProviderPtr
+  createStaticConfigProvider(std::vector<std::unique_ptr<const Protobuf::Message>>&&,
+                             Server::Configuration::FactoryContext&, const OptionalArg&) override {
+    ASSERT(false || "this provider does not expect multiple config protos");
+    return nullptr;
+  }
 };
 
 StaticDummyConfigProvider::StaticDummyConfigProvider(
@@ -198,7 +206,7 @@ StaticDummyConfigProvider::StaticDummyConfigProvider(
     Server::Configuration::FactoryContext& factory_context,
     DummyConfigProviderManager& config_provider_manager)
     : ImmutableConfigProviderImplBase(factory_context, config_provider_manager,
-                                      ConfigProviderInstanceType::Static),
+                                      ConfigProviderInstanceType::Static, ApiType::Full),
       config_(std::make_shared<DummyConfig>(config_proto)), config_proto_(config_proto) {}
 
 DummyConfigSubscription::DummyConfigSubscription(

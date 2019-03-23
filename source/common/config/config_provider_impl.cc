@@ -5,9 +5,11 @@ namespace Config {
 
 ImmutableConfigProviderImplBase::ImmutableConfigProviderImplBase(
     Server::Configuration::FactoryContext& factory_context,
-    ConfigProviderManagerImplBase& config_provider_manager, ConfigProviderInstanceType type)
+    ConfigProviderManagerImplBase& config_provider_manager,
+    ConfigProviderInstanceType instance_type, ApiType api_type)
     : last_updated_(factory_context.timeSource().systemTime()),
-      config_provider_manager_(config_provider_manager), type_(type) {
+      config_provider_manager_(config_provider_manager), instance_type_(instance_type),
+      api_type_(api_type) {
   config_provider_manager_.bindImmutableConfigProvider(this);
 }
 
@@ -31,8 +33,11 @@ bool ConfigSubscriptionInstanceBase::checkAndApplyConfig(const Protobuf::Message
                                                          const std::string& config_name,
                                                          const std::string& version_info) {
   const uint64_t new_hash = MessageUtil::hash(config_proto);
-  if (config_info_ && config_info_.value().last_config_hash_ == new_hash) {
-    return false;
+  if (config_info_) {
+    ASSERT(config_info_.value().last_config_hash_.has_value());
+    if (config_info_.value().last_config_hash_.value() == new_hash) {
+      return false;
+    }
   }
 
   config_info_ = {new_hash, version_info};
@@ -55,6 +60,14 @@ bool ConfigSubscriptionInstanceBase::checkAndApplyConfig(const Protobuf::Message
   }
 
   return true;
+}
+
+void ConfigSubscriptionInstanceBase::propagateDeltaConfigUpdate(
+    std::function<void(ConfigProvider::ConfigConstSharedPtr)> updateFn) {
+  for (auto* provider : mutable_config_providers_) {
+    ConfigProvider::ConfigConstSharedPtr config = provider->getConfig();
+    provider->onDeltaConfigUpdate([config, updateFn]() { updateFn(config); });
+  }
 }
 
 void ConfigSubscriptionInstanceBase::bindConfigProvider(MutableConfigProviderImplBase* provider) {
@@ -95,13 +108,13 @@ ConfigProviderManagerImplBase::immutableConfigProviders(ConfigProviderInstanceTy
 
 void ConfigProviderManagerImplBase::bindImmutableConfigProvider(
     ImmutableConfigProviderImplBase* provider) {
-  ASSERT(provider->type() == ConfigProviderInstanceType::Static ||
-         provider->type() == ConfigProviderInstanceType::Inline);
+  ASSERT(provider->instanceType() == ConfigProviderInstanceType::Static ||
+         provider->instanceType() == ConfigProviderInstanceType::Inline);
   ConfigProviderMap::iterator it;
-  if ((it = immutable_config_providers_map_.find(provider->type())) ==
+  if ((it = immutable_config_providers_map_.find(provider->instanceType())) ==
       immutable_config_providers_map_.end()) {
     immutable_config_providers_map_.insert(std::make_pair(
-        provider->type(),
+        provider->instanceType(),
         std::make_unique<ConfigProviderSet>(std::initializer_list<ConfigProvider*>({provider}))));
   } else {
     it->second->insert(provider);
@@ -110,9 +123,9 @@ void ConfigProviderManagerImplBase::bindImmutableConfigProvider(
 
 void ConfigProviderManagerImplBase::unbindImmutableConfigProvider(
     ImmutableConfigProviderImplBase* provider) {
-  ASSERT(provider->type() == ConfigProviderInstanceType::Static ||
-         provider->type() == ConfigProviderInstanceType::Inline);
-  auto it = immutable_config_providers_map_.find(provider->type());
+  ASSERT(provider->instanceType() == ConfigProviderInstanceType::Static ||
+         provider->instanceType() == ConfigProviderInstanceType::Inline);
+  auto it = immutable_config_providers_map_.find(provider->instanceType());
   ASSERT(it != immutable_config_providers_map_.end());
   it->second->erase(provider);
 }

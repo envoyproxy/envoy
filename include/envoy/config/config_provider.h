@@ -42,6 +42,11 @@ public:
   using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
   /**
+   *
+   */
+  enum class ApiType { Full, Delta };
+
+  /**
    * Stores the config proto as well as the associated version.
    */
   template <typename P> struct ConfigProtoInfo {
@@ -51,7 +56,22 @@ public:
     std::string version_;
   };
 
+  /**
+   *
+   */
+  struct ConfigProtoInfoVec {
+    const std::vector<const Protobuf::Message*> config_protos_;
+
+    // Only populated by dynamic config providers.
+    std::string version_;
+  };
+
   virtual ~ConfigProvider() = default;
+
+  /**
+   *
+   */
+  virtual ApiType apiType() const PURE;
 
   /**
    * Returns a ConfigProtoInfo associated with the provider.
@@ -67,6 +87,14 @@ public:
       return absl::nullopt;
     }
     return ConfigProtoInfo<P>{*config_proto, getConfigVersion()};
+  }
+
+  absl::optional<ConfigProtoInfoVec> configProtoInfoVec() const {
+    std::vector<const Protobuf::Message*> config_protos = getConfigProtos();
+    if (config_protos.empty()) {
+      return absl::nullopt;
+    }
+    return ConfigProtoInfoVec{std::move(config_protos), getConfigVersion()};
   }
 
   /**
@@ -93,6 +121,11 @@ protected:
    *         provider.
    */
   virtual const Protobuf::Message* getConfigProto() const PURE;
+
+  /**
+   *
+   */
+  virtual const std::vector<const Protobuf::Message*> getConfigProtos() const PURE;
 
   /**
    * Returns the config version associated with the provider.

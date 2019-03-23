@@ -65,42 +65,6 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
-// Validates that HttpConnectionManager configuration correctly specifies routing configuration.
-void validateScopedRoutingAndRds(
-    const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-        config) {
-  // NOTE: This validation can not be done via proto validators due to the conditionals involved.
-  if (config.scoped_routes_specifier_case() !=
-      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
-          SCOPED_ROUTES_SPECIFIER_NOT_SET) {
-    // When scoped routing is enabled, RDS _must_ be used and subscriptions are dynamically
-    // generated based on the SRDS config.
-    if (config.route_specifier_case() !=
-        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds) {
-      throw EnvoyException(fmt::format("Error: RDS must be used when scoped routing is enabled"));
-    }
-
-    if (config.rds().subscription_specifier_case() !=
-            envoy::config::filter::network::http_connection_manager::v2::Rds::kScopedRdsTemplate ||
-        config.rds().scoped_rds_template() != true) {
-      throw EnvoyException(fmt::format(
-          "Error: the RDS subscription specifier must be set to scoped_rds_template=true "
-          "when scoped routing is enabled"));
-    }
-  } else {
-    // Scoped routing is not enabled, ensure a route configuration name is specified if RDS is
-    // used.
-    if (config.route_specifier_case() ==
-        envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::kRds) {
-      if (config.rds().subscription_specifier_case() !=
-          envoy::config::filter::network::http_connection_manager::v2::Rds::kRouteConfigName) {
-        throw EnvoyException(fmt::format(
-            "Error: RDS must specify a route_config_name when scoped routing is not enabled"));
-      }
-    }
-  }
-}
-
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
@@ -200,13 +164,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)) {
-  // Throws an exception on invalid config.
-  validateScopedRoutingAndRds(config);
-
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
   // be managed by the scoped routing logic instead.
-  if (config.rds().subscription_specifier_case() !=
-      envoy::config::filter::network::http_connection_manager::v2::Rds::kScopedRdsTemplate) {
+  if (config.route_specifier_case() != envoy::config::filter::network::http_connection_manager::v2::
+                                           HttpConnectionManager::kScopedRoutes) {
     route_config_provider_ = Router::RouteConfigProviderUtil::create(
         config, context_, stats_prefix_, route_config_provider_manager_);
   }
