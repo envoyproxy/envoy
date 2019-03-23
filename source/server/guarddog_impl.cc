@@ -85,7 +85,6 @@ void GuardDogImpl::step() {
       }
       if (delta > miss_timeout_) {
         if (!watched_dog.miss_alerted_) {
-          // std::cerr << "watchdog_miss_counter\n";
           watchdog_miss_counter_.inc();
           watched_dog.last_alert_time_ = ltt;
           watched_dog.miss_alerted_ = true;
@@ -93,7 +92,6 @@ void GuardDogImpl::step() {
       }
       if (delta > megamiss_timeout_) {
         if (!watched_dog.megamiss_alerted_) {
-          // std::cerr << "watchdog_megamiss_counter\n";
           watchdog_megamiss_counter_.inc();
           watched_dog.last_alert_time_ = ltt;
           watched_dog.megamiss_alerted_ = true;

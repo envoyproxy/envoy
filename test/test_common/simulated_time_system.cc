@@ -226,16 +226,6 @@ SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& base_schedule
   return std::make_unique<SimulatedScheduler>(*this, base_scheduler);
 }
 
-bool SimulatedTimeSystemHelper::sleepTillNextTimer() {
-  mutex_.lock();
-  if (alarms_.empty()) {
-    mutex_.unlock();
-    return false;
-  }
-  setMonotonicTimeAndUnlock((*alarms_.begin())->time());
-  return true;
-}
-
 void SimulatedTimeSystemHelper::setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) {
   // We don't have a convenient LockGuard construct that allows temporarily
   // dropping the lock to run a callback. The main issue here is that we must
@@ -265,14 +255,6 @@ void SimulatedTimeSystemHelper::setMonotonicTimeAndUnlock(const MonotonicTime& m
     monotonic_time_ = monotonic_time;
   }
   mutex_.unlock();
-}
-
-void SimulatedTimeSystemHelper::settle() {
-  // Allow whatever thread is executing the timers to finish them. It should not
-  // take long.
-  while (hasPending()) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-  }
 }
 
 void SimulatedTimeSystemHelper::setSystemTime(const SystemTime& system_time) {

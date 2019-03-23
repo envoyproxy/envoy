@@ -56,9 +56,6 @@ public:
    */
   void setSystemTime(const SystemTime& system_time);
 
-  bool sleepTillNextTimer();
-  void settle();
-
   static bool hasInstance();
 
 private:
@@ -121,9 +118,6 @@ public:
   template <class Duration> void setSystemTime(const Duration& duration) {
     setSystemTime(SystemTime(duration));
   }
-
-  bool sleepTillNextTimer() { return timeSystem().sleepTillNextTimer(); }
-  void settle() { timeSystem().settle(); }
 };
 
 // Class encapsulating a SimulatedTimeSystem, intended for integration tests.
