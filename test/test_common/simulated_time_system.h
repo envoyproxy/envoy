@@ -61,7 +61,7 @@ public:
 private:
   class SimulatedScheduler;
   class Alarm;
-  friend class Alarm;
+  friend class Alarm; // Needed to reference mutex for thread annotations.
   struct CompareAlarms {
     bool operator()(const Alarm* a, const Alarm* b) const;
   };
@@ -76,6 +76,9 @@ private:
    * @param monotonic_time The desired new current time.
    */
   void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
+
+  MonotonicTime alarmTimeLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void alarmActivateLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // The simulation keeps a unique ID for each alarm to act as a deterministic
   // tie-breaker for alarm-ordering.

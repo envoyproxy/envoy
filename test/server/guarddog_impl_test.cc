@@ -142,7 +142,6 @@ TEST_P(GuardDogDeathTest, KillDeathTest) {
   EXPECT_DEATH(die_function(), "");
 }
 
-//!
 TEST_P(GuardDogAlmostDeadTest, KillNoFinalCheckTest) {
   // This does everything the death test does, except allow enough time to
   // expire to reach the death panic. The death test does not verify that there
@@ -159,7 +158,6 @@ TEST_P(GuardDogDeathTest, MultiKillDeathTest) {
   EXPECT_DEATH(die_function(), "");
 }
 
-//!
 TEST_P(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {
   // This does everything the death test does not except the final force check that
   // should actually result in dying. The death test does not verify that there
@@ -167,7 +165,6 @@ TEST_P(GuardDogAlmostDeadTest, MultiKillNoFinalCheckTest) {
   SetupForMultiDeath();
 }
 
-//!
 TEST_P(GuardDogAlmostDeadTest, NearDeathTest) {
   // This ensures that if only one thread surpasses the multiple kill threshold
   // there is no death. The positive case is covered in MultiKillDeathTest.
