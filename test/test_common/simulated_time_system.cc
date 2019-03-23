@@ -214,15 +214,13 @@ int64_t SimulatedTimeSystemHelper::nextIndex() {
   return index_++;
 }
 
-void SimulatedTimeSystemHelper::addAlarmLockHeld(
-    Alarm* alarm, const std::chrono::milliseconds& duration) {
+void SimulatedTimeSystemHelper::addAlarmLockHeld(Alarm* alarm,
+                                                 const std::chrono::milliseconds& duration) {
   alarm->setTimeLockHeld(monotonic_time_ + duration);
   alarms_.insert(alarm);
 }
 
-void SimulatedTimeSystemHelper::removeAlarmLockHeld(Alarm* alarm) {
-  alarms_.erase(alarm);
-}
+void SimulatedTimeSystemHelper::removeAlarmLockHeld(Alarm* alarm) { alarms_.erase(alarm); }
 
 SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& base_scheduler) {
   return std::make_unique<SimulatedScheduler>(*this, base_scheduler);

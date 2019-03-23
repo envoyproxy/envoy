@@ -35,11 +35,11 @@ public:
   /**
    * Defines a test interlock hook to enable tests to synchronize the guard-dog
    * execution so they can probe current counter values. The default
-   * implementation that runs in produciton has empty methods, which are
+   * implementation that runs in production has empty methods, which are
    * overridden in the implementation used during tests.
    */
   class TestInterlockHook {
-   public:
+  public:
     virtual ~TestInterlockHook() = default;
     virtual void signalFromImpl(Thread::MutexBasicLockable&, MonotonicTime) {}
     virtual void waitFromTest(Thread::MutexBasicLockable&, MonotonicTime) {}
@@ -70,18 +70,15 @@ public:
    * production binary.
    */
   void forceCheckForTest() {
-    Thread::LockGuard guard(exit_lock_);
+    Thread::LockGuard guard(mutex_);
     MonotonicTime now = time_source_.monotonicTime();
     wakeupLockHeld(std::chrono::milliseconds(0));
-    test_interlock_hook_->waitFromTest(exit_lock_, now);
+    test_interlock_hook_->waitFromTest(mutex_, now);
   }
 
   // Server::GuardDog
   WatchDogSharedPtr createWatchDog(Thread::ThreadIdPtr&& thread_id) override;
   void stopWatching(WatchDogSharedPtr wd) override;
-
-  // This is made visible to facilitate the test interlock implementation in guarddog_impl_test.cc.
-  Thread::MutexBasicLockable& exitLock() { return exit_lock_; }
 
 private:
   void threadRoutine();
@@ -94,7 +91,7 @@ private:
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
 
-  void wakeupLockHeld(std::chrono::milliseconds ms) EXCLUSIVE_LOCKS_REQUIRED(exit_lock_);
+  void wakeupLockHeld(std::chrono::milliseconds ms) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   struct WatchedDog {
     WatchDogSharedPtr dog_;
@@ -105,7 +102,6 @@ private:
 
   std::unique_ptr<TestInterlockHook> test_interlock_hook_;
   TimeSource& time_source_;
-  MonotonicTime step_time_; // Time at which step last occurred.
   const std::chrono::milliseconds miss_timeout_;
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;
@@ -118,12 +114,10 @@ private:
   Thread::ThreadPtr thread_;
   Event::DispatcherPtr dispatcher_;
   Event::TimerPtr loop_timer_;
-  Event::TimerPtr exit_timer_;
-  Event::TimerPtr wakeup_timer_;
-  Thread::MutexBasicLockable exit_lock_;
-  Thread::CondVar exit_event_;
-  bool pending_ GUARDED_BY(exit_lock_);
-  bool run_thread_ GUARDED_BY(exit_lock_);
+  Thread::MutexBasicLockable mutex_;
+  Thread::CondVar run_event_;
+  bool pending_ GUARDED_BY(mutex_);
+  bool run_thread_ GUARDED_BY(mutex_);
 };
 
 } // namespace Server

@@ -1,8 +1,7 @@
-#include <iostream>
-
 #include "server/guarddog_impl.h"
 
 #include <chrono>
+#include <iostream>
 #include <memory>
 
 #include "envoy/stats/scope.h"
@@ -20,10 +19,9 @@ namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
                            Api::Api& api, std::unique_ptr<TestInterlockHook>&& test_interlock)
-    : test_interlock_hook_(std::move(test_interlock)),
-      time_source_(api.timeSource()), miss_timeout_(config.wdMissTimeout()),
-      megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
-      multi_kill_timeout_(config.wdMultiKillTimeout()),
+    : test_interlock_hook_(std::move(test_interlock)), time_source_(api.timeSource()),
+      miss_timeout_(config.wdMissTimeout()), megamiss_timeout_(config.wdMegaMissTimeout()),
+      kill_timeout_(config.wdKillTimeout()), multi_kill_timeout_(config.wdMultiKillTimeout()),
       loop_interval_([&]() -> std::chrono::milliseconds {
         // The loop interval is simply the minimum of all specified intervals,
         // but we must account for the 0=disabled case. This lambda takes care
@@ -36,8 +34,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_miss_counter_(stats_scope.counter("server.watchdog_miss")),
       watchdog_megamiss_counter_(stats_scope.counter("server.watchdog_mega_miss")),
       dispatcher_(api.allocateDispatcher()),
-      loop_timer_(dispatcher_->createTimer([this]() { this->step(); })),
-      pending_(false),
+      loop_timer_(dispatcher_->createTimer([this]() { this->step(); })), pending_(false),
       run_thread_(true) {
   start(api);
 }
@@ -53,9 +50,9 @@ void GuardDogImpl::threadRoutine() {
     // Use a condvar to avoid spinning in Dispatcher::run() with no pending events. The
     // condvar is signaled when a timer is enabled.
     {
-      Thread::LockGuard guard(exit_lock_);
+      Thread::LockGuard guard(mutex_);
       while (!pending_ && run_thread_) {
-        exit_event_.wait(exit_lock_);
+        run_event_.wait(mutex_);
       }
       pending_ = false;
       if (!run_thread_) {
@@ -68,32 +65,27 @@ void GuardDogImpl::threadRoutine() {
 
 void GuardDogImpl::step() {
   {
-    Thread::LockGuard guard(exit_lock_);
+    Thread::LockGuard guard(mutex_);
     if (!run_thread_) {
       return;
     }
   }
 
-  {
-    // Sample the current time and hold it in a member variable, so that when
-    // calling the test-interlock hook in waitOrDetectStop, we are accurately
-    // reflecting how much has been evaluated so far. If we call
-    // time_source_.monotonicTime() again in waitOrDetectStop, time may have
-    // advanced beyond what this evaluation has seen, causing test flakes.
-    step_time_ = time_source_.monotonicTime();
+  const auto now = time_source_.monotonicTime();
 
+  {
     bool seen_one_multi_timeout(false);
     Thread::LockGuard guard(wd_lock_);
     for (auto& watched_dog : watched_dogs_) {
       const auto ltt = watched_dog.dog_->lastTouchTime();
-      const auto delta = step_time_ - ltt;
+      const auto delta = now - ltt;
       if (watched_dog.last_alert_time_ && watched_dog.last_alert_time_.value() < ltt) {
         watched_dog.miss_alerted_ = false;
         watched_dog.megamiss_alerted_ = false;
       }
       if (delta > miss_timeout_) {
         if (!watched_dog.miss_alerted_) {
-          //std::cerr << "watchdog_miss_counter\n";
+          // std::cerr << "watchdog_miss_counter\n";
           watchdog_miss_counter_.inc();
           watched_dog.last_alert_time_ = ltt;
           watched_dog.miss_alerted_ = true;
@@ -101,7 +93,7 @@ void GuardDogImpl::step() {
       }
       if (delta > megamiss_timeout_) {
         if (!watched_dog.megamiss_alerted_) {
-          //std::cerr << "watchdog_megamiss_counter\n";
+          // std::cerr << "watchdog_megamiss_counter\n";
           watchdog_megamiss_counter_.inc();
           watched_dog.last_alert_time_ = ltt;
           watched_dog.megamiss_alerted_ = true;
@@ -124,7 +116,13 @@ void GuardDogImpl::step() {
     }
   }
 
-  waitOrDetectStop();
+  {
+    Thread::LockGuard guard(mutex_);
+    test_interlock_hook_->signalFromImpl(mutex_, now);
+    if (run_thread_) {
+      wakeupLockHeld(loop_interval_);
+    }
+  }
 }
 
 WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadIdPtr&& thread_id) {
@@ -156,23 +154,15 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
   }
 }
 
-void GuardDogImpl::waitOrDetectStop() {
-  Thread::LockGuard guard(exit_lock_);
-  test_interlock_hook_->signalFromImpl(exit_lock_, step_time_);
-  if (run_thread_) {
-    wakeupLockHeld(loop_interval_);
-  }
-}
-
 void GuardDogImpl::start(Api::Api& api) {
-  Thread::LockGuard guard(exit_lock_);
+  Thread::LockGuard guard(mutex_);
   thread_ = api.threadFactory().createThread([this]() -> void { threadRoutine(); });
   wakeupLockHeld(std::chrono::milliseconds(0));
 }
 
 void GuardDogImpl::stop() {
   {
-    Thread::LockGuard guard(exit_lock_);
+    Thread::LockGuard guard(mutex_);
     run_thread_ = false;
     wakeupLockHeld(std::chrono::milliseconds(0));
   }
@@ -185,7 +175,7 @@ void GuardDogImpl::stop() {
 void GuardDogImpl::wakeupLockHeld(std::chrono::milliseconds ms) {
   loop_timer_->enableTimer(ms);
   pending_ = true;
-  exit_event_.notifyAll();
+  run_event_.notifyAll();
 }
 
 } // namespace Server

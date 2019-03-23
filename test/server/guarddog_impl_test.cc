@@ -26,7 +26,7 @@ namespace Server {
 namespace {
 
 class DebugTestInterlock : public GuardDogImpl::TestInterlockHook {
- public:
+public:
   virtual void signalFromImpl(Thread::MutexBasicLockable& mutex, MonotonicTime time)
       EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     impl_reached_ = time;
@@ -40,7 +40,7 @@ class DebugTestInterlock : public GuardDogImpl::TestInterlockHook {
     }
   }
 
- private:
+private:
   Thread::CondVar impl_;
   MonotonicTime impl_reached_; // GUARDED_BY(mutex_) = false;
 };
@@ -56,7 +56,7 @@ protected:
 
   void sleep(const Event::TimeSystem::Duration& duration) {
     time_system_.sleep(duration);
-    //time_system_.settle();
+    // time_system_.settle();
 
     /*
     MonotonicTime current_time = time_system_.monotonicTime();
@@ -111,7 +111,7 @@ protected:
     initGuardDog(fakestats_, config_kill_);
     unpet_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
     guard_dog_->forceCheckForTest();
-    sleep(std::chrono::milliseconds(99));  // 1 ms shy of death.
+    sleep(std::chrono::milliseconds(99)); // 1 ms shy of death.
   }
 
   /**
@@ -125,8 +125,7 @@ protected:
     guard_dog_->forceCheckForTest();
     auto second_dog_ = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
     guard_dog_->forceCheckForTest();
-    sleep(std::chrono::milliseconds(499));  // 1 ms shy of multi-death.
-
+    sleep(std::chrono::milliseconds(499)); // 1 ms shy of multi-death.
   }
 
   NiceMock<Configuration::MockMain> config_kill_;
@@ -144,7 +143,7 @@ TEST_F(GuardDogDeathTest, KillDeathTest) {
   // Is it German for "The Function"? Almost...
   auto die_function = [&]() -> void {
     SetupForDeath();
-    sleep(std::chrono::milliseconds(401));  // 400 ms past death.
+    sleep(std::chrono::milliseconds(401)); // 400 ms past death.
     guard_dog_->forceCheckForTest();
   };
 
@@ -164,7 +163,7 @@ TEST_F(GuardDogAlmostDeadTest, KillNoFinalCheckTest) {
 TEST_F(GuardDogDeathTest, MultiKillDeathTest) {
   auto die_function = [&]() -> void {
     SetupForMultiDeath();
-    sleep(std::chrono::milliseconds(2));  // 1 ms past multi-death.
+    sleep(std::chrono::milliseconds(2)); // 1 ms past multi-death.
     guard_dog_->forceCheckForTest();
   };
   EXPECT_DEATH(die_function(), "");
