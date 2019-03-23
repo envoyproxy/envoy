@@ -49,7 +49,7 @@ public:
    * @param stats_scope Statistics scope to write watchdog_miss and
    * watchdog_mega_miss events into.
    * @param config Configuration object.
-   * @param api API pobject.a
+   * @param api API object.
    * @param test_interlock a hook for enabling interlock with unit tests.
    *
    * See the configuration documentation for details on the timeout settings.

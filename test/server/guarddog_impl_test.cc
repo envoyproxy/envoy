@@ -5,6 +5,7 @@
 #include "envoy/common/time.h"
 
 #include "common/api/api_impl.h"
+#include "common/common/macros.h"
 #include "common/common/utility.h"
 
 #include "server/guarddog_impl.h"
@@ -29,6 +30,7 @@ class DebugTestInterlock : public GuardDogImpl::TestInterlockHook {
 public:
   virtual void signalFromImpl(Thread::MutexBasicLockable& mutex, MonotonicTime time)
       EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+    UNREFERENCED_PARAMETER(mutex);
     impl_reached_ = time;
     impl_.notifyAll();
   }
@@ -42,7 +44,7 @@ public:
 
 private:
   Thread::CondVar impl_;
-  MonotonicTime impl_reached_; // GUARDED_BY(mutex_) = false;
+  MonotonicTime impl_reached_;
 };
 
 class GuardDogTestBase : public testing::Test {
