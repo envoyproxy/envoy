@@ -41,7 +41,17 @@ public:
   class TestInterlockHook {
   public:
     virtual ~TestInterlockHook() = default;
-    virtual void signalFromImpl(Thread::MutexBasicLockable&, MonotonicTime) {}
+
+    /**
+     * Called from GuardDogImpl to indicate that it has evaluated all watch-dogs
+     * up to a particular point in time.
+     */
+    virtual void signalFromImpl(MonotonicTime) {}
+
+    /**
+     * Called from GuardDog tests to block until the implementation has reached
+     * the desired point in time.
+     */
     virtual void waitFromTest(Thread::MutexBasicLockable&, MonotonicTime) {}
   };
 

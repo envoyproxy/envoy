@@ -32,7 +32,7 @@ public:
 
   void disableTimerLockHeld() EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_);
 
-  void setTimeLockHeld(MonotonicTime time) { // EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_)
+  void setTimeLockHeld(MonotonicTime time) EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
     time_ = time;
   }
 
@@ -54,7 +54,7 @@ public:
     time_system_.mutex_.lock();
   }
 
-  MonotonicTime time() const { //  EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_)
+  MonotonicTime time() const EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
     ASSERT(armed_);
     return time_;
   }
@@ -69,14 +69,15 @@ private:
 
   TimerPtr base_timer_;
   SimulatedTimeSystemHelper& time_system_;
-  MonotonicTime time_; // GUARDED_BY(time_system_.mutex_);
+  MonotonicTime time_ GUARDED_BY(time_system_.mutex_);
   const uint64_t index_;
-  bool armed_; // GUARDED_BY(time_system_.mutex_);
+  bool armed_ GUARDED_BY(time_system_.mutex_);
 };
 
 // Compare two alarms, based on wakeup time and insertion order. Returns true if
 // a comes before b.
-bool SimulatedTimeSystemHelper::CompareAlarms::operator()(const Alarm* a, const Alarm* b) const {
+bool SimulatedTimeSystemHelper::CompareAlarms::
+operator()(const Alarm* a, const Alarm* b) const NO_THREAD_SAFETY_ANALYSIS {
   if (a != b) {
     if (a->time() < b->time()) {
       return true;
@@ -172,9 +173,9 @@ void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
   setMonotonicTimeAndUnlock(monotonic_time);
 }
 
-Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(Thread::MutexBasicLockable& mutex,
-                                                               Thread::CondVar& condvar,
-                                                               const Duration& duration) noexcept {
+Thread::CondVar::WaitStatus
+SimulatedTimeSystemHelper::waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+                                   const Duration& duration) noexcept NO_THREAD_SAFETY_ANALYSIS {
   const Duration real_time_poll_delay(
       std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
   const MonotonicTime end_time = monotonicTime() + duration;
@@ -214,8 +215,8 @@ int64_t SimulatedTimeSystemHelper::nextIndex() {
   return index_++;
 }
 
-void SimulatedTimeSystemHelper::addAlarmLockHeld(Alarm* alarm,
-                                                 const std::chrono::milliseconds& duration) {
+void SimulatedTimeSystemHelper::addAlarmLockHeld(
+    Alarm* alarm, const std::chrono::milliseconds& duration) NO_THREAD_SAFETY_ANALYSIS {
   alarm->setTimeLockHeld(monotonic_time_ + duration);
   alarms_.insert(alarm);
 }
@@ -226,7 +227,8 @@ SchedulerPtr SimulatedTimeSystemHelper::createScheduler(Scheduler& base_schedule
   return std::make_unique<SimulatedScheduler>(*this, base_scheduler);
 }
 
-void SimulatedTimeSystemHelper::setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) {
+void SimulatedTimeSystemHelper::setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time)
+    NO_THREAD_SAFETY_ANALYSIS {
   // We don't have a convenient LockGuard construct that allows temporarily
   // dropping the lock to run a callback. The main issue here is that we must
   // be careful not to be holding mutex_ when an exception can be thrown.

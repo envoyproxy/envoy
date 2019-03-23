@@ -116,7 +116,7 @@ void GuardDogImpl::step() {
 
   {
     Thread::LockGuard guard(mutex_);
-    test_interlock_hook_->signalFromImpl(mutex_, now);
+    test_interlock_hook_->signalFromImpl(now);
     if (run_thread_) {
       wakeupLockHeld(loop_interval_);
     }
