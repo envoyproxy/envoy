@@ -66,8 +66,10 @@ private:
   friend SimulatedTimeSystemHelper::CompareAlarms;
 
   void runAlarm(TimerCb cb) {
+    // Capture time_system_ in a local in case the alarm gets deleted in the callback.
+    SimulatedTimeSystemHelper& time_system = time_system_;
     cb();
-    time_system_.decPending();
+    time_system.decPending();
   }
 
   TimerPtr base_timer_;

@@ -58,12 +58,11 @@ protected:
       : time_system_(makeTimeSystem()), api_(Api::createApiForTest(stats_store_, *time_system_)) {}
 
   static std::unique_ptr<Event::TestTimeSystem> makeTimeSystem() {
-    switch (GetParam()) {
-    case TimeSystemType::Real:
+    if (GetParam() == TimeSystemType::Real) {
       return std::make_unique<Event::GlobalTimeSystem>();
-    case TimeSystemType::Simulated:
-      return std::make_unique<Event::SimulatedTimeSystem>();
     }
+    ASSERT(GetParam() == TimeSystemType::Simulated);
+    return std::make_unique<Event::SimulatedTimeSystem>();
   }
 
   void initGuardDog(Stats::Scope& stats_scope, const Server::Configuration::Main& config) {
