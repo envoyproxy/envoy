@@ -467,6 +467,24 @@ requests that spans are sampled and reported.
 
 .. _config_http_conn_man_headers_custom_request_headers:
 
+x-instana-t
+-----------
+
+The *x-instana-t* HTTP header is used by the Instana tracer in Envoy.
+The hex-encoded 64-bit value represents the ID of the overall distributed trace,
+and is used to correlate all spans which are part of the same distributed trace.
+
+.. _config_http_conn_man_headers_x-instana-t:
+
+x-instana-s
+-----------
+
+The *x-instana-s* HTTP header is used by the Instana tracer in Envoy.
+The hex-encoded 64-bit value represents the ID of parent Span ID of the calling context,
+and is used to create parent-child relationships between spans.
+
+.. _config_http_conn_man_headers_x-instana-s:
+
 Custom request/response headers
 -------------------------------
 
