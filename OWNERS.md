@@ -18,7 +18,7 @@ routing PRs, questions, etc. to the right place.
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
-  * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), bazel, build
+  * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
     issues, and CI in general.
 
 # Maintainers
