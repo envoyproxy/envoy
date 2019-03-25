@@ -329,11 +329,11 @@ private:
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
     void chargeStats(const HeaderMap& headers);
     // Returns the encoder filter to start iteration with. If the function is called from a filter
-    // that should always iterate from the next filter, sets always_start_next to be true.
+    // that should always iterate from the next filter, always_start_next should be set to true.
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream, bool always_start_next);
     // Returns the decoder filter to start iteration with. If the function is called from a filter
-    // that should always iterate from the next filter, sets always_start_next to be true.
+    // that should always iterate from the next filter, always_start_next should be set to true.
     std::list<ActiveStreamDecoderFilterPtr>::iterator
     commonDecodePrefix(ActiveStreamDecoderFilter* filter, bool always_start_next);
     const Network::Connection* connection();
