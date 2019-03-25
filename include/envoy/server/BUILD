@@ -171,6 +171,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "lifecycle_notifier_interface",
     hdrs = ["lifecycle_notifier.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+    ],
 )
 
 envoy_cc_library(

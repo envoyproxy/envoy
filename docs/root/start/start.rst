@@ -24,8 +24,8 @@ A very minimal Envoy configuration that can be used to validate basic plain HTTP
 proxying is available in :repo:`configs/google_com_proxy.v2.yaml`. This is not
 intended to represent a realistic Envoy deployment::
 
-  $ docker pull envoyproxy/envoy:latest
-  $ docker run --rm -d -p 10000:10000 envoyproxy/envoy:latest
+  $ docker pull envoyproxy/envoy-dev:latest
+  $ docker run --rm -d -p 10000:10000 envoyproxy/envoy-dev:latest
   $ curl -v localhost:10000
 
 The Docker image used will contain the latest version of Envoy
@@ -115,7 +115,7 @@ You can refer to the :ref:`Command line options <operations_cli>`.
 
 .. code-block:: none
 
-  FROM envoyproxy/envoy:latest
+  FROM envoyproxy/envoy-dev:latest
   COPY envoy.yaml /etc/envoy/envoy.yaml
 
 Build the Docker image that runs your configuration using::
@@ -138,7 +138,7 @@ by using a volume.
   version: '3'
   services:
     envoy:
-      image: envoyproxy/envoy:latest
+      image: envoyproxy/envoy-dev:latest
       ports:
         - "10000:10000"
       volumes:

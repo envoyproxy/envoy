@@ -194,6 +194,7 @@ public:
 
   // ServerLifecycleNotifier
   void registerCallback(Stage stage, StageCallback callback) override;
+  void registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
@@ -204,7 +205,7 @@ private:
   uint64_t numConnections();
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(Stage stage);
+  void notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb = [] {});
 
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
@@ -260,6 +261,7 @@ private:
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
   std::unordered_map<Stage, std::vector<StageCallback>> stage_callbacks_;
+  std::unordered_map<Stage, std::vector<StageCallbackWithCompletion>> stage_completable_callbacks_;
 };
 
 } // namespace Server

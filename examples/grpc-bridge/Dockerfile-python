@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy:latest
+FROM envoyproxy/envoy-dev:latest
 
 RUN apt-get update
 RUN apt-get -q install -y python-dev \

@@ -2,6 +2,7 @@
 
 #include <signal.h>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -535,8 +536,7 @@ void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");
   shutdown_ = true;
   restarter_.terminateParent();
-  notifyCallbacksForStage(Stage::ShutdownExit);
-  dispatcher_->exit();
+  notifyCallbacksForStage(Stage::ShutdownExit, [this] { dispatcher_->exit(); });
 }
 
 void InstanceImpl::shutdownAdmin() {
@@ -556,13 +556,37 @@ void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {
   stage_callbacks_[stage].push_back(callback);
 }
 
-void InstanceImpl::notifyCallbacksForStage(Stage stage) {
+void InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
+  ASSERT(stage == Stage::ShutdownExit);
+  stage_completable_callbacks_[stage].push_back(callback);
+}
+
+void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
   auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {
       callback();
     }
+  }
+
+  auto it2 = stage_completable_callbacks_.find(stage);
+  if (it2 != stage_completable_callbacks_.end()) {
+    ASSERT(!it2->second.empty());
+    // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
+    // have finished their work.
+    auto completion_cb_count = std::make_shared<int>(it2->second.size());
+    Event::PostCb wrapped_cb = [this, completion_cb, completion_cb_count] {
+      ASSERT(std::this_thread::get_id() == main_thread_id_);
+      if (--*completion_cb_count == 0) {
+        completion_cb();
+      }
+    };
+    for (const StageCallbackWithCompletion& callback : it2->second) {
+      callback(wrapped_cb);
+    }
+  } else {
+    completion_cb();
   }
 }
 
