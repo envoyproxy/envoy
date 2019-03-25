@@ -78,6 +78,10 @@ Alternatively the trace context can be manually propagated by the service:
   :ref:`config_http_conn_man_headers_x-datadog-parent-id`,
   :ref:`config_http_conn_man_headers_x-datadog-sampling-priority`).
 
+* When using the Instana tracer, Envoy relies on the service to propagate then Instana-specific HTTP headers (
+  :ref:`config_http_conn_man_headers_x-instana-t`,
+  :ref:`config_http_conn_man_headers_x-instana-s`).
+
 What data each trace contains
 -----------------------------
 An end-to-end trace is comprised of one or more spans. A
