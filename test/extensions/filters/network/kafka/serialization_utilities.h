@@ -3,6 +3,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/stack_array.h"
 
+#include "extensions/filters/network/kafka/request_codec.h"
 #include "extensions/filters/network/kafka/serialization.h"
 
 #include "absl/strings/string_view.h"
@@ -18,19 +19,10 @@ namespace Kafka {
  * by 'difference' bytes.
  */
 void assertStringViewIncrement(absl::string_view incremented, absl::string_view original,
-                               size_t difference) {
-
-  ASSERT_EQ(incremented.data(), original.data() + difference);
-  ASSERT_EQ(incremented.size(), original.size() - difference);
-}
+                               size_t difference);
 
 // Helper function converting buffer to raw bytes.
-const char* getRawData(const Buffer::OwnedImpl& buffer) {
-  uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
-  buffer.getRawSlices(slices.begin(), num_slices);
-  return reinterpret_cast<const char*>((slices[0]).mem_);
-}
+const char* getRawData(const Buffer::OwnedImpl& buffer);
 
 // Exactly what is says on the tin:
 // 1. serialize expected using Encoder,
@@ -120,6 +112,27 @@ template <typename BT, typename AT> void serializeThenDeserializeAndCheckEqualit
   serializeThenDeserializeAndCheckEqualityInOneGo<BT>(expected);
   serializeThenDeserializeAndCheckEqualityWithChunks<BT>(expected);
 }
+
+/**
+ * Request callback that captures the messages.
+ */
+class CapturingRequestCallback : public RequestCallback {
+public:
+  /**
+   * Stores the message.
+   */
+  virtual void onMessage(MessageSharedPtr request) override;
+
+  /**
+   * Returns the stored messages.
+   */
+  const std::vector<MessageSharedPtr>& getCaptured() const;
+
+private:
+  std::vector<MessageSharedPtr> captured_;
+};
+
+typedef std::shared_ptr<CapturingRequestCallback> CapturingRequestCallbackSharedPtr;
 
 } // namespace Kafka
 } // namespace NetworkFilters

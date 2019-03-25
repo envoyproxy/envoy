@@ -1,5 +1,6 @@
 #include "extensions/filters/network/kafka/request_codec.h"
 
+#include "test/extensions/filters/network/kafka/serialization_utilities.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gtest/gtest.h"
@@ -15,24 +16,6 @@ protected:
 
   Buffer::OwnedImpl buffer_;
 };
-
-class CapturingRequestCallback : public RequestCallback {
-public:
-  virtual void onMessage(MessageSharedPtr request) override;
-
-  const std::vector<MessageSharedPtr>& getCaptured() const;
-
-private:
-  std::vector<MessageSharedPtr> captured_;
-};
-
-typedef std::shared_ptr<CapturingRequestCallback> CapturingRequestCallbackSharedPtr;
-
-void CapturingRequestCallback::onMessage(MessageSharedPtr message) { captured_.push_back(message); }
-
-const std::vector<MessageSharedPtr>& CapturingRequestCallback::getCaptured() const {
-  return captured_;
-}
 
 // Other request types are tested in (generated) 'request_codec_request_integration_test.cc'.
 TEST_F(RequestDecoderTest, shouldProduceAbortedMessageOnUnknownData) {

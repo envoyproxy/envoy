@@ -14,9 +14,11 @@ envoy_package()
 
 envoy_cc_test_library(
     name = "serialization_utilities_lib",
+    srcs = ["serialization_utilities.cc"],
     hdrs = ["serialization_utilities.h"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
         "//source/extensions/filters/network/kafka:serialization_lib",
     ],
 )
@@ -82,6 +84,7 @@ envoy_extension_cc_test(
     srcs = ["request_codec_integration_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
+        ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
         "//test/mocks/server:server_mocks",
     ],
@@ -92,6 +95,7 @@ envoy_extension_cc_test(
     srcs = ["request_codec_request_integration_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
+        ":serialization_utilities_lib",
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
         "//test/mocks/server:server_mocks",
     ],
