@@ -972,23 +972,26 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
                                                           factory_context, validate_clusters));
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
+      bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
           throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
       } else if (domain.size() > 0 && '*' == domain[0]) {
-        wildcard_virtual_host_suffixes_[domain.size() - 1].emplace(domain.substr(1), virtual_host);
+        duplicate_found = !wildcard_virtual_host_suffixes_[domain.size() - 1]
+                               .emplace(domain.substr(1), virtual_host)
+                               .second;
       } else if (domain.size() > 0 && '*' == domain[domain.size() - 1]) {
-        wildcard_virtual_host_prefixes_[domain.size() - 1].emplace(
-            domain.substr(0, domain.size() - 1), virtual_host);
+        duplicate_found = !wildcard_virtual_host_prefixes_[domain.size() - 1]
+                               .emplace(domain.substr(0, domain.size() - 1), virtual_host)
+                               .second;
       } else {
-        if (virtual_hosts_.find(domain) != virtual_hosts_.end()) {
-          throw EnvoyException(fmt::format(
-              "Only unique values for domains are permitted. Duplicate entry of domain {}",
-              domain));
-        }
-        virtual_hosts_.emplace(domain, virtual_host);
+        duplicate_found = !virtual_hosts_.emplace(domain, virtual_host).second;
+      }
+      if (duplicate_found) {
+        throw EnvoyException(fmt::format(
+            "Only unique values for domains are permitted. Duplicate entry of domain {}", domain));
       }
     }
   }
@@ -1018,7 +1021,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& headers) const {
   // Fast path the case where we only have a default virtual host.
   if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
-      wildcard_virtual_host_prefixes_.empty() && default_virtual_host_) {
+      wildcard_virtual_host_prefixes_.empty()) {
     return default_virtual_host_.get();
   }
 

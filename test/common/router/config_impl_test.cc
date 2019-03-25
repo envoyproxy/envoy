@@ -2740,6 +2740,105 @@ virtual_hosts:
       "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com");
 }
 
+TEST_F(RouteMatcherTest, TestDuplicateWildcardDomainConfig) {
+  const std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    },
+    {
+      "name": "www2_staging",
+      "domains": ["*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2_staging"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context_, true), EnvoyException,
+      "Only a single wildcard domain is permitted");
+}
+
+TEST_F(RouteMatcherTest, TestDuplicateSuffixWildcardDomainConfig) {
+  const std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["*.lyft.com"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    },
+    {
+      "name": "www2_staging",
+      "domains": ["*.LYFT.COM"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2_staging"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context_, true), EnvoyException,
+      "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com");
+}
+
+TEST_F(RouteMatcherTest, TestDuplicatePrefixWildcardDomainConfig) {
+  const std::string json = R"EOF(
+{
+  "virtual_hosts": [
+    {
+      "name": "www2",
+      "domains": ["bar.*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2"
+        }
+      ]
+    },
+    {
+      "name": "www2_staging",
+      "domains": ["BAR.*"],
+      "routes": [
+        {
+          "prefix": "/",
+          "cluster": "www2_staging"
+        }
+      ]
+    }
+  ]
+}
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromJson(json), factory_context_, true), EnvoyException,
+      "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
+}
+
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
                                                   bool ssl, bool internal) {
   Http::TestHeaderMapImpl headers{
