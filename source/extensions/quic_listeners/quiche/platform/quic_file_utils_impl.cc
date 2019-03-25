@@ -4,26 +4,29 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/filesystem/filesystem_impl.h"
-#include "common/filesystem/directory.h""
 #include "extensions/quic_listeners/quiche/platform/quic_file_utils_impl.h"
+
+#include "common/filesystem/directory.h"
+#include "common/filesystem/filesystem_impl.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace quic {
 
 void DFTraverseDirectory(const std::string& dirname, std::vector<std::string>& files) {
-   Filesystem::Directory directory(dirname);
-  for (const Filesystem::DirectoryEntry& entry : directory) {
+  Envoy::Filesystem::Directory directory(dirname);
+  for (const Envoy::Filesystem::DirectoryEntry& entry : directory) {
     switch (entry.type_) {
-      case Envoy::Filesystem::Regular:
-        files.push_back(absl::StrCat(dirnam, "/", entry.name_));
-        break;
-      case Envoy::Filesystem::Directory:
-        if (entry.name_ != "." && entry.name_ != "..") {
-          DFTraverseDirectory(absl::StrCat(dirnam, "/", entry.name_), files);
-        }
-        break;
-      default:
-        ASSERT(false) << "Unknow file entry under directory " << dirname;
+    case Envoy::Filesystem::FileType::Regular:
+      files.push_back(absl::StrCat(dirname, "/", entry.name_));
+      break;
+    case Envoy::Filesystem::FileType::Directory:
+      if (entry.name_ != "." && entry.name_ != "..") {
+        DFTraverseDirectory(absl::StrCat(dirname, "/", entry.name_), files);
+      }
+      break;
+    default:
+      ASSERT(false, "Unknow file entry under directory " + dirname);
     }
   }
 }
@@ -37,9 +40,12 @@ std::vector<std::string> ReadFileContentsImpl(const std::string& dirname) {
 
 // Reads the contents of |filename| as a string into |contents|.
 void ReadFileContentsImpl(QuicStringPiece filename, std::string* contents) {
-  Envoy::Filesystem::InstanceImpl fs;
-  *contents = fs.fileReadToEnd(filename);
+#ifdef WIN32
+  Envoy::Filesystem::InstanceImplWin32 fs;
+#else
+  Envoy::Filesystem::InstanceImplPosix fs;
+#endif
+  *contents = fs.fileReadToEnd(std::string(filename.data(), filename.size()));
 }
 
-
-}  // namespace quic
+} // namespace quic

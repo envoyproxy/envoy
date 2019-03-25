@@ -100,7 +100,10 @@ cc_library(
 cc_library(
     name = "quic_platform",
     srcs = ["quiche/quic/platform/api/quic_mutex.cc"] + envoy_select_quiche(
-        ["quiche/quic/platform/api/quic_hostname_utils.cc"],
+        [
+            "quiche/quic/platform/api/quic_hostname_utils.cc",
+            "quiche/quic/platform/api/quic_file_utils.cc",
+        ],
         "@envoy",
     ),
     hdrs = [
@@ -108,7 +111,10 @@ cc_library(
         "quiche/quic/platform/api/quic_mutex.h",
         "quiche/quic/platform/api/quic_str_cat.h",
     ] + envoy_select_quiche(
-        ["quiche/quic/platform/api/quic_hostname_utils.h"],
+        [
+            "quiche/quic/platform/api/quic_hostname_utils.h",
+            "quiche/quic/platform/api/quic_file_utils.h",
+        ],
         "@envoy",
     ),
     visibility = ["//visibility:public"],
@@ -154,7 +160,6 @@ cc_library(
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_clock.h",
         # "quiche/quic/platform/api/quic_expect_bug.h",
-        # "quiche/quic/platform/api/quic_file_utils.h",
         # "quiche/quic/platform/api/quic_flags.h",
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
         # "quiche/quic/platform/api/quic_goog_cc_sender.h",

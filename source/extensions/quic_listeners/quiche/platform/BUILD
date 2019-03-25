@@ -60,7 +60,9 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
-    srcs = envoy_select_quiche(["quic_logging_impl.cc"]),
+    srcs = envoy_select_quiche([
+        "quic_logging_impl.cc",
+    ]),
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
@@ -99,6 +101,8 @@ envoy_cc_library(
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
+        "//source/common/filesystem:directory_lib",
+        "//source/common/filesystem:filesystem_lib",
     ]),
 )
 
@@ -107,6 +111,7 @@ envoy_cc_library(
     srcs = ["quic_cert_utils_impl.cc"] + envoy_select_quiche([
         "quic_hostname_utils_impl.cc",
         "quic_test_output_impl.cc",
+        "quic_file_utils_impl.cc",
     ]),
     hdrs = [
         "quic_cert_utils_impl.h",
@@ -114,6 +119,7 @@ envoy_cc_library(
         "quic_str_cat_impl.h",
     ] + envoy_select_quiche([
         "quic_bug_tracker_impl.h",
+        "quic_file_utils_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_string_utils_impl.h",
         "quic_test_output_impl.h",
