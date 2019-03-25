@@ -1,7 +1,6 @@
 #include "server/guarddog_impl.h"
 
 #include <chrono>
-#include <iostream>
 #include <memory>
 
 #include "envoy/stats/scope.h"
