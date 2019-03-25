@@ -24,8 +24,6 @@ struct ResourceNameDiff {
   std::vector<std::string> removed_;
 };
 
-const char EmptyVersion[] = "";
-
 /**
  * Manages the logic of a (non-aggregated) delta xDS subscription.
  * TODO(fredlas) add aggregation support.
@@ -62,10 +60,10 @@ public:
                         resources.end(), std::inserter(diff.removed_, diff.removed_.begin()));
 
     for (const auto& added : diff.added_) {
-      insertOrUpdateResourceVersion(added, EmptyVersion);
+      setResourceWaitingForServer(added);
     }
     for (const auto& removed : diff.removed_) {
-      eraseResourceVersion(removed);
+      lostInterestInResource(removed);
     }
     queueDiscoveryRequest(diff);
   }
@@ -123,7 +121,7 @@ public:
                       const std::string& version_info) {
     callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
     for (const auto& resource : added_resources) {
-      insertOrUpdateResourceVersion(resource.name(), resource.version());
+      setResourceVersion(resource.name(), resource.version());
     }
     // If a resource is gone, there is no longer a meaningful version for it that makes sense to
     // provide to the server upon stream reconnect: either it will continue to not exist, in which
@@ -135,7 +133,7 @@ public:
     // cancelling my subscription" when we lose interest.
     for (const auto& resource_name : removed_resources) {
       if (resource_names_.find(resource_name) != resource_names_.end()) {
-        insertOrUpdateResourceVersion(resource_name, EmptyVersion);
+        setResourceWaitingForServer(resource_name);
       }
     }
     stats_.update_success_.inc();
@@ -174,9 +172,11 @@ public:
 
     request_.Clear();
     for (auto const& resource : resource_versions_) {
-      // See comment on resource_versions_ declaration for why we need this if.
-      if (!resource.second.empty()) {
-        (*request_.mutable_initial_resource_versions())[resource.first] = resource.second;
+      // Populate initial_resource_versions with the resource versions we currently have. Resources
+      // we are interested in, but are still waiting to get any version of from the server, do not
+      // belong in initial_resource_versions.
+      if (!resource.second.waitingForServer()) {
+        (*request_.mutable_initial_resource_versions())[resource.first] = resource.second.version();
       }
     }
     request_.set_type_url(type_url_);
@@ -226,28 +226,50 @@ private:
     }
   }
 
+  class ResourceVersion {
+  public:
+    explicit ResourceVersion(absl::string_view version) : version_(version) {}
+    // Builds a ResourceVersion in the waitingForServer state.
+    ResourceVersion() {}
+
+    // If true, we currently have no version of this resource - we are waiting for the server to
+    // provide us with one.
+    bool waitingForServer() const { return version_ == absl::nullopt; }
+    // Must not be called if waitingForServer() == true.
+    std::string version() const {
+      ASSERT(version_.has_value());
+      return version_.value_or("");
+    }
+
+  private:
+    absl::optional<std::string> version_;
+  };
+
   // Use these helpers to avoid forgetting to update both at once.
-  void insertOrUpdateResourceVersion(const std::string& key, const std::string& val) {
-    resource_versions_[key] = val;
-    resource_names_.insert(key);
+  void setResourceVersion(const std::string& resource_name, const std::string& resource_version) {
+    resource_versions_[resource_name] = ResourceVersion(resource_version);
+    resource_names_.insert(resource_name);
   }
 
-  void eraseResourceVersion(const std::string& key) {
-    resource_versions_.erase(key);
-    resource_names_.erase(key);
+  void setResourceWaitingForServer(const std::string& resource_name) {
+    resource_versions_[resource_name] = ResourceVersion();
+    resource_names_.insert(resource_name);
   }
 
-  // A map from resource name to per-resource version. Entries having EmptyVersion (which is just
-  // the empty string) are those which we are interested in, but have not gotten any version of from
-  // the server. We need these placeholders to know what to include in a delta discovery request:
-  // imagine we have lost interest in a resource the server never sent us. We need to inform the
-  // server that we no longer care, and if we didn't have an entry in resource_versions_ we wouldn't
-  // know to. On the other hand, when resource_versions_ is used to populate
-  // initial_resource_versions in a stream reconnect, we must leave these out.
-  std::unordered_map<std::string, std::string> resource_versions_;
+  void lostInterestInResource(const std::string& resource_name) {
+    resource_versions_.erase(resource_name);
+    resource_names_.erase(resource_name);
+  }
+
+  // A map from resource name to per-resource version. The keys of this map are exactly the resource
+  // names we are currently interested in. Those in the waitingForServer state currently don't have
+  // any version for that resource: we need to inform the server if we lose interest in them, but we
+  // also need to *not* include them in the initial_resource_versions map upon a reconnect.
+  std::unordered_map<std::string, ResourceVersion> resource_versions_;
   // The keys of resource_versions_. Only tracked separately because std::map does not provide an
   // iterator into just its keys, e.g. for use in std::set_difference.
   std::unordered_set<std::string> resource_names_;
+
   const std::string type_url_;
   SubscriptionCallbacks<ResourceType>* callbacks_{};
   // In-flight or previously sent request.
@@ -257,7 +279,6 @@ private:
   absl::optional<ResourceNameDiff> pending_;
 
   const LocalInfo::LocalInfo& local_info_;
-
   SubscriptionStats stats_;
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;
