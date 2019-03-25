@@ -70,7 +70,8 @@ public:
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
     helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
-                                          init_manager_, init_watcher_, overload_manager_);
+                                          init_manager_, overload_manager_,
+                                          [this] { start_workers_.ready(); });
   }
 
   NiceMock<MockInstance> server_;
@@ -80,7 +81,7 @@ public:
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
   Init::ManagerImpl init_manager_{""};
-  Init::ExpectableWatcherImpl init_watcher_;
+  ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
   Event::MockSignalEvent* sigterm_;
@@ -91,30 +92,27 @@ public:
 };
 
 TEST_F(RunHelperTest, Normal) {
-  EXPECT_CALL(init_watcher_, ready());
+  EXPECT_CALL(start_workers_, ready());
   cm_init_callback_();
 }
 
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
-  EXPECT_CALL(init_watcher_, ready()).Times(0);
+  EXPECT_CALL(start_workers_, ready()).Times(0);
   sigterm_->callback_();
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
 }
 
-// TODO(mergeconflict): this test isn't valid anymore, since the "if (!shutdown) startWorkers()"
-// logic has moved into InstanceImpl. But it's important behavior. Figure out what to do instead.
-//
-// TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
-//   EXPECT_CALL(init_watcher_, ready()).Times(0);
-//   Init::ExpectableTargetImpl target;
-//   init_manager_.add(target);
-//   EXPECT_CALL(target, initialize());
-//   cm_init_callback_();
-//   sigterm_->callback_();
-//   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
-//   target.ready();
-// }
+TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
+  EXPECT_CALL(start_workers_, ready()).Times(0);
+  Init::ExpectableTargetImpl target;
+  init_manager_.add(target);
+  EXPECT_CALL(target, initialize());
+  cm_init_callback_();
+  sigterm_->callback_();
+  EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
+  target.ready();
+}
 
 // Class creates minimally viable server instance for testing.
 class ServerInstanceImplTest : public testing::TestWithParam<Network::Address::IpVersion> {

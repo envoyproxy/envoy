@@ -122,10 +122,11 @@ class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
   RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
             Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-            Init::Manager& init_manager, const Init::Watcher& init_watcher,
-            OverloadManager& overload_manager);
+            Init::Manager& init_manager, OverloadManager& overload_manager,
+            std::function<void()> workers_start_cb);
 
 private:
+  Init::WatcherImpl init_watcher_;
   Event::SignalEventPtr sigterm_;
   Event::SignalEventPtr sigint_;
   Event::SignalEventPtr sig_usr_1_;
@@ -209,9 +210,8 @@ private:
 
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
-  // occur at any point during member lifetime.
+  // occur at any point during member lifetime. This init manager is populated with LdsApi targets.
   Init::ManagerImpl init_manager_{"Server"};
-  Init::WatcherImpl init_watcher_;
   // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
   // only after these members can no longer reference it, since:
   // - There may be active filter chains referencing it in listener_manager_.

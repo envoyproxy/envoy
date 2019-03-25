@@ -672,8 +672,15 @@ protected:
    */
   void onInitDone();
 
+  // This init manager is shared via TransportSocketFactoryContext. The initialization targets that
+  // register with this init manager are expected to be for implementations of SdsApi (see
+  // SdsApi::init_target_).
   Init::ManagerImpl init_manager_;
+
+  // Once all targets are initialized (i.e. once all dynamic secrets are loaded), this watcher calls
+  // onInitDone() above.
   Init::WatcherImpl init_watcher_;
+
   Runtime::Loader& runtime_;
   ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
                                    // initialized first and destroyed last.

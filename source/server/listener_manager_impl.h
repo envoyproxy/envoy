@@ -403,7 +403,13 @@ private:
   const bool modifiable_;
   const bool workers_started_;
   const uint64_t hash_;
+
+  // This init manager is populated with targets from the filter chain factories, namely
+  // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   Init::ManagerImpl dynamic_init_manager_;
+
+  // This init watcher notifies the "parent" listener manager when listener initialization is
+  // complete (assuming it wasn't explicitly canceled in destruction).
   Init::WatcherImpl init_watcher_;
   bool initialize_canceled_{};
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;

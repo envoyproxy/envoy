@@ -55,13 +55,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
                            Filesystem::Instance& file_system)
-    : init_watcher_("InstanceImpl",
-                    [this]() {
-                      if (!shutdown_) {
-                        startWorkers();
-                      }
-                    }),
-      secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
+    : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
       options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system)),
@@ -418,9 +412,13 @@ uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnectio
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-                     Init::Manager& init_manager, const Init::Watcher& init_watcher,
-                     OverloadManager& overload_manager) {
-
+                     Init::Manager& init_manager, OverloadManager& overload_manager,
+                     std::function<void()> workers_start_cb)
+    : init_watcher_("RunHelper", [&instance, workers_start_cb]() {
+        if (!instance.isShutdown()) {
+          workers_start_cb();
+        }
+      }) {
   // Setup signals.
   if (options.signalHandlingEnabled()) {
     sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
@@ -451,7 +449,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // this can fire immediately if all clusters have already initialized. Also note that we need
   // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
   // starts.
-  cm.setInitializedCb([&instance, &init_manager, &init_watcher, &cm]() {
+  cm.setInitializedCb([&instance, &init_manager, &cm, this]() {
     if (instance.isShutdown()) {
       return;
     }
@@ -462,7 +460,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
-    init_manager.initialize(init_watcher);
+    init_manager.initialize(init_watcher_);
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
@@ -471,11 +469,20 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 }
 
 void InstanceImpl::run() {
-  // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
-  // we save it as a member variable.
-  run_helper_ = std::make_unique<RunHelper>(*this, options_, *dispatcher_, clusterManager(),
-                                            access_log_manager_, init_manager_, init_watcher_,
-                                            overloadManager());
+  // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
+  // startup (see RunHelperTest in server_test.cc). We need its init watcher to outlive this call,
+  // so we save run_helper_ as a member variable and explicitly reset it when we're called back.
+  // A cleaner design might be to have this InstanceImpl own the init watcher, rather than passing
+  // in a raw callback function, but then we couldn't test its behavior in isolation.
+
+  // TODO(mergeconflict): Think about ways to reduce unnecessary complexity here while
+  //                      preserving testability.
+  run_helper_ =
+      std::make_unique<RunHelper>(*this, options_, *dispatcher_, clusterManager(),
+                                  access_log_manager_, init_manager_, overloadManager(), [this] {
+                                    startWorkers();
+                                    run_helper_.reset();
+                                  });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
