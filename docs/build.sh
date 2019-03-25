@@ -16,15 +16,19 @@ then
     exit 1
   fi
   # Check the version_history.rst contains current release version.
-  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst
+  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst \
+    || (echo "Git tag not found in version_history.rst" && exit 1)
+
   # Now that we now there is a match, we can use the tag.
   export ENVOY_DOCS_VERSION_STRING="tag-$CIRCLE_TAG"
   export ENVOY_DOCS_RELEASE_LEVEL=tagged
+  export ENVOY_BLOB_SHA="$CIRCLE_TAG"
 else
   BUILD_SHA=$(git rev-parse HEAD)
   VERSION_NUM=$(cat VERSION)
   export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-"${BUILD_SHA:0:6}"
   export ENVOY_DOCS_RELEASE_LEVEL=pre-release
+  export ENVOY_BLOB_SHA="$BUILD_SHA"
 fi
 
 SCRIPT_DIR=$(dirname "$0")
