@@ -71,6 +71,8 @@ Version history
 * upstream: add cluster factory to allow creating and registering :ref:`custom cluster type<arch_overview_service_discovery_types_custom>`.
 * tracing: added :ref:`verbose <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` to support logging annotations on spans.
 * upstream: added support for host weighting and :ref:`locality weighting <arch_overview_load_balancing_locality_weighted_lb>` in the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`, and added a :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` config parameter to strictly bound the ring size.
+* zookeeper: added a ZooKeeper proxy filter that parses ZooKeeper messages (requests/responses/events).
+  Refer to ::ref:`ZooKeeper proxy<config_network_filters_zookeeper_proxy>` for more details.
 * upstream: added configuration option to select any host when the fallback policy fails.
 * upstream: stopped incrementing upstream_rq_total for HTTP/1 conn pool when request is circuit broken.
 
