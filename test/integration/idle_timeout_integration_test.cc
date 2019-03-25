@@ -1,4 +1,4 @@
-#include "envoy/data/core/v2alpha/local_reply_body.pb.h"
+#include "envoy/data/core/v2alpha/local_reply.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
@@ -36,7 +36,7 @@ public:
 
   IntegrationStreamDecoderPtr
   setupPerStreamIdleTimeoutTest(const char* method = "GET",
-                                const char* content_type = "text/plain") {
+                                const char* accept_type = "text/plain") {
     initialize();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -45,7 +45,7 @@ public:
                                                             {":path", "/test/long/url"},
                                                             {":scheme", "http"},
                                                             {":authority", "host"},
-                                                            {"content-type", content_type}});
+                                                            {"accept", accept_type}});
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     AssertionResult result =
@@ -206,9 +206,9 @@ TEST_P(IdleTimeoutIntegrationTest,
   EXPECT_STREQ("408", response->headers().Status()->value().c_str());
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
             response->headers().ContentType()->value().c_str());
-  envoy::data::core::v2alpha::LocalReplyBody local_reply_body;
-  local_reply_body.set_body("stream timeout");
-  EXPECT_EQ(MessageUtil::getJsonStringFromMessage(local_reply_body, true, true), response->body());
+  envoy::data::core::v2alpha::LocalReply local_reply;
+  local_reply.set_body("stream timeout");
+  EXPECT_EQ(MessageUtil::getJsonStringFromMessage(local_reply, true, true), response->body());
 }
 
 // Global per-stream idle timeout applies if there is no per-stream idle timeout.

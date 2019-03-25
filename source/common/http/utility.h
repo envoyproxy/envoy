@@ -178,7 +178,7 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
 struct LocalReplyInfo {
   bool is_grpc{false};
   bool is_head_request{false};
-  bool has_json_content_type{false};
+  bool accept_json_type{false};
 };
 
 /**
@@ -189,7 +189,8 @@ LocalReplyInfo generateLocalReplyInfo(const Http::HeaderMap& request_headers);
 
 /**
  * Create a locally generated response using filter callbacks.
- * @param is_grpc tells if this is a response to a gRPC request.
+ * @param info used to indicate what type of response is, such as grpc, head response, or json
+ *             content type.
  * @param callbacks supplies the filter callbacks to use.
  * @param is_reset boolean reference that indicates whether a stream has been reset. It is the
  *                 responsibility of the caller to ensure that this is set to false if onDestroy()
@@ -198,7 +199,6 @@ LocalReplyInfo generateLocalReplyInfo(const Http::HeaderMap& request_headers);
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
  * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
- * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(const LocalReplyInfo& info, StreamDecoderFilterCallbacks& callbacks,
                     const bool& is_reset, Code response_code, absl::string_view body_text,
@@ -206,7 +206,8 @@ void sendLocalReply(const LocalReplyInfo& info, StreamDecoderFilterCallbacks& ca
 
 /**
  * Create a locally generated response using the provided lambdas.
- * @param is_grpc tells if this is a response to a gRPC request.
+ * @param info used to indicate what type of response is, such as grpc, head response, or json
+ *             content type.
  * @param encode_headers supplies the function to encode response headers.
  * @param encode_data supplies the function to encode the response body.
  * @param is_reset boolean reference that indicates whether a stream has been reset. It is the

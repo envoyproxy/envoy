@@ -15,6 +15,6 @@ api_proto_library(
 )
 
 api_proto_library_internal(
-    name = "local_reply_body",
-    srcs = ["local_reply_body.proto"],
+    name = "local_reply",
+    srcs = ["local_reply.proto"],
 )

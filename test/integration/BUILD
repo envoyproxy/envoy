@@ -363,7 +363,7 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:test_time_lib",
-        "@envoy_api//envoy/data/core/v2alpha:local_reply_body_cc",
+        "@envoy_api//envoy/data/core/v2alpha:local_reply_cc",
     ],
 )
 
