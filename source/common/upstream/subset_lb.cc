@@ -509,10 +509,6 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
                                                 const HostVector& hosts_removed,
                                                 std::function<bool(const Host&)> predicate) {
-  HostVectorSharedPtr hosts(new HostVector());
-  HostVectorSharedPtr healthy_hosts(new HostVector());
-  HostVectorSharedPtr degraded_hosts(new HostVector());
-
   // We cache the result of matching the host against the predicate. This ensures
   // that we maintain a consistent view of the metadata and saves on computation
   // since metadata lookups can be expensive.
@@ -526,20 +522,26 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
 
   // TODO(snowp): If we had a unhealthyHosts() function we could avoid potentially traversing
   // the list of hosts twice.
-  for (const auto host : original_host_set_.hosts()) {
+  auto hosts = std::make_shared<HostVector>();
+  hosts->reserve(original_host_set_.hosts().size());
+  for (const auto& host : original_host_set_.hosts()) {
     if (predicate(*host)) {
       matching_hosts.insert(host.get());
       hosts->emplace_back(host);
     }
   }
 
-  for (const auto host : original_host_set_.healthyHosts()) {
+  auto healthy_hosts = std::make_shared<HostVector>();
+  healthy_hosts->reserve(original_host_set_.healthyHosts().size());
+  for (const auto& host : original_host_set_.healthyHosts()) {
     if (cached_predicate(*host)) {
       healthy_hosts->emplace_back(host);
     }
   }
 
-  for (const auto host : original_host_set_.degradedHosts()) {
+  auto degraded_hosts = std::make_shared<HostVector>();
+  degraded_hosts->reserve(original_host_set_.degradedHosts().size());
+  for (const auto& host : original_host_set_.degradedHosts()) {
     if (cached_predicate(*host)) {
       degraded_hosts->emplace_back(host);
     }
@@ -552,8 +554,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   HostsPerLocalityConstSharedPtr hosts_per_locality;
 
   if (original_host_set_.hostsPerLocality().get().size() == 1) {
-    hosts_per_locality.reset(
-        new HostsPerLocalityImpl(*hosts, original_host_set_.hostsPerLocality().hasLocalLocality()));
+    hosts_per_locality = std::make_shared<HostsPerLocalityImpl>(*hosts, original_host_set_.hostsPerLocality().hasLocalLocality());
   } else {
     hosts_per_locality = original_host_set_.hostsPerLocality().filter(cached_predicate);
   }
@@ -566,7 +567,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   // We can use the cached predicate here, since we trust that the hosts in hosts_added were also
   // present in the list of all hosts.
   HostVector filtered_added;
-  for (const auto host : hosts_added) {
+  for (const auto& host : hosts_added) {
     if (cached_predicate(*host)) {
       filtered_added.emplace_back(host);
     }
@@ -575,7 +576,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   // Since the removed hosts would not be present in the list of all hosts, we need to evaluate the
   // predicate directly for these hosts.
   HostVector filtered_removed;
-  for (const auto host : hosts_removed) {
+  for (const auto& host : hosts_removed) {
     if (predicate(*host)) {
       filtered_removed.emplace_back(host);
     }
