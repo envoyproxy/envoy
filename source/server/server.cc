@@ -470,19 +470,9 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 
 void InstanceImpl::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
-  // startup (see RunHelperTest in server_test.cc). We need its init watcher to outlive this call,
-  // so we save run_helper_ as a member variable and explicitly reset it when we're called back.
-  // A cleaner design might be to have this InstanceImpl own the init watcher, rather than passing
-  // in a raw callback function, but then we couldn't test its behavior in isolation.
-
-  // TODO(mergeconflict): Think about ways to reduce unnecessary complexity here while
-  //                      preserving testability.
-  run_helper_ =
-      std::make_unique<RunHelper>(*this, options_, *dispatcher_, clusterManager(),
-                                  access_log_manager_, init_manager_, overloadManager(), [this] {
-                                    startWorkers();
-                                    run_helper_.reset();
-                                  });
+  // startup (see RunHelperTest in server_test.cc).
+  auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_,
+                              init_manager_, overloadManager(), [this] { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
@@ -495,7 +485,6 @@ void InstanceImpl::run() {
   watchdog.reset();
 
   terminate();
-  run_helper_.reset();
 }
 
 void InstanceImpl::terminate() {

@@ -256,7 +256,6 @@ private:
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
-  std::unique_ptr<RunHelper> run_helper_;
   Envoy::MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
