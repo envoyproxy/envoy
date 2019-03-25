@@ -137,7 +137,7 @@ void ZooKeeperFilter::onCreateRequest(const std::string& path, const CreateFlags
     config_->stats_.createttl_rq_.inc();
     break;
   default:
-    throw EnvoyException(fmt::format("Unknown opcode: {}", enumToIntSigned(opcode)));
+    throw EnvoyException(fmt::format("Unknown opcode: {}", enumToSignedInt(opcode)));
     break;
   }
 

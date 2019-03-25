@@ -84,7 +84,7 @@ public:
     buffer.writeBEInt<int32_t>(50);
     buffer.writeBEInt<int32_t>(1000);
     // Opcode.
-    buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::DELETE));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::DELETE));
     // Path.
     addString(buffer, std::string(2 * 1024 * 1024, '*'));
     // Version.
@@ -97,7 +97,7 @@ public:
     Buffer::OwnedImpl buffer;
 
     buffer.writeBEInt<uint32_t>(8);
-    buffer.writeBEInt<int32_t>(enumToIntSigned(XidCodes::PING_XID));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(XidCodes::PING_XID));
     buffer.writeBEInt<uint32_t>(enumToInt(OpCodes::PING));
 
     return buffer;
@@ -118,7 +118,7 @@ public:
 
     buffer.writeBEInt<uint32_t>(8);
     buffer.writeBEInt<int32_t>(1000);
-    buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::CLOSE));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::CLOSE));
 
     return buffer;
   }
@@ -128,8 +128,8 @@ public:
     Buffer::OwnedImpl buffer;
 
     buffer.writeBEInt<uint32_t>(28 + scheme.length() + credential.length());
-    buffer.writeBEInt<int32_t>(enumToIntSigned(XidCodes::AUTH_XID));
-    buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::SETAUTH));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(XidCodes::AUTH_XID));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::SETAUTH));
     // Type.
     buffer.writeBEInt<int32_t>(0);
     addString(buffer, scheme);
@@ -140,7 +140,7 @@ public:
 
   Buffer::OwnedImpl
   encodePathWatch(const std::string& path, const bool watch,
-                  const int32_t opcode = enumToIntSigned(OpCodes::GETDATA)) const {
+                  const int32_t opcode = enumToSignedInt(OpCodes::GETDATA)) const {
     Buffer::OwnedImpl buffer;
 
     buffer.writeBEInt<int32_t>(13 + path.length());
@@ -157,7 +157,7 @@ public:
   }
 
   Buffer::OwnedImpl encodePathVersion(const std::string& path, const int32_t version,
-                                      const int32_t opcode = enumToIntSigned(OpCodes::GETDATA),
+                                      const int32_t opcode = enumToSignedInt(OpCodes::GETDATA),
                                       const bool txn = false) const {
     Buffer::OwnedImpl buffer;
 
@@ -204,7 +204,7 @@ public:
   Buffer::OwnedImpl
   encodeCreateRequest(const std::string& path, const std::string& data, const CreateFlags flags,
                       const bool txn = false,
-                      const int32_t opcode = enumToIntSigned(OpCodes::CREATE)) const {
+                      const int32_t opcode = enumToSignedInt(OpCodes::CREATE)) const {
     Buffer::OwnedImpl buffer;
 
     if (!txn) {
@@ -232,7 +232,7 @@ public:
     if (!txn) {
       buffer.writeBEInt<int32_t>(20 + path.length() + data.length());
       buffer.writeBEInt<int32_t>(1000);
-      buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::SETDATA));
+      buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::SETDATA));
     }
 
     // Path.
@@ -251,7 +251,7 @@ public:
     buffer.writeBEInt<int32_t>(16 + path.length());
     buffer.writeBEInt<int32_t>(1000);
     // Opcode.
-    buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::DELETE));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::DELETE));
     // Path.
     addString(buffer, path);
     // Version.
@@ -268,7 +268,7 @@ public:
     buffer.writeBEInt<int32_t>(32 + path.length() + scheme.length() + credential.length());
     buffer.writeBEInt<int32_t>(1000);
     // Opcode.
-    buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::SETACL));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::SETACL));
     // Path.
     addString(buffer, path);
 
@@ -293,7 +293,7 @@ public:
 
     buffer.writeBEInt<int32_t>(28 + joining.length() + leaving.length() + new_members.length());
     buffer.writeBEInt<int32_t>(1000);
-    buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::RECONFIG));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::RECONFIG));
     addString(buffer, joining);
     addString(buffer, leaving);
     addString(buffer, new_members);
@@ -315,7 +315,7 @@ public:
 
     buffer.writeBEInt<int32_t>(8 + watches_buffer.length());
     buffer.writeBEInt<int32_t>(xid);
-    buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::SETWATCHES));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::SETWATCHES));
     buffer.add(watches_buffer);
 
     return buffer;
@@ -344,7 +344,7 @@ public:
     // Multi prefix.
     buffer.writeBEInt<int32_t>(8 + requests.length());
     buffer.writeBEInt<int32_t>(1000);
-    buffer.writeBEInt<int32_t>(enumToIntSigned(OpCodes::MULTI));
+    buffer.writeBEInt<int32_t>(enumToSignedInt(OpCodes::MULTI));
 
     // Requests.
     buffer.add(requests);
@@ -390,7 +390,7 @@ public:
   void testCreate(CreateFlags flags, const OpCodes opcode = OpCodes::CREATE) {
     initialize();
     Buffer::OwnedImpl data =
-        encodeCreateRequest("/foo", "bar", flags, false, enumToIntSigned(opcode));
+        encodeCreateRequest("/foo", "bar", flags, false, enumToSignedInt(opcode));
     std::string opname = "create";
 
     switch (opcode) {
@@ -504,7 +504,7 @@ TEST_F(ZooKeeperFilterTest, UnknownOpcode) {
 TEST_F(ZooKeeperFilterTest, BufferSmallerThanStringLength) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathLongerThanBuffer("/foo", enumToIntSigned(OpCodes::SYNC));
+  Buffer::OwnedImpl data = encodePathLongerThanBuffer("/foo", enumToSignedInt(OpCodes::SYNC));
 
   EXPECT_EQ(Envoy::Network::FilterStatus::Continue, filter_->onData(data, false));
   EXPECT_EQ(1UL, config_->stats().decoder_error_.value());
@@ -594,7 +594,7 @@ TEST_F(ZooKeeperFilterTest, CreateRequest2) {
   initialize();
 
   Buffer::OwnedImpl data = encodeCreateRequest("/foo", "bar", CreateFlags::PERSISTENT, false,
-                                               enumToIntSigned(OpCodes::CREATE2));
+                                               enumToSignedInt(OpCodes::CREATE2));
 
   expectSetDynamicMetadata({{"opname", "create2"}, {"path", "/foo"}, {"create_type", "persistent"}},
                            {{"bytes", "35"}});
@@ -621,7 +621,7 @@ TEST_F(ZooKeeperFilterTest, SetRequest) {
 TEST_F(ZooKeeperFilterTest, GetChildrenRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToIntSigned(OpCodes::GETCHILDREN));
+  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::GETCHILDREN));
 
   expectSetDynamicMetadata({{"opname", "getchildren"}, {"path", "/foo"}, {"watch", "false"}},
                            {{"bytes", "21"}});
@@ -635,7 +635,7 @@ TEST_F(ZooKeeperFilterTest, GetChildrenRequest) {
 TEST_F(ZooKeeperFilterTest, GetChildrenRequest2) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToIntSigned(OpCodes::GETCHILDREN2));
+  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::GETCHILDREN2));
 
   expectSetDynamicMetadata({{"opname", "getchildren2"}, {"path", "/foo"}, {"watch", "false"}},
                            {{"bytes", "21"}});
@@ -663,7 +663,7 @@ TEST_F(ZooKeeperFilterTest, DeleteRequest) {
 TEST_F(ZooKeeperFilterTest, ExistsRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToIntSigned(OpCodes::EXISTS));
+  Buffer::OwnedImpl data = encodePathWatch("/foo", false, enumToSignedInt(OpCodes::EXISTS));
 
   expectSetDynamicMetadata({{"opname", "exists"}, {"path", "/foo"}, {"watch", "false"}},
                            {{"bytes", "21"}});
@@ -677,7 +677,7 @@ TEST_F(ZooKeeperFilterTest, ExistsRequest) {
 TEST_F(ZooKeeperFilterTest, GetAclRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePath("/foo", enumToIntSigned(OpCodes::GETACL));
+  Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::GETACL));
 
   expectSetDynamicMetadata({{"opname", "getacl"}, {"path", "/foo"}}, {{"bytes", "20"}});
 
@@ -704,7 +704,7 @@ TEST_F(ZooKeeperFilterTest, SetAclRequest) {
 TEST_F(ZooKeeperFilterTest, SyncRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePath("/foo", enumToIntSigned(OpCodes::SYNC));
+  Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::SYNC));
 
   expectSetDynamicMetadata({{"opname", "sync"}, {"path", "/foo"}}, {{"bytes", "20"}});
 
@@ -717,7 +717,7 @@ TEST_F(ZooKeeperFilterTest, SyncRequest) {
 TEST_F(ZooKeeperFilterTest, GetEphemeralsRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePath("/foo", enumToIntSigned(OpCodes::GETEPHEMERALS));
+  Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::GETEPHEMERALS));
 
   expectSetDynamicMetadata({{"opname", "getephemerals"}, {"path", "/foo"}}, {{"bytes", "20"}});
 
@@ -730,7 +730,7 @@ TEST_F(ZooKeeperFilterTest, GetEphemeralsRequest) {
 TEST_F(ZooKeeperFilterTest, GetAllChildrenNumberRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePath("/foo", enumToIntSigned(OpCodes::GETALLCHILDRENNUMBER));
+  Buffer::OwnedImpl data = encodePath("/foo", enumToSignedInt(OpCodes::GETALLCHILDRENNUMBER));
 
   expectSetDynamicMetadata({{"opname", "getallchildrennumber"}, {"path", "/foo"}},
                            {{"bytes", "20"}});
@@ -744,7 +744,7 @@ TEST_F(ZooKeeperFilterTest, GetAllChildrenNumberRequest) {
 TEST_F(ZooKeeperFilterTest, CheckRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathVersion("/foo", 100, enumToIntSigned(OpCodes::CHECK));
+  Buffer::OwnedImpl data = encodePathVersion("/foo", 100, enumToSignedInt(OpCodes::CHECK));
 
   expectSetDynamicMetadata({{"bytes", "24"}});
 
@@ -759,14 +759,14 @@ TEST_F(ZooKeeperFilterTest, MultiRequest) {
 
   Buffer::OwnedImpl create1 = encodeCreateRequest("/foo", "1", CreateFlags::PERSISTENT, true);
   Buffer::OwnedImpl create2 = encodeCreateRequest("/bar", "1", CreateFlags::PERSISTENT, true);
-  Buffer::OwnedImpl check1 = encodePathVersion("/foo", 100, enumToIntSigned(OpCodes::CHECK), true);
+  Buffer::OwnedImpl check1 = encodePathVersion("/foo", 100, enumToSignedInt(OpCodes::CHECK), true);
   Buffer::OwnedImpl set1 = encodeSetRequest("/bar", "2", -1, true);
 
   std::vector<std::pair<int32_t, Buffer::OwnedImpl>> ops;
-  ops.push_back(std::make_pair(enumToIntSigned(OpCodes::CREATE), std::move(create1)));
-  ops.push_back(std::make_pair(enumToIntSigned(OpCodes::CREATE), std::move(create2)));
-  ops.push_back(std::make_pair(enumToIntSigned(OpCodes::CHECK), std::move(check1)));
-  ops.push_back(std::make_pair(enumToIntSigned(OpCodes::SETDATA), std::move(set1)));
+  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::CREATE), std::move(create1)));
+  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::CREATE), std::move(create2)));
+  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::CHECK), std::move(check1)));
+  ops.push_back(std::make_pair(enumToSignedInt(OpCodes::SETDATA), std::move(set1)));
 
   Buffer::OwnedImpl data = encodeMultiRequest(ops);
 
@@ -800,7 +800,7 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequestControlXid) {
   const std::vector<std::string> childw = {"/foo2", "/bar2"};
 
   Buffer::OwnedImpl data =
-      encodeSetWatchesRequest(dataw, existw, childw, enumToIntSigned(XidCodes::SET_WATCHES_XID));
+      encodeSetWatchesRequest(dataw, existw, childw, enumToSignedInt(XidCodes::SET_WATCHES_XID));
 
   expectSetDynamicMetadata({{"opname", "setwatches"}}, {{"bytes", "76"}});
 
@@ -830,8 +830,8 @@ TEST_F(ZooKeeperFilterTest, SetWatchesRequest) {
 TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathVersion("/foo", enumToIntSigned(WatcherType::CHILDREN),
-                                             enumToIntSigned(OpCodes::CHECKWATCHES));
+  Buffer::OwnedImpl data = encodePathVersion("/foo", enumToSignedInt(WatcherType::CHILDREN),
+                                             enumToSignedInt(OpCodes::CHECKWATCHES));
 
   expectSetDynamicMetadata({{"opname", "checkwatches"}, {"path", "/foo"}}, {{"bytes", "24"}});
 
@@ -844,8 +844,8 @@ TEST_F(ZooKeeperFilterTest, CheckWatchesRequest) {
 TEST_F(ZooKeeperFilterTest, RemoveWatchesRequest) {
   initialize();
 
-  Buffer::OwnedImpl data = encodePathVersion("/foo", enumToIntSigned(WatcherType::DATA),
-                                             enumToIntSigned(OpCodes::REMOVEWATCHES));
+  Buffer::OwnedImpl data = encodePathVersion("/foo", enumToSignedInt(WatcherType::DATA),
+                                             enumToSignedInt(OpCodes::REMOVEWATCHES));
 
   expectSetDynamicMetadata({{"opname", "removewatches"}, {"path", "/foo"}}, {{"bytes", "24"}});
 
