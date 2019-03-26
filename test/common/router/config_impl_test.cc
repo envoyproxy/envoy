@@ -3659,8 +3659,11 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
+      "oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
@@ -3674,8 +3677,9 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "RouteValidationError.Match: \\[\"value is required\"\\]");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndRegex) {
@@ -3692,8 +3696,11 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
+      "oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoAction) {
@@ -3706,8 +3713,10 @@ virtual_hosts:
   - match:
       prefix: "/api"
   )EOF";
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "caused by field: \"action\", reason: is required");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
@@ -3715,7 +3724,7 @@ TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPathAndRegex) {
 virtual_hosts:
 - name: www2
   domains:
- - "*"
+  - "*"
   routes:
   - match:
       path: "/foo"
@@ -3724,8 +3733,11 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for type "
+      "oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
@@ -3743,8 +3755,11 @@ virtual_hosts:
       cluster: www2
   )EOF";
 
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
+      "oneof");
 }
 
 TEST_F(RouteMatcherTest, TestOpaqueConfig) {
