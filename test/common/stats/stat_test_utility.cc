@@ -13,7 +13,7 @@ bool hasDeterministicMallocStats() {
   // to a different malloc library than we'd have to re-evaluate all the
   // thresholds in the tests referencing hasDeterministicMallocStats().
   // TODO(cmluciano) Enable LIBCPP testing once stabilized
-#if _LIBCPP_VERSION
+#ifdef _LIBCPP_VERSION
   return false;
 #elif defined(TCMALLOC) && !defined(ENVOY_MEMORY_DEBUG_ENABLED)
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
