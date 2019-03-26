@@ -72,26 +72,38 @@ Runtime
 
 The HTTP fault injection filter supports the following global runtime settings:
 
+.. attention::
+
+  Some of the following runtime keys require the filter to be configured for the specific fault
+  type and some do not. Please consult the documentation for each key for more information.
+
 fault.http.abort.abort_percent
   % of requests that will be aborted if the headers match. Defaults to the
   *abort_percent* specified in config. If the config does not contain an
-  *abort* block, then *abort_percent* defaults to 0.
+  *abort* block, then *abort_percent* defaults to 0. For historic reasons, this runtime key is
+  available regardless of whether the filter is :ref:`configured for abort
+  <envoy_api_field_config.filter.http.fault.v2.HTTPFault.abort>`.
 
 fault.http.abort.http_status
   HTTP status code that will be used as the  of requests that will be
   aborted if the headers match. Defaults to the HTTP status code specified
   in the config. If the config does not contain an *abort* block, then
-  *http_status* defaults to 0.
+  *http_status* defaults to 0. For historic reasons, this runtime key is
+  available regardless of whether the filter is :ref:`configured for abort
+  <envoy_api_field_config.filter.http.fault.v2.HTTPFault.abort>`.
 
 fault.http.delay.fixed_delay_percent
   % of requests that will be delayed if the headers match. Defaults to the
-  *delay_percent* specified in the config or 0 otherwise.
+  *delay_percent* specified in the config or 0 otherwise. This runtime key is only available when
+  the filter is :ref:`configured for delay
+  <envoy_api_field_config.filter.http.fault.v2.HTTPFault.delay>`.
 
 fault.http.delay.fixed_duration_ms
   The delay duration in milliseconds. If not specified, the
   *fixed_duration_ms* specified in the config will be used. If this field
   is missing from both the runtime and the config, no delays will be
-  injected.
+  injected. This runtime key is only available when the filter is :ref:`configured for delay
+  <envoy_api_field_config.filter.http.fault.v2.HTTPFault.delay>`.
 
 fault.http.max_active_faults
   The maximum number of active faults (of all types) that Envoy will will inject via the fault
@@ -101,10 +113,10 @@ fault.http.max_active_faults
   <envoy_api_field_config.filter.http.fault.v2.HTTPFault.max_active_faults>` setting will be used.
 
 fault.http.rate_limit.response_percent
-  % of requests which will have a response rate limit fault injected, if the filter is
-  :ref:`configured <envoy_api_field_config.filter.http.fault.v2.HTTPFault.response_rate_limit>` to
-  do so. Defaults to the value set in the :ref:`percentage
-  <envoy_api_field_config.filter.fault.v2.FaultRateLimit.percentage>` field.
+  % of requests which will have a response rate limit fault injected. Defaults to the value set in
+  the :ref:`percentage <envoy_api_field_config.filter.fault.v2.FaultRateLimit.percentage>` field.
+  This runtime key is only available when the filter is :ref:`configured for response rate limiting
+  <envoy_api_field_config.filter.http.fault.v2.HTTPFault.response_rate_limit>`.
 
 *Note*, fault filter runtime settings for the specific downstream cluster
 override the default ones if present. The following are downstream specific
