@@ -17,6 +17,7 @@
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/redis_proxy/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -68,9 +69,9 @@ public:
 
 class CommandHandlerBase {
 protected:
-  CommandHandlerBase(ConnPool::Instance& conn_pool) : conn_pool_(conn_pool) {}
+  CommandHandlerBase(Router& router) : router_(router) {}
 
-  ConnPool::Instance& conn_pool_;
+  Router& router_;
 };
 
 class SplitRequestBase : public SplitRequest {
@@ -121,8 +122,7 @@ protected:
  */
 class SimpleRequest : public SingleServerRequest {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(Router& router, const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -137,8 +137,7 @@ private:
  */
 class EvalRequest : public SingleServerRequest {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(Router& router, const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -195,8 +194,7 @@ protected:
  */
 class MGETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(Router& router, const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -217,8 +215,7 @@ private:
  */
 class SplitKeysSumResultRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(Router& router, const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -240,8 +237,7 @@ private:
  */
 class MSETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                const Common::Redis::RespValue& incoming_request,
+  static SplitRequestPtr create(Router& router, const Common::Redis::RespValue& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -261,11 +257,11 @@ private:
 template <class RequestClass>
 class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:
-  CommandHandlerFactory(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
+  CommandHandlerFactory(Router& router) : CommandHandlerBase(router) {}
   SplitRequestPtr startRequest(const Common::Redis::RespValue& request, SplitCallbacks& callbacks,
                                CommandStats& command_stats, TimeSource& time_source,
                                bool latency_in_micros) {
-    return RequestClass::create(conn_pool_, request, callbacks, command_stats, time_source,
+    return RequestClass::create(router_, request, callbacks, command_stats, time_source,
                                 latency_in_micros);
   }
 };
@@ -288,8 +284,8 @@ struct InstanceStats {
 
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
-  InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
-               const std::string& stat_prefix, TimeSource& time_source, bool latency_in_micros);
+  InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
+               TimeSource& time_source, bool latency_in_micros);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(const Common::Redis::RespValue& request,
@@ -307,7 +303,7 @@ private:
                   CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
 
-  ConnPool::InstancePtr conn_pool_;
+  RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;

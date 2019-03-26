@@ -8,7 +8,7 @@ where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoypr
 may work with `envoyproxy/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
 running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
 at [`envoyproxy/envoy:<hash>`](https://hub.docker.com/r/envoyproxy/envoy/) is an image that has an Envoy binary at `/usr/local/bin/envoy`. The `<hash>`
-corresponds to the master commit at which the binary was compiled. Lastly, `envoyproxy/envoy:latest` contains an Envoy
+corresponds to the master commit at which the binary was compiled. Lastly, `envoyproxy/envoy-dev:latest` contains an Envoy
 binary built from the latest tip of master that passed tests.
 
 ## Alpine Envoy image
