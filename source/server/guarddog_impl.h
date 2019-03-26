@@ -101,6 +101,12 @@ private:
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
 
+  /**
+   * Schedules a wakeup to occur some number of milliseconds in the future. Passing zero
+   * causes an immediate wakeup.
+   *
+   * @param ms The delay before wakeup, expressed in milliseconds.
+   */
   void wakeupLockHeld(std::chrono::milliseconds ms) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   struct WatchedDog {
