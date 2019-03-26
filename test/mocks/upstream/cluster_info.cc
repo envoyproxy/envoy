@@ -1,5 +1,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 
+#include <limits>
+
 #include "common/network/raw_buffer_socket.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -35,6 +37,7 @@ MockClusterInfo::MockClusterInfo()
       circuit_breakers_stats_(
           ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1,
+                                                          std::numeric_limits<uint64_t>::max(),
                                                           circuit_breakers_stats_)) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));

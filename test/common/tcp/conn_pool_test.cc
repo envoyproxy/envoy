@@ -271,7 +271,7 @@ struct ActiveTestConn {
  * Verify that connections are drained when requested.
  */
 TEST_F(TcpConnPoolImplTest, DrainConnections) {
-  cluster_->resetResourceManager(3, 1024, 1024, 1);
+  cluster_->resetResourceManager(3, 1024, 1024, 1, 1);
   InSequence s;
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
@@ -484,7 +484,7 @@ TEST_F(TcpConnPoolImplTest, ConnectionStateLifecycle) {
  * Test when we overflow max pending requests.
  */
 TEST_F(TcpConnPoolImplTest, MaxPendingRequests) {
-  cluster_->resetResourceManager(1, 1, 1024, 1);
+  cluster_->resetResourceManager(1, 1, 1024, 1, 1);
 
   ConnPoolCallbacks callbacks;
   conn_pool_.expectConnCreate();
@@ -657,7 +657,7 @@ TEST_F(TcpConnPoolImplTest, DisconnectWhileBound) {
  * Test upstream disconnection of one request while another is pending.
  */
 TEST_F(TcpConnPoolImplTest, DisconnectWhilePending) {
-  cluster_->resetResourceManager(1, 1024, 1024, 1);
+  cluster_->resetResourceManager(1, 1024, 1024, 1, 1);
   InSequence s;
 
   // First request connected.
@@ -767,7 +767,7 @@ TEST_F(TcpConnPoolImplTest, MaxRequestsPerConnection) {
  * Test that multiple connections can be assigned at once.
  */
 TEST_F(TcpConnPoolImplTest, ConcurrentConnections) {
-  cluster_->resetResourceManager(2, 1024, 1024, 1);
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   InSequence s;
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
@@ -803,7 +803,7 @@ TEST_F(TcpConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
   auto* s2 = new TestConnectionState(2, [&]() -> void { state_destroyed |= 2; });
   auto* s3 = new TestConnectionState(2, [&]() -> void { state_destroyed |= 4; });
 
-  cluster_->resetResourceManager(2, 1024, 1024, 1);
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   c1.callbacks_.conn_data_->setConnectionState(std::unique_ptr<TestConnectionState>(s1));
   ActiveTestConn c2(*this, 1, ActiveTestConn::Type::CreateConnection);
