@@ -204,8 +204,6 @@ protected:
   void setLastUpdated() { last_updated_ = time_source_.systemTime(); }
 
 private:
-  void registerInitTarget(Init::Manager& init_manager) { init_manager.add(init_target_); }
-
   void bindConfigProvider(MutableConfigProviderImplBase* provider);
 
   void unbindConfigProvider(MutableConfigProviderImplBase* provider) {
@@ -378,8 +376,7 @@ protected:
       // around it. However, since this is not a performance critical path we err on the side
       // of simplicity.
       subscription = subscription_factory_fn(manager_identifier, *this);
-
-      subscription->registerInitTarget(init_manager);
+      init_manager.add(subscription->init_target_);
 
       bindSubscription(manager_identifier, subscription);
     } else {

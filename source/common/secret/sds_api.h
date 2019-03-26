@@ -55,6 +55,7 @@ protected:
   Common::CallbackManager<> update_callback_manager_;
 
 private:
+  void initialize();
   Init::TargetImpl init_target_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;

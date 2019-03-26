@@ -130,10 +130,6 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
   init_target_.ready();
 }
 
-void RdsRouteConfigSubscription::registerInitTarget(Init::Manager& init_manager) {
-  init_manager.add(init_target_);
-}
-
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::FactoryContext& factory_context)
@@ -201,7 +197,7 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
     subscription.reset(new RdsRouteConfigSubscription(rds, manager_identifier, factory_context,
                                                       stat_prefix, *this));
 
-    subscription->registerInitTarget(factory_context.initManager());
+    factory_context.initManager().add(subscription->init_target_);
 
     route_config_subscriptions_.insert({manager_identifier, subscription});
   } else {

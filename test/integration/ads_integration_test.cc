@@ -722,7 +722,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsInvalidated) {
   // -----------------------------------------
 
   // Request for updates to listener_0 version 1, respond with version 2. Under the hood, this
-  // invokes RdsRouteConfigSubscription::registerInitTarget with the new ListenerImpl instance.
+  // registers RdsRouteConfigSubscription's init target with the new ListenerImpl instance.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
   sendDiscoveryResponse<envoy::api::v2::Listener>(
       Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_1")}, "2");

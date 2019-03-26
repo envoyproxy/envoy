@@ -17,16 +17,7 @@ SdsApi::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispat
                const envoy::api::v2::core::ConfigSource& sds_config,
                const std::string& sds_config_name, std::function<void()> destructor_cb,
                Api::Api& api)
-    : init_target_(
-          fmt::format("SdsApi {}", sds_config_name),
-          [this]() {
-            subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
-                envoy::api::v2::auth::Secret>(
-                sds_config_, local_info_, dispatcher_, cluster_manager_, random_, stats_,
-                "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets",
-                "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets", api_);
-            subscription_->start({sds_config_name_}, *this);
-          }),
+    : init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
       local_info_(local_info), dispatcher_(dispatcher), random_(random), stats_(stats),
       cluster_manager_(cluster_manager), sds_config_(sds_config), sds_config_name_(sds_config_name),
       secret_hash_(0), clean_up_(destructor_cb), api_(api) {
@@ -70,6 +61,15 @@ void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&)
 void SdsApi::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad config.
   init_target_.ready();
+}
+
+void SdsApi::initialize() {
+  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
+      envoy::api::v2::auth::Secret>(
+      sds_config_, local_info_, dispatcher_, cluster_manager_, random_, stats_,
+      "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets",
+      "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets", api_);
+  subscription_->start({sds_config_name_}, *this);
 }
 
 } // namespace Secret

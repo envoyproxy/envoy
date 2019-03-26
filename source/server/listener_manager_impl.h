@@ -408,10 +408,9 @@ private:
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
   Init::ManagerImpl dynamic_init_manager_;
 
-  // This init watcher notifies the "parent" listener manager when listener initialization is
-  // complete (assuming it wasn't explicitly canceled in destruction).
-  Init::WatcherImpl init_watcher_;
-  bool initialize_canceled_{};
+  // This init watcher, if available, notifies the "parent" listener manager when listener
+  // initialization is complete. It may be reset to cancel interest.
+  std::unique_ptr<Init::WatcherImpl> init_watcher_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};

@@ -123,8 +123,6 @@ private:
       const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
-  void registerInitTarget(Init::Manager& init_manager);
-
   const std::string route_config_name_;
   Init::TargetImpl init_target_;
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
