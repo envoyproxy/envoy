@@ -1061,7 +1061,10 @@ void ConnectionManagerImpl::startDrainSequence() {
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
-  Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
+  Router::RouteConstSharedPtr route;
+  if (request_headers_ != nullptr) {
+    route = snapped_route_config_->route(*request_headers_, stream_id_);
+  }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
   if (nullptr == stream_info_.route_entry_) {
