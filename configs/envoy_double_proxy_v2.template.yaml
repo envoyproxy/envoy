@@ -26,7 +26,7 @@
     filters:
     - name: envoy.http_connection_manager
       typed_config:
-        '@type': type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
         codec_type: AUTO
         stat_prefix: router
         route_config:
@@ -44,14 +44,14 @@
         http_filters:
         - name: envoy.health_check
           typed_config:
-            '@type': type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+            "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
             pass_through_mode: false
             headers:
               - exact_match: /healthcheck
                 name: :path
         - name: envoy.buffer
           typed_config:
-            '@type': type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
+            "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
             max_request_bytes: 5242880
         - name: envoy.router
           typed_config: {}
@@ -165,13 +165,13 @@ flags_path: "/etc/envoy/flags"
 stats_sinks:
 - name: envoy.statsd
   typed_config:
-    '@type': type.googleapis.com/envoy.config.metrics.v2.StatsdSink
+    "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     tcp_cluster_name: statsd
 tracing:
   http:
     name: envoy.lightstep
     typed_config:
-      '@type': type.googleapis.com/envoy.config.trace.v2.LightstepConfig
+      "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
       access_token_file: "/etc/envoy/lightstep_access_token"
       collector_cluster: lightstep_saas
 runtime:
