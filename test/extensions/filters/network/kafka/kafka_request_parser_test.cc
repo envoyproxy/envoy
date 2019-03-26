@@ -12,6 +12,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
+namespace KafkaRequestParserTest {
 
 const int32_t FAILED_DESERIALIZER_STEP = 13;
 
@@ -248,6 +249,7 @@ TEST_F(KafkaRequestParserTest, SentinelParserShouldConsumeDataUntilEndOfRequest)
   assertStringViewIncrement(data, orig_data, request_len);
 }
 
+} // namespace KafkaRequestParserTest
 } // namespace Kafka
 } // namespace NetworkFilters
 } // namespace Extensions

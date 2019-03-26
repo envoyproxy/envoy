@@ -16,6 +16,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
+namespace RequestCodecUnitTest {
 
 class MockParserFactory : public InitialParserFactory {
 public:
@@ -164,6 +165,7 @@ template <typename T> void RequestCodecUnitTest::putInBuffer(T arg) {
   serializer.encode(arg);
 }
 
+} // namespace RequestCodecUnitTest
 } // namespace Kafka
 } // namespace NetworkFilters
 } // namespace Extensions

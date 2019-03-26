@@ -9,6 +9,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
+namespace RequestCodecIntegrationTest {
 
 class RequestCodecIntegrationTest : public testing::Test {
 protected:
@@ -17,7 +18,7 @@ protected:
   Buffer::OwnedImpl buffer_;
 };
 
-// Other request types are tested in (generated) 'request_codec_request_integration_test.cc'.
+// Other request types are tested in (generated) 'request_codec_request_test.cc'.
 TEST_F(RequestCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
   // given
   // As real api keys have values below 100, the messages generated in this loop should not be
@@ -61,6 +62,7 @@ template <typename T> void RequestCodecIntegrationTest::putInBuffer(T arg) {
   serializer.encode(arg);
 }
 
+} // namespace RequestCodecIntegrationTest
 } // namespace Kafka
 } // namespace NetworkFilters
 } // namespace Extensions

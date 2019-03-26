@@ -91,8 +91,8 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "request_codec_request_integration_test",
-    srcs = ["request_codec_request_integration_test.cc"],
+    name = "request_codec_request_test",
+    srcs = ["request_codec_request_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
         ":serialization_utilities_lib",
@@ -118,11 +118,11 @@ genrule(
     ],
     outs = [
         "requests_test.cc",
-        "request_codec_request_integration_test.cc",
+        "request_codec_request_test.cc",
     ],
     cmd = """
         ./$(location //source/extensions/filters/network/kafka:kafka_code_generator) generate-test \
-        $(location requests_test.cc) $(location request_codec_request_integration_test.cc) \
+        $(location requests_test.cc) $(location request_codec_request_test.cc) \
         $(SRCS)
     """,
     tools = [

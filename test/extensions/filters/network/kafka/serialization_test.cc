@@ -4,6 +4,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
+namespace SerializationTest {
 
 /**
  * Tests in this file are supposed to check whether serialization operations
@@ -215,6 +216,7 @@ TEST(NullableArrayDeserializer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
+} // namespace SerializationTest
 } // namespace Kafka
 } // namespace NetworkFilters
 } // namespace Extensions

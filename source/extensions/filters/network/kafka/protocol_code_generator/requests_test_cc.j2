@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
+namespace RequestTest {
 
 class RequestTest : public testing::Test {
 public:
@@ -70,6 +71,7 @@ TEST_F(RequestTest, shouldParse{{ request_type.name }}V{{ field_list.version }})
 }
 {% endfor %}{% endfor %}
 
+} // namespace RequestTest
 } // namespace Kafka
 } // namespace NetworkFilters
 } // namespace Extensions

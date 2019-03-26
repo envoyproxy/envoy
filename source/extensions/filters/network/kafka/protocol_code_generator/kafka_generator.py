@@ -14,8 +14,7 @@ def main():
   COMMAND : 'generate-source', to generate source files,
             'generate-test', to generate test files.
   OUTPUT_FILES : if generate-source: location of 'requests.h' and 'kafka_request_resolver.cc',
-                 if generate-test: location of 'requests_test.cc',
-                 'request_codec_request_integration_test.cc'.
+                 if generate-test: location of 'requests_test.cc', 'request_codec_request_test.cc'.
   INPUT_FILES: Kafka protocol json files to be processed.
 
   Kafka spec files are provided in Kafka clients jar file.
@@ -25,15 +24,13 @@ def main():
                                   requests.h.
   When generating test code, it creates:
     - requests_test.cc - serialization/deserialization tests for kafka structures,
-    - request_codec_request_integration_test.cc - integration test for all request operations using
-                                                  the codec API.
+    - request_codec_request_test.cc - test for all request operations using the codec API.
 
   Templates used are:
   - to create 'requests.h': requests_h.j2, complex_type_template.j2, request_parser.j2,
   - to create 'kafka_request_resolver.cc': kafka_request_resolver_cc.j2,
   - to create 'requests_test.cc': requests_test_cc.j2,
-  - to create 'request_codec_request_integration_test.cc' -
-      request_codec_request_integration_test_cc.j2.
+  - to create 'request_codec_request_test.cc' - request_codec_request_test_cc.j2.
   """
 
   import sys
@@ -46,7 +43,7 @@ def main():
     input_files = sys.argv[4:]
   elif 'generate-test' == command:
     requests_test_cc_file = os.path.abspath(sys.argv[2])
-    request_codec_request_integration_test_cc_file = os.path.abspath(sys.argv[3])
+    request_codec_request_test_cc_file = os.path.abspath(sys.argv[3])
     input_files = sys.argv[4:]
   else:
     raise ValueError('invalid command: ' + command)
@@ -103,10 +100,10 @@ def main():
     with open(requests_test_cc_file, 'w') as fd:
       fd.write(contents)
 
-    template = RenderingHelper.get_template('request_codec_request_integration_test_cc.j2')
+    template = RenderingHelper.get_template('request_codec_request_test_cc.j2')
     contents = template.render(request_types=requests)
 
-    with open(request_codec_request_integration_test_cc_file, 'w') as fd:
+    with open(request_codec_request_test_cc_file, 'w') as fd:
       fd.write(contents)
 
 

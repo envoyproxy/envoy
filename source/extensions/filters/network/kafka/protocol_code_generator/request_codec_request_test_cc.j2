@@ -1,5 +1,5 @@
 {#
-  Template for 'request_codec_request_integration_test.cc'.
+  Template for 'request_codec_request_test.cc'.
 
   Provides integration tests using Kafka codec.
   The tests do the following:
@@ -21,6 +21,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
+namespace RequestCodecRequestTest {
 
 class RequestCodecRequestTest : public testing::Test {
 protected:
@@ -80,6 +81,7 @@ void RequestCodecRequestTest::putInBuffer(const T arg) {
   serializer.encode(arg);
 }
 
+} // namespace RequestCodecRequestTest
 } // namespace Kafka
 } // namespace NetworkFilters
 } // namespace Extensions
