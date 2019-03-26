@@ -55,14 +55,14 @@ public:
       // decodeData will only be called once after iteration resumes.
       EXPECT_EQ(data.length(), content_size_);
     }
-    Buffer::OwnedImpl added_data("a");
+    Buffer::OwnedImpl added_data(std::string(added_size_, 'a'));
     decoder_callbacks_->addDecodedData(added_data, false);
     return Http::FilterDataStatus::Continue;
   }
 
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     ASSERT(timer_triggered_);
-    Buffer::OwnedImpl data("a");
+    Buffer::OwnedImpl data(std::string(added_size_, 'a'));
     decoder_callbacks_->addDecodedData(data, false);
     return Http::FilterTrailersStatus::Continue;
   }
