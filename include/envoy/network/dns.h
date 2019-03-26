@@ -62,6 +62,25 @@ public:
    */
   virtual ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                                   ResolveCb callback) PURE;
+
+  /**
+   * Called when a resolution attempt for an SRV record is complete.
+   * @param srv_records supplies the list of resolved SRV records. The list will be empty if the
+   *        resolution failed.
+   */
+  typedef std::function<void(const std::list<Address::SrvInstanceConstSharedPtr>&& srv_records)>
+      ResolveSrvCb;
+
+  /**
+   * Initiate an async DNS resolution for an SRV record.
+   * @param dns_name supplies the DNS name to lookup.
+   * @param dns_lookup_family the DNS IP version lookup policy.
+   * @param callback supplies the callback to invoke when the resolution is complete.
+   * @return if non-null, a handle that can be used to cancel the resolution.
+   *         This is only valid until the invocation of callback or ~DnsResolver().
+   */
+  virtual ActiveDnsQuery* resolveSrv(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
+                                     ResolveSrvCb callback) PURE;
 };
 
 using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;

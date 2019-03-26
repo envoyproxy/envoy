@@ -9,5 +9,11 @@ ActiveDnsQuery* ValidationDnsResolver::resolve(const std::string&, DnsLookupFami
   return nullptr;
 }
 
+ActiveDnsQuery* ValidationDnsResolver::resolveSrv(const std::string&, DnsLookupFamily,
+                                                  ResolveSrvCb callback) {
+  callback({});
+  return nullptr;
+}
+
 } // namespace Network
 } // namespace Envoy

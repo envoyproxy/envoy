@@ -165,6 +165,39 @@ public:
 
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
 
+/**
+ * Interface for SRV records.
+ */
+class SrvInstance {
+public:
+  virtual ~SrvInstance() {}
+
+  virtual bool operator==(const SrvInstance& rhs) const PURE;
+  bool operator!=(const SrvInstance& rhs) const { return !operator==(rhs); }
+
+  /**
+   * @return the address instance for the SRV record.
+   */
+  virtual InstanceConstSharedPtr address() const PURE;
+
+  /**
+   * @return the priority of the SRV record.
+   */
+  virtual uint32_t priority() const PURE;
+
+  /**
+   * @return the weight of the SRV record.
+   */
+  virtual uint32_t weight() const PURE;
+
+  /**
+   * @return a human readable string for the SRV record.
+   */
+  virtual const std::string& asString() const PURE;
+};
+
+typedef std::shared_ptr<const SrvInstance> SrvInstanceConstSharedPtr;
+
 } // namespace Address
 } // namespace Network
 } // namespace Envoy
