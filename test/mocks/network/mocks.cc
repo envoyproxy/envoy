@@ -37,6 +37,7 @@ MockActiveDnsQuery::~MockActiveDnsQuery() {}
 
 MockDnsResolver::MockDnsResolver() {
   ON_CALL(*this, resolve(_, _, _)).WillByDefault(Return(&active_query_));
+  ON_CALL(*this, resolveSrv(_, _, _)).WillByDefault(Return(&active_query_));
 }
 
 MockDnsResolver::~MockDnsResolver() {}
