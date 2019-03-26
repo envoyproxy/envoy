@@ -11,8 +11,6 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * Use of `enabled` in `CorsPolicy`, found in
   [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
   Set the `filter_enabled` field instead.
-* Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
-google.protobuf.Struct in google.protobuf.Any.
 * Use of `cluster`, found in [redis-proxy.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto) is deprecated. Set a `PrefixRoutes.catch_all_cluster` instead.
 
 ## Version 1.9.0 (Dec 20, 2018)
