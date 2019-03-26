@@ -12,8 +12,7 @@
 namespace Envoy {
 namespace Config {
 
-template <class ResourceType>
-class MockSubscriptionCallbacks : public SubscriptionCallbacks<ResourceType> {
+template <class ResourceType> class MockSubscriptionCallbacks : public SubscriptionCallbacks {
 public:
   MockSubscriptionCallbacks() {
     ON_CALL(*this, resourceName(testing::_))
@@ -28,7 +27,7 @@ public:
 
   // TODO(fredlas) deduplicate
   MOCK_METHOD2_T(onConfigUpdate,
-                 void(const typename SubscriptionCallbacks<ResourceType>::ResourceVector& resources,
+                 void(const typename SubscriptionCallbacks::ResourceVector& resources,
                       const std::string& version_info));
   MOCK_METHOD3_T(onConfigUpdate,
                  void(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
@@ -38,10 +37,10 @@ public:
   MOCK_METHOD1_T(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
-template <class ResourceType> class MockSubscription : public Subscription<ResourceType> {
+class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD2_T(start, void(const std::vector<std::string>& resources,
-                             SubscriptionCallbacks<ResourceType>& callbacks));
+  MOCK_METHOD2_T(start,
+                 void(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks));
   MOCK_METHOD1_T(updateResources, void(const std::vector<std::string>& resources));
 };
 

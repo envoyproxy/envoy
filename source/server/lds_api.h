@@ -19,7 +19,7 @@ namespace Server {
  */
 class LdsApiImpl : public LdsApi,
                    public Init::Target,
-                   Config::SubscriptionCallbacks<envoy::api::v2::Listener>,
+                   Config::SubscriptionCallbacks,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
@@ -48,7 +48,7 @@ public:
 private:
   void runInitializeCallbackIfAny();
 
-  std::unique_ptr<Config::Subscription<envoy::api::v2::Listener>> subscription_;
+  std::unique_ptr<Config::Subscription> subscription_;
   std::string version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopePtr scope_;

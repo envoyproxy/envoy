@@ -93,10 +93,9 @@ class RdsRouteConfigProviderImpl;
  * A class that fetches the route configuration dynamically using the RDS API and updates them to
  * RDS config providers.
  */
-class RdsRouteConfigSubscription
-    : public Init::Target,
-      Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
-      Logger::Loggable<Logger::Id::router> {
+class RdsRouteConfigSubscription : public Init::Target,
+                                   Envoy::Config::SubscriptionCallbacks,
+                                   Logger::Loggable<Logger::Id::router> {
 public:
   ~RdsRouteConfigSubscription();
 
@@ -133,7 +132,7 @@ private:
   void registerInitTarget(Init::Manager& init_manager);
   void runInitializeCallbackIfAny();
 
-  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
+  std::unique_ptr<Envoy::Config::Subscription> subscription_;
   std::function<void()> initialize_callback_;
   const std::string route_config_name_;
   Stats::ScopePtr scope_;
