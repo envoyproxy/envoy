@@ -37,15 +37,15 @@ public:
                   cb_stats.remaining_rq_),
         retries_(max_retries, runtime, runtime_key + "max_retries", cb_stats.rq_retry_open_,
                  cb_stats.remaining_retries_),
-        connectionPools_(max_connection_pools, runtime, runtime_key + "max_connection_pools",
-                         cb_stats.cx_pool_open_, cb_stats.remaining_cx_pools_) {}
+        connection_pools_(max_connection_pools, runtime, runtime_key + "max_connection_pools",
+                          cb_stats.cx_pool_open_, cb_stats.remaining_cx_pools_) {}
 
   // Upstream::ResourceManager
   Resource& connections() override { return connections_; }
   Resource& pendingRequests() override { return pending_requests_; }
   Resource& requests() override { return requests_; }
   Resource& retries() override { return retries_; }
-  Resource& connectionPools() override { return connectionPools_; }
+  Resource& connectionPools() override { return connection_pools_; }
 
 private:
   struct ResourceImpl : public Resource {
@@ -109,7 +109,7 @@ private:
   ResourceImpl pending_requests_;
   ResourceImpl requests_;
   ResourceImpl retries_;
-  ResourceImpl connectionPools_;
+  ResourceImpl connection_pools_;
 };
 
 typedef std::unique_ptr<ResourceManagerImpl> ResourceManagerImplPtr;
