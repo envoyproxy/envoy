@@ -2,6 +2,8 @@
 
 #include "extensions/filters/http/jwt_authn/extractor.h"
 
+#include "test/test_common/utility.h"
+
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
