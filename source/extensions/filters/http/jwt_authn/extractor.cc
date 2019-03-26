@@ -224,7 +224,7 @@ constexpr char ConstantBase64UrlEncodingCharsPlusDot[] =
 // Base64Url+dot string until first non-Base64Url char.
 //
 // The input parameters:
-//    "value_str" - the header value string, perhaps "Bearer eyJhbG....", and
+//    "value_str" - the header value string, perhaps "Bearer string....", and
 //    "after" - the offset into that string after which to begin looking for JWT-legal characters
 //
 // For backwards compatibility, if it finds no suitable string, it returns value_str as-is.
