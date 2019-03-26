@@ -554,7 +554,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   HostsPerLocalityConstSharedPtr hosts_per_locality;
 
   if (original_host_set_.hostsPerLocality().get().size() == 1) {
-    hosts_per_locality = std::make_shared<HostsPerLocalityImpl>(*hosts, original_host_set_.hostsPerLocality().hasLocalLocality());
+    hosts_per_locality = std::make_shared<HostsPerLocalityImpl>(
+        *hosts, original_host_set_.hostsPerLocality().hasLocalLocality());
   } else {
     hosts_per_locality = original_host_set_.hostsPerLocality().filter(cached_predicate);
   }
