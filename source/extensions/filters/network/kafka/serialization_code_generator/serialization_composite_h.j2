@@ -2,7 +2,8 @@
   Creates 'serialization_composite.h'.
 
   Template for composite serializers (the CompositeDeserializerWith_N_Delegates classes).
-  Covers the corner case of 0 delegates, and then uses templating to create declarations for 1..N variants.
+  Covers the corner case of 0 delegates, and then uses templating to create declarations for 1..N
+  variants.
 #}
 #pragma once
 
@@ -53,8 +54,9 @@ public:
 {% for field_count in counts %}
 /**
  * Composite deserializer that uses {{ field_count }} deserializer(s).
- * Passes data to each of the underlying deserializers (deserializers that are already ready do not consume data,
- * so it's safe). The composite deserializer is ready when the last deserializer is ready (what means that all
+ * Passes data to each of the underlying deserializers (deserializers that are already ready do not
+ * consume data, so it's safe).
+ * The composite deserializer is ready when the last deserializer is ready (what means that all
  * deserializers before it are ready too).
  * Constructs the result of type ResponseType using { delegate1_.get(), delegate2_.get() ... }
  *
@@ -62,7 +64,8 @@ public:
  * @param DeserializerType{{ field }} deserializer {{ field }}
 {% endfor %} */
 template <
-  typename ResponseType{% for field in range(1, field_count + 1) %}, typename DeserializerType{{ field }}{% endfor %}
+  typename ResponseType{% for field in range(1, field_count + 1) %},
+  typename DeserializerType{{ field }}{% endfor %}
 >
 class CompositeDeserializerWith{{ field_count }}Delegates : public Deserializer<ResponseType> {
 public:

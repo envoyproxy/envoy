@@ -10,7 +10,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-class RequestDecoderTest : public testing::Test {
+class RequestCodecIntegrationTest : public testing::Test {
 protected:
   template <typename T> void putInBuffer(T arg);
 
@@ -18,7 +18,7 @@ protected:
 };
 
 // Other request types are tested in (generated) 'request_codec_request_integration_test.cc'.
-TEST_F(RequestDecoderTest, shouldProduceAbortedMessageOnUnknownData) {
+TEST_F(RequestCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
   // given
   // As real api keys have values below 100, the messages generated in this loop should not be
   // recognized by the codec.
@@ -56,7 +56,7 @@ TEST_F(RequestDecoderTest, shouldProduceAbortedMessageOnUnknownData) {
 }
 
 // Helper function.
-template <typename T> void RequestDecoderTest::putInBuffer(T arg) {
+template <typename T> void RequestCodecIntegrationTest::putInBuffer(T arg) {
   MessageEncoderImpl serializer{buffer_};
   serializer.encode(arg);
 }

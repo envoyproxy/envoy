@@ -6,7 +6,8 @@ def main():
   Serialization composite generator script
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Generates main&test source code files for composite deserializers.
-  The files are generated, as they are extremely repetitive (composite deserializer for 0..9 sub-deserializers).
+  The files are generated, as they are extremely repetitive (composite deserializer for 0..9
+  sub-deserializers).
 
   Usage:
     serialization_composite_generator.py COMMAND LOCATION_OF_OUTPUT_FILE
@@ -17,7 +18,8 @@ def main():
                             if generate-test: location of 'serialization_composite_test.cc'.
 
   When generating source code, it creates:
-    - serialization_composite.h - header with declarations of CompositeDeserializerWith???Delegates classes.
+    - serialization_composite.h - header with declarations of CompositeDeserializerWith???Delegates
+                                  classes.
   When generating test code, it creates:
     - serialization_composite_test.cc - tests for these classes.
 

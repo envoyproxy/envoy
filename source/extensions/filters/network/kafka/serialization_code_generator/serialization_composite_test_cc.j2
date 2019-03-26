@@ -15,7 +15,8 @@ namespace NetworkFilters {
 namespace Kafka {
 
 /**
- * Tests in this class are supposed to check whether serialization operations on composite deserializers are correct.
+ * Tests in this class are supposed to check whether serialization operations on composite
+ * deserializers are correct.
  */
 
 // Tests for composite deserializer with 0 fields (corner case).
@@ -57,7 +58,9 @@ struct CompositeResultWith{{ field_count }}Fields {
   }
 
   bool operator==(const CompositeResultWith{{ field_count }}Fields& rhs) const {
-    return true{% for field in range(1, field_count + 1) %} && field{{ field }}_ == rhs.field{{ field }}_{% endfor %};
+    return true
+    {% for field in range(1, field_count + 1) %} && field{{ field }}_ == rhs.field{{ field }}_
+    {% endfor %};
   }
 };
 

@@ -15,7 +15,7 @@ namespace Kafka {
 
 const int32_t FAILED_DESERIALIZER_STEP = 13;
 
-class BufferBasedTest : public testing::Test {
+class KafkaRequestParserTest : public testing::Test {
 public:
   const char* getBytes() {
     uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);
@@ -44,7 +44,7 @@ public:
   MOCK_CONST_METHOD3(createParser, ParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
 };
 
-TEST_F(BufferBasedTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
+TEST_F(KafkaRequestParserTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
   // given
   MockRequestParserResolver resolver{};
   RequestStartParser testee{resolver};
@@ -73,7 +73,7 @@ public:
   }
 };
 
-TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNextParser) {
+TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldExtractHeaderAndResolveNextParser) {
   // given
   const MockRequestParserResolver parser_resolver;
   const ParserSharedPtr parser{new MockParser{}};
@@ -112,7 +112,7 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldExtractHeaderDataAndResolveNext
   assertStringViewIncrement(data, orig_data, header_len);
 }
 
-TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDuringFeeding) {
+TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldHandleExceptionsDuringFeeding) {
   // given
 
   // This deserializer throws during feeding.
@@ -155,7 +155,7 @@ TEST_F(BufferBasedTest, RequestHeaderParserShouldHandleDeserializerExceptionsDur
   assertStringViewIncrement(data, orig_data, FAILED_DESERIALIZER_STEP);
 }
 
-TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerExceptionsDuringFeeding) {
+TEST_F(KafkaRequestParserTest, RequestParserShouldHandleDeserializerExceptionsDuringFeeding) {
   // given
 
   // This deserializer throws during feeding.
@@ -201,7 +201,7 @@ public:
   int32_t get() const override { return 0; };
 };
 
-TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerClaimingItsReadyButLeavingData) {
+TEST_F(KafkaRequestParserTest, RequestParserShouldHandleDeserializerReturningReadyButLeavingData) {
   // given
   const int32_t request_size = 1024; // There are still 1024 bytes to read to complete the request.
   RequestContextSharedPtr request_context{new RequestContext{request_size, {}}};
@@ -225,7 +225,7 @@ TEST_F(BufferBasedTest, RequestParserShouldHandleDeserializerClaimingItsReadyBut
   assertStringViewIncrement(data, orig_data, FAILED_DESERIALIZER_STEP);
 }
 
-TEST_F(BufferBasedTest, SentinelParserShouldConsumeDataUntilEndOfRequest) {
+TEST_F(KafkaRequestParserTest, SentinelParserShouldConsumeDataUntilEndOfRequest) {
   // given
   const int32_t request_len = 1000;
   RequestContextSharedPtr context{new RequestContext()};

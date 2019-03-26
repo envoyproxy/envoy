@@ -14,22 +14,26 @@ def main():
   COMMAND : 'generate-source', to generate source files,
             'generate-test', to generate test files.
   OUTPUT_FILES : if generate-source: location of 'requests.h' and 'kafka_request_resolver.cc',
-                 if generate-test: location of 'requests_test.cc', 'request_codec_request_integration_test.cc'.
+                 if generate-test: location of 'requests_test.cc',
+                 'request_codec_request_integration_test.cc'.
   INPUT_FILES: Kafka protocol json files to be processed.
 
   Kafka spec files are provided in Kafka clients jar file.
   When generating source code, it creates:
     - requests.h - definition of all the structures/deserializers/parsers related to Kafka requests,
-    - kafka_request_resolver.cc - resolver that binds api_key & api_version to parsers from requests.h.
+    - kafka_request_resolver.cc - resolver that binds api_key & api_version to parsers from
+                                  requests.h.
   When generating test code, it creates:
     - requests_test.cc - serialization/deserialization tests for kafka structures,
-    - request_codec_request_integration_test.cc - integration test for all request operations using the codec API.
+    - request_codec_request_integration_test.cc - integration test for all request operations using
+                                                  the codec API.
 
   Templates used are:
   - to create 'requests.h': requests_h.j2, complex_type_template.j2, request_parser.j2,
   - to create 'kafka_request_resolver.cc': kafka_request_resolver_cc.j2,
   - to create 'requests_test.cc': requests_test_cc.j2,
-  - to create 'request_codec_request_integration_test.cc' - request_codec_request_integration_test_cc.j2.
+  - to create 'request_codec_request_integration_test.cc' -
+      request_codec_request_integration_test_cc.j2.
   """
 
   import sys
@@ -109,8 +113,8 @@ def main():
 def parse_request(spec):
   """
   Parse a given structure into a request.
-  Request is just a complex type, that has name & version information kept in differently named fields, compared to
-  sub-structures in a request.
+  Request is just a complex type, that has name & version information kept in differently named
+  fields, compared to sub-structures in a request.
   """
   request_type_name = spec['name']
   request_versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
@@ -120,7 +124,8 @@ def parse_request(spec):
 
 def parse_complex_type(type_name, field_spec, versions):
   """
-  Parse given complex type, returning a structure that holds its name, field specification and allowed versions.
+  Parse given complex type, returning a structure that holds its name, field specification and
+  allowed versions.
   """
   fields = []
   for child_field in field_spec['fields']:
@@ -131,8 +136,9 @@ def parse_complex_type(type_name, field_spec, versions):
 
 def parse_field(field_spec, highest_possible_version):
   """
-  Parse given field, returning a structure holding the name, type, and versions when this field is actually used
-  (nullable or not). Obviously, field cannot be used in version higher than its type's usage.
+  Parse given field, returning a structure holding the name, type, and versions when this field is
+  actually used (nullable or not). Obviously, field cannot be used in version higher than its
+  type's usage.
   """
   version_usage = Statics.parse_version_string(field_spec['versions'], highest_possible_version)
   version_usage_as_nullable = Statics.parse_version_string(
@@ -144,10 +150,11 @@ def parse_field(field_spec, highest_possible_version):
 
 def parse_type(type_name, field_spec, highest_possible_version):
   """
-  Parse a given type element - returns an array type, primitive (e.g. uint32_t) or complex one (== struct).
+  Parse a given type element - returns an array type, primitive (e.g. uint32_t) or complex one.
   """
   if (type_name.startswith('[]')):
-    # In spec files, array types are defined as `[]underlying_type` instead of having its own element with type inside.
+    # In spec files, array types are defined as `[]underlying_type` instead of having its own
+    # element with type inside.
     underlying_type = parse_type(type_name[2:], field_spec, highest_possible_version)
     return Array(underlying_type)
   else:
@@ -178,8 +185,8 @@ class Statics:
 
 class FieldList:
   """
-  List of fields used by given entity (request or child structure) in given request version (as fields get added
-  or removed across versions).
+  List of fields used by given entity (request or child structure) in given request version
+  (as fields get added or removed across versions).
   """
 
   def __init__(self, version, fields):
@@ -195,7 +202,8 @@ class FieldList:
   def constructor_signature(self):
     """
     Return constructor signature.
-    Multiple versions of the same structure can have identical signatures (due to version bumps in Kafka).
+    Multiple versions of the same structure can have identical signatures (due to version bumps in
+    Kafka).
     """
     parameter_spec = map(lambda x: x.parameter_declaration(self.version), self.used_fields())
     return ', '.join(parameter_spec)
@@ -203,7 +211,8 @@ class FieldList:
   def constructor_init_list(self):
     """
     Renders member initialization list in constructor.
-    Takes care of potential optional<T> conversions (as field could be T in V1, but optional<T> in V2).
+    Takes care of potential optional<T> conversions (as field could be T in V1, but optional<T>
+    in V2).
     """
     init_list = []
     for field in self.fields:
@@ -461,8 +470,9 @@ class Complex(TypeSpecification):
 
   def compute_constructors(self):
     """
-    Field lists for different versions may not differ (as Kafka can bump version without any changes).
-    But constructors need to be unique, so we need to remove duplicates if the signatures match.
+    Field lists for different versions may not differ (as Kafka can bump version without any
+    changes). But constructors need to be unique, so we need to remove duplicates if the signatures
+    match.
     """
     signature_to_constructor = {}
     for field_list in self.compute_field_lists():

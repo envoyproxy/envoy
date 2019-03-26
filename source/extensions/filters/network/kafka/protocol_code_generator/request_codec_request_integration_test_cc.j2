@@ -22,7 +22,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-class RequestCodecIntegrationTest : public testing::Test {
+class RequestCodecRequestTest : public testing::Test {
 protected:
   template <typename T> void putInBuffer(T arg);
 
@@ -33,17 +33,17 @@ protected:
 
 // Integration test for {{ request_type.name }} messages.
 
-TEST_F(RequestCodecIntegrationTest, shouldHandle{{ request_type.name }}Messages) {
+TEST_F(RequestCodecRequestTest, shouldHandle{{ request_type.name }}Messages) {
   // given
   using Request = ConcreteRequest<{{ request_type.name }}>;
 
   std::vector<Request> sent;
-  int32_t correlation_id = 0;
+  int32_t correlation = 0;
 
   {% for field_list in request_type.compute_field_lists() %}
   for (int i = 0; i < 100; ++i ) {
     const RequestHeader header =
-      { {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, correlation_id++, "client-id" };
+      { {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, correlation++, "id" };
     const {{ request_type.name }} data = { {{ field_list.example_value() }} };
     const Request request = {header, data};
     putInBuffer(request);
@@ -52,8 +52,10 @@ TEST_F(RequestCodecIntegrationTest, shouldHandle{{ request_type.name }}Messages)
   {% endfor %}
 
   const InitialParserFactory& initial_parser_factory = InitialParserFactory::getDefaultInstance();
-  const RequestParserResolver& request_parser_resolver = RequestParserResolver::getDefaultInstance();
-  const CapturingRequestCallbackSharedPtr request_callback = std::make_shared<CapturingRequestCallback>();
+  const RequestParserResolver& request_parser_resolver =
+    RequestParserResolver::getDefaultInstance();
+  const CapturingRequestCallbackSharedPtr request_callback =
+    std::make_shared<CapturingRequestCallback>();
 
   RequestDecoder testee{initial_parser_factory, request_parser_resolver, {request_callback}};
 
@@ -73,7 +75,7 @@ TEST_F(RequestCodecIntegrationTest, shouldHandle{{ request_type.name }}Messages)
 {% endfor %}
 
 template <typename T>
-void RequestCodecIntegrationTest::putInBuffer(const T arg) {
+void RequestCodecRequestTest::putInBuffer(const T arg) {
   MessageEncoderImpl serializer{buffer_};
   serializer.encode(arg);
 }

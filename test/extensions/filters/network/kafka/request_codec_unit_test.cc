@@ -42,7 +42,7 @@ public:
 
 typedef std::shared_ptr<MockRequestCallback> MockRequestCallbackSharedPtr;
 
-class RequestDecoderTest : public testing::Test {
+class RequestCodecUnitTest : public testing::Test {
 protected:
   template <typename T> void putInBuffer(T arg);
 
@@ -58,7 +58,7 @@ ParseResponse consumeOneByte(absl::string_view& data) {
   return ParseResponse::stillWaiting();
 }
 
-TEST_F(RequestDecoderTest, shouldDoNothingIfParserNeverReturnsMessage) {
+TEST_F(RequestCodecUnitTest, shouldDoNothingIfParserNeverReturnsMessage) {
   // given
   putInBuffer(ConcreteRequest<int32_t>{{}, 0});
 
@@ -76,7 +76,7 @@ TEST_F(RequestDecoderTest, shouldDoNothingIfParserNeverReturnsMessage) {
   // There were no interactions with `request_callback`.
 }
 
-TEST_F(RequestDecoderTest, shouldUseNewParserAsResponse) {
+TEST_F(RequestCodecUnitTest, shouldUseNewParserAsResponse) {
   // given
   putInBuffer(ConcreteRequest<int32_t>{{}, 0});
 
@@ -98,7 +98,7 @@ TEST_F(RequestDecoderTest, shouldUseNewParserAsResponse) {
   // There were no interactions with `request_callback`.
 }
 
-TEST_F(RequestDecoderTest, shouldReturnParsedMessageAndReinitialize) {
+TEST_F(RequestCodecUnitTest, shouldReturnParsedMessageAndReinitialize) {
   // given
   putInBuffer(ConcreteRequest<int32_t>{{}, 0});
 
@@ -124,7 +124,7 @@ TEST_F(RequestDecoderTest, shouldReturnParsedMessageAndReinitialize) {
   // There was only one message sent to `request_callback`.
 }
 
-TEST_F(RequestDecoderTest, shouldInvokeParsersEvenIfTheyDoNotConsumeZeroBytes) {
+TEST_F(RequestCodecUnitTest, shouldInvokeParsersEvenIfTheyDoNotConsumeZeroBytes) {
   // given
   putInBuffer(ConcreteRequest<int32_t>{{}, 0});
 
@@ -159,7 +159,7 @@ TEST_F(RequestDecoderTest, shouldInvokeParsersEvenIfTheyDoNotConsumeZeroBytes) {
 }
 
 // Helper function.
-template <typename T> void RequestDecoderTest::putInBuffer(T arg) {
+template <typename T> void RequestCodecUnitTest::putInBuffer(T arg) {
   MessageEncoderImpl serializer{buffer_};
   serializer.encode(arg);
 }

@@ -16,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-class RequestDecoderTest : public testing::Test {
+class RequestTest : public testing::Test {
 public:
   Buffer::OwnedImpl buffer_;
 
@@ -33,7 +33,7 @@ public:
  * Takes an instance of a request, serializes it, then deserializes it.
  * This method gets executed for every request * version pair.
  */
-template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeserialize(T request) {
+template <typename T> std::shared_ptr<T> RequestTest::serializeAndDeserialize(T request) {
   MessageEncoderImpl serializer{buffer_};
   serializer.encode(request);
 
@@ -41,7 +41,8 @@ template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeseria
   RequestDecoder testee{RequestParserResolver::getDefaultInstance(), {mock_listener}};
 
   MessageSharedPtr receivedMessage;
-  EXPECT_CALL(*mock_listener, onMessage(testing::_)).WillOnce(testing::SaveArg<0>(&receivedMessage));
+  EXPECT_CALL(*mock_listener, onMessage(testing::_))
+    .WillOnce(testing::SaveArg<0>(&receivedMessage));
 
   testee.onData(buffer_);
 
@@ -50,10 +51,11 @@ template <typename T> std::shared_ptr<T> RequestDecoderTest::serializeAndDeseria
 
 {#
   Concrete tests for each request_type and version (field_list).
-  Each request is naively constructed using some default values (put "string" as std::string, 32 as uint32_t, etc.).
+  Each request is naively constructed using some default values
+  (put "string" as std::string, 32 as uint32_t, etc.).
 #}
 {% for request_type in request_types %}{% for field_list in request_type.compute_field_lists() %}
-TEST_F(RequestDecoderTest, shouldParse{{ request_type.name }}V{{ field_list.version }}) {
+TEST_F(RequestTest, shouldParse{{ request_type.name }}V{{ field_list.version }}) {
   // given
   {{ request_type.name }} data = { {{ field_list.example_value() }} };
   ConcreteRequest<{{ request_type.name }}> request = { {
