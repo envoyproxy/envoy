@@ -157,7 +157,7 @@ public:
    *              called) or non-blocking mode where only active events will be executed and then
    *              run() will return.
    */
-  enum class RunType { Block, NonBlock };
+  enum class RunType { Block, NonBlock, RunUntilExit };
   virtual void run(RunType type) PURE;
 
   /**

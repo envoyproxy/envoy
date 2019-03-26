@@ -82,7 +82,7 @@ public:
   void forceCheckForTest() {
     Thread::LockGuard guard(mutex_);
     MonotonicTime now = time_source_.monotonicTime();
-    wakeupLockHeld(std::chrono::milliseconds(0));
+    loop_timer_->enableTimer(std::chrono::milliseconds(0));
     test_interlock_hook_->waitFromTest(mutex_, now);
   }
 
@@ -100,14 +100,6 @@ private:
   // it is after kill and multikill timeout values are initialized.
   bool killEnabled() const { return kill_timeout_ > std::chrono::milliseconds(0); }
   bool multikillEnabled() const { return multi_kill_timeout_ > std::chrono::milliseconds(0); }
-
-  /**
-   * Schedules a wakeup to occur some number of milliseconds in the future. Passing zero
-   * causes an immediate wakeup.
-   *
-   * @param ms The delay before wakeup, expressed in milliseconds.
-   */
-  void wakeupLockHeld(std::chrono::milliseconds ms) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   struct WatchedDog {
     WatchDogSharedPtr dog_;
@@ -131,8 +123,6 @@ private:
   Event::DispatcherPtr dispatcher_;
   Event::TimerPtr loop_timer_;
   Thread::MutexBasicLockable mutex_;
-  Thread::CondVar run_event_;
-  bool pending_ GUARDED_BY(mutex_);
   bool run_thread_ GUARDED_BY(mutex_);
 };
 

@@ -18,14 +18,21 @@ public:
   TimerPtr createTimer(const TimerCb& cb) override;
 
   /**
-   * Runs the libevent loop once, without blocking.
+   * Executes any events that been activated, then returns.
    */
-  void nonBlockingLoop();
+  void runActivatedEvents();
 
   /**
-   * Runs the libevent loop once, with block.
+   * Waits for any pending events to activate, executes them, then exits. Exits
+   * immediately if there are no pending or active events.
    */
-  void blockingLoop();
+  void runUntilEmpty();
+
+  /**
+   * Runs the event-loop until loopExit() is called, blocking until there
+   * are pending or active events.
+   */
+  void runUntilExit();
 
   /**
    * Exits the libevent loop.

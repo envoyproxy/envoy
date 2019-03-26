@@ -33,7 +33,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_miss_counter_(stats_scope.counter("server.watchdog_miss")),
       watchdog_megamiss_counter_(stats_scope.counter("server.watchdog_mega_miss")),
       dispatcher_(api.allocateDispatcher()),
-      loop_timer_(dispatcher_->createTimer([this]() { step(); })), pending_(false),
+      loop_timer_(dispatcher_->createTimer([this]() { step(); })), //, pending_(false) {
       run_thread_(true) {
   start(api);
 }
@@ -44,23 +44,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 
 GuardDogImpl::~GuardDogImpl() { stop(); }
 
-void GuardDogImpl::threadRoutine() {
-  while (true) {
-    // Use a condvar to avoid spinning in Dispatcher::run() with no pending events. The
-    // condvar is signaled when a timer is enabled.
-    {
-      Thread::LockGuard guard(mutex_);
-      while (!pending_ && run_thread_) {
-        run_event_.wait(mutex_);
-      }
-      pending_ = false;
-      if (!run_thread_) {
-        return;
-      }
-    }
-    dispatcher_->run(Event::Dispatcher::RunType::Block);
-  }
-}
+void GuardDogImpl::threadRoutine() {}
 
 void GuardDogImpl::step() {
   {
@@ -117,7 +101,7 @@ void GuardDogImpl::step() {
     Thread::LockGuard guard(mutex_);
     test_interlock_hook_->signalFromImpl(now);
     if (run_thread_) {
-      wakeupLockHeld(loop_interval_);
+      loop_timer_->enableTimer(loop_interval_);
     }
   }
 }
@@ -153,26 +137,21 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
 
 void GuardDogImpl::start(Api::Api& api) {
   Thread::LockGuard guard(mutex_);
-  thread_ = api.threadFactory().createThread([this]() -> void { threadRoutine(); });
-  wakeupLockHeld(std::chrono::milliseconds(0));
+  thread_ = api.threadFactory().createThread(
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
+  loop_timer_->enableTimer(std::chrono::milliseconds(0));
 }
 
 void GuardDogImpl::stop() {
   {
     Thread::LockGuard guard(mutex_);
     run_thread_ = false;
-    wakeupLockHeld(std::chrono::milliseconds(0));
   }
+  dispatcher_->exit();
   if (thread_) {
     thread_->join();
     thread_.reset();
   }
-}
-
-void GuardDogImpl::wakeupLockHeld(std::chrono::milliseconds ms) {
-  loop_timer_->enableTimer(ms);
-  pending_ = true;
-  run_event_.notifyAll();
 }
 
 } // namespace Server

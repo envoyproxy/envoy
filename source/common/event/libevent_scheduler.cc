@@ -15,7 +15,7 @@ TimerPtr LibeventScheduler::createTimer(const TimerCb& cb) {
   return std::make_unique<TimerImpl>(libevent_, cb);
 };
 
-void LibeventScheduler::nonBlockingLoop() {
+void LibeventScheduler::runActivatedEvents() {
 #ifdef WIN32
   // On Windows, EVLOOP_NONBLOCK will cause the libevent event_base_loop to run forever.
   // This is because libevent only supports level triggering on Windows, and so the write
@@ -28,7 +28,11 @@ void LibeventScheduler::nonBlockingLoop() {
   event_base_loop(libevent_.get(), flag);
 }
 
-void LibeventScheduler::blockingLoop() { event_base_loop(libevent_.get(), 0); }
+void LibeventScheduler::runUntilEmpty() { event_base_loop(libevent_.get(), 0); }
+
+void LibeventScheduler::runUntilExit() {
+  event_base_loop(libevent_.get(), EVLOOP_NO_EXIT_ON_EMPTY);
+}
 
 void LibeventScheduler::loopExit() { event_base_loopexit(libevent_.get(), nullptr); }
 

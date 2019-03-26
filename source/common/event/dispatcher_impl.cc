@@ -165,10 +165,16 @@ void DispatcherImpl::run(RunType type) {
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
 
-  if (type == RunType::NonBlock) {
-    base_scheduler_.nonBlockingLoop();
-  } else {
-    base_scheduler_.blockingLoop();
+  switch (type) {
+  case RunType::NonBlock:
+    base_scheduler_.runActivatedEvents();
+    break;
+  case RunType::Block:
+    base_scheduler_.runUntilEmpty();
+    break;
+  case RunType::RunUntilExit:
+    base_scheduler_.runUntilEmpty();
+    break;
   }
 }
 
