@@ -49,7 +49,7 @@ Retry plugin configuration
 --------------------------
 
 Normally during retries, host selection follows the same process as the original request. Retry plugins
-can be used to modify this behavior, and fall into two categories:
+can be used to modify this behavior, and they fall into two categories:
 
 * :ref:`Host Predicates <envoy_api_field_route.RetryPolicy.retry_host_predicate>`:
   These predicates can be used to "reject" a host, which will cause host selection to be reattempted.
