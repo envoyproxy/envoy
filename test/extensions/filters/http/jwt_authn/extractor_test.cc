@@ -123,10 +123,6 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
   // Only the issue1 is using default header location.
   EXPECT_EQ(tokens[0]->token(), GoodToken);
   EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer1"));
-
-  // Test token remove
-  tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.Authorization());
 }
 
 // Test extracting token from the default query parameter: "access_token"
@@ -209,10 +205,6 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch1) {
   // Match issuer 7 with map key as: prefix-header + 'CCCDDD'
   EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer7"));
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
-
-  // Test token remove
-  tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.get(Http::LowerCaseString("prefix-header")));
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
@@ -224,10 +216,6 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
   // Match issuer 7 with map key as: prefix-header + AAA
   EXPECT_TRUE(tokens[0]->isIssuerSpecified("issuer7"));
   EXPECT_EQ(tokens[0]->token(), "and0X3Rva2Vu");
-
-  // Test token remove
-  tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.get(Http::LowerCaseString("prefix-header")));
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
@@ -243,10 +231,6 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
   // Match issuer 7 with map key as: prefix-header + 'CCCDDD'
   EXPECT_TRUE(tokens[1]->isIssuerSpecified("issuer7"));
   EXPECT_EQ(tokens[1]->token(), "and0X3Rva2Vu");
-
-  // Test token remove
-  tokens[0]->removeJwt(headers);
-  EXPECT_FALSE(headers.get(Http::LowerCaseString("prefix-header")));
 }
 
 // Test extracting token from the custom query parameter: "token_param"
