@@ -85,6 +85,8 @@ public:
     return wrapped_scope_->gauge(name);
   }
 
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
+
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogram(name);
@@ -98,6 +100,7 @@ private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
   StatsOptionsImpl stats_options_;
+  NullGaugeImpl null_gauge_;
 };
 
 /**
@@ -121,6 +124,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauge(name);
   }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
@@ -159,6 +163,7 @@ private:
   IsolatedStoreImpl store_;
   SourceImpl source_;
   StatsOptionsImpl stats_options_;
+  NullGaugeImpl null_gauge_;
 };
 
 } // namespace Stats
@@ -190,11 +195,13 @@ public:
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
-    on_worker_listener_added_cb_ = on_worker_listener_added;
+    on_worker_listener_added_cb_ = std::move(on_worker_listener_added);
   }
   void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
-    on_worker_listener_removed_cb_ = on_worker_listener_removed;
+    on_worker_listener_removed_cb_ = std::move(on_worker_listener_removed);
   }
+  void onRuntimeCreated() override;
+
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization);

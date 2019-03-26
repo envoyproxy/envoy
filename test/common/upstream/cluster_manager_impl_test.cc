@@ -605,8 +605,7 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
       "name": "redis_cluster",
       "lb_type": "ring_hash",
       "ring_hash_lb_config": {
-        "minimum_ring_size": 125,
-        "use_std_hash": true
+        "minimum_ring_size": 125
       },
       "connect_timeout_ms": 250,
       "type": "static",
@@ -634,8 +633,6 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
       dns_lookup_family: V4_ONLY
       ring_hash_lb_config:
         minimum_ring_size: 125
-        deprecated_v1:
-          use_std_hash: true
   )EOF";
   create(parseBootstrapFromV2Yaml(yaml));
 }
@@ -1691,7 +1688,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // drain callbacks, etc.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
-
   factory_.tls_.shutdownThread();
 }
 
@@ -1918,7 +1914,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   // drain callbacks, etc.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
-
   factory_.tls_.shutdownThread();
 }
 

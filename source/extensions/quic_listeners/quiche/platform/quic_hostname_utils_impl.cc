@@ -27,9 +27,9 @@ bool QuicHostnameUtilsImpl::IsValidSNI(QuicStringPiece sni) {
 }
 
 // static
-QuicString QuicHostnameUtilsImpl::NormalizeHostname(QuicStringPiece hostname) {
+std::string QuicHostnameUtilsImpl::NormalizeHostname(QuicStringPiece hostname) {
   // TODO(wub): Implement it on top of GoogleUrl, once it is available.
-  QuicString host = absl::AsciiStrToLower(hostname);
+  std::string host = absl::AsciiStrToLower(hostname);
 
   // Walk backwards over the string, stopping at the first trailing dot.
   size_t host_end = host.length();

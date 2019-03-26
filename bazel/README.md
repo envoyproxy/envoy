@@ -268,7 +268,7 @@ Use `RUN_REMOTE=yes` when you don't want to run against your local docker instan
 will need to override a few environment variables to set up the remote docker. The list of variables
 can be found in the [Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
 
-Use `LOCAL_MOUNT=yes` when you are not building with the envoy build container. This will ensure
+Use `LOCAL_MOUNT=yes` when you are not building with the Envoy build container. This will ensure
 that the libraries against which the tests dynamically link will be available and of the correct
 version.
 

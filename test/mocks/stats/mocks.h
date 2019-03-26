@@ -162,6 +162,7 @@ public:
   MOCK_CONST_METHOD0(counters, std::vector<CounterSharedPtr>());
   MOCK_METHOD1(createScope_, Scope*(const std::string& name));
   MOCK_METHOD1(gauge, Gauge&(const std::string&));
+  MOCK_METHOD1(nullGauge, NullGaugeImpl&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
