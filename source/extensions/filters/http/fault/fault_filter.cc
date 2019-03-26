@@ -121,7 +121,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   maybeSetupResponseRateLimit(headers);
 
   absl::optional<std::chrono::milliseconds> duration = delayDuration(headers);
-  if (duration) {
+  if (duration.has_value()) {
     delay_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
     ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
@@ -219,7 +219,8 @@ FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
     return ret;
   }
 
-  // See if the delay provider has a default delay, if not there is no delay.
+  // See if the configured delay provider has a default delay, if not there is no delay (e.g.,
+  // header configuration and no/invalid header).
   auto config_duration = fault_settings_->requestDelay()->duration(
       request_headers.get(Filters::Common::Fault::HeaderNames::get().DelayRequest));
   if (!config_duration.has_value()) {

@@ -22,6 +22,11 @@ TEST(FaultConfigTest, FaultDelayHeaderConfig) {
   // Header with bad data.
   Http::TestHeaderMapImpl bad_headers{{"x-envoy-fault-delay-request", "abc"}};
   EXPECT_EQ(absl::nullopt, config.duration(bad_headers.get(HeaderNames::get().DelayRequest)));
+
+  // Valid header.
+  Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-delay-request", "123"}};
+  EXPECT_EQ(std::chrono::milliseconds(123),
+            config.duration(good_headers.get(HeaderNames::get().DelayRequest)).value());
 }
 
 TEST(FaultConfigTest, FaultRateLimitHeaderConfig) {
@@ -40,6 +45,11 @@ TEST(FaultConfigTest, FaultRateLimitHeaderConfig) {
   Http::TestHeaderMapImpl zero_headers{{"x-envoy-fault-throughput-response", "0"}};
   EXPECT_EQ(absl::nullopt,
             config.rateKbps(zero_headers.get(HeaderNames::get().ThroughputResponse)));
+
+  // Valid header.
+  Http::TestHeaderMapImpl good_headers{{"x-envoy-fault-throughput-response", "123"}};
+  EXPECT_EQ(123UL,
+            config.rateKbps(good_headers.get(HeaderNames::get().ThroughputResponse)).value());
 }
 
 } // namespace
