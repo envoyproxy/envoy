@@ -27,8 +27,7 @@ namespace Secret {
 /**
  * SDS API implementation that fetches secrets from SDS server via Subscription.
  */
-class SdsApi : public Init::Target,
-               public Config::SubscriptionCallbacks<envoy::api::v2::auth::Secret> {
+class SdsApi : public Init::Target, public Config::SubscriptionCallbacks {
 public:
   SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
          Runtime::RandomGenerator& random, Stats::Store& stats,
@@ -67,7 +66,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
 
   const envoy::api::v2::core::ConfigSource sds_config_;
-  std::unique_ptr<Config::Subscription<envoy::api::v2::auth::Secret>> subscription_;
+  std::unique_ptr<Config::Subscription> subscription_;
   std::function<void()> initialize_callback_;
   const std::string sds_config_name_;
 

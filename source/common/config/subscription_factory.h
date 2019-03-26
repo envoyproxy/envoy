@@ -37,19 +37,17 @@ public:
    *        service description).
    * @param api reference to the Api object
    */
-  template <class ResourceType>
-  static std::unique_ptr<Subscription<ResourceType>> subscriptionFromConfigSource(
+  static std::unique_ptr<Subscription> subscriptionFromConfigSource(
       const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
       Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
       Stats::Scope& scope, const std::string& rest_method, const std::string& grpc_method,
-      Api::Api& api) {
-    std::unique_ptr<Subscription<ResourceType>> result;
+      const std::string& type_url, Api::Api& api) {
+    std::unique_ptr<Subscription> result;
     SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {
     case envoy::api::v2::core::ConfigSource::kPath: {
       Utility::checkFilesystemSubscriptionBackingPath(config.path(), api);
-      result.reset(new Config::FilesystemSubscriptionImpl<ResourceType>(dispatcher, config.path(),
-                                                                        stats, api));
+      result.reset(new Config::FilesystemSubscriptionImpl(dispatcher, config.path(), stats, api));
       break;
     }
     case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
@@ -62,7 +60,7 @@ public:
             "Please specify an explicit supported api_type in the following config:\n" +
             config.DebugString());
       case envoy::api::v2::core::ApiConfigSource::REST:
-        result.reset(new HttpSubscriptionImpl<ResourceType>(
+        result.reset(new HttpSubscriptionImpl(
             local_info, cm, api_config_source.cluster_names()[0], dispatcher, random,
             Utility::apiConfigSourceRefreshDelay(api_config_source),
             Utility::apiConfigSourceRequestTimeout(api_config_source),
@@ -70,20 +68,20 @@ public:
             Utility::configSourceInitialFetchTimeout(config)));
         break;
       case envoy::api::v2::core::ApiConfigSource::GRPC:
-        result.reset(new GrpcSubscriptionImpl<ResourceType>(
+        result.reset(new GrpcSubscriptionImpl(
             local_info,
             Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
                                                            api_config_source, scope)
                 ->create(),
             dispatcher, random,
-            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats,
-            scope, Utility::parseRateLimitSettings(api_config_source),
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), type_url,
+            stats, scope, Utility::parseRateLimitSettings(api_config_source),
             Utility::configSourceInitialFetchTimeout(config)));
         break;
       case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
         Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);
-        result.reset(new DeltaSubscriptionImpl<ResourceType>(
-            local_info,
+        result.reset(new DeltaSubscriptionImpl(
+            cm.grpcDeltaXdsContext(), type_url, local_info,
             Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
                                                            api_config_source, scope)
                 ->create(),
@@ -98,8 +96,8 @@ public:
       break;
     }
     case envoy::api::v2::core::ConfigSource::kAds: {
-      result.reset(new GrpcMuxSubscriptionImpl<ResourceType>(
-          cm.adsMux(), stats, dispatcher, Utility::configSourceInitialFetchTimeout(config)));
+      result.reset(new GrpcMuxSubscriptionImpl(cm.adsMux(), stats, type_url, dispatcher,
+                                               Utility::configSourceInitialFetchTimeout(config)));
       break;
     }
     default:

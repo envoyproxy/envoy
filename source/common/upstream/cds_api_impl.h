@@ -19,7 +19,7 @@ namespace Upstream {
  * CDS API implementation that fetches via Subscription.
  */
 class CdsApiImpl : public CdsApi,
-                   Config::SubscriptionCallbacks<envoy::api::v2::Cluster>,
+                   Config::SubscriptionCallbacks,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
@@ -51,7 +51,7 @@ private:
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;
-  std::unique_ptr<Config::Subscription<envoy::api::v2::Cluster>> subscription_;
+  std::unique_ptr<Config::Subscription> subscription_;
   std::string system_version_info_;
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;

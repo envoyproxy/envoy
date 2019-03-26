@@ -208,6 +208,9 @@ public:
    */
   virtual Config::GrpcMux& adsMux() PURE;
 
+  // TODO TODO COMMENT
+  virtual Config::GrpcDeltaXdsContext& grpcDeltaXdsContext() PURE;
+
   /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.
    */

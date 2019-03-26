@@ -37,12 +37,14 @@ public:
                                                                   RETRY_MAX_DELAY_MS, random_);
   }
 
-  virtual void handleResponse(std::unique_ptr<ResponseProto>&& message) PURE;
-  virtual void handleStreamEstablished() PURE;
-  virtual void handleEstablishmentFailure() PURE;
+  //  virtual void handleResponse(std::unique_ptr<ResponseProto>&& message) PURE; // TODO TODO NOTE
+  //  MOVED TO include/grpc_xds_context.h virtual void handleStreamEstablished() PURE; // TODO TODO
+  //  NOTE MOVED TO include/grpc_xds_context.h virtual void handleEstablishmentFailure() PURE; //
+  //  TODO TODO NOTE MOVED TO include/grpc_xds_context.h
 
   // Returns whether the request was actually sent (and so can leave the queue).
-  virtual void sendDiscoveryRequest(const RequestQueueItem& queue_item) PURE;
+  // virtual void sendDiscoveryRequest(const RequestQueueItem& queue_item) PURE;  // TODO TODO NOTE
+  // MOVED TO include/grpc_xds_context.h
 
   void queueDiscoveryRequest(const RequestQueueItem& queue_item) {
     request_queue_.push(queue_item);
@@ -58,6 +60,14 @@ public:
   }
 
   void establishNewStream() {
+
+    // TODO TODO TODO since this file also serves vanilla, need to DOUBLE CHECK whether this
+    // idempotency im adding here makes sense for vanilla too.
+    if (stream_ != nullptr) {
+      ENVOY_LOG(debug, "gRPC bidi stream for {} already exists!", service_method_.DebugString());
+      return;
+    }
+
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
     stream_ = async_client_->start(service_method_, *this);
     if (stream_ == nullptr) {
@@ -167,7 +177,16 @@ private:
   Event::TimerPtr drain_request_timer_;
   // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
   // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
-  std::queue<RequestQueueItem> request_queue_;
+  std::queue<RequestQueueItem>
+      request_queue_; // TODO TODO actually i think this queue can be its own little class. It would
+                      // still be templated on RequestQueueItem, but owned by either
+                      // GrpcDeltaXdsContext or GrpcStateOfWorldXdsContext, which could provide the
+                      // type.
+
+  // TODO TODO as for the rest of this class.... I think we can have GrpcDeltaXdsContext /
+  // GrpcWhateverMux (i.e. the GrpcXdsContext implementors) no longer inherit from it. Instead, it
+  // will just be its own GrpcStream< RequestProto, ResponseProto> thing, with nothing inheriting
+  // from it, and the GrpcXdsContext implementors will *own* one of it.
 };
 
 } // namespace Config

@@ -158,12 +158,13 @@ message DeltaDiscoveryRequest {
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
 
-  // This map must be populated when the DeltaDiscoveryRequest is the
-  // first in a stream (assuming there are any resources - this field's purpose is to enable
-  // a session to continue in a reconnected gRPC stream, and so will not be used in the very
-  // first stream of a session). The keys are the resources names of the xDS resources
-  // known to the xDS client. The values in the map are the associated resource
-  // level version info.
+  // Informs the server of the versions of the resources the xDS client knows of, to enable an xDS
+  // session to continue in a reconnected gRPC stream. This map will only be populated in the first
+  // message of a stream, as it is not applicable in later messages. It will not be populated in the
+  // very first stream of a session, since the client will not yet have any resources. In ADS, the
+  // first message *of each type_url* of a reconnected stream should populate this map. The map's
+  // keys are names of xDS resources known to the xDS client. The values are opaque resource
+  // versions.
   map<string, string> initial_resource_versions = 5;
 
   // When the DeltaDiscoveryRequest is a ACK or NACK message in response
@@ -182,8 +183,15 @@ message DeltaDiscoveryResponse {
   // The version of the response data (used for debugging).
   string system_version_info = 1;
 
-  // The response resources. These are typed resources that match the type url
-  // in the DeltaDiscoveryRequest.
+  // Type of the resources that are being provided, e.g.
+  // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit
+  // in requests made via singleton xDS APIs such as CDS, LDS, etc. but is
+  // required for ADS.
+  // Must match the type_url in the DeltaDiscoveryRequest.
+  string type_url = 3;
+
+  // The response resources. The Resource proto's Any field named 'resource' should be
+  // of type type_url.
   repeated Resource resources = 2 [(gogoproto.nullable) = false];
 
   // Resources names of resources that have be deleted and to be removed from the xDS Client.

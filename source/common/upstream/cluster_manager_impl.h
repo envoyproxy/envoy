@@ -211,6 +211,9 @@ public:
   const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
 
   Config::GrpcMux& adsMux() override { return *ads_mux_; }
+  Config::GrpcDeltaXdsContext& grpcDeltaXdsContext() {
+    return *grpc_delta_xds_context_;
+  } // TODO TODO the return type can be the parent class, GrpcXdsContext
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const std::string& localClusterName() const override { return local_cluster_name_; }
@@ -453,6 +456,7 @@ private:
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxPtr ads_mux_;
+  Config::GrpcDeltaXdsContextPtr grpc_delta_xds_context_;
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined, else the empty string.
   std::string local_cluster_name_;

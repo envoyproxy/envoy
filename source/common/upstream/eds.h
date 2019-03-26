@@ -19,8 +19,7 @@ namespace Upstream {
 /**
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
-class EdsClusterImpl : public BaseDynamicClusterImpl,
-                       Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
+class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallbacks {
 
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
@@ -69,7 +68,7 @@ private:
   };
 
   const ClusterManager& cm_;
-  std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;
+  std::unique_ptr<Config::Subscription> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
