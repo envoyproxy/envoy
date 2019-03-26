@@ -17,6 +17,8 @@
 #include "common/common/token_bucket_impl.h"
 #include "common/http/header_utility.h"
 
+#include "extensions/filters/common/fault/fault_config.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -46,35 +48,32 @@ struct FaultFilterStats {
  */
 class FaultSettings : public Router::RouteSpecificFilterConfig {
 public:
-  struct RateLimit {
-    uint64_t fixed_rate_kbps_;
-    envoy::type::FractionalPercent percentage_;
-  };
-
   FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault);
 
   const std::vector<Http::HeaderUtility::HeaderData>& filterHeaders() const {
     return fault_filter_headers_;
   }
   envoy::type::FractionalPercent abortPercentage() const { return abort_percentage_; }
-  envoy::type::FractionalPercent delayPercentage() const { return fixed_delay_percentage_; }
-  uint64_t delayDuration() const { return fixed_duration_ms_; }
   uint64_t abortCode() const { return http_status_; }
+  const Filters::Common::Fault::FaultDelayConfig* requestDelay() const {
+    return request_delay_config_.get();
+  }
   const std::string& upstreamCluster() const { return upstream_cluster_; }
   const std::unordered_set<std::string>& downstreamNodes() const { return downstream_nodes_; }
   absl::optional<uint64_t> maxActiveFaults() const { return max_active_faults_; }
-  const absl::optional<RateLimit>& responseRateLimit() const { return response_rate_limit_; }
+  const Filters::Common::Fault::FaultRateLimitConfig* responseRateLimit() const {
+    return response_rate_limit_.get();
+  }
 
 private:
   envoy::type::FractionalPercent abort_percentage_;
   uint64_t http_status_{}; // HTTP or gRPC return codes
-  envoy::type::FractionalPercent fixed_delay_percentage_;
-  uint64_t fixed_duration_ms_{}; // in milliseconds
+  Filters::Common::Fault::FaultDelayConfigPtr request_delay_config_;
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
   std::vector<Http::HeaderUtility::HeaderData> fault_filter_headers_;
   std::unordered_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
-  absl::optional<RateLimit> response_rate_limit_;
+  Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
 };
 
 /**
@@ -160,7 +159,7 @@ private:
 /**
  * A filter that is capable of faulting an entire request before dispatching it upstream.
  */
-class FaultFilter : public Http::StreamFilter {
+class FaultFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   FaultFilter(FaultFilterConfigSharedPtr config);
   ~FaultFilter();
@@ -200,7 +199,7 @@ private:
     const std::string DelayDurationKey = "fault.http.delay.fixed_duration_ms";
     const std::string AbortHttpStatusKey = "fault.http.abort.http_status";
     const std::string MaxActiveFaultsKey = "fault.http.max_active_faults";
-    const std::string ResponseRateLimitKey = "fault.http.rate_limit.response_percent";
+    const std::string ResponseRateLimitPercentKey = "fault.http.rate_limit.response_percent";
   };
 
   using RuntimeKeys = ConstSingleton<RuntimeKeyValues>;
@@ -215,10 +214,10 @@ private:
   bool matchesDownstreamNodes(const Http::HeaderMap& headers);
   bool isAbortEnabled();
   bool isDelayEnabled();
-  absl::optional<uint64_t> delayDuration();
+  absl::optional<std::chrono::milliseconds> delayDuration(const Http::HeaderMap& request_headers);
   uint64_t abortHttpStatus();
   void maybeIncActiveFaults();
-  void maybeSetupResponseRateLimit();
+  void maybeSetupResponseRateLimit(const Http::HeaderMap& request_headers);
 
   FaultFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};

@@ -95,6 +95,7 @@ void MessageUtil::loadFromJsonEx(const std::string& json, Protobuf::Message& mes
   if (proto_unknown_fields == ProtoUnknownFieldsMode::Allow) {
     options.ignore_unknown_fields = true;
   }
+  options.case_insensitive_enum_parsing = true;
   const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
