@@ -215,8 +215,8 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch1) {
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
-  auto headers = TestHeaderMapImpl{{"prefix-header",
-                                    "CCCDDD=\"and0X3Rva2Vu\",comment=\"fish tag\""}};
+  auto headers =
+      TestHeaderMapImpl{{"prefix-header", "CCCDDD=\"and0X3Rva2Vu\",comment=\"fish tag\""}};
   auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
@@ -230,9 +230,8 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch2) {
 }
 
 TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
-  auto headers = TestHeaderMapImpl{{"prefix-header",
-                                    "creds={\"authLevel\": \"20\", \"CCCDDD\": \"and0X3Rva2Vu\"}"}
-  };
+  auto headers = TestHeaderMapImpl{
+      {"prefix-header", "creds={\"authLevel\": \"20\", \"CCCDDD\": \"and0X3Rva2Vu\"}"}};
   auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 2);
 
