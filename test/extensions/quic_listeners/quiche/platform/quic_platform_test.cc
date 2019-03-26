@@ -357,6 +357,19 @@ TEST(QuicPlatformTest, QuicDLog) {
 
 #undef VALUE_BY_COMPILE_MODE
 
+TEST(QuicPlatformTest, QuicCHECK) {
+  CHECK(1 == 1);
+  CHECK(1 == 1) << " 1 == 1 is forever true.";
+
+  EXPECT_DEBUG_DEATH({ DCHECK(false) << " Supposed to fail in debug mode."; },
+                     "CHECK failed:.* Supposed to fail in debug mode.");
+  EXPECT_DEBUG_DEATH({ DCHECK(false); }, "CHECK failed");
+
+  EXPECT_DEATH({ CHECK(false) << " Supposed to fail in all modes."; },
+               "CHECK failed:.* Supposed to fail in all modes.");
+  EXPECT_DEATH({ CHECK(false); }, "CHECK failed");
+}
+
 // Test the behaviors of the cross products of
 //
 //   {QUIC_LOG, QUIC_DLOG} x {FATAL, DFATAL} x {debug, release}
