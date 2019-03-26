@@ -536,4 +536,11 @@ MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
 
 MATCHER_P(RepeatedProtoEq, rhs, "") { return TestUtility::repeatedPtrFieldEqual(arg, rhs); }
 
+MATCHER_P(Percent, rhs, "") {
+  envoy::type::FractionalPercent expected;
+  expected.set_numerator(rhs);
+  expected.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  return TestUtility::protoEqual(expected, arg);
+}
+
 } // namespace Envoy

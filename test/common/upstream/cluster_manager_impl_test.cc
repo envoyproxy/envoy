@@ -1688,7 +1688,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // drain callbacks, etc.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
-
   factory_.tls_.shutdownThread();
 }
 
@@ -1915,7 +1914,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   // drain callbacks, etc.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
-
   factory_.tls_.shutdownThread();
 }
 

@@ -25,7 +25,7 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   ON_CALL(store, gauge(_)).WillByDefault(ReturnRef(gauge));
 
   ResourceManagerImpl resource_manager(
-      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1,
+      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1, 0,
       ClusterCircuitBreakersStats{
           ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))});
 
@@ -58,6 +58,13 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
       .WillRepeatedly(Return(0U));
   EXPECT_EQ(0U, resource_manager.retries().max());
   EXPECT_FALSE(resource_manager.retries().canCreate());
+  EXPECT_CALL(
+      runtime.snapshot_,
+      getInteger("circuit_breakers.runtime_resource_manager_test.default.max_connection_pools", 0U))
+      .Times(2)
+      .WillRepeatedly(Return(5U));
+  EXPECT_EQ(5U, resource_manager.connectionPools().max());
+  EXPECT_TRUE(resource_manager.connectionPools().canCreate());
 }
 
 TEST(ResourceManagerImplTest, RemainingResourceGauges) {
@@ -67,7 +74,7 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   auto stats = ClusterCircuitBreakersStats{
       ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))};
   ResourceManagerImpl resource_manager(
-      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, stats);
+      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, 3, stats);
 
   // Test remaining_cx_ gauge
   EXPECT_EQ(1U, resource_manager.connections().max());
@@ -104,7 +111,14 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   resource_manager.retries().inc();
   EXPECT_EQ(0U, stats.remaining_retries_.value());
   resource_manager.retries().dec();
-  EXPECT_EQ(0U, stats.remaining_retries_.value());
+
+  // Test remaining_cx_pools gauge.
+  EXPECT_EQ(3U, resource_manager.connectionPools().max());
+  EXPECT_EQ(3U, stats.remaining_cx_pools_.value());
+  resource_manager.connectionPools().inc();
+  EXPECT_EQ(2U, stats.remaining_cx_pools_.value());
+  resource_manager.connectionPools().dec();
+  EXPECT_EQ(3U, stats.remaining_cx_pools_.value());
 }
 } // namespace
 } // namespace Upstream

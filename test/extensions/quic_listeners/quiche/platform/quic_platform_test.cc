@@ -18,6 +18,7 @@
 #include "quiche/quic/platform/api/quic_containers.h"
 #include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
+#include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
@@ -72,6 +73,18 @@ TEST(QuicPlatformTest, QuicClientStats) {
                               100, "doc");
   QUIC_CLIENT_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
   QuicClientSparseHistogram("my.sparse.histogram", 345);
+}
+
+TEST(QuicPlatformTest, QuicExpectBug) {
+  auto bug = [](const char* error_message) { QUIC_BUG << error_message; };
+
+  auto peer_bug = [](const char* error_message) { QUIC_PEER_BUG << error_message; };
+
+  EXPECT_QUIC_BUG(bug("bug one is expected"), "bug one");
+  EXPECT_QUIC_BUG(bug("bug two is expected"), "bug two");
+
+  EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_1 is expected"), "peer_bug_1");
+  EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_2 is expected"), "peer_bug_2");
 }
 
 TEST(QuicPlatformTest, QuicExportedStats) {

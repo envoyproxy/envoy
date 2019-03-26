@@ -62,13 +62,15 @@ cc_library(
         "quiche/http2/platform/api/http2_string.h",
         "quiche/http2/platform/api/http2_string_piece.h",
         # TODO: uncomment the following files as implementations are added.
-        # "quiche/http2/platform/api/http2_bug_tracker.h",
         # "quiche/http2/platform/api/http2_flags.h",
-        # "quiche/http2/platform/api/http2_mock_log.h",
         # "quiche/http2/platform/api/http2_reconstruct_object.h",
         # "quiche/http2/platform/api/http2_test_helpers.h",
     ] + envoy_select_quiche(
-        ["quiche/http2/platform/api/http2_string_utils.h"],
+        [
+            "quiche/http2/platform/api/http2_bug_tracker.h",
+            "quiche/http2/platform/api/http2_logging.h",
+            "quiche/http2/platform/api/http2_string_utils.h",
+        ],
         "@envoy",
     ),
     visibility = ["//visibility:public"],
@@ -90,7 +92,11 @@ cc_library(
         # TODO: uncomment the following files as implementations are added.
         # "quiche/spdy/platform/api/spdy_flags.h",
     ] + envoy_select_quiche(
-        ["quiche/spdy/platform/api/spdy_string_utils.h"],
+        [
+            "quiche/spdy/platform/api/spdy_bug_tracker.h",
+            "quiche/spdy/platform/api/spdy_logging.h",
+            "quiche/spdy/platform/api/spdy_string_utils.h",
+        ],
         "@envoy",
     ),
     visibility = ["//visibility:public"],
@@ -130,7 +136,6 @@ cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
-        "quiche/quic/platform/api/quic_bug_tracker.h",
         "quiche/quic/platform/api/quic_client_stats.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
@@ -139,21 +144,16 @@ cc_library(
         "quiche/quic/platform/api/quic_fallthrough.h",
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_iovec.h",
-        "quiche/quic/platform/api/quic_logging.h",
         "quiche/quic/platform/api/quic_map_util.h",
-        "quiche/quic/platform/api/quic_mock_log.h",
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_reference_counted.h",
         "quiche/quic/platform/api/quic_server_stats.h",
-        "quiche/quic/platform/api/quic_stack_trace.h",
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_test_output.h",
         "quiche/quic/platform/api/quic_uint128.h",
-        "quiche/quic/platform/api/quic_thread.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_clock.h",
-        # "quiche/quic/platform/api/quic_expect_bug.h",
         # "quiche/quic/platform/api/quic_file_utils.h",
         # "quiche/quic/platform/api/quic_flags.h",
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
@@ -166,15 +166,19 @@ cc_library(
         # "quiche/quic/platform/api/quic_mem_slice_storage.h",
         # "quiche/quic/platform/api/quic_pcc_sender.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
-        # "quiche/quic/platform/api/quic_stack_trace.h",
-        # "quiche/quic/platform/api/quic_test.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
     ] + envoy_select_quiche(
         [
+            "quiche/quic/platform/api/quic_bug_tracker.h",
+            "quiche/quic/platform/api/quic_expect_bug.h",
+            "quiche/quic/platform/api/quic_mock_log.h",
+            "quiche/quic/platform/api/quic_logging.h",
+            "quiche/quic/platform/api/quic_stack_trace.h",
             "quiche/quic/platform/api/quic_string_utils.h",
             "quiche/quic/platform/api/quic_test.h",
             "quiche/quic/platform/api/quic_text_utils.h",
+            "quiche/quic/platform/api/quic_thread.h",
         ],
         "@envoy",
     ),
@@ -222,12 +226,11 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "quic_platform_test",
-    srcs = [
-        "quiche/quic/platform/api/quic_reference_counted_test.cc",
-    ] + envoy_select_quiche(
+    srcs = envoy_select_quiche(
         [
-            "quiche/quic/platform/api/quic_text_utils_test.cc",
+            "quiche/quic/platform/api/quic_reference_counted_test.cc",
             "quiche/quic/platform/api/quic_string_utils_test.cc",
+            "quiche/quic/platform/api/quic_text_utils_test.cc",
         ],
         "@envoy",
     ),
