@@ -14,7 +14,7 @@
 namespace quic {
 namespace {
 
-void DFTraverseDirectory(const std::string& dirname, std::vector<std::string>& files) {
+void depthFirstTraverseDirectory(const std::string& dirname, std::vector<std::string>& files) {
   Envoy::Filesystem::Directory directory(dirname);
   for (const Envoy::Filesystem::DirectoryEntry& entry : directory) {
     switch (entry.type_) {
@@ -23,7 +23,7 @@ void DFTraverseDirectory(const std::string& dirname, std::vector<std::string>& f
       break;
     case Envoy::Filesystem::FileType::Directory:
       if (entry.name_ != "." && entry.name_ != "..") {
-        DFTraverseDirectory(absl::StrCat(dirname, "/", entry.name_), files);
+        depthFirstTraverseDirectory(absl::StrCat(dirname, "/", entry.name_), files);
       }
       break;
     default:
@@ -38,7 +38,7 @@ void DFTraverseDirectory(const std::string& dirname, std::vector<std::string>& f
 // Traverses the directory |dirname| and returns all of the files it contains.
 std::vector<std::string> ReadFileContentsImpl(const std::string& dirname) {
   std::vector<std::string> files;
-  DFTraverseDirectory(dirname, files);
+  depthFirstTraverseDirectory(dirname, files);
   return files;
 }
 
