@@ -17,6 +17,9 @@ routing PRs, questions, etc. to the right place.
 * Stephan Zuercher ([zuercher](https://github.com/zuercher)) (zuercher@gmail.com)
   * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
     (metadata, etc.), and macOS build.
+* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
+  * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
+    issues, and CI in general.
 
 # Maintainers
 
@@ -24,8 +27,6 @@ routing PRs, questions, etc. to the right place.
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
   * Base server (watchdog, workers, startup, stack trace handling, etc.).
-* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
-  * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)

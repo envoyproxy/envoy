@@ -4,6 +4,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_options_impl.h"
 #include "common/stats/tag_producer_impl.h"
@@ -22,7 +23,8 @@ namespace Envoy {
 class ThreadLocalStorePerf {
 public:
   ThreadLocalStorePerf()
-      : store_(options_, heap_alloc_), api_(Api::createApiForTest(store_, time_system_)) {
+      : heap_alloc_(symbol_table_), store_(options_, heap_alloc_),
+        api_(Api::createApiForTest(store_, time_system_)) {
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
   }
 
@@ -45,6 +47,7 @@ public:
   }
 
 private:
+  Stats::FakeSymbolTableImpl symbol_table_;
   Event::SimulatedTimeSystem time_system_;
   Stats::StatsOptionsImpl options_;
   Stats::HeapStatDataAllocator heap_alloc_;

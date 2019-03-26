@@ -12,7 +12,8 @@ metrics.
 Build and run the containers:
 
 ```console
-$ docker-compose build && docker-compose up
+$ docker-compose pull
+$ docker-compose up --build
 ```
 
 Use `mysql` to issue some commands and verify they are routed via Envoy. Note

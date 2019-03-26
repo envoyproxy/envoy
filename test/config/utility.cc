@@ -113,6 +113,85 @@ config:
     nanos: 0
 )EOF";
 
+// TODO(#6327) cleaner approach to testing with static config.
+std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
+  return fmt::format(
+      R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+dynamic_resources:
+  cds_config:
+    api_config_source:
+      api_type: {}
+      grpc_services:
+        envoy_grpc:
+          cluster_name: my_cds_cluster
+static_resources:
+  clusters:
+  - name: my_cds_cluster
+    http2_protocol_options: {{}}
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+  listeners:
+    name: http
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: envoy.http_connection_manager
+        config:
+          stat_prefix: config_test
+          http_filters:
+            name: envoy.router
+          codec_type: HTTP2
+          route_config:
+            name: route_config_0
+            validate_clusters: false
+            virtual_hosts:
+              name: integration
+              routes:
+              - route:
+                  cluster: cluster_1
+                match:
+                  prefix: "/cluster1"
+              - route:
+                  cluster: cluster_2
+                match:
+                  prefix: "/cluster2"
+              domains: "*"
+)EOF",
+      api_type);
+}
+
+envoy::api::v2::Cluster ConfigHelper::buildCluster(const std::string& name, int port,
+                                                   const std::string& ip_version) {
+  return TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 5s
+      type: STATIC
+      load_assignment:
+        cluster_name: {}
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: {}
+      lb_policy: ROUND_ROBIN
+      http2_protocol_options: {{}}
+    )EOF",
+                                                                     name, name, ip_version, port));
+}
+
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
                            const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");

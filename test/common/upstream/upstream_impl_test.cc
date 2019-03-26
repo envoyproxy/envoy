@@ -1873,6 +1873,47 @@ TEST_F(ClusterInfoImplTest, OneofExtensionProtocolOptionsForUnknownFilter) {
                             "Only one of typed_extension_protocol_options or "
                             "extension_protocol_options can be specified");
 }
+TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 1
+        max_pending_requests: 2
+        max_requests: 3
+        max_retries: 4
+        track_remaining: false
+      - priority: HIGH
+        max_connections: 1
+        max_pending_requests: 2
+        max_requests: 3
+        max_retries: 4
+        track_remaining: true
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  // The value of a remaining resource gauge will always be 0 for the default
+  // priority circuit breaker since track_remaining is false
+  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::Default).retries().inc();
+  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::Default).retries().dec();
+  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+
+  // This gauge will be correctly set since we have opted in to tracking remaining
+  // resource gauges in the high priority circuit breaker.
+  EXPECT_EQ(4U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::High).retries().inc();
+  EXPECT_EQ(3U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::High).retries().dec();
+  EXPECT_EQ(4U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+}
 
 class TestFilterConfigFactoryBase {
 public:
@@ -2175,7 +2216,7 @@ public:
 // When no locality weights belong to the host set, there's an empty pick.
 TEST_F(HostSetImplLocalityTest, Empty) {
   EXPECT_EQ(nullptr, host_set_.localityWeights());
-  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+  EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When no hosts are healthy we should fail to select a locality
@@ -2186,7 +2227,7 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(HostSetImpl::updateHostsParams(hosts, hosts_per_locality), locality_weights,
                         {}, {}, absl::nullopt);
-  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+  EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When a locality has zero hosts, it should be treated as if it has zero healthy.
@@ -2199,8 +2240,8 @@ TEST_F(HostSetImplLocalityTest, EmptyLocality) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
   // Verify that we are not RRing between localities.
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
 }
 
 // When all locality weights are zero we should fail to select a locality.
@@ -2211,7 +2252,7 @@ TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {});
-  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+  EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When all locality weights are the same we have unweighted RR behavior.
@@ -2223,12 +2264,12 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
 }
 
 // When locality weights differ, we have weighted RR behavior.
@@ -2239,12 +2280,12 @@ TEST_F(HostSetImplLocalityTest, Weighted) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
 }
 
 // Localities with no weight assignment are never picked.
@@ -2256,12 +2297,12 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
 }
 
 // Gentle failover between localities as health diminishes.
@@ -2288,7 +2329,7 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
   const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {
     uint32_t count[2] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
-      const uint32_t locality_index = host_set_.chooseLocality().value();
+      const uint32_t locality_index = host_set_.chooseHealthyLocality().value();
       ASSERT_LT(locality_index, 2);
       ++count[locality_index];
     }
@@ -2332,7 +2373,7 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
                          locality_weights, {}, {}, absl::nullopt);
     uint32_t cnts[] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
-      absl::optional<uint32_t> locality_index = host_set.chooseLocality();
+      absl::optional<uint32_t> locality_index = host_set.chooseHealthyLocality();
       if (!locality_index.has_value()) {
         // It's possible locality scheduler is nullptr (when factor is 0).
         continue;

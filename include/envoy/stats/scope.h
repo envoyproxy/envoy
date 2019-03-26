@@ -2,11 +2,11 @@
 
 #include <cstdint>
 #include <memory>
-#include <string>
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats_options.h"
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Stats {
@@ -16,6 +16,7 @@ class Gauge;
 class Histogram;
 class Scope;
 class StatsOptions;
+class NullGaugeImpl;
 
 typedef std::unique_ptr<Scope> ScopePtr;
 typedef std::shared_ptr<Scope> ScopeSharedPtr;
@@ -52,6 +53,11 @@ public:
   virtual Gauge& gauge(const std::string& name) PURE;
 
   /**
+   * @return a null gauge within the scope's namespace.
+   */
+  virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
+
+  /**
    * @return a histogram within the scope's namespace with a particular value type.
    */
   virtual Histogram& histogram(const std::string& name) PURE;
@@ -61,6 +67,12 @@ public:
    * maximum allowable object name length and stat suffix length.
    */
   virtual const Stats::StatsOptions& statsOptions() const PURE;
+
+  /**
+   * @return a reference to the symbol table.
+   */
+  virtual const SymbolTable& symbolTable() const PURE;
+  virtual SymbolTable& symbolTable() PURE;
 };
 
 } // namespace Stats
