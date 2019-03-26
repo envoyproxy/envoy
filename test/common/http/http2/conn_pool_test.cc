@@ -609,7 +609,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
 }
 
 TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
-  cluster_->resetResourceManager(1024, 1024, 1, 1);
+  cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
   InSequence s;
 
   expectClientCreate();
