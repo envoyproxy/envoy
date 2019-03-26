@@ -20,9 +20,9 @@ import sys
 
 
 # https://stackoverflow.com/questions/44761197/how-to-use-substitution-definitions-with-code-blocks
-class SubstitutionCodeBlock(CodeBlock):  # type: ignore
+class SubstitutionCodeBlock(CodeBlock):
   """
-  Similar to CodeBlock but replaces placeholders with variables.
+  Similar to CodeBlock but replaces placeholders with variables. See "substitutions" below.
   """
 
   def run(self):
@@ -31,7 +31,6 @@ class SubstitutionCodeBlock(CodeBlock):  # type: ignore
     """
     app = self.state.document.settings.env.app
     new_content = []
-    self.content = self.content  # type: List[str]
     existing_content = self.content
     for item in existing_content:
       for pair in app.config.substitutions:
