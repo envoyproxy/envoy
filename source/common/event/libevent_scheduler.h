@@ -18,7 +18,7 @@ public:
   TimerPtr createTimer(const TimerCb& cb) override;
 
   /**
-   * Executes any events that been activated, then returns.
+   * Executes any events that have been activated, then exit.
    */
   void runActivatedEvents();
 
