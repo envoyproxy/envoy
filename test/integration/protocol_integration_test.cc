@@ -943,6 +943,82 @@ name: passthrough-filter
   EXPECT_EQ(true, upstream_request_->complete());
 }
 
+// Tests encodeHeaders() returns StopAllIterationAndBuffer.
+TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAll) {
+  config_helper_.addFilter(R"EOF(
+name: encode-headers-return-stop-all-filter
+)EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Upstream responds with headers, data and trailers.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  waitForNextUpstreamRequest();
+
+  const int count = 70;
+  const int size = 1000;
+  const int added_decoded_data_size = 1;
+  default_response_headers_.addCopy("content_size", std::to_string(count * size));
+  default_response_headers_.addCopy("added_size", std::to_string(added_decoded_data_size));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  for (int i = 0; i < count - 1; i++) {
+    upstream_request_->encodeData(size, false);
+  }
+  // Sleeps for 1s in order to be consistent with testEncodeHeadersReturnsStopAllWatermark.
+  sleep(1);
+  upstream_request_->encodeData(size, false);
+  Http::TestHeaderMapImpl response_trailers{{"response", "trailer"}};
+  upstream_request_->encodeTrailers(response_trailers);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(count * size + added_decoded_data_size, response->body().size());
+}
+
+// Tests encodeHeaders() returns StopAllIterationAndWatermark.
+TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAllWatermark) {
+  config_helper_.addFilter(R"EOF(
+name: encode-headers-return-stop-all-filter
+)EOF");
+
+  // Sets initial stream window to min value to make the upstream sensitive to a low watermark.
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
+            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Upstream responds with headers, data and trailers.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  waitForNextUpstreamRequest();
+
+  const int count = 70;
+  const int size = 1000;
+  const int added_decoded_data_size = 1;
+  const int buffer_limit = 100;
+  default_response_headers_.addCopy("content_size", std::to_string(count * size));
+  default_response_headers_.addCopy("added_size", std::to_string(added_decoded_data_size));
+  default_response_headers_.addCopy("buffer_limit", std::to_string(buffer_limit));
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  for (int i = 0; i < count - 1; i++) {
+    upstream_request_->encodeData(size, false);
+  }
+  // Sleeps for 1s in order to be consistent with testDecodeHeadersReturnsStopAllWatermark.
+  sleep(1);
+  upstream_request_->encodeData(size, false);
+  Http::TestHeaderMapImpl response_trailers{{"response", "trailer"}};
+  upstream_request_->encodeTrailers(response_trailers);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(count * size + added_decoded_data_size, response->body().size());
+}
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
