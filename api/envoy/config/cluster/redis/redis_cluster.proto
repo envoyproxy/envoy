@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.config.cluster.redis;
+
+option java_outer_classname = "RedisClusterProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.cluster.redis";
+option go_package = "v2";
+
+import "google/protobuf/duration.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+message RedisClusterConfig {
+
+    google.protobuf.Duration cluster_refresh_rate = 1
+    [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+
+    google.protobuf.Duration cluster_refresh_timeout = 2
+    [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+}

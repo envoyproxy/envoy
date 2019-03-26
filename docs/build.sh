@@ -78,6 +78,7 @@ PROTO_RST="
   /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
   /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
   /envoy/config/common/tap/v2alpha/common/envoy/config/common/tap/v2alpha/common.proto.rst
+  /envoy/config/cluster/redis/redis_cluster/envoy/config/cluster/redis/redis_cluster.proto.rst
   /envoy/config/ratelimit/v2/rls/envoy/config/ratelimit/v2/rls.proto.rst
   /envoy/config/metrics/v2/metrics_service/envoy/config/metrics/v2/metrics_service.proto.rst
   /envoy/config/metrics/v2/stats/envoy/config/metrics/v2/stats.proto.rst
