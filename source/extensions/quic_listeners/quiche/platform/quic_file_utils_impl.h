@@ -12,10 +12,17 @@
 
 namespace quic {
 
-// Traverses the directory |dirname| and returns all of the files it contains.
+/**
+ * Traverses the directory |dirname| and returns all of the files it contains.
+ * @param dirname full path without trailing '/'.
+ */
 std::vector<std::string> ReadFileContentsImpl(const std::string& dirname);
 
-// Reads the contents of |filename| as a string into |contents|.
+/**
+ * Reads the contents of |filename| as a string into |contents|.
+ *  @param filename the full path to the file.
+ *  @param contents output location of the file content.
+ */
 void ReadFileContentsImpl(QuicStringPiece filename, std::string* contents);
 
 } // namespace quic

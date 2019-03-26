@@ -105,9 +105,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_impl_lib",
     srcs = ["quic_cert_utils_impl.cc"] + envoy_select_quiche([
+        "quic_file_utils_impl.cc",
         "quic_hostname_utils_impl.cc",
         "quic_test_output_impl.cc",
-        "quic_file_utils_impl.cc",
     ]),
     hdrs = [
         "quic_cert_utils_impl.h",

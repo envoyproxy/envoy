@@ -498,14 +498,10 @@ TEST_F(FileUtilsTest, ReadDirContents) {
   addSubDirs({"sub_dir1", "sub_dir2", "sub_dir1/sub_dir1_1"});
   addFiles({"file", "sub_dir1/sub_file1", "sub_dir1/sub_dir1_1/sub_file1_1", "sub_dir2/sub_file2"});
 
-  const std::unordered_set<std::string> expected = {
-      dir_path_ + "/file", dir_path_ + "/sub_dir1/sub_file1",
-      dir_path_ + "/sub_dir1/sub_dir1_1/sub_file1_1", dir_path_ + "/sub_dir2/sub_file2"};
-  std::vector<std::string> files = ReadFileContents(dir_path_);
-  EXPECT_EQ(expected.size(), files.size());
-  for (auto file : files) {
-    EXPECT_NE(expected.end(), expected.find(file)) << "Fail to find " << file;
-  }
+  EXPECT_THAT(ReadFileContents(dir_path_),
+              testing::UnorderedElementsAre(dir_path_ + "/file", dir_path_ + "/sub_dir1/sub_file1",
+                                            dir_path_ + "/sub_dir1/sub_dir1_1/sub_file1_1",
+                                            dir_path_ + "/sub_dir2/sub_file2"));
 }
 
 TEST_F(FileUtilsTest, ReadFileContents) {

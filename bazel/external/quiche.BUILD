@@ -101,8 +101,8 @@ cc_library(
     name = "quic_platform",
     srcs = ["quiche/quic/platform/api/quic_mutex.cc"] + envoy_select_quiche(
         [
-            "quiche/quic/platform/api/quic_hostname_utils.cc",
             "quiche/quic/platform/api/quic_file_utils.cc",
+            "quiche/quic/platform/api/quic_hostname_utils.cc",
         ],
         "@envoy",
     ),
@@ -112,8 +112,8 @@ cc_library(
         "quiche/quic/platform/api/quic_str_cat.h",
     ] + envoy_select_quiche(
         [
-            "quiche/quic/platform/api/quic_hostname_utils.h",
             "quiche/quic/platform/api/quic_file_utils.h",
+            "quiche/quic/platform/api/quic_hostname_utils.h",
         ],
         "@envoy",
     ),

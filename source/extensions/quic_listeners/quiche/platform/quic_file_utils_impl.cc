@@ -12,6 +12,7 @@
 #include "absl/strings/str_cat.h"
 
 namespace quic {
+namespace {
 
 void DFTraverseDirectory(const std::string& dirname, std::vector<std::string>& files) {
   Envoy::Filesystem::Directory directory(dirname);
@@ -26,10 +27,13 @@ void DFTraverseDirectory(const std::string& dirname, std::vector<std::string>& f
       }
       break;
     default:
-      ASSERT(false, "Unknow file entry under directory " + dirname);
+      ASSERT(false,
+             absl::StrCat("Unknow file entry type ", entry.type_, " under directory ", dirname));
     }
   }
 }
+
+} // namespace
 
 // Traverses the directory |dirname| and returns all of the files it contains.
 std::vector<std::string> ReadFileContentsImpl(const std::string& dirname) {
