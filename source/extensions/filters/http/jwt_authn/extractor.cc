@@ -102,11 +102,11 @@ private:
   // ctor helper for a jwt provider config
   void addProvider(const JwtProvider& provider);
 
-// retrieve base64url-encoded substring; see RFC-7519
-    absl::string_view extractJWT(const absl::string_view &value_str,
-                                 absl::string_view::size_type after) const;
+  // retrieve base64url-encoded substring; see RFC-7519
+  absl::string_view extractJWT(const absl::string_view& value_str,
+                               absl::string_view::size_type after) const;
 
-      // HeaderMap value type to store prefix and issuers that specified this
+  // HeaderMap value type to store prefix and issuers that specified this
   // header.
   struct HeaderLocationSpec {
     HeaderLocationSpec(const Http::LowerCaseString& header, const std::string& value_prefix)
@@ -175,7 +175,6 @@ void ExtractorImpl::addQueryParamConfig(const std::string& issuer, const std::st
   param_location_spec.specified_issuers_.insert(issuer);
 }
 
-
 std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& headers) const {
   std::vector<JwtLocationConstPtr> tokens;
 
@@ -191,7 +190,7 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
           // value_prefix not found anywhere in value_str, so skip
           continue;
         }
-      value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
+        value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
       }
       tokens.push_back(std::make_unique<const JwtHeaderLocation>(
           std::string(value_str), location_spec->specified_issuers_, location_spec->header_));
@@ -218,7 +217,8 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
 }
 
 // as specified in RFC-4648 § 5, plus dot (period, 0x2e), of which two are required in the JWT
-constexpr char kBase64UrlEncodingCharsPlusDot[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+constexpr char kBase64UrlEncodingCharsPlusDot[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
 
 // Returns a token, not a URL: skips non-Base64Url-legal (or dot) characters, collects following
 // Base64Url+dot string until first non-Base64Url char.
@@ -228,7 +228,7 @@ constexpr char kBase64UrlEncodingCharsPlusDot[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabc
 // It is forgiving w.r.t. dots/periods, as the exact syntax will be verified after extraction.
 //
 // See RFC-7519 § 2, RFC-7515 § 2, and RFC-4648 "Base-N Encodings" § 5.
-absl::string_view ExtractorImpl::extractJWT(const absl::string_view &value_str,
+absl::string_view ExtractorImpl::extractJWT(const absl::string_view& value_str,
                                             absl::string_view::size_type after) const {
   const auto starting = value_str.find_first_of(kBase64UrlEncodingCharsPlusDot, after);
   if (starting == value_str.npos) {
@@ -239,7 +239,7 @@ absl::string_view ExtractorImpl::extractJWT(const absl::string_view &value_str,
   if (ending == value_str.npos) { // Base64Url-encoded string occupies the rest of the line
     return value_str.substr(starting);
   }
-  return value_str.substr(starting, ending-starting);
+  return value_str.substr(starting, ending - starting);
 }
 
 void ExtractorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
