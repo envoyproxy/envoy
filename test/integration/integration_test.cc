@@ -399,7 +399,7 @@ TEST_P(IntegrationTest, BadPath) {
 TEST_P(IntegrationTest, AbsolutePath) {
   // Configure www.redirect.com to send a redirect, and ensure the redirect is
   // encountered via absolute URL.
-  auto host = config_helper_.createHost("www.redirect.com", "/");
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
@@ -415,7 +415,7 @@ TEST_P(IntegrationTest, AbsolutePath) {
 TEST_P(IntegrationTest, AbsolutePathWithPort) {
   // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
   // encountered via absolute URL with a port.
-  auto host = config_helper_.createHost("www.namewithport.com:1234", "/");
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
   host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
@@ -432,7 +432,7 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   // Set a matcher for www.namewithport.com:1234 and verify http://www.namewithport.com does not
   // match
-  auto host = config_helper_.createHost("www.namewithport.com:1234", "/");
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
   host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);

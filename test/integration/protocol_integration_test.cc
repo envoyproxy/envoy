@@ -78,7 +78,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
 // Add a route that uses unknown cluster (expect 404 Not Found).
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
-  auto host = config_helper_.createHost("foo.com", "/unknown", "unknown_cluster");
+  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
       envoy::api::v2::route::RouteAction::NOT_FOUND);
   config_helper_.addVirtualHost(host);
@@ -93,7 +93,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
 // Add a route that uses unknown cluster (expect 503 Service Unavailable).
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
-  auto host = config_helper_.createHost("foo.com", "/unknown", "unknown_cluster");
+  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
       envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE);
   config_helper_.addVirtualHost(host);
@@ -107,7 +107,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
 
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
 TEST_P(ProtocolIntegrationTest, RouterRedirect) {
-  auto host = config_helper_.createHost("www.redirect.com", "/");
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
   initialize();
@@ -240,7 +240,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request
 // and updated after the request is retried.
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
-  auto host = config_helper_.createHost("host", "/test_retry");
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
   config_helper_.addVirtualHost(host);
   initialize();
@@ -291,7 +291,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 
   // Add route with custom retry policy
-  auto host = config_helper_.createHost("host", "/test_retry");
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
   auto retry_policy = host.mutable_routes(0)->mutable_route()->mutable_retry_policy();
   retry_policy->mutable_retry_priority()->set_name(factory.name());
@@ -366,7 +366,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
 
   // Add route with custom retry policy
-  auto host = config_helper_.createHost("host", "/test_retry");
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
   host.set_include_request_attempt_count(true);
   auto retry_policy = host.mutable_routes(0)->mutable_route()->mutable_retry_policy();
   retry_policy->add_retry_host_predicate()->set_name(predicate_factory.name());

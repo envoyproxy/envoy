@@ -104,10 +104,10 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
-  envoy::api::v2::route::VirtualHost createHost(const char* host, const char* route = "/",
-                                                const char* cluster = "cluster_0");
+  envoy::api::v2::route::VirtualHost createVirtualHost(const char* host, const char* route = "/",
+                                                       const char* cluster = "cluster_0");
 
-  void addVirtualHost(envoy::api::v2::route::VirtualHost& vhost);
+  void addVirtualHost(const envoy::api::v2::route::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);

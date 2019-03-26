@@ -7,10 +7,10 @@ public:
   void initialize() override {
     envoy::api::v2::route::RetryPolicy retry_policy;
 
-    auto pass_through = config_helper_.createHost("pass.through.internal.redirect");
+    auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
     config_helper_.addVirtualHost(pass_through);
 
-    auto handle = config_helper_.createHost("handle.internal.redirect");
+    auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
     handle.mutable_routes(0)->mutable_route()->set_internal_redirect_action(
         envoy::api::v2::route::RouteAction::HANDLE_INTERNAL_REDIRECT);
     config_helper_.addVirtualHost(handle);

@@ -319,7 +319,7 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
         foo_upgrade->set_upgrade_type("foo");
         foo_upgrade->mutable_enabled()->set_value(false);
       });
-  auto host = config_helper_.createHost("host", "/websocket/test");
+  auto host = config_helper_.createVirtualHost("host", "/websocket/test");
   host.mutable_routes(0)->mutable_route()->add_upgrade_configs()->set_upgrade_type("foo");
   config_helper_.addVirtualHost(host);
   initialize();

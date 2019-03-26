@@ -337,8 +337,8 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
-envoy::api::v2::route::VirtualHost ConfigHelper::createHost(const char* domain, const char* prefix,
-                                                            const char* cluster) {
+envoy::api::v2::route::VirtualHost
+ConfigHelper::createVirtualHost(const char* domain, const char* prefix, const char* cluster) {
   envoy::api::v2::route::VirtualHost virtual_host;
   virtual_host.set_name(domain);
   virtual_host.add_domains(domain);
@@ -348,7 +348,7 @@ envoy::api::v2::route::VirtualHost ConfigHelper::createHost(const char* domain, 
   return virtual_host;
 }
 
-void ConfigHelper::addVirtualHost(envoy::api::v2::route::VirtualHost& vhost) {
+void ConfigHelper::addVirtualHost(const envoy::api::v2::route::VirtualHost& vhost) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
