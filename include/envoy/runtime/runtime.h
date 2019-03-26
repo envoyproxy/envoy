@@ -64,7 +64,7 @@ public:
     virtual ~OverrideLayer() {}
 
     /**
-     * @return const absl::flat_hash_ma<std::string, Entry>& the values in this layer.
+     * @return const absl::flat_hash_map<std::string, Entry>& the values in this layer.
      */
     virtual const EntryMap& values() const PURE;
 
