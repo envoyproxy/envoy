@@ -23,6 +23,21 @@ TEST(RedisProxyFilterConfigFactoryTest, ValidateFail) {
                ProtoValidationException);
 }
 
+TEST(RedisProxyFilterConfigFactoryTest, NoUpstreamDefined) {
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings settings;
+  settings.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
+
+  envoy::config::filter::network::redis_proxy::v2::RedisProxy config;
+  config.set_stat_prefix("foo");
+  config.mutable_settings()->CopyFrom(settings);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_THROW_WITH_MESSAGE(
+      RedisProxyFilterConfigFactory().createFilterFactoryFromProto(config, context), EnvoyException,
+      "cannot configure a redis-proxy without any upstream");
+}
+
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectJson) {
   std::string json_string = R"EOF(
   {
