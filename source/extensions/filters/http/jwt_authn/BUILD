@@ -103,5 +103,6 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/config:metadata_lib",
     ],
 )

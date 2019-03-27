@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/config/metadata.h"
 #include "envoy/api/api.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
@@ -77,6 +78,17 @@ public:
           Matcher::create(rule),
           Verifier::create(rule.requires(), proto_config_.providers(), *this, getExtractor()));
     }
+
+    if (proto_config_.has_metadata_rules()) {
+      metadata_filter_ = proto_config_.metadata_rules().filter();
+      for (const auto& key : proto_config_.metadata_rules().path()) {
+        metadata_path_.push_back(key);
+      }
+      for (const auto& it : proto_config_.metadata_rules().requires()) {
+        metadata_verifiers_.emplace(it.first, Verifier::create(it.second, proto_config_.providers(),
+                                                               *this, getExtractor()));
+      }
+    }
   }
 
   JwtAuthnFilterStats& stats() { return stats_; }
@@ -97,10 +109,21 @@ public:
   const Extractor& getExtractor() const { return *extractor_; }
 
   // Finds the matcher that matched the header
-  virtual const Verifier* findVerifier(const Http::HeaderMap& headers) const {
+  virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
+                                       const envoy::api::v2::core::Metadata& metadata) const {
     for (const auto& pair : rule_pairs_) {
       if (pair.matcher_->matches(headers)) {
         return pair.verifier_.get();
+      }
+    }
+    if (metadata_path_.size() > 0 && metadata_verifiers_.size() > 0) {
+      const auto& value = Envoy::Config::Metadata::metadataValue(
+          metadata, metadata_filter_, metadata_path_);
+      if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
+        const auto& it = metadata_verifiers_.find(value.string_value());
+        if (it != metadata_verifiers_.end()) {
+          return it->second.get();
+        }
       }
     }
     return nullptr;
@@ -139,6 +162,11 @@ private:
   ExtractorConstPtr extractor_;
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
+  // The metadata path filter name and path
+  std::string metadata_filter_;
+  std::vector<std::string> metadata_path_;
+  // The metadata verifier map
+  std::unordered_map<std::string, VerifierConstPtr> metadata_verifiers_;
   TimeSource& time_source_;
   Api::Api& api_;
 };

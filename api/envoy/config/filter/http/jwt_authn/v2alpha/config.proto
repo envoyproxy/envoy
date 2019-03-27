@@ -339,6 +339,38 @@ message RequirementRule {
   JwtRequirement requires = 2;
 }
 
+// This message specifies Jwt requirements based on a Metadata string value
+// Another HTTP filter can use it to specify Jwt requirement dynamically.
+//
+// Example:
+//
+// .. code-block:: yaml
+//
+//    filter: foo
+//    path:
+//      - jwt_requirement
+//    requires:
+//      issuer_1:
+//        provider_name: issuer1
+//      issuer_2:
+//        provider_name: issuer2
+//
+// If filter "foo" sets {"jwt_requirement": "issuer_1"} to the dynamicMetadata for a request,
+// Jwt filter will use JwtRequirement({"provider_name": "issuer1"}) to verify. If the metadata
+// is not set, or metadata value is not found in the "requires" map, Jwt verification is not
+// required for the request.
+message MetadataRule {
+  // The filter name to retrieve the dynamic metadata Struct.
+  string filter = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The path to retrieve the Value from the dynamic metadata Struct.
+  // It mush point to a string value.
+  repeated string path = 2 [(validate.rules).repeated .min_items = 1];
+
+  // A map of the metadata string values to requirements.
+  map<string, JwtRequirement> requires = 3;
+}
+
 // This is the Envoy HTTP filter config for JWT authentication.
 //
 // For example:
@@ -432,4 +464,10 @@ message JwtAuthentication {
   //           - provider_name: provider2
   //
   repeated RequirementRule rules = 2;
+
+  // This message specifies Jwt requirements based on a Metadata string value
+  // Another HTTP filter can use it to specify JWT requirement dynamically.
+  // Above "rules" field is checked first, if it could not find any matches,
+  // check this one.
+  MetadataRule metadata_rules = 3;
 }
