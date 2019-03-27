@@ -8,11 +8,13 @@
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/conn_pool.h"
+#include "test/mocks/upstream/host.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AtLeast;
 using testing::Invoke;
 using testing::InvokeArgument;
 using testing::NiceMock;
@@ -30,10 +32,17 @@ public:
   using TestMap = ConnPoolMap<int, Http::ConnectionPool::Instance>;
   using TestMapPtr = std::unique_ptr<TestMap>;
 
-  TestMapPtr makeTestMap() { return std::make_unique<TestMap>(dispatcher_, absl::nullopt); }
+  TestMapPtr makeTestMap() {
+    return std::make_unique<TestMap>(dispatcher_, host_, ResourcePriority::Default);
+  }
 
   TestMapPtr makeTestMapWithLimit(uint64_t limit) {
-    return std::make_unique<TestMap>(dispatcher_, absl::make_optional(limit));
+    return makeTestMapWithLimitAtPriority(limit, ResourcePriority::Default);
+  }
+
+  TestMapPtr makeTestMapWithLimitAtPriority(uint64_t limit, ResourcePriority priority) {
+    host_->cluster_.resetResourceManager(1024, 1024, 1024, 1024, limit);
+    return std::make_unique<TestMap>(dispatcher_, host_, priority);
   }
 
   TestMap::PoolFactory getBasicFactory() {
@@ -73,6 +82,7 @@ public:
 protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::vector<NiceMock<Http::ConnectionPool::MockInstance>*> mock_pools_;
+  std::shared_ptr<NiceMock<MockHost>> host_ = std::make_shared<NiceMock<MockHost>>();
 };
 
 TEST_F(ConnPoolMapImplTest, TestMapIsEmptyOnConstruction) {
@@ -293,6 +303,58 @@ TEST_F(ConnPoolMapImplTest, GetPoolFailStateIsCleared) {
   EXPECT_FALSE(opt_pool_failed.has_value());
 
   EXPECT_EQ(test_map->size(), 2);
+}
+
+TEST_F(ConnPoolMapImplTest, CircuitBreakerNotSetOnClear) {
+  TestMapPtr test_map = makeTestMapWithLimit(1);
+
+  test_map->getPool(1, getBasicFactory());
+  test_map->getPool(2, getBasicFactory());
+  test_map->getPool(3, getBasicFactory());
+
+  test_map->clear();
+
+  EXPECT_EQ(host_->cluster_.circuit_breakers_stats_.cx_pool_open_.value(), 0);
+}
+
+TEST_F(ConnPoolMapImplTest, CircuitBreakerSetAtLimit) {
+  TestMapPtr test_map = makeTestMapWithLimit(2);
+
+  test_map->getPool(1, getBasicFactory());
+  test_map->getPool(2, getBasicFactory());
+
+  EXPECT_EQ(host_->cluster_.circuit_breakers_stats_.cx_pool_open_.value(), 1);
+}
+
+TEST_F(ConnPoolMapImplTest, CircuitBreakerClearedOnDestroy) {
+  {
+    TestMapPtr test_map = makeTestMapWithLimit(2);
+
+    test_map->getPool(1, getBasicFactory());
+    test_map->getPool(2, getBasicFactory());
+  }
+
+  EXPECT_EQ(host_->cluster_.circuit_breakers_stats_.cx_pool_open_.value(), 0);
+}
+
+TEST_F(ConnPoolMapImplTest, CircuitBreakerUsesProvidedPriorityDefault) {
+  TestMapPtr test_map = makeTestMapWithLimitAtPriority(2, ResourcePriority::Default);
+
+  EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::High)).Times(0);
+  EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::Default)).Times(AtLeast(1));
+
+  test_map->getPool(1, getBasicFactory());
+  test_map->getPool(2, getBasicFactory());
+}
+
+TEST_F(ConnPoolMapImplTest, CircuitBreakerUsesProvidedPriorityHigh) {
+  TestMapPtr test_map = makeTestMapWithLimitAtPriority(2, ResourcePriority::High);
+
+  EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::High)).Times(AtLeast(1));
+  EXPECT_CALL(host_->cluster_, resourceManager(ResourcePriority::Default)).Times(0);
+
+  test_map->getPool(1, getBasicFactory());
+  test_map->getPool(2, getBasicFactory());
 }
 
 // The following tests only die in debug builds, so don't run them if this isn't one.

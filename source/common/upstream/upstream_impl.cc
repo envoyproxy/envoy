@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
@@ -644,7 +645,8 @@ ClusterImplBase::ClusterImplBase(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : runtime_(runtime), init_manager_(fmt::format("Cluster {}", cluster.name())) {
+    : init_manager_(fmt::format("Cluster {}", cluster.name())),
+      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
@@ -714,7 +716,7 @@ void ClusterImplBase::onPreInitComplete() {
   initialization_started_ = true;
 
   ENVOY_LOG(debug, "initializing secondary cluster {} completed", info()->name());
-  init_manager_.initialize([this]() { onInitDone(); });
+  init_manager_.initialize(init_watcher_);
 }
 
 void ClusterImplBase::onInitDone() {
@@ -846,6 +848,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
+  uint64_t max_connection_pools = std::numeric_limits<uint64_t>::max();
 
   bool track_remaining = false;
 
@@ -877,9 +880,12 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
     max_requests = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_requests, max_requests);
     max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
     track_remaining = it->track_remaining();
+    max_connection_pools =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
   }
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
+      max_connection_pools,
       ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name, track_remaining));
 }
 

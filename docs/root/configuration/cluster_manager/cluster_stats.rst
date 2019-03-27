@@ -149,6 +149,7 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
   :widths: 1, 1, 2
 
   cx_open, Gauge, Whether the connection circuit breaker is closed (0) or open (1)
+  cx_pool_open, Gauge, Whether the connection pool circuit breaker is closed (0) or open (1)
   rq_pending_open, Gauge, Whether the pending requests circuit breaker is closed (0) or open (1)
   rq_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
   rq_retry_open, Gauge, Whether the retry circuit breaker is closed (0) or open (1)

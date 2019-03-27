@@ -252,7 +252,6 @@ void FilterJson::translateMongoProxy(
     auto* delay = proto_config.mutable_delay();
     auto* percentage = delay->mutable_percentage();
 
-    delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
     percentage->set_numerator(static_cast<uint32_t>(json_fault->getInteger("percent")));
     percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_fault, *delay, fixed_delay, duration);
@@ -282,7 +281,6 @@ void FilterJson::translateFaultFilter(
   if (!json_config_delay->empty()) {
     auto* delay = proto_config.mutable_delay();
     auto* percentage = delay->mutable_percentage();
-    delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
     percentage->set_numerator(
         static_cast<uint32_t>(json_config_delay->getInteger("fixed_delay_percent")));
     percentage->set_denominator(envoy::type::FractionalPercent::HUNDRED);
