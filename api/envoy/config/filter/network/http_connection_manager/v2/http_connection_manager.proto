@@ -380,8 +380,18 @@ message HttpConnectionManager {
 
   reserved 27;
 
-  // This is reserved for a pending security fix.
-  reserved 30;
+  // Should paths be normalized according to RFC 3986 before any processing of
+  // requests by HTTP filters or routing? This affects the upstream *:path* header
+  // as well. For paths that fail this check, Envoy will respond with 400 to
+  // paths that are malformed. This defaults to false currently but will default
+  // true in the future. When not specified, this value may be overridden by the
+  // runtime variable
+  // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
+  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`
+  // for details of normalization.
+  // Note that Envoy does not perform
+  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
+  google.protobuf.BoolValue normalize_path = 30;
 }
 
 message Rds {

@@ -81,13 +81,17 @@ Version history
 * tracing: added :ref:`verbose <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` to support logging annotations on spans.
 * upstream: added support for host weighting and :ref:`locality weighting <arch_overview_load_balancing_locality_weighted_lb>` in the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`, and added a :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` config parameter to strictly bound the ring size.
 * zookeeper: added a ZooKeeper proxy filter that parses ZooKeeper messages (requests/responses/events).
-  Refer to ::ref:`ZooKeeper proxy<config_network_filters_zookeeper_proxy>` for more details.
+  Refer to :ref:`ZooKeeper proxy<config_network_filters_zookeeper_proxy>` for more details.
 * upstream: added configuration option to select any host when the fallback policy fails.
 * upstream: stopped incrementing upstream_rq_total for HTTP/1 conn pool when request is circuit broken.
 
 1.9.1 (Apr 2, 2019)
 ===================
 * http: fixed CVE-2019-9900 by rejecting HTTP/1.x headers with embedded NUL characters.
+* http: fixed CVE-2019-9901 by normalizing HTTP paths prior to routing or L7 data plane processing.
+  This defaults off and is configurable via either HTTP connection manager :ref:`normalize_path
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.normalize_path>`
+  or the :ref:`runtime <config_http_conn_man_runtime_normalize_path>`.
 
 1.9.0 (Dec 20, 2018)
 ====================

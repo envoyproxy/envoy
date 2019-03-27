@@ -349,6 +349,8 @@ bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {
   return true;
 }
 
+bool HeaderMapImpl::operator!=(const HeaderMapImpl& rhs) const { return !operator==(rhs); }
+
 void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
   EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.c_str());
   if (cb) {
