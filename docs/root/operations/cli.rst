@@ -222,7 +222,7 @@ following are the command line options that Envoy supports.
 
   .. attention::
 
-    This setting affects the output of :option:`--hot-restart-version`. If you started envoy with this
+    This setting affects the output of :option:`--hot-restart-version`. If you started Envoy with this
     option set to a non default value, you should use the same option (and same value) for subsequent hot
     restarts.
 

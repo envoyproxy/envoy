@@ -11,7 +11,7 @@
             var remoteIP = document.getElementById("remoteip").value;
             var enforcement = document.querySelector('input[name="cors"]:checked').value;
             if(client) {
-                var url = `http://${remoteIP}:8000/cors/${enforcement}`;
+                var url = `http://${remoteIP}:8002/cors/${enforcement}`;
                 client.open('GET', url, true);
                 client.onreadystatechange = handler;
                 client.send();
@@ -43,12 +43,10 @@
         It does <b>NOT</b> dispatch a preflight request.
     </p>
     <p>
-        Enter the IP address of your docker machine.<br/>
-        <em>Hint</em>: This can be found by running
-        <code>docker-machine ip default</code>.
+        Enter the IP address of backend Docker container. As we are running Docker Compose this should just be localhost.<br/>
     </p>
     <div>
-        <input id="remoteip" type="text" placeholder="Remote IP"/>
+        <input id="remoteip" type="text" placeholder="Remote IP" value="localhost"/>
         <button id="submit" onclick="invokeRemoteDomain()">Fetch asset</button><br/>
         <div style="width:20%;float:left;">
             <h5>CORS Enforcement</h5>

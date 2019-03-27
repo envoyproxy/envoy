@@ -68,6 +68,8 @@ template <typename ReturnValue> struct IoCallResult {
   IoErrorPtr err_;
 };
 
+using IoCallBoolResult = IoCallResult<bool>;
+using IoCallSizeResult = IoCallResult<ssize_t>;
 using IoCallUint64Result = IoCallResult<uint64_t>;
 
 inline Api::IoCallUint64Result ioCallUint64ResultNoError() {

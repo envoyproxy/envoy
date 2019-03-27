@@ -91,11 +91,11 @@ void initializeMutex(pthread_mutex_t& mutex) {
   pthread_mutex_init(&mutex, &attribute);
 }
 
-HotRestartImpl::HotRestartImpl(const Options& options)
+HotRestartImpl::HotRestartImpl(const Options& options, Stats::SymbolTable& symbol_table)
     : as_child_(HotRestartingChild(options.baseId(), options.restartEpoch())),
       as_parent_(HotRestartingParent(options.baseId(), options.restartEpoch())),
-      shmem_(attachSharedMemory(options)), options_(options), log_lock_(shmem_->log_lock_),
-      access_log_lock_(shmem_->access_log_lock_) {
+      shmem_(attachSharedMemory(options)), options_(options), stats_allocator_(symbol_table),
+      log_lock_(shmem_->log_lock_), access_log_lock_(shmem_->access_log_lock_) {
   // If our parent ever goes away just terminate us so that we don't have to rely on ops/launching
   // logic killing the entire process tree. We should never exist without our parent.
   int rc = prctl(PR_SET_PDEATHSIG, SIGTERM);

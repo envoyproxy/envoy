@@ -97,7 +97,7 @@ void OpenTracingSpan::setTag(const std::string& name, const std::string& value) 
 }
 
 void OpenTracingSpan::log(SystemTime timestamp, const std::string& event) {
-  opentracing::LogRecord record{timestamp, {{Tracing::Logs::get().EVENT_KEY, event}}};
+  opentracing::LogRecord record{timestamp, {{Tracing::Logs::get().EventKey, event}}};
   finish_options_.log_records.emplace_back(std::move(record));
 }
 

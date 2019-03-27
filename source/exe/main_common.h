@@ -5,6 +5,7 @@
 
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
@@ -36,7 +37,7 @@ public:
   MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
                  Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
-                 Thread::ThreadFactory& thread_factory);
+                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
   ~MainCommonBase();
 
   bool run();
@@ -64,9 +65,10 @@ public:
 
 protected:
   const Envoy::OptionsImpl& options_;
-
+  Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
+  Filesystem::Instance& file_system_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
