@@ -116,7 +116,8 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
 // Test extracting JWT as Bearer token from the default header location: "Authorization" -
 // using an actual (correctly-formatted) JWT:
 TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
-  auto headers = TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  auto headers = TestHeaderMapImpl{{absl::StrCat("Authorization"),
+                                    absl::StrCat("Bearer ", GoodToken)}};
   auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
