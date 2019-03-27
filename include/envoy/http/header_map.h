@@ -19,6 +19,17 @@
 namespace Envoy {
 namespace Http {
 
+// Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
+// never contain embedded NULLs.
+static inline bool validHeaderString(absl::string_view s) {
+  for (const char c : {'\0', '\r', '\n'}) {
+    if (s.find(c) != absl::string_view::npos) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Wrapper for a lower case string used in header operations to generally avoid needless case
  * insensitive compares.
@@ -35,6 +46,7 @@ public:
 
 private:
   void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
+  bool valid() const { return validHeaderString(string_); }
 
   std::string string_;
 };
@@ -169,6 +181,7 @@ private:
   };
 
   void freeDynamic();
+  bool valid() const;
 
   uint32_t string_length_;
   Type type_;

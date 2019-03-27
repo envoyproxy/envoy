@@ -206,7 +206,7 @@ TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
   }
   {
     Http::TestHeaderMapImpl headers = {
-        {"accept-encoding", "\tdeflate\t, gzip\t ; q\t =\t 1.0,\t * ;q=0.5\n"}};
+        {"accept-encoding", "\tdeflate\t, gzip\t ; q\t =\t 1.0,\t * ;q=0.5"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
     EXPECT_EQ(3, stats_.counter("test.gzip.header_gzip").value());
   }
@@ -414,7 +414,7 @@ TEST_F(GzipFilterTest, isContentTypeAllowed) {
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    Http::TestHeaderMapImpl headers = {{"content-type", "\ttext/html\t\n"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "\ttext/html\t"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
 
@@ -586,7 +586,7 @@ TEST_F(GzipFilterTest, isTransferEncodingAllowed) {
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
   {
-    Http::TestHeaderMapImpl headers = {{"transfer-encoding", " gzip\t,  chunked\t\n"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", " gzip\t,  chunked\t"}};
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
 }

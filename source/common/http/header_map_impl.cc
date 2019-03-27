@@ -86,6 +86,8 @@ void HeaderString::freeDynamic() {
   }
 }
 
+bool HeaderString::valid() const { return validHeaderString(getStringView()); }
+
 void HeaderString::append(const char* data, uint32_t size) {
   switch (type_) {
   case Type::Reference: {
