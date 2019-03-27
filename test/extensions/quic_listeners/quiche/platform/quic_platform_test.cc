@@ -4,9 +4,13 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include <fstream>
+#include <unordered_set>
+
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -20,6 +24,7 @@
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
+#include "quiche/quic/platform/api/quic_file_utils.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"
@@ -476,6 +481,62 @@ TEST(QuicPlatformTest, QuicTestOutput) {
                           QuicRecordTestOutput("quic_test_output.2", "output 2 content\n"));
   EXPECT_LOG_CONTAINS("info", "Recorded test output into",
                       QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
+}
+
+class FileUtilsTest : public testing::Test {
+public:
+  FileUtilsTest() : dir_path_(Envoy::TestEnvironment::temporaryPath("envoy_test")) {
+    files_to_remove_.push(dir_path_);
+  }
+
+protected:
+  void SetUp() override { Envoy::TestUtility::createDirectory(dir_path_); }
+
+  void TearDown() override {
+    while (!files_to_remove_.empty()) {
+      const std::string& f = files_to_remove_.top();
+      Envoy::TestEnvironment::removePath(f);
+      files_to_remove_.pop();
+    }
+  }
+
+  void addSubDirs(std::list<std::string> sub_dirs) {
+    for (const std::string& dir_name : sub_dirs) {
+      const std::string full_path = dir_path_ + "/" + dir_name;
+      Envoy::TestUtility::createDirectory(full_path);
+      files_to_remove_.push(full_path);
+    }
+  }
+
+  void addFiles(std::list<std::string> files) {
+    for (const std::string& file_name : files) {
+      const std::string full_path = dir_path_ + "/" + file_name;
+      { const std::ofstream file(full_path); }
+      files_to_remove_.push(full_path);
+    }
+  }
+
+  const std::string dir_path_;
+  std::stack<std::string> files_to_remove_;
+};
+
+TEST_F(FileUtilsTest, ReadDirContents) {
+  addSubDirs({"sub_dir1", "sub_dir2", "sub_dir1/sub_dir1_1"});
+  addFiles({"file", "sub_dir1/sub_file1", "sub_dir1/sub_dir1_1/sub_file1_1", "sub_dir2/sub_file2"});
+
+  EXPECT_THAT(ReadFileContents(dir_path_),
+              testing::UnorderedElementsAre(dir_path_ + "/file", dir_path_ + "/sub_dir1/sub_file1",
+                                            dir_path_ + "/sub_dir1/sub_dir1_1/sub_file1_1",
+                                            dir_path_ + "/sub_dir2/sub_file2"));
+}
+
+TEST_F(FileUtilsTest, ReadFileContents) {
+  const std::string data = "test string\ntest";
+  const std::string file_path =
+      Envoy::TestEnvironment::writeStringToFileForTest("test_envoy", data);
+  std::string output;
+  ReadFileContents(file_path, &output);
+  EXPECT_EQ(data, output);
 }
 
 } // namespace
