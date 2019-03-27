@@ -3757,9 +3757,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-      EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
-      "oneof");
+      EnvoyException, "invalid value oneof field 'path_specifier' is already set.");
 }
 
 TEST_F(RouteMatcherTest, TestOpaqueConfig) {
