@@ -54,9 +54,9 @@ PrefixRoutes::makeRequest(const std::string& key, const Common::Redis::RespValue
       view.remove_prefix(value->prefix.length());
     }
     std::string str(view);
-    value->upstream->makeRequest(str, request, callbacks);
+    return value->upstream->makeRequest(str, request, callbacks);
   } else if (catch_all_upstream_ != nullptr) {
-    catch_all_upstream_.value()->makeRequest(key, request, callbacks);
+    return catch_all_upstream_.value()->makeRequest(key, request, callbacks);
   }
 
   return nullptr;
