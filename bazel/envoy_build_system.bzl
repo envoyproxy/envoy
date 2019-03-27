@@ -681,7 +681,8 @@ def envoy_select_boringssl(if_fips, default = None):
 
 # Selects the part of QUICHE that does not yet work with the current CI.
 def envoy_select_quiche(xs, repository = ""):
-    return select({
-        repository + "//bazel:enable_quiche": xs,
-        "//conditions:default": [],
-    })
+    return xs
+    # return select({
+    #     repository + "//bazel:enable_quiche": xs,
+    #     "//conditions:default": [],
+    # })
