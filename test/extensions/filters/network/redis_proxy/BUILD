@@ -75,7 +75,6 @@ envoy_cc_mock(
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/redis_proxy:command_splitter_interface",
         "//source/extensions/filters/network/redis_proxy:conn_pool_interface",
-        "//source/extensions/filters/network/redis_proxy:router_interface",
     ],
 )
 
@@ -103,17 +102,5 @@ envoy_extension_cc_test_binary(
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
-    ],
-)
-
-envoy_extension_cc_test(
-    name = "router_impl_test",
-    srcs = ["router_impl_test.cc"],
-    extension_name = "envoy.filters.network.redis_proxy",
-    deps = [
-        ":redis_mocks",
-        "//source/extensions/filters/network/redis_proxy:router_lib",
-        "//test/extensions/filters/network/common/redis:redis_mocks",
-        "//test/test_common:utility_lib",
     ],
 )
