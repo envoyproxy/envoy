@@ -17,10 +17,8 @@ envoy_cc_test(
     deps = [
         ":route_fuzz_proto_cc",
         "//source/common/config:metadata_lib",
-        "//source/common/config:rds_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/router:config_lib",
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
@@ -28,6 +26,8 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
     ],
 )
 
