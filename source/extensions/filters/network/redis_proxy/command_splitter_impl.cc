@@ -59,15 +59,15 @@ void SingleServerRequest::cancel() {
   handle_ = nullptr;
 }
 
-SplitRequestPtr SimpleRequest::create(Router& router,
+SplitRequestPtr SimpleRequest::create(ConnPool::Instance& conn_pool,
                                       const Common::Redis::RespValue& incoming_request,
                                       SplitCallbacks& callbacks, CommandStats& command_stats,
                                       TimeSource& time_source, bool latency_in_micros) {
   std::unique_ptr<SimpleRequest> request_ptr{
       new SimpleRequest(callbacks, command_stats, time_source, latency_in_micros)};
 
-  request_ptr->handle_ =
-      router.makeRequest(incoming_request.asArray()[1].asString(), incoming_request, *request_ptr);
+  request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[1].asString(),
+                                               incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
     request_ptr->callbacks_.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     return nullptr;
@@ -76,7 +76,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   return std::move(request_ptr);
 }
 
-SplitRequestPtr EvalRequest::create(Router& router,
+SplitRequestPtr EvalRequest::create(ConnPool::Instance& conn_pool,
                                     const Common::Redis::RespValue& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool latency_in_micros) {
@@ -91,8 +91,8 @@ SplitRequestPtr EvalRequest::create(Router& router,
 
   std::unique_ptr<EvalRequest> request_ptr{
       new EvalRequest(callbacks, command_stats, time_source, latency_in_micros)};
-  request_ptr->handle_ =
-      router.makeRequest(incoming_request.asArray()[3].asString(), incoming_request, *request_ptr);
+  request_ptr->handle_ = conn_pool.makeRequest(incoming_request.asArray()[3].asString(),
+                                               incoming_request, *request_ptr);
   if (!request_ptr->handle_) {
     command_stats.error_.inc();
     request_ptr->callbacks_.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
@@ -123,7 +123,7 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
   onChildResponse(Utility::makeError(Response::get().UpstreamFailure), index);
 }
 
-SplitRequestPtr MGETRequest::create(Router& router,
+SplitRequestPtr MGETRequest::create(ConnPool::Instance& conn_pool,
                                     const Common::Redis::RespValue& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool latency_in_micros) {
@@ -152,8 +152,8 @@ SplitRequestPtr MGETRequest::create(Router& router,
 
     single_mget.asArray()[1].asString() = incoming_request.asArray()[i].asString();
     ENVOY_LOG(debug, "redis: parallel get: '{}'", single_mget.toString());
-    pending_request.handle_ =
-        router.makeRequest(incoming_request.asArray()[i].asString(), single_mget, pending_request);
+    pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
+                                                    single_mget, pending_request);
     if (!pending_request.handle_) {
       pending_request.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     }
@@ -195,7 +195,7 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   }
 }
 
-SplitRequestPtr MSETRequest::create(Router& router,
+SplitRequestPtr MSETRequest::create(ConnPool::Instance& conn_pool,
                                     const Common::Redis::RespValue& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool latency_in_micros) {
@@ -231,8 +231,8 @@ SplitRequestPtr MSETRequest::create(Router& router,
     single_mset.asArray()[2].asString() = incoming_request.asArray()[i + 1].asString();
 
     ENVOY_LOG(debug, "redis: parallel set: '{}'", single_mset.toString());
-    pending_request.handle_ =
-        router.makeRequest(incoming_request.asArray()[i].asString(), single_mset, pending_request);
+    pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
+                                                    single_mset, pending_request);
     if (!pending_request.handle_) {
       pending_request.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     }
@@ -270,7 +270,7 @@ void MSETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   }
 }
 
-SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
+SplitRequestPtr SplitKeysSumResultRequest::create(ConnPool::Instance& conn_pool,
                                                   const Common::Redis::RespValue& incoming_request,
                                                   SplitCallbacks& callbacks,
                                                   CommandStats& command_stats,
@@ -299,8 +299,8 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     single_fragment.asArray()[1].asString() = incoming_request.asArray()[i].asString();
     ENVOY_LOG(debug, "redis: parallel {}: '{}'", incoming_request.asArray()[0].asString(),
               single_fragment.toString());
-    pending_request.handle_ = router.makeRequest(incoming_request.asArray()[i].asString(),
-                                                 single_fragment, pending_request);
+    pending_request.handle_ = conn_pool.makeRequest(incoming_request.asArray()[i].asString(),
+                                                    single_fragment, pending_request);
     if (!pending_request.handle_) {
       pending_request.onResponse(Utility::makeError(Response::get().NoUpstreamHost));
     }
@@ -337,11 +337,12 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
   }
 }
 
-InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
-                           TimeSource& time_source, bool latency_in_micros)
-    : router_(std::move(router)), simple_command_handler_(*router_),
-      eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
-      split_keys_sum_result_handler_(*router_),
+InstanceImpl::InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
+                           const std::string& stat_prefix, TimeSource& time_source,
+                           bool latency_in_micros)
+    : conn_pool_(std::move(conn_pool)), simple_command_handler_(*conn_pool_),
+      eval_command_handler_(*conn_pool_), mget_handler_(*conn_pool_), mset_handler_(*conn_pool_),
+      split_keys_sum_result_handler_(*conn_pool_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       latency_in_micros_(latency_in_micros), time_source_(time_source) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {

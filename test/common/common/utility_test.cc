@@ -828,41 +828,4 @@ TEST(DateFormatter, FromTimeSameWildcard) {
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
 }
 
-TEST(TrieLookupTable, AddItems) {
-  TrieLookupTable<const char*> trie;
-  EXPECT_TRUE(trie.add("foo", "a"));
-  EXPECT_TRUE(trie.add("bar", "b"));
-  EXPECT_EQ("a", trie.find("foo"));
-  EXPECT_EQ("b", trie.find("bar"));
-
-  // overwrite_existing = false
-  EXPECT_FALSE(trie.add("foo", "c", false));
-  EXPECT_EQ("a", trie.find("foo"));
-
-  // overwrite_existing = true
-  EXPECT_TRUE(trie.add("foo", "c"));
-  EXPECT_EQ("c", trie.find("foo"));
-}
-
-TEST(TrieLookupTable, LongestPrefix) {
-  TrieLookupTable<const char*> trie;
-  EXPECT_TRUE(trie.add("foo", "a"));
-  EXPECT_TRUE(trie.add("bar", "b"));
-  EXPECT_TRUE(trie.add("baro", "c"));
-
-  EXPECT_EQ("a", trie.find("foo"));
-  EXPECT_EQ("a", trie.findLongestPrefix("foo"));
-  EXPECT_EQ("a", trie.findLongestPrefix("foosball"));
-
-  EXPECT_EQ("b", trie.find("bar"));
-  EXPECT_EQ("b", trie.findLongestPrefix("bar"));
-  EXPECT_EQ("b", trie.findLongestPrefix("baritone"));
-  EXPECT_EQ("c", trie.findLongestPrefix("barometer"));
-
-  EXPECT_EQ(nullptr, trie.find("toto"));
-  EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));
-  EXPECT_EQ(nullptr, trie.find(" "));
-  EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
-}
-
 } // namespace Envoy
