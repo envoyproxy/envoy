@@ -3,6 +3,7 @@
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/codes.h"
+#include "common/http/utility.h"
 #include "common/router/config_impl.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -13,19 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
-
-namespace {
-// Asserts that the HTTP method is for a header-only request. For details
-// https://tools.ietf.org/html/rfc7231#section-4.3.
-bool isHeaderOnlyMethod(absl::string_view method) {
-  const static absl::flat_hash_set<std::string>* keys = new absl::flat_hash_set<std::string>(
-      {Http::Headers::get().MethodValues.Get, Http::Headers::get().MethodValues.Head,
-       Http::Headers::get().MethodValues.Connect, Http::Headers::get().MethodValues.Options,
-       Http::Headers::get().MethodValues.Trace});
-
-  return keys->find(method) != keys->end();
-}
-} // namespace
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   disabled_ = other.disabled_;
@@ -82,11 +70,9 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
-  request_headers_ = &headers;
-  const auto* method = headers.Method();
   buffer_data_ = config_->withRequestBody() &&
-                 !(end_stream || (method && isHeaderOnlyMethod(method->value().getStringView())));
-
+                 !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers));
+  request_headers_ = &headers;
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz is buffering", *callbacks_);
     if (!config_->allowPartialMessage()) {
@@ -102,10 +88,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
   if (buffer_data_) {
-    if (!end_stream && !isBufferFull()) {
+    if (end_stream || isBufferFull()) {
+      ENVOY_STREAM_LOG(debug, "ext_authz finished buffering", *callbacks_);
+      initiateCall(*request_headers_);
+    } else {
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
-    return Http::FilterDataStatus::StopIterationAndWatermark;
   }
 
   return filter_return_ == FilterReturn::StopDecoding
@@ -114,8 +102,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
-  if (buffer_data_) {
-    // Call the authorization service.
+  if (buffer_data_ && filter_return_ != FilterReturn::StopDecoding) {
     ENVOY_STREAM_LOG(debug, "ext_authz finished buffering", *callbacks_);
     initiateCall(*request_headers_);
   }
@@ -221,8 +208,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 }
 
 bool Filter::isBufferFull() {
-  if (config_->allowPartialMessage()) {
-    return callbacks_->decodingBuffer()->length() >= config_->maxRequestBytes();
+  const auto* buffer = callbacks_->decodingBuffer();
+  if (config_->allowPartialMessage() && buffer != nullptr) {
+    return buffer->length() >= config_->maxRequestBytes();
   }
   return false;
 }
