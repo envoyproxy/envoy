@@ -86,7 +86,8 @@ message AttributeContext {
     // lowercased, because HTTP header keys are case-insensitive.
     map<string, string> headers = 3;
 
-    // The HTTP URL path.
+    // The request target, as it appears in the first line of the HTTP request. This includes
+    // the URL path and query-string. No decoding is performed.
     string path = 4;
 
     // The HTTP request `Host` or 'Authority` header value.
@@ -95,18 +96,21 @@ message AttributeContext {
     // The HTTP URL scheme, such as `http` and `https`.
     string scheme = 6;
 
-    // The HTTP URL query in the format of `name1=value`&name2=value2`, as it
-    // appears in the first line of the HTTP request. No decoding is performed.
+    // This field is always empty, and exists for compatibility reasons. The HTTP URL query is
+    // included in `path` field.
     string query = 7;
 
-    // The HTTP URL fragment, excluding leading `#`. No URL decoding is performed.
+    // This field is always empty, and exists for compatibility reasons. The URL fragment is
+    // not submitted as part of HTTP requests; it is unknowable.
     string fragment = 8;
 
     // The HTTP request size in bytes. If unknown, it must be -1.
     int64 size = 9;
 
-    // The network protocol used with the request, such as
-    // "http/1.1", "spdy/3", "h2", "h2c"
+    // The network protocol used with the request, such as "HTTP/1.0", "HTTP/1.1", or "HTTP/2".
+    //
+    // See :repo:`headers.h:ProtocolStrings <source/common/http/headers.h>` for a list of all
+    // possible values.
     string protocol = 10;
   }
 

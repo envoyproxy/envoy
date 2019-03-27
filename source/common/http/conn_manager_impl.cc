@@ -420,6 +420,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   stream_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
 
+  stream_info_.setDownstreamSslConnection(connection_manager_.read_callbacks_->connection().ssl());
+
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
@@ -1059,7 +1061,10 @@ void ConnectionManagerImpl::startDrainSequence() {
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
-  Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
+  Router::RouteConstSharedPtr route;
+  if (request_headers_ != nullptr) {
+    route = snapped_route_config_->route(*request_headers_, stream_id_);
+  }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
   if (nullptr == stream_info_.route_entry_) {

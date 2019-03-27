@@ -2,6 +2,7 @@
 
 #include <signal.h>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -52,11 +53,12 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
-                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory)
+                           ThreadLocal::Instance& tls, Thread::ThreadFactory& thread_factory,
+                           Filesystem::Instance& file_system)
     : secret_manager_(std::make_unique<Secret::SecretManagerImpl>()), shutdown_(false),
       options_(options), time_source_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
-      thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system)),
+      thread_local_(tls), api_(new Api::Impl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory().currentThreadId())),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
@@ -82,7 +84,7 @@ InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_syste
 
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(options, local_address, component_factory);
+    initialize(options, std::move(local_address), component_factory, hooks);
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
@@ -198,7 +200,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
-                              ComponentFactory& component_factory) {
+                              ComponentFactory& component_factory, TestHooks& hooks) {
   ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
@@ -232,7 +234,7 @@ void InstanceImpl::initialize(const Options& options,
             Buffer::OwnedImpl().usesOldImpl() ? "old (libevent)" : "new");
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options, api());
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options, *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
@@ -251,7 +253,7 @@ void InstanceImpl::initialize(const Options& options,
   assert_action_registration_ = Assert::setDebugAssertionFailureRecordAction(
       [this]() { server_stats_->debug_assertion_failures_.inc(); });
 
-  failHealthcheck(false);
+  InstanceImpl::failHealthcheck(false);
 
   uint64_t version_int;
   if (!StringUtil::atoull(VersionInfo::revision().substr(0, 6).c_str(), version_int, 16)) {
@@ -262,8 +264,8 @@ void InstanceImpl::initialize(const Options& options,
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
-      bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
-      options.serviceNodeName());
+      bootstrap_.node(), std::move(local_address), options.serviceZone(),
+      options.serviceClusterName(), options.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
@@ -292,10 +294,11 @@ void InstanceImpl::initialize(const Options& options,
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
-                                                            bootstrap_.overload_manager(), api());
+  overload_manager_ = std::make_unique<OverloadManagerImpl>(
+      *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(), *api_);
 
-  heap_shrinker_ = std::make_unique<Memory::HeapShrinker>(dispatcher(), overloadManager(), stats());
+  heap_shrinker_ =
+      std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
 
   // Workers get created first so they register for thread local updates.
   listener_manager_ =
@@ -312,15 +315,16 @@ void InstanceImpl::initialize(const Options& options,
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(
       component_factory.createRuntime(*this, initial_config));
+  hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_source_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
-      dispatcher(), localInfo(), secretManager(), api(), http_context_, accessLogManager(),
-      singletonManager());
+      *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
+      dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_, *api_,
+      http_context_, access_log_manager_, *singleton_manager_);
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -338,14 +342,15 @@ void InstanceImpl::initialize(const Options& options,
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        clusterManager(), thread_local_, time_source_, api());
+        *config_.clusterManager(), thread_local_, time_source_, *api_);
     hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-        stats(),
-        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
+        stats_store_,
+        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
+                                                       stats_store_)
             ->create(),
-        dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
-        access_log_manager_, clusterManager(), localInfo(), admin(), singletonManager(),
-        threadLocal(), api());
+        *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
+        *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
+        *local_info_, *admin_, *singleton_manager_, thread_local_, *api_);
   }
 
   for (Stats::SinkPtr& sink : config_.statsSinks()) {
@@ -359,7 +364,7 @@ void InstanceImpl::initialize(const Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, api());
+  guard_dog_ = std::make_unique<Server::GuardDogImpl>(stats_store_, config_, *api_);
 }
 
 void InstanceImpl::startWorkers() {
@@ -399,7 +404,7 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
   ENVOY_LOG(info, "server flags path: {}", flags_path.value());
   if (api_->fileSystem().fileExists(flags_path.value() + "/drain")) {
     ENVOY_LOG(info, "starting server in drain mode");
-    failHealthcheck(true);
+    InstanceImpl::failHealthcheck(true);
   }
 }
 
@@ -407,9 +412,13 @@ uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnectio
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-                     InitManagerImpl& init_manager, OverloadManager& overload_manager,
-                     std::function<void()> workers_start_cb) {
-
+                     Init::Manager& init_manager, OverloadManager& overload_manager,
+                     std::function<void()> workers_start_cb)
+    : init_watcher_("RunHelper", [&instance, workers_start_cb]() {
+        if (!instance.isShutdown()) {
+          workers_start_cb();
+        }
+      }) {
   // Setup signals.
   if (options.signalHandlingEnabled()) {
     sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
@@ -440,7 +449,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // this can fire immediately if all clusters have already initialized. Also note that we need
   // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
   // starts.
-  cm.setInitializedCb([&instance, &init_manager, &cm, workers_start_cb]() {
+  cm.setInitializedCb([&instance, &init_manager, &cm, this]() {
     if (instance.isShutdown()) {
       return;
     }
@@ -451,16 +460,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
-
-    // Note: the lambda below should not capture "this" since the RunHelper object may
-    // have been destructed by the time it gets executed.
-    init_manager.initialize([&instance, workers_start_cb]() {
-      if (instance.isShutdown()) {
-        return;
-      }
-
-      workers_start_cb();
-    });
+    init_manager.initialize(init_watcher_);
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
@@ -469,11 +469,10 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 }
 
 void InstanceImpl::run() {
-  // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
-  // we save it as a member variable.
-  run_helper_ = std::make_unique<RunHelper>(*this, options_, *dispatcher_, clusterManager(),
-                                            access_log_manager_, init_manager_, overloadManager(),
-                                            [this]() -> void { startWorkers(); });
+  // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
+  // startup (see RunHelperTest in server_test.cc).
+  auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_,
+                              init_manager_, overloadManager(), [this] { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
@@ -486,7 +485,6 @@ void InstanceImpl::run() {
   watchdog.reset();
 
   terminate();
-  run_helper_.reset();
 }
 
 void InstanceImpl::terminate() {
@@ -531,8 +529,7 @@ void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");
   shutdown_ = true;
   restarter_.terminateParent();
-  notifyCallbacksForStage(Stage::ShutdownExit);
-  dispatcher_->exit();
+  notifyCallbacksForStage(Stage::ShutdownExit, [this] { dispatcher_->exit(); });
 }
 
 void InstanceImpl::shutdownAdmin() {
@@ -552,13 +549,37 @@ void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {
   stage_callbacks_[stage].push_back(callback);
 }
 
-void InstanceImpl::notifyCallbacksForStage(Stage stage) {
+void InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
+  ASSERT(stage == Stage::ShutdownExit);
+  stage_completable_callbacks_[stage].push_back(callback);
+}
+
+void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
   auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {
       callback();
     }
+  }
+
+  auto it2 = stage_completable_callbacks_.find(stage);
+  if (it2 != stage_completable_callbacks_.end()) {
+    ASSERT(!it2->second.empty());
+    // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
+    // have finished their work.
+    auto completion_cb_count = std::make_shared<int>(it2->second.size());
+    Event::PostCb wrapped_cb = [this, completion_cb, completion_cb_count] {
+      ASSERT(std::this_thread::get_id() == main_thread_id_);
+      if (--*completion_cb_count == 0) {
+        completion_cb();
+      }
+    };
+    for (const StageCallbackWithCompletion& callback : it2->second) {
+      callback(wrapped_cb);
+    }
+  } else {
+    completion_cb();
   }
 }
 

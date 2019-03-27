@@ -14,6 +14,7 @@
 #include "server/hot_restart_nop_impl.h"
 #include "server/options_impl.h"
 
+#include "test/common/runtime/utility.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
@@ -153,19 +154,30 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                           lock, *this, std::move(random_generator));
 }
 
+void IntegrationTestServer::onRuntimeCreated() {
+  // Override runtime values to by default allow all disallowed features.
+  //
+  // Per #6288 we explicitly want to allow end to end testing of disallowed features until the code
+  // is removed from Envoy.
+  //
+  // This will revert as the runtime is torn down with the test Envoy server.
+  Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed();
+}
+
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
-  Server::HotRestartNopImpl restarter;
+  Stats::FakeSymbolTableImpl symbol_table;
+  Server::HotRestartNopImpl restarter(symbol_table);
   ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
+  Stats::HeapStatDataAllocator stats_allocator(symbol_table);
   Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                               access_log_lock, component_factory, std::move(random_generator), tls,
-                              Thread::threadFactoryForTest());
+                              Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
   // This is technically thread unsafe (assigning to a shared_ptr accessed
   // across threads), but because we synchronize below through serverReady(), the only
   // consumer on the main test thread in ~IntegrationTestServerImpl will not race.

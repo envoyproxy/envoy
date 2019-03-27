@@ -31,5 +31,7 @@ void TimerImpl::enableTimer(const std::chrono::milliseconds& d) {
   }
 }
 
+bool TimerImpl::enabled() { return 0 != evtimer_pending(&raw_event_, nullptr); }
+
 } // namespace Event
 } // namespace Envoy
