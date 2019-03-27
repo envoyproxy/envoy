@@ -325,17 +325,22 @@ private:
     ActiveStream(ConnectionManagerImpl& connection_manager);
     ~ActiveStream();
 
+    // Indicates which filter to start the iteration with.
+    enum class FilterIterationStartState { Always_start_from_next, Can_start_from_current };
+
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
     void chargeStats(const HeaderMap& headers);
     // Returns the encoder filter to start iteration with. If the function is called from a filter
     // that should always iterate from the next filter, always_start_next should be set to true.
     std::list<ActiveStreamEncoderFilterPtr>::iterator
-    commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream, bool always_start_next);
+    commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream,
+                       FilterIterationStartState filter_iteration_start_state);
     // Returns the decoder filter to start iteration with. If the function is called from a filter
     // that should always iterate from the next filter, always_start_next should be set to true.
     std::list<ActiveStreamDecoderFilterPtr>::iterator
-    commonDecodePrefix(ActiveStreamDecoderFilter* filter, bool always_start_next);
+    commonDecodePrefix(ActiveStreamDecoderFilter* filter,
+                       FilterIterationStartState filter_iteration_start_state);
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addDecodedTrailers();

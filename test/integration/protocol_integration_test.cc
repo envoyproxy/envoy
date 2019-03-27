@@ -47,7 +47,21 @@ namespace Envoy {
 // This is useful for things which will likely not differ based on upstream
 // behavior, for example "how does Envoy handle duplicate content lengths from
 // downstream"?
-typedef HttpProtocolIntegrationTest DownstreamProtocolIntegrationTest;
+class DownstreamProtocolIntegrationTest : public HttpProtocolIntegrationTest {
+protected:
+  void changeHeadersForStopAllTests(Http::TestHeaderMapImpl& headers, bool set_buffer_limit) {
+    headers.addCopy("content_size", std::to_string(count_ * size_));
+    headers.addCopy("added_size", std::to_string(added_decoded_data_size_));
+    headers.addCopy("first_trigger", "value");
+    if (set_buffer_limit) {
+      headers.addCopy("buffer_limit", std::to_string(buffer_limit_));
+    }
+  }
+  const int count_ = 70;
+  const int size_ = 1000;
+  const int added_decoded_data_size_ = 1;
+  const int buffer_limit_ = 100;
+};
 
 // Tests for ProtocolIntegrationTest will be run with the full mesh of H1/H2
 // downstream and H1/H2 upstreams.
@@ -764,38 +778,31 @@ name: passthrough-filter
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Sends a request with headers and data.
-  const int count = 70;
-  const int size = 1000;
-  const int added_decoded_data_size = 1;
-  default_request_headers_.addCopy("content_size", std::to_string(count * size));
-  default_request_headers_.addCopy("added_size", std::to_string(added_decoded_data_size));
+  changeHeadersForStopAllTests(default_request_headers_, false);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  for (int i = 0; i < count - 1; i++) {
-    codec_client_->sendData(*request_encoder_, size, false);
+  for (int i = 0; i < count_ - 1; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
   }
   // Sleeps for 1s in order to be consistent with testDecodeHeadersReturnsStopAllWatermark.
   sleep(1);
-  codec_client_->sendData(*request_encoder_, size, true);
+  codec_client_->sendData(*request_encoder_, size_, true);
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count * size + added_decoded_data_size, upstream_request_->bodyLength());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, upstream_request_->bodyLength());
   EXPECT_EQ(true, upstream_request_->complete());
 
   // Sends a request with headers, data, and trailers.
   auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder_2.first;
   response = std::move(encoder_decoder_2.second);
-  for (int i = 0; i < count - 1; i++) {
-    codec_client_->sendData(*request_encoder_, size, false);
+  for (int i = 0; i < count_; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
   }
-  // Sleeps for 1s in order to be consistent with testDecodeHeadersReturnsStopAllWatermark.
-  sleep(1);
-  codec_client_->sendData(*request_encoder_, size, false);
   Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
   waitForNextUpstreamRequest();
@@ -805,9 +812,9 @@ name: passthrough-filter
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
     // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and decodeTrailers.
     // 2 decoded data were added.
-    EXPECT_EQ(count * size + added_decoded_data_size * 2, upstream_request_->bodyLength());
+    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
   } else {
-    EXPECT_EQ(count * size + added_decoded_data_size * 1, upstream_request_->bodyLength());
+    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
   }
   EXPECT_EQ(true, upstream_request_->complete());
 }
@@ -834,40 +841,34 @@ name: passthrough-filter
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Sends a request with headers and data.
-  const int count = 70;
-  const int size = 1000;
-  const int added_decoded_data_size = 1;
-  const int buffer_limit = 100;
-  default_request_headers_.addCopy("content_size", std::to_string(count * size));
-  default_request_headers_.addCopy("added_size", std::to_string(added_decoded_data_size));
-  default_request_headers_.addCopy("buffer_limit", std::to_string(buffer_limit));
+  changeHeadersForStopAllTests(default_request_headers_, true);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  for (int i = 0; i < count - 1; i++) {
-    codec_client_->sendData(*request_encoder_, size, false);
+  for (int i = 0; i < count_ - 1; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
   }
   // Gives buffer 1s to react to buffer limit.
   sleep(1);
-  codec_client_->sendData(*request_encoder_, size, true);
+  codec_client_->sendData(*request_encoder_, size_, true);
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count * size + added_decoded_data_size, upstream_request_->bodyLength());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, upstream_request_->bodyLength());
   EXPECT_EQ(true, upstream_request_->complete());
 
   // Sends a request with headers, data, and trailers.
   auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder_2.first;
   response = std::move(encoder_decoder_2.second);
-  for (int i = 0; i < count - 1; i++) {
-    codec_client_->sendData(*request_encoder_, size, false);
+  for (int i = 0; i < count_ - 1; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
   }
   // Gives buffer 1s to react to buffer limit.
   sleep(1);
-  codec_client_->sendData(*request_encoder_, size, false);
+  codec_client_->sendData(*request_encoder_, size_, false);
   Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
   waitForNextUpstreamRequest();
@@ -877,17 +878,17 @@ name: passthrough-filter
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
     // decode-headers-return-stop-all-watermark-filter calls addDecodedData in decodeData and
     // decodeTrailers. 2 decoded data were added.
-    EXPECT_EQ(count * size + added_decoded_data_size * 2, upstream_request_->bodyLength());
+    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
   } else {
-    EXPECT_EQ(count * size + added_decoded_data_size * 1, upstream_request_->bodyLength());
+    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
   }
   EXPECT_EQ(true, upstream_request_->complete());
 }
 
-// Test two filters that return StopAllIterationAndBuffer back-to-back. Verifies
+// Test two filters that return StopAllIterationAndBuffer back-to-back.
 TEST_P(DownstreamProtocolIntegrationTest, testTwoFiltersDecodeHeadersReturnsStopAll) {
   config_helper_.addFilter(R"EOF(
-name: decode-headers-return-stop-all-filter-2
+name: decode-headers-return-stop-all-filter
 )EOF");
   config_helper_.addFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
@@ -900,32 +901,28 @@ name: passthrough-filter
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Sends a request with headers and data.
-  const int count = 70;
-  const int size = 1000;
-  const int added_decoded_data_size = 1;
-  default_request_headers_.addCopy("content_size", std::to_string(count * size));
-  default_request_headers_.addCopy("added_size", std::to_string(added_decoded_data_size));
+  changeHeadersForStopAllTests(default_request_headers_, false);
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  for (int i = 0; i < count - 1; i++) {
-    codec_client_->sendData(*request_encoder_, size, false);
+  for (int i = 0; i < count_ - 1; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
   }
-  codec_client_->sendData(*request_encoder_, size, true);
+  codec_client_->sendData(*request_encoder_, size_, true);
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count * size + added_decoded_data_size, upstream_request_->bodyLength());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, upstream_request_->bodyLength());
   EXPECT_EQ(true, upstream_request_->complete());
 
   // Sends a request with headers, data, and trailers.
   auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder_2.first;
   response = std::move(encoder_decoder_2.second);
-  for (int i = 0; i < count; i++) {
-    codec_client_->sendData(*request_encoder_, size, false);
+  for (int i = 0; i < count_; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
   }
   Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
@@ -936,9 +933,9 @@ name: passthrough-filter
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
     // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and decodeTrailers.
     // 2 decoded data were added.
-    EXPECT_EQ(count * size + added_decoded_data_size * 2, upstream_request_->bodyLength());
+    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
   } else {
-    EXPECT_EQ(count * size + added_decoded_data_size * 1, upstream_request_->bodyLength());
+    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
   }
   EXPECT_EQ(true, upstream_request_->complete());
 }
@@ -956,24 +953,20 @@ name: encode-headers-return-stop-all-filter
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
   waitForNextUpstreamRequest();
 
-  const int count = 70;
-  const int size = 1000;
-  const int added_decoded_data_size = 1;
-  default_response_headers_.addCopy("content_size", std::to_string(count * size));
-  default_response_headers_.addCopy("added_size", std::to_string(added_decoded_data_size));
+  changeHeadersForStopAllTests(default_response_headers_, false);
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  for (int i = 0; i < count - 1; i++) {
-    upstream_request_->encodeData(size, false);
+  for (int i = 0; i < count_ - 1; i++) {
+    upstream_request_->encodeData(size_, false);
   }
   // Sleeps for 1s in order to be consistent with testEncodeHeadersReturnsStopAllWatermark.
   sleep(1);
-  upstream_request_->encodeData(size, false);
+  upstream_request_->encodeData(size_, false);
   Http::TestHeaderMapImpl response_trailers{{"response", "trailer"}};
   upstream_request_->encodeTrailers(response_trailers);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count * size + added_decoded_data_size, response->body().size());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
 }
 
 // Tests encodeHeaders() returns StopAllIterationAndWatermark.
@@ -997,26 +990,20 @@ name: encode-headers-return-stop-all-filter
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
   waitForNextUpstreamRequest();
 
-  const int count = 70;
-  const int size = 1000;
-  const int added_decoded_data_size = 1;
-  const int buffer_limit = 100;
-  default_response_headers_.addCopy("content_size", std::to_string(count * size));
-  default_response_headers_.addCopy("added_size", std::to_string(added_decoded_data_size));
-  default_response_headers_.addCopy("buffer_limit", std::to_string(buffer_limit));
+  changeHeadersForStopAllTests(default_response_headers_, true);
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  for (int i = 0; i < count - 1; i++) {
-    upstream_request_->encodeData(size, false);
+  for (int i = 0; i < count_ - 1; i++) {
+    upstream_request_->encodeData(size_, false);
   }
-  // Sleeps for 1s in order to be consistent with testDecodeHeadersReturnsStopAllWatermark.
+  // Gives buffer 1s to react to buffer limit.
   sleep(1);
-  upstream_request_->encodeData(size, false);
+  upstream_request_->encodeData(size_, false);
   Http::TestHeaderMapImpl response_trailers{{"response", "trailer"}};
   upstream_request_->encodeTrailers(response_trailers);
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ(count * size + added_decoded_data_size, response->body().size());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

@@ -1,7 +1,5 @@
 #include "test/integration/http_integration.h"
 
-#include <unistd.h>
-
 #include <functional>
 #include <list>
 #include <memory>
@@ -942,5 +940,4 @@ std::string HttpIntegrationTest::listenerStatPrefix(const std::string& stat_name
   }
   return "listener.[__1]_0." + stat_name;
 }
-
 } // namespace Envoy
