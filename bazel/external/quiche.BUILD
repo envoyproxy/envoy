@@ -188,7 +188,6 @@ cc_library(
         # "quiche/quic/platform/api/quic_lru_cache.h",
         # "quiche/quic/platform/api/quic_pcc_sender.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
-        # "quiche/quic/platform/api/quic_test_loopback.h",
     ] + envoy_select_quiche(
         [
             "quiche/quic/platform/api/quic_bug_tracker.h",
@@ -361,7 +360,7 @@ cc_library(
     deps = [
         ":quic_platform_base",
         ":quic_time_lib",
-        "@envoy//external:ssl",
+        "//external:ssl",
     ],
 )
 

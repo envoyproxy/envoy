@@ -35,7 +35,7 @@ public:
   }
 
   // Constructs a QuicMemSliceImpl from a Buffer::Instance whose getRawSlices()
-  // reutrns only 1 slice.
+  // returns only 1 slice.
   QuicMemSliceImpl(std::shared_ptr<Envoy::Buffer::Instance> slice)
       : length_(slice->length()), slice_(std::move(slice)) {
     ASSERT(slice_->getRawSlices(nullptr, 0) == 1);
