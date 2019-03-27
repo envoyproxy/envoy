@@ -61,6 +61,7 @@ public:
    * comparison (order matters).
    */
   bool operator==(const HeaderMapImpl& rhs) const;
+  bool operator!=(const HeaderMapImpl& rhs) const;
 
   // Http::HeaderMap
   void addReference(const LowerCaseString& key, const std::string& value) override;

@@ -8,6 +8,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
+#include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/runtime/uuid_util.h"
@@ -328,6 +329,16 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);
   }
+}
+
+/* static */
+bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
+                                                  const ConnectionManagerConfig& config) {
+  ASSERT(request_headers.Path());
+  if (config.shouldNormalizePath()) {
+    return PathUtil::canonicalPath(*request_headers.Path());
+  }
+  return true;
 }
 
 } // namespace Http

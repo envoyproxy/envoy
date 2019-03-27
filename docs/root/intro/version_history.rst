@@ -4,6 +4,10 @@ Version history
 1.9.1 (Apr 5, 2019)
 ===================
 * http: fixed CVE-2019-9900 by rejecting HTTP/1.x headers with embedded NUL characters.
+* http: fixed CVE-2019-9901 by normalizing HTTP paths prior to routing or L7 data plane processing.
+  This defaults off and is configurable via either HTTP connection manager :ref:`normalize_path
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.normalize_path>`
+  or the :ref:`runtime <config_http_conn_man_runtime_normalize_path>`.
 
 1.9.0 (Dec 20, 2018)
 ====================
