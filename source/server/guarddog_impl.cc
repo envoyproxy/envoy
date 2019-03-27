@@ -33,8 +33,7 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       watchdog_miss_counter_(stats_scope.counter("server.watchdog_miss")),
       watchdog_megamiss_counter_(stats_scope.counter("server.watchdog_mega_miss")),
       dispatcher_(api.allocateDispatcher()),
-      loop_timer_(dispatcher_->createTimer([this]() { step(); })), //, pending_(false) {
-      run_thread_(true) {
+      loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
   start(api);
 }
 
@@ -43,8 +42,6 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
     : GuardDogImpl(stats_scope, config, api, std::make_unique<TestInterlockHook>()) {}
 
 GuardDogImpl::~GuardDogImpl() { stop(); }
-
-void GuardDogImpl::threadRoutine() {}
 
 void GuardDogImpl::step() {
   {

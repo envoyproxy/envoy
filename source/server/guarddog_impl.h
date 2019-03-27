@@ -91,8 +91,6 @@ public:
   void stopWatching(WatchDogSharedPtr wd) override;
 
 private:
-  void threadRoutine();
-  void waitOrDetectStop();
   void start(Api::Api& api);
   void step();
   void stop();

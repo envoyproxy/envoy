@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
 #include "common/event/libevent.h"
@@ -18,21 +19,11 @@ public:
   TimerPtr createTimer(const TimerCb& cb) override;
 
   /**
-   * Executes any events that have been activated, then exit.
+   * Runs the event loop.
+   *
+   * @param mode The mode in which to run the event loop.
    */
-  void runActivatedEvents();
-
-  /**
-   * Waits for any pending events to activate, executes them, then exits. Exits
-   * immediately if there are no pending or active events.
-   */
-  void runUntilEmpty();
-
-  /**
-   * Runs the event-loop until loopExit() is called, blocking until there
-   * are pending or active events.
-   */
-  void runUntilExit();
+  void run(Dispatcher::RunType mode);
 
   /**
    * Exits the libevent loop.

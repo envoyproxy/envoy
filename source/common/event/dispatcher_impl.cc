@@ -164,18 +164,7 @@ void DispatcherImpl::run(RunType type) {
   // not guarantee that events are run in any particular order. So even if we post() and call
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
-
-  switch (type) {
-  case RunType::NonBlock:
-    base_scheduler_.runActivatedEvents();
-    break;
-  case RunType::Block:
-    base_scheduler_.runUntilEmpty();
-    break;
-  case RunType::RunUntilExit:
-    base_scheduler_.runUntilEmpty();
-    break;
-  }
+  base_scheduler_.run(type);
 }
 
 void DispatcherImpl::runPostCallbacks() {
