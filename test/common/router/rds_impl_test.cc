@@ -534,8 +534,8 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   EXPECT_FALSE(provider_->configInfo().has_value());
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
-  route_configs.Add()->MergeFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
+  route_configs.Add()->PackFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
 name: foo_route_config
 virtual_hosts:
   - name: bar
@@ -614,10 +614,11 @@ virtual_hosts:
 TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
   setup();
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
-  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
-  auto* route_config = route_configs.Add();
-  route_config->set_name("foo_route_config");
-  route_config->mutable_virtual_hosts()->Add();
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
+  envoy::api::v2::RouteConfiguration route_config;
+  route_config.set_name("foo_route_config");
+  route_config.mutable_virtual_hosts()->Add();
+  route_configs.Add()->PackFrom(route_config);
   EXPECT_THROW(provider_impl.subscription().onConfigUpdate(route_configs, ""),
                ProtoValidationException);
 }
@@ -636,7 +637,7 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
   setup();
   factory_context_.init_manager_.initialize(init_watcher_);
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
-  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
   route_configs.Add();
   route_configs.Add();
   EXPECT_CALL(init_watcher_, ready());

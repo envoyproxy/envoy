@@ -1,8 +1,8 @@
 #pragma once
 
 #include <functional>
-#include <queue>
 
+#include "envoy/config/xds_context.h"
 #include "envoy/grpc/async_client.h"
 
 #include "common/common/backoff_strategy.h"
@@ -15,46 +15,29 @@ namespace Config {
 // Oversees communication for gRPC xDS implementations (parent to both regular xDS and delta
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
-template <class RequestProto, class ResponseProto, class RequestQueueItem>
+template <class RequestProto, class ResponseProto>
 class GrpcStream : public Grpc::TypedAsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcStream(Grpc::AsyncClientPtr async_client, const Protobuf::MethodDescriptor& service_method,
-             Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher, Stats::Scope& scope,
-             const RateLimitSettings& rate_limit_settings)
-      : async_client_(std::move(async_client)), service_method_(service_method),
-        control_plane_stats_(generateControlPlaneStats(scope)), random_(random),
-        time_source_(dispatcher.timeSource()),
-        rate_limiting_enabled_(rate_limit_settings.enabled_) {
+  GrpcStream(XdsContext* owning_context, Grpc::AsyncClientPtr async_client,
+             const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
+             Event::Dispatcher& dispatcher, Stats::Scope& scope,
+             const RateLimitSettings& rate_limit_settings,
+             std::function<void(std::unique_ptr<ResponseProto>&&)> handle_response_cb)
+      : owning_context_(owning_context), async_client_(std::move(async_client)),
+        service_method_(service_method), control_plane_stats_(generateControlPlaneStats(scope)),
+        random_(random), time_source_(dispatcher.timeSource()),
+        rate_limiting_enabled_(rate_limit_settings.enabled_),
+        handle_response_cb_(handle_response_cb) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
       // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
       limit_request_ = std::make_unique<TokenBucketImpl>(
           rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
-      drain_request_timer_ = dispatcher.createTimer([this]() { drainRequests(); });
+      drain_request_timer_ = dispatcher.createTimer([this]() { owning_context_->drainRequests(); });
     }
     backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
                                                                   RETRY_MAX_DELAY_MS, random_);
-  }
-
-  virtual void handleResponse(std::unique_ptr<ResponseProto>&& message) PURE;
-  virtual void handleStreamEstablished() PURE;
-  virtual void handleEstablishmentFailure() PURE;
-
-  // Returns whether the request was actually sent (and so can leave the queue).
-  virtual void sendDiscoveryRequest(const RequestQueueItem& queue_item) PURE;
-
-  void queueDiscoveryRequest(const RequestQueueItem& queue_item) {
-    request_queue_.push(queue_item);
-    drainRequests();
-  }
-
-  void clearRequestQueue() {
-    control_plane_stats_.pending_requests_.sub(request_queue_.size());
-    // TODO(fredlas) when we have C++17: request_queue_ = {};
-    while (!request_queue_.empty()) {
-      request_queue_.pop();
-    }
   }
 
   void establishNewStream() {
@@ -62,12 +45,12 @@ public:
     stream_ = async_client_->start(service_method_, *this);
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
-      handleEstablishmentFailure();
+      owning_context_->handleEstablishmentFailure();
       setRetryTimer();
       return;
     }
     control_plane_stats_.connected_state_.set(1);
-    handleStreamEstablished();
+    owning_context_->handleStreamEstablished();
   }
 
   bool grpcStreamAvailable() const { return stream_ != nullptr; }
@@ -86,11 +69,11 @@ public:
   void onReceiveMessage(std::unique_ptr<ResponseProto>&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
-    // Some times during hot restarts this stat's value becomes inconsistent and will continue to
-    // have 0 till it is reconnected. Setting here ensures that it is consistent with the state of
+    // Sometimes during hot restarts this stat's value becomes inconsistent and will continue to
+    // have 0 until it is reconnected. Setting here ensures that it is consistent with the state of
     // management server connection.
     control_plane_stats_.connected_state_.set(1);
-    handleResponse(std::move(message));
+    handle_response_cb_(std::move(message));
   }
 
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
@@ -101,18 +84,11 @@ public:
     ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
     stream_ = nullptr;
     control_plane_stats_.connected_state_.set(0);
-    handleEstablishmentFailure();
+    owning_context_->handleEstablishmentFailure();
     setRetryTimer();
   }
 
-private:
-  void drainRequests() {
-    ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-    while (!request_queue_.empty() && checkRateLimitAllowsDrain()) {
-      // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-      sendDiscoveryRequest(request_queue_.front());
-      request_queue_.pop();
-    }
+  void maybeUpdateQueueSizeStat(uint64_t size) {
     // Although request_queue_.push() happens elsewhere, the only time the queue is non-transiently
     // non-empty is when it remains non-empty after a drain attempt. (The push() doesn't matter
     // because we always attempt this drain immediately after the push). Basically, a change in
@@ -120,8 +96,8 @@ private:
     // if(>0 || used) to keep this stat from being wrongly marked interesting by a pointless set(0)
     // and needlessly taking up space. The first time we set(123), used becomes true, and so we will
     // subsequently always do the set (including set(0)).
-    if (request_queue_.size() > 0 || control_plane_stats_.pending_requests_.used()) {
-      control_plane_stats_.pending_requests_.set(request_queue_.size());
+    if (size > 0 || control_plane_stats_.pending_requests_.used()) {
+      control_plane_stats_.pending_requests_.set(size);
     }
   }
 
@@ -136,6 +112,7 @@ private:
     return false;
   }
 
+private:
   void setRetryTimer() {
     retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
   }
@@ -145,6 +122,8 @@ private:
     return {ALL_CONTROL_PLANE_STATS(POOL_COUNTER_PREFIX(scope, control_plane_prefix),
                                     POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
   }
+
+  XdsContext* const owning_context_;
 
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
@@ -165,9 +144,8 @@ private:
   TokenBucketPtr limit_request_;
   const bool rate_limiting_enabled_;
   Event::TimerPtr drain_request_timer_;
-  // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
-  // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
-  std::queue<RequestQueueItem> request_queue_;
+
+  std::function<void(std::unique_ptr<ResponseProto>&&)> handle_response_cb_;
 };
 
 } // namespace Config
