@@ -1,9 +1,9 @@
-#include "common/safe_init/manager_impl.h"
+#include "common/init/manager_impl.h"
 
 #include "common/common/assert.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 
 ManagerImpl::ManagerImpl(absl::string_view name)
     : name_(fmt::format("init manager {}", name)), state_(State::Uninitialized), count_(0),
@@ -75,5 +75,5 @@ void ManagerImpl::ready() {
   watcher_handle_->ready();
 }
 
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy
