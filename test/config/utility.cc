@@ -416,34 +416,24 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
-void ConfigHelper::addRoute(
-    const std::string& domains, const std::string& prefix, const std::string& cluster,
-    bool validate_clusters, envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-    envoy::api::v2::route::VirtualHost::TlsRequirementType type,
-    envoy::api::v2::route::RetryPolicy retry_policy, bool include_attempt_count_header,
-    const absl::string_view upgrade,
-    envoy::api::v2::route::RouteAction::InternalRedirectAction internal_redirect_action) {
+envoy::api::v2::route::VirtualHost
+ConfigHelper::createVirtualHost(const char* domain, const char* prefix, const char* cluster) {
+  envoy::api::v2::route::VirtualHost virtual_host;
+  virtual_host.set_name(domain);
+  virtual_host.add_domains(domain);
+  virtual_host.add_routes()->mutable_match()->set_prefix(prefix);
+  auto* route = virtual_host.mutable_routes(0)->mutable_route();
+  route->set_cluster(cluster);
+  return virtual_host;
+}
+
+void ConfigHelper::addVirtualHost(const envoy::api::v2::route::VirtualHost& vhost) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
-
-  auto* route_config = hcm_config.mutable_route_config();
-  route_config->mutable_validate_clusters()->set_value(validate_clusters);
+  auto route_config = hcm_config.mutable_route_config();
   auto* virtual_host = route_config->add_virtual_hosts();
-  virtual_host->set_name(domains);
-  virtual_host->set_include_request_attempt_count(include_attempt_count_header);
-  virtual_host->add_domains(domains);
-  virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
-  auto* route = virtual_host->mutable_routes(0)->mutable_route();
-  route->set_cluster(cluster);
-  route->set_cluster_not_found_response_code(code);
-  route->mutable_retry_policy()->Swap(&retry_policy);
-  if (!upgrade.empty()) {
-    route->add_upgrade_configs()->set_upgrade_type(std::string(upgrade));
-  }
-  route->set_internal_redirect_action(internal_redirect_action);
-  virtual_host->set_require_tls(type);
-
+  virtual_host->CopyFrom(vhost);
   storeHttpConnectionManager(hcm_config);
 }
 
