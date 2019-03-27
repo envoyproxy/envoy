@@ -138,18 +138,7 @@ class DetectorImpl;
  */
 class DetectorHostMonitorImpl : public DetectorHostMonitor {
 public:
-  DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host)
-      : detector_(detector), host_(host) {
-    // add Success Rate monitors
-    success_rate_monitors_
-        [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN] =
-            std::make_unique<SuccessRateMonitor>(
-                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN);
-    success_rate_monitors_
-        [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN] =
-            std::make_unique<SuccessRateMonitor>(
-                envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN);
-  }
+  DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host);
 
   void eject(MonotonicTime ejection_time);
   void uneject(MonotonicTime ejection_time);
@@ -157,6 +146,7 @@ public:
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
   void resetConsecutiveLocalOriginFailure() { consecutive_local_origin_failure_ = 0; }
+  static Http::Code resultToHttpCode(Result result);
 
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return num_ejections_; }
@@ -208,6 +198,9 @@ private:
   absl::flat_hash_map<envoy::data::cluster::v2alpha::OutlierEjectionType,
                       std::unique_ptr<SuccessRateMonitor>>
       success_rate_monitors_;
+  void putResultNoLocalExternalSplit(Result result);
+  void putResultWithLocalExternalSplit(Result result);
+  std::function<void(DetectorHostMonitorImpl*, Result)> put_result_func_;
 };
 
 /**
@@ -260,6 +253,7 @@ public:
     return enforcing_consecutive_gateway_failure_;
   }
   uint64_t enforcingSuccessRate() const { return enforcing_success_rate_; }
+  bool splitExternalLocalOriginErrors() const { return split_external_local_origin_errors_; }
   uint64_t consecutiveLocalOriginFailure() const { return consecutive_local_origin_failure_; }
   uint64_t enforcingConsecutiveLocalOriginFailure() const {
     return enforcing_consecutive_local_origin_failure_;
@@ -278,6 +272,7 @@ private:
   const uint64_t enforcing_consecutive_5xx_;
   const uint64_t enforcing_consecutive_gateway_failure_;
   const uint64_t enforcing_success_rate_;
+  const bool split_external_local_origin_errors_;
   const uint64_t consecutive_local_origin_failure_;
   const uint64_t enforcing_consecutive_local_origin_failure_;
   const uint64_t enforcing_local_origin_success_rate_;

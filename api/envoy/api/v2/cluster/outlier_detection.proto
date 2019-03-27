@@ -81,19 +81,29 @@ message OutlierDetection {
   google.protobuf.UInt32Value enforcing_consecutive_gateway_failure = 11
       [(validate.rules).uint32.lte = 100];
 
+  // Determines whether to distinguish local origin failures from external errors. If set to true
+  // the following configuration parameters are taken into account:
+  // consecutive_local_origin_failure, consecutive_local_origin_failure
+  // enforcing_consecutive_local_origin_failure and enforcing_local_origin_success_rate.
+  // Defaults to false.
+  google.protobuf.BoolValue split_external_local_origin_errors = 12;
+
   // The number of consecutive locally originated failures before ejection
-  // occurs. Defaults to 5.
-  google.protobuf.UInt32Value consecutive_local_origin_failure = 12;
+  // occurs. Defaults to 5. Parameter takes effect only when
+  // split_external_local_origin_errors is set to true.
+  google.protobuf.UInt32Value consecutive_local_origin_failure = 13;
 
   // The % chance that a host will be actually ejected when an outlier status
   // is detected through consecutive locally originated failures. This setting can be
   // used to disable ejection or to ramp it up slowly. Defaults to 100.
-  google.protobuf.UInt32Value enforcing_consecutive_local_origin_failure = 13
+  // Parameter takes effect only when split_external_local_origin_errors is set to true.
+  google.protobuf.UInt32Value enforcing_consecutive_local_origin_failure = 14
       [(validate.rules).uint32.lte = 100];
 
   // The % chance that a host will be actually ejected when an outlier status
   // is detected through success rate statistics for locally originated errors.
   // This setting can be used to disable ejection or to ramp it up slowly. Defaults to 100.
-  google.protobuf.UInt32Value enforcing_local_origin_success_rate = 14
+  // Parameter takes effect only when split_external_local_origin_errors is set to true.
+  google.protobuf.UInt32Value enforcing_local_origin_success_rate = 15
       [(validate.rules).uint32.lte = 100];
 }

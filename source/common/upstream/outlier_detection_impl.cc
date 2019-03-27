@@ -33,6 +33,26 @@ DetectorSharedPtr DetectorImplFactory::createForCluster(
   }
 }
 
+DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector,
+                                                 HostSharedPtr host)
+    : detector_(detector), host_(host) {
+  // add Success Rate monitors
+  success_rate_monitors_
+      [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN] =
+          std::make_unique<SuccessRateMonitor>(
+              envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN);
+  success_rate_monitors_
+      [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN] =
+          std::make_unique<SuccessRateMonitor>(
+              envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN);
+
+  // Setup method to call when putResult is invoked. Depending on the config's
+  // split_external_local_origin_errors_ boolean value different method is called.
+  put_result_func_ = detector->config().splitExternalLocalOriginErrors()
+                         ? &DetectorHostMonitorImpl::putResultWithLocalExternalSplit
+                         : &DetectorHostMonitorImpl::putResultNoLocalExternalSplit;
+}
+
 void DetectorHostMonitorImpl::eject(MonotonicTime ejection_time) {
   ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   host_.lock()->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -83,9 +103,38 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-/* putResult is used to report events via enums, not http codes.
- */
-void DetectorHostMonitorImpl::putResult(Result result) {
+Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
+  Http::Code http_code = Http::Code::InternalServerError;
+
+  switch (result) {
+  case Result::SUCCESS:
+  case Result::REQUEST_SUCCESS:
+    http_code = Http::Code::OK;
+    break;
+  case Result::TIMEOUT:
+    http_code = Http::Code::GatewayTimeout;
+    break;
+  case Result::CONNECT_FAILED:
+    http_code = Http::Code::ServiceUnavailable;
+    break;
+  case Result::REQUEST_FAILED:
+    http_code = Http::Code::InternalServerError;
+    break;
+  }
+
+  return http_code;
+}
+
+// Method is called by putResult when external and local origin errors
+// are not treated differently. All errors are mapped to HTTP codes.
+void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result) {
+  putHttpResponseCode(enumToInt(resultToHttpCode(result)));
+}
+
+// Method is called by putResult when external and local origin errors
+// are treated separately. Local origin errors have separate counters and
+// separate success rate monitor.
+void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result) {
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
@@ -110,6 +159,12 @@ void DetectorHostMonitorImpl::putResult(Result result) {
     break;
   }
 }
+
+// Method is used by other components to reports success or error.
+// It calls putResultWithLocalExternalSplit or put putResultNoLocalExternalSplit via
+// std::function. The setting happens in constructor based on split_external_local_origin_errors
+// config parameter.
+void DetectorHostMonitorImpl::putResult(Result result) { put_result_func_(this, result); }
 
 void DetectorHostMonitorImpl::localOriginFailure() {
   std::shared_ptr<DetectorImpl> detector = detector_.lock();
@@ -164,6 +219,8 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_gateway_failure, 0))),
       enforcing_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))),
+      split_external_local_origin_errors_(static_cast<bool>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, split_external_local_origin_errors, false))),
       consecutive_local_origin_failure_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_local_origin_failure, 5))),
       enforcing_consecutive_local_origin_failure_(

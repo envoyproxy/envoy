@@ -69,6 +69,10 @@ public:
     ON_CALL(runtime_.snapshot_,
             featureEnabled("outlier_detection.enforcing_local_origin_success_rate", 100))
         .WillByDefault(Return(true));
+
+    // Prepare separate config with split_external_local_origin_errors set to true.
+    // It will be used for tests with split external and local origin errors.
+    outlier_detection_split_.mutable_split_external_local_origin_errors()->set_value(true);
   }
 
   void addHosts(std::vector<std::string> urls, bool primary = true) {
@@ -106,6 +110,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   std::shared_ptr<MockEventLogger> event_logger_{new MockEventLogger()};
   envoy::api::v2::cluster::OutlierDetection empty_outlier_detection_;
+  envoy::api::v2::cluster::OutlierDetection outlier_detection_split_;
 };
 
 TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
@@ -119,10 +124,7 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
     "enforcing_success_rate": 20,
     "success_rate_minimum_hosts": 50,
     "success_rate_request_volume": 200,
-    "success_rate_stdev_factor": 3000,
-    "consecutive_local_origin_failure": 15,
-    "enforcing_consecutive_local_origin_failure": 40,
-    "enforcing_local_origin_success_rate": 53 
+    "success_rate_stdev_factor": 3000
   }
   )EOF";
 
@@ -144,9 +146,6 @@ TEST_F(OutlierDetectorImplTest, DetectorStaticConfig) {
   EXPECT_EQ(50UL, detector->config().successRateMinimumHosts());
   EXPECT_EQ(200UL, detector->config().successRateRequestVolume());
   EXPECT_EQ(3000UL, detector->config().successRateStdevFactor());
-  EXPECT_EQ(15UL, detector->config().consecutiveLocalOriginFailure());
-  EXPECT_EQ(40UL, detector->config().enforcingConsecutiveLocalOriginFailure());
-  EXPECT_EQ(53UL, detector->config().enforcingLocalOriginSuccessRate());
 }
 
 TEST_F(OutlierDetectorImplTest, DestroyWithActive) {
@@ -372,12 +371,11 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
   addHosts({"tcp://127.0.0.1:80"}, true);
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
-      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
+      cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_, event_logger_));
 
   ON_CALL(runtime_.snapshot_,
           featureEnabled("outlier_detection.enforcing_consecutive_local_origin_failure", 100))
       .WillByDefault(Return(true));
-
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // When connect failure is detected the following methods should be called.
@@ -671,7 +669,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
 
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
   std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
-      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
+      cluster_, outlier_detection_split_, dispatcher_, runtime_, time_system_, event_logger_));
   detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
 
   // Turn off detecting consecutive local origin failures.
