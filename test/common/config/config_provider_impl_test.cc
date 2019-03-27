@@ -235,7 +235,8 @@ test::common::config::DummyConfig parseDummyConfigFromYaml(const std::string& ya
 // subscriptions, config protos and data structures generated as a result of the
 // configurations (i.e., the ConfigProvider::Config).
 TEST_F(ConfigProviderImplTest, SharedOwnership) {
-  factory_context_.init_manager_.initialize();
+  Init::ExpectableWatcherImpl watcher;
+  factory_context_.init_manager_.initialize(watcher);
 
   envoy::api::v2::core::ApiConfigSource config_source_proto;
   config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);

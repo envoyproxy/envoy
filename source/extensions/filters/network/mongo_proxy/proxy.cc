@@ -56,13 +56,12 @@ void AccessLog::logMessage(const Message& message, bool full,
 
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
-                         const FaultConfigSharedPtr& fault_config,
-                         const Network::DrainDecision& drain_decision,
-                         Runtime::RandomGenerator& generator, TimeSource& time_source,
+                         const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
+                         const Network::DrainDecision& drain_decision, TimeSource& time_source,
                          bool emit_dynamic_metadata)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
-      runtime_(runtime), drain_decision_(drain_decision), generator_(generator),
-      access_log_(access_log), fault_config_(fault_config), time_source_(time_source),
+      runtime_(runtime), drain_decision_(drain_decision), access_log_(access_log),
+      fault_config_(fault_config), time_source_(time_source),
       emit_dynamic_metadata_(emit_dynamic_metadata) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
@@ -365,26 +364,30 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks)};
 }
 
-absl::optional<uint64_t> ProxyFilter::delayDuration() {
-  absl::optional<uint64_t> result;
+absl::optional<std::chrono::milliseconds> ProxyFilter::delayDuration() {
+  absl::optional<std::chrono::milliseconds> result;
 
   if (!fault_config_) {
     return result;
   }
 
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().FixedDelayPercent,
-                                          fault_config_->delayPercentage().numerator(),
-                                          generator_.random(),
-                                          ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-                                              fault_config_->delayPercentage().denominator()))) {
+                                          fault_config_->percentage())) {
     return result;
   }
 
-  const uint64_t duration = runtime_.snapshot().getInteger(
-      MongoRuntimeConfig::get().FixedDelayDurationMs, fault_config_->delayDuration());
+  // See if the delay provider has a default delay, if not there is no delay.
+  auto config_duration = fault_config_->duration(nullptr);
+  if (!config_duration.has_value()) {
+    return result;
+  }
+
+  const std::chrono::milliseconds duration =
+      std::chrono::milliseconds(runtime_.snapshot().getInteger(
+          MongoRuntimeConfig::get().FixedDelayDurationMs, config_duration.value().count()));
 
   // Delay only if the duration is > 0ms.
-  if (duration > 0) {
+  if (duration.count() > 0) {
     result = duration;
   }
 
@@ -405,12 +408,12 @@ void ProxyFilter::tryInjectDelay() {
     return;
   }
 
-  const absl::optional<uint64_t> delay_ms = delayDuration();
+  const absl::optional<std::chrono::milliseconds> delay = delayDuration();
 
-  if (delay_ms) {
+  if (delay) {
     delay_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { delayInjectionTimerCallback(); });
-    delay_timer_->enableTimer(std::chrono::milliseconds(delay_ms.value()));
+    delay_timer_->enableTimer(delay.value());
     stats_.delays_injected_.inc();
   }
 }

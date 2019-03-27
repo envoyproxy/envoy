@@ -38,4 +38,12 @@ TEST(Hash, stdhash) {
 }
 #endif
 
+TEST(Hash, sharedStringSet) {
+  SharedStringSet set;
+  auto foo = std::make_shared<std::string>("foo");
+  set.insert(foo);
+  auto pos = set.find("foo");
+  EXPECT_EQ(pos->get(), foo.get());
+}
+
 } // namespace Envoy

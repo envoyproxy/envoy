@@ -36,6 +36,7 @@
 #include "common/network/utility.h"
 #include "common/stats/stats_options_impl.h"
 #include "common/filesystem/directory.h"
+#include "common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -260,6 +261,19 @@ std::string TestUtility::convertTime(const std::string& input, const std::string
   return TestUtility::formatTime(TestUtility::parseTime(input, input_format), output_format);
 }
 
+// static
+bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges) {
+  // Returns true if all gauges are 0 except the circuit_breaker remaining resource
+  // gauges which default to the resource max.
+  std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+  for (const Stats::GaugeSharedPtr& gauge : gauges) {
+    if (!std::regex_match(gauge->name(), omitted) && gauge->value() != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 void ConditionalInitializer::setReady() {
   Thread::LockGuard lock(mutex_);
   EXPECT_FALSE(ready_);
@@ -369,8 +383,9 @@ bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nul
 
 namespace Stats {
 
-MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
-    : TestAllocator(stats_options) {
+MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options,
+                                         SymbolTable& symbol_table)
+    : TestAllocator(stats_options, symbol_table) {
   ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
     return TestAllocator::alloc(name);
   }));
@@ -400,6 +415,21 @@ ThreadFactory& threadFactoryForTest() {
 
 } // namespace Thread
 
+namespace Filesystem {
+
+// TODO(sesmith177) Tests should get the Filesystem::Instance from the same location as the main
+// code
+Instance& fileSystemForTest() {
+#ifdef WIN32
+  static InstanceImplWin32* file_system = new InstanceImplWin32();
+#else
+  static InstanceImplPosix* file_system = new InstanceImplPosix();
+#endif
+  return *file_system;
+}
+
+} // namespace Filesystem
+
 namespace Api {
 
 class TestImplProvider {
@@ -410,26 +440,34 @@ protected:
 
 class TestImpl : public TestImplProvider, public Impl {
 public:
-  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
-      : Impl(thread_factory, stats_store, global_time_system_) {}
-  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system)
-      : Impl(thread_factory, default_stats_store_, time_system) {}
-  TestImpl(Thread::ThreadFactory& thread_factory)
-      : Impl(thread_factory, default_stats_store_, global_time_system_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
+           Filesystem::Instance& file_system)
+      : Impl(thread_factory, stats_store, global_time_system_, file_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system,
+           Filesystem::Instance& file_system)
+      : Impl(thread_factory, default_stats_store_, time_system, file_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
+      : Impl(thread_factory, default_stats_store_, global_time_system_, file_system) {}
 };
 
-ApiPtr createApiForTest() { return std::make_unique<TestImpl>(Thread::threadFactoryForTest()); }
+ApiPtr createApiForTest() {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(),
+                                    Filesystem::fileSystemForTest());
+}
 
 ApiPtr createApiForTest(Stats::Store& stat_store) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store,
+                                    Filesystem::fileSystemForTest());
 }
 
 ApiPtr createApiForTest(Event::TimeSystem& time_system) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system,
+                                    Filesystem::fileSystemForTest());
 }
 
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
-  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system);
+  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system,
+                                Filesystem::fileSystemForTest());
 }
 
 } // namespace Api

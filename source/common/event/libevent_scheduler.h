@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
 #include "common/event/libevent.h"
@@ -18,14 +19,11 @@ public:
   TimerPtr createTimer(const TimerCb& cb) override;
 
   /**
-   * Runs the libevent loop once, without blocking.
+   * Runs the event loop.
+   *
+   * @param mode The mode in which to run the event loop.
    */
-  void nonBlockingLoop();
-
-  /**
-   * Runs the libevent loop once, with block.
-   */
-  void blockingLoop();
+  void run(Dispatcher::RunType mode);
 
   /**
    * Exits the libevent loop.
