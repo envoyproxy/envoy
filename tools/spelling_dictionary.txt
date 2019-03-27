@@ -21,6 +21,7 @@ CHACHA
 CIDR
 CLA
 CLI
+CMSG
 CN
 CNAME
 CORS
@@ -695,6 +696,7 @@ tm
 tmp
 tokenizing
 traceid
+transferral
 trie
 tuple
 tuples
