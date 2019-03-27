@@ -568,8 +568,11 @@ template <class Value> struct TrieLookupTable {
    * Adds an entry to the Trie at the given Key.
    * @param key the key used to add the entry.
    * @param value the value to be associated with the key.
+   * @param overwrite_existing will overwrite the value when the value for a given key already
+   * exists.
+   * @return false when a value already exists for the given key.
    */
-  void add(const char* key, Value value) {
+  bool add(const char* key, Value value, bool overwrite_existing = true) {
     TrieEntry<Value>* current = &root_;
     while (uint8_t c = *key) {
       if (!current->entries_[c]) {
@@ -578,7 +581,11 @@ template <class Value> struct TrieLookupTable {
       current = current->entries_[c].get();
       key++;
     }
+    if (current->value_ && !overwrite_existing) {
+      return false;
+    }
     current->value_ = value;
+    return true;
   }
 
   /**
@@ -597,6 +604,31 @@ template <class Value> struct TrieLookupTable {
       }
     }
     return current->value_;
+  }
+
+  /**
+   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix, key
+   * length))
+   * @param key the key used to find.
+   * @return the value matching the longest prefix based on the key.
+   */
+  Value findLongestPrefix(const char* key) const {
+    const TrieEntry<Value>* current = &root_;
+    const TrieEntry<Value>* result = nullptr;
+    while (uint8_t c = *key) {
+      if (current->value_) {
+        result = current;
+      }
+
+      // https://github.com/facebook/mcrouter/blob/master/mcrouter/lib/fbi/cpp/Trie-inl.h#L126-L143
+      current = current->entries_[c].get();
+      if (current == nullptr) {
+        return result ? result->value_ : nullptr;
+      }
+
+      key++;
+    }
+    return current ? current->value_ : result->value_;
   }
 
   TrieEntry<Value> root_;
