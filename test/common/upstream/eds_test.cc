@@ -682,9 +682,9 @@ TEST_F(EdsTest, EndpointMoved) {
 
   // Verify that no hosts gets added or removed to/from the PrioritySet.
   cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
-      EXPECT_TRUE(added.empty());
-      EXPECT_TRUE(removed.empty());
-      });
+    EXPECT_TRUE(added.empty());
+    EXPECT_TRUE(removed.empty());
+  });
 
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
 
