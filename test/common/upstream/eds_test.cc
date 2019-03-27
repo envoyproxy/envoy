@@ -687,6 +687,11 @@ TEST_F(EdsTest, EndpointMoved) {
   fare_cluster_load_assignment_.clear_endpoints();
   add_endpoint(81, 0);
   add_endpoint(80, 1);
+  // Verify that no hosts gets added or removed to/from the PrioritySet.
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_TRUE(added.empty());
+    EXPECT_TRUE(removed.empty());
+  });
   resources_.Clear();
   resources_.Add()->PackFrom(fare_cluster_load_assignment_);
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources_, ""));

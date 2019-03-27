@@ -2,17 +2,17 @@
 
 #include <list>
 
-#include "envoy/safe_init/manager.h"
+#include "envoy/init/manager.h"
 
 #include "common/common/logger.h"
-#include "common/safe_init/watcher_impl.h"
+#include "common/init/watcher_impl.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 
 /**
- * SafeInit::ManagerImpl coordinates initialization of one or more "targets." See comments in
- * include/envoy/safe_init/manager.h for an overview.
+ * Init::ManagerImpl coordinates initialization of one or more "targets." See comments in
+ * include/envoy/init/manager.h for an overview.
  *
  * When the logging level is set to "debug" or "trace," the log will contain entries for all
  * significant events in the initialization flow:
@@ -30,7 +30,7 @@ public:
    */
   ManagerImpl(absl::string_view name);
 
-  // SafeInit::Manager
+  // Init::Manager
   State state() const override;
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
@@ -58,5 +58,5 @@ private:
   std::list<TargetHandlePtr> target_handles_;
 };
 
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

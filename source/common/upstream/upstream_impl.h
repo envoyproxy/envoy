@@ -34,13 +34,12 @@
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/init/manager_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
-
-#include "server/init_manager_impl.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -673,8 +672,16 @@ protected:
    */
   void onInitDone();
 
+  // This init manager is shared via TransportSocketFactoryContext. The initialization targets that
+  // register with this init manager are expected to be for implementations of SdsApi (see
+  // SdsApi::init_target_).
+  Init::ManagerImpl init_manager_;
+
+  // Once all targets are initialized (i.e. once all dynamic secrets are loaded), this watcher calls
+  // onInitDone() above.
+  Init::WatcherImpl init_watcher_;
+
   Runtime::Loader& runtime_;
-  Server::InitManagerImpl init_manager_;
   ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;

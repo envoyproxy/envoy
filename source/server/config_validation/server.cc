@@ -98,8 +98,7 @@ void ValidationInstance::initialize(const Options& options,
       singletonManager(), time_system_);
   config_.initialize(bootstrap, *this, *cluster_manager_factory_);
   http_context_.setTracer(config_.httpTracer());
-  clusterManager().setInitializedCb(
-      [this]() -> void { init_manager_.initialize([]() -> void {}); });
+  clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
 }
 
 void ValidationInstance::shutdown() {

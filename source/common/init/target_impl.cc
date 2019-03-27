@@ -1,7 +1,7 @@
-#include "common/safe_init/target_impl.h"
+#include "common/init/target_impl.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 
 TargetHandleImpl::TargetHandleImpl(absl::string_view handle_name, absl::string_view name,
                                    std::weak_ptr<InternalInitalizeFn> fn)
@@ -50,5 +50,5 @@ bool TargetImpl::ready() {
   return false;
 }
 
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

@@ -20,19 +20,15 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        Runtime::RandomGenerator& random, Init::Manager& init_manager,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                        ListenerManager& lm, Api::Api& api)
-    : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm) {
+    : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
+      init_target_("LDS", [this]() { subscription_->start({}, *this); }) {
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       lds_config, local_info, dispatcher, cm, random, *scope_,
       "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
       "envoy.api.v2.ListenerDiscoveryService.StreamListeners",
       Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()), api);
   Config::Utility::checkLocalInfo("lds", local_info);
-  init_manager.registerTarget(*this, "LDS");
-}
-
-void LdsApiImpl::initialize(std::function<void()> callback) {
-  initialize_callback_ = callback;
-  subscription_->start({}, *this);
+  init_manager.add(init_target_);
 }
 
 void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -85,7 +81,7 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
   }
 
   version_info_ = version_info;
-  runInitializeCallbackIfAny();
+  init_target_.ready();
   if (!exception_msgs.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
                                      StringUtil::join(exception_msgs, ", ")));
@@ -95,14 +91,7 @@ void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
 void LdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
-  runInitializeCallbackIfAny();
-}
-
-void LdsApiImpl::runInitializeCallbackIfAny() {
-  if (initialize_callback_) {
-    initialize_callback_();
-    initialize_callback_ = nullptr;
-  }
+  init_target_.ready();
 }
 
 } // namespace Server
