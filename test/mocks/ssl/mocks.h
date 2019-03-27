@@ -28,6 +28,7 @@ public:
                                       const std::vector<std::string>& server_names));
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD1(iterateContexts, void(std::function<void(const Context&)> callback));
+  MOCK_METHOD0(privateKeyOperationsManager, Ssl::PrivateKeyOperationsManager&());
 };
 
 class MockConnectionInfo : public ConnectionInfo {
