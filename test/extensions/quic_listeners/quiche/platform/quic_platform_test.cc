@@ -24,11 +24,8 @@
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
-<<<<<<< HEAD
 #include "quiche/quic/platform/api/quic_flags.h"
-=======
 #include "quiche/quic/platform/api/quic_file_utils.h"
->>>>>>> a45077733... quiche: implement QuicFileUtils (#6375)
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
 #include "quiche/quic/platform/api/quic_map_util.h"

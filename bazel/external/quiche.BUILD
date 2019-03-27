@@ -183,11 +183,6 @@ cc_library(
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_clock.h",
-<<<<<<< HEAD
-        # "quiche/quic/platform/api/quic_file_utils.h",
-=======
-        # "quiche/quic/platform/api/quic_flags.h",
->>>>>>> a45077733... quiche: implement QuicFileUtils (#6375)
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
         # "quiche/quic/platform/api/quic_goog_cc_sender.h",
         # "quiche/quic/platform/api/quic_ip_address_family.h",
