@@ -96,6 +96,7 @@ envoy_cc_library(
         "quic_ptr_util_impl.h",
         "quic_server_stats_impl.h",
         "quic_string_piece_impl.h",
+        "quic_socket_address_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
         "quic_expect_bug_impl.h",
