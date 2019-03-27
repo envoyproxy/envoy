@@ -90,9 +90,7 @@ void HeaderString::freeDynamic() {
   }
 }
 
-bool HeaderString::valid() const {
-  return std::string(c_str(), string_length_).find('\0') == std::string::npos;
-}
+bool HeaderString::valid() const { return validHeaderString(getStringView()); }
 
 void HeaderString::append(const char* data, uint32_t size) {
   switch (type_) {

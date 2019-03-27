@@ -85,6 +85,10 @@ Version history
 * upstream: added configuration option to select any host when the fallback policy fails.
 * upstream: stopped incrementing upstream_rq_total for HTTP/1 conn pool when request is circuit broken.
 
+1.9.1 (Apr 2, 2019)
+===================
+* http: fixed CVE-2019-9900 by rejecting HTTP/1.x headers with embedded NUL characters.
+
 1.9.0 (Dec 20, 2018)
 ====================
 * access log: added a :ref:`JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format.

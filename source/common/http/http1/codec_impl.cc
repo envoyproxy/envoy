@@ -418,6 +418,13 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     // Ignore trailers.
     return;
   }
+  // http-parser should filter for this
+  // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
+  // have an invariant that they must not contain embedded zero characters
+  // (NUL, ASCII 0x0).
+  if (absl::string_view(data, length).find('\0') != absl::string_view::npos) {
+    throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
+  }
 
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
