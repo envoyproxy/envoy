@@ -101,10 +101,14 @@ cc_library(
         "@envoy",
     ),
     visibility = ["//visibility:public"],
+<<<<<<< HEAD
     deps = [
         ":quic_buffer_allocator_lib",
         "@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib",
     ],
+=======
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib"],
+>>>>>>> master
 )
 
 cc_library(
@@ -188,6 +192,7 @@ cc_library(
         # "quiche/quic/platform/api/quic_ip_address_family.h",
         # "quiche/quic/platform/api/quic_lru_cache.h",
         # "quiche/quic/platform/api/quic_pcc_sender.h",
+        # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
     ] + envoy_select_quiche(
         [
