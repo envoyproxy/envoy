@@ -18,6 +18,8 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/registry",
+        "//include/envoy/ssl/private_key:private_key_config_interface",
         "//include/envoy/ssl/private_key:private_key_interface",
         "@envoy_api//envoy/api/v2/core:config_source_cc",
     ],

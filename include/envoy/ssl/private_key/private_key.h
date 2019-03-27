@@ -11,6 +11,12 @@
 #include "openssl/ssl.h"
 
 namespace Envoy {
+namespace Server {
+namespace Configuration {
+class TransportSocketFactoryContext;
+} // namespace Configuration
+} // namespace Server
+
 namespace Ssl {
 
 typedef std::shared_ptr<SSL_PRIVATE_KEY_METHOD> PrivateKeyMethodSharedPtr;
@@ -60,15 +66,17 @@ public:
    *
    * @param config_source a protobuf message object containing a TLS config source.
    * @param config_name a name that uniquely refers to the private key operations provider.
+   * @param private_key_provider_context context that provides components for creating and
+   * initializing connections for keyless TLS etc.
    * @return TlsPrivateKeyOperationsProvider the private key operations provider, or nullptr if
    * no provider can be used with the context configuration.
    */
-  virtual PrivateKeyOperationsProviderSharedPtr
-  findPrivateKeyOperationsProvider(const envoy::api::v2::core::ConfigSource& config_source,
-                                   const std::string& config_name) PURE;
+  virtual PrivateKeyOperationsProviderSharedPtr createPrivateKeyOperationsProvider(
+      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) PURE;
 };
 
-typedef std::shared_ptr<PrivateKeyOperationsManager> PrivateKeyOperationsManagerSharedPtr;
+// typedef std::shared_ptr<PrivateKeyOperationsManager> PrivateKeyOperationsManagerSharedPtr;
 
 } // namespace Ssl
 } // namespace Envoy

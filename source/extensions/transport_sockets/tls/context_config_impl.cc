@@ -107,11 +107,16 @@ getCertificateValidationContextConfigProvider(
 Ssl::PrivateKeyOperationsProviderSharedPtr getPrivateKeyOperationsProvider(
     const envoy::api::v2::auth::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
-  (void)config;
-  (void)factory_context;
 
-  // TODO: get PrivateKeyOperationsManager from the factory_context and
-  // get a provider based on the provider name in the TLS context.
+  const auto private_key_operations_config = config.private_key_operations();
+
+  if (private_key_operations_config.private_key_provider() != "") {
+    return factory_context.sslContextManager()
+        .privateKeyOperationsManager()
+        .createPrivateKeyOperationsProvider(
+            private_key_operations_config.private_key_provider_config(),
+            private_key_operations_config.private_key_provider(), factory_context);
+  }
   return nullptr;
 }
 

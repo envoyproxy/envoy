@@ -20,6 +20,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "private_key_config_interface",
+    hdrs = ["private_key_config.h"],
+    deps = [
+        ":private_key_interface",
+        "//include/envoy/registry",
+    ],
+)
+
+envoy_cc_library(
     name = "private_key_callbacks_interface",
     hdrs = ["private_key_callbacks.h"],
     external_deps = ["ssl"],

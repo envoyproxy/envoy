@@ -147,6 +147,11 @@ message TlsSessionTicketKeys {
   repeated core.DataSource keys = 1 [(validate.rules).repeated .min_items = 1];
 }
 
+message PrivateKeyOperations {
+  string private_key_provider = 1;
+  core.ConfigSource private_key_provider_config = 2;
+}
+
 message CertificateValidationContext {
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
@@ -315,6 +320,8 @@ message CommonTlsContext {
   repeated string alpn_protocols = 4;
 
   reserved 5;
+
+  PrivateKeyOperations private_key_operations = 9;
 }
 
 message UpstreamTlsContext {

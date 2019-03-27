@@ -1,18 +1,26 @@
 #include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
 
+#include "envoy/registry/registry.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
 Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr
-PrivateKeyOperationsManagerImpl::findPrivateKeyOperationsProvider(
-    const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name) {
+PrivateKeyOperationsManagerImpl::createPrivateKeyOperationsProvider(
+    const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+    Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) {
 
-  (void)config_name;
-  (void)config_source;
+  Ssl::PrivateKeyOperationsProviderInstanceFactory* factory =
+      Registry::FactoryRegistry<Ssl::PrivateKeyOperationsProviderInstanceFactory>::getFactory(
+          config_name);
 
-  // TODO(ipuustin): implement this.
+  // Create a new provider instance with the configuration.
+  if (factory) {
+    return factory->createPrivateKeyOperationsProviderInstance(config_name, config_source,
+                                                               private_key_provider_context);
+  }
 
   return nullptr;
 }
