@@ -2672,8 +2672,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException,
-      "Only a single wildcard domain is permitted");
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Only a single wildcard domain is permitted");
 }
 
 TEST_F(RouteMatcherTest, TestDuplicateSuffixWildcardDomainConfig) {
@@ -2692,7 +2692,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
       "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com");
 }
 
@@ -2712,7 +2713,8 @@ virtual_hosts:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException,
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
       "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
 }
 
