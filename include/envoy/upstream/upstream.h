@@ -296,9 +296,16 @@ public:
   virtual LocalityWeightsConstSharedPtr localityWeights() const PURE;
 
   /**
-   * @return next locality index to route to if performing locality weighted balancing.
+   * @return next locality index to route to if performing locality weighted balancing
+   * against healthy hosts.
    */
-  virtual absl::optional<uint32_t> chooseLocality() PURE;
+  virtual absl::optional<uint32_t> chooseHealthyLocality() PURE;
+
+  /**
+   * @return next locality index to route to if performing locality weighted balancing
+   * against degraded hosts.
+   */
+  virtual absl::optional<uint32_t> chooseDegradedLocality() PURE;
 
   /**
    * @return uint32_t the priority of this host set.
@@ -521,14 +528,21 @@ public:
 // clang-format on
 
 /**
- * Cluster circuit breakers stats.
+ * Cluster circuit breakers stats. Open circuit breaker stats and remaining resource stats
+ * can be handled differently by passing in different macros.
  */
 // clang-format off
-#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GAUGE)                                                  \
-  GAUGE (cx_open)                                                                                  \
-  GAUGE (rq_pending_open)                                                                          \
-  GAUGE (rq_open)                                                                                  \
-  GAUGE (rq_retry_open)
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                            \
+  OPEN_GAUGE      (cx_open)                                                                        \
+  OPEN_GAUGE      (rq_pending_open)                                                                \
+  OPEN_GAUGE      (rq_open)                                                                        \
+  OPEN_GAUGE      (rq_retry_open)                                                                  \
+  OPEN_GAUGE      (cx_pool_open)                                                                   \
+  REMAINING_GAUGE (remaining_cx)                                                                   \
+  REMAINING_GAUGE (remaining_pending)                                                              \
+  REMAINING_GAUGE (remaining_rq)                                                                   \
+  REMAINING_GAUGE (remaining_retries)                                                              \
+  REMAINING_GAUGE (remaining_cx_pools)
 // clang-format on
 
 /**
@@ -549,7 +563,7 @@ struct ClusterLoadReportStats {
  * Struct definition for cluster circuit breakers stats. @see stats_macros.h
  */
 struct ClusterCircuitBreakersStats {
-  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**

@@ -12,6 +12,7 @@ namespace quic {
 
 namespace {
 std::atomic<int> g_verbosity_threshold;
+std::atomic<bool> g_dfatal_exit_disabled;
 
 // Pointer to the global log sink, usually it is nullptr.
 // If not nullptr, as in some tests, the sink will receive a copy of the log message right after the
@@ -39,7 +40,15 @@ QuicLogEmitter::~QuicLogEmitter() {
   }
 
   if (level_ == FATAL) {
+#ifdef NDEBUG
+    // Release mode.
     abort();
+#else
+    // Debug mode.
+    if (!g_dfatal_exit_disabled) {
+      abort();
+    }
+#endif
   }
 }
 
@@ -47,6 +56,12 @@ int GetVerbosityLogThreshold() { return g_verbosity_threshold.load(std::memory_o
 
 void SetVerbosityLogThreshold(int new_verbosity) {
   g_verbosity_threshold.store(new_verbosity, std::memory_order_relaxed);
+}
+
+bool IsDFatalExitDisabled() { return g_dfatal_exit_disabled.load(std::memory_order_relaxed); }
+
+void SetDFatalExitDisabled(bool is_disabled) {
+  g_dfatal_exit_disabled.store(is_disabled, std::memory_order_relaxed);
 }
 
 QuicLogSink* SetLogSink(QuicLogSink* new_sink) {

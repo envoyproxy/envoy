@@ -78,6 +78,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "google_grpc_creds_test",
     srcs = envoy_select_google_grpc(["google_grpc_creds_test.cc"]),
+    data = [":service_key.json"],
     deps = [
         ":utility_lib",
         "//test/mocks/stats:stats_mocks",

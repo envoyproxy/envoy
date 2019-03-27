@@ -61,6 +61,7 @@ public:
 private:
   class SimulatedScheduler;
   class Alarm;
+  friend class Alarm; // Needed to reference mutex for thread annotations.
   struct CompareAlarms {
     bool operator()(const Alarm* a, const Alarm* b) const;
   };
@@ -76,13 +77,17 @@ private:
    */
   void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
 
+  MonotonicTime alarmTimeLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void alarmActivateLockHeld(Alarm* alarm) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+
   // The simulation keeps a unique ID for each alarm to act as a deterministic
   // tie-breaker for alarm-ordering.
   int64_t nextIndex();
 
   // Adds/removes an alarm.
-  void addAlarm(Alarm*, const std::chrono::milliseconds& duration);
-  void removeAlarm(Alarm*);
+  void addAlarmLockHeld(Alarm*, const std::chrono::milliseconds& duration)
+      EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeAlarmLockHeld(Alarm*) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Keeps track of how many alarms have been activated but not yet called,
   // which helps waitFor() determine when to give up and declare a timeout.

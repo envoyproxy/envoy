@@ -40,4 +40,8 @@ namespace Envoy {
 #define POOL_COUNTER(POOL) POOL_COUNTER_PREFIX(POOL, "")
 #define POOL_GAUGE(POOL) POOL_GAUGE_PREFIX(POOL, "")
 #define POOL_HISTOGRAM(POOL) POOL_HISTOGRAM_PREFIX(POOL, "")
+
+#define NULL_STAT_DECL_(X) std::string(#X)),
+
+#define NULL_POOL_GAUGE(POOL) (POOL).nullGauge(NULL_STAT_DECL_
 } // namespace Envoy

@@ -538,7 +538,13 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   }
 
   // If we're doing locality weighted balancing, pick locality.
-  const absl::optional<uint32_t> locality = host_set.chooseLocality();
+  absl::optional<uint32_t> locality;
+  if (host_availability == HostAvailability::Degraded) {
+    locality = host_set.chooseDegradedLocality();
+  } else {
+    locality = host_set.chooseHealthyLocality();
+  }
+
   if (locality.has_value()) {
     hosts_source.source_type_ = localitySourceType(host_availability);
     hosts_source.locality_index_ = locality.value();

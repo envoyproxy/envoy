@@ -1,7 +1,10 @@
+#include <stdlib.h>
+
 #include "common/grpc/google_grpc_creds_impl.h"
 
 #include "test/common/grpc/utility.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -31,6 +34,14 @@ TEST_F(CredsUtilityTest, GetChannelCredentials) {
   EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
   creds->mutable_local_credentials();
   EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
+
+  const char var_name[] = "GOOGLE_APPLICATION_CREDENTIALS";
+  EXPECT_EQ(nullptr, ::getenv(var_name));
+  const auto creds_path = TestEnvironment::runfilesPath("test/common/grpc/service_key.json");
+  ::setenv(var_name, creds_path.c_str(), 0);
+  creds->mutable_google_default();
+  EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
+  ::unsetenv(var_name);
 }
 
 TEST_F(CredsUtilityTest, DefaultSslChannelCredentials) {
