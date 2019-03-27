@@ -799,7 +799,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   configure(accessLogConfig("%RESPONSE_FLAGS%"));
   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(
-      0, 0, 0, 0);
+      0, 0, 0, 0, 0);
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
   filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());

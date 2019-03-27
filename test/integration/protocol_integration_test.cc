@@ -41,6 +41,12 @@ using testing::Not;
 
 namespace Envoy {
 
+void setDoNotValidateRouteConfig(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+  auto* route_config = hcm.mutable_route_config();
+  route_config->mutable_validate_clusters()->set_value(false);
+};
+
 // Tests for DownstreamProtocolIntegrationTest will be run with all protocols
 // (H1/H2 downstream) but only H1 upstreams.
 //
@@ -71,9 +77,11 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
 
 // Add a route that uses unknown cluster (expect 404 Not Found).
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
-  config_helper_.addRoute("foo.com", "/unknown", "unknown_cluster", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE);
+  config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
+  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
+  host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
+      envoy::api::v2::route::RouteAction::NOT_FOUND);
+  config_helper_.addVirtualHost(host);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -84,9 +92,11 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
 
 // Add a route that uses unknown cluster (expect 503 Service Unavailable).
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
-  config_helper_.addRoute("foo.com", "/unknown", "unknown_cluster", false,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::NONE);
+  config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
+  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
+  host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
+      envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE);
+  config_helper_.addVirtualHost(host);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -97,9 +107,9 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
 
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
 TEST_P(ProtocolIntegrationTest, RouterRedirect) {
-  config_helper_.addRoute("www.redirect.com", "/", "cluster_0", true,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::ALL);
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -230,9 +240,9 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request
 // and updated after the request is retried.
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
-  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  host.set_include_request_attempt_count(true);
+  config_helper_.addVirtualHost(host);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response =
@@ -280,13 +290,12 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
 
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 
-  envoy::api::v2::route::RetryPolicy retry_policy;
-  retry_policy.mutable_retry_priority()->set_name(factory.name());
-
   // Add route with custom retry policy
-  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, retry_policy);
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  host.set_include_request_attempt_count(true);
+  auto retry_policy = host.mutable_routes(0)->mutable_route()->mutable_retry_policy();
+  retry_policy->mutable_retry_priority()->set_name(factory.name());
+  config_helper_.addVirtualHost(host);
 
   // Use load assignments instead of static hosts. Necessary in order to use priorities.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -356,13 +365,12 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   TestHostPredicateFactory predicate_factory;
   Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
 
-  envoy::api::v2::route::RetryPolicy retry_policy;
-  retry_policy.add_retry_host_predicate()->set_name(predicate_factory.name());
-
   // Add route with custom retry policy
-  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, retry_policy);
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  host.set_include_request_attempt_count(true);
+  auto retry_policy = host.mutable_routes(0)->mutable_route()->mutable_retry_policy();
+  retry_policy->add_retry_host_predicate()->set_name(predicate_factory.name());
+  config_helper_.addVirtualHost(host);
 
   // We want to work with a cluster with two hosts.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {

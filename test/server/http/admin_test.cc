@@ -1191,7 +1191,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     Http::HeaderMapImpl response_headers;
     std::string body;
 
-    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::NotInitialized));
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
     envoy::admin::v2alpha::ServerInfo server_info_proto;
     EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),

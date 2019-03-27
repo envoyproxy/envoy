@@ -12,10 +12,10 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
+#include "common/init/manager_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
-#include "server/init_manager_impl.h"
 #include "server/lds_api.h"
 
 namespace Envoy {
@@ -403,8 +403,14 @@ private:
   const bool modifiable_;
   const bool workers_started_;
   const uint64_t hash_;
-  InitManagerImpl dynamic_init_manager_;
-  bool initialize_canceled_{};
+
+  // This init manager is populated with targets from the filter chain factories, namely
+  // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
+  Init::ManagerImpl dynamic_init_manager_;
+
+  // This init watcher, if available, notifies the "parent" listener manager when listener
+  // initialization is complete. It may be reset to cancel interest.
+  std::unique_ptr<Init::WatcherImpl> init_watcher_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};

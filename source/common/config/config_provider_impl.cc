@@ -16,15 +16,8 @@ ImmutableConfigProviderImplBase::~ImmutableConfigProviderImplBase() {
 }
 
 ConfigSubscriptionInstanceBase::~ConfigSubscriptionInstanceBase() {
-  runInitializeCallbackIfAny();
+  init_target_.ready();
   config_provider_manager_.unbindSubscription(manager_identifier_);
-}
-
-void ConfigSubscriptionInstanceBase::runInitializeCallbackIfAny() {
-  if (initialize_callback_) {
-    initialize_callback_();
-    initialize_callback_ = nullptr;
-  }
 }
 
 bool ConfigSubscriptionInstanceBase::checkAndApplyConfig(const Protobuf::Message& config_proto,

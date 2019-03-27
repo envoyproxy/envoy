@@ -27,7 +27,7 @@ class ResourceManagerImpl : public ResourceManager {
 public:
   ResourceManagerImpl(Runtime::Loader& runtime, const std::string& runtime_key,
                       uint64_t max_connections, uint64_t max_pending_requests,
-                      uint64_t max_requests, uint64_t max_retries,
+                      uint64_t max_requests, uint64_t max_retries, uint64_t max_connection_pools,
                       ClusterCircuitBreakersStats cb_stats)
       : connections_(max_connections, runtime, runtime_key + "max_connections", cb_stats.cx_open_,
                      cb_stats.remaining_cx_),
@@ -36,13 +36,16 @@ public:
         requests_(max_requests, runtime, runtime_key + "max_requests", cb_stats.rq_open_,
                   cb_stats.remaining_rq_),
         retries_(max_retries, runtime, runtime_key + "max_retries", cb_stats.rq_retry_open_,
-                 cb_stats.remaining_retries_) {}
+                 cb_stats.remaining_retries_),
+        connection_pools_(max_connection_pools, runtime, runtime_key + "max_connection_pools",
+                          cb_stats.cx_pool_open_, cb_stats.remaining_cx_pools_) {}
 
   // Upstream::ResourceManager
   Resource& connections() override { return connections_; }
   Resource& pendingRequests() override { return pending_requests_; }
   Resource& requests() override { return requests_; }
   Resource& retries() override { return retries_; }
+  Resource& connectionPools() override { return connection_pools_; }
 
 private:
   struct ResourceImpl : public Resource {
@@ -61,9 +64,10 @@ private:
       updateRemaining();
       open_gauge_.set(canCreate() ? 0 : 1);
     }
-    void dec() override {
-      ASSERT(current_ > 0);
-      current_--;
+    void dec() override { decBy(1); }
+    void decBy(uint64_t amount) override {
+      ASSERT(current_ >= amount);
+      current_ -= amount;
       updateRemaining();
       open_gauge_.set(canCreate() ? 0 : 1);
     }
@@ -105,6 +109,7 @@ private:
   ResourceImpl pending_requests_;
   ResourceImpl requests_;
   ResourceImpl retries_;
+  ResourceImpl connection_pools_;
 };
 
 typedef std::unique_ptr<ResourceManagerImpl> ResourceManagerImplPtr;

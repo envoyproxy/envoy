@@ -11,6 +11,10 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * Use of `enabled` in `CorsPolicy`, found in
   [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
   Set the `filter_enabled` field instead.
+* Use of the `type` field in the `FaultDelay` message (found in
+  [fault.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto))
+  has been deprecated. It was never used and setting it has no effect. It will be removed in the
+  following release.
 
 ## Version 1.9.0 (Dec 20, 2018)
 
