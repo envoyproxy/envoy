@@ -15,9 +15,7 @@ namespace Config {
 
 class SubscriptionCallbacks {
 public:
-  typedef Protobuf::RepeatedPtrField<ProtobufWkt::Any> ResourceVector;
-
-  virtual ~SubscriptionCallbacks() {}
+  virtual ~SubscriptionCallbacks() = default;
 
   /**
    * Called when a configuration update is received.
@@ -27,7 +25,7 @@ public:
    *        is accepted. Accepted configurations have their version_info reflected in subsequent
    *        requests.
    */
-  virtual void onConfigUpdate(const ResourceVector& resources,
+  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) PURE;
 
   // TODO(fredlas) it is a HACK that there are two of these. After delta CDS is merged,
@@ -66,7 +64,7 @@ public:
  */
 class Subscription {
 public:
-  virtual ~Subscription() {}
+  virtual ~Subscription() = default;
 
   /**
    * Start a configuration subscription asynchronously. This should be called once and will continue

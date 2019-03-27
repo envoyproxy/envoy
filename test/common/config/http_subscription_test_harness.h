@@ -30,8 +30,6 @@ using testing::Return;
 namespace Envoy {
 namespace Config {
 
-typedef HttpSubscriptionImpl HttpEdsSubscriptionImpl;
-
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   HttpSubscriptionTestHarness() : HttpSubscriptionTestHarness(std::chrono::milliseconds(0)) {}

@@ -87,8 +87,9 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
   route_config_provider_manager_.route_config_subscriptions_.erase(manager_identifier_);
 }
 
-void RdsRouteConfigSubscription::onConfigUpdate(const ResourceVector& resources,
-                                                const std::string& version_info) {
+void RdsRouteConfigSubscription::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+    const std::string& version_info) {
   last_updated_ = time_source_.systemTime();
 
   if (resources.empty()) {

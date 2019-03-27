@@ -23,7 +23,7 @@ namespace Config {
 class FilesystemSubscriptionImpl : public Config::Subscription,
                                    Logger::Loggable<Logger::Id::config> {
 public:
-  FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, const std::string& path,
+  FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, absl::string_view path,
                              SubscriptionStats stats, Api::Api& api)
       : path_(path), watcher_(dispatcher.createFilesystemWatcher()), stats_(stats), api_(api) {
     watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t events) {

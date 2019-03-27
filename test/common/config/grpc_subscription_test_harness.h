@@ -48,7 +48,7 @@ public:
         rate_limit_settings_, init_fetch_timeout);
   }
 
-  ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
+  ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {

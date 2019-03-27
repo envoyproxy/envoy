@@ -52,7 +52,7 @@ public:
 
   // Envoy::Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
-  void onConfigUpdate(const SubscriptionCallbacks::ResourceVector& resources,
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override {
     auto config = MessageUtil::anyConvert<test::common::config::DummyConfig>(resources[0]);
     if (checkAndApplyConfig(config, "dummy_config", version_info)) {

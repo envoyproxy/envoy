@@ -35,7 +35,8 @@ void LdsApiImpl::initialize(std::function<void()> callback) {
   subscription_->start({}, *this);
 }
 
-void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
+void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
 
@@ -71,7 +72,7 @@ void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   }
 
   for (const auto& listener : listeners) {
-    const std::string listener_name = listener.name();
+    const std::string& listener_name = listener.name();
     try {
       if (listener_manager_.addOrUpdateListener(listener, version_info, true)) {
         ENVOY_LOG(info, "lds: add/update listener '{}'", listener_name);

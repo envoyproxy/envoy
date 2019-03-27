@@ -40,7 +40,8 @@ void SdsApi::initialize(std::function<void()> callback) {
   subscription_->start({sds_config_name_}, *this);
 }
 
-void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&) {
+void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                            const std::string&) {
   if (resources.empty()) {
     throw EnvoyException(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));

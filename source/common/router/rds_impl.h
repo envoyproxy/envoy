@@ -97,7 +97,7 @@ class RdsRouteConfigSubscription : public Init::Target,
                                    Envoy::Config::SubscriptionCallbacks,
                                    Logger::Loggable<Logger::Id::router> {
 public:
-  ~RdsRouteConfigSubscription();
+  ~RdsRouteConfigSubscription() override;
 
   // Init::Target
   void initialize(std::function<void()> callback) override {
@@ -107,7 +107,8 @@ public:
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
