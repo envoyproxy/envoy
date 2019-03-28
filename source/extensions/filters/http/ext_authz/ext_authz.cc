@@ -71,7 +71,8 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool end_stream) {
   buffer_data_ = config_->withRequestBody() &&
-                 !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers));
+                 !(end_stream || Http::Utility::isWebSocketUpgradeRequest(headers) ||
+                   Http::Utility::isH2UpgradeRequest(headers));
   request_headers_ = &headers;
   if (buffer_data_) {
     ENVOY_STREAM_LOG(debug, "ext_authz is buffering", *callbacks_);
