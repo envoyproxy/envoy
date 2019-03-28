@@ -8,8 +8,6 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
-#include "absl/container/flat_hash_set.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
