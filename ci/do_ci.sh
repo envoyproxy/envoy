@@ -54,6 +54,8 @@ function bazel_release_binary_build() {
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_release
   mkdir -p "${ENVOY_SRCDIR}"/build_release_stripped
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_release_stripped/envoy
+  # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
+  bazel clean
 }
 
 function bazel_debug_binary_build() {
@@ -260,6 +262,8 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
+  # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
+  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt=--allow-multiple-definition"
   cd "${ENVOY_CI_DIR}"
   ./run_clang_tidy.sh
   exit 0
@@ -269,6 +273,8 @@ elif [[ "$1" == "bazel.coverity" ]]; then
   # supports Clang 5. Until this issue is resolved, run Coverity Scan with
   # the GCC toolchain.
   setup_gcc_toolchain
+  # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
+  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt=--allow-multiple-definition"
   echo "bazel Coverity Scan build"
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
