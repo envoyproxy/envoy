@@ -332,12 +332,14 @@ private:
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
     void chargeStats(const HeaderMap& headers);
     // Returns the encoder filter to start iteration with. If the function is called from a filter
-    // that should always iterate from the next filter, always_start_next should be set to true.
+    // that should always iterate from the next filter, set Always_start_from_next to
+    // filter_iteration_start_state.
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream,
                        FilterIterationStartState filter_iteration_start_state);
     // Returns the decoder filter to start iteration with. If the function is called from a filter
-    // that should always iterate from the next filter, always_start_next should be set to true.
+    // that should always iterate from the next filter, set Always_start_from_next to
+    // filter_iteration_start_state.
     std::list<ActiveStreamDecoderFilterPtr>::iterator
     commonDecodePrefix(ActiveStreamDecoderFilter* filter,
                        FilterIterationStartState filter_iteration_start_state);
@@ -363,7 +365,8 @@ private:
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
     // Returns true if filter has stopped iteration for all frame types. Otherwise, returns false.
-    // filter_streaming is the variable to indicate if stream is streaming.
+    // filter_streaming is the variable to indicate if stream is streaming, and its value may be
+    // changed by the function.
     bool handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
                              bool& filter_streaming);
 

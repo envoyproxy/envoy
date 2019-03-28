@@ -1053,16 +1053,14 @@ ConnectionManagerImpl::ActiveStream::commonEncodePrefix(
 
   if (!filter) {
     return encoder_filters_.begin();
-  } else {
-    if (filter_iteration_start_state == FilterIterationStartState::Can_start_from_current &&
-        (*(filter->entry()))->iterate_from_current_filter_) {
-      // The filter iteration has been stopped for all frame types, and now the iteration continues.
-      // The current filter's encoding callback has not be called. Call it now.
-      return filter->entry();
-    } else {
-      return std::next(filter->entry());
-    }
   }
+  if (filter_iteration_start_state == FilterIterationStartState::Can_start_from_current &&
+      (*(filter->entry()))->iterate_from_current_filter_) {
+    // The filter iteration has been stopped for all frame types, and now the iteration continues.
+    // The current filter's encoding callback has not be called. Call it now.
+    return filter->entry();
+  }
+  return std::next(filter->entry());
 }
 
 std::list<ConnectionManagerImpl::ActiveStreamDecoderFilterPtr>::iterator
@@ -1070,16 +1068,14 @@ ConnectionManagerImpl::ActiveStream::commonDecodePrefix(
     ActiveStreamDecoderFilter* filter, FilterIterationStartState filter_iteration_start_state) {
   if (!filter) {
     return decoder_filters_.begin();
-  } else {
-    if (filter_iteration_start_state == FilterIterationStartState::Can_start_from_current &&
-        (*(filter->entry()))->iterate_from_current_filter_) {
-      // The filter iteration has been stopped for all frame types, and now the iteration continues.
-      // The current filter's callback function has not been called. Call it now.
-      return filter->entry();
-    } else {
-      return std::next(filter->entry());
-    }
   }
+  if (filter_iteration_start_state == FilterIterationStartState::Can_start_from_current &&
+      (*(filter->entry()))->iterate_from_current_filter_) {
+    // The filter iteration has been stopped for all frame types, and now the iteration continues.
+    // The current filter's callback function has not been called. Call it now.
+    return filter->entry();
+  }
+  return std::next(filter->entry());
 }
 
 void ConnectionManagerImpl::startDrainSequence() {
