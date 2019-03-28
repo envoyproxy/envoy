@@ -28,8 +28,8 @@ echo "Cleanup completed."
 # Force dbg for path consistency later, don't include debug code in coverage.
 BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 
-# TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
-BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --linkopt='-Wl,--allow-multiple-definition'"
+# TODO(wu-bin): Remove pushd/popd once https://github.com/envoyproxy/envoy/pull/6229 is merged.
+pushd ${ENVOY_SRCDIR}
 
 # Run all tests under "bazel test", no sandbox. We're going to generate the
 # .gcda inplace in the bazel-out/ directory. This is in contrast to the "bazel
@@ -42,6 +42,8 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --linkopt='-Wl,--allow-multiple-defini
   --linkopt="--coverage" --define ENVOY_CONFIG_COVERAGE=1 --test_output=streamed \
   --strategy=Genrule=standalone --spawn_strategy=standalone --test_timeout=2000 \
   --test_arg="--log-path /dev/null" --test_arg="-l trace"
+
+popd
 
 # The Bazel build has a lot of whack in it, in particular generated files, headers from external
 # deps, etc. So, we exclude this from gcov to avoid false reporting of these files in the html and
