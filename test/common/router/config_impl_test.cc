@@ -141,8 +141,6 @@ virtual_hosts:
   domains:
   - "*.foo.com"
   - "*-bar.baz.com"
-  - "foo.*"
-  - "foo-bar.*"
   routes:
   - match:
       prefix: "/"
@@ -151,7 +149,6 @@ virtual_hosts:
 - name: wildcard2
   domains:
   - "*.baz.com"
-  - "www.foo.*"
   routes:
   - match:
       prefix: "/"
@@ -318,16 +315,8 @@ virtual_hosts:
             config.route(genHeaders("bar.baz.com", "/", "GET"), 0)->routeEntry()->clusterName());
   EXPECT_EQ("instant-server",
             config.route(genHeaders(".foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("wildcard",
+  EXPECT_EQ("instant-server",
             config.route(genHeaders("foo.com", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("wildcard",
-            config.route(genHeaders("foo.org", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("wildcard2",
-            config.route(genHeaders("www.foo.org", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("wildcard",
-            config.route(genHeaders("foo.bar.org", "/", "GET"), 0)->routeEntry()->clusterName());
-  EXPECT_EQ("wildcard",
-            config.route(genHeaders("foo-bar.org", "/", "GET"), 0)->routeEntry()->clusterName());
 
   // Regular Expression matching
   EXPECT_EQ("clock",
@@ -2716,6 +2705,51 @@ virtual_hosts:
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
       "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
+}
+
+TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: exact
+  domains: ["www.example.com", "www.example.cc", "wwww.example.com" ]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: exact }
+- name: suffix
+  domains: ["*w.example.com" ]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: suffix }
+- name: prefix
+  domains: ["www.example.c*", "ww.example.c*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: prefix }
+- name: default
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: default }
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  EXPECT_EQ(
+      "exact",
+      config.route(genHeaders("www.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      "exact",
+      config.route(genHeaders("wwww.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("exact",
+            config.route(genHeaders("www.example.cc", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("suffix",
+            config.route(genHeaders("ww.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("prefix",
+            config.route(genHeaders("www.example.co", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("default",
+            config.route(genHeaders("w.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("default",
+            config.route(genHeaders("www.example.c", "/", "GET"), 0)->routeEntry()->clusterName());
 }
 
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
