@@ -417,8 +417,10 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
-  host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
-  client_->close(Network::ConnectionCloseType::NoFlush);
+  if (client_) {
+    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
+    client_->close(Network::ConnectionCloseType::NoFlush);
+  }
 }
 
 GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
