@@ -992,10 +992,15 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
 RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
                                                          uint64_t random_value) const {
   // First check for ssl redirect.
-  if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
+  bool httpRequest = true;
+  if (headers.ForwardedProto() != nullptr) {
+    httpRequest = (headers.ForwardedProto()->value() != "https");
+  }
+
+  if (ssl_requirements_ == SslRequirements::ALL && httpRequest) {
     return SSL_REDIRECT_ROUTE;
-  } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
-             headers.ForwardedProto()->value() != "https" && !headers.EnvoyInternalRequest()) {
+  } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY && httpRequest &&
+             !headers.EnvoyInternalRequest()) {
     return SSL_REDIRECT_ROUTE;
   }
 

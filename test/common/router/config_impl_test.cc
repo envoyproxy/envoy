@@ -2645,6 +2645,27 @@ virtual_hosts:
       "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com");
 }
 
+TEST_F(RouteMatcherTest, NoProtocolInHeadersWhenTlsIsRequired) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  require_tls: all
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: www
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  // route may be called early in some edge cases and "x-forwarded-proto" will not be set.
+  Http::TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/"}};
+  EXPECT_NO_THROW(config.route(headers, 0));
+}
+
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
                                                   bool ssl, bool internal) {
   Http::TestHeaderMapImpl headers{
