@@ -39,7 +39,7 @@ function bazel_with_collection() {
 
 function bazel_release_binary_build() {
   echo "Building..."
-  cd "${ENVOY_CI_DIR}"
+  pushd "${ENVOY_CI_DIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static
   collect_build_profile release_build
   # Copy the envoy-static binary somewhere that we can access outside of the
@@ -56,6 +56,7 @@ function bazel_release_binary_build() {
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_release_stripped/envoy
   # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
   bazel clean
+  popd
 }
 
 function bazel_debug_binary_build() {
@@ -263,7 +264,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
   # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt=--allow-multiple-definition"
+  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt='-Wl,--allow-multiple-definition'"
   cd "${ENVOY_CI_DIR}"
   ./run_clang_tidy.sh
   exit 0
@@ -274,7 +275,7 @@ elif [[ "$1" == "bazel.coverity" ]]; then
   # the GCC toolchain.
   setup_gcc_toolchain
   # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt=--allow-multiple-definition"
+  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt='-Wl,--allow-multiple-definition'"
   echo "bazel Coverity Scan build"
   echo "Building..."
   cd "${ENVOY_CI_DIR}"
