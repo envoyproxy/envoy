@@ -98,6 +98,7 @@ envoy_cc_library(
     deps = [
         ":libevent_lib",
         ":timer_lib",
+        "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//source/common/common:assert_lib",
     ],

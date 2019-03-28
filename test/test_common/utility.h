@@ -351,6 +351,16 @@ public:
     matcher.set_regex(str);
     return matcher;
   }
+
+  /**
+   * Checks that passed gauges have a value of 0. Gauges can be omitted from
+   * this check by modifying the regex that matches gauge names in the
+   * implementation.
+   *
+   * @param vector of gauges to check.
+   * @return bool indicating that passed gauges not matching the omitted regex have a value of 0.
+   */
+  static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges);
 };
 
 /**
@@ -525,5 +535,12 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {
 MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
 
 MATCHER_P(RepeatedProtoEq, rhs, "") { return TestUtility::repeatedPtrFieldEqual(arg, rhs); }
+
+MATCHER_P(Percent, rhs, "") {
+  envoy::type::FractionalPercent expected;
+  expected.set_numerator(rhs);
+  expected.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  return TestUtility::protoEqual(expected, arg);
+}
 
 } // namespace Envoy

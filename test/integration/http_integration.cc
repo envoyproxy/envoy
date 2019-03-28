@@ -579,9 +579,10 @@ void HttpIntegrationTest::testRetry() {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request
 // and updated after the request is retried.
 void HttpIntegrationTest::testRetryAttemptCountHeader() {
-  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  host.set_include_request_attempt_count(true);
+  config_helper_.addVirtualHost(host);
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response =

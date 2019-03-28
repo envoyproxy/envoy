@@ -1248,6 +1248,53 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
+TEST_F(HttpConnectionManagerImplTest, AccessEncoderRouteBeforeHeadersArriveOnIdleTimeout) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+
+  std::shared_ptr<MockStreamEncoderFilter> filter(new NiceMock<MockStreamEncoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamEncoderFilter(filter);
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    Event::MockTimer* idle_timer = setUpTimer();
+    EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
+    conn_manager_->newStream(response_encoder_);
+
+    // Expect resetIdleTimer() to be called for the response
+    // encodeHeaders()/encodeData().
+    EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
+    EXPECT_CALL(*idle_timer, disableTimer());
+    // Simulate and idle timeout so that the filter chain gets created.
+    idle_timer->callback_();
+  }));
+
+  // This should not be called as we don't have request headers.
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _)).Times(0);
+
+  EXPECT_CALL(*filter, encodeHeaders(_, _))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        // Under heavy load it is possible that stream timeout will be reached before any headers
+        // were received. Envoy will create a local reply that will go through the encoder filter
+        // chain. We want to make sure that encoder filters get a null route object.
+        auto route = filter->callbacks_->route();
+        EXPECT_EQ(route.get(), nullptr);
+        return FilterHeadersStatus::Continue;
+      }));
+  EXPECT_CALL(*filter, encodeData(_, _));
+  EXPECT_CALL(*filter, encodeComplete());
+  EXPECT_CALL(*filter, onDestroy());
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, _));
+  EXPECT_CALL(response_encoder_, encodeData(_, _));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestStreamIdleAccessLog) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");

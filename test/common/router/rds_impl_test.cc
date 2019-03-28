@@ -49,7 +49,15 @@ parseHttpConnectionManagerFromJson(const std::string& json_string, const Stats::
 
 class RdsTestBase : public testing::Test {
 public:
-  RdsTestBase() : request_(&factory_context_.cluster_manager_.async_client_) {}
+  RdsTestBase() : request_(&factory_context_.cluster_manager_.async_client_) {
+    ON_CALL(factory_context_.init_manager_, add(_))
+        .WillByDefault(Invoke([this](const Init::Target& target) {
+          init_target_handle_ = target.createHandle("test");
+        }));
+    ON_CALL(factory_context_.init_manager_, initialize(_))
+        .WillByDefault(Invoke(
+            [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
+  }
 
   void expectRequest() {
     EXPECT_CALL(factory_context_.cluster_manager_, httpAsyncClientForCluster("foo_cluster"));
@@ -72,6 +80,8 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Init::ExpectableWatcherImpl init_watcher_;
+  Init::TargetHandlePtr init_target_handle_;
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};
   Event::MockTimer* interval_timer_{};
@@ -112,12 +122,12 @@ public:
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
-    EXPECT_CALL(factory_context_.init_manager_, registerTarget(_, _));
+    EXPECT_CALL(factory_context_.init_manager_, add(_));
     rds_ =
         RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
                                         factory_context_, "foo.", *route_config_provider_manager_);
     expectRequest();
-    factory_context_.init_manager_.initialize();
+    factory_context_.init_manager_.initialize(init_watcher_);
   }
 
   NiceMock<Stats::MockStore> scope_;
@@ -198,7 +208,7 @@ TEST_F(RdsImplTest, DestroyDuringInitialize) {
   InSequence s;
 
   setup();
-  EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
+  EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(request_, cancel());
   rds_.reset();
 }
@@ -232,7 +242,7 @@ TEST_F(RdsImplTest, Basic) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
 
-  EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
+  EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
@@ -342,7 +352,7 @@ TEST_F(RdsImplTest, Failure) {
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
 
-  EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
+  EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
 
@@ -465,7 +475,7 @@ dynamic_route_configs:
   // Static + dynamic.
   setup();
   expectRequest();
-  factory_context_.init_manager_.initialize();
+  factory_context_.init_manager_.initialize(init_watcher_);
 
   const std::string response1_json = R"EOF(
 {
@@ -483,7 +493,7 @@ dynamic_route_configs:
   Http::MessagePtr message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
   message->body() = std::make_unique<Buffer::OwnedImpl>(response1_json);
-  EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
+  EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
@@ -518,8 +528,6 @@ dynamic_route_configs:
 
 TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   Buffer::OwnedImpl data;
-
-  factory_context_.init_manager_.initialize();
 
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
   setup();
@@ -616,9 +624,9 @@ TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
 
 TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
   setup();
-  factory_context_.init_manager_.initialize();
+  factory_context_.init_manager_.initialize(init_watcher_);
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
-  EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
+  EXPECT_CALL(init_watcher_, ready());
   provider_impl.subscription().onConfigUpdate({}, "");
   EXPECT_EQ(
       1UL, factory_context_.scope_.counter("foo_prefix.rds.foo_route_config.update_empty").value());
@@ -626,12 +634,12 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
 
 TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
   setup();
-  factory_context_.init_manager_.initialize();
+  factory_context_.init_manager_.initialize(init_watcher_);
   auto& provider_impl = dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_.get());
   Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
   route_configs.Add();
   route_configs.Add();
-  EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
+  EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(provider_impl.subscription().onConfigUpdate(route_configs, ""),
                             EnvoyException, "Unexpected RDS resource length: 2");
 }

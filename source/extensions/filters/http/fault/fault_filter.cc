@@ -34,9 +34,8 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
   }
 
   if (fault.has_delay()) {
-    const auto& delay = fault.delay();
-    fixed_delay_percentage_ = delay.percentage();
-    fixed_duration_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(delay, fixed_delay, 0);
+    request_delay_config_ =
+        std::make_unique<Filters::Common::Fault::FaultDelayConfig>(fault.delay());
   }
 
   for (const Http::HeaderUtility::HeaderData& header_map : fault.headers()) {
@@ -54,11 +53,8 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
   }
 
   if (fault.has_response_rate_limit()) {
-    RateLimit rate_limit;
-    ASSERT(fault.response_rate_limit().has_fixed_limit());
-    rate_limit.fixed_rate_kbps_ = fault.response_rate_limit().fixed_limit().limit_kbps();
-    rate_limit.percentage_ = fault.response_rate_limit().percentage();
-    response_rate_limit_ = rate_limit;
+    response_rate_limit_ =
+        std::make_unique<Filters::Common::Fault::FaultRateLimitConfig>(fault.response_rate_limit());
   }
 }
 
@@ -122,13 +118,14 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
         fmt::format("fault.http.{}.abort.http_status", downstream_cluster_);
   }
 
-  maybeSetupResponseRateLimit();
+  maybeSetupResponseRateLimit(headers);
 
-  absl::optional<uint64_t> duration_ms = delayDuration();
-  if (duration_ms) {
+  absl::optional<std::chrono::milliseconds> duration = delayDuration(headers);
+  if (duration.has_value()) {
     delay_timer_ =
         decoder_callbacks_->dispatcher().createTimer([this]() -> void { postDelayInjection(); });
-    delay_timer_->enableTimer(std::chrono::milliseconds(duration_ms.value()));
+    ENVOY_LOG(debug, "fault: delaying request {}ms", duration.value().count());
+    delay_timer_->enableTimer(duration.value());
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::DelayInjected);
     return Http::FilterHeadersStatus::StopIteration;
@@ -142,15 +139,21 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   return Http::FilterHeadersStatus::Continue;
 }
 
-void FaultFilter::maybeSetupResponseRateLimit() {
-  if (!fault_settings_->responseRateLimit().has_value()) {
+void FaultFilter::maybeSetupResponseRateLimit(const Http::HeaderMap& request_headers) {
+  if (fault_settings_->responseRateLimit() == nullptr) {
+    return;
+  }
+
+  absl::optional<uint64_t> rate_kbps = fault_settings_->responseRateLimit()->rateKbps(
+      request_headers.get(Filters::Common::Fault::HeaderNames::get().ThroughputResponse));
+  if (!rate_kbps.has_value()) {
     return;
   }
 
   // TODO(mattklein123): Allow runtime override via downstream cluster similar to the other keys.
   if (!config_->runtime().snapshot().featureEnabled(
-          RuntimeKeys::get().ResponseRateLimitKey,
-          fault_settings_->responseRateLimit().value().percentage_)) {
+          RuntimeKeys::get().ResponseRateLimitPercentKey,
+          fault_settings_->responseRateLimit()->percentage())) {
     return;
   }
 
@@ -159,8 +162,7 @@ void FaultFilter::maybeSetupResponseRateLimit() {
   config_->stats().response_rl_injected_.inc();
 
   response_limiter_ = std::make_unique<StreamRateLimiter>(
-      fault_settings_->responseRateLimit().value().fixed_rate_kbps_,
-      encoder_callbacks_->encoderBufferLimit(),
+      rate_kbps.value(), encoder_callbacks_->encoderBufferLimit(),
       [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
       [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
       [this](Buffer::Instance& data, bool end_stream) {
@@ -186,11 +188,15 @@ bool FaultFilter::faultOverflow() {
 }
 
 bool FaultFilter::isDelayEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(RuntimeKeys::get().DelayPercentKey,
-                                                              fault_settings_->delayPercentage());
+  if (fault_settings_->requestDelay() == nullptr) {
+    return false;
+  }
+
+  bool enabled = config_->runtime().snapshot().featureEnabled(
+      RuntimeKeys::get().DelayPercentKey, fault_settings_->requestDelay()->percentage());
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
-                                                            fault_settings_->delayPercentage());
+    enabled |= config_->runtime().snapshot().featureEnabled(
+        downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
   }
   return enabled;
 }
@@ -205,22 +211,32 @@ bool FaultFilter::isAbortEnabled() {
   return enabled;
 }
 
-absl::optional<uint64_t> FaultFilter::delayDuration() {
-  absl::optional<uint64_t> ret;
+absl::optional<std::chrono::milliseconds>
+FaultFilter::delayDuration(const Http::HeaderMap& request_headers) {
+  absl::optional<std::chrono::milliseconds> ret;
 
   if (!isDelayEnabled()) {
     return ret;
   }
 
-  uint64_t duration = config_->runtime().snapshot().getInteger(RuntimeKeys::get().DelayDurationKey,
-                                                               fault_settings_->delayDuration());
+  // See if the configured delay provider has a default delay, if not there is no delay (e.g.,
+  // header configuration and no/invalid header).
+  auto config_duration = fault_settings_->requestDelay()->duration(
+      request_headers.get(Filters::Common::Fault::HeaderNames::get().DelayRequest));
+  if (!config_duration.has_value()) {
+    return ret;
+  }
+
+  std::chrono::milliseconds duration =
+      std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
+          RuntimeKeys::get().DelayDurationKey, config_duration.value().count()));
   if (!downstream_cluster_delay_duration_key_.empty()) {
-    duration =
-        config_->runtime().snapshot().getInteger(downstream_cluster_delay_duration_key_, duration);
+    duration = std::chrono::milliseconds(config_->runtime().snapshot().getInteger(
+        downstream_cluster_delay_duration_key_, duration.count()));
   }
 
   // Delay only if the duration is >0ms
-  if (duration > 0) {
+  if (duration.count() > 0) {
     ret = duration;
   }
 
