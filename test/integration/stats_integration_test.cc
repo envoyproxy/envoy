@@ -195,7 +195,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
 
   EXPECT_LT(start_mem, m1);
   EXPECT_LT(start_mem, m1001);
-  EXPECT_LT(m_per_cluster, 48000); // As of 2019/03/29, m_per_cluster = 47629 (libstdc++)
+  EXPECT_LT(m_per_cluster, 49000); // As of 2019/03/29, m_per_cluster = 48839 (libstdc++)
 }
 
 } // namespace

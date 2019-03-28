@@ -36,32 +36,6 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       }),
       null_gauge_(symbol_table) {}
 
-/*
-struct IsolatedScopeImpl : public Scope {
-  IsolatedScopeImpl(IsolatedStoreImpl& parent, const std::string& prefix)
-      : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
-
-  // Stats::Scope
-  ScopePtr createScope(const std::string& name) override {
-    return ScopePtr{new IsolatedScopeImpl(parent_, prefix_ + name)};
-  }
-  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
-  Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
-  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
-  Histogram& histogram(const std::string& name) override {
-    return parent_.histogram(prefix_ + name);
-  }
-  const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
-  const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
-  SymbolTable& symbolTable() override { return parent_.symbolTable(); }
-
-  IsolatedStoreImpl& parent_;
-  NullGaugeImpl null_gauge_;
-  const std::string prefix_;
-};
-*/
-
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);
 }
