@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
@@ -72,7 +72,7 @@ public:
    * no provider can be used with the context configuration.
    */
   virtual PrivateKeyOperationsProviderSharedPtr createPrivateKeyOperationsProvider(
-      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      const envoy::api::v2::auth::PrivateKeyOperations& message,
       Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) PURE;
 };
 

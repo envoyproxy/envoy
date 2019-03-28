@@ -110,12 +110,10 @@ Ssl::PrivateKeyOperationsProviderSharedPtr getPrivateKeyOperationsProvider(
 
   const auto private_key_operations_config = config.private_key_operations();
 
-  if (private_key_operations_config.private_key_provider() != "") {
+  if (private_key_operations_config.provider_name() != "") {
     return factory_context.sslContextManager()
         .privateKeyOperationsManager()
-        .createPrivateKeyOperationsProvider(
-            private_key_operations_config.private_key_provider_config(),
-            private_key_operations_config.private_key_provider(), factory_context);
+        .createPrivateKeyOperationsProvider(private_key_operations_config, factory_context);
   }
   return nullptr;
 }

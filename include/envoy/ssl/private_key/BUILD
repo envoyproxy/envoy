@@ -15,7 +15,7 @@ envoy_cc_library(
     deps = [
         ":private_key_callbacks_interface",
         "//include/envoy/event:dispatcher_interface",
-        "@envoy_api//envoy/api/v2/core:config_source_cc",
+        "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
 
