@@ -16,7 +16,7 @@ sources of latency. Envoy supports three features related to system wide tracing
   be used to join untrusted request IDs to the trusted internal
   :ref:`config_http_conn_man_headers_x-request-id`.
 * **External trace service integration**: Envoy supports pluggable external trace visualization
-  providers, that are devided into two subgroups:
+  providers, that are divided into two subgroups:
 
   - External tracers which are part of the Envoy code base, like `LightStep <https://lightstep.com/>`_,
     `Zipkin <https://zipkin.io/>`_  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_), and
