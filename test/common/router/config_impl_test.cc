@@ -602,7 +602,7 @@ virtual_hosts:
                           EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
 }
 
-// Validates behavior of request_headers_to_add at router, and vhost levels.
+// Validates behavior of request_headers_to_add at router, vhost, and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -734,8 +734,8 @@ request_headers_to_add:
   }
 }
 
-// Validates behavior of request_headers_to_add at router, vhost, and route levels
-// when append is disabled.
+// Validates behavior of request_headers_to_add at router, vhost, and route levels when append is
+// disabled.
 TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
   const std::string yaml = R"EOF(
 name: foo
@@ -841,7 +841,7 @@ request_headers_to_remove: ["x-global-nope"]
 }
 
 // Validates behavior of response_headers_to_add and response_headers_to_remove at router, vhost,
-// route, and route action levels.
+// and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
   const std::string yaml = R"EOF(
 name: foo
