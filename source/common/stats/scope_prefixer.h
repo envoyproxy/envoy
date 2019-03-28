@@ -43,6 +43,8 @@ public:
   const SymbolTable& symbolTable() const override { return scope_->symbolTable(); }
   virtual SymbolTable& symbolTable() override { return scope_->symbolTable(); }
 
+  NullGaugeImpl& nullGauge(const std::string& str) override { return scope_->nullGauge(str); }
+
 private:
   StatNameStorage prefix_;
   Scope* scope_;

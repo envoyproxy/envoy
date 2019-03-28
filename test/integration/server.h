@@ -89,6 +89,9 @@ public:
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogramFromStatName(name);
   }
+  NullGaugeImpl& nullGauge(const std::string& str) override {
+    return wrapped_scope_->nullGauge(str);
+  }
 
   Counter& counter(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
@@ -146,6 +149,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogramFromStatName(name);
   }
+  NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
@@ -214,11 +218,13 @@ public:
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
-    on_worker_listener_added_cb_ = on_worker_listener_added;
+    on_worker_listener_added_cb_ = std::move(on_worker_listener_added);
   }
   void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
-    on_worker_listener_removed_cb_ = on_worker_listener_removed;
+    on_worker_listener_removed_cb_ = std::move(on_worker_listener_removed);
   }
+  void onRuntimeCreated() override;
+
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization);

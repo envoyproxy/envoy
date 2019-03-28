@@ -16,6 +16,7 @@ class Gauge;
 class Histogram;
 class Scope;
 class StatsOptions;
+class NullGaugeImpl;
 
 typedef std::unique_ptr<Scope> ScopePtr;
 typedef std::shared_ptr<Scope> ScopeSharedPtr;
@@ -52,6 +53,11 @@ public:
    */
   virtual Gauge& gaugeFromStatName(StatName name) PURE;
   virtual Gauge& gauge(const std::string& name) PURE;
+
+  /**
+   * @return a null gauge within the scope's namespace.
+   */
+  virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
 
   /**
    * @return a histogram within the scope's namespace with a particular value type.

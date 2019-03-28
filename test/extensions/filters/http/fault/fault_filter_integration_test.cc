@@ -26,6 +26,20 @@ config:
     percentage:
       numerator: 100
 )EOF";
+
+  const std::string header_fault_config_ =
+      R"EOF(
+name: envoy.fault
+config:
+  delay:
+    header_delay: {}
+    percentage:
+      numerator: 100
+  response_rate_limit:
+    header_limit: {}
+    percentage:
+      numerator: 100
+)EOF";
 };
 
 // Fault integration tests that should run with all protocols, useful for testing various
@@ -47,6 +61,9 @@ config: {}
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 1024);
+
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
 
 // Response rate limited with no trailers.
@@ -65,10 +82,56 @@ TEST_P(FaultIntegrationTestAllProtocols, ResponseRateLimitNoTrailers) {
   simTime().sleep(std::chrono::milliseconds(63));
   decoder->waitForBodyData(1088);
 
-  // Advance time and wait for a ticks worth of data and end stream.
+  // Advance time and wait for a tick worth of data and end stream.
   simTime().sleep(std::chrono::milliseconds(63));
   decoder->waitForBodyData(1152);
   decoder->waitForEndStream();
+
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+}
+
+// Request delay and response rate limited via header configuration.
+TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfig) {
+  initializeFilter(header_fault_config_);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-envoy-fault-delay-request", "200"},
+                                          {"x-envoy-fault-throughput-response", "1"}};
+  const auto current_time = simTime().monotonicTime();
+  IntegrationStreamDecoderPtr decoder = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // At least 200ms of simulated time should have elapsed before we got the upstream request.
+  EXPECT_LE(std::chrono::milliseconds(200), simTime().monotonicTime() - current_time);
+
+  // Verify response body throttling.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  Buffer::OwnedImpl data(std::string(1025, 'a'));
+  upstream_request_->encodeData(data, true);
+  decoder->waitForBodyData(1024);
+
+  // Advance time and wait for a tick worth of data and end stream.
+  simTime().sleep(std::chrono::milliseconds(63));
+  decoder->waitForBodyData(1025);
+  decoder->waitForEndStream();
+
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
+}
+
+// Header configuration with no headers, so no fault injection.
+TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultConfigNoHeaders) {
+  initializeFilter(header_fault_config_);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 1024);
+
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
 
 // Fault integration tests that run with HTTP/2 only, used for fully testing trailers.
@@ -90,11 +153,11 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   upstream_request_->encodeData(data, false);
   decoder->waitForBodyData(1024);
 
-  // Advance time and wait for a ticks worth of data.
+  // Advance time and wait for a tick worth of data.
   simTime().sleep(std::chrono::milliseconds(63));
   decoder->waitForBodyData(1088);
 
-  // Advance time and wait for a ticks worth of data.
+  // Advance time and wait for a tick worth of data.
   simTime().sleep(std::chrono::milliseconds(63));
   decoder->waitForBodyData(1152);
 
@@ -103,6 +166,9 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   upstream_request_->encodeTrailers(trailers);
   decoder->waitForEndStream();
   EXPECT_NE(nullptr, decoder->trailers());
+
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
 
 // Rate limiting with trailers received before the body has been flushed.
@@ -119,15 +185,18 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyNotFlushed) {
   upstream_request_->encodeTrailers(trailers);
   decoder->waitForBodyData(1024);
 
-  // Advance time and wait for a ticks worth of data.
+  // Advance time and wait for a tick worth of data.
   simTime().sleep(std::chrono::milliseconds(63));
   decoder->waitForBodyData(1088);
 
-  // Advance time and wait for a ticks worth of data, trailers, and end stream.
+  // Advance time and wait for a tick worth of data, trailers, and end stream.
   simTime().sleep(std::chrono::milliseconds(63));
   decoder->waitForBodyData(1152);
   decoder->waitForEndStream();
   EXPECT_NE(nullptr, decoder->trailers());
+
+  EXPECT_EQ(0UL, test_server_->counter("http.config_test.fault.delays_injected")->value());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.response_rl_injected")->value());
 }
 
 } // namespace

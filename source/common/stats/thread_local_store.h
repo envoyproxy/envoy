@@ -159,6 +159,7 @@ public:
     return default_scope_->histogramFromStatName(name);
   }
   Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
@@ -239,6 +240,8 @@ private:
       StatNameTempStorage storage(name, symbolTable());
       return histogramFromStatName(storage.statName());
     }
+
+    NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
 
     template <class StatType>
     using MakeStatFn = std::function<std::shared_ptr<StatType>(StatDataAllocator&, StatName name,

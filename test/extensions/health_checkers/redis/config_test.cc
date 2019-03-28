@@ -112,57 +112,6 @@ TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
                              dispatcher, log_manager)
                              .get()));
 }
-
-TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
-  const std::string json = R"EOF(
-    {
-      "type": "redis",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "unhealthy_threshold": 1,
-      "healthy_threshold": 1
-    }
-    )EOF";
-
-  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
-  AccessLog::MockAccessLogManager log_manager;
-  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
-                         // Always use Upstream's HealthCheckerFactory when creating instance using
-                         // deprecated config.
-                         Upstream::HealthCheckerFactory::create(
-                             Upstream::parseHealthCheckFromV1Json(json), cluster, runtime, random,
-                             dispatcher, log_manager)
-                             .get()));
-}
-
-TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfigWithKey) {
-  const std::string json = R"EOF(
-    {
-      "type": "redis",
-      "timeout_ms": 1000,
-      "interval_ms": 1000,
-      "unhealthy_threshold": 1,
-      "healthy_threshold": 1,
-      "redis_key": "foo"
-    }
-    )EOF";
-
-  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
-  AccessLog::MockAccessLogManager log_manager;
-  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
-                         // Always use Upstream's HealthCheckerFactory when creating instance using
-                         // deprecated config.
-                         Upstream::HealthCheckerFactory::create(
-                             Upstream::parseHealthCheckFromV1Json(json), cluster, runtime, random,
-                             dispatcher, log_manager)
-                             .get()));
-}
 } // namespace
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers

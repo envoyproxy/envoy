@@ -12,7 +12,6 @@
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
-#include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -23,6 +22,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
+#include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
@@ -94,17 +94,10 @@ class RdsRouteConfigProviderImpl;
  * RDS config providers.
  */
 class RdsRouteConfigSubscription
-    : public Init::Target,
-      Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
+    : Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
       Logger::Loggable<Logger::Id::router> {
 public:
   ~RdsRouteConfigSubscription();
-
-  // Init::Target
-  void initialize(std::function<void()> callback) override {
-    initialize_callback_ = callback;
-    subscription_->start({route_config_name_}, *this);
-  }
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
@@ -130,12 +123,9 @@ private:
       const std::string& stat_prefix,
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
-  void registerInitTarget(Init::Manager& init_manager);
-  void runInitializeCallbackIfAny();
-
-  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
-  std::function<void()> initialize_callback_;
   const std::string route_config_name_;
+  Init::TargetImpl init_target_;
+  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
   Stats::ScopePtr scope_;
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
