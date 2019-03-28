@@ -28,6 +28,9 @@ echo "Cleanup completed."
 # Force dbg for path consistency later, don't include debug code in coverage.
 BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 
+# TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
+BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --linkopt='-Wl,--allow-multiple-definition'"
+
 # Run all tests under "bazel test", no sandbox. We're going to generate the
 # .gcda inplace in the bazel-out/ directory. This is in contrast to the "bazel
 # coverage" method, which is currently broken for C++ (see

@@ -228,8 +228,6 @@ elif [[ "$1" == "bazel.api" ]]; then
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
-  # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt='-Wl,--allow-multiple-definition'"
   echo "bazel coverage build with tests..."
 
   # gcovr is a pain to run with `bazel run`, so package it up into a
