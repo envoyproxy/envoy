@@ -124,6 +124,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quic_platform_impl_lib",
     srcs = ["quic_cert_utils_impl.cc"] + envoy_select_quiche([
+        "quic_file_utils_impl.cc",
         "quic_hostname_utils_impl.cc",
         "quic_test_output_impl.cc",
     ]),
@@ -132,6 +133,7 @@ envoy_cc_library(
         "quic_mutex_impl.h",
         "quic_str_cat_impl.h",
     ] + envoy_select_quiche([
+        "quic_file_utils_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_string_utils_impl.h",
         "quic_test_output_impl.h",
@@ -147,6 +149,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = envoy_select_quiche([
         ":string_utils_lib",
+        "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:utility_lib",
     ]),

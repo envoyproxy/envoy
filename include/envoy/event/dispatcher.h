@@ -157,7 +157,14 @@ public:
    *              called) or non-blocking mode where only active events will be executed and then
    *              run() will return.
    */
-  enum class RunType { Block, NonBlock };
+  enum class RunType {
+    Block,       // Executes any events that have been activated, then exit.
+    NonBlock,    // Waits for any pending events to activate, executes them,
+                 // then exits. Exits immediately if there are no pending or
+                 // active events.
+    RunUntilExit // Runs the event-loop until loopExit() is called, blocking
+                 // until there are pending or active events.
+  };
   virtual void run(RunType type) PURE;
 
   /**
