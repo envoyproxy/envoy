@@ -32,10 +32,17 @@ public:
           auto* static_resources = bootstrap.mutable_static_resources();
           for (int i = 0; i < static_resources->clusters_size(); ++i) {
             auto* cluster = static_resources->mutable_clusters(i);
-            for (int j = 0; j < cluster->hosts_size(); ++j) {
-              cluster->mutable_hosts(j)->clear_socket_address();
-              cluster->mutable_hosts(j)->mutable_pipe()->set_path(
-                  TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_));
+            auto* load_assignment = cluster->mutable_load_assignment();
+            for (int j = 0; j < load_assignment->endpoints_size(); ++j) {
+              auto* locality_lb_endpoint = load_assignment->mutable_endpoints(j);
+              for (int k = 0; k < locality_lb_endpoint->lb_endpoints_size(); ++k) {
+                auto* lb_endpoint = locality_lb_endpoint->mutable_lb_endpoints(k);
+                // TODO(dio): Make lb_endpoint's endpoint and address non-nullable.
+                auto* address = lb_endpoint->mutable_endpoint()->mutable_address();
+                address->clear_socket_address();
+                address->mutable_pipe()->set_path(
+                    TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_));
+              }
             }
           }
         });

@@ -72,6 +72,7 @@ Version history
   routing to certain hosts only when there are insufficient healthy hosts available.
 * upstream: add cluster factory to allow creating and registering :ref:`custom cluster type<arch_overview_service_discovery_types_custom>`.
 * upstream: added a :ref:`circuit breaker <arch_overview_circuit_break_cluster_maximum_connection_pools>` to limit the number of concurrent connection pools in use.
+* upstream: removed cluster.hosts.
 * tracing: added :ref:`verbose <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` to support logging annotations on spans.
 * upstream: added support for host weighting and :ref:`locality weighting <arch_overview_load_balancing_locality_weighted_lb>` in the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`, and added a :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` config parameter to strictly bound the ring size.
 * zookeeper: added a ZooKeeper proxy filter that parses ZooKeeper messages (requests/responses/events).

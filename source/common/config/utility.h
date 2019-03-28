@@ -312,14 +312,6 @@ public:
                                 Stats::Scope& scope);
 
   /**
-   * Translate a set of cluster's hosts into a load assignment configuration.
-   * @param hosts cluster's list of hosts.
-   * @return envoy::api::v2::ClusterLoadAssignment a load assignment configuration.
-   */
-  static envoy::api::v2::ClusterLoadAssignment
-  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
-
-  /**
    * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
    * message.
    * @param typed_config opaque config packed in google.protobuf.Any

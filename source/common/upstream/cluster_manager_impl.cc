@@ -205,6 +205,10 @@ ClusterManagerImpl::ClusterManagerImpl(
     }
   }
 
+  // TODO(dio): make sure cluster's load_assignment cluster name to be the same with its cluster
+  // name, even for static configuration.
+  // https://github.com/envoyproxy/envoy/pull/4123#issuecomment-412693859.
+
   // Now setup ADS if needed, this might rely on a primary cluster.
   if (bootstrap.dynamic_resources().has_ads_config()) {
     ads_mux_ = std::make_unique<Config::GrpcMuxImpl>(

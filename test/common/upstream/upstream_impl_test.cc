@@ -191,7 +191,15 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
 
   ResolverData resolver(*dns_resolver_, dispatcher_);
@@ -366,7 +374,15 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     drain_connections_on_host_removal: true
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
 
   ResolverData resolver(*dns_resolver_, dispatcher_);
@@ -891,10 +907,15 @@ TEST_F(StaticClusterImplTest, InitialHosts) {
     connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: 10.0.0.1
-        port_value: 443
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 443
   )EOF";
 
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
@@ -1122,7 +1143,15 @@ TEST_F(StaticClusterImplTest, AltStatName) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: 10.0.0.1, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 443
   )EOF";
 
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
@@ -1429,7 +1458,15 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
     connect_timeout: 0.25s
     type: STATIC
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
 
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
@@ -1561,7 +1598,15 @@ TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     close_connections_on_host_health_failure: true
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
   )EOF";
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
@@ -1746,7 +1791,15 @@ TEST_F(ClusterInfoImplTest, Metadata) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: MAGLEV
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
                                    baz: {name: meh } } }
     common_lb_config:
@@ -1776,7 +1829,15 @@ TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
     lb_policy: MAGLEV
     eds_cluster_config:
       service_name: service_foo
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     common_lb_config:
       healthy_panic_threshold:
         value: 0.3
@@ -1791,7 +1852,15 @@ TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
     lb_policy: MAGLEV
     eds_cluster_config:
       service_name: service_foo
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     common_lb_config:
       healthy_panic_threshold:
         value: 0.3
@@ -1807,7 +1876,15 @@ TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: MAGLEV
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     metadata: { filter_metadata: { com.bar.foo: { baz: test_value },
                                    baz: {boom: meh} } }
     common_lb_config:
@@ -1828,7 +1905,15 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
     extension_protocol_options:
       no_such_filter: { option: value }
   )EOF";

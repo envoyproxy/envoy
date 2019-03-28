@@ -1019,11 +1019,8 @@ StaticClusterImpl::StaticClusterImpl(
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
       priority_state_manager_(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
-  // TODO(dio): Use by-reference when cluster.hosts() is removed.
-  const envoy::api::v2::ClusterLoadAssignment cluster_load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
 
+  const auto& cluster_load_assignment = cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
@@ -1261,11 +1258,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  const envoy::api::v2::ClusterLoadAssignment load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
-  const auto& locality_lb_endpoints = load_assignment.endpoints();
-  for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
+  const auto& load_assignment = cluster.load_assignment();
+  for (const auto& locality_lb_endpoint : load_assignment.endpoints()) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& host = lb_endpoint.endpoint().address();
       const std::string& url = fmt::format("tcp://{}:{}", host.socket_address().address(),

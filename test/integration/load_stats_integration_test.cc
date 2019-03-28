@@ -123,7 +123,7 @@ public:
       locality->set_sub_zone(sub_zone_);
       // Switch predefined cluster_0 to EDS filesystem sourcing.
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster_0->mutable_hosts()->Clear();
+      cluster_0->mutable_load_assignment()->clear_endpoints();
       cluster_0->set_type(envoy::api::v2::Cluster::EDS);
       auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
       eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());

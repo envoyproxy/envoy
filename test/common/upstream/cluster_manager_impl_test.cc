@@ -209,13 +209,20 @@ public:
       connect_timeout: 0.250s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11001
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 11002
   )EOF";
     const std::string merge_window_enabled = R"EOF(
       common_lb_config:
