@@ -70,7 +70,8 @@ TEST(PrefixRoutesTest, RoutedToCatchAll) {
   Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolCallbacks callbacks;
 
-  EXPECT_CALL(*upstream_c, makeRequest(Eq("c:bar"), Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));;
+  EXPECT_CALL(*upstream_c, makeRequest(Eq("c:bar"), Ref(value), Ref(callbacks)))
+      .WillOnce(Return(&active_request));
   EXPECT_EQ(&active_request, router.makeRequest("c:bar", value, callbacks));
 }
 
@@ -86,7 +87,8 @@ TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
   Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolCallbacks callbacks;
 
-  EXPECT_CALL(*upstream_a, makeRequest(Eq("ab:bar"), Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
+  EXPECT_CALL(*upstream_a, makeRequest(Eq("ab:bar"), Ref(value), Ref(callbacks)))
+      .WillOnce(Return(&active_request));
   EXPECT_EQ(&active_request, router.makeRequest("ab:bar", value, callbacks));
 }
 
@@ -141,13 +143,13 @@ TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
   upstreams.emplace("fake_clusterA", std::make_shared<ConnPool::MockInstance>());
   upstreams.emplace("fake_clusterB", upstream_b);
 
-
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams));
   Common::Redis::Client::MockPoolRequest active_request;
   Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolCallbacks callbacks;
 
-  EXPECT_CALL(*upstream_b, makeRequest(Eq("a:bar"), Ref(value), Ref(callbacks))).WillOnce(Return(&active_request));
+  EXPECT_CALL(*upstream_b, makeRequest(Eq("a:bar"), Ref(value), Ref(callbacks)))
+      .WillOnce(Return(&active_request));
   EXPECT_EQ(&active_request, router.makeRequest("a:bar", value, callbacks));
 }
 
