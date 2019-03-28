@@ -7,7 +7,7 @@
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/init/init.h"
+#include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_callbacks.h"
@@ -18,6 +18,7 @@
 
 #include "common/common/callback_impl.h"
 #include "common/common/cleanup.h"
+#include "common/init/target_impl.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
 
@@ -27,17 +28,13 @@ namespace Secret {
 /**
  * SDS API implementation that fetches secrets from SDS server via Subscription.
  */
-class SdsApi : public Init::Target,
-               public Config::SubscriptionCallbacks<envoy::api::v2::auth::Secret> {
+class SdsApi : public Config::SubscriptionCallbacks<envoy::api::v2::auth::Secret> {
 public:
   SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
          Runtime::RandomGenerator& random, Stats::Store& stats,
          Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
          const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
          std::function<void()> destructor_cb, Api::Api& api);
-
-  // Init::Target
-  void initialize(std::function<void()> callback) override;
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
@@ -58,8 +55,8 @@ protected:
   Common::CallbackManager<> update_callback_manager_;
 
 private:
-  void runInitializeCallbackIfAny();
-
+  void initialize();
+  Init::TargetImpl init_target_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
   Runtime::RandomGenerator& random_;
@@ -68,7 +65,6 @@ private:
 
   const envoy::api::v2::core::ConfigSource sds_config_;
   std::unique_ptr<Config::Subscription<envoy::api::v2::auth::Secret>> subscription_;
-  std::function<void()> initialize_callback_;
   const std::string sds_config_name_;
 
   uint64_t secret_hash_;

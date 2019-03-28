@@ -24,7 +24,7 @@
 namespace Envoy {
 namespace Runtime {
 
-bool runtimeFeatureEnabled(const std::string& feature);
+bool runtimeFeatureEnabled(absl::string_view feature);
 
 using RuntimeSingleton = ThreadSafeSingleton<Loader>;
 
@@ -74,7 +74,7 @@ public:
 
   // Runtime::Snapshot
   bool deprecatedFeatureEnabled(const std::string& key) const override;
-  bool runtimeFeatureEnabled(const std::string& key) const override;
+  bool runtimeFeatureEnabled(absl::string_view key) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
                       uint64_t num_buckets) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
@@ -92,7 +92,7 @@ public:
 
   // Returns true and sets 'value' to the key if found.
   // Returns false if the key is not a boolean value.
-  bool getBoolean(const std::string& key, bool& value) const;
+  bool getBoolean(absl::string_view key, bool& value) const;
 
 private:
   static void resolveEntryType(Entry& entry) {

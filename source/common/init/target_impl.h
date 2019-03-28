@@ -2,12 +2,12 @@
 
 #include <functional>
 
-#include "envoy/safe_init/target.h"
+#include "envoy/init/target.h"
 
 #include "common/common/logger.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 
 /**
  * A target is just a glorified callback function, called by the manager it was registered with.
@@ -33,7 +33,7 @@ private:
                    std::weak_ptr<InternalInitalizeFn> fn);
 
 public:
-  // SafeInit::TargetHandle
+  // Init::TargetHandle
   bool initialize(const Watcher& watcher) const override;
 
 private:
@@ -62,7 +62,7 @@ public:
   TargetImpl(absl::string_view name, InitializeFn fn);
   ~TargetImpl() override;
 
-  // SafeInit::Target
+  // Init::Target
   absl::string_view name() const override;
   TargetHandlePtr createHandle(absl::string_view handle_name) const override;
 
@@ -85,5 +85,5 @@ private:
   const std::shared_ptr<InternalInitalizeFn> fn_;
 };
 
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

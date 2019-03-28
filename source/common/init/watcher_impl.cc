@@ -1,7 +1,7 @@
-#include "common/safe_init/watcher_impl.h"
+#include "common/init/watcher_impl.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 
 WatcherHandleImpl::WatcherHandleImpl(absl::string_view handle_name, absl::string_view name,
                                      std::weak_ptr<ReadyFn> fn)
@@ -34,5 +34,5 @@ WatcherHandlePtr WatcherImpl::createHandle(absl::string_view handle_name) const 
       new WatcherHandleImpl(handle_name, name_, std::weak_ptr<ReadyFn>(fn_)));
 }
 
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

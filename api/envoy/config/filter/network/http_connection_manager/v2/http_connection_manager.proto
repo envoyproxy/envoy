@@ -24,7 +24,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 30]
+// [#comment:next free field: 31]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -378,6 +378,9 @@ message HttpConnectionManager {
   repeated UpgradeConfig upgrade_configs = 23;
 
   reserved 27;
+
+  // This is reserved for a pending security fix.
+  reserved 30;
 }
 
 message Rds {

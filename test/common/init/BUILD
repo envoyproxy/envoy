@@ -12,7 +12,7 @@ envoy_cc_test(
     name = "watcher_impl_test",
     srcs = ["watcher_impl_test.cc"],
     deps = [
-        "//test/mocks/safe_init:safe_init_mocks",
+        "//test/mocks/init:init_mocks",
     ],
 )
 
@@ -20,7 +20,7 @@ envoy_cc_test(
     name = "target_impl_test",
     srcs = ["target_impl_test.cc"],
     deps = [
-        "//test/mocks/safe_init:safe_init_mocks",
+        "//test/mocks/init:init_mocks",
     ],
 )
 
@@ -28,7 +28,7 @@ envoy_cc_test(
     name = "manager_impl_test",
     srcs = ["manager_impl_test.cc"],
     deps = [
-        "//source/common/safe_init:manager_lib",
-        "//test/mocks/safe_init:safe_init_mocks",
+        "//source/common/init:manager_lib",
+        "//test/mocks/init:init_mocks",
     ],
 )
