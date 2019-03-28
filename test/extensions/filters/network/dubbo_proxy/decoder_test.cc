@@ -51,19 +51,19 @@ public:
   Protocol::Context context_;
 };
 
-class DecoderStateMachineTest : public DecoderStateMachineTestBase, public testing::Test {};
+class DubboDecoderStateMachineTest : public DecoderStateMachineTestBase, public testing::Test {};
 
-class DecoderTest : public testing::Test {
+class DubboDecoderTest : public testing::Test {
 public:
-  DecoderTest() = default;
-  virtual ~DecoderTest() override = default;
+  DubboDecoderTest() = default;
+  virtual ~DubboDecoderTest() override = default;
 
   NiceMock<MockProtocol> protocol_;
   NiceMock<MockDeserializer> deserializer_;
   NiceMock<MockDecoderCallbacks> callbacks_;
 };
 
-TEST_F(DecoderStateMachineTest, EmptyData) {
+TEST_F(DubboDecoderStateMachineTest, EmptyData) {
   EXPECT_CALL(protocol_, decode(_, _, _)).Times(1);
   EXPECT_CALL(handler_, transferHeaderTo(_, _)).Times(0);
   EXPECT_CALL(handler_, messageBegin(_, _, _)).Times(0);
@@ -73,7 +73,7 @@ TEST_F(DecoderStateMachineTest, EmptyData) {
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
 }
 
-TEST_F(DecoderStateMachineTest, OnlyHaveHeaderData) {
+TEST_F(DubboDecoderStateMachineTest, OnlyHaveHeaderData) {
   initHandler();
   initProtocolDecoder(MessageType::Request, 1, false);
 
@@ -87,7 +87,7 @@ TEST_F(DecoderStateMachineTest, OnlyHaveHeaderData) {
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
 }
 
-TEST_F(DecoderStateMachineTest, RequestMessageCallbacks) {
+TEST_F(DubboDecoderStateMachineTest, RequestMessageCallbacks) {
   initHandler();
   initProtocolDecoder(MessageType::Request, 0, false);
 
@@ -105,7 +105,7 @@ TEST_F(DecoderStateMachineTest, RequestMessageCallbacks) {
   EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
 }
 
-TEST_F(DecoderStateMachineTest, ResponseMessageCallbacks) {
+TEST_F(DubboDecoderStateMachineTest, ResponseMessageCallbacks) {
   initHandler();
   initProtocolDecoder(MessageType::Response, 0, false);
 
@@ -126,7 +126,7 @@ TEST_F(DecoderStateMachineTest, ResponseMessageCallbacks) {
   EXPECT_EQ(dsm.run(buffer), ProtocolState::Done);
 }
 
-TEST_F(DecoderStateMachineTest, DeserializeRpcInvocationException) {
+TEST_F(DubboDecoderStateMachineTest, DeserializeRpcInvocationException) {
   initHandler();
   initProtocolDecoder(MessageType::Request, 0, false);
 
@@ -146,7 +146,7 @@ TEST_F(DecoderStateMachineTest, DeserializeRpcInvocationException) {
   EXPECT_EQ(dsm.currentState(), ProtocolState::onMessageEnd);
 }
 
-TEST_F(DecoderStateMachineTest, DeserializeRpcResultException) {
+TEST_F(DubboDecoderStateMachineTest, DeserializeRpcResultException) {
   initHandler();
   initProtocolDecoder(MessageType::Response, 0, false);
 
@@ -166,7 +166,7 @@ TEST_F(DecoderStateMachineTest, DeserializeRpcResultException) {
   EXPECT_EQ(dsm.currentState(), ProtocolState::onMessageEnd);
 }
 
-TEST_F(DecoderStateMachineTest, ProtocolDecodeException) {
+TEST_F(DubboDecoderStateMachineTest, ProtocolDecodeException) {
   EXPECT_CALL(decoder_callback_, newDecoderEventHandler()).Times(0);
   EXPECT_CALL(protocol_, decode(_, _, _))
       .WillOnce(Invoke([](Buffer::Instance&, Protocol::Context*, MessageMetadataSharedPtr) -> bool {
@@ -180,7 +180,7 @@ TEST_F(DecoderStateMachineTest, ProtocolDecodeException) {
   EXPECT_EQ(dsm.currentState(), ProtocolState::onTransportBegin);
 }
 
-TEST_F(DecoderTest, NeedMoreDataForProtocolHeader) {
+TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {
   EXPECT_CALL(protocol_, decode(_, _, _))
       .WillOnce(Invoke([](Buffer::Instance&, Protocol::Context*, MessageMetadataSharedPtr) -> bool {
         return false;
@@ -195,7 +195,7 @@ TEST_F(DecoderTest, NeedMoreDataForProtocolHeader) {
   EXPECT_EQ(buffer_underflow, true);
 }
 
-TEST_F(DecoderTest, NeedMoreDataForProtocolBody) {
+TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
   EXPECT_CALL(protocol_, decode(_, _, _))
       .WillOnce(Invoke([](Buffer::Instance&, Protocol::Context* context,
                           MessageMetadataSharedPtr metadata) -> bool {
@@ -219,7 +219,7 @@ TEST_F(DecoderTest, NeedMoreDataForProtocolBody) {
   EXPECT_EQ(buffer_underflow, true);
 }
 
-TEST_F(DecoderTest, decodeResponseMessage) {
+TEST_F(DubboDecoderTest, decodeResponseMessage) {
   Buffer::OwnedImpl buffer;
   buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
 
