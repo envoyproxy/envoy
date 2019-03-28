@@ -103,7 +103,7 @@ private:
   void addProvider(const JwtProvider& provider);
 
   // @return what should be the 3-part base64url-encoded substring; see RFC-7519
-  absl::string_view extractJWT(const absl::string_view value_str,
+  absl::string_view extractJWT(const absl::string_view& value_str,
                                absl::string_view::size_type after) const;
 
   // HeaderMap value type to store prefix and issuers that specified this
@@ -232,7 +232,7 @@ constexpr absl::string_view ConstantBase64UrlEncodingCharsPlusDot =
 // It is forgiving w.r.t. dots/periods, as the exact syntax will be verified after extraction.
 //
 // See RFC-7519 § 2, RFC-7515 § 2, and RFC-4648 "Base-N Encodings" § 5.
-absl::string_view ExtractorImpl::extractJWT(const absl::string_view value_str,
+absl::string_view ExtractorImpl::extractJWT(const absl::string_view& value_str,
                                             absl::string_view::size_type after) const {
   const auto starting = value_str.find_first_of(ConstantBase64UrlEncodingCharsPlusDot, after);
   if (starting == value_str.npos) {
