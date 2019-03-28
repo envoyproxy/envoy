@@ -832,11 +832,12 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
 
-  decodeData(nullptr, data, end_stream);
+  decodeData(nullptr, data, end_stream, FilterIterationStartState::Can_start_from_current);
 }
 
-void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
-                                                     Buffer::Instance& data, bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::decodeData(
+    ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream,
+    FilterIterationStartState filter_iteration_start_state) {
   resetIdleTimer();
 
   // If we previously decided to decode only the headers, do nothing here.
@@ -854,7 +855,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   const bool trailers_exists_at_start = request_trailers_ != nullptr;
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
-      commonDecodePrefix(filter, FilterIterationStartState::Can_start_from_current);
+      commonDecodePrefix(filter, filter_iteration_start_state);
 
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame types, return now.
@@ -965,15 +966,9 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
     // Inline processing happens in the decodeHeaders() callback if necessary.
     filter.commonHandleBufferData(data);
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
-    const bool saved_iterate_from_current_filter = filter.iterate_from_current_filter_;
-    // decodeData() below should always iterate from the next filter.
-    filter.iterate_from_current_filter_ = false;
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
-    decodeData(&filter, data, false);
-    // Restores iterate_from_current_filter_'s original value for the filter's callbacks in the
-    // future.
-    filter.iterate_from_current_filter_ = saved_iterate_from_current_filter;
+    decodeData(&filter, data, false, FilterIterationStartState::Always_start_from_next);
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -1123,7 +1118,8 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
                           [this](Buffer::Instance& data, bool end_stream) -> void {
                             // TODO: Start encoding from the last decoder filter that saw the
                             // request instead.
-                            encodeData(nullptr, data, end_stream);
+                            encodeData(nullptr, data, end_stream,
+                                       FilterIterationStartState::Can_start_from_current);
                           },
                           state_.destroyed_, code, body, grpc_status, is_head_request);
 }
@@ -1362,13 +1358,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
-    const bool saved_iterate_from_current_filter = filter.iterate_from_current_filter_;
-    // decodeData() below should always iterate from the next filter.
-    filter.iterate_from_current_filter_ = false;
-    encodeData(&filter, data, false);
-    // Restores iterate_from_current_filter_'s original value for the filter's callbacks in the
-    // future.
-    filter.iterate_from_current_filter_ = saved_iterate_from_current_filter;
+    encodeData(&filter, data, false, FilterIterationStartState::Always_start_from_next);
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -1376,8 +1366,9 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* filter,
-                                                     Buffer::Instance& data, bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::encodeData(
+    ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
+    FilterIterationStartState filter_iteration_start_state) {
   resetIdleTimer();
 
   // If we previously decided to encode only the headers, do nothing here.
@@ -1387,7 +1378,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
-      commonEncodePrefix(filter, end_stream, FilterIterationStartState::Can_start_from_current);
+      commonEncodePrefix(filter, end_stream, filter_iteration_start_state);
   auto trailers_added_entry = encoder_filters_.end();
 
   const bool trailers_exists_at_start = response_trailers_ != nullptr;
@@ -1815,7 +1806,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::In
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(
     Buffer::Instance& data, bool end_stream) {
-  parent_.decodeData(this, data, end_stream);
+  parent_.decodeData(this, data, end_stream,
+                     ActiveStream::FilterIterationStartState::Can_start_from_current);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
@@ -1839,7 +1831,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeHeaders(HeaderMapPt
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data,
                                                                   bool end_stream) {
-  parent_.encodeData(nullptr, data, end_stream);
+  parent_.encodeData(nullptr, data, end_stream,
+                     ActiveStream::FilterIterationStartState::Can_start_from_current);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapPtr&& trailers) {
@@ -1936,7 +1929,8 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::In
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(
     Buffer::Instance& data, bool end_stream) {
-  parent_.encodeData(this, data, end_stream);
+  parent_.encodeData(this, data, end_stream,
+                     ActiveStream::FilterIterationStartState::Can_start_from_current);
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {

@@ -199,7 +199,8 @@ private:
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
     }
     void doData(bool end_stream) override {
-      parent_.decodeData(this, *parent_.buffered_request_data_, end_stream);
+      parent_.decodeData(this, *parent_.buffered_request_data_, end_stream,
+                         ActiveStream::FilterIterationStartState::Can_start_from_current);
     }
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
@@ -282,7 +283,8 @@ private:
       parent_.encodeHeaders(this, *parent_.response_headers_, end_stream);
     }
     void doData(bool end_stream) override {
-      parent_.encodeData(this, *parent_.buffered_response_data_, end_stream);
+      parent_.encodeData(this, *parent_.buffered_response_data_, end_stream,
+                         ActiveStream::FilterIterationStartState::Can_start_from_current);
     }
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
@@ -347,7 +349,10 @@ private:
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addDecodedTrailers();
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
-    void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
+    // Sends data through decoding filter chains. filter_iteration_start_state indicates which
+    // filter to start the iteration with.
+    void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream,
+                    FilterIterationStartState filter_iteration_start_state);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
     void disarmRequestTimeout();
     void maybeEndDecode(bool end_stream);
@@ -359,7 +364,10 @@ private:
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
-    void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
+    // Sends data through encoding filter chains. filter_iteration_start_state indicates which
+    // filter to start the iteration with.
+    void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
+                    FilterIterationStartState filter_iteration_start_state);
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void maybeEndEncode(bool end_stream);
