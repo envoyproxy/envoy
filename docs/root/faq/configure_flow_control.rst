@@ -42,12 +42,13 @@ the only one which needs to be amended is the listener
       name: http
       address:
         socketAddress:
-          address: '::1'
+          address: ::1
           portValue: 0
       filterChains:
         filters:
           name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             http2_protocol_options:
               initial_stream_window_size: 65535
             route_config: {}
@@ -59,7 +60,12 @@ the only one which needs to be amended is the listener
       name: cluster_0
       connectTimeout: 5s
       perConnectionBufferLimitBytes: 1024
-      hosts:
-        socketAddress:
-          address: '::1'
-          portValue: 46685
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: ::1
+                  port_value: 46685
