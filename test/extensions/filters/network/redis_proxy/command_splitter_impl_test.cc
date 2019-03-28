@@ -50,10 +50,11 @@ public:
     value.asArray().swap(values);
   }
 
-  MockRouter* router_{new MockRouter()};
+  ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{RouterPtr{router_}, store_, "redis.foo.", time_system_, false};
+  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_,
+                         false};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -110,7 +111,7 @@ class RedisSingleServerRequestTest : public RedisCommandSplitterImplTest,
                                      public testing::WithParamInterface<std::string> {
 public:
   void makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request) {
-    EXPECT_CALL(*router_, makeRequest(hash_key, Ref(request), _))
+    EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Ref(request), _))
         .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     handle_ = splitter_.makeRequest(request, callbacks_);
   }
@@ -222,7 +223,7 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
 
   Common::Redis::RespValue request;
   makeBulkStringArray(request, {GetParam(), "hello"});
-  EXPECT_CALL(*router_, makeRequest("hello", Ref(request), _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*conn_pool_, makeRequest("hello", Ref(request), _)).WillOnce(Return(nullptr));
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
   response.asString() = Response::get().NoUpstreamHost;
@@ -323,7 +324,7 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
 
   Common::Redis::RespValue request;
   makeBulkStringArray(request, {"eval", "return {ARGV[1]}", "1", "key", "arg"});
-  EXPECT_CALL(*router_, makeRequest("key", Ref(request), _)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*conn_pool_, makeRequest("key", Ref(request), _)).WillOnce(Return(nullptr));
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
   response.asString() = Response::get().NoUpstreamHost;
@@ -358,7 +359,7 @@ public:
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
       }
-      EXPECT_CALL(*router_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
+      EXPECT_CALL(*conn_pool_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
     }
 
@@ -561,7 +562,7 @@ public:
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
       }
-      EXPECT_CALL(*router_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
+      EXPECT_CALL(*conn_pool_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
     }
 
@@ -684,7 +685,7 @@ public:
           null_handle_indexes.end()) {
         request_to_use = &pool_requests_[i];
       }
-      EXPECT_CALL(*router_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
+      EXPECT_CALL(*conn_pool_, makeRequest(std::to_string(i), Eq(ByRef(expected_requests_[i])), _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
     }
 
@@ -772,13 +773,14 @@ INSTANTIATE_TEST_SUITE_P(
 class RedisSingleServerRequestWithLatencyMicrosTest : public RedisSingleServerRequestTest {
 public:
   void makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request) {
-    EXPECT_CALL(*router_, makeRequest(hash_key, Ref(request), _))
+    EXPECT_CALL(*conn_pool_, makeRequest(hash_key, Ref(request), _))
         .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     handle_ = splitter_.makeRequest(request, callbacks_);
   }
 
-  MockRouter* router_{new MockRouter()};
-  InstanceImpl splitter_{RouterPtr{router_}, store_, "redis.foo.", time_system_, true};
+  ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
+  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_,
+                         true};
 };
 
 TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {

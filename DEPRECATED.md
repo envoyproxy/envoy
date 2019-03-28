@@ -15,7 +15,6 @@ A logged warning is expected for each deprecated item that is in deprecation win
   [fault.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto))
   has been deprecated. It was never used and setting it has no effect. It will be removed in the
   following release.
-* Use of `cluster`, found in [redis-proxy.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto) is deprecated. Set a `PrefixRoutes.catch_all_cluster` instead.
 
 ## Version 1.9.0 (Dec 20, 2018)
 

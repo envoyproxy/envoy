@@ -56,6 +56,7 @@ public:
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;
+  const std::string cluster_name_;
   const std::string stat_prefix_;
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
   ProxyStats stats_;
