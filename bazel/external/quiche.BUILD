@@ -283,6 +283,46 @@ cc_library(
     srcs = envoy_select_quiche(
         [
             "quiche/quic/core/crypto/quic_random.cc",
+            "quiche/quic/core/quic_connection_id.cc",
+            "quiche/quic/core/quic_constants.cc",
+            "quiche/quic/core/quic_error_codes.cc",
+            "quiche/quic/core/quic_packet_number.cc",
+            "quiche/quic/core/quic_tag.cc",
+            "quiche/quic/core/quic_types.cc",
+            "quiche/quic/core/quic_versions.cc",
+        ],
+        "@envoy",
+    ),
+    hdrs = envoy_select_quiche(
+        [
+            "quiche/quic/core/crypto/quic_random.h",
+            "quiche/quic/core/quic_connection_id.h",
+            "quiche/quic/core/quic_constants.h",
+            "quiche/quic/core/quic_error_codes.h",
+            "quiche/quic/core/quic_interval.h",
+            "quiche/quic/core/quic_interval_set.h",
+            "quiche/quic/core/quic_packet_number.h",
+            "quiche/quic/core/quic_tag.h",
+            "quiche/quic/core/quic_types.h",
+            "quiche/quic/core/quic_versions.h",
+        ],
+        "@envoy",
+    ),
+    # Need to use same compiler options as envoy_cc_library uses to enforce compiler version and c++ version.
+    # QUIC uses offsetof() to optimize memory usage in frames.
+    copts = envoy_copts("@envoy") + ["-Wno-error=invalid-offsetof"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_base",
+        ":quic_time_lib",
+        "//external:ssl",
+    ],
+)
+
+cc_library(
+    name = "quiche_quic_core_frames",
+    srcs = envoy_select_quiche(
+        [
             "quiche/quic/core/frames/quic_ack_frame.cc",
             "quiche/quic/core/frames/quic_application_close_frame.cc",
             "quiche/quic/core/frames/quic_blocked_frame.cc",
@@ -305,19 +345,11 @@ cc_library(
             "quiche/quic/core/frames/quic_stream_frame.cc",
             "quiche/quic/core/frames/quic_stream_id_blocked_frame.cc",
             "quiche/quic/core/frames/quic_window_update_frame.cc",
-            "quiche/quic/core/quic_connection_id.cc",
-            "quiche/quic/core/quic_constants.cc",
-            "quiche/quic/core/quic_error_codes.cc",
-            "quiche/quic/core/quic_packet_number.cc",
-            "quiche/quic/core/quic_tag.cc",
-            "quiche/quic/core/quic_types.cc",
-            "quiche/quic/core/quic_versions.cc",
         ],
         "@envoy",
     ),
     hdrs = envoy_select_quiche(
         [
-            "quiche/quic/core/crypto/quic_random.h",
             "quiche/quic/core/frames/quic_ack_frame.h",
             "quiche/quic/core/frames/quic_application_close_frame.h",
             "quiche/quic/core/frames/quic_blocked_frame.h",
@@ -342,25 +374,17 @@ cc_library(
             "quiche/quic/core/frames/quic_stream_frame.h",
             "quiche/quic/core/frames/quic_stream_id_blocked_frame.h",
             "quiche/quic/core/frames/quic_window_update_frame.h",
-            "quiche/quic/core/quic_connection_id.h",
-            "quiche/quic/core/quic_constants.h",
-            "quiche/quic/core/quic_error_codes.h",
-            "quiche/quic/core/quic_interval.h",
-            "quiche/quic/core/quic_interval_set.h",
-            "quiche/quic/core/quic_packet_number.h",
-            "quiche/quic/core/quic_tag.h",
-            "quiche/quic/core/quic_types.h",
-            "quiche/quic/core/quic_versions.h",
         ],
         "@envoy",
     ),
     # Need to use same compiler options as envoy_cc_library uses to enforce compiler version and c++ version.
     # QUIC uses offsetof() to optimize memory usage in frames.
     copts = envoy_copts("@envoy") + ["-Wno-error=invalid-offsetof"],
+    visibility = ["//visibility:public"],
     deps = [
+        ":quic_mem_slice_span_lib",
         ":quic_platform_base",
-        ":quic_time_lib",
-        "//external:ssl",
+        ":quiche_quic_core_base",
     ],
 )
 
@@ -390,6 +414,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_quic_core_base",
+        ":quiche_quic_core_frames",
     ],
 )
 

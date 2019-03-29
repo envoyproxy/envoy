@@ -166,10 +166,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_mem_slice_span_impl_lib",
-    srcs =
-        envoy_select_quiche([
-            "quic_mem_slice_span_impl.cc",
-        ]),
     hdrs = envoy_select_quiche([
         "quic_mem_slice_span_impl.h",
         "quic_test_mem_slice_vector_impl.h",
@@ -177,7 +173,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_googlesource_quiche//:quic_platform_base",
-        "@com_googlesource_quiche//:quiche_quic_core",
+        "@com_googlesource_quiche//:quiche_quic_core_base",
     ] + envoy_select_quiche([
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:stack_array",
@@ -197,6 +193,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_googlesource_quiche//:quic_mem_slice_span_lib",
+        "@com_googlesource_quiche//:quiche_quic_core",
     ],
 )
 

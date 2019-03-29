@@ -10,8 +10,9 @@
 
 #include "common/common/stack_array.h"
 
-#include "quiche/quic/core/frames/quic_message_frame.h"
-#include "quiche/quic/core/quic_stream_send_buffer.h"
+#include "quiche/quic/core/quic_types.h"
+#include "quiche/quic/platform/api/quic_mem_slice.h"
+#include "quiche/quic/platform/api/quic_string_piece.h"
 
 namespace quic {
 
@@ -42,12 +43,26 @@ public:
 
   size_t NumSlices() { return buffer_.getRawSlices(nullptr, 0); }
 
-  // Save data in buffer_ to |send_buffer| and returns the length of all
-  // saved mem slices.
-  QuicByteCount SaveMemSlicesInSendBuffer(QuicStreamSendBuffer* send_buffer);
-
-  // Save data buffers as message data in |message_frame|.
-  void SaveMemSlicesAsMessageData(QuicMessageFrame* message_frame);
+  template <typename ConsumeFunction> QuicByteCount ConsumeAll(ConsumeFunction consume) {
+    uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);
+    STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
+    buffer_.getRawSlices(slices.begin(), num_slices);
+    size_t saved_length = 0;
+    for (auto slice : slices) {
+      if (slice.len_ == 0) {
+        continue;
+      }
+      auto single_slice_buffer = std::make_shared<Envoy::Buffer::OwnedImpl>();
+      // Move each slice into a stand-alone buffer.
+      // TODO(danzh): investigate the cost of allocating one buffer per slice.
+      // If it turns out to be expensive, add a new function to free data in the middle in buffer
+      // interface and re-design QuicMemSliceImpl.
+      single_slice_buffer->move(buffer_, slice.len_);
+      consume(QuicMemSlice(QuicMemSliceImpl(std::move(single_slice_buffer))));
+      saved_length += slice.len_;
+    }
+    return saved_length;
+  }
 
   bool empty() const { return buffer_.length() == 0; }
 
