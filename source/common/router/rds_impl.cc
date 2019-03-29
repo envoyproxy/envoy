@@ -69,12 +69,13 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       last_updated_(factory_context.timeSource().systemTime()) {
   Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
-  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::RouteConfiguration>(
+  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
       factory_context.clusterManager(), factory_context.random(), *scope_,
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
-      "envoy.api.v2.RouteDiscoveryService.StreamRoutes", factory_context.api());
+      "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
+      Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
+      factory_context.api());
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -88,8 +89,9 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
   route_config_provider_manager_.route_config_subscriptions_.erase(manager_identifier_);
 }
 
-void RdsRouteConfigSubscription::onConfigUpdate(const ResourceVector& resources,
-                                                const std::string& version_info) {
+void RdsRouteConfigSubscription::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+    const std::string& version_info) {
   last_updated_ = time_source_.systemTime();
 
   if (resources.empty()) {
@@ -101,7 +103,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(const ResourceVector& resources,
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", resources.size()));
   }
-  const auto& route_config = resources[0];
+  auto route_config = MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resources[0]);
   MessageUtil::validate(route_config);
   // TODO(PiotrSikora): Remove this hack once fixed internally.
   if (!(route_config.name() == route_config_name_)) {

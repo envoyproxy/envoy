@@ -30,8 +30,6 @@ using testing::Return;
 namespace Envoy {
 namespace Config {
 
-typedef HttpSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> HttpEdsSubscriptionImpl;
-
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   HttpSubscriptionTestHarness() : HttpSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
@@ -46,7 +44,7 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_ = std::make_unique<HttpEdsSubscriptionImpl>(
+    subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
         std::chrono::milliseconds(1000), *method_descriptor_, stats_, init_fetch_timeout);
   }
@@ -119,12 +117,7 @@ public:
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
-    EXPECT_CALL(callbacks_,
-                onConfigUpdate(
-                    RepeatedProtoEq(
-                        Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                            response_pb)),
-                    version))
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (!accept) {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
@@ -172,7 +165,7 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;
+  std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;
 };
