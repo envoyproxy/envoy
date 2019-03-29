@@ -5,7 +5,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/subscription.h"
-#include "envoy/config/xds_context.h"
+#include "envoy/config/xds_grpc_context.h"
 
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
@@ -30,7 +30,7 @@ struct ResourceNameDiff {
  * TODO(fredlas) add aggregation support.
  */
 class DeltaSubscriptionImpl : public Subscription,
-                              public XdsContext,
+                              public XdsGrpcContext,
                               public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
@@ -93,28 +93,6 @@ public:
     request_.clear_initial_resource_versions();
   }
 
-  void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) {
-    ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
-              message->system_version_info());
-    disableInitFetchTimeoutTimer();
-
-    request_.set_response_nonce(message->nonce());
-
-    try {
-      onConfigUpdate(message->resources(), message->removed_resources(),
-                     message->system_version_info());
-    } catch (const EnvoyException& e) {
-      stats_.update_rejected_.inc();
-      ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
-      stats_.update_attempt_.inc();
-      callbacks_->onConfigUpdateFailed(&e);
-      ::google::rpc::Status* error_detail = request_.mutable_error_detail();
-      error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
-      error_detail->set_message(e.what());
-    }
-    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
-  }
-
   void subscribe(const std::vector<std::string>& resources) {
     ENVOY_LOG(debug, "delta subscribe for " + type_url_);
     buildAndQueueDiscoveryRequest(resources);
@@ -138,10 +116,10 @@ public:
 
   envoy::api::v2::DeltaDiscoveryRequest internalRequestStateForTest() const { return request_; }
 
-  // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& version_info) {
+  void
+  handleConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                     const std::string& version_info) {
     callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
     for (const auto& resource : added_resources) {
       setResourceVersion(resource.name(), resource.version());
@@ -166,6 +144,7 @@ public:
               added_resources.size(), removed_resources.size());
   }
 
+  // Config::XdsGrpcContext
   void handleStreamEstablished() override {
     // initial_resource_versions "must be populated for first request in a stream", so guarantee
     // that the initial version'd request we're about to enqueue is what gets sent.
@@ -193,7 +172,17 @@ public:
     callbacks_->onConfigUpdateFailed(nullptr);
   }
 
-  // Config::DeltaSubscription
+  void drainRequests() override {
+    ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
+    while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
+      // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
+      sendDiscoveryRequest(request_queue_.front());
+      request_queue_.pop();
+    }
+    grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
+  }
+
+  // Config::Subscription
   void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
     callbacks_ = &callbacks;
 
@@ -219,6 +208,28 @@ public:
   }
 
 private:
+  void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) {
+    ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
+              message->system_version_info());
+    disableInitFetchTimeoutTimer();
+
+    request_.set_response_nonce(message->nonce());
+
+    try {
+      handleConfigUpdate(message->resources(), message->removed_resources(),
+                         message->system_version_info());
+    } catch (const EnvoyException& e) {
+      stats_.update_rejected_.inc();
+      ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
+      stats_.update_attempt_.inc();
+      callbacks_->onConfigUpdateFailed(&e);
+      ::google::rpc::Status* error_detail = request_.mutable_error_detail();
+      error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
+      error_detail->set_message(e.what());
+    }
+    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
+  }
+
   void disableInitFetchTimeoutTimer() {
     if (init_fetch_timeout_timer_) {
       init_fetch_timeout_timer_->disableTimer();
@@ -261,11 +272,11 @@ private:
     resource_names_.erase(resource_name);
   }
 
-  // Request queue management logic.
   void queueDiscoveryRequest(const ResourceNameDiff& queue_item) {
     request_queue_.push(queue_item);
     drainRequests();
   }
+
   void clearRequestQueue() {
     grpc_stream_.maybeUpdateQueueSizeStat(0);
     // TODO(fredlas) when we have C++17: request_queue_ = {};
@@ -273,15 +284,7 @@ private:
       request_queue_.pop();
     }
   }
-  void drainRequests() override {
-    ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-    while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
-      // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-      sendDiscoveryRequest(request_queue_.front());
-      request_queue_.pop();
-    }
-    grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
-  }
+
   // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
   // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
   std::queue<ResourceNameDiff> request_queue_;

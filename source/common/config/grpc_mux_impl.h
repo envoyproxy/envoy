@@ -20,7 +20,9 @@ namespace Config {
 /**
  * ADS API implementation that fetches via gRPC.
  */
-class GrpcMuxImpl : public GrpcMux, public XdsContext, public Logger::Loggable<Logger::Id::config> {
+class GrpcMuxImpl : public GrpcMux,
+                    public XdsGrpcContext,
+                    public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
@@ -36,9 +38,10 @@ public:
 
   void sendDiscoveryRequest(const std::string& type_url);
 
-  // GrpcStream
+  // Config::XdsGrpcContext
   void handleStreamEstablished() override;
   void handleEstablishmentFailure() override;
+  void drainRequests() override;
 
 private:
   void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
@@ -85,7 +88,6 @@ private:
   // Request queue management logic.
   void queueDiscoveryRequest(const std::string& queue_item);
   void clearRequestQueue();
-  void drainRequests() override;
 
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;

@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "envoy/config/xds_context.h"
+#include "envoy/config/xds_grpc_context.h"
 #include "envoy/grpc/async_client.h"
 
 #include "common/common/backoff_strategy.h"
@@ -19,7 +19,7 @@ template <class RequestProto, class ResponseProto>
 class GrpcStream : public Grpc::TypedAsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcStream(XdsContext* owning_context, Grpc::AsyncClientPtr async_client,
+  GrpcStream(XdsGrpcContext* owning_context, Grpc::AsyncClientPtr async_client,
              const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
              Event::Dispatcher& dispatcher, Stats::Scope& scope,
              const RateLimitSettings& rate_limit_settings,
@@ -123,7 +123,7 @@ private:
                                     POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
   }
 
-  XdsContext* const owning_context_;
+  XdsGrpcContext* const owning_context_;
 
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;

@@ -8,9 +8,9 @@
 namespace Envoy {
 namespace Config {
 
-class XdsContext {
+class XdsGrpcContext {
 public:
-  virtual ~XdsContext() = default;
+  virtual ~XdsGrpcContext() = default;
 
   /**
    * For the gRPC stream handler to prompt the context to take appropriate action in response to the
@@ -24,11 +24,10 @@ public:
    */
   virtual void handleEstablishmentFailure() PURE;
 
-  // TODO(fredlas) virtual void addSubscription(...
-  // TODO(fredlas) virtual void updateSubscription(...
-  // TODO(fredlas) virtual void removeSubscription(const std::string& type_url) PURE;
-  // TODO(fredlas) virtual void pause(const std::string& type_url) PURE;
-  // TODO(fredlas) virtual void resume(const std::string& type_url) PURE;
+  /**
+   * For the gRPC stream handler to call when its rate limiting logic allows more requests to be
+   * sent.
+   */
   virtual void drainRequests() PURE;
 };
 
