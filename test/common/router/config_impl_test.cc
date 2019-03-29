@@ -82,7 +82,7 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
   return Http::TestHeaderMapImpl{{":authority", host},        {":path", path},
                                  {":method", method},         {"x-safe", "safe"},
                                  {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
-                                 {"x-route-nope", "route"}};
+                                 {"x-route-nope", "route"},   {"x-forwarded-proto", "http"}};
 }
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
@@ -2663,7 +2663,7 @@ virtual_hosts:
 
   // route may be called early in some edge cases and "x-forwarded-proto" will not be set.
   Http::TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/"}};
-  EXPECT_NO_THROW(config.route(headers, 0));
+  EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
