@@ -17,8 +17,8 @@ public:
   const std::string ClusterLoadAssignment{"type.googleapis.com/envoy.api.v2.ClusterLoadAssignment"};
   const std::string Secret{"type.googleapis.com/envoy.api.v2.auth.Secret"};
   const std::string RouteConfiguration{"type.googleapis.com/envoy.api.v2.RouteConfiguration"};
-  const std::string ScopedRouteConfigurationsSet{
-      "type.googleapis.com/envoy.api.v2.ScopedRouteConfigurationsSet"};
+  const std::string ScopedRouteConfiguration{
+      "type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration"};
 };
 
 typedef ConstSingleton<TypeUrlValues> TypeUrl;

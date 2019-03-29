@@ -199,8 +199,10 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
        immutableConfigProviders(Envoy::Config::ConfigProviderInstanceType::Inline)) {
     ASSERT(provider->configProtoInfoVec().has_value());
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
+    const absl::optional<Envoy::Config::ConfigProvider::ConfigProtoInfoVec> protos_info =
+        provider->configProtoInfoVec();
     const std::vector<const Protobuf::Message*>& scoped_route_configurations =
-        provider->configProtoInfoVec().value().config_protos_;
+        protos_info.value().config_protos_;
     for (auto it = scoped_route_configurations.begin(); it != scoped_route_configurations.end();
          ++it) {
       inline_config->mutable_scoped_route_configs()->Add()->MergeFrom(**it);

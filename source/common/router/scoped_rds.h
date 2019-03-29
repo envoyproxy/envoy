@@ -44,12 +44,12 @@ public:
   // Envoy::Config::ConfigProvider
   const Protobuf::Message* getConfigProto() const override { return nullptr; }
   const std::vector<const Protobuf::Message*> getConfigProtos() const override {
-    std::vector<const Protobuf::Message*> ret_protos(config_protos_.size());
+    std::vector<const Protobuf::Message*> out_protos;
     std::for_each(config_protos_.begin(), config_protos_.end(),
-                  [&ret_protos](const std::unique_ptr<const Protobuf::Message>& message) {
-                    ret_protos.push_back(message.get());
+                  [&out_protos](const std::unique_ptr<const Protobuf::Message>& message) {
+                    out_protos.push_back(message.get());
                   });
-    return ret_protos;
+    return out_protos;
   }
 
   std::string getConfigVersion() const override { return ""; }

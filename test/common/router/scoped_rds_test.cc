@@ -34,7 +34,7 @@ parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
 }
 
 std::vector<std::unique_ptr<const Protobuf::Message>>
-concreteProtosToMessageVec(std::vector<envoy::api::v2::ScopedRouteConfiguration> protos) {
+protosToMessageVec(std::vector<envoy::api::v2::ScopedRouteConfiguration>&& protos) {
   std::vector<std::unique_ptr<const Protobuf::Message>> messages;
   for (const auto& proto : protos) {
     Protobuf::Message* message = proto.New();
@@ -193,8 +193,7 @@ key:
     - string_key: x-foo-key
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
-  // EXPECT_NO_THROW(subscription().onConfigUpdate(resources, "1"));
-  subscription().onConfigUpdate(resources, "1");
+  EXPECT_NO_THROW(subscription().onConfigUpdate(resources, "1"));
   EXPECT_EQ(1UL, factory_context_.scope_.counter("foo.scoped_rds.config_reload").value());
 }
 
@@ -289,17 +288,16 @@ key:
   fragments: { string_key: "172.10.10.20" }
 )EOF";
   std::vector<std::unique_ptr<const Protobuf::Message>> config_protos =
-      concreteProtosToMessageVec({parseScopedRouteConfigurationFromYaml(config_yaml),
-                                  parseScopedRouteConfigurationFromYaml(config_yaml2)});
+      protosToMessageVec({parseScopedRouteConfigurationFromYaml(config_yaml),
+                          parseScopedRouteConfigurationFromYaml(config_yaml2)});
 
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
 
   envoy::config::filter::network::http_connection_manager::v2 ::ScopedRoutes::ScopeKeyBuilder
       scope_key_builder;
   MessageUtil::loadFromYaml(R"EOF(
-scope_key_builder:
-  fragments:
-    - header_value_extractor: { name: X-Google-VIP }
+fragments:
+  - header_value_extractor: { name: X-Google-VIP }
 )EOF",
                             scope_key_builder);
   // Only load the inline scopes.
@@ -313,19 +311,19 @@ scope_key_builder:
           *message_ptr);
   MessageUtil::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
-  - scoped_routes_config:
-      name: foo
-      scope_key_builder:
-        fragments:
-          - header_value_extractor: { name: X-Google-VIP }
-      scopes:
-        - route_configuration_name: foo-route-config
-          key:
-            fragments: { string_key: "172.10.10.10" }
-    last_updated:
-      seconds: 1234567891
-      nanos: 234000000
-dynamic_scoped_routes_configs:
+  scoped_route_configs:
+    - name: foo
+      route_configuration_name: foo-route-config
+      key:
+        fragments: { string_key: "172.10.10.10" }
+    - name: foo2
+      route_configuration_name: foo-route-config2
+      key:
+        fragments: { string_key: "172.10.10.20" }
+  last_updated:
+    seconds: 1234567891
+    nanos: 234000000
+dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump2.DebugString());

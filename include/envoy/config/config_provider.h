@@ -90,7 +90,7 @@ public:
   }
 
   absl::optional<ConfigProtoInfoVec> configProtoInfoVec() const {
-    std::vector<const Protobuf::Message*> config_protos = getConfigProtos();
+    const std::vector<const Protobuf::Message*> config_protos = getConfigProtos();
     if (config_protos.empty()) {
       return absl::nullopt;
     }

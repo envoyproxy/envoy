@@ -46,21 +46,30 @@ protected:
     config_helper_.addConfigModifier(
         [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
                    http_connection_manager) {
-          // RDS must be enabled along when SRDS is enabled.
-          auto* rds = http_connection_manager.mutable_rds();
-          rds->set_scoped_rds_template(true);
-          auto* api_config_source = rds->mutable_config_source()->mutable_api_config_source();
-          api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-          auto* grpc_service = api_config_source->add_grpc_services();
-          setGrpcService(*grpc_service, "rds_cluster", fake_upstreams_[2]->localAddress());
+          const std::string& scope_key_builder_config_yaml = R"EOF(
+fragments:
+  - header_value_extractor: { name: X-Google-VIP }
+)EOF";
+          envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
+              scope_key_builder;
+          MessageUtil::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
+          auto* scoped_routes = http_connection_manager.mutable_scoped_routes();
+          *scoped_routes->mutable_scope_key_builder() = scope_key_builder;
 
-          // Configure SRDS.
-          auto* scoped_rds = http_connection_manager.mutable_scoped_rds();
-          scoped_rds->set_scoped_routes_config_set_name("foo_scope_set");
-          api_config_source = scoped_rds->mutable_config_source()->mutable_api_config_source();
-          api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-          grpc_service = api_config_source->add_grpc_services();
-          setGrpcService(*grpc_service, "srds_cluster", fake_upstreams_[1]->localAddress());
+          envoy::api::v2::core::ApiConfigSource* rds_api_config_source =
+              scoped_routes->mutable_rds_config_source()->mutable_api_config_source();
+          rds_api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+          envoy::api::v2::core::GrpcService* grpc_service =
+              rds_api_config_source->add_grpc_services();
+          setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
+
+          envoy::api::v2::core::ApiConfigSource* srds_api_config_source =
+              scoped_routes->mutable_scoped_rds()
+                  ->mutable_scoped_rds_config_source()
+                  ->mutable_api_config_source();
+          srds_api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+          grpc_service = srds_api_config_source->add_grpc_services();
+          setGrpcService(*grpc_service, "srds_cluster", getScopedRdsFakeUpstream().localAddress());
         });
 
     HttpIntegrationTest::initialize();
@@ -114,16 +123,19 @@ protected:
     createStream(&scoped_rds_upstream_info_, getScopedRdsFakeUpstream());
   }
 
-  void sendScopedRdsResponse(const std::string& response_yaml, const std::string& version) {
+  void sendScopedRdsResponse(const std::vector<std::string>& resource_protos,
+                             const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_ != nullptr);
 
     envoy::api::v2::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().ScopedRouteConfigurationsSet);
+    response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
-    envoy::api::v2::ScopedRouteConfigurationsSet scoped_routes_proto;
-    MessageUtil::loadFromYaml(response_yaml, scoped_routes_proto);
-    response.add_resources()->PackFrom(scoped_routes_proto);
+    for (const auto& resource_proto : resource_protos) {
+      envoy::api::v2::ScopedRouteConfiguration scoped_route_proto;
+      MessageUtil::loadFromYaml(resource_proto, scoped_route_proto);
+      response.add_resources()->PackFrom(scoped_route_proto);
+    }
 
     scoped_rds_upstream_info_.stream_->sendGrpcMessage(response);
   }
@@ -136,47 +148,44 @@ INSTANTIATE_TEST_CASE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(ScopedRdsIntegrationTest, BasicSuccess) {
-  const std::string response_yaml = R"EOF(
-name: foo_scope_set
-scope_key_builder:
+  const std::string scope_route1 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_route1
+key:
   fragments:
-    - header_value_extractor: { name: element }
-scopes:
-  - route_configuration_name: foo_routes
-    key:
-      fragments:
-        - string_key: x-foo-key
+    - string_key: x-foo-key
+)EOF";
+  const std::string scope_route2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_route2
+key:
+  fragments:
+    - string_key: x-foo-key
 )EOF";
 
-  pre_worker_start_test_steps_ = [this, &response_yaml]() {
+  pre_worker_start_test_steps_ = [this, &scope_route1, &scope_route2]() {
     createScopedRdsStream();
-    sendScopedRdsResponse(response_yaml, "1");
+    sendScopedRdsResponse({scope_route1, scope_route2}, "1");
   };
   initialize();
 
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo_scope_set.update_attempt", 1);
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo_scope_set.update_success", 1);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.update_attempt", 1);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.update_success", 1);
   // The version gauge should be set to xxHash64("1").
-  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo_scope_set.version",
-                               13237225503670494420UL);
+  test_server_->waitForGaugeEq("http.config_test.scoped_rds.version", 13237225503670494420UL);
 
-  const std::string response_yaml2 = R"EOF(
-name: foo_scope_set
-scope_key_builder:
+  const std::string scope_route3 = R"EOF(
+name: foo_scope3
+route_configuration_name: foo_route3
+key:
   fragments:
-    - header_value_extractor: { name: element }
-scopes:
-  - route_configuration_name: foo_routes2
-    key:
-      fragments:
-        - string_key: x-baz-key
+    - string_key: x-baz-key
 )EOF";
-  sendScopedRdsResponse(response_yaml, "2");
+  sendScopedRdsResponse({scope_route3}, "2");
 
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo_scope_set.update_attempt", 2);
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo_scope_set.update_success", 2);
-  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo_scope_set.version",
-                               6927017134761466251UL);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.update_attempt", 2);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.update_success", 2);
+  test_server_->waitForGaugeEq("http.config_test.scoped_rds.version", 6927017134761466251UL);
 
   // TODO(AndresGuedez): test actual scoped routing logic; only the config handling is implemented
   // at this point.
