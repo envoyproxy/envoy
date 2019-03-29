@@ -167,7 +167,16 @@ private:
   // Callback issued when a delayed close timeout triggers.
   void onDelayedCloseTimeout();
 
+  void initializeDelayedCloseTimer();
+  bool inDelayedClose() const { return delayed_close_state_ != DelayedCloseState::None; }
+
   static std::atomic<uint64_t> next_global_id_;
+
+  // States associated with delayed closing of the connection (i.e., when the
+  // underlying socket is not immediately close()d as a result of a
+  // ConnectionImpl::close()).
+  enum class DelayedCloseState { None, CloseAfterFlush, CloseAfterFlushAndTimeout };
+  DelayedCloseState delayed_close_state_{DelayedCloseState::None};
 
   Event::Dispatcher& dispatcher_;
   const uint64_t id_;
@@ -175,8 +184,6 @@ private:
   std::list<ConnectionCallbacks*> callbacks_;
   std::list<BytesSentCb> bytes_sent_callbacks_;
   bool read_enabled_{true};
-  bool close_after_flush_{false};
-  bool delayed_close_{false};
   bool above_high_watermark_{false};
   bool detect_early_close_{true};
   bool enable_half_close_{false};
