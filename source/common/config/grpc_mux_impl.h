@@ -2,6 +2,8 @@
 
 #include <unordered_map>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
@@ -28,7 +30,7 @@ public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Runtime::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, Server::ConfigTracker& config_tracker);
+              const RateLimitSettings& rate_limit_settings, Server::ConfigTracker& config_tracker,const envoy::api::v2::core::GrpcService& grpc_service );
   ~GrpcMuxImpl();
 
   void start() override;
@@ -87,19 +89,20 @@ private:
     bool subscribed_{};
   };
 
-  // ControlPlane with which Envoy is connected to.
-  struct ControlPlane {
-    std::string control_plane_identifier_;
-    SystemTime last_updated_;
-  };
-
+struct ConfigSourceHash {
+  std::size_t operator()(envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo const& config_source_info) const noexcept {
+    return MessageUtil::hash(config_source_info.grpc_service());
+  }
+};
   const LocalInfo::LocalInfo& local_info_;
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
-  ControlPlane control_plane_;
+  const std::string& service_name_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   TimeSource& time_source_;
+  const envoy::api::v2::core::GrpcService& grpc_service_;
+  static std::unordered_map<std::string, std::unordered_set<envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo,ConfigSourceHash>> service_control_plane_config_dump_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

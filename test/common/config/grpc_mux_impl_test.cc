@@ -184,11 +184,12 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
 // Validate that controlplane config dump is generated correctly.
 TEST_F(GrpcMuxImplTest, DumpControlPlaneConfig) {
   const std::string expected_config_dump = R"EOF({
-   "control_plane": {
-     "identifier": "control_plane_1"
-   }
-}
-)EOF";
+     "service": "envoy.service.discovery.v2.AggregatedDiscoveryService",
+     "control_plane": {
+       "identifier" : "control_plane_1"
+     }
+  }
+  )EOF";
   setup();
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;

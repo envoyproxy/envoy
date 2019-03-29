@@ -70,6 +70,8 @@ public:
             Utility::configSourceInitialFetchTimeout(config)));
         break;
       case envoy::api::v2::core::ApiConfigSource::GRPC:
+       envoy::api::v2::core::GrpcService grpc_service;
+        grpc_service.MergeFrom(api_config_source.grpc_services(0));
         result.reset(new GrpcSubscriptionImpl<ResourceType>(
             local_info,
             Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
@@ -78,7 +80,7 @@ public:
             dispatcher, random,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats,
             scope, Utility::parseRateLimitSettings(api_config_source),
-            Utility::configSourceInitialFetchTimeout(config), config_tracker));
+            Utility::configSourceInitialFetchTimeout(config), config_tracker, grpc_service));
         break;
       case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
         Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);

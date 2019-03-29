@@ -10,6 +10,8 @@ import "envoy/api/v2/cds.proto";
 import "envoy/api/v2/lds.proto";
 import "envoy/api/v2/rds.proto";
 import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/grpc_service.proto";
+
 import "envoy/config/bootstrap/v2/bootstrap.proto";
 
 import "google/protobuf/any.proto";
@@ -34,7 +36,6 @@ message ConfigDump {
   // <envoy_api_msg_admin.v2alpha.ControlPlaneConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v2alpha.RoutesConfigDump>`
-
   repeated google.protobuf.Any configs = 1 [(gogoproto.nullable) = false];
 }
 
@@ -185,9 +186,29 @@ message RoutesConfigDump {
 
 // This message describes the control plane configuration that Envoy is currently connected to.
 message ControlPlaneConfigDump {
-  // The control plane that Envoy is currently connected to.
-  envoy.api.v2.core.ControlPlane control_plane = 1 [(gogoproto.nullable) = false];
 
+  message ConfigSourceControlPlaneInfo {
+
+  // gRPC service represented by ApiConfigSource.
+  envoy.api.v2.core.GrpcService grpc_service = 1;
+
+  // The control plane that this Service is currently connected to.
+  envoy.api.v2.core.ControlPlane control_plane = 2 [(gogoproto.nullable) = false];
+ 
   // The timestamp when the ControlPlane information was last updated.
-  google.protobuf.Timestamp last_updated = 2;
+  google.protobuf.Timestamp last_updated = 3; 
+  }
+
+  message ServiceControlPlaneInfo {
+
+    // The xDS service this control plane information belongs to. For example envoy.api.v2.EndpointDiscoveryService represents control plane info that Envoy 
+    // has been configured for EndpointDiscoveryService.
+    string service = 1;
+
+    // The list of control plane information that Envoy has been configured to connect with for this service.
+    repeated ConfigSourceControlPlaneInfo config_source_control_plane = 2;
+  }
+
+  // The list of all service specific control plane information.
+  repeated ServiceControlPlaneInfo service_control_plane_info = 1;
 }
