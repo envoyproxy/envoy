@@ -993,19 +993,16 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
                                                          uint64_t random_value) const {
   // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
   // bails early (as it rejects a request), so there is no routing is going to happen anyway.
-  if (headers.ForwardedProto() == nullptr) {
+  const auto* forwarded_proto_header = headers.ForwardedProto();
+  if (forwarded_proto_header == nullptr) {
     return nullptr;
   }
 
-  // Check if this is an http or https request. Defaults to assume that it is an http
-  // request unless ForwardedProto is explicitly set to https
-  bool http_request = (headers.ForwardedProto()->value() != "https");
-
   // First check for ssl redirect.
-  if (ssl_requirements_ == SslRequirements::ALL && http_request) {
+  if (ssl_requirements_ == SslRequirements::ALL && forwarded_proto_header->value() != "https") {
     return SSL_REDIRECT_ROUTE;
-  } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY && http_request &&
-             !headers.EnvoyInternalRequest()) {
+  } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
+             forwarded_proto_header->value() != "https" && !headers.EnvoyInternalRequest()) {
     return SSL_REDIRECT_ROUTE;
   }
 
