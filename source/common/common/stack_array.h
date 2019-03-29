@@ -19,7 +19,7 @@ namespace Envoy {
 // the array won't be deallocated until the function containing the macro returns.
 // We can't call alloca in the StackArray constructor since the memory would
 // be freed when the constructor returns.
-#define STACK_ARRAY(var, type, num) Envoy::StackArray<type> var(::alloca(sizeof(type) * num), num)
+#define STACK_ARRAY(var, type, num) StackArray<type> var(::alloca(sizeof(type) * num), num)
 
 template <typename T> class StackArray {
 public:

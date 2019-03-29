@@ -255,27 +255,21 @@ cc_library(
         "quiche/quic/core/quic_simple_buffer_allocator.h",
     ],
     visibility = ["//visibility:public"],
-    deps = [
-        ":quic_platform_export",
-    ],
+    deps = [":quic_platform_export"],
 )
 
 cc_library(
-    name = "quic_mem_slice_span_lib",
+    name = "quic_platform_mem_slice_span_lib",
     hdrs = ["quiche/quic/platform/api/quic_mem_slice_span.h"],
     visibility = ["//visibility:public"],
-    deps = [
-        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_mem_slice_span_impl_lib",
-    ],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_span_impl_lib"],
 )
 
 cc_library(
-    name = "quic_mem_slice_storage_lib",
+    name = "quic_platform_mem_slice_storage_lib",
     hdrs = ["quiche/quic/platform/api/quic_mem_slice_storage.h"],
     visibility = ["//visibility:public"],
-    deps = [
-        "@envoy//source/extensions/quic_listeners/quiche/platform:quic_mem_slice_storage_impl_lib",
-    ],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_storage_impl_lib"],
 )
 
 cc_library(
@@ -382,8 +376,8 @@ cc_library(
     copts = envoy_copts("@envoy") + ["-Wno-error=invalid-offsetof"],
     visibility = ["//visibility:public"],
     deps = [
-        ":quic_mem_slice_span_lib",
         ":quic_platform_base",
+        ":quic_platform_mem_slice_span_lib",
         ":quiche_quic_core_base",
     ],
 )
@@ -434,9 +428,9 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         ":quic_buffer_allocator_lib",
-        ":quic_mem_slice_span_lib",
-        ":quic_mem_slice_storage_lib",
         ":quic_platform",
+        ":quic_platform_mem_slice_span_lib",
+        ":quic_platform_mem_slice_storage_lib",
         ":spdy_platform",
     ],
 )

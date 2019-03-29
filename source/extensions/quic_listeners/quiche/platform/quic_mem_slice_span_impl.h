@@ -34,7 +34,7 @@ public:
   QuicStringPiece GetData(size_t index) {
     uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);
     ASSERT(num_slices > index);
-    STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
+    Envoy::STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
     buffer_.getRawSlices(slices.begin(), num_slices);
     return QuicStringPiece(reinterpret_cast<char*>(slices[index].mem_), slices[index].len_);
   }
@@ -45,7 +45,7 @@ public:
 
   template <typename ConsumeFunction> QuicByteCount ConsumeAll(ConsumeFunction consume) {
     uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);
-    STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
+    Envoy::STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
     buffer_.getRawSlices(slices.begin(), num_slices);
     size_t saved_length = 0;
     for (auto slice : slices) {
