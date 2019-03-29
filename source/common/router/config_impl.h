@@ -722,7 +722,14 @@ public:
 
 private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
-  const VirtualHostImpl* findWildcardVirtualHost(const std::string& host) const;
+
+  typedef std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>,
+                   std::greater<int64_t>>
+      WildcardVirtualHosts;
+  typedef std::function<std::string(const std::string&, int)> SubstringFunction;
+  const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
+                                                 const WildcardVirtualHosts& wildcard_virtual_hosts,
+                                                 SubstringFunction substring_function) const;
 
   std::unordered_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
@@ -734,8 +741,9 @@ private:
   // and climbs to about 110ns once there are any entries.
   //
   // The break-even is 4 entries.
-  std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<int64_t>>
-      wildcard_virtual_host_suffixes_;
+  WildcardVirtualHosts wildcard_virtual_host_suffixes_;
+  WildcardVirtualHosts wildcard_virtual_host_prefixes_;
+
   VirtualHostSharedPtr default_virtual_host_;
 };
 

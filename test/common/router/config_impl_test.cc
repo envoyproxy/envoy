@@ -2645,6 +2645,113 @@ virtual_hosts:
       "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com");
 }
 
+TEST_F(RouteMatcherTest, TestDuplicateWildcardDomainConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2 }
+- name: www2_staging
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2_staging }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Only a single wildcard domain is permitted");
+}
+
+TEST_F(RouteMatcherTest, TestDuplicateSuffixWildcardDomainConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["*.lyft.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2 }
+- name: www2_staging
+  domains: ["*.LYFT.COM"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2_staging }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com");
+}
+
+TEST_F(RouteMatcherTest, TestDuplicatePrefixWildcardDomainConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["bar.*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2 }
+- name: www2_staging
+  domains: ["BAR.*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2_staging }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
+}
+
+TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: exact
+  domains: ["www.example.com", "www.example.cc", "wwww.example.com" ]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: exact }
+- name: suffix
+  domains: ["*w.example.com" ]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: suffix }
+- name: prefix
+  domains: ["www.example.c*", "ww.example.c*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: prefix }
+- name: default
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: default }
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  EXPECT_EQ(
+      "exact",
+      config.route(genHeaders("www.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      "exact",
+      config.route(genHeaders("wwww.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("exact",
+            config.route(genHeaders("www.example.cc", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("suffix",
+            config.route(genHeaders("ww.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("prefix",
+            config.route(genHeaders("www.example.co", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("default",
+            config.route(genHeaders("w.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("default",
+            config.route(genHeaders("www.example.c", "/", "GET"), 0)->routeEntry()->clusterName());
+}
+
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
                                                   bool ssl, bool internal) {
   Http::TestHeaderMapImpl headers{
