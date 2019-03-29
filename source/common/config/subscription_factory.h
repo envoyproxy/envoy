@@ -41,7 +41,7 @@ public:
       const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
       Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
       Stats::Scope& scope, const std::string& rest_method, const std::string& grpc_method,
-      const std::string& type_url, Api::Api& api) {
+      absl::string_view type_url, Api::Api& api) {
     std::unique_ptr<Subscription> result;
     SubscriptionStats stats = Utility::generateStats(scope);
     switch (config.config_source_specifier_case()) {

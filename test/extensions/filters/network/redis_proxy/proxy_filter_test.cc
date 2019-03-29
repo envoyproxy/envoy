@@ -60,7 +60,7 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       parseProtoFromJson(json_string);
   ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_);
-  EXPECT_EQ("redis.foo.", config.stat_prefix_);
+  EXPECT_EQ("fake_cluster", config.cluster_name_);
 }
 
 TEST_F(RedisProxyFilterConfigTest, BadRedisProxyConfig) {
