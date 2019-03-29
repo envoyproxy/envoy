@@ -1199,13 +1199,13 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
 
   InSequence s1;
 
-  // The actual timeout is insignificant, we just need to enable delayed close processing by
-  // setting it to > 0.
+  // The actual timeout is insignificant, we just need to enable delayed close processing by setting
+  // it to > 0.
   server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
-  // NOTE: Avoid providing stats storage to the connection via setConnectionStats(). This
-  // guarantees that connection_stats_ is a nullptr and that the callback resiliency validation
-  // below tests that edge case.
+  // NOTE: Avoid providing stats storage to the connection via setConnectionStats(). This guarantees
+  // that connection_stats_ is a nullptr and that the callback resiliency validation below tests
+  // that edge case.
 
   Buffer::OwnedImpl data("data");
   EXPECT_CALL(*mocks.file_event_, activate(Event::FileReadyType::Write))

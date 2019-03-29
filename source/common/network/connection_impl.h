@@ -172,9 +172,8 @@ private:
 
   static std::atomic<uint64_t> next_global_id_;
 
-  // States associated with delayed closing of the connection (i.e., when the
-  // underlying socket is not immediately close()d as a result of a
-  // ConnectionImpl::close()).
+  // States associated with delayed closing of the connection (i.e., when the underlying socket is
+  // not immediately close()d as a result of a ConnectionImpl::close()).
   enum class DelayedCloseState { None, CloseAfterFlush, CloseAfterFlushAndTimeout };
   DelayedCloseState delayed_close_state_{DelayedCloseState::None};
 
