@@ -58,7 +58,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       retriable_status_codes_(route_policy.retriableStatusCodes()) {
 
   retry_on_ = route_policy.retryOn();
-  retries_remaining_ = route_policy.numRetries();
+  retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
   const uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
   // Cap the max interval to 10 times the base interval to ensure reasonable backoff intervals.
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
