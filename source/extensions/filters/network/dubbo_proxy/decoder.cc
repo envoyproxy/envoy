@@ -152,9 +152,6 @@ Network::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_under
   case ProtocolState::StopIteration:
     ENVOY_LOG(debug, "dubbo decoder: wait for continuation");
     return Network::FilterStatus::StopIteration;
-  case ProtocolState::HeartbeatEventDone:
-    ENVOY_LOG(debug, "dubbo decoder: complete heartbeat processing");
-    return Network::FilterStatus::StopIteration;
   default:
     break;
   }

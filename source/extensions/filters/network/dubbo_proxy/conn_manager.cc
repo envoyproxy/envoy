@@ -39,7 +39,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
     if (stopped_) {
       ASSERT(!active_message_list_.empty());
       auto metadata = (*active_message_list_.begin())->metadata();
-      if (metadata->message_type() == MessageType::Oneway) {
+      if (metadata && metadata->message_type() == MessageType::Oneway) {
         ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
         half_closed_ = true;
         return Network::FilterStatus::StopIteration;
@@ -85,7 +85,6 @@ DecoderEventHandler* ConnectionManager::newDecoderEventHandler() {
   ActiveMessagePtr new_message(std::make_unique<ActiveMessage>(*this));
   new_message->createFilterChain();
   new_message->moveIntoList(std::move(new_message), active_message_list_);
-  ASSERT((*active_message_list_.begin()).get()->inserted());
   return (*active_message_list_.begin()).get();
 }
 
@@ -186,7 +185,9 @@ void ConnectionManager::continueDecoding() {
 }
 
 void ConnectionManager::deferredMessage(ActiveMessage& message) {
-  ASSERT(message.inserted());
+  if (!message.inserted()) {
+    return;
+  }
   read_callbacks_->connection().dispatcher().deferredDelete(
       message.removeFromList(active_message_list_));
 }

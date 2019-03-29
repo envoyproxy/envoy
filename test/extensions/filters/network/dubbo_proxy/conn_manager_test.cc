@@ -3,6 +3,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "extensions/filters/network/dubbo_proxy/app_exception.h"
 #include "extensions/filters/network/dubbo_proxy/config.h"
 #include "extensions/filters/network/dubbo_proxy/conn_manager.h"
 #include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
@@ -62,11 +63,20 @@ public:
     return ConfigImpl::createProtocol();
   }
 
+  Router::RouteConstSharedPtr route(const MessageMetadata& metadata,
+                                    uint64_t random_value) const override {
+    if (route_) {
+      return route_;
+    }
+    return ConfigImpl::route(metadata, random_value);
+  }
+
   DubboFilters::DecoderFilterSharedPtr custom_filter_;
   DubboFilters::DecoderFilterSharedPtr decoder_filter_;
   DubboFilterStats& stats_;
   MockDeserializer* deserializer_{};
   MockProtocol* protocol_{};
+  std::shared_ptr<Router::MockRoute> route_;
 };
 
 class ConnectionManagerTest : public testing::Test {
@@ -125,9 +135,11 @@ public:
 
     buffer.add(std::string{'\xda', '\xbb'});
     buffer.add(static_cast<void*>(&msg_type), 1);
-    buffer.add(std::string{0x46});                   // Response status
-    addInt64(buffer, request_id);                    // Request Id
-    buffer.add(std::string{0x00, 0x00, 0x00, 0x01}); // Body Length
+    buffer.add(std::string{0x46});                     // Response status
+    addInt64(buffer, request_id);                      // Request Id
+    buffer.add(std::string{0x00, 0x00, 0x00, 0x06,     // Body Length
+                           '\x91',                     // return type, exception
+                           0x05, 't', 'e', 's', 't'}); // return body
   }
 
   void writeHessianExceptionResponseMessage(Buffer::Instance& buffer, bool is_event,
@@ -329,10 +341,6 @@ TEST_F(ConnectionManagerTest, OnDataHandlesHeartbeatEvent) {
         EXPECT_EQ(metadata->response_status().value(), ResponseStatus::Ok);
         EXPECT_EQ(metadata->message_type(), MessageType::Response);
         buffer.drain(ctx.header_size_);
-
-        // DeserializerPtr deserializer = filter_->config().createDeserializer();
-        // RpcResultPtr result = deserializer->deserializeRpcResult(buffer, ctx.body_size_);
-        // EXPECT_FALSE(result->hasException());
       }));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -422,8 +430,9 @@ TEST_F(ConnectionManagerTest, OnDataStopsSniffingWithTooManyPendingCalls) {
 }
 
 TEST_F(ConnectionManagerTest, OnWriteHandlesResponse) {
+  uint64_t request_id = 100;
   initializeFilter();
-  writeHessianRequestMessage(buffer_, false, false, 0x0F);
+  writeHessianRequestMessage(buffer_, false, false, request_id);
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
@@ -433,11 +442,15 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponse) {
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.gauge("test.request_active").value());
 
-  writeHessianResponseMessage(write_buffer_, false, 0x0F);
+  writeHessianResponseMessage(write_buffer_, false, request_id);
 
   DubboProtocolImpl protocol;
   HessianDeserializerImpl deserializer;
   callbacks->startUpstreamResponse(deserializer, protocol);
+
+  EXPECT_EQ(callbacks->requestId(), request_id);
+  EXPECT_EQ(callbacks->connection(), &(filter_callbacks_.connection_));
+  EXPECT_GE(callbacks->streamId(), 0);
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
   EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
@@ -452,7 +465,7 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponse) {
   EXPECT_EQ(0U, store_.gauge("test.request_active").value());
 }
 
-TEST_F(ConnectionManagerTest, OnWriteHandlesResponseError) {
+TEST_F(ConnectionManagerTest, HandlesResponseContainExceptionInfo) {
   initializeFilter();
   writeHessianRequestMessage(buffer_, false, false, 1);
 
@@ -479,6 +492,36 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponseError) {
   EXPECT_EQ(1U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
   EXPECT_EQ(1U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_decoding_error").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+}
+
+TEST_F(ConnectionManagerTest, HandlesResponseError) {
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, false, false, 1);
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+
+  writeHessianErrorResponseMessage(write_buffer_, false, 1);
+
+  DubboProtocolImpl protocol;
+  HessianDeserializerImpl deserializer;
+  callbacks->startUpstreamResponse(deserializer, protocol);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("test.response_success").value());
+  EXPECT_EQ(1U, store_.counter("test.response_error").value());
   EXPECT_EQ(0U, store_.counter("test.response_decoding_error").value());
   EXPECT_EQ(0U, store_.gauge("test.request_active").value());
 }
@@ -769,6 +812,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   // First filter sends local reply.
   EXPECT_CALL(*filter, messageEnd(_))
       .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> Network::FilterStatus {
+        callbacks->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
         callbacks->sendLocalReply(direct_response, false);
         return Network::FilterStatus::StopIteration;
       }));
@@ -778,6 +822,8 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
       }));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(SerializationType::Hessian, callbacks->downstreamSerializationType());
+  EXPECT_EQ(ProtocolType::Dubbo, callbacks->downstreamProtocolType());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
@@ -834,6 +880,273 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_EQ(1U, store_.counter("test.local_response_error").value());
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+}
+
+TEST_F(ConnectionManagerTest, TwoWayRequestWithEndStream) {
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, false, false, 0x0F);
+
+  ON_CALL(*decoder_filter_, transferHeaderTo(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance&, size_t) -> Network::FilterStatus {
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+}
+
+TEST_F(ConnectionManagerTest, OneWayRequestWithEndStream) {
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, true, false, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, messageEnd(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> Network::FilterStatus {
+        return Network::FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(0);
+  EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+}
+
+TEST_F(ConnectionManagerTest, EmptyRequestData) {
+  initializeFilter();
+  buffer_.drain(buffer_.length());
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(0);
+  EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.request_active").value());
+}
+
+TEST_F(ConnectionManagerTest, StopHandleRequest) {
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, false, false, 0x0F);
+
+  ON_CALL(*decoder_filter_, transferHeaderTo(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance&, size_t) -> Network::FilterStatus {
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(0);
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+}
+
+TEST_F(ConnectionManagerTest, HandlesHeartbeatEventWithConnectionClose) {
+  initializeFilter();
+  writeHessianHeartbeatRequestMessage(buffer_, 0x0F);
+
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, false)).Times(0);
+
+  filter_callbacks_.connection_.close(Network::ConnectionCloseType::FlushWrite);
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_event").value());
+}
+
+TEST_F(ConnectionManagerTest, SendsLocalReplyWithCloseConnection) {
+  initializeFilter();
+
+  const std::string fake_response("mock dubbo response");
+  NiceMock<DubboFilters::MockDirectResponse> direct_response;
+  EXPECT_CALL(direct_response, encode(_, _, _, _))
+      .WillOnce(Invoke([&](MessageMetadata&, Protocol&, Deserializer&,
+                           Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+        buffer.add(fake_response);
+        return DubboFilters::DirectResponse::ResponseType::ErrorReply;
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(1);
+
+  MessageMetadata metadata;
+  filter_->sendLocalReply(metadata, direct_response, true);
+  EXPECT_EQ(1U, store_.counter("test.local_response_error").value());
+
+  // The connection closed.
+  EXPECT_CALL(direct_response, encode(_, _, _, _)).Times(0);
+  filter_->sendLocalReply(metadata, direct_response, true);
+}
+
+TEST_F(ConnectionManagerTest, ContinueDecodingWithHalfClose) {
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, true, false, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, messageEnd(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> Network::FilterStatus {
+        return Network::FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(0);
+  EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
+      .Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  filter_->continueDecoding();
+}
+
+TEST_F(ConnectionManagerTest, RoutingSuccess) {
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, false, false, 0x0F);
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  config_->route_ = std::make_shared<Router::MockRoute>();
+  EXPECT_EQ(config_->route_, callbacks->route());
+
+  // Use the cache.
+  EXPECT_NE(nullptr, callbacks->route());
+}
+
+TEST_F(ConnectionManagerTest, RoutingFailure) {
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, false, false, 0x0F);
+
+  EXPECT_CALL(*decoder_filter_, transportBegin()).WillOnce(Invoke([&]() -> Network::FilterStatus {
+    return Network::FilterStatus::StopIteration;
+  }));
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  // The metadata is nullptr.
+  config_->route_ = std::make_shared<Router::MockRoute>();
+  EXPECT_EQ(nullptr, callbacks->route());
+}
+
+TEST_F(ConnectionManagerTest, ResetStream) {
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, false, false, 0x0F);
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  callbacks->resetStream();
+}
+
+TEST_F(ConnectionManagerTest, NeedMoreDataForHandleResponse) {
+  uint64_t request_id = 100;
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, false, false, request_id);
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+
+  writePartialHessianRequestMessage(write_buffer_, false, false, 0x0F, true);
+
+  DubboProtocolImpl protocol;
+  HessianDeserializerImpl deserializer;
+  callbacks->startUpstreamResponse(deserializer, protocol);
+
+  EXPECT_EQ(DubboFilters::UpstreamResponseStatus::MoreData, callbacks->upstreamData(write_buffer_));
+}
+
+TEST_F(ConnectionManagerTest, PendingMessageEnd) {
+  uint64_t request_id = 100;
+  initializeFilter();
+  writeHessianRequestMessage(buffer_, false, false, request_id);
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+  EXPECT_CALL(*decoder_filter_, messageEnd(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> Network::FilterStatus {
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+}
+
+TEST_F(ConnectionManagerTest, Routing) {
+  const std::string yaml = R"EOF(
+stat_prefix: test
+protocol_type: Dubbo
+serialization_type: Hessian2
+route_config:
+  - name: test1
+    interface: org.apache.dubbo.demo.DemoService
+    routes:
+      - match:
+          method:
+            name:
+              regex: "(.*?)"
+        route:
+            cluster: user_service_dubbo_server
+)EOF";
+
+  initializeFilter(yaml);
+  writeHessianRequestMessage(buffer_, false, false, 100);
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+  EXPECT_CALL(*decoder_filter_, messageEnd(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> Network::FilterStatus {
+        metadata->setServiceName("org.apache.dubbo.demo.DemoService");
+        metadata->setMethodName("test");
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+
+  Router::RouteConstSharedPtr route = callbacks->route();
+  EXPECT_NE(nullptr, route);
+  EXPECT_NE(nullptr, route->routeEntry());
+  EXPECT_EQ("user_service_dubbo_server", route->routeEntry()->clusterName());
+}
+
+TEST_F(ConnectionManagerTest, TransportEndWithConnectionClose) {
+  initializeFilter();
+
+  DubboFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  writeHessianRequestMessage(buffer_, false, false, 1);
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  writeHessianResponseMessage(write_buffer_, false, 1);
+
+  DubboProtocolImpl protocol;
+  HessianDeserializerImpl deserializer;
+  callbacks->startUpstreamResponse(deserializer, protocol);
+
+  filter_callbacks_.connection_.close(Network::ConnectionCloseType::FlushWrite);
+
+  EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
+  EXPECT_EQ(1U, store_.counter("test.response_error").value());
 }
 
 } // namespace DubboProxy

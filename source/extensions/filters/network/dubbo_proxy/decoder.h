@@ -17,7 +17,6 @@ namespace DubboProxy {
 #define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
   FUNCTION(StopIteration)                                                                          \
   FUNCTION(WaitForData)                                                                            \
-  FUNCTION(HeartbeatEventDone)                                                                     \
   FUNCTION(onTransportBegin)                                                                       \
   FUNCTION(onTransportEnd)                                                                         \
   FUNCTION(onMessageBegin)                                                                         \
