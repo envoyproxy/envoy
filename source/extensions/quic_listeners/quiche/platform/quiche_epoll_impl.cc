@@ -13,8 +13,6 @@
 #include <algorithm>
 #include <utility>
 
-#define CHECK(condition)                                                                           \
-  QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << "CHECK failed: " #condition "."
 #define CHECK_NE(x, y) CHECK(x != y)
 #define CHECK_EQ(x, y) CHECK(x == y)
 #define CHECK_GE(x, y) CHECK(x >= y)
@@ -23,7 +21,6 @@
 #define CHECK_LT(x, y) CHECK(x < y)
 
 #ifndef NDEBUG
-#define DCHECK(condition) CHECK(condition)
 #define DCHECK_NE(x, y) CHECK(x != y)
 #define DCHECK_EQ(x, y) CHECK(x == y)
 #define DCHECK_GE(x, y) CHECK(x >= y)
@@ -31,9 +28,6 @@
 #define DCHECK_LE(x, y) CHECK(x <= y)
 #define DCHECK_LT(x, y) CHECK(x < y)
 #else
-#define DCHECK(condition)                                                                          \
-  while (false && (condition))                                                                     \
-  quic::NullLogStream().stream()
 #define DCHECK_NE(x, y) DCHECK(x != y)
 #define DCHECK_EQ(x, y) DCHECK(x == y)
 #define DCHECK_GE(x, y) DCHECK(x >= y)

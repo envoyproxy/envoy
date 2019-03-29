@@ -8,15 +8,19 @@
 #include <string>
 #include <vector>
 
-#define GetQuicFlagImpl(flag) []() { return true; }()
+// This is a dummy implementation which just allows its dependency to build.
+// TODO(mpwarres): implement once QUICHE flag mechanism is defined.
+
+extern bool FLAGS_quic_supports_tls_handshake;
+#define GetQuicFlagImpl(flag) ({ false; })
 #define SetQuicFlagImpl(flag, value)                                                               \
   do {                                                                                             \
   } while (0)
-#define GetQuicReloadableFlagImpl(flag) []() { return true; }()
+#define GetQuicReloadableFlagImpl(flag) ({ false; })
 #define SetQuicReloadableFlagImpl(flag, value)                                                     \
   do {                                                                                             \
   } while (0)
-#define GetQuicRestartFlagImpl(flag) []() { return true; }()
+#define GetQuicRestartFlagImpl(flag) ({ false; })
 #define SetQuicRestartFlagImpl(flag, value)                                                        \
   do {                                                                                             \
   } while (0)
@@ -26,11 +30,11 @@
   } while (0)
 
 namespace quic {
-std::vector<std::string> QuicParseCommandLineFlagsImpl(const char* /*usage*/, int /*argc*/,
-                                                       const char* const* /*argv*/) {
+inline std::vector<std::string> QuicParseCommandLineFlagsImpl(const char* /*usage*/, int /*argc*/,
+                                                              const char* const* /*argv*/) {
   return std::vector<std::string>();
 }
 
-void QuicPrintCommandLineFlagHelpImpl(const char* /*usage*/) {}
+inline void QuicPrintCommandLineFlagHelpImpl(const char* /*usage*/) {}
 
 // porting layer for QUICHE.
