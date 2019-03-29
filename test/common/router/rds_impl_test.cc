@@ -130,6 +130,11 @@ public:
     factory_context_.init_manager_.initialize(init_watcher_);
   }
 
+  RouteConstSharedPtr route(Http::TestHeaderMapImpl headers) {
+    headers.addCopy("x-forwarded-proto", "http");
+    return rds_->config()->route(headers, 0);
+  }
+
   NiceMock<Stats::MockStore> scope_;
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
@@ -221,7 +226,7 @@ TEST_F(RdsImplTest, Basic) {
   setup();
 
   // Make sure the initial empty route table works.
-  EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
+  EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
   EXPECT_EQ(0UL, factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
 
   // Initial request.
@@ -245,7 +250,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
+  EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
   EXPECT_EQ(13237225503670494420U,
             factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
 
@@ -259,7 +264,7 @@ TEST_F(RdsImplTest, Basic) {
 
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ(nullptr, rds_->config()->route(Http::TestHeaderMapImpl{{":authority", "foo"}}, 0));
+  EXPECT_EQ(nullptr, route(Http::TestHeaderMapImpl{{":authority", "foo"}}));
 
   EXPECT_EQ(13237225503670494420U,
             factory_context_.scope_.gauge("foo.rds.foo_route_config.version").value());
@@ -310,8 +315,7 @@ TEST_F(RdsImplTest, Basic) {
   EXPECT_CALL(factory_context_.cluster_manager_, get("bar")).Times(0);
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   callbacks_->onSuccess(std::move(message));
-  EXPECT_EQ("foo", rds_->config()
-                       ->route(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}}, 0)
+  EXPECT_EQ("foo", route(Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
                        ->clusterName());
 

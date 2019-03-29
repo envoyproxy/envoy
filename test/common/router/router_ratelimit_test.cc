@@ -94,7 +94,8 @@ TEST(BadRateLimitConfiguration, ActionsMissingRequiredFields) {
 
 static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
                                           const std::string& method) {
-  return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
+  return Http::TestHeaderMapImpl{
+      {":authority", host}, {":path", path}, {":method", method}, {"x-forwarded-proto", "http"}};
 }
 
 class RateLimitConfiguration : public testing::Test {
