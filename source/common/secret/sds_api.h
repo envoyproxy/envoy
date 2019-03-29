@@ -28,7 +28,7 @@ namespace Secret {
 /**
  * SDS API implementation that fetches secrets from SDS server via Subscription.
  */
-class SdsApi : public Config::SubscriptionCallbacks<envoy::api::v2::auth::Secret> {
+class SdsApi : public Config::SubscriptionCallbacks {
 public:
   SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
          Runtime::RandomGenerator& random, Stats::Store& stats,
@@ -38,7 +38,8 @@ public:
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -64,7 +65,7 @@ private:
   Upstream::ClusterManager& cluster_manager_;
 
   const envoy::api::v2::core::ConfigSource sds_config_;
-  std::unique_ptr<Config::Subscription<envoy::api::v2::auth::Secret>> subscription_;
+  std::unique_ptr<Config::Subscription> subscription_;
   const std::string sds_config_name_;
 
   uint64_t secret_hash_;
