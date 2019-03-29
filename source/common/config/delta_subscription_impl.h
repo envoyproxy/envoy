@@ -98,13 +98,13 @@ public:
     buildAndQueueDiscoveryRequest(resources);
   }
 
-  void pause(const std::string&) {
+  void pause() {
     ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url_);
     ASSERT(!paused_);
     paused_ = true;
   }
 
-  void resume(const std::string&) {
+  void resume() {
     ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url_);
     ASSERT(paused_);
     paused_ = false;
