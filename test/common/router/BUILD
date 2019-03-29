@@ -137,7 +137,7 @@ envoy_cc_test(
     srcs = ["router_ratelimit_test.cc"],
     deps = [
         "//source/common/http:header_map_lib",
-        "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:router_ratelimit_lib",
         "//test/mocks/http:http_mocks",
