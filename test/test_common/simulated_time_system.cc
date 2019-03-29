@@ -110,11 +110,7 @@ private:
   Scheduler& base_scheduler_;
 };
 
-SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() {
-  if (armed_) {
-    disableTimer();
-  }
-}
+SimulatedTimeSystemHelper::Alarm::Alarm::~Alarm() { disableTimer(); }
 
 void SimulatedTimeSystemHelper::Alarm::Alarm::disableTimer() {
   Thread::LockGuard lock(time_system_.mutex_);
