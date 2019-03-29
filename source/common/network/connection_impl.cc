@@ -541,7 +541,6 @@ void ConnectionImpl::onWriteReady() {
       closeSocket(ConnectionEvent::LocalClose);
     }
   } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
-    ENVOY_CONN_LOG(debug, "processed {} bytes", *this, result.bytes_processed_);
     for (BytesSentCb& cb : bytes_sent_callbacks_) {
       cb(result.bytes_processed_);
 
