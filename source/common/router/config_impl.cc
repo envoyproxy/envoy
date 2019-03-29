@@ -991,14 +991,14 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
                                                          uint64_t random_value) const {
-  // No x-forwarded-proto header. This normally only happen when ActiveStream::decodeHeaders
+  // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
   // bails early (as it rejects a request), so there is no routing is going to happen anyway.
   if (headers.ForwardedProto() == nullptr) {
     return nullptr;
   }
 
   // Check if this is an http or https request. Defaults to assume that it is an http
-  // request undless ForwardedProto is explicitly set to https
+  // request unless ForwardedProto is explicitly set to https
   bool http_request = (headers.ForwardedProto()->value() != "https");
 
   // First check for ssl redirect.
