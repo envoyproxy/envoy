@@ -200,8 +200,10 @@ message HttpConnectionManager {
 
   // The delayed close timeout is for downstream connections managed by the HTTP connection manager.
   // It is defined as a grace period after connection close processing has been locally initiated
-  // during which Envoy will flush the write buffers for the connection and await the peer to close
-  // (i.e., a TCP FIN/RST is received by Envoy from the downstream connection).
+  // during which Envoy will wait for the peer to close (i.e., a TCP FIN/RST is received by Envoy
+  // from the downstream connection) prior to Envoy closing the socket associated with that
+  // connection. The timer associated with this timeout will be started only *after* all pending
+  // data in the connection's write buffer has been flushed.
   //
   // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
