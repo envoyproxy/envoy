@@ -79,9 +79,11 @@ public:
     armed_ = false;
     time_system_.incPending();
 
-    // We don't want to activate the alarm under lock, as it will make a libevent call,
-    // and libevent itself uses locks:
+    // We don't want to activate the alarm under lock, as it will make a
+    // libevent call, and libevent itself uses locks:
     // https://github.com/libevent/libevent/blob/29cc8386a2f7911eaa9336692a2c5544d8b4734f/event.c#L1917
+    // See class comment for UnlockGuard for details on saving
+    // time_system_.mutex_ prior to running libevent, which may delete this.
     UnlockGuard unlocker(time_system_.mutex_);
     std::chrono::milliseconds duration = std::chrono::milliseconds::zero();
     base_timer_->enableTimer(duration);
