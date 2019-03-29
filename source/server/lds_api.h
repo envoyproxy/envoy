@@ -19,7 +19,7 @@ namespace Server {
  * LDS API implementation that fetches via Subscription.
  */
 class LdsApiImpl : public LdsApi,
-                   Config::SubscriptionCallbacks<envoy::api::v2::Listener>,
+                   Config::SubscriptionCallbacks,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
@@ -32,7 +32,8 @@ public:
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -43,7 +44,7 @@ public:
   }
 
 private:
-  std::unique_ptr<Config::Subscription<envoy::api::v2::Listener>> subscription_;
+  std::unique_ptr<Config::Subscription> subscription_;
   std::string version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopePtr scope_;
