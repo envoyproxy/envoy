@@ -783,19 +783,15 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
-  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
-  std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
-  if (!filter) {
-    entry = decoder_filters_.begin();
-  } else {
-    entry = std::next(filter->entry());
-  }
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
+      filter ? std::next(filter->entry()) : decoder_filters_.begin();
+  absl::optional<std::list<ActiveStreamDecoderFilterPtr>::iterator> continue_data_entry;
 
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
     state_.filter_call_state_ |= FilterCallState::DecodeHeaders;
     (*entry)->end_stream_ =
-        decoding_headers_only_ || (end_stream && continue_data_entry == decoder_filters_.end());
+        decoding_headers_only_ || (end_stream && !continue_data_entry.has_value());
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
 
     ASSERT(!(status == FilterHeadersStatus::ContinueAndEndStream && (*entry)->end_stream_));
@@ -813,17 +809,17 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 
     // Here we handle the case where we have a header only request, but a filter adds a body
     // to it. We need to not raise end_stream = true to further filters during inline iteration.
-    if (end_stream && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
+    if (end_stream && buffered_request_data_ && !continue_data_entry.has_value()) {
       continue_data_entry = entry;
     }
   }
 
-  if (continue_data_entry != decoder_filters_.end()) {
+  if (continue_data_entry.has_value()) {
     // We use the continueDecoding() code since it will correctly handle not calling
     // decodeHeaders() again. Fake setting stopped_ since the continueDecoding() code expects it.
     ASSERT(buffered_request_data_);
-    (*continue_data_entry)->stopped_ = true;
-    (*continue_data_entry)->continueDecoding();
+    (*continue_data_entry.value())->stopped_ = true;
+    (*continue_data_entry.value())->continueDecoding();
   }
 
   if (end_stream) {
@@ -853,15 +849,11 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     return;
   }
 
-  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
-  auto trailers_added_entry = decoder_filters_.end();
-  const bool trailers_exists_at_start = request_trailers_ != nullptr;
-  if (!filter) {
-    entry = decoder_filters_.begin();
-  } else {
-    entry = std::next(filter->entry());
-  }
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
+      filter ? std::next(filter->entry()) : decoder_filters_.begin();
+  absl::optional<std::list<ActiveStreamDecoderFilterPtr>::iterator> continue_data_entry;
 
+  const bool trailers_exists_at_start = request_trailers_ != nullptr;
   for (; entry != decoder_filters_.end(); entry++) {
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
     //
@@ -920,9 +912,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
-    if (!trailers_exists_at_start && request_trailers_ &&
-        trailers_added_entry == decoder_filters_.end()) {
-      trailers_added_entry = entry;
+    if (!trailers_exists_at_start && request_trailers_ && !continue_data_entry.has_value()) {
+      continue_data_entry = entry;
     }
 
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) &&
@@ -936,8 +927,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 
   // If trailers were adding during decodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
-  if (trailers_added_entry != decoder_filters_.end()) {
-    decodeTrailers(trailers_added_entry->get(), *request_trailers_);
+  if (continue_data_entry.has_value()) {
+    decodeTrailers((*continue_data_entry)->get(), *request_trailers_);
   }
 
   if (end_stream) {
@@ -1147,13 +1138,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   disarmRequestTimeout();
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
-  std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
+  absl::optional<std::list<ActiveStreamEncoderFilterPtr>::iterator> continue_data_entry;
 
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeHeaders));
     state_.filter_call_state_ |= FilterCallState::EncodeHeaders;
     (*entry)->end_stream_ =
-        encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
+        encoding_headers_only_ || (end_stream && !continue_data_entry.has_value());
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
     if ((*entry)->end_stream_) {
       (*entry)->handle_->encodeComplete();
@@ -1177,7 +1168,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
     // Here we handle the case where we have a header only response, but a filter adds a body
     // to it. We need to not raise end_stream = true to further filters during inline iteration.
-    if (end_stream && buffered_response_data_ && continue_data_entry == encoder_filters_.end()) {
+    if (end_stream && buffered_response_data_ && !continue_data_entry.has_value()) {
       continue_data_entry = entry;
     }
   }
@@ -1263,21 +1254,19 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   chargeStats(headers);
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this,
-                   encoding_headers_only_ ||
-                       (end_stream && continue_data_entry == encoder_filters_.end()),
+                   encoding_headers_only_ || (end_stream && !continue_data_entry.has_value()),
                    headers);
 
   // Now actually encode via the codec.
   stream_info_.onFirstDownstreamTxByteSent();
-  response_encoder_->encodeHeaders(
-      headers,
-      encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
-  if (continue_data_entry != encoder_filters_.end()) {
+  response_encoder_->encodeHeaders(headers, encoding_headers_only_ ||
+                                                (end_stream && !continue_data_entry.has_value()));
+  if (continue_data_entry.has_value()) {
     // We use the continueEncoding() code since it will correctly handle not calling
     // encodeHeaders() again. Fake setting stopped_ since the continueEncoding() code expects it.
     ASSERT(buffered_response_data_);
-    (*continue_data_entry)->stopped_ = true;
-    (*continue_data_entry)->continueEncoding();
+    (*continue_data_entry.value())->stopped_ = true;
+    (*continue_data_entry.value())->continueEncoding();
   } else {
     // End encoding if this is a header only response, either due to a filter converting it to one
     // or due to the upstream returning headers only.
@@ -1350,7 +1339,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   }
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
-  auto trailers_added_entry = encoder_filters_.end();
+  absl::optional<std::list<ActiveStreamEncoderFilterPtr>::iterator> continue_data_entry;
 
   const bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
@@ -1383,9 +1372,8 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
-    if (!trailers_exists_at_start && response_trailers_ &&
-        trailers_added_entry == encoder_filters_.end()) {
-      trailers_added_entry = entry;
+    if (!trailers_exists_at_start && response_trailers_ && !continue_data_entry.has_value()) {
+      continue_data_entry = entry;
     }
 
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_)) {
@@ -1400,9 +1388,9 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
-  if (trailers_added_entry != encoder_filters_.end()) {
+  if (continue_data_entry.has_value()) {
     response_encoder_->encodeData(data, false);
-    encodeTrailers(trailers_added_entry->get(), *response_trailers_);
+    encodeTrailers((*continue_data_entry)->get(), *response_trailers_);
   } else {
     response_encoder_->encodeData(data, end_stream);
     maybeEndEncode(end_stream);
