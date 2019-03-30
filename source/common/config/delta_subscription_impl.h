@@ -28,23 +28,21 @@ struct ResourceNameDiff {
  * Manages the logic of a (non-aggregated) delta xDS subscription.
  * TODO(fredlas) add aggregation support.
  */
-template <class ResourceType>
 class DeltaSubscriptionImpl
-    : public Subscription<ResourceType>,
+    : public Subscription,
       public GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
                         envoy::api::v2::DeltaDiscoveryResponse, ResourceNameDiff> {
 public:
   DeltaSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                         Event::Dispatcher& dispatcher,
                         const Protobuf::MethodDescriptor& service_method,
-                        Runtime::RandomGenerator& random, Stats::Scope& scope,
-                        const RateLimitSettings& rate_limit_settings, SubscriptionStats stats,
-                        std::chrono::milliseconds init_fetch_timeout)
+                        absl::string_view type_url, Runtime::RandomGenerator& random,
+                        Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+                        SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout)
       : GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse,
                    ResourceNameDiff>(std::move(async_client), service_method, random, dispatcher,
                                      scope, rate_limit_settings),
-        type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
-        local_info_(local_info), stats_(stats), dispatcher_(dispatcher),
+        type_url_(type_url), local_info_(local_info), stats_(stats), dispatcher_(dispatcher),
         init_fetch_timeout_(init_fetch_timeout) {
     request_.set_type_url(type_url_);
     request_.mutable_node()->MergeFrom(local_info_.node());
@@ -193,8 +191,7 @@ public:
   }
 
   // Config::DeltaSubscription
-  void start(const std::vector<std::string>& resources,
-             SubscriptionCallbacks<ResourceType>& callbacks) override {
+  void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
     callbacks_ = &callbacks;
 
     if (init_fetch_timeout_.count() > 0) {
@@ -271,7 +268,7 @@ private:
   std::unordered_set<std::string> resource_names_;
 
   const std::string type_url_;
-  SubscriptionCallbacks<ResourceType>* callbacks_{};
+  SubscriptionCallbacks* callbacks_{};
   // In-flight or previously sent request.
   envoy::api::v2::DeltaDiscoveryRequest request_;
   // Paused via pause()?
