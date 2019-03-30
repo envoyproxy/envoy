@@ -4,6 +4,7 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
+#include "fmt/printf.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::envoy::config::filter::network::http_connection_manager::v2::HttpFilter;
@@ -14,9 +15,9 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-std::string getFilterConfig(bool use_local_jwks) {
+std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
-  MessageUtil::loadFromYaml(ExampleConfig, proto_config);
+  MessageUtil::loadFromYaml(config_str, proto_config);
 
   if (use_local_jwks) {
     auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
@@ -29,6 +30,10 @@ std::string getFilterConfig(bool use_local_jwks) {
   filter.set_name(HttpFilterNames::get().JwtAuthn);
   MessageUtil::jsonConvert(proto_config, *filter.mutable_config());
   return MessageUtil::getJsonStringFromMessage(filter);
+}
+
+std::string getFilterConfig(bool use_local_jwks) {
+  return getAuthFilterConfig(ExampleConfig, use_local_jwks);
 }
 
 typedef HttpProtocolIntegrationTest LocalJwksIntegrationTest;
@@ -85,6 +90,24 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
   EXPECT_STREQ("401", response->headers().Status()->value().c_str());
 }
 
+TEST_P(LocalJwksIntegrationTest, MissingToken) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
+}
+
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
   config_helper_.addFilter(getFilterConfig(true));
   initialize();
@@ -126,6 +149,97 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
+// This test verifies JwtRequirement specified from metadata
+TEST_P(LocalJwksIntegrationTest, MetadataRequirement) {
+  const std::string meta_filter_conf = R"(
+name: %s
+config:
+  request_rules:
+    - header: selector
+      on_header_present:
+        metadata_namespace: selector_filter
+        key: selector
+)";
+
+  // A config with local jwks with metadata rules.
+  const std::string auth_filter_conf = R"(
+  providers:
+    example_provider:
+      issuer: https://example.com
+      audiences:
+      - example_service
+  metadata_rules:
+    filter: selector_filter
+    path:
+    - selector
+    requires:
+      example_provider:
+        provider_name: example_provider
+)";
+
+  config_helper_.addFilter(getAuthFilterConfig(auth_filter_conf, true));
+  config_helper_.addFilter(fmt::sprintf(meta_filter_conf, HttpFilterNames::get().HeaderToMetadata));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  struct TestCase {
+    std::vector<std::pair<std::string, std::string>> extra_headers;
+    std::string expected_status;
+  };
+  // clang-format off
+  const TestCase test_cases[] = {
+      // Case1: not set metadata, so Jwt is not required, expect 200
+      {
+          // Empty extra headers
+          {},
+          "200",
+      },
+
+      // Case2: requirement is set in the metadata, but missing token, expect 401
+      {
+          // selector header, but not token header
+          {
+              {"selector", "example_provider"},
+          },
+          "401",
+      },
+
+      // Case 3: requirement is set in the metadata, token is good, expect 200
+      {
+          // selector header, and token header
+          {
+              {"selector", "example_provider"},
+              {"Authorization", "Bearer " + std::string(GoodToken)},
+          },
+          "200",
+      },
+  };
+  // clang-format on
+
+  for (const auto& test : test_cases) {
+    Http::TestHeaderMapImpl headers{
+        {":method", "GET"},
+        {":path", "/foo"},
+        {":scheme", "http"},
+        {":authority", "host"},
+    };
+    for (const auto& h : test.extra_headers) {
+      headers.addCopy(h.first, h.second);
+    }
+    auto response = codec_client_->makeHeaderOnlyRequest(headers);
+
+    if (test.expected_status == "200") {
+      waitForNextUpstreamRequest();
+      upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+    }
+
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(test.expected_status, response->headers().Status()->value().c_str());
+  }
 }
 
 // The test case with a fake upstream for remote Jwks server.

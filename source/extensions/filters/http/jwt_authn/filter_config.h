@@ -81,8 +81,8 @@ public:
 
     if (proto_config_.has_metadata_rules()) {
       metadata_filter_ = proto_config_.metadata_rules().filter();
-      for (const auto& key : proto_config_.metadata_rules().path()) {
-        metadata_path_.push_back(key);
+      for (const auto& path : proto_config_.metadata_rules().path()) {
+        metadata_path_.push_back(path);
       }
       for (const auto& it : proto_config_.metadata_rules().requires()) {
         metadata_verifiers_.emplace(it.first, Verifier::create(it.second, proto_config_.providers(),
@@ -117,9 +117,10 @@ public:
       }
     }
     if (metadata_path_.size() > 0 && metadata_verifiers_.size() > 0) {
-      const auto& value = Envoy::Config::Metadata::metadataValue(
-          metadata, metadata_filter_, metadata_path_);
+      const auto& value =
+          Envoy::Config::Metadata::metadataValue(metadata, metadata_filter_, metadata_path_);
       if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
+        ENVOY_LOG(debug, "use metadata_rules key: {}", value.string_value());
         const auto& it = metadata_verifiers_.find(value.string_value());
         if (it != metadata_verifiers_.end()) {
           return it->second.get();

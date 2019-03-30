@@ -51,6 +51,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "filter_config_test",
+    srcs = ["filter_config_test.cc"],
+    extension_name = "envoy.filters.http.jwt_authn",
+    deps = [
+        "//source/extensions/filters/http/jwt_authn:config",
+        "//test/extensions/filters/http/jwt_authn:test_common_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "filter_factory_test",
     srcs = ["filter_factory_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
@@ -98,6 +109,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         "//source/extensions/filters/http/jwt_authn:config",
+        "//source/extensions/filters/http/header_to_metadata:config",
         "//test/config:utility_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/integration:http_protocol_integration_lib",
