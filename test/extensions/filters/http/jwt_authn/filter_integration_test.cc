@@ -4,6 +4,7 @@
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
+
 #include "fmt/printf.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;

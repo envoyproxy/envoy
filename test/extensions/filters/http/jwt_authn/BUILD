@@ -108,8 +108,8 @@ envoy_extension_cc_test(
     srcs = ["filter_integration_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
-        "//source/extensions/filters/http/jwt_authn:config",
         "//source/extensions/filters/http/header_to_metadata:config",
+        "//source/extensions/filters/http/jwt_authn:config",
         "//test/config:utility_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/integration:http_protocol_integration_lib",
