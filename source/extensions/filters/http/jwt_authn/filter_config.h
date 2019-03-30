@@ -164,10 +164,11 @@ private:
   ExtractorConstPtr extractor_;
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
-  // The metadata path filter name and path
+  // The metadata filter name.
   std::string metadata_filter_;
+  // The metadata path.
   std::vector<std::string> metadata_path_;
-  // The metadata verifier map
+  // The metadata verifier map.
   std::unordered_map<std::string, VerifierConstPtr> metadata_verifiers_;
   TimeSource& time_source_;
   Api::Api& api_;

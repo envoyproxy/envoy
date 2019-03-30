@@ -164,7 +164,7 @@ config:
         key: selector
 )";
 
-  // A config with local jwks with metadata rules.
+  // A config with metadata rules.
   const std::string auth_filter_conf = R"(
   providers:
     example_provider:
@@ -190,7 +190,7 @@ config:
     std::vector<std::pair<std::string, std::string>> extra_headers;
     std::string expected_status;
   };
-  // clang-format off
+
   const TestCase test_cases[] = {
       // Case1: not set metadata, so Jwt is not required, expect 200
       {
@@ -218,7 +218,6 @@ config:
           "200",
       },
   };
-  // clang-format on
 
   for (const auto& test : test_cases) {
     Http::TestHeaderMapImpl headers{

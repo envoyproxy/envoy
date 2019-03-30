@@ -340,7 +340,7 @@ message RequirementRule {
 }
 
 // This message specifies Jwt requirements based on a Metadata string value
-// Another HTTP filter can use it to specify Jwt requirement dynamically.
+// Other HTTP filters can use this message to specify Jwt requirement.
 //
 // Example:
 //
@@ -348,26 +348,24 @@ message RequirementRule {
 //
 //    filter: foo
 //    path:
-//      - jwt_requirement
+//      - jwt_selector
 //    requires:
 //      issuer_1:
 //        provider_name: issuer1
 //      issuer_2:
 //        provider_name: issuer2
 //
-// If filter "foo" sets {"jwt_requirement": "issuer_1"} to the dynamicMetadata for a request,
-// Jwt filter will use JwtRequirement({"provider_name": "issuer1"}) to verify. If the metadata
-// is not set, or metadata value is not found in the "requires" map, Jwt verification is not
-// required for the request.
+// If the filter "foo" sets {"jwt_selector": "issuer_1"} to the dynamicMetadata for a request,
+// jwt_authn filter will use JwtRequirement{"provider_name": "issuer1"} to verify.
 message MetadataRule {
-  // The filter name to retrieve the dynamic metadata Struct.
+  // The filter name to retrieve the dynamic metadata.
   string filter = 1 [(validate.rules).string.min_bytes = 1];
 
-  // The path to retrieve the Value from the dynamic metadata Struct.
-  // It mush point to a string value.
+  // The path to retrieve a string value from the dynamic metadata.
   repeated string path = 2 [(validate.rules).repeated .min_items = 1];
 
-  // A map of the metadata string values to requirements.
+  // A map of string keys to requirements. The string key is the value
+  // in the dynamic metadata specified by `filter` and `path` fields.
   map<string, JwtRequirement> requires = 3;
 }
 
@@ -465,9 +463,9 @@ message JwtAuthentication {
   //
   repeated RequirementRule rules = 2;
 
-  // This message specifies Jwt requirements based on a Metadata string value
-  // Another HTTP filter can use it to specify JWT requirement dynamically.
-  // Above "rules" field is checked first, if it could not find any matches,
+  // This message specifies Jwt requirements based on a metadata string value.
+  // Other HTTP filters can use this message to specify Jwt requirements.
+  // The "rules" field above is checked first, if it could not find any matches,
   // check this one.
   MetadataRule metadata_rules = 3;
 }
