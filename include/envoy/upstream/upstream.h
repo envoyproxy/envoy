@@ -230,6 +230,16 @@ public:
   filter(std::function<bool(const Host&)> predicate) const PURE;
 
   /**
+   * Clone object with multiple filter predicates. Returns a vector of clones, each with host that
+   * match the provided predicates.
+   * @param predicates vector of predicates on Host entries.
+   * @return vector of HostsPerLocalityConstSharedPtr clones of the HostsPerLocality that match
+   *         hosts according to predicates.
+   */
+  virtual std::vector<std::shared_ptr<const HostsPerLocality>>
+  filter(const std::vector<std::function<bool(const Host&)>>& predicates) const PURE;
+
+  /**
    * Clone object.
    * @return HostsPerLocalityConstSharedPtr clone of the HostsPerLocality.
    */

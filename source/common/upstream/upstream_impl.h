@@ -257,6 +257,8 @@ public:
   bool hasLocalLocality() const override { return local_; }
   const std::vector<HostVector>& get() const override { return hosts_per_locality_; }
   HostsPerLocalityConstSharedPtr filter(std::function<bool(const Host&)> predicate) const override;
+  std::vector<HostsPerLocalityConstSharedPtr>
+  filter(const std::vector<std::function<bool(const Host&)>>& predicate) const override;
 
   // The const shared pointer for the empty HostsPerLocalityImpl.
   static HostsPerLocalityConstSharedPtr empty() {
@@ -637,9 +639,14 @@ public:
   const Network::Address::InstanceConstSharedPtr
   resolveProtoAddress(const envoy::api::v2::core::Address& address);
 
-  static HostVectorConstSharedPtr createHostList(const HostVector& hosts, Host::Health health);
-  static HostsPerLocalityConstSharedPtr createHostLists(const HostsPerLocality& hosts,
-                                                        Host::Health);
+  // Pratitions the provided list of hosts into two new lists containing the healthy and degraded
+  // hosts respectively.
+  static std::pair<HostVectorConstSharedPtr, HostVectorConstSharedPtr>
+  partitionHostList(const HostVector& hosts);
+  // Pratitions the provided list of hosts per locality into two new lists containing the healthy
+  // and degraded hosts respectively.
+  static std::pair<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr>
+  partitionHostsPerLocality(const HostsPerLocality& hosts);
 
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
