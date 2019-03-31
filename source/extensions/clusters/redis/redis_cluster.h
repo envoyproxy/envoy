@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
@@ -58,7 +59,6 @@
 #include "extensions/filters/network/common/redis/codec.h"
 
 #include "absl/synchronization/mutex.h"
-#include "external/envoy_api/envoy/api/v2/cds.pb.h"
 
 namespace Envoy {
 namespace Extensions {

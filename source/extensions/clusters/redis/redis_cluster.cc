@@ -1,13 +1,5 @@
 #include "redis_cluster.h"
 
-//#include "common/http/utility.h"
-//#include "common/network/resolver_impl.h"
-//#include "common/network/socket_option_factory.h"
-//#include "common/upstream/eds.h"
-//#include "common/upstream/health_checker_impl.h"
-//#include "common/upstream/logical_dns_cluster.h"
-//#include "common/upstream/original_dst_cluster.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -122,9 +114,13 @@ inline Network::Address::InstanceConstSharedPtr
 ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
   ASSERT(value.type() == NetworkFilters::Common::Redis::RespType::Array);
   ASSERT(value.asArray().size() >= 2);
-  // TODO(hyang): make this work with Ipv6 also
-  return std::make_shared<Network::Address::Ipv4Instance>(value.asArray()[0].asString(),
-                                                          value.asArray()[1].asInteger());
+  std::string address = value.asArray()[0].asString();
+  bool ipv6 = (address.find(":") != std::string::npos);
+  if (ipv6) {
+    return std::make_shared<Network::Address::Ipv6Instance>(address,
+                                                            value.asArray()[1].asInteger());
+  }
+  return std::make_shared<Network::Address::Ipv4Instance>(address, value.asArray()[1].asInteger());
 }
 
 RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {

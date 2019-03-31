@@ -120,18 +120,19 @@ protected:
     pool_callbacks_->onFailure();
   }
 
-  NetworkFilters::Common::Redis::RespValuePtr singleSlotMasterSlave() const {
+  NetworkFilters::Common::Redis::RespValuePtr
+  singleSlotMasterSlave(const std::string& master, const std::string& slave, int64_t port) const {
     std::vector<NetworkFilters::Common::Redis::RespValue> master_1(2);
     master_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
-    master_1[0].asString() = "127.0.0.1";
+    master_1[0].asString() = master;
     master_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
-    master_1[1].asInteger() = 22120;
+    master_1[1].asInteger() = port;
 
     std::vector<NetworkFilters::Common::Redis::RespValue> slave_1(2);
     slave_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
-    slave_1[0].asString() = "127.0.0.2";
+    slave_1[0].asString() = slave;
     slave_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
-    slave_1[1].asInteger() = 22120;
+    slave_1[1].asInteger() = port;
 
     std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(4);
     slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
@@ -205,6 +206,9 @@ protected:
                     cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts())));
     EXPECT_EQ(1UL,
               cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+    EXPECT_EQ(
+        1UL,
+        cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
   }
 
   void testBasicSetup(const std::string& config, const std::string& expected_discovery_address) {
@@ -219,7 +223,7 @@ protected:
     EXPECT_CALL(initialized_, ready());
     cluster_->initialize([&]() -> void { initialized_.ready(); });
 
-    expectClusterSlotResponse(singleSlotMasterSlave());
+    expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
     // TODO(hyang): this will change once we register slaves as well
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
@@ -240,7 +244,7 @@ protected:
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->callback_();
-    expectClusterSlotResponse(singleSlotMasterSlave());
+    expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
   }
 
@@ -268,7 +272,8 @@ protected:
   Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
 };
 
-typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>
+typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>,
+                   std::list<std::string>>
     RedisDnsConfigTuple;
 std::vector<RedisDnsConfigTuple> generateRedisDnsParams() {
   std::vector<RedisDnsConfigTuple> dns_config;
@@ -276,25 +281,29 @@ std::vector<RedisDnsConfigTuple> generateRedisDnsParams() {
     std::string family_yaml("");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    std::list<std::string> resolved_host{"127.0.0.1:22120"};
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, resolved_host));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: V4_ONLY)EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    std::list<std::string> resolved_host{"127.0.0.1:22120"};
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, resolved_host));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: V6_ONLY)EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
     std::list<std::string> dns_response{"::1", "::2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    std::list<std::string> resolved_host{"[::1]:22120"};
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, resolved_host));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: AUTO)EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
-    std::list<std::string> dns_response{"::1"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    std::list<std::string> dns_response{"::1", "::2"};
+    std::list<std::string> resolved_host{"[::1]:22120"};
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, resolved_host));
   }
   return dns_config;
 }
@@ -331,9 +340,10 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
-
-        expectClusterSlotResponse(singleSlotMasterSlave());
+        std::list<std::string> address_pair = std::get<2>(GetParam());
+        cb(TestUtility::makeDnsResponse(address_pair));
+        expectClusterSlotResponse(
+            singleSlotMasterSlave(address_pair.front(), address_pair.back(), 22120));
         return nullptr;
       }));
 
@@ -341,14 +351,7 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   EXPECT_CALL(initialized_, ready());
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
-  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
-  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
-  EXPECT_EQ(
-      1UL,
-      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
-  EXPECT_EQ(cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
-            cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
+  expectHealthyHosts(std::get<3>(GetParam()));
 }
 
 TEST_F(RedisClusterTest, Basic) {
@@ -432,7 +435,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   resolve_timer_->callback_();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
-  expectClusterSlotResponse(singleSlotMasterSlave());
+  expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
   // expect no change if resolve failed
