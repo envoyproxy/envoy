@@ -23,11 +23,12 @@ EdsClusterImpl::EdsClusterImpl(
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   Runtime::RandomGenerator& random = factory_context.random();
   Upstream::ClusterManager& cm = factory_context.clusterManager();
-  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::ClusterLoadAssignment>(
+  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints", factory_context.api());
+      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
+      Grpc::Common::typeUrl(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
+      factory_context.api());
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
@@ -97,7 +98,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   parent_.onPreInitComplete();
 }
 
-void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::string&) {
+void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                    const std::string&) {
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -107,7 +109,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
-  const auto& cluster_load_assignment = resources[0];
+  auto cluster_load_assignment =
+      MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
   MessageUtil::validate(cluster_load_assignment);
   // TODO(PiotrSikora): Remove this hack once fixed internally.
   if (!(cluster_load_assignment.cluster_name() == cluster_name_)) {
