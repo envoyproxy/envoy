@@ -73,7 +73,7 @@ Cc: envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
 
 Hello Envoy Community,
 
-The Envoy maintainers would like to announce the availablity of Envoy $VERSION.
+The Envoy maintainers would like to announce the availability of Envoy $VERSION.
 This addresses the following CVE(s):
 
 * CVE-YEAR-ABCDEF (CVSS score $CVSS): $CVESUMMARY
