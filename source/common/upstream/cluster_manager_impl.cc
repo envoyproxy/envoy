@@ -207,6 +207,13 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // Now setup ADS if needed, this might rely on a primary cluster.
   if (bootstrap.dynamic_resources().has_ads_config()) {
+    envoy::api::v2::core::GrpcService grpc_service;
+    grpc_service.MergeFrom(bootstrap.dynamic_resources().ads_config().grpc_services(0));
+    std::cout << bootstrap.dynamic_resources().ads_config().DebugString() << "\n";
+
+    std::cout << "Grpc Service in cl"
+              << "\n";
+    std::cout << grpc_service.DebugString() << "\n";
     ads_mux_ = std::make_unique<Config::GrpcMuxImpl>(
         local_info,
         Config::Utility::factoryForGrpcApiConfigSource(
@@ -217,7 +224,7 @@ ClusterManagerImpl::ClusterManagerImpl(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
         random_, stats_,
         Envoy::Config::Utility::parseRateLimitSettings(bootstrap.dynamic_resources().ads_config()),
-        admin.getConfigTracker());
+        admin.getConfigTracker(), grpc_service);
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }

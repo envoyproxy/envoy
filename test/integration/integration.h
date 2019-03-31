@@ -208,6 +208,7 @@ public:
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
                              const std::string& version) {
     envoy::api::v2::DiscoveryResponse discovery_response;
+    discovery_response.mutable_control_plane()->set_identifier("control_plane_1");
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {

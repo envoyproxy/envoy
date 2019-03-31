@@ -3,7 +3,6 @@
 #include <unordered_map>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
-
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
@@ -30,7 +29,8 @@ public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Runtime::RandomGenerator& random, Stats::Scope& scope,
-              const RateLimitSettings& rate_limit_settings, Server::ConfigTracker& config_tracker,const envoy::api::v2::core::GrpcService& grpc_service );
+              const RateLimitSettings& rate_limit_settings, Server::ConfigTracker& config_tracker,
+              const envoy::api::v2::core::GrpcService& grpc_service);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -41,15 +41,16 @@ public:
 
   void sendDiscoveryRequest(const std::string& type_url) override;
 
+  ProtobufTypes::MessagePtr dumpControlPlaneConfig() const;
+
   // GrpcStream
   void handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
   void handleStreamEstablished() override;
   void handleEstablishmentFailure() override;
 
-  ProtobufTypes::MessagePtr dumpControlPlaneConfig() const;
-
 private:
   void setRetryTimer();
+  void populateControlPlaneInfo(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
@@ -89,11 +90,6 @@ private:
     bool subscribed_{};
   };
 
-struct ConfigSourceHash {
-  std::size_t operator()(envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo const& config_source_info) const noexcept {
-    return MessageUtil::hash(config_source_info.grpc_service());
-  }
-};
   const LocalInfo::LocalInfo& local_info_;
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
@@ -101,8 +97,14 @@ struct ConfigSourceHash {
   const std::string& service_name_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   TimeSource& time_source_;
-  const envoy::api::v2::core::GrpcService& grpc_service_;
-  static std::unordered_map<std::string, std::unordered_set<envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo,ConfigSourceHash>> service_control_plane_config_dump_;
+  envoy::api::v2::core::GrpcService grpc_service_;
+  // Per Service Control Plane configuration that Envoy is connected to. For services like
+  // RouteDiscoveryService and EndpointDiscovery the configuration allows to specify multiple config
+  // sources, for example a different RouteDiscoveryService can be specified for each listener.
+  static std::unordered_map<
+      std::string,
+      std::list<envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo>>
+      per_service_control_plane_info_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

@@ -184,28 +184,34 @@ message RoutesConfigDump {
   repeated DynamicRouteConfig dynamic_route_configs = 3 [(gogoproto.nullable) = false];
 }
 
-// This message describes the control plane configuration that Envoy is currently connected to.
+// This message describes the control plane configuration that Envoy is currently connected to for
+// various xDS implementations.
 message ControlPlaneConfigDump {
 
+  // This message describes the control plane information per each config source.
   message ConfigSourceControlPlaneInfo {
 
-  // gRPC service represented by ApiConfigSource.
-  envoy.api.v2.core.GrpcService grpc_service = 1;
+    // gRPC service represented by ApiConfigSource.
+    envoy.api.v2.core.GrpcService grpc_service = 1;
 
-  // The control plane that this Service is currently connected to.
-  envoy.api.v2.core.ControlPlane control_plane = 2 [(gogoproto.nullable) = false];
- 
-  // The timestamp when the ControlPlane information was last updated.
-  google.protobuf.Timestamp last_updated = 3; 
+    // The control plane that this Service is currently connected to.
+    envoy.api.v2.core.ControlPlane control_plane = 2;
+
+    // The timestamp when the ControlPlane information was last updated.
+    google.protobuf.Timestamp last_updated = 3;
   }
 
+  // This is message describes the control plane configuration for each xDS service that Envoy
+  // connects to.
   message ServiceControlPlaneInfo {
 
-    // The xDS service this control plane information belongs to. For example envoy.api.v2.EndpointDiscoveryService represents control plane info that Envoy 
-    // has been configured for EndpointDiscoveryService.
+    // The xDS service this control plane information belongs to. For example
+    // envoy.api.v2.EndpointDiscoveryService represents control plane info that Envoy has been
+    // configured for EndpointDiscoveryService.
     string service = 1;
 
-    // The list of control plane information that Envoy has been configured to connect with for this service.
+    // The list of control plane information that Envoy has been configured to connect with for this
+    // service.
     repeated ConfigSourceControlPlaneInfo config_source_control_plane = 2;
   }
 

@@ -45,19 +45,23 @@ public:
   GrpcMuxImplTestBase() : async_client_(new Grpc::MockAsyncClient()) {}
 
   void setup() {
+    envoy::api::v2::core::GrpcService grpc_service;
+    grpc_service.mutable_envoy_grpc()->set_cluster_name("xds_cluster");
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_, config_tracker_);
+        random_, stats_, rate_limit_settings_, config_tracker_, grpc_service);
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
+    envoy::api::v2::core::GrpcService grpc_service;
+    grpc_service.mutable_envoy_grpc()->set_cluster_name("xds_cluster");
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, custom_rate_limit_settings, config_tracker_);
+        random_, stats_, custom_rate_limit_settings, config_tracker_, grpc_service);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -184,13 +188,27 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
 // Validate that controlplane config dump is generated correctly.
 TEST_F(GrpcMuxImplTest, DumpControlPlaneConfig) {
   const std::string expected_config_dump = R"EOF({
+ "service_control_plane_info": [
+    {
      "service": "envoy.service.discovery.v2.AggregatedDiscoveryService",
-     "control_plane": {
-       "identifier" : "control_plane_1"
-     }
+     "config_source_control_plane": [
+      {
+       "grpc_service": {
+        "envoy_grpc": {
+         "cluster_name": "xds_cluster"
+        }
+       },
+       "control_plane": {
+        "identifier": "control_plane_1"
+       },
+      }
+     ]
+    }
+   ]
   }
   )EOF";
   setup();
+
   InSequence s;
   const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
   NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
@@ -651,26 +669,30 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
 }
 
 TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
+  envoy::api::v2::core::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("xds_cluster");
   EXPECT_CALL(local_info_, clusterName()).WillOnce(Return(""));
   EXPECT_THROW_WITH_MESSAGE(
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, config_tracker_),
+          random_, stats_, rate_limit_settings_, config_tracker_, grpc_service),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
 }
 
 TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
+  envoy::api::v2::core::GrpcService grpc_service;
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("xds_cluster");
   EXPECT_CALL(local_info_, nodeName()).WillOnce(Return(""));
   EXPECT_THROW_WITH_MESSAGE(
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, config_tracker_),
+          random_, stats_, rate_limit_settings_, config_tracker_, grpc_service),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");

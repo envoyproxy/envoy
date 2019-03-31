@@ -8,20 +8,25 @@
 namespace Envoy {
 namespace Config {
 
-std::unordered_map<std::string, std::unordered_set<envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo,GrpcMuxImpl::ConfigSourceHash>> GrpcMuxImpl::service_control_plane_config_dump_;
+std::unordered_map<
+    std::string,
+    std::list<envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo>>
+    GrpcMuxImpl::per_service_control_plane_info_;
 
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings,
-                         Server::ConfigTracker& config_tracker, const envoy::api::v2::core::GrpcService& grpc_service )
+                         Server::ConfigTracker& config_tracker,
+                         const envoy::api::v2::core::GrpcService& grpc_service)
     : GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse, std::string>(
           std::move(async_client), service_method, random, dispatcher, scope, rate_limit_settings),
       local_info_(local_info), service_name_(service_method.service()->full_name()),
       config_tracker_entry_(config_tracker.add(service_method.service()->name(),
                                                [this] { return dumpControlPlaneConfig(); })),
-      time_source_(dispatcher.timeSource()), grpc_service_(grpc_service) {
+      time_source_(dispatcher.timeSource()) {
+  grpc_service_.MergeFrom(grpc_service);
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -130,19 +135,7 @@ void GrpcMuxImpl::handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryRespon
     return;
   }
 
-//   if (message->has_control_plane()) {
-//   if (service_control_plane_config_dump_.count(service_name_) == 0) {
-// service_control_plane_config_dump_.insert({service_name_, });
-//   }
-
-   envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo config_source_info;
-      config_source_info.mutable_control_plane()->set_identifier("control_plane_1");
-       TimestampUtil::systemClockToTimestamp(time_source_.systemTime(),
-                                         *(config_source_info.mutable_last_updated()));
-  GrpcMuxImpl::service_control_plane_config_dump_[service_name_].insert(config_source_info);  
-  
-
-  // }
+  populateControlPlaneInfo(std::move(message));
 
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.
@@ -227,23 +220,45 @@ void GrpcMuxImpl::handleEstablishmentFailure() {
   }
 }
 
-ProtobufTypes::MessagePtr GrpcMuxImpl::dumpControlPlaneConfig() const {
-   auto config_dump = std::make_unique<envoy::admin::v2alpha::ControlPlaneConfigDump>();
-   std::cout<<"service_control_plane_config_dump_" << service_control_plane_config_dump_.size()<<"\n";
-    for (auto& service_info: GrpcMuxImpl::service_control_plane_config_dump_) {
-           envoy::admin::v2alpha::ControlPlaneConfigDump::ServiceControlPlaneInfo service_control_plane_info;
-           service_control_plane_info.set_service(service_info.first);
-           for (auto& config_source_control_info: service_info.second) {
-             std::cout<<"before merging..."<<"\n";
-             std::string iden = config_source_control_info.control_plane().identifier();
-             std::cout<<"here "<<iden<<"\n";
-             service_control_plane_info.add_config_source_control_plane().MergeFrom(*config_source_control_info);
-                          std::cout<<"after merging..."<<"\n";
+void GrpcMuxImpl::populateControlPlaneInfo(
+    std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
+  if (message->has_control_plane()) {
+    Protobuf::util::MessageDifferencer message_differencer;
+    envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo
+        config_source_control_plane_info;
+    bool config_exists = false;
+    for (auto& config_control_plane : GrpcMuxImpl::per_service_control_plane_info_[service_name_]) {
+      if (message_differencer.Compare(grpc_service_, config_control_plane.grpc_service())) {
+        config_source_control_plane_info = config_control_plane;
+        break;
+      }
+    }
+    config_source_control_plane_info.mutable_control_plane()->set_identifier(
+        message->control_plane().identifier());
+    TimestampUtil::systemClockToTimestamp(
+        time_source_.systemTime(), *(config_source_control_plane_info.mutable_last_updated()));
+    config_source_control_plane_info.mutable_grpc_service()->MergeFrom(grpc_service_);
+    if (!config_exists) {
+      GrpcMuxImpl::per_service_control_plane_info_[service_name_].push_back(
+          config_source_control_plane_info);
+    }
+  }
+}
 
-           }
-     config_dump->add_service_control_plane_info()->MergeFrom(service_control_plane_info);
- }
- return config_dump;
+ProtobufTypes::MessagePtr GrpcMuxImpl::dumpControlPlaneConfig() const {
+  auto config_dump = std::make_unique<envoy::admin::v2alpha::ControlPlaneConfigDump>();
+  for (auto& service_info : GrpcMuxImpl::per_service_control_plane_info_) {
+    envoy::admin::v2alpha::ControlPlaneConfigDump::ServiceControlPlaneInfo
+        service_control_plane_info;
+    service_control_plane_info.set_service(service_info.first);
+    for (auto& config_source_control_plane_info : service_info.second) {
+      std::string iden = config_source_control_plane_info.control_plane().identifier();
+      service_control_plane_info.add_config_source_control_plane()->MergeFrom(
+          config_source_control_plane_info);
+    }
+    config_dump->add_service_control_plane_info()->MergeFrom(service_control_plane_info);
+  }
+  return config_dump;
 }
 
 } // namespace Config
