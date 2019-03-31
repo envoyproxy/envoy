@@ -54,17 +54,10 @@ public:
     EXPECT_CALL(cluster, info());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&dispatcher_);
-<<<<<<< HEAD
-    EXPECT_CALL(init_, registerTarget(_, _));
-    lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_, init_,
-                                        local_info_, store_, listener_manager_, *api_,
-                                        config_tracker_);
-=======
     EXPECT_CALL(init_manager_, add(_));
-    lds_ =
-        std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_,
-                                     init_manager_, local_info_, store_, listener_manager_, *api_);
->>>>>>> master
+    lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, dispatcher_, random_,
+                                        init_manager_, local_info_, store_, listener_manager_,
+                                        *api_, config_tracker_);
 
     expectRequest();
     init_target_handle_->initialize(init_watcher_);
@@ -180,13 +173,8 @@ TEST_F(LdsApiTest, UnknownCluster) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
-<<<<<<< HEAD
-      LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_, store_,
-                 listener_manager_, *api_, config_tracker_),
-=======
       LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
-                 store_, listener_manager_, *api_),
->>>>>>> master
+                 store_, listener_manager_, *api_, config_tracker_),
       EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
       "cluster: 'foo_cluster' does not exist, was added via api, or is an "
@@ -305,13 +293,8 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   EXPECT_CALL(*cluster.info_, type());
   ON_CALL(local_info_, clusterName()).WillByDefault(Return(std::string()));
   EXPECT_THROW_WITH_MESSAGE(
-<<<<<<< HEAD
-      LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_, store_,
-                 listener_manager_, *api_, config_tracker_),
-=======
       LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_manager_, local_info_,
-                 store_, listener_manager_, *api_),
->>>>>>> master
+                 store_, listener_manager_, *api_, config_tracker_),
       EnvoyException,
       "lds: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
