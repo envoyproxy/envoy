@@ -13,23 +13,23 @@
 namespace Envoy {
 namespace Config {
 
-template <class ResourceType>
-class GrpcSubscriptionImpl : public Config::Subscription<ResourceType> {
+class GrpcSubscriptionImpl : public Config::Subscription {
 public:
   GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats,
-                       Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+                       const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
+                       SubscriptionStats stats, Stats::Scope& scope,
+                       const RateLimitSettings& rate_limit_settings,
                        std::chrono::milliseconds init_fetch_timeout,
                        Server::ConfigTracker& config_tracker,
                        const envoy::api::v2::core::GrpcService& grpc_service)
       : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
                   rate_limit_settings, config_tracker, grpc_service),
-        grpc_mux_subscription_(grpc_mux_, stats, dispatcher, init_fetch_timeout) {}
+        grpc_mux_subscription_(grpc_mux_, stats, type_url, dispatcher, init_fetch_timeout) {}
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
-             Config::SubscriptionCallbacks<ResourceType>& callbacks) override {
+             Config::SubscriptionCallbacks& callbacks) override {
     // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
     grpc_mux_subscription_.start(resources, callbacks);
     grpc_mux_.start();
@@ -43,7 +43,7 @@ public:
 
 private:
   GrpcMuxImpl grpc_mux_;
-  GrpcMuxSubscriptionImpl<ResourceType> grpc_mux_subscription_;
+  GrpcMuxSubscriptionImpl grpc_mux_subscription_;
 };
 
 } // namespace Config

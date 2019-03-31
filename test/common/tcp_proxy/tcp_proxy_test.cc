@@ -475,9 +475,10 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
-  ConfigSharedPtr config_;
-  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  ConfigSharedPtr config_;
+  std::unique_ptr<Filter> filter_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
   std::vector<std::unique_ptr<NiceMock<Network::MockClientConnection>>> upstream_connections_{};
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
@@ -486,7 +487,6 @@ public:
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockCancellable>>> conn_pool_handles_;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
   Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks_;
-  std::unique_ptr<Filter> filter_;
   StringViewSaver access_log_data_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
@@ -799,7 +799,7 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   configure(accessLogConfig("%RESPONSE_FLAGS%"));
   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(
-      0, 0, 0, 0);
+      0, 0, 0, 0, 0);
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
   filter_ = std::make_unique<Filter>(config_, factory_context_.cluster_manager_, timeSystem());
@@ -1128,10 +1128,10 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<Filter> filter_;
 };
 

@@ -35,7 +35,8 @@ namespace Server {
  * the config is valid, false if invalid.
  */
 bool validateConfig(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
+                    ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                    Filesystem::Instance& file_system);
 
 /**
  * ValidationInstance does the bulk of the work for config-validation runs of Envoy. It implements
@@ -57,7 +58,8 @@ public:
   ValidationInstance(const Options& options, Event::TimeSystem& time_system,
                      Network::Address::InstanceConstSharedPtr local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
-                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory);
+                     ComponentFactory& component_factory, Thread::ThreadFactory& thread_factory,
+                     Filesystem::Instance& file_system);
 
   // Server::Instance
   Admin& admin() override { return admin_; }
@@ -143,7 +145,8 @@ private:
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
   // occur at any point during member lifetime.
-  InitManagerImpl init_manager_{"Validation server"};
+  Init::ManagerImpl init_manager_{"Validation server"};
+  Init::WatcherImpl init_watcher_{"(no-op)", []() {}};
   // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
   // only after these members can no longer reference it, since:
   // - There may be active filter chains referencing it in listener_manager_.

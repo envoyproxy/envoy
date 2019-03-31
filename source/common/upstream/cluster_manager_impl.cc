@@ -31,10 +31,10 @@
 #include "common/router/shadow_writer_impl.h"
 #include "common/tcp/conn_pool.h"
 #include "common/upstream/cds_api_impl.h"
-#include "common/upstream/conn_pool_map_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/maglev_lb.h"
 #include "common/upstream/original_dst_cluster.h"
+#include "common/upstream/priority_conn_pool_map_impl.h"
 #include "common/upstream/ring_hash_lb.h"
 #include "common/upstream/subset_lb.h"
 
@@ -209,11 +209,6 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (bootstrap.dynamic_resources().has_ads_config()) {
     envoy::api::v2::core::GrpcService grpc_service;
     grpc_service.MergeFrom(bootstrap.dynamic_resources().ads_config().grpc_services(0));
-    std::cout << bootstrap.dynamic_resources().ads_config().DebugString() << "\n";
-
-    std::cout << "Grpc Service in cl"
-              << "\n";
-    std::cout << grpc_service.DebugString() << "\n";
     ads_mux_ = std::make_unique<Config::GrpcMuxImpl>(
         local_info,
         Config::Utility::factoryForGrpcApiConfigSource(
@@ -1051,7 +1046,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
     if (!allocate) {
       return nullptr;
     }
-    ConnPoolsContainer container{thread_local_dispatcher_};
+    ConnPoolsContainer container{thread_local_dispatcher_, host};
     container_iter = host_http_conn_pool_map_.emplace(host, std::move(container)).first;
   }
 
@@ -1140,7 +1135,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
   }
 
   // Inherit socket options from downstream connection, if set.
-  std::vector<uint8_t> hash_key = {uint8_t(protocol), uint8_t(priority)};
+  std::vector<uint8_t> hash_key = {uint8_t(protocol)};
 
   // Use downstream connection socket options for computing connection pool hash key, if any.
   // This allows socket options to control connection pooling so that connections with
@@ -1161,16 +1156,18 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::connPool(
 
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
-  ConnPoolsContainer::ConnPools::OptPoolRef pool = container.pools_->getPool(hash_key, [&]() {
-    return parent_.parent_.factory_.allocateConnPool(
-        parent_.thread_local_dispatcher_, host, priority, protocol,
-        have_options ? context->downstreamConnection()->socketOptions() : nullptr);
-  });
-  // The Connection Pool tracking is a work in progress. We plan for it to eventually have the
-  // ability to fail, but until we add upper layer handling for failures, it should not. So, assert
-  // that we don't accidentally add conditions that could allow it to fail.
-  ASSERT(pool.has_value(), "Pool allocation should never fail");
-  return &(pool.value().get());
+  ConnPoolsContainer::ConnPools::OptPoolRef pool =
+      container.pools_->getPool(priority, hash_key, [&]() {
+        return parent_.parent_.factory_.allocateConnPool(
+            parent_.thread_local_dispatcher_, host, priority, protocol,
+            have_options ? context->downstreamConnection()->socketOptions() : nullptr);
+      });
+
+  if (pool.has_value()) {
+    return &(pool.value().get());
+  } else {
+    return nullptr;
+  }
 }
 
 Tcp::ConnectionPool::Instance*

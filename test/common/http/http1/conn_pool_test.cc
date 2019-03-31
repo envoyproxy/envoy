@@ -128,10 +128,7 @@ public:
         conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
 
   ~Http1ConnPoolImplTest() {
-    // Make sure all gauges are 0.
-    for (const Stats::GaugeSharedPtr& gauge : cluster_->stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
-    }
+    EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -172,7 +169,9 @@ struct ActiveTestRequest {
       parent.conn_pool_.test_clients_[client_index_].connection_->raiseEvent(
           Network::ConnectionEvent::Connected);
     }
-    EXPECT_EQ(current_rq_total + 1, parent_.cluster_->stats_.upstream_rq_total_.value());
+    if (type != Type::Pending) {
+      EXPECT_EQ(current_rq_total + 1, parent_.cluster_->stats_.upstream_rq_total_.value());
+    }
   }
 
   void completeResponse(bool with_body) {
@@ -208,7 +207,7 @@ struct ActiveTestRequest {
  * Verify that connections are drained when requested.
  */
 TEST_F(Http1ConnPoolImplTest, DrainConnections) {
-  cluster_->resetResourceManager(2, 1024, 1024, 1);
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   InSequence s;
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
@@ -293,7 +292,7 @@ TEST_F(Http1ConnPoolImplTest, MultipleRequestAndResponse) {
  * Test when we overflow max pending requests.
  */
 TEST_F(Http1ConnPoolImplTest, MaxPendingRequests) {
-  cluster_->resetResourceManager(1, 1, 1024, 1);
+  cluster_->resetResourceManager(1, 1, 1024, 1, 1);
 
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_pending_open_.value());
 
@@ -371,7 +370,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_EQ(2U, cluster_->stats_.upstream_rq_total_.value());
+  EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_timeout_.value());
 }
@@ -615,7 +614,7 @@ TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {
 }
 
 TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
-  cluster_->resetResourceManager(2, 1024, 1024, 1);
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   InSequence s;
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
@@ -633,6 +632,7 @@ TEST_F(Http1ConnPoolImplTest, ConcurrentConnections) {
   r1.completeResponse(false);
   conn_pool_.expectAndRunUpstreamReady();
   r3.startRequest();
+  EXPECT_EQ(3U, cluster_->stats_.upstream_rq_total_.value());
 
   r2.completeResponse(false);
   r3.completeResponse(false);
@@ -654,6 +654,7 @@ TEST_F(Http1ConnPoolImplTest, DrainCallback) {
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Pending);
   r2.handle_->cancel();
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_total_.value());
 
   EXPECT_CALL(drained, ready());
   r1.startRequest();
@@ -759,6 +760,7 @@ TEST_F(Http1ConnPoolImplTest, PendingRequestIsConsideredActive) {
 
   EXPECT_CALL(conn_pool_, onClientDestroy());
   r1.handle_->cancel();
+  EXPECT_EQ(0U, cluster_->stats_.upstream_rq_total_.value());
   conn_pool_.drainConnections();
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();

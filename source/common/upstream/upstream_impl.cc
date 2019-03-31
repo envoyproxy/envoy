@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
@@ -202,8 +203,11 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
   HostVector net_hosts;
   net_hosts.reserve(hosts.size());
 
-  std::set_difference(hosts.begin(), hosts.end(), excluded_hosts.begin(), excluded_hosts.end(),
-                      std::inserter(net_hosts, net_hosts.begin()));
+  for (const auto& host : hosts) {
+    if (excluded_hosts.find(host) == excluded_hosts.end()) {
+      net_hosts.emplace_back(host);
+    }
+  }
 
   return net_hosts;
 }
@@ -305,9 +309,9 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
   degraded_hosts_per_locality_ = std::move(update_hosts_params.degraded_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
 
-  rebuildLocalityScheduler(locality_scheduler_, locality_entries_, *healthy_hosts_per_locality_,
-                           *healthy_hosts_, hosts_per_locality_, locality_weights_,
-                           overprovisioning_factor_);
+  rebuildLocalityScheduler(healthy_locality_scheduler_, healthy_locality_entries_,
+                           *healthy_hosts_per_locality_, *healthy_hosts_, hosts_per_locality_,
+                           locality_weights_, overprovisioning_factor_);
   rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
                            *degraded_hosts_per_locality_, *degraded_hosts_, hosts_per_locality_,
                            locality_weights_, overprovisioning_factor_);
@@ -357,16 +361,25 @@ void HostSetImpl::rebuildLocalityScheduler(
   }
 }
 
-absl::optional<uint32_t> HostSetImpl::chooseLocality() {
-  if (locality_scheduler_ == nullptr) {
+absl::optional<uint32_t> HostSetImpl::chooseHealthyLocality() {
+  return chooseLocality(healthy_locality_scheduler_.get());
+}
+
+absl::optional<uint32_t> HostSetImpl::chooseDegradedLocality() {
+  return chooseLocality(degraded_locality_scheduler_.get());
+}
+
+absl::optional<uint32_t>
+HostSetImpl::chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler) {
+  if (locality_scheduler == nullptr) {
     return {};
   }
-  const std::shared_ptr<LocalityEntry> locality = locality_scheduler_->pick();
+  const std::shared_ptr<LocalityEntry> locality = locality_scheduler->pick();
   // We don't build a schedule if there are no weighted localities, so we should always succeed.
   ASSERT(locality != nullptr);
   // If we picked it before, its weight must have been positive.
   ASSERT(locality->effective_weight_ > 0);
-  locality_scheduler_->add(locality->effective_weight_, locality);
+  locality_scheduler->add(locality->effective_weight_, locality);
   return locality->index_;
 }
 
@@ -635,7 +648,8 @@ ClusterImplBase::ClusterImplBase(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
-    : runtime_(runtime), init_manager_(fmt::format("Cluster {}", cluster.name())) {
+    : init_manager_(fmt::format("Cluster {}", cluster.name())),
+      init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
@@ -705,7 +719,7 @@ void ClusterImplBase::onPreInitComplete() {
   initialization_started_ = true;
 
   ENVOY_LOG(debug, "initializing secondary cluster {} completed", info()->name());
-  init_manager_.initialize([this]() { onInitDone(); });
+  init_manager_.initialize(init_watcher_);
 }
 
 void ClusterImplBase::onInitDone() {
@@ -816,9 +830,16 @@ ClusterInfoImpl::ResourceManagers::ResourceManagers(const envoy::api::v2::Cluste
 }
 
 ClusterCircuitBreakersStats
-ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix) {
+ClusterInfoImpl::generateCircuitBreakersStats(Stats::Scope& scope, const std::string& stat_prefix,
+                                              bool track_remaining) {
   std::string prefix(fmt::format("circuit_breakers.{}.", stat_prefix));
-  return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix))};
+  if (track_remaining) {
+    return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix),
+                                               POOL_GAUGE_PREFIX(scope, prefix))};
+  } else {
+    return {ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE_PREFIX(scope, prefix),
+                                               NULL_POOL_GAUGE(scope))};
+  }
 }
 
 ResourceManagerImplPtr
@@ -830,6 +851,9 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;
   uint64_t max_retries = 3;
+  uint64_t max_connection_pools = std::numeric_limits<uint64_t>::max();
+
+  bool track_remaining = false;
 
   std::string priority_name;
   switch (priority) {
@@ -858,10 +882,14 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_pending_requests, max_pending_requests);
     max_requests = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_requests, max_requests);
     max_retries = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_retries, max_retries);
+    track_remaining = it->track_remaining();
+    max_connection_pools =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
   }
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
-      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name));
+      max_connection_pools,
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name, track_remaining));
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
@@ -1119,6 +1147,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       // Did the priority change?
       if (host->priority() != existing_host->second->priority()) {
         existing_host->second->priority(host->priority());
+        hosts_added_to_current_priority.emplace_back(existing_host->second);
       }
 
       existing_host->second->weight(host->weight());

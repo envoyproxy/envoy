@@ -40,7 +40,12 @@ TEST_F(SdsApiTest, BasicTest) {
   const envoy::service::discovery::v2::SdsDummy dummy;
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
-  EXPECT_CALL(init_manager, registerTarget(_, _));
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
 
   envoy::api::v2::core::ConfigSource config_source;
   config_source.mutable_api_config_source()->set_api_type(
@@ -62,8 +67,8 @@ TEST_F(SdsApiTest, BasicTest) {
   EXPECT_CALL(*factory, create()).WillOnce(Invoke([grpc_client] {
     return Grpc::AsyncClientPtr{grpc_client};
   }));
-  EXPECT_CALL(init_manager.initialized_, ready());
-  init_manager.initialize();
+  EXPECT_CALL(init_watcher, ready());
+  init_target_handle->initialize(init_watcher);
 }
 
 // Validate that TlsCertificateSdsApi updates secrets successfully if a good secret
@@ -89,10 +94,11 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
     private_key:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
     )EOF";
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
@@ -133,9 +139,10 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
     allow_expired_certificate: true
   )EOF";
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
@@ -182,10 +189,9 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
         validation_callback.validateCvc(cvc);
       });
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto* secret_config = secret_resources.Add();
-  secret_config->set_name("abc.com");
-  auto* dynamic_cvc = secret_config->mutable_validation_context();
+  envoy::api::v2::auth::Secret typed_secret;
+  typed_secret.set_name("abc.com");
+  auto* dynamic_cvc = typed_secret.mutable_validation_context();
   dynamic_cvc->set_allow_expired_certificate(false);
   dynamic_cvc->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
@@ -195,6 +201,9 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   dynamic_cvc->add_verify_certificate_spki(dynamic_verify_certificate_spki);
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   EXPECT_CALL(validation_callback, validateCvc(_));
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
   sds_api.onConfigUpdate(secret_resources, "");
 
   const std::string default_verify_certificate_hash =
@@ -241,7 +250,7 @@ TEST_F(SdsApiTest, EmptyResource) {
                                server.stats(), server.clusterManager(), init_manager, config_source,
                                "abc.com", []() {}, *api_, config_tracker_);
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
 
   EXPECT_THROW_WITH_MESSAGE(sds_api.onConfigUpdate(secret_resources, ""), EnvoyException,
                             "Missing SDS resources for abc.com in onConfigUpdate()");
@@ -266,11 +275,11 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
       )EOF";
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config_1 = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config_1);
-  auto secret_config_2 = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config_2);
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
+  secret_resources.Add()->PackFrom(typed_secret);
 
   EXPECT_THROW_WITH_MESSAGE(sds_api.onConfigUpdate(secret_resources, ""), EnvoyException,
                             "Unexpected SDS secrets length: 2");
@@ -296,9 +305,10 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
           filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
         )EOF";
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
 
   EXPECT_THROW_WITH_MESSAGE(sds_api.onConfigUpdate(secret_resources, ""), EnvoyException,
                             "Unexpected SDS secret (expecting abc.com): wrong.name.com");
