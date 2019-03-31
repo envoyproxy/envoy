@@ -435,6 +435,8 @@ TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
 }
 
 TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
+  // The max retries header will take precedence over the policy
+  policy_.num_retries_ = 4;
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"},
                                           {"x-envoy-retry-grpc-on", "cancelled"},
                                           {"x-envoy-max-retries", "3"}};
@@ -520,6 +522,20 @@ TEST_F(RouterRetryStateImplTest, Cancel) {
 
   expectTimerCreateAndEnable();
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, ZeroMaxRetriesHeader) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"},
+                                          {"x-envoy-retry-grpc-on", "cancelled"},
+                                          {"x-envoy-max-retries", "0"}};
+  setup(request_headers);
+  EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
+  EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
+  EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
+  EXPECT_TRUE(state_->enabled());
+
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
+            state_->shouldRetryReset(connect_failure_, callback_));
 }
 
 } // namespace

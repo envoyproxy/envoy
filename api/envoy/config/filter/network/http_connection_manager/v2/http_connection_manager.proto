@@ -345,6 +345,7 @@ message HttpConnectionManager {
   // :ref:`http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6
   // <config_http_conn_man_runtime_represent_ipv4_remote_address_as_ipv4_mapped_ipv6>` for runtime
   // control.
+  // [#not-implemented-hide:]
   bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6 = 20;
 
   // The configuration for HTTP upgrades.

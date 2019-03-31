@@ -12,6 +12,40 @@
 namespace Envoy {
 namespace Event {
 
+namespace {
+class UnlockGuard {
+public:
+  /**
+   * Establishes a scoped mutex-lock; the mutex is unlocked upon construction.
+   * The main motivation for setting up a class to manage this, rather than
+   * simply { mutex.unlock(); operation(); mutex.lock(); } is that in method
+   * Alarm::activateLockHeld(), the mutex is owned by the time-system, which
+   * lives long enough. However the Alarm may be destructed while the lock is
+   * dropped, so there can be a tsan error when re-taking time_system_.mutex_.
+   *
+   * It's also easy to make a temp mutex reference, however this confuses
+   * clang's thread-annotation analysis, whereas this unlock-guard seems to work
+   * with thread annotation.
+   *
+   * Another reason to use this Guard class is so that the mutex is re-taken
+   * even if there is an exception thrown while the lock is dropped. That is
+   * not likely to happen at this call-site as the functions being called don't
+   * throw.
+   *
+   * @param lock the mutex.
+   */
+  explicit UnlockGuard(Thread::BasicLockable& lock) : lock_(lock) { lock_.unlock(); }
+
+  /**
+   * Destruction of the UnlockGuard re-locks the lock.
+   */
+  ~UnlockGuard() { lock_.lock(); }
+
+private:
+  Thread::BasicLockable& lock_;
+};
+} // namespace
+
 // Our simulated alarm inherits from TimerImpl so that the same dispatching
 // mechanism used in RealTimeSystem timers is employed for simulated alarms.
 class SimulatedTimeSystemHelper::Alarm : public Timer {
@@ -45,13 +79,14 @@ public:
     armed_ = false;
     time_system_.incPending();
 
-    // We don't want to activate the alarm under lock, as it will make a libevent call,
-    // and libevent itself uses locks:
+    // We don't want to activate the alarm under lock, as it will make a
+    // libevent call, and libevent itself uses locks:
     // https://github.com/libevent/libevent/blob/29cc8386a2f7911eaa9336692a2c5544d8b4734f/event.c#L1917
-    time_system_.mutex_.unlock();
+    // See class comment for UnlockGuard for details on saving
+    // time_system_.mutex_ prior to running libevent, which may delete this.
+    UnlockGuard unlocker(time_system_.mutex_);
     std::chrono::milliseconds duration = std::chrono::milliseconds::zero();
     base_timer_->enableTimer(duration);
-    time_system_.mutex_.lock();
   }
 
   MonotonicTime time() const EXCLUSIVE_LOCKS_REQUIRED(time_system_.mutex_) {
