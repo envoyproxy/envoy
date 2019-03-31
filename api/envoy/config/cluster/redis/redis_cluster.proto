@@ -14,9 +14,9 @@ import "gogoproto/gogo.proto";
 
 message RedisClusterConfig {
 
-    google.protobuf.Duration cluster_refresh_rate = 1
-    [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration cluster_refresh_rate = 1
+      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
-    google.protobuf.Duration cluster_refresh_timeout = 2
-    [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration cluster_refresh_timeout = 2
+      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 }
