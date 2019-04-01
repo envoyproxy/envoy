@@ -1,8 +1,8 @@
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 
-#include "extensions/filters/network/redis_proxy/config.h"
-
 #include "common/protobuf/utility.h"
+
+#include "extensions/filters/network/redis_proxy/config.h"
 
 #include "test/mocks/server/mocks.h"
 
@@ -30,7 +30,8 @@ stat_prefix: foo
   )EOF";
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config;
-  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYamlAndValidate(yaml, proto_config), ProtoValidationException, "value is required");
+  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYamlAndValidate(yaml, proto_config),
+                          ProtoValidationException, "value is required");
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyNoOpTimeout) {
@@ -41,7 +42,8 @@ settings: {}
   )EOF";
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config;
-  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYamlAndValidate(yaml, proto_config), ProtoValidationException, "embedded message failed validation");
+  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYamlAndValidate(yaml, proto_config),
+                          ProtoValidationException, "embedded message failed validation");
 }
 
 TEST(RedisProxyFilterConfigFactoryTest, RedisProxyCorrectProto) {
