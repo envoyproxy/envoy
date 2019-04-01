@@ -332,7 +332,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
   return bytes;
 }
 
-void SymbolTableImpl::populateList(absl::string_view* names, int32_t num_names,
+void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_names,
                                    StatNameList& list) {
   RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
@@ -340,7 +340,7 @@ void SymbolTableImpl::populateList(absl::string_view* names, int32_t num_names,
   size_t total_size_bytes = 1; /* one byte for holding the number of names */
 
   STACK_ARRAY(encodings, Encoding, num_names);
-  for (int32_t i = 0; i < num_names; ++i) {
+  for (uint32_t i = 0; i < num_names; ++i) {
     Encoding& encoding = encodings[i];
     addTokensToEncoding(names[i], encoding);
     total_size_bytes += encoding.bytesRequired();

@@ -112,11 +112,12 @@ public:
    * construction time to enable StatNameList to be instantiated directly in
    * a class that doesn't have a live SymbolTable when it is constructed.
    *
-   * @param names A pointer to the first name in an array.
+   * @param names A pointer to the first name in an array, allocated by the caller.
    * @param num_names The number of names.
    * @param symbol_table The symbol table in which to encode the names.
    */
-  virtual void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) PURE;
+  virtual void populateList(const absl::string_view* names, uint32_t num_names,
+                            StatNameList& list) PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;
@@ -154,7 +155,7 @@ private:
    * Since SymbolTable does manual reference counting, a client of SymbolTable
    * must manually call free(symbol_vec) when it is freeing the backing store
    * for a StatName. This way, the symbol table will grow and shrink
-   * dynamically, instead of being write-only
+   * dynamically, instead of being write-only.
    *
    * @param stat_name the stat name.
    */

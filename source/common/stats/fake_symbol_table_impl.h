@@ -50,7 +50,8 @@ namespace Stats {
 class FakeSymbolTableImpl : public SymbolTable {
 public:
   // SymbolTable
-  void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override {
+  void populateList(const absl::string_view* names, uint32_t num_names,
+                    StatNameList& list) override {
     // This implementation of populateList is similar to
     // SymbolTableImpl::populateList. This variant is more efficient for
     // FakeSymbolTableImpl, because it avoid "encoding" each name in names. The
@@ -68,7 +69,7 @@ public:
     // lengths of each name.
     size_t total_size_bytes = 1 + num_names * StatNameSizeEncodingBytes;
 
-    for (int32_t i = 0; i < num_names; ++i) {
+    for (uint32_t i = 0; i < num_names; ++i) {
       total_size_bytes += names[i].size();
     }
 
@@ -77,7 +78,7 @@ public:
     auto storage = std::make_unique<Storage>(total_size_bytes);
     uint8_t* p = &storage[0];
     *p++ = num_names;
-    for (int32_t i = 0; i < num_names; ++i) {
+    for (uint32_t i = 0; i < num_names; ++i) {
       auto& name = names[i];
       size_t sz = name.size();
       p = SymbolTableImpl::writeLengthReturningNext(sz, p);

@@ -133,7 +133,8 @@ public:
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
   SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
-  void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) override;
+  void populateList(const absl::string_view* names, uint32_t num_names,
+                    StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
   void callWithStringView(StatName stat_name,
                           const std::function<void(absl::string_view)>& fn) const override;
