@@ -389,6 +389,27 @@ TEST_F(RedisSingleServerRequestTest, MovedRedirectionFailure) {
   respond();
 };
 
+TEST_F(RedisSingleServerRequestTest, RedirectionFailure) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"get", "foo"});
+  makeRequest("foo", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  // bad error (but could be valid moved or ask error)
+  Common::Redis::RespValue moved_response;
+  moved_response.type(Common::Redis::RespType::Error);
+  moved_response.asString() = "NOTMOVEDORASK 1111 1.1.1.1:1";
+  EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
+  // bad response type
+  moved_response.type(Common::Redis::RespType::Integer);
+  moved_response.asInteger() = 1;
+  EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
+
+  respond();
+};
+
 TEST_F(RedisSingleServerRequestTest, AskRedirectionSuccess) {
   InSequence s;
 
