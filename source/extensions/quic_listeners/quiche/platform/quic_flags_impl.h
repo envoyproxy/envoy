@@ -3,13 +3,15 @@
 // NOLINT(namespace-envoy)
 
 // This file is part of the QUICHE platform implementation, and is not to be
-// consumed or referenced directly by other Envoy
+// consumed or referenced directly by other Envoy code. It serves purely as a
+// porting layer for QUICHE.
 
 #include <string>
 #include <vector>
 
 // This is a dummy implementation which just allows its dependency to build.
 // TODO(mpwarres): implement once QUICHE flag mechanism is defined.
+// GetQuic(Restart|Reloadable)FlagImpl will be implemented with non-macro construct.
 
 extern bool FLAGS_quic_supports_tls_handshake;
 #define GetQuicFlagImpl(flag) ({ false; })
@@ -36,7 +38,5 @@ inline std::vector<std::string> QuicParseCommandLineFlagsImpl(const char* /*usag
 }
 
 inline void QuicPrintCommandLineFlagHelpImpl(const char* /*usage*/) {}
-
-// porting layer for QUICHE.
 
 } // namespace quic

@@ -6,8 +6,9 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include <stdint.h>
 #include <sys/socket.h>
+
+#include <cstdint>
 
 #include "extensions/quic_listeners/quiche/platform/quic_ip_address_impl.h"
 

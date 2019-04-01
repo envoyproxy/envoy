@@ -8,6 +8,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "quiche/quic/platform/api/quic_iovec.h"
 #include "quiche/quic/platform/api/quic_mem_slice_span.h"
 
 namespace quic {
@@ -22,8 +23,6 @@ public:
   QuicMemSliceStorageImpl& operator=(const QuicMemSliceStorageImpl& other) = default;
   QuicMemSliceStorageImpl(QuicMemSliceStorageImpl&& other) = default;
   QuicMemSliceStorageImpl& operator=(QuicMemSliceStorageImpl&& other) = default;
-
-  ~QuicMemSliceStorageImpl() = default;
 
   QuicMemSliceSpan ToSpan() { return QuicMemSliceSpan(QuicMemSliceSpanImpl(buffer_)); }
 

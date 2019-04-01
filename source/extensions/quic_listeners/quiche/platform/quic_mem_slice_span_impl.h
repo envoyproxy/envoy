@@ -29,7 +29,6 @@ public:
   QuicMemSliceSpanImpl& operator=(const QuicMemSliceSpanImpl& other) = default;
   QuicMemSliceSpanImpl(QuicMemSliceSpanImpl&& other) = default;
   QuicMemSliceSpanImpl& operator=(QuicMemSliceSpanImpl&& other) = default;
-  ~QuicMemSliceSpanImpl() = default;
 
   QuicStringPiece GetData(size_t index) {
     uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);

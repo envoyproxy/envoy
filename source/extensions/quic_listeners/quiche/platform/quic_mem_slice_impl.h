@@ -16,6 +16,9 @@
 
 namespace quic {
 
+// Implements the interface required by
+// https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/quic_mem_slice.h
+// Note the Quic plugin strategy relies on link-time binding rather than inheritance.
 class QuicMemSliceImpl {
 public:
   // Constructs an empty QuicMemSliceImpl.
@@ -24,7 +27,7 @@ public:
   // Constructs a QuicMemSliceImpl by let |allocator| allocate a data buffer of
   // |length|.
   QuicMemSliceImpl(QuicBufferAllocator* allocator, size_t length)
-      : length_(length), slice_(new Envoy::Buffer::OwnedImpl()) {
+      : slice_(new Envoy::Buffer::OwnedImpl()) {
     auto fragment = new Envoy::Buffer::BufferFragmentImpl(
         allocator->New(length), length,
         [allocator](const void* data, size_t, const Envoy::Buffer::BufferFragmentImpl* fragment) {
@@ -36,8 +39,8 @@ public:
 
   // Constructs a QuicMemSliceImpl from a Buffer::Instance whose getRawSlices()
   // returns only 1 slice.
-  QuicMemSliceImpl(std::shared_ptr<Envoy::Buffer::Instance> slice)
-      : length_(slice->length()), slice_(std::move(slice)) {
+  explicit QuicMemSliceImpl(std::shared_ptr<Envoy::Buffer::Instance> slice)
+      : slice_(std::move(slice)) {
     ASSERT(slice_->getRawSlices(nullptr, 0) == 1);
   }
 
@@ -46,24 +49,18 @@ public:
 
   // Move constructors. |other| will not hold a reference to the data buffer
   // after this call completes.
-  QuicMemSliceImpl(QuicMemSliceImpl&& other)
-      : length_(other.length_), slice_(std::move(other.slice_)) {
-    other.Reset();
-  }
+  QuicMemSliceImpl(QuicMemSliceImpl&& other) : slice_(std::move(other.slice_)) { other.Reset(); }
 
   QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) {
     if (this != &other) {
-      length_ = other.length_;
       slice_ = std::move(other.slice_);
       other.Reset();
     }
     return *this;
   }
 
-  void Reset() {
-    length_ = 0;
-    slice_ = nullptr;
-  }
+  // Below methods implements interface needed by QuicMemSlice.
+  void Reset() { slice_ = nullptr; }
 
   // Returns a char pointer to the one and only slice in buffer.
   const char* data() const {
@@ -76,11 +73,9 @@ public:
   }
 
   size_t length() const { return slice_ == nullptr ? 0 : slice_->length(); }
-
   bool empty() const { return length() == 0; }
 
 private:
-  size_t length_;
   std::shared_ptr<Envoy::Buffer::Instance> slice_;
 };
 
