@@ -22,7 +22,7 @@ public:
   ~SimulatedTimeSystemHelper() override;
 
   // TimeSystem
-  SchedulerPtr createScheduler(Libevent::BasePtr&) override;
+  SchedulerPtr createScheduler(Scheduler& base_scheduler) override;
 
   // TestTimeSystem
   void sleep(const Duration& duration) override;

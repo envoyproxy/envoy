@@ -89,8 +89,8 @@ public:
     return timeSystem().waitFor(mutex, condvar, duration);
   }
 
-  SchedulerPtr createScheduler(Libevent::BasePtr& base_ptr) override {
-    return timeSystem().createScheduler(base_ptr);
+  SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
+    return timeSystem().createScheduler(base_scheduler);
   }
   SystemTime systemTime() override { return timeSystem().systemTime(); }
   MonotonicTime monotonicTime() override { return timeSystem().monotonicTime(); }

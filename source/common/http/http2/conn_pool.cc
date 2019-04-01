@@ -89,7 +89,8 @@ void ConnPoolImpl::newClientStream(Http::StreamDecoder& response_decoder,
                                    ConnectionPool::Callbacks& callbacks) {
   if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
     ENVOY_LOG(debug, "max requests overflow");
-    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+    callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
+                            nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
   } else {
     ENVOY_CONN_LOG(debug, "creating stream", *primary_client_->client_);
@@ -127,7 +128,8 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     // If we're not allowed to enqueue more requests, fail fast.
     if (!host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
       ENVOY_LOG(debug, "max pending requests overflow");
-      callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+      callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
+                              nullptr);
       host_->cluster().stats().upstream_rq_pending_overflow_.inc();
       return nullptr;
     }
@@ -165,7 +167,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // do with the request.
       // NOTE: We move the existing pending requests to a temporary list. This is done so that
       //       if retry logic submits a new request to the pool, we don't fail it inline.
-      purgePendingRequests(client.real_host_description_);
+      purgePendingRequests(client.real_host_description_,
+                           client.client_->connectionFailureReason());
     }
 
     if (&client == primary_client_.get()) {

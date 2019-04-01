@@ -30,6 +30,7 @@ import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 option (gogoproto.equal_all) = true;
+option (gogoproto.stable_marshaler_all) = true;
 
 // Return list of all clusters this proxy will load balance to.
 service ClusterDiscoveryService {

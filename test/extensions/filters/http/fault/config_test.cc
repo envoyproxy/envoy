@@ -40,7 +40,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   FaultFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -55,7 +55,7 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
   FaultFilterFactory factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -65,7 +65,7 @@ TEST(FaultFilterConfigTest, FaultFilterEmptyProto) {
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 

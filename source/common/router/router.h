@@ -41,7 +41,7 @@ namespace Router {
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_direct_response)                                                                      \
   COUNTER(rq_total)                                                                                \
-  COUNTER(rq_reset_after_downstream_response_started)                                              \
+  COUNTER(rq_reset_after_downstream_response_started)
 // clang-format on
 
 /**
@@ -295,7 +295,8 @@ private:
     void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
     // Http::StreamCallbacks
-    void onResetStream(Http::StreamResetReason reason) override;
+    void onResetStream(Http::StreamResetReason reason,
+                       absl::string_view transport_failure_reason) override;
     void onAboveWriteBufferHighWatermark() override { disableDataFromDownstream(); }
     void onBelowWriteBufferLowWatermark() override { enableDataFromDownstream(); }
 
@@ -310,6 +311,7 @@ private:
 
     // Http::ConnectionPool::Callbacks
     void onPoolFailure(Http::ConnectionPool::PoolFailureReason reason,
+                       absl::string_view transport_failure_reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Http::StreamEncoder& request_encoder,
                      Upstream::HostDescriptionConstSharedPtr host) override;
@@ -353,8 +355,6 @@ private:
 
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
 
-  enum class UpstreamResetType { Reset, GlobalTimeout, PerTryTimeout };
-
   StreamInfo::ResponseFlag streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason);
 
   static const std::string upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
@@ -371,19 +371,28 @@ private:
                                          Upstream::ResourcePriority priority) PURE;
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
+  bool maybeRetryReset(Http::StreamResetReason reset_reason);
+  void onPerTryTimeout();
   void onRequestComplete();
   void onResponseTimeout();
   void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
+  // Handle an upstream request aborted due to a local timeout.
+  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag);
+  // Handle an "aborted" upstream request, meaning we didn't see response
+  // headers (e.g. due to a reset). Handles recording stats and responding
+  // downstream if appropriate.
+  void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
+                       absl::string_view body, bool dropped);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
   void onUpstreamComplete();
-  void onUpstreamReset(UpstreamResetType type,
-                       const absl::optional<Http::StreamResetReason> reset_reason);
+  void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
   bool setupRedirect(const Http::HeaderMap& headers);
+  void updateOutlierDetection(Http::Code code);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.

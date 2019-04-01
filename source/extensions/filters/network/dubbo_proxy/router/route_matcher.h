@@ -34,7 +34,7 @@ public:
   // Router::RouteEntry
   const std::string& clusterName() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return metadata_match_criteria_.get();
   }
 
   // Router::Route
