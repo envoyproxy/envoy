@@ -38,9 +38,9 @@ Private Distributors List of some details on the pending Envoy $VERSION
 security release, following the process described at
 https://github.com/envoyproxy/envoy/blob/master/SECURITY_RELEASE_PROCESS.md.
 
-This release will be made available on the $ORDINALDATE of $MONTH $YEAR at
+This release will be made available on the $ORDINALDAY of $MONTH $YEAR at
 $PDTHOUR PDT ($GMTHOUR GMT). This release will fix $NUMDEFECTS security
-defects. The highest rated security defect is considered $SEVERITY severity.
+defect(s). The highest rated security defect is considered $SEVERITY severity.
 
 Below we provide details of these vulnerabilities under our embargo policy
 (https://github.com/envoyproxy/envoy/blob/master/SECURITY_RELEASE_PROCESS.md#embargo-policy).
@@ -83,13 +83,16 @@ Upgrading to $VERSION is encouraged to fix these issues.
 
 GitHub tag: https://github.com/envoyproxy/envoy/releases/tag/v$VERSION
 Docker images: https://hub.docker.com/r/envoyproxy/envoy/tags
-Release notes: https://www.envoyproxy.io/docs/envoy/latest/intro/version_history
+Release notes: https://www.envoyproxy.io/docs/envoy/v$VERSION/intro/version_history
 Docs: https://www.envoyproxy.io/docs/envoy/v$VERSION/
 
 **Am I vulnerable?**
 
 Run `envoy --version` and if it indicates a base version of $OLDVERSION or
 older you are running a vulnerable version.
+
+<!-- Provide details on features, extensions, configuration that make it likely that a system is
+vulnerable in practice. -->
 
 **How do I mitigate the vulnerability?**
 
