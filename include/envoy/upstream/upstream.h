@@ -463,6 +463,7 @@ public:
   COUNTER  (upstream_cx_connect_timeout)                                                           \
   COUNTER  (upstream_cx_idle_timeout)                                                              \
   COUNTER  (upstream_cx_connect_attempts_exceeded)                                                 \
+  COUNTER  (upstream_cx_connect_attempt_interval_exceeded)                                         \
   COUNTER  (upstream_cx_overflow)                                                                  \
   HISTOGRAM(upstream_cx_connect_ms)                                                                \
   HISTOGRAM(upstream_cx_length_ms)                                                                 \

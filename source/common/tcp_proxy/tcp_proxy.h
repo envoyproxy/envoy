@@ -111,6 +111,9 @@ public:
     return shared_config_->idleTimeout();
   }
   UpstreamDrainManager& drainManager();
+  const absl::optional<std::chrono::milliseconds>& maxConnectAttemptInterval() {
+    return max_connect_attempt_interval_;
+  }
   SharedConfigSharedPtr sharedConfig() { return shared_config_; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() {
     return cluster_metadata_match_criteria_.get();
@@ -147,6 +150,7 @@ private:
   uint64_t total_cluster_weight_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const uint32_t max_connect_attempts_;
+  absl::optional<std::chrono::milliseconds> max_connect_attempt_interval_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
@@ -286,6 +290,8 @@ protected:
   StreamInfo::StreamInfoImpl stream_info_;
   uint32_t connect_attempts_{};
   bool connecting_{};
+  absl::optional<MonotonicTime> current_connect_start_time_;
+  TimeSource& time_source_;
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream

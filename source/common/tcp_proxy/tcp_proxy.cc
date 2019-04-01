@@ -70,6 +70,10 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
       shared_config_(std::make_shared<SharedConfig>(config, context)),
       random_generator_(context.random()) {
 
+  if (config.has_max_connect_attempt_interval()) {
+    max_connect_attempt_interval_ = std::chrono::milliseconds(
+        DurationUtil::durationToMilliseconds(config.max_connect_attempt_interval()));
+  }
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     return ThreadLocal::ThreadLocalObjectSharedPtr(new UpstreamDrainManager());
   });
@@ -172,7 +176,8 @@ UpstreamDrainManager& Config::drainManager() {
 Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
                TimeSource& time_source)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(this)), stream_info_(time_source) {
+      upstream_callbacks_(new UpstreamCallbacks(this)), stream_info_(time_source),
+      time_source_(time_source) {
   ASSERT(config != nullptr);
 }
 
@@ -359,6 +364,17 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
+  if (config_->maxConnectAttemptInterval().has_value() && current_connect_start_time_.has_value()) {
+    auto interval = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time_source_.monotonicTime() - current_connect_start_time_.value());
+    if (interval > config_->maxConnectAttemptInterval().value()) {
+      getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
+      cluster->stats().upstream_cx_connect_attempt_interval_exceeded_.inc();
+      onInitFailure(UpstreamFailureReason::CONNECT_FAILED);
+      return Network::FilterStatus::StopIteration;
+    }
+  }
+
   const uint32_t max_connect_attempts = config_->maxConnectAttempts();
   if (connect_attempts_ >= max_connect_attempts) {
     getStreamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded);
@@ -391,7 +407,9 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   connecting_ = true;
   connect_attempts_++;
-
+  if (config_->maxConnectAttemptInterval().has_value()) {
+    current_connect_start_time_ = time_source_.monotonicTime();
+  }
   // Because we never return open connections to the pool, this should either return a handle while
   // a connection completes or it invokes onPoolFailure inline. Either way, stop iteration.
   upstream_handle_ = conn_pool->newConnection(*this);

@@ -68,6 +68,7 @@ Version history
   updated at least once.
 * stats: added gauges tracking remaining resources before circuit breakers open.
 * tap: added new alpha :ref:`HTTP tap filter <config_http_filters_tap>`.
+* tcp_proxy: added the :ref:`max_connect_attempt_interval <envoy_api_field_config.filter.network.tcp_proxy.v.tcp_proxy.max_connect_attempt_interval>` setting.
 * tls: enabled TLS 1.3 on the server-side (non-FIPS builds).
 * upstream: add hash_function to specify the hash function for :ref:`ring hash<envoy_api_msg_Cluster.RingHashLbConfig>` as either xxHash or `murmurHash2 <https://sites.google.com/site/murmurhash>`_. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 * upstream: added :ref:`degraded health value<arch_overview_load_balancing_degraded>` which allows

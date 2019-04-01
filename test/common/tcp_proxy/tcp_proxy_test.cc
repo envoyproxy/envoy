@@ -26,6 +26,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -474,8 +475,10 @@ public:
   }
 
   Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+  Event::SimulatedTimeSystem& simulatedTimeSystem() { return simulated_test_system_; }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Event::SimulatedTimeSystem simulated_test_system_;
   ConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
@@ -605,6 +608,21 @@ TEST_F(TcpProxyTest, ConnectAttemptsUpstreamTimeout) {
 
   EXPECT_EQ(0U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
                     .counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+}
+
+TEST_F(TcpProxyTest, ExceededMaxConnectAttemptInterval) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  config.mutable_max_connect_attempt_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
+  setup(1, config);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  simulatedTimeSystem().setMonotonicTime(std::chrono::milliseconds(1) + std::chrono::seconds(1));
+  raiseEventUpstreamConnectFailed(0, Tcp::ConnectionPool::PoolFailureReason::Timeout);
+
+  EXPECT_EQ(1U, factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_cx_connect_attempt_interval_exceeded")
                     .value());
 }
 

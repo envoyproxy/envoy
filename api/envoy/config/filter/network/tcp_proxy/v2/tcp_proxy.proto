@@ -178,6 +178,11 @@ message TcpProxy {
   // giving up. If the parameter is not specified, 1 connection attempt will be made.
   google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32.gte = 1];
 
+  // Control the max interval between the connect attempts.
+  // If the interval between two attempts is greater than this value, the connection fails.
+  // If not set, can be any time interval of two attempts
+  google.protobuf.Duration max_connect_attempt_interval = 11 [(validate.rules).duration.gt = {}];
+
   // Allows for specification of multiple upstream clusters along with weights
   // that indicate the percentage of traffic to be forwarded to each cluster.
   // The router selects an upstream cluster based on these weights.
