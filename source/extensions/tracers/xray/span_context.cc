@@ -6,14 +6,15 @@
 #include "extensions/tracers/xray/xray_core_constants.h"
 
 namespace Envoy {
-    namespace Extensions {
-        namespace Tracers {
-            namespace XRay {
+namespace Extensions {
+namespace Tracers {
+namespace XRay {
 
-                SpanContext::SpanContext(const Span& span)
-                        : trace_id_(span.traceId()), id_(span.id()), parent_id_(span.isSetParentId() ? span.parentId() : 0), sampled_(span.sampled()) {}
+SpanContext::SpanContext(const Span& span)
+    : trace_id_(span.traceId()), id_(span.id()),
+      parent_id_(span.isSetParentId() ? span.parentId() : 0), sampled_(span.sampled()) {}
 
-            } // namespace XRay
-        } // namespace Tracers
-    } // namespace Extensions
+} // namespace XRay
+} // namespace Tracers
+} // namespace Extensions
 } // namespace Envoy

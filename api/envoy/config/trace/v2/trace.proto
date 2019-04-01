@@ -112,7 +112,10 @@ message XRayConfig {
   string daemon_endpoint = 1 [(validate.rules).string.min_bytes = 1];
 
   // The custom name to name a X-Ray segment. By default will use cluster name.
-  string segment_name = 2 [(validate.rules).string.min_bytes = 1];
+  string segment_name = 2 [(validate.rules).string.min_bytes = 0];
+
+  // The location of custom sampling rule json file
+  string json_file = 3 [(validate.rules).string.min_bytes = 0];
 }
 
 // Configuration structure.

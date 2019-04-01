@@ -16,10 +16,10 @@ envoy_extension_cc_test(
     name = "xray_test",
     srcs = [
         "sampling_test.cc",
-        "xray_core_types_test.cc",
         "tracer_test.cc",
         "util_test.cc",
-        "xray_tracer_impl_test.cc"
+        "xray_core_types_test.cc",
+        "xray_tracer_impl_test.cc",
     ],
     extension_name = "envoy.tracers.xray",
     external_deps = ["abseil_optional"],

@@ -22,7 +22,7 @@ public:
   // Datadog tracer
   const std::string Datadog = "envoy.tracers.datadog";
   // XRay tracer
-  const std::string XRay = "envoy.xray";
+  const std::string XRay = "envoy.tracers.xray";
 };
 
 typedef ConstSingleton<TracerNameValues> TracerNames;

@@ -1,5 +1,8 @@
 #include "extensions/tracers/xray/xray_core_types.h"
 
+#include <ctime>
+#include <string>
+
 #include "common/common/utility.h"
 
 #include "extensions/tracers/xray/span_context.h"
@@ -10,277 +13,296 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
-#include <ctime>
-#include <string>
-
 namespace Envoy {
-    namespace Extensions {
-        namespace Tracers {
-            namespace XRay {
+namespace Extensions {
+namespace Tracers {
+namespace XRay {
 
-                const std::string Span::EMPTY_HEX_STRING_ = "0000000000000000";
-                const std::string Span::VERSION_ = "1";
-                const std::string Span::FORMAT_ = "json";
+const std::string Span::EMPTY_HEX_STRING_ = "0000000000000000";
+const std::string Span::VERSION_ = "1";
+const std::string Span::FORMAT_ = "json";
 
-                Annotation::Annotation(const Annotation& ann) {
-                    key_ = ann.key();
-                    value_ = ann.value();
-                }
+Annotation::Annotation(const Annotation& ann) {
+  key_ = ann.key();
+  value_ = ann.value();
+}
 
-                Annotation& Annotation::operator=(const Annotation& ann) {
-                    key_ = ann.key();
-                    value_ = ann.value();
+Annotation& Annotation::operator=(const Annotation& ann) {
+  key_ = ann.key();
+  value_ = ann.value();
 
-                    return *this;
-                }
+  return *this;
+}
 
-                const std::string Annotation::toJson() {
-                    rapidjson::StringBuffer s;
-                    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
-                    writer.StartObject();
-                    writer.Key(key_.c_str());
-                    writer.String(value_.c_str());
-                    writer.EndObject();
+const std::string Annotation::toJson() {
+  rapidjson::StringBuffer s;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+  writer.StartObject();
+  writer.Key(key_.c_str());
+  writer.String(value_.c_str());
+  writer.EndObject();
 
-                    std::string json_string = s.GetString();
+  std::string json_string = s.GetString();
 
-                    return json_string;
-                }
+  return json_string;
+}
 
-                ChildSpan::ChildSpan(const ChildSpan &child) {
-                    name_ = child.name();
-                    id_ = child.id();
-                    annotations_ = child.annotations();
-                    start_time_ = child.startTime();
-                }
+ChildSpan::ChildSpan(const ChildSpan& child) : time_source_(child.time_source_) {
+  name_ = child.name();
+  id_ = child.id();
+  annotations_ = child.annotations();
+  start_time_ = child.startTime();
+}
 
-                const std::string ChildSpan::toJson() {
-                    rapidjson::StringBuffer s;
-                    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
-                    writer.StartObject();
-                    writer.Key(XRayJsonFieldNames::get().SPAN_ID.c_str());
-                    writer.String(idAsHexString().c_str());
-                    writer.Key(XRayJsonFieldNames::get().SPAN_START_TIME.c_str());
-                    writer.Double(start_time_);
-                    writer.Key(XRayJsonFieldNames::get().SPAN_END_TIME.c_str());
-                    const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()/static_cast<double>(1000);
-                    writer.Double(stop_time);
-                    writer.Key(XRayJsonFieldNames::get().SPAN_NAMESPACE.c_str());
-                    writer.String(XRayJsonFieldNames::get().SPAN_REMOTE.c_str());
+ChildSpan& ChildSpan::operator=(const ChildSpan& child) {
+  name_ = child.name();
+  id_ = child.id();
+  annotations_ = child.annotations();
+  start_time_ = child.startTime();
+  time_source_ = child.time_source_;
+  return *this;
+}
 
-                    std::vector<Annotation> http_request_annotation_json_vector;
-                    std::vector<Annotation> http_response_annotation_json_vector;
+const std::string ChildSpan::toJson() {
+  rapidjson::StringBuffer s;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+  writer.StartObject();
+  writer.Key(XRayJsonFieldNames::get().SPAN_ID.c_str());
+  writer.String(idAsHexString().c_str());
+  writer.Key(XRayJsonFieldNames::get().SPAN_START_TIME.c_str());
+  writer.Double(start_time_);
+  writer.Key(XRayJsonFieldNames::get().SPAN_END_TIME.c_str());
+  const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               time_source_.systemTime().time_since_epoch())
+                               .count() /
+                           static_cast<double>(1000);
+  writer.Double(stop_time);
+  writer.Key(XRayJsonFieldNames::get().SPAN_NAMESPACE.c_str());
+  writer.String(XRayJsonFieldNames::get().SPAN_REMOTE.c_str());
 
-                    writer.Key(XRayJsonFieldNames::get().SPAN_NAME.c_str());
-                    std::string span_name;
-                    writer.String(name_.c_str());
+  std::vector<Annotation> http_request_annotation_json_vector;
+  std::vector<Annotation> http_response_annotation_json_vector;
 
-                    for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
-                        if (it->key() == XRayJsonFieldNames::get().SPAN_URL) {
-                            http_request_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayJsonFieldNames::get().SPAN_METHOD) {
-                            http_request_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayJsonFieldNames::get().SPAN_USER_AGENT) {
-                            http_request_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayJsonFieldNames::get().SPAN_STATUS) {
-                            http_response_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayJsonFieldNames::get().SPAN_CONTENT_LENGTH) {
-                            http_response_annotation_json_vector.push_back(*it);
-                        }
-                    }
+  writer.Key(XRayJsonFieldNames::get().SPAN_NAME.c_str());
+  std::string span_name;
+  writer.String(name_.c_str());
 
-                    if (http_request_annotation_json_vector.size() != 0 || http_response_annotation_json_vector.size() != 0) {
-                        writer.Key(XRayJsonFieldNames::get().SPAN_HTTP_ANNOTATIONS.c_str());
-                        writer.StartObject();
+  for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
+    if (it->key() == XRayJsonFieldNames::get().SPAN_URL) {
+      http_request_annotation_json_vector.push_back(*it);
+    } else if (it->key() == XRayJsonFieldNames::get().SPAN_METHOD) {
+      http_request_annotation_json_vector.push_back(*it);
+    } else if (it->key() == XRayJsonFieldNames::get().SPAN_USER_AGENT) {
+      http_request_annotation_json_vector.push_back(*it);
+    } else if (it->key() == XRayJsonFieldNames::get().SPAN_STATUS) {
+      http_response_annotation_json_vector.push_back(*it);
+    } else if (it->key() == XRayJsonFieldNames::get().SPAN_CONTENT_LENGTH) {
+      http_response_annotation_json_vector.push_back(*it);
+    }
+  }
 
-                        if (http_request_annotation_json_vector.size() != 0) {
-                            writer.Key(XRayJsonFieldNames::get().SPAN_REQUEST.c_str());
-                            writer.StartObject();
-                            for (auto it = http_request_annotation_json_vector.begin(); it != http_request_annotation_json_vector.end(); it++) {
-                                writer.Key(it->key().c_str());
-                                writer.String(it->value().c_str());
-                            }
-                            writer.EndObject();
-                        }
+  if (http_request_annotation_json_vector.size() != 0 ||
+      http_response_annotation_json_vector.size() != 0) {
+    writer.Key(XRayJsonFieldNames::get().SPAN_HTTP_ANNOTATIONS.c_str());
+    writer.StartObject();
 
-                        if (http_response_annotation_json_vector.size() != 0) {
-                            writer.Key(XRayJsonFieldNames::get().SPAN_RESPONSE.c_str());
-                            writer.StartObject();
-                            for (auto it = http_response_annotation_json_vector.begin(); it != http_response_annotation_json_vector.end(); it++) {
-                                if (it->value() != "-") {
-                                    writer.Key(it->key().c_str());
-                                    writer.Int(std::stoi(it->value()));
-                                }
-                            }
-                            writer.EndObject();
-                        }
+    if (http_request_annotation_json_vector.size() != 0) {
+      writer.Key(XRayJsonFieldNames::get().SPAN_REQUEST.c_str());
+      writer.StartObject();
+      for (auto it = http_request_annotation_json_vector.begin();
+           it != http_request_annotation_json_vector.end(); it++) {
+        writer.Key(it->key().c_str());
+        writer.String(it->value().c_str());
+      }
+      writer.EndObject();
+    }
 
-                        // end http
-                        writer.EndObject();
-                    }
+    if (http_response_annotation_json_vector.size() != 0) {
+      writer.Key(XRayJsonFieldNames::get().SPAN_RESPONSE.c_str());
+      writer.StartObject();
+      for (auto it = http_response_annotation_json_vector.begin();
+           it != http_response_annotation_json_vector.end(); it++) {
+        if (it->value() != "-") {
+          writer.Key(it->key().c_str());
+          writer.Int(std::stoi(it->value()));
+        }
+      }
+      writer.EndObject();
+    }
 
-                    writer.EndObject();
+    // end http
+    writer.EndObject();
+  }
 
-                    std::string json_string = s.GetString();
+  writer.EndObject();
 
-                    return json_string;
-                }
+  std::string json_string = s.GetString();
 
-                Span::Span(const Span &span) {
-                    trace_id_ = span.traceId();
-                    name_ = span.name();
-                    id_ = span.id();
-                    if (span.isSetParentId()) {
-                        parent_id_ = span.parentId();
-                    }
-                    sampled_ = span.sampled();
-                    annotations_ = span.annotations();
-                    start_time_ = span.startTime();
-                    tracer_ = span.tracer();
-                    child_span_ = span.childSpans();
-                }
+  return json_string;
+}
 
-                const std::string Span::toJson() {
-                    // Header information contains Tracing Daemon Wire Protocol in order to send span to daemon.
-                    rapidjson::StringBuffer h;
-                    rapidjson::Writer<rapidjson::StringBuffer> writer_h(h);
-                    writer_h.StartObject();
-                    writer_h.Key(XRayJsonFieldNames::get().HEADER_FORMAT.c_str());
-                    writer_h.String(FORMAT_.c_str());
-                    writer_h.Key(XRayJsonFieldNames::get().HEADER_VERSION.c_str());
-                    writer_h.Int(std::stoi(VERSION_));
-                    writer_h.EndObject();
-                    std::string header_json_string = h.GetString();
+Span::Span(const Span& span) : time_source_(span.time_source_) {
+  trace_id_ = span.traceId();
+  name_ = span.name();
+  id_ = span.id();
+  if (span.isSetParentId()) {
+    parent_id_ = span.parentId();
+  }
+  sampled_ = span.sampled();
+  annotations_ = span.annotations();
+  start_time_ = span.startTime();
+  tracer_ = span.tracer();
+  child_span_ = span.childSpans();
+}
 
-                    rapidjson::StringBuffer s;
-                    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
-                    writer.StartObject();
-                    writer.Key(XRayJsonFieldNames::get().SPAN_TRACE_ID.c_str());
-                    writer.String(trace_id_.c_str());
-                    writer.Key(XRayJsonFieldNames::get().SPAN_ID.c_str());
-                    writer.String(idAsHexString().c_str());
+const std::string Span::toJson() {
+  // Header information contains Tracing Daemon Wire Protocol in order to send span to daemon.
+  rapidjson::StringBuffer h;
+  rapidjson::Writer<rapidjson::StringBuffer> writer_h(h);
+  writer_h.StartObject();
+  writer_h.Key(XRayJsonFieldNames::get().HEADER_FORMAT.c_str());
+  writer_h.String(FORMAT_.c_str());
+  writer_h.Key(XRayJsonFieldNames::get().HEADER_VERSION.c_str());
+  writer_h.Int(std::stoi(VERSION_));
+  writer_h.EndObject();
+  std::string header_json_string = h.GetString();
 
-                    if (parent_id_ && parent_id_.value()) {
-                        writer.Key(XRayJsonFieldNames::get().SPAN_PARENT_ID.c_str());
-                        writer.String(Hex::uint64ToHex(parent_id_.value()).c_str());
-                    }
+  rapidjson::StringBuffer s;
+  rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+  writer.StartObject();
+  writer.Key(XRayJsonFieldNames::get().SPAN_TRACE_ID.c_str());
+  writer.String(trace_id_.c_str());
+  writer.Key(XRayJsonFieldNames::get().SPAN_ID.c_str());
+  writer.String(idAsHexString().c_str());
 
-                    writer.Key(XRayJsonFieldNames::get().SPAN_START_TIME.c_str());
-                    writer.Double(start_time_);
+  if (parent_id_ && parent_id_.value()) {
+    writer.Key(XRayJsonFieldNames::get().SPAN_PARENT_ID.c_str());
+    writer.String(Hex::uint64ToHex(parent_id_.value()).c_str());
+  }
 
-                    writer.Key(XRayJsonFieldNames::get().SPAN_END_TIME.c_str());
-		            const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()/static_cast<double>(1000);
-                    writer.Double(stop_time);
+  writer.Key(XRayJsonFieldNames::get().SPAN_START_TIME.c_str());
+  writer.Double(start_time_);
 
-                    writer.Key(XRayJsonFieldNames::get().SPAN_ORIGIN.c_str());
-                    writer.String(XRayJsonFieldNames::get().SPAN_ORIGIN_VALUE.c_str());
+  writer.Key(XRayJsonFieldNames::get().SPAN_END_TIME.c_str());
+  const double stop_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                               time_source_.systemTime().time_since_epoch())
+                               .count() /
+                           static_cast<double>(1000);
+  writer.Double(stop_time);
 
-                    std::vector<Annotation> http_request_annotation_json_vector;
-                    std::vector<Annotation> http_response_annotation_json_vector;
+  writer.Key(XRayJsonFieldNames::get().SPAN_ORIGIN.c_str());
+  writer.String(XRayJsonFieldNames::get().SPAN_ORIGIN_VALUE.c_str());
 
-                    writer.Key(XRayJsonFieldNames::get().SPAN_NAME.c_str());
-                    writer.String(name_.c_str());
+  std::vector<Annotation> http_request_annotation_json_vector;
+  std::vector<Annotation> http_response_annotation_json_vector;
 
-                    for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
-                        if (it->key() == XRayCoreConstants::get().HTTP_URL) {
-                            it->setKey(XRayJsonFieldNames::get().SPAN_URL);
-                            http_request_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayCoreConstants::get().HTTP_METHOD) {
-                            it->setKey(XRayJsonFieldNames::get().SPAN_METHOD);
-                            http_request_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayCoreConstants::get().HTTP_USER_AGENT) {
-                            it->setKey(XRayJsonFieldNames::get().SPAN_USER_AGENT);
-                            http_request_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayCoreConstants::get().HTTP_STATUS_CODE) {
-                            it->setKey(XRayJsonFieldNames::get().SPAN_STATUS);
-                            http_response_annotation_json_vector.push_back(*it);
-                        } else if (it->key() == XRayCoreConstants::get().HTTP_RESPONSE_SIZE) {
-                            it->setKey(XRayJsonFieldNames::get().SPAN_CONTENT_LENGTH);
-                            http_response_annotation_json_vector.push_back(*it);
-                        }
-                    }
+  writer.Key(XRayJsonFieldNames::get().SPAN_NAME.c_str());
+  writer.String(name_.c_str());
 
-                    int status_code = 0;
-                    if (http_request_annotation_json_vector.size() != 0 || http_response_annotation_json_vector.size() != 0) {
-                        writer.Key(XRayJsonFieldNames::get().SPAN_HTTP_ANNOTATIONS.c_str());
-                        writer.StartObject();
+  for (auto it = annotations_.begin(); it != annotations_.end(); it++) {
+    if (it->key() == XRayCoreConstants::get().HTTP_URL) {
+      it->setKey(XRayJsonFieldNames::get().SPAN_URL);
+      http_request_annotation_json_vector.push_back(*it);
+    } else if (it->key() == XRayCoreConstants::get().HTTP_METHOD) {
+      it->setKey(XRayJsonFieldNames::get().SPAN_METHOD);
+      http_request_annotation_json_vector.push_back(*it);
+    } else if (it->key() == XRayCoreConstants::get().HTTP_USER_AGENT) {
+      it->setKey(XRayJsonFieldNames::get().SPAN_USER_AGENT);
+      http_request_annotation_json_vector.push_back(*it);
+    } else if (it->key() == XRayCoreConstants::get().HTTP_STATUS_CODE) {
+      it->setKey(XRayJsonFieldNames::get().SPAN_STATUS);
+      http_response_annotation_json_vector.push_back(*it);
+    } else if (it->key() == XRayCoreConstants::get().HTTP_RESPONSE_SIZE) {
+      it->setKey(XRayJsonFieldNames::get().SPAN_CONTENT_LENGTH);
+      http_response_annotation_json_vector.push_back(*it);
+    }
+  }
 
-                        if (http_request_annotation_json_vector.size() != 0) {
-                            writer.Key(XRayJsonFieldNames::get().SPAN_REQUEST.c_str());
-                            writer.StartObject();
-                            for (auto it = http_request_annotation_json_vector.begin(); it != http_request_annotation_json_vector.end(); it++) {
-                                writer.Key(it->key().c_str());
-                                writer.String(it->value().c_str());
-                            }
-                            writer.EndObject();
-                        }
+  int status_code = 0;
+  if (http_request_annotation_json_vector.size() != 0 ||
+      http_response_annotation_json_vector.size() != 0) {
+    writer.Key(XRayJsonFieldNames::get().SPAN_HTTP_ANNOTATIONS.c_str());
+    writer.StartObject();
 
-                        if (http_response_annotation_json_vector.size() != 0) {
-                            writer.Key(XRayJsonFieldNames::get().SPAN_RESPONSE.c_str());
-                            writer.StartObject();
-                            for (auto it = http_response_annotation_json_vector.begin(); it != http_response_annotation_json_vector.end(); it++) {
-                                if (it->key() == XRayJsonFieldNames::get().SPAN_STATUS) {
-                                    writer.Key(it->key().c_str());
-                                    status_code = std::stoi(it->value());
-                                    writer.Int(status_code);
-                                } else if (it->key() == XRayJsonFieldNames::get().SPAN_CONTENT_LENGTH) {
-                                    if (it->value() != "-") {
-                                        writer.Key(it->key().c_str());
-                                        writer.Int(std::stoi(it->value()));
-                                    }
-                                }
-                            }
-                            writer.EndObject();
-                        }
+    if (http_request_annotation_json_vector.size() != 0) {
+      writer.Key(XRayJsonFieldNames::get().SPAN_REQUEST.c_str());
+      writer.StartObject();
+      for (auto it = http_request_annotation_json_vector.begin();
+           it != http_request_annotation_json_vector.end(); it++) {
+        writer.Key(it->key().c_str());
+        writer.String(it->value().c_str());
+      }
+      writer.EndObject();
+    }
 
-                        // end http
-                        writer.EndObject();
-                    }
+    if (http_response_annotation_json_vector.size() != 0) {
+      writer.Key(XRayJsonFieldNames::get().SPAN_RESPONSE.c_str());
+      writer.StartObject();
+      for (auto it = http_response_annotation_json_vector.begin();
+           it != http_response_annotation_json_vector.end(); it++) {
+        if (it->key() == XRayJsonFieldNames::get().SPAN_STATUS) {
+          writer.Key(it->key().c_str());
+          status_code = std::stoi(it->value());
+          writer.Int(status_code);
+        } else if (it->key() == XRayJsonFieldNames::get().SPAN_CONTENT_LENGTH) {
+          if (it->value() != "-") {
+            writer.Key(it->key().c_str());
+            writer.Int(std::stoi(it->value()));
+          }
+        }
+      }
+      writer.EndObject();
+    }
 
-                    if (status_code >= 400 && status_code < 500) {
-                        writer.Key(XRayJsonFieldNames::get().SPAN_ERROR.c_str());
-                        writer.Bool(true);
-                    }
-                    if (status_code == 429) {
-                        writer.Key(XRayJsonFieldNames::get().SPAN_THROTTLE.c_str());
-                        writer.Bool(true);
-                    }
-                    if (status_code >= 500 && status_code < 600) {
-                        writer.Key(XRayJsonFieldNames::get().SPAN_FAULT.c_str());
-                        writer.Bool(true);
-                    }
+    // end http
+    writer.EndObject();
+  }
 
-                    writer.EndObject();
+  if (status_code >= 400 && status_code < 500) {
+    writer.Key(XRayJsonFieldNames::get().SPAN_ERROR.c_str());
+    writer.Bool(true);
+  }
+  if (status_code == 429) {
+    writer.Key(XRayJsonFieldNames::get().SPAN_THROTTLE.c_str());
+    writer.Bool(true);
+  }
+  if (status_code >= 500 && status_code < 600) {
+    writer.Key(XRayJsonFieldNames::get().SPAN_FAULT.c_str());
+    writer.Bool(true);
+  }
 
-                    std::string json_string = s.GetString();
+  writer.EndObject();
 
-                    std::vector<std::string> child_json_vector;
+  std::string json_string = s.GetString();
 
-                    child_span_[0].setAnnotations(annotations_);
+  std::vector<std::string> child_json_vector;
 
-                    for (auto it = child_span_.begin(); it != child_span_.end(); it++) {
-                        child_json_vector.push_back(it->toJson());
-                    }
-                    Util::addArrayToJson(json_string, child_json_vector, XRayJsonFieldNames::get().CHILD_SPAN.c_str());
+  child_span_[0].setAnnotations(annotations_);
 
-                    std::string json_doc = header_json_string + "\n" + json_string;
+  for (auto it = child_span_.begin(); it != child_span_.end(); it++) {
+    child_json_vector.push_back(it->toJson());
+  }
+  Util::addArrayToJson(json_string, child_json_vector,
+                       XRayJsonFieldNames::get().CHILD_SPAN.c_str());
 
-                    ENVOY_LOG(info, "xray generated segments document: {}", json_doc);
-                    return json_doc;
-                }
+  std::string json_doc = header_json_string + "\n" + json_string;
 
-                void Span::finish() {
-                    if (auto t = tracer()) {
-                        t->reportSpan(std::move(*this));
-                    }
-                }
+  ENVOY_LOG(info, "xray generated segments document: {}", json_doc);
+  return json_doc;
+}
 
-                void Span::setTag(const std::string& name, const std::string& value) {
-                    if (name.size() > 0 && value.size() > 0) {
-                        addAnnotation(Annotation(name, value));
-                    }
-                }
-            } // namespace XRay
-        } // namespace Tracers
-    } // namespace Extensions
+void Span::finish() {
+  if (auto t = tracer()) {
+    t->reportSpan(std::move(*this));
+  }
+}
+
+void Span::setTag(const std::string& name, const std::string& value) {
+  if (name.size() > 0 && value.size() > 0) {
+    addAnnotation(Annotation(name, value));
+  }
+}
+} // namespace XRay
+} // namespace Tracers
+} // namespace Extensions
 } // namespace Envoy

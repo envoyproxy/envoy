@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Trace driver for X-Ray (https://xray.us-east-1.amazonaws.com).
 
 load(
@@ -17,8 +18,8 @@ envoy_cc_library(
         "span_context.cc",
         "tracer.cc",
         "util.cc",
-        "xray_tracer_impl.cc",
         "xray_core_types.cc",
+        "xray_tracer_impl.cc",
     ],
     hdrs = [
         "reservoir.h",
@@ -28,9 +29,9 @@ envoy_cc_library(
         "tracer_interface.h",
         "util.h",
         "xray_core_constants.h",
-        "xray_tracer_impl.h",
         "xray_core_types.h",
         "xray_json_field_names.h",
+        "xray_tracer_impl.h",
     ],
     external_deps = [
         "rapidjson",
