@@ -602,7 +602,7 @@ virtual_hosts:
                           EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
 }
 
-// Validates behavior of request_headers_to_add at router, vhost, and route action levels.
+// Validates behavior of request_headers_to_add at router, vhost, and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -626,24 +626,24 @@ virtual_hosts:
     route:
       prefix_rewrite: "/api/new_endpoint"
       cluster: www2
-      request_headers_to_add:
-      - header:
-          key: x-global-header1
-          value: route-override
-      - header:
-          key: x-vhost-header1
-          value: route-override
-      - header:
-          key: x-route-action-header
-          value: route-new_endpoint
+    request_headers_to_add:
+    - header:
+        key: x-global-header1
+        value: route-override
+    - header:
+        key: x-vhost-header1
+        value: route-override
+    - header:
+        key: x-route-header
+        value: route-new_endpoint
   - match:
       path: "/"
     route:
       cluster: root_www2
-      request_headers_to_add:
-      - header:
-          key: x-route-action-header
-          value: route-allpath
+    request_headers_to_add:
+    - header:
+        key: x-route-header
+        value: route-allpath
   - match:
       prefix: "/"
     route:
@@ -661,10 +661,10 @@ virtual_hosts:
       prefix: "/"
     route:
       cluster: www2_staging
-      request_headers_to_add:
-      - header:
-          key: x-route-action-header
-          value: route-allprefix
+    request_headers_to_add:
+    - header:
+        key: x-route-header
+        value: route-allprefix
 - name: default
   domains:
   - "*"
@@ -701,7 +701,7 @@ request_headers_to_add:
       route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-new_endpoint", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-new_endpoint", headers.get_("x-route-header"));
     }
 
     // Multiple routes can have same route-level headers with different values.
@@ -711,7 +711,7 @@ request_headers_to_add:
       route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-allpath", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
     }
 
     // Multiple virtual hosts can have same virtual host level headers with different values.
@@ -721,7 +721,7 @@ request_headers_to_add:
       route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-allprefix", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
     }
 
     // Global headers.
@@ -734,8 +734,8 @@ request_headers_to_add:
   }
 }
 
-// Validates behavior of request_headers_to_add at router, vhost, route, and route action levels
-// when append is disabled.
+// Validates behavior of request_headers_to_add at router, vhost, and route levels when append is
+// disabled.
 TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
   const std::string yaml = R"EOF(
 name: foo
@@ -770,22 +770,6 @@ virtual_hosts:
         request_headers_to_remove: ["x-route-nope"]
         route:
           cluster: www2
-          request_headers_to_add:
-            - header:
-                key: x-global-header
-                value: route-action-endpoint
-              append: false
-            - header:
-                key: x-vhost-header
-                value: route-action-endpoint
-              append: false
-            - header:
-                key: x-route-header
-                value: route-action-endpoint
-            - header:
-                key: x-route-action-header
-                value: route-action-endpoint
-              append: false
       - match: { prefix: "/" }
         route: { cluster: www2 }
   - name: default
@@ -818,7 +802,6 @@ request_headers_to_remove: ["x-global-nope"]
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
       EXPECT_EQ("route-endpoint", headers.get_("x-route-header"));
-      EXPECT_EQ("route-action-endpoint", headers.get_("x-route-action-header"));
       // Removed headers.
       EXPECT_FALSE(headers.has("x-global-nope"));
       EXPECT_FALSE(headers.has("x-vhost-nope"));
@@ -834,7 +817,6 @@ request_headers_to_remove: ["x-global-nope"]
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
       EXPECT_FALSE(headers.has("x-route-header"));
-      EXPECT_FALSE(headers.has("x-route-action-header"));
       // Removed headers.
       EXPECT_FALSE(headers.has("x-global-nope"));
       EXPECT_FALSE(headers.has("x-vhost-nope"));
@@ -850,7 +832,6 @@ request_headers_to_remove: ["x-global-nope"]
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_FALSE(headers.has("x-vhost-header"));
       EXPECT_FALSE(headers.has("x-route-header"));
-      EXPECT_FALSE(headers.has("x-route-action-header"));
       // Removed headers.
       EXPECT_FALSE(headers.has("x-global-nope"));
       EXPECT_TRUE(headers.has("x-vhost-nope"));
@@ -860,7 +841,7 @@ request_headers_to_remove: ["x-global-nope"]
 }
 
 // Validates behavior of response_headers_to_add and response_headers_to_remove at router, vhost,
-// route, and route action levels.
+// and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
   const std::string yaml = R"EOF(
 name: foo
@@ -877,31 +858,27 @@ virtual_hosts:
     response_headers_to_remove: ["x-vhost-remove"]
     routes:
       - match: { prefix: "/new_endpoint" }
+        route:
+          prefix_rewrite: "/api/new_endpoint"
+          cluster: www2
         response_headers_to_add:
           - header:
               key: x-route-header
               value: route-override
-        route:
-          prefix_rewrite: "/api/new_endpoint"
-          cluster: www2
-          response_headers_to_add:
-            - header:
-                key: x-global-header1
-                value: route-override
-            - header:
-                key: x-vhost-header1
-                value: route-override
-            - header:
-                key: x-route-action-header
-                value: route-new_endpoint
+          - header:
+              key: x-global-header1
+              value: route-override
+          - header:
+              key: x-vhost-header1
+              value: route-override
       - match: { path: "/" }
         route:
           cluster: root_www2
-          response_headers_to_add:
-            - header:
-                key: x-route-action-header
-                value: route-allpath
-          response_headers_to_remove: ["x-route-remove"]
+        response_headers_to_add:
+          - header:
+              key: x-route-header
+              value: route-allpath
+        response_headers_to_remove: ["x-route-remove"]
       - match: { prefix: "/" }
         route: { cluster: "www2" }
   - name: www2_staging
@@ -914,10 +891,10 @@ virtual_hosts:
       - match: { prefix: "/" }
         route:
           cluster: www2_staging
-          response_headers_to_add:
-            - header:
-                key: x-route-action-header
-                value: route-allprefix
+        response_headers_to_add:
+          - header:
+              key: x-route-header
+              value: route-allprefix
   - name: default
     domains: ["*"]
     routes:
@@ -944,7 +921,6 @@ response_headers_to_remove: ["x-global-remove"]
       route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-new_endpoint", headers.get_("x-route-action-header"));
       EXPECT_EQ("route-override", headers.get_("x-route-header"));
     }
 
@@ -956,7 +932,7 @@ response_headers_to_remove: ["x-global-remove"]
       route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-allpath", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
     }
 
     // Multiple virtual hosts can have same virtual host level headers with different values.
@@ -967,7 +943,7 @@ response_headers_to_remove: ["x-global-remove"]
       route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-allprefix", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
     }
 
     // Global headers.
@@ -4197,10 +4173,10 @@ virtual_hosts:
     route:
       prefix_rewrite: "/api/new_endpoint"
       cluster: www2
-      request_headers_to_add:
-      - header:
-          key: x-client-ip
-          value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    request_headers_to_add:
+    - header:
+        key: x-client-ip
+        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
 request_headers_to_add:
 - header:
     key: x-client-ip
@@ -4234,10 +4210,10 @@ virtual_hosts:
     route:
       prefix_rewrite: "/api/new_endpoint"
       cluster: www2
-      request_headers_to_add:
-      - header:
-          key: x-client-ip
-          value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
+    request_headers_to_add:
+    - header:
+        key: x-client-ip
+        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
 request_headers_to_add:
 - header:
     key: x-client-ip
