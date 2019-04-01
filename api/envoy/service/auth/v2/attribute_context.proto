@@ -6,6 +6,7 @@ option java_outer_classname = "AttributeContextProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.auth.v2";
 
+import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/address.proto";
 
 import "google/protobuf/timestamp.proto";
@@ -112,6 +113,9 @@ message AttributeContext {
     // See :repo:`headers.h:ProtocolStrings <source/common/http/headers.h>` for a list of all
     // possible values.
     string protocol = 10;
+
+    // The HTTP request body.
+    string body = 11;
   }
 
   // The source of a network activity, such as starting a TCP connection.
