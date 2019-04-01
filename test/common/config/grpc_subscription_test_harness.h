@@ -45,7 +45,7 @@ public:
     }));
     envoy::api::v2::core::GrpcService grpc_service;
     grpc_service.mutable_envoy_grpc()->set_cluster_name("eds_cluster");
-    subscription_ = std::make_unique<GrpcEdsSubscriptionImpl>(
+        subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
         *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, stats_, stats_store_,
         rate_limit_settings_, init_fetch_timeout, config_tracker_, grpc_service);
