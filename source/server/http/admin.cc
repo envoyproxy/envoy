@@ -1197,8 +1197,8 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
-          code = Http::Code::BadRequest;
-          response.add("Invalid request; POST required");
+          code = Http::Code::MethodNotAllowed;
+          response.add(fmt::format("Method {} not allowed, POST required.", method));
           break;
         }
       }

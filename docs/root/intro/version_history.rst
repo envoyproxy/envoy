@@ -10,6 +10,7 @@ Version history
   :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.AccessLogCommon.upstream_transport_failure_reason>` for HTTP access logs.
 * access log: added new fields for downstream x509 information (URI sans and subject) to file and gRPC access logger.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
+* admin: changed HTTP response status code from 400 to 405 when attempting to GET a POST-only route (such as /quitquitquit).
 * buffer: fix vulnerabilities when allocation fails.
 * build: releases are built with GCC-7 and linked with LLD.
 * build: dev docker images :ref:`have been split <install_binaries>` from tagged images for easier
