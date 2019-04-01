@@ -32,8 +32,7 @@ message ConfigDump {
   //
   // * *bootstrap*: :ref:`BootstrapConfigDump <envoy_api_msg_admin.v2alpha.BootstrapConfigDump>`
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`
-  // * *control plane*:  :ref:`ControlPlaneConfigDump
-  // <envoy_api_msg_admin.v2alpha.ControlPlaneConfigDump>`
+  // * *control plane*:  :ref:`ControlPlaneConfigDump <envoy_api_msg_admin.v2alpha.ControlPlaneConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v2alpha.RoutesConfigDump>`
   repeated google.protobuf.Any configs = 1 [(gogoproto.nullable) = false];

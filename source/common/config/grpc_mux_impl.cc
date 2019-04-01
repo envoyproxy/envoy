@@ -135,7 +135,7 @@ void GrpcMuxImpl::handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryRespon
     return;
   }
 
-  populateControlPlaneInfo(std::move(message));
+  populateControlPlaneInfo(*message);
 
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.
@@ -220,9 +220,8 @@ void GrpcMuxImpl::handleEstablishmentFailure() {
   }
 }
 
-void GrpcMuxImpl::populateControlPlaneInfo(
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
-  if (message->has_control_plane()) {
+void GrpcMuxImpl::populateControlPlaneInfo(const envoy::api::v2::DiscoveryResponse& message) {
+  if (message.has_control_plane()) {
     Protobuf::util::MessageDifferencer message_differencer;
     envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo
         config_source_control_plane_info;
@@ -234,7 +233,7 @@ void GrpcMuxImpl::populateControlPlaneInfo(
       }
     }
     config_source_control_plane_info.mutable_control_plane()->set_identifier(
-        message->control_plane().identifier());
+        message.control_plane().identifier());
     TimestampUtil::systemClockToTimestamp(
         time_source_.systemTime(), *(config_source_control_plane_info.mutable_last_updated()));
     config_source_control_plane_info.mutable_grpc_service()->MergeFrom(grpc_service_);

@@ -50,7 +50,7 @@ public:
 
 private:
   void setRetryTimer();
-  void populateControlPlaneInfo(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
+  void populateControlPlaneInfo(const envoy::api::v2::DiscoveryResponse& message);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
