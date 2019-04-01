@@ -3,12 +3,13 @@
 #include <cstdint>
 
 #include "envoy/grpc/status.h"
+#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Grpc {
 
 /**
- * Grpc::Status utilities.
+ * Grpc utilities.
  */
 class Utility {
 public:
@@ -26,6 +27,12 @@ public:
    * @return uint64_t the canonical HTTP status code corresponding to a gRPC status code.
    */
   static uint64_t grpcToHttpStatus(Status::GrpcStatus grpc_status);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether content-type is gRPC.
+   */
+  static bool hasGrpcContentType(const Http::HeaderMap& headers);
 };
 
 } // namespace Grpc

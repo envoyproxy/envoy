@@ -63,12 +63,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "status_lib",
-    srcs = ["status.cc"],
-    hdrs = ["status.h"],
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/grpc:status",
+        "//include/envoy/http:header_map_interface",
+        "//source/common/http:headers_lib",
     ],
 )
 
@@ -91,7 +93,7 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
-        "//source/common/grpc:status_lib",
+        "//source/common/grpc:utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",

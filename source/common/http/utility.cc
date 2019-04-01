@@ -15,7 +15,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/grpc/status.h"
+#include "common/grpc/utility.h"
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -282,17 +282,8 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
 =======
 Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& request_headers) {
   bool is_grpc = false, is_head_request = false, accept_json_type = false;
-  // TODO(zyfjeff): This code is copied from Envoy::Grpc::Common::hasGrpcContentType in order to
-  // rely directly on it to avoid causing circular dependencies.
-  const Http::HeaderEntry* content_type = request_headers.ContentType();
-  // Content type is gRPC if it is exactly "application/grpc" or starts with
-  // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
-  is_grpc =
-      content_type != nullptr &&
-      absl::StartsWith(content_type->value().getStringView(),
-                       Http::Headers::get().ContentTypeValues.Grpc) &&
-      (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
-       content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
+
+  is_grpc = Grpc::Utility::hasGrpcContentType(request_headers);
 
   if (Http::Headers::get().MethodValues.Head == request_headers.Method()->value().c_str()) {
     is_head_request = true;

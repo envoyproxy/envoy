@@ -17,7 +17,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
-        "//source/common/grpc:status_lib",
+        "//source/common/grpc:utility_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:pass_through_filter_lib",

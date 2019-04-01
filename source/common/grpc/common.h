@@ -9,8 +9,10 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 
-#include "common/common/hash.h"
 #include "common/grpc/status.h"
+#include "common/grpc/utility.h"
+#include "common/common/hash.h"
+
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
@@ -28,12 +30,6 @@ public:
 
 class Common {
 public:
-  /**
-   * @param headers the headers to parse.
-   * @return bool indicating whether content-type is gRPC.
-   */
-  static bool hasGrpcContentType(const Http::HeaderMap& headers);
-
   /**
    * @param headers the headers to parse.
    * @param bool indicating whether the header is at end_stream.

@@ -10,7 +10,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
-#include "common/grpc/status.h"
+#include "common/grpc/utility.h"
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
 

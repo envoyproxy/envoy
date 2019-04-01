@@ -16,27 +16,14 @@
 #include "common/common/macros.h"
 #include "common/common/stack_array.h"
 #include "common/common/utility.h"
+#include "common/grpc/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
 
-#include "absl/strings/match.h"
-
 namespace Envoy {
 namespace Grpc {
-
-bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
-  const Http::HeaderEntry* content_type = headers.ContentType();
-  // Content type is gRPC if it is exactly "application/grpc" or starts with
-  // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
-  return content_type != nullptr &&
-         absl::StartsWith(content_type->value().getStringView(),
-                          Http::Headers::get().ContentTypeValues.Grpc) &&
-         (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
-          content_type->value()
-                  .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
-}
 
 bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
   if (end_stream) {
@@ -46,7 +33,7 @@ bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_strea
   if (Http::Utility::getResponseStatus(headers) != enumToInt(Http::Code::OK)) {
     return false;
   }
-  return hasGrpcContentType(headers);
+  return Utility::hasGrpcContentType(headers);
 }
 
 absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& trailers) {

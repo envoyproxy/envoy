@@ -5,7 +5,7 @@
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/grpc/status.h"
+#include "common/grpc/utility.h"
 
 #include "extensions/filters/http/common/pass_through_filter.h"
 

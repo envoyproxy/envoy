@@ -218,11 +218,11 @@ TEST(GrpcContextTest, HttpToGrpcStatus) {
 TEST(GrpcContextTest, HasGrpcContentType) {
   {
     Http::TestHeaderMapImpl headers{};
-    EXPECT_FALSE(Common::hasGrpcContentType(headers));
+    EXPECT_FALSE(Grpc::Utility::hasGrpcContentType(headers));
   }
   auto isGrpcContentType = [](const std::string& s) {
     Http::TestHeaderMapImpl headers{{"content-type", s}};
-    return Common::hasGrpcContentType(headers);
+    return Grpc::Utility::hasGrpcContentType(headers);
   };
   EXPECT_FALSE(isGrpcContentType(""));
   EXPECT_FALSE(isGrpcContentType("application/text"));

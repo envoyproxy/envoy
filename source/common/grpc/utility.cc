@@ -1,4 +1,8 @@
-#include "common/grpc/status.h"
+#include "common/grpc/utility.h"
+
+#include "common/http/headers.h"
+
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -83,6 +87,17 @@ uint64_t Utility::grpcToHttpStatus(Status::GrpcStatus grpc_status) {
     // Internal server error.
     return 500;
   }
+}
+
+bool Utility::hasGrpcContentType(const Http::HeaderMap& headers) {
+  const Http::HeaderEntry* content_type = headers.ContentType();
+  // Content type is gRPC if it is exactly "application/grpc" or starts with
+  // "application/grpc+". Specifically, something like application/grpc-web is not gRPC.
+  return content_type != nullptr &&
+         absl::StartsWith(content_type->value().getStringView(),
+                          Http::Headers::get().ContentTypeValues.Grpc) &&
+         (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
+          content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
 } // namespace Grpc

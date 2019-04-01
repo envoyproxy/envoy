@@ -329,7 +329,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
           : nullptr;
 
   // TODO: Maybe add a filter API for this.
-  grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
+  grpc_request_ = Grpc::Utility::hasGrpcContentType(headers);
 
   // Only increment rq total stat if we actually decode headers here. This does not count requests
   // that get handled by earlier filters.
