@@ -414,7 +414,7 @@ TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
   NetworkFilters::Common::Redis::RespValue moved_response;
   moved_response.type(NetworkFilters::Common::Redis::RespType::Error);
   moved_response.asString() = "MOVED 1111 127.0.0.1:81"; // exact values not important
-  pool_callbacks_->onMovedRedirection(moved_response);
+  pool_callbacks_->onRedirection(moved_response);
 
   expectExistsRequestCreate();
   interval_timer_->callback_();
@@ -425,7 +425,7 @@ TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
   NetworkFilters::Common::Redis::RespValue ask_response;
   ask_response.type(NetworkFilters::Common::Redis::RespType::Error);
   ask_response.asString() = "ASK 1111 127.0.0.1:81"; // exact values not important
-  pool_callbacks_->onAskRedirection(ask_response);
+  pool_callbacks_->onRedirection(ask_response);
 
   EXPECT_CALL(*client_, close());
 

@@ -103,8 +103,7 @@ public:
   // Common::Redis::Client::PoolCallbacks
   void onResponse(Common::Redis::RespValuePtr&& response) override;
   void onFailure() override;
-  bool onMovedRedirection(const Common::Redis::RespValue& value) override;
-  bool onAskRedirection(const Common::Redis::RespValue& value) override;
+  bool onRedirection(const Common::Redis::RespValue& value) override;
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -180,11 +179,8 @@ protected:
     }
     void onFailure() override { parent_.onChildFailure(index_); }
 
-    bool onMovedRedirection(const Common::Redis::RespValue& value) override {
-      return parent_.onChildMovedRedirection(value, index_, conn_pool_);
-    }
-    bool onAskRedirection(const Common::Redis::RespValue& value) override {
-      return parent_.onChildAskRedirection(value, index_, conn_pool_);
+    bool onRedirection(const Common::Redis::RespValue& value) override {
+      return parent_.onChildRedirection(value, index_, conn_pool_);
     }
 
     FragmentedRequest& parent_;
@@ -195,10 +191,8 @@ protected:
 
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
   void onChildFailure(uint32_t index);
-  virtual bool onChildMovedRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                       ConnPool::Instance* conn_pool) PURE;
-  virtual bool onChildAskRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                     ConnPool::Instance* conn_pool) PURE;
+  virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
+                                  ConnPool::Instance* conn_pool) PURE;
 
   SplitCallbacks& callbacks_;
 
@@ -227,11 +221,8 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  virtual bool onChildMovedRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                       ConnPool::Instance* conn_pool) override;
-  virtual bool onChildAskRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                     ConnPool::Instance* conn_pool) override;
-
+  virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
+                                  ConnPool::Instance* conn_pool) override;
   void recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking);
 };
 
@@ -255,11 +246,8 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  virtual bool onChildMovedRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                       ConnPool::Instance* conn_pool) override;
-  virtual bool onChildAskRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                     ConnPool::Instance* conn_pool) override;
-
+  virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
+                                  ConnPool::Instance* conn_pool) override;
   void recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking);
 
   int64_t total_{0};
@@ -284,11 +272,8 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  virtual bool onChildMovedRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                       ConnPool::Instance* conn_pool) override;
-  virtual bool onChildAskRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                     ConnPool::Instance* conn_pool) override;
-
+  virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
+                                  ConnPool::Instance* conn_pool) override;
   void recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking);
 };
 

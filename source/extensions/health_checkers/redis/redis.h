@@ -66,8 +66,7 @@ private:
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
-    bool onMovedRedirection(const NetworkFilters::Common::Redis::RespValue& value) override;
-    bool onAskRedirection(const NetworkFilters::Common::Redis::RespValue& value) override;
+    bool onRedirection(const NetworkFilters::Common::Redis::RespValue& value) override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;

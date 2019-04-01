@@ -99,15 +99,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
 }
 
-bool RedisHealthChecker::RedisActiveHealthCheckSession::onMovedRedirection(
-    const NetworkFilters::Common::Redis::RespValue&) {
-  // treat redirection error response from redis server as success
-  current_request_ = nullptr;
-  handleSuccess();
-  return true;
-}
-
-bool RedisHealthChecker::RedisActiveHealthCheckSession::onAskRedirection(
+bool RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
     const NetworkFilters::Common::Redis::RespValue&) {
   // treat redirection error response from redis server as success
   current_request_ = nullptr;

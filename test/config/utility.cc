@@ -41,18 +41,6 @@ static_resources:
         port_value: 0
 )EOF";
 
-const std::string ConfigHelper::REDIS_PROXY_CONFIG = ConfigHelper::BASE_CONFIG + R"EOF(
-    filter_chains:
-      filters:
-        name: envoy.redis_proxy
-        config:
-          stat_prefix: redis_stats
-          cluster: cluster_0
-          settings:
-            op_timeout: 5s
-            enable_redirection: true
-)EOF";
-
 const std::string ConfigHelper::TCP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
     filter_chains:
       filters:

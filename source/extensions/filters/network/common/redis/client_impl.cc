@@ -145,24 +145,17 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
     bool redirected = false;
     if (err.size() == 3) {
-      if (err[0] == RedirectionResponse::get().MOVED) {
-        redirected = request.callbacks_.onMovedRedirection(*value);
-        if (redirected) {
-          host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
-        } else {
-          host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
-        }
-      } else if (err[0] == RedirectionResponse::get().ASK) {
-        redirected = request.callbacks_.onAskRedirection(*value);
+      if (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK) {
+        redirected = request.callbacks_.onRedirection(*value);
         if (redirected) {
           host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
         } else {
           host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
         }
       }
-    }
-    if (!redirected) {
-      request.callbacks_.onResponse(std::move(value));
+      if (!redirected) {
+        request.callbacks_.onResponse(std::move(value));
+      }
     }
   } else {
     request.callbacks_.onResponse(std::move(value));
@@ -171,7 +164,8 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   pending_requests_.pop_front();
 
   // If there are no remaining ops in the pipeline we need to disable the timer.
-  // Otherwise we boost the timer since we are receiving responses and there are more to flush out.
+  // Otherwise we boost the timer since we are receiving responses and there are more to flush
+  // out.
   if (pending_requests_.empty()) {
     connect_or_op_timer_->disableTimer();
   } else {

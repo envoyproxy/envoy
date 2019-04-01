@@ -394,7 +394,7 @@ TEST_F(RedisClientImplTest, AskRedirection) {
     // exact values of hash slot and ip info not important
     response1->asString() = "ASK 1111 10.1.2.3:4321";
     // simulate redirection failure
-    EXPECT_CALL(callbacks1, onAskRedirection(Ref(*response1))).WillOnce(Return(false));
+    EXPECT_CALL(callbacks1, onRedirection(Ref(*response1))).WillOnce(Return(false));
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
@@ -406,7 +406,7 @@ TEST_F(RedisClientImplTest, AskRedirection) {
     response2->type(Common::Redis::RespType::Error);
     // exact values of hash slot and ip info not important
     response2->asString() = "ASK 2222 10.1.2.4:4321";
-    EXPECT_CALL(callbacks2, onAskRedirection(Ref(*response2))).WillOnce(Return(true));
+    EXPECT_CALL(callbacks2, onRedirection(Ref(*response2))).WillOnce(Return(true));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response2));
@@ -452,7 +452,7 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
     // exact values of hash slot and ip info not important
     response1->asString() = "MOVED 1111 10.1.2.3:4321";
     // simulate redirection failure
-    EXPECT_CALL(callbacks1, onMovedRedirection(Ref(*response1))).WillOnce(Return(false));
+    EXPECT_CALL(callbacks1, onRedirection(Ref(*response1))).WillOnce(Return(false));
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
@@ -464,7 +464,7 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
     response2->type(Common::Redis::RespType::Error);
     // exact values of hash slot and ip info not important
     response2->asString() = "MOVED 2222 10.1.2.4:4321";
-    EXPECT_CALL(callbacks2, onMovedRedirection(Ref(*response2))).WillOnce(Return(true));
+    EXPECT_CALL(callbacks2, onRedirection(Ref(*response2))).WillOnce(Return(true));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
     callbacks_->onRespValue(std::move(response2));

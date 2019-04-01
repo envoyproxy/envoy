@@ -28,7 +28,8 @@ Common::Redis::RespValuePtr Utility::makeError(const std::string& error) {
 namespace {
 auto redirectionArgsInvalid = [](const Common::Redis::RespValue* original_request,
                                  const Common::Redis::RespValue& error_response,
-                                 std::vector<absl::string_view>& error_substrings) -> bool {
+                                 std::vector<absl::string_view>& error_substrings,
+                                 bool& ask_redirection) -> bool {
   if ((original_request == nullptr) ||
       (original_request->type() != Common::Redis::RespType::Array) ||
       (original_request->asArray().size() == 0) ||
@@ -39,6 +40,15 @@ auto redirectionArgsInvalid = [](const Common::Redis::RespValue* original_reques
   if (error_substrings.size() != 3) {
     return true;
   }
+  if (error_substrings[0] == "ASK") {
+    ask_redirection = true;
+  } else if (error_substrings[0] == "MOVED") {
+    ask_redirection = false;
+  } else {
+    // the first substring must be MOVED or ASK...
+    return true;
+  }
+  // other validation done later to avoid duplicate processing
   return false;
 };
 }
@@ -88,28 +98,15 @@ void SingleServerRequest::recreate(Common::Redis::RespValue& request, bool prepe
                            incoming_request_->asArray().end());
 }
 
-bool SingleServerRequest::onMovedRedirection(const Common::Redis::RespValue& value) {
+bool SingleServerRequest::onRedirection(const Common::Redis::RespValue& value) {
   std::vector<absl::string_view> err;
-  if (redirectionArgsInvalid(incoming_request_.get(), value, err) || !conn_pool_) {
+  bool ask_redirection = false;
+  if (redirectionArgsInvalid(incoming_request_.get(), value, err, ask_redirection) || !conn_pool_) {
     return false;
   }
 
   Common::Redis::RespValue request;
-  recreate(request, false);
-
-  const std::string host_address = std::string(err[2]); // ip:port
-  handle_ = conn_pool_->makeRequestToHost(host_address, request, *this);
-  return (handle_ != nullptr);
-}
-
-bool SingleServerRequest::onAskRedirection(const Common::Redis::RespValue& value) {
-  std::vector<absl::string_view> err;
-  if (redirectionArgsInvalid(incoming_request_.get(), value, err) || !conn_pool_) {
-    return false;
-  }
-
-  Common::Redis::RespValue request;
-  recreate(request, true);
+  recreate(request, ask_redirection);
 
   const std::string host_address = std::string(err[2]); // ip:port
   handle_ = conn_pool_->makeRequestToHost(host_address, request, *this);
@@ -284,30 +281,16 @@ void MGETRequest::recreate(Common::Redis::RespValue& request, uint32_t index, bo
   request.asArray().swap(values);
 }
 
-bool MGETRequest::onChildMovedRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                          ConnPool::Instance* conn_pool) {
+bool MGETRequest::onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
+                                     ConnPool::Instance* conn_pool) {
   std::vector<absl::string_view> err;
-  if (redirectionArgsInvalid(incoming_request_.get(), value, err) || !conn_pool) {
+  bool ask_redirection = false;
+  if (redirectionArgsInvalid(incoming_request_.get(), value, err, ask_redirection) || !conn_pool) {
     return false;
   }
 
   Common::Redis::RespValue request;
-  recreate(request, index, false);
-
-  this->pending_requests_[index].handle_ =
-      conn_pool->makeRequestToHost(std::string(err[2]), request, this->pending_requests_[index]);
-  return (this->pending_requests_[index].handle_ != nullptr);
-}
-
-bool MGETRequest::onChildAskRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                        ConnPool::Instance* conn_pool) {
-  std::vector<absl::string_view> err;
-  if (redirectionArgsInvalid(incoming_request_.get(), value, err) || !conn_pool) {
-    return false;
-  }
-
-  Common::Redis::RespValue request;
-  recreate(request, index, true);
+  recreate(request, index, ask_redirection);
 
   this->pending_requests_[index].handle_ =
       conn_pool->makeRequestToHost(std::string(err[2]), request, this->pending_requests_[index]);
@@ -413,30 +396,16 @@ void MSETRequest::recreate(Common::Redis::RespValue& request, uint32_t index, bo
   request.asArray().swap(values);
 }
 
-bool MSETRequest::onChildMovedRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                          ConnPool::Instance* conn_pool) {
+bool MSETRequest::onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
+                                     ConnPool::Instance* conn_pool) {
   std::vector<absl::string_view> err;
-  if (redirectionArgsInvalid(incoming_request_.get(), value, err) || !conn_pool) {
+  bool ask_redirection = false;
+  if (redirectionArgsInvalid(incoming_request_.get(), value, err, ask_redirection) || !conn_pool) {
     return false;
   }
 
   Common::Redis::RespValue request;
-  recreate(request, index, false);
-
-  this->pending_requests_[index].handle_ =
-      conn_pool->makeRequestToHost(std::string(err[2]), request, this->pending_requests_[index]);
-  return (this->pending_requests_[index].handle_ != nullptr);
-}
-
-bool MSETRequest::onChildAskRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                        ConnPool::Instance* conn_pool) {
-  std::vector<absl::string_view> err;
-  if (redirectionArgsInvalid(incoming_request_.get(), value, err) || !conn_pool) {
-    return false;
-  }
-
-  Common::Redis::RespValue request;
-  recreate(request, index, true);
+  recreate(request, index, ask_redirection);
 
   this->pending_requests_[index].handle_ =
       conn_pool->makeRequestToHost(std::string(err[2]), request, this->pending_requests_[index]);
@@ -534,32 +503,16 @@ void SplitKeysSumResultRequest::recreate(Common::Redis::RespValue& request, uint
   request.asArray().swap(values);
 }
 
-bool SplitKeysSumResultRequest::onChildMovedRedirection(const Common::Redis::RespValue& value,
-                                                        uint32_t index,
-                                                        ConnPool::Instance* conn_pool) {
+bool SplitKeysSumResultRequest::onChildRedirection(const Common::Redis::RespValue& value,
+                                                   uint32_t index, ConnPool::Instance* conn_pool) {
   std::vector<absl::string_view> err;
-  if (redirectionArgsInvalid(incoming_request_.get(), value, err) || !conn_pool) {
+  bool ask_redirection = false;
+  if (redirectionArgsInvalid(incoming_request_.get(), value, err, ask_redirection) || !conn_pool) {
     return false;
   }
 
   Common::Redis::RespValue request;
-  recreate(request, index, false);
-
-  this->pending_requests_[index].handle_ =
-      conn_pool->makeRequestToHost(std::string(err[2]), request, this->pending_requests_[index]);
-  return (this->pending_requests_[index].handle_ != nullptr);
-}
-
-bool SplitKeysSumResultRequest::onChildAskRedirection(const Common::Redis::RespValue& value,
-                                                      uint32_t index,
-                                                      ConnPool::Instance* conn_pool) {
-  std::vector<absl::string_view> err;
-  if (redirectionArgsInvalid(incoming_request_.get(), value, err) || !conn_pool) {
-    return false;
-  }
-
-  Common::Redis::RespValue request;
-  recreate(request, index, true);
+  recreate(request, index, ask_redirection);
 
   this->pending_requests_[index].handle_ =
       conn_pool->makeRequestToHost(std::string(err[2]), request, this->pending_requests_[index]);

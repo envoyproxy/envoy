@@ -43,18 +43,11 @@ public:
   virtual void onFailure() PURE;
 
   /**
-   * Called when a MOVED redirection error is received, and the request must be retried.
+   * Called when a MOVED or ASK redirection error is received, and the request must be retried.
    * @param value supplies the MOVED error response
    * @return bool true if the request is successfully redirected, false otherwise
    */
-  virtual bool onMovedRedirection(const Common::Redis::RespValue& value) PURE;
-
-  /**
-   * Called when an ASK redirection error is received, and the request must be retried.
-   * @param value supplies the ASK error response
-   * @return bool true if the request is successfully redirected, false otherwise
-   */
-  virtual bool onAskRedirection(const Common::Redis::RespValue& value) PURE;
+  virtual bool onRedirection(const Common::Redis::RespValue& value) PURE;
 };
 
 /**

@@ -93,8 +93,7 @@ public:
 
   MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
   MOCK_METHOD0(onFailure, void());
-  MOCK_METHOD1(onMovedRedirection, bool(const Common::Redis::RespValue& value));
-  MOCK_METHOD1(onAskRedirection, bool(const Common::Redis::RespValue& value));
+  MOCK_METHOD1(onRedirection, bool(const Common::Redis::RespValue& value));
 };
 
 } // namespace Client

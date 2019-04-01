@@ -356,7 +356,7 @@ TEST_F(RedisSingleServerRequestTest, MovedRedirectionSuccess) {
   EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_)))
       .WillOnce(
           DoAll(SaveArg<0>(&host_address), SaveArg<1>(&request_copy), Return(&pool_request2)));
-  EXPECT_TRUE(pool_callbacks_->onMovedRedirection(moved_response));
+  EXPECT_TRUE(pool_callbacks_->onRedirection(moved_response));
   EXPECT_EQ(host_address, "10.1.2.3:4000");
   EXPECT_EQ(request_copy.type(), Common::Redis::RespType::Array);
   EXPECT_EQ(request_copy.asArray().size(), 2);
@@ -380,11 +380,11 @@ TEST_F(RedisSingleServerRequestTest, MovedRedirectionFailure) {
   Common::Redis::RespValue moved_response;
   moved_response.type(Common::Redis::RespType::Error);
   moved_response.asString() = "MOVED 1111";
-  EXPECT_FALSE(pool_callbacks_->onMovedRedirection(moved_response));
+  EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
   // bad response type
   moved_response.type(Common::Redis::RespType::Integer);
   moved_response.asInteger() = 1;
-  EXPECT_FALSE(pool_callbacks_->onMovedRedirection(moved_response));
+  EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
 
   respond();
 };
@@ -416,7 +416,7 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionSuccess) {
             }
             return &pool_request2;
           }));
-  EXPECT_TRUE(pool_callbacks_->onAskRedirection(ask_response));
+  EXPECT_TRUE(pool_callbacks_->onRedirection(ask_response));
   // cleanup...
   respond();
 };
@@ -434,11 +434,11 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionFailure) {
   // bad format
   ask_response.type(Common::Redis::RespType::Error);
   ask_response.asString() = "ASK 1111";
-  EXPECT_FALSE(pool_callbacks_->onAskRedirection(ask_response));
+  EXPECT_FALSE(pool_callbacks_->onRedirection(ask_response));
   // bad response type
   ask_response.type(Common::Redis::RespType::Integer);
   ask_response.asInteger() = 1;
-  EXPECT_FALSE(pool_callbacks_->onAskRedirection(ask_response));
+  EXPECT_FALSE(pool_callbacks_->onRedirection(ask_response));
 
   respond();
 };
@@ -653,7 +653,7 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithMovedRedirection) {
   Common::Redis::RespValue bad_moved_response;
   bad_moved_response.type(Common::Redis::RespType::Integer);
   bad_moved_response.asInteger() = 1;
-  EXPECT_FALSE(pool_callbacks_[0]->onMovedRedirection(bad_moved_response));
+  EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_moved_response));
 
   // good responses...
   Common::Redis::RespValue moved_response;
@@ -674,7 +674,7 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithMovedRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
-    EXPECT_TRUE(pool_callbacks_[i]->onMovedRedirection(moved_response));
+    EXPECT_TRUE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
   Common::Redis::RespValue expected_response;
@@ -714,7 +714,7 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithAskRedirection) {
   Common::Redis::RespValue bad_ask_response;
   bad_ask_response.type(Common::Redis::RespType::Integer);
   bad_ask_response.asInteger() = 1;
-  EXPECT_FALSE(pool_callbacks_[0]->onAskRedirection(bad_ask_response));
+  EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_ask_response));
 
   // good responses...
   Common::Redis::RespValue ask_response;
@@ -737,7 +737,7 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithAskRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
-    EXPECT_TRUE(pool_callbacks_[i]->onAskRedirection(ask_response));
+    EXPECT_TRUE(pool_callbacks_[i]->onRedirection(ask_response));
   }
 
   Common::Redis::RespValue expected_response;
@@ -902,7 +902,7 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithMovedRedirection) {
   Common::Redis::RespValue bad_moved_response;
   bad_moved_response.type(Common::Redis::RespType::Integer);
   bad_moved_response.asInteger() = 1;
-  EXPECT_FALSE(pool_callbacks_[0]->onMovedRedirection(bad_moved_response));
+  EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_moved_response));
 
   // good responses...
   Common::Redis::RespValue moved_response;
@@ -925,7 +925,7 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithMovedRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
-    EXPECT_TRUE(pool_callbacks_[i]->onMovedRedirection(moved_response));
+    EXPECT_TRUE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
   Common::Redis::RespValue expected_response;
@@ -961,7 +961,7 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithAskRedirection) {
   Common::Redis::RespValue bad_ask_response;
   bad_ask_response.type(Common::Redis::RespType::Integer);
   bad_ask_response.asInteger() = 1;
-  EXPECT_FALSE(pool_callbacks_[0]->onAskRedirection(bad_ask_response));
+  EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_ask_response));
 
   // good responses...
   Common::Redis::RespValue ask_response;
@@ -986,7 +986,7 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithAskRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
-    EXPECT_TRUE(pool_callbacks_[i]->onAskRedirection(ask_response));
+    EXPECT_TRUE(pool_callbacks_[i]->onRedirection(ask_response));
   }
 
   Common::Redis::RespValue expected_response;
@@ -1127,7 +1127,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithMovedRedirection) {
   Common::Redis::RespValue bad_moved_response;
   bad_moved_response.type(Common::Redis::RespType::Integer);
   bad_moved_response.asInteger() = 1;
-  EXPECT_FALSE(pool_callbacks_[0]->onMovedRedirection(bad_moved_response));
+  EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_moved_response));
 
   // good responses...
   Common::Redis::RespValue moved_response;
@@ -1148,7 +1148,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithMovedRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
-    EXPECT_TRUE(pool_callbacks_[i]->onMovedRedirection(moved_response));
+    EXPECT_TRUE(pool_callbacks_[i]->onRedirection(moved_response));
   }
 
   Common::Redis::RespValue expected_response;
@@ -1185,7 +1185,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithAskRedirection) {
   Common::Redis::RespValue bad_ask_response;
   bad_ask_response.type(Common::Redis::RespType::Integer);
   bad_ask_response.asInteger() = 1;
-  EXPECT_FALSE(pool_callbacks_[0]->onAskRedirection(bad_ask_response));
+  EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_ask_response));
 
   // good responses...
   Common::Redis::RespValue ask_response;
@@ -1208,7 +1208,7 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithAskRedirection) {
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
-    EXPECT_TRUE(pool_callbacks_[i]->onAskRedirection(ask_response));
+    EXPECT_TRUE(pool_callbacks_[i]->onRedirection(ask_response));
   }
 
   Common::Redis::RespValue expected_response;
