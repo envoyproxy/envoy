@@ -200,7 +200,7 @@ private:
     }
     void doData(bool end_stream) override {
       parent_.decodeData(this, *parent_.buffered_request_data_, end_stream,
-                         ActiveStream::FilterIterationStartState::Can_start_from_current);
+                         ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
@@ -284,7 +284,7 @@ private:
     }
     void doData(bool end_stream) override {
       parent_.encodeData(this, *parent_.buffered_response_data_, end_stream,
-                         ActiveStream::FilterIterationStartState::Can_start_from_current);
+                         ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
@@ -328,20 +328,16 @@ private:
     ~ActiveStream();
 
     // Indicates which filter to start the iteration with.
-    enum class FilterIterationStartState { Always_start_from_next, Can_start_from_current };
+    enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
     void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter, bool dual_filter);
     void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter, bool dual_filter);
     void chargeStats(const HeaderMap& headers);
-    // Returns the encoder filter to start iteration with. If the function is called from a filter
-    // that should always iterate from the next filter, set Always_start_from_next to
-    // filter_iteration_start_state.
+    // Returns the encoder filter to start iteration with.
     std::list<ActiveStreamEncoderFilterPtr>::iterator
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream,
                        FilterIterationStartState filter_iteration_start_state);
-    // Returns the decoder filter to start iteration with. If the function is called from a filter
-    // that should always iterate from the next filter, set Always_start_from_next to
-    // filter_iteration_start_state.
+    // Returns the decoder filter to start iteration with.
     std::list<ActiveStreamDecoderFilterPtr>::iterator
     commonDecodePrefix(ActiveStreamDecoderFilter* filter,
                        FilterIterationStartState filter_iteration_start_state);

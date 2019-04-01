@@ -783,7 +783,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
                                                         HeaderMap& headers, bool end_stream) {
   // Headers filter iteration should always start with the next filter if available.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
-      commonDecodePrefix(filter, FilterIterationStartState::Always_start_from_next);
+      commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
 
   for (; entry != decoder_filters_.end(); entry++) {
@@ -832,7 +832,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
 
-  decodeData(nullptr, data, end_stream, FilterIterationStartState::Can_start_from_current);
+  decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(
@@ -968,7 +968,7 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
-    decodeData(&filter, data, false, FilterIterationStartState::Always_start_from_next);
+    decodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -997,7 +997,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
 
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
-      commonDecodePrefix(filter, FilterIterationStartState::Can_start_from_current);
+      commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, return now.
@@ -1049,7 +1049,7 @@ ConnectionManagerImpl::ActiveStream::commonEncodePrefix(
   if (!filter) {
     return encoder_filters_.begin();
   }
-  if (filter_iteration_start_state == FilterIterationStartState::Can_start_from_current &&
+  if (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
       (*(filter->entry()))->iterate_from_current_filter_) {
     // The filter iteration has been stopped for all frame types, and now the iteration continues.
     // The current filter's encoding callback has not be called. Call it now.
@@ -1064,7 +1064,7 @@ ConnectionManagerImpl::ActiveStream::commonDecodePrefix(
   if (!filter) {
     return decoder_filters_.begin();
   }
-  if (filter_iteration_start_state == FilterIterationStartState::Can_start_from_current &&
+  if (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
       (*(filter->entry()))->iterate_from_current_filter_) {
     // The filter iteration has been stopped for all frame types, and now the iteration continues.
     // The current filter's callback function has not been called. Call it now.
@@ -1119,7 +1119,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
                             // TODO: Start encoding from the last decoder filter that saw the
                             // request instead.
                             encodeData(nullptr, data, end_stream,
-                                       FilterIterationStartState::Can_start_from_current);
+                                       FilterIterationStartState::CanStartFromCurrent);
                           },
                           state_.destroyed_, code, body, grpc_status, is_head_request);
 }
@@ -1137,7 +1137,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   // complex continuation logic.
   // 100-continue filter iteration should always start with the next filter if available.
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
-      commonEncodePrefix(filter, false, FilterIterationStartState::Always_start_from_next);
+      commonEncodePrefix(filter, false, FilterIterationStartState::AlwaysStartFromNext);
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode100ContinueHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode100ContinueHeaders;
@@ -1170,7 +1170,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   // Headers filter iteration should always start with the next filter if available.
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
-      commonEncodePrefix(filter, end_stream, FilterIterationStartState::Always_start_from_next);
+      commonEncodePrefix(filter, end_stream, FilterIterationStartState::AlwaysStartFromNext);
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
 
   for (; entry != encoder_filters_.end(); entry++) {
@@ -1358,7 +1358,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
-    encodeData(&filter, data, false, FilterIterationStartState::Always_start_from_next);
+    encodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -1453,7 +1453,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 
   // Filter iteration may start at the current filter.
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
-      commonEncodePrefix(filter, true, FilterIterationStartState::Can_start_from_current);
+      commonEncodePrefix(filter, true, FilterIterationStartState::CanStartFromCurrent);
   for (; entry != encoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, return now.
     if ((*entry)->stoppedAll()) {
@@ -1807,7 +1807,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::In
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(
     Buffer::Instance& data, bool end_stream) {
   parent_.decodeData(this, data, end_stream,
-                     ActiveStream::FilterIterationStartState::Can_start_from_current);
+                     ActiveStream::FilterIterationStartState::CanStartFromCurrent);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
@@ -1832,7 +1832,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeHeaders(HeaderMapPt
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data,
                                                                   bool end_stream) {
   parent_.encodeData(nullptr, data, end_stream,
-                     ActiveStream::FilterIterationStartState::Can_start_from_current);
+                     ActiveStream::FilterIterationStartState::CanStartFromCurrent);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapPtr&& trailers) {
@@ -1930,7 +1930,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::In
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(
     Buffer::Instance& data, bool end_stream) {
   parent_.encodeData(this, data, end_stream,
-                     ActiveStream::FilterIterationStartState::Can_start_from_current);
+                     ActiveStream::FilterIterationStartState::CanStartFromCurrent);
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {

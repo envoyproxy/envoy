@@ -52,11 +52,23 @@ protected:
   void changeHeadersForStopAllTests(Http::TestHeaderMapImpl& headers, bool set_buffer_limit) {
     headers.addCopy("content_size", std::to_string(count_ * size_));
     headers.addCopy("added_size", std::to_string(added_decoded_data_size_));
-    headers.addCopy("first_trigger", "value");
+    headers.addCopy("is_first_trigger", "value");
     if (set_buffer_limit) {
       headers.addCopy("buffer_limit", std::to_string(buffer_limit_));
     }
   }
+
+  void verifyUpStreamRequestAfterStopAllFilter() {
+    if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
+      // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and
+      // decodeTrailers. 2 decoded data were added.
+      EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
+    } else {
+      EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
+    }
+    EXPECT_EQ(true, upstream_request_->complete());
+  }
+
   const int count_ = 70;
   const int size_ = 1000;
   const int added_decoded_data_size_ = 1;
@@ -809,14 +821,7 @@ name: passthrough-filter
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
-    // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and decodeTrailers.
-    // 2 decoded data were added.
-    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
-  } else {
-    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
-  }
-  EXPECT_EQ(true, upstream_request_->complete());
+  verifyUpStreamRequestAfterStopAllFilter();
 }
 
 // Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
@@ -875,14 +880,7 @@ name: passthrough-filter
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
-    // decode-headers-return-stop-all-watermark-filter calls addDecodedData in decodeData and
-    // decodeTrailers. 2 decoded data were added.
-    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
-  } else {
-    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
-  }
-  EXPECT_EQ(true, upstream_request_->complete());
+  verifyUpStreamRequestAfterStopAllFilter();
 }
 
 // Test two filters that return StopAllIterationAndBuffer back-to-back.
@@ -930,14 +928,7 @@ name: passthrough-filter
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
-    // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and decodeTrailers.
-    // 2 decoded data were added.
-    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
-  } else {
-    EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
-  }
-  EXPECT_EQ(true, upstream_request_->complete());
+  verifyUpStreamRequestAfterStopAllFilter();
 }
 
 // Tests encodeHeaders() returns StopAllIterationAndBuffer.
