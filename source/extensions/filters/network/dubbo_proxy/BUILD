@@ -193,7 +193,6 @@ envoy_cc_library(
         "active_message.h",
         "conn_manager.h",
     ],
-    external_deps = ["abseil_any"],
     deps = [
         ":app_exception_lib",
         ":decoder_events_lib",

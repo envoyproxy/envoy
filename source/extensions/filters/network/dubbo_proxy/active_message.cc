@@ -261,7 +261,7 @@ DubboProxy::Router::RouteConstSharedPtr ActiveMessage::route() {
   if (metadata_ != nullptr) {
     DubboProxy::Router::RouteConstSharedPtr route =
         parent_.config().routerConfig().route(*metadata_, stream_id_);
-    cached_route_ = std::move(route);
+    cached_route_ = route;
     return cached_route_.value();
   }
 
