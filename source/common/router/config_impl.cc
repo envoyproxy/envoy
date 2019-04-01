@@ -991,11 +991,18 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
                                                          uint64_t random_value) const {
+  // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
+  // bails early (as it rejects a request), so there is no routing is going to happen anyway.
+  const auto* forwarded_proto_header = headers.ForwardedProto();
+  if (forwarded_proto_header == nullptr) {
+    return nullptr;
+  }
+
   // First check for ssl redirect.
-  if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
+  if (ssl_requirements_ == SslRequirements::ALL && forwarded_proto_header->value() != "https") {
     return SSL_REDIRECT_ROUTE;
   } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
-             headers.ForwardedProto()->value() != "https" && !headers.EnvoyInternalRequest()) {
+             forwarded_proto_header->value() != "https" && !headers.EnvoyInternalRequest()) {
     return SSL_REDIRECT_ROUTE;
   }
 
