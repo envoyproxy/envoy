@@ -639,11 +639,11 @@ public:
   const Network::Address::InstanceConstSharedPtr
   resolveProtoAddress(const envoy::api::v2::core::Address& address);
 
-  // Pratitions the provided list of hosts into two new lists containing the healthy and degraded
+  // Partitions the provided list of hosts into two new lists containing the healthy and degraded
   // hosts respectively.
   static std::pair<HostVectorConstSharedPtr, HostVectorConstSharedPtr>
   partitionHostList(const HostVector& hosts);
-  // Pratitions the provided list of hosts per locality into two new lists containing the healthy
+  // Partitions the provided list of hosts per locality into two new lists containing the healthy
   // and degraded hosts respectively.
   static std::pair<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
