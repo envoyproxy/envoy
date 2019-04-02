@@ -784,12 +784,12 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  absl::optional<std::list<ActiveStreamDecoderFilterPtr>::iterator> continue_data_entry;
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
     entry = std::next(filter->entry());
   }
-  absl::optional<std::list<ActiveStreamDecoderFilterPtr>::iterator> continue_data_entry;
 
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
@@ -854,14 +854,14 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  absl::optional<std::list<ActiveStreamDecoderFilterPtr>::iterator> continue_data_entry;
+  const bool trailers_exists_at_start = request_trailers_ != nullptr;
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
     entry = std::next(filter->entry());
   }
-  absl::optional<std::list<ActiveStreamDecoderFilterPtr>::iterator> continue_data_entry;
 
-  const bool trailers_exists_at_start = request_trailers_ != nullptr;
   for (; entry != decoder_filters_.end(); entry++) {
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
     //
