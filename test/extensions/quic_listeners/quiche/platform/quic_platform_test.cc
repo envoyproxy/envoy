@@ -493,18 +493,20 @@ TEST(QuicPlatformTest, ConstructMemSliceFromBuffer) {
       str.data(), str.length(),
       [](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {});
   Envoy::Buffer::OwnedImpl buffer;
-  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer)}, "");
+  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
   buffer.add(str2);
-  quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer)};
-  EXPECT_EQ(0, buffer.length());
+  EXPECT_EQ(1u, buffer.getRawSlices(nullptr, 0));
+  buffer.addBufferFragment(fragment);
+
+  quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
+  EXPECT_EQ(str.length(), buffer.length());
   EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
   slice1.Reset();
   EXPECT_TRUE(slice1.empty());
   EXPECT_EQ(nullptr, slice1.data());
 
-  buffer.addBufferFragment(fragment);
-  quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer)};
+  quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer, str.length())};
   EXPECT_EQ(0, buffer.length());
   EXPECT_EQ(str.data(), slice2.data());
   EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));

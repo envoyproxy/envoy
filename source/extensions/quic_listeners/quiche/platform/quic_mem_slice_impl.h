@@ -37,11 +37,17 @@ public:
     single_slice_buffer_.addBufferFragment(*fragment);
   }
 
-  // Constructs a QuicMemSliceImpl from a Buffer::Instance whose getRawSlices()
-  // returns only 1 slice. Data will be moved from |slice|.
-  explicit QuicMemSliceImpl(Envoy::Buffer::Instance& slice) {
-    ASSERT(slice.getRawSlices(nullptr, 0) > 1);
-    single_slice_buffer_.move(slice);
+  // Constructs a QuicMemSliceImpl from a Buffer::Instance with first |length| bytes in it.
+  // Data will be moved from |buffer| to this mem slice.
+  // Prerequisit: |buffer| has at least |length| bytes of data and not empty.
+  explicit QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length) {
+#ifndef NDEBUG
+    Envoy::Buffer::RawSlice slice;
+    ASSERT(buffer.getRawSlices(&slice, 1) != 0);
+    ASSERT(slice.len_ == length);
+#endif
+    single_slice_buffer_.move(buffer, length);
+    ASSERT(single_slice_buffer_.getRawSlices(nullptr, 0) == 1);
   }
 
   QuicMemSliceImpl(const QuicMemSliceImpl& other) = delete;

@@ -51,15 +51,14 @@ public:
       if (slice.len_ == 0) {
         continue;
       }
-      Envoy::Buffer::OwnedImpl single_slice_buffer;
       // Move each slice into a stand-alone buffer.
       // TODO(danzh): investigate the cost of allocating one buffer per slice.
       // If it turns out to be expensive, add a new function to free data in the middle in buffer
       // interface and re-design QuicMemSliceImpl.
-      single_slice_buffer.move(buffer_, slice.len_);
-      consume(QuicMemSlice(QuicMemSliceImpl(single_slice_buffer)));
+      consume(QuicMemSlice(QuicMemSliceImpl(buffer_, slice.len_)));
       saved_length += slice.len_;
     }
+    ASSERT(buffer_.length() == 0);
     return saved_length;
   }
 
