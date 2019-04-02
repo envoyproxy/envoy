@@ -135,7 +135,7 @@ The transformation between flattened string and symbolized form is CPU-intensive
 at scale. It requires parsing, encoding, and lookups in a shared map, which must
 be mutex-protected. To avoid adding latency and CPU overhead while serving
 requests, the tokens can be symbolized and saved in context classes, such as
-(Http::CodeStatsImpl)[https://github.com/envoyproxy/envoy/blob/master/source/common/http/code_stats_impl.h].
+[Http::CodeStatsImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/http/codes.h).
 Symbolization can occur on startup or when new hosts or clusters are configured
 dynamically. Users of stats that are allocated dynamically per cluster, host,
 etc, must explicitly store partial stat-names their class instances, which later
@@ -154,22 +154,22 @@ runtime name lookup.
 If a PR is issued that changes the underlying representation of a stat name to
 be a symbol table entry then each stat-name will need to be transformed at
 runtime, which would add CPU overhead and lock contention in the request-path,
-violating one of the principles of Envoy's (threading
-model)[https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310]. Before
+violating one of the principles of Envoy's [threading
+model](https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310). Before
 issuing such a PR we need to first iterate through the codebase memoizing the
 symbols that are used to form stat-names.
 
-To resolve this chicken-and-egg challenge to switch to symbol-table stat-name
+To resolve this chicken-and-egg challenge of switching to symbol-table stat-name
 representation without suffering a temporary loss of performance, we employ a
-("fake" symbol table
-implementation)[https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h].
+["fake" symbol table
+implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h).
 This implemenation uses elaborated strings as an underlying representation, but
-contains an identical API to the ("real"
-implemention)[https://github.com/envoyproxy/envoy/blob/master/source/common/stats/symbol_table_impl.h].]
+contains an identical API to the ["real"
+implemention](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/symbol_table_impl.h).
 . The underlying string representation means that there is minimal runtime
 overhead compared to the current state. But once all stat-allocation call-sites
-have been converted to use the abstract (SymbolTable
-API)[https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/symbol_table.h],
+have been converted to use the abstract [SymbolTable
+API](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/symbol_table.h),
 
 Once all the call-sites that allocate stat-names have been converted to the
 SymbolTable API, the real implementation can be swapped in, the space savings

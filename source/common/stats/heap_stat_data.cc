@@ -1,8 +1,7 @@
 #include "common/stats/heap_stat_data.h"
 
-#include <iostream>
-
 #include "common/common/lock_guard.h"
+#include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
@@ -59,9 +58,8 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
 void HeapStatDataAllocator::debugPrint() {
   Thread::LockGuard lock(mutex_);
   for (HeapStatData* heap_stat_data : stats_) {
-    std::cout << symbolTable().toString(heap_stat_data->statName()) << std::endl;
+    ENVOY_LOG_MISC(info, "{}", symbolTable().toString(heap_stat_data->statName()));
   }
-  std::cout << std::flush;
 }
 #endif
 
