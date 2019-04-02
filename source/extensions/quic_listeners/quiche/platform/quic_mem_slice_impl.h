@@ -26,22 +26,22 @@ public:
 
   // Constructs a QuicMemSliceImpl by let |allocator| allocate a data buffer of
   // |length|.
-  QuicMemSliceImpl(QuicBufferAllocator* allocator, size_t length)
-      : slice_(new Envoy::Buffer::OwnedImpl()) {
-    auto fragment = new Envoy::Buffer::BufferFragmentImpl(
-        allocator->New(length), length,
-        [allocator](const void* data, size_t, const Envoy::Buffer::BufferFragmentImpl* fragment) {
+  QuicMemSliceImpl(QuicBufferAllocator* allocator, size_t length) {
+    size_t total_length = sizeof(Envoy::Buffer::BufferFragmentImpl) + length;
+    char* mem = allocator->New(total_length);
+    auto fragment = new (mem + length) Envoy::Buffer::BufferFragmentImpl(
+        mem, length,
+        [allocator](const void* data, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
           allocator->Delete(const_cast<char*>(static_cast<const char*>(data)));
-          delete fragment;
         });
-    slice_->addBufferFragment(*fragment);
+    single_slice_buffer_.addBufferFragment(*fragment);
   }
 
   // Constructs a QuicMemSliceImpl from a Buffer::Instance whose getRawSlices()
   // returns only 1 slice.
-  explicit QuicMemSliceImpl(std::shared_ptr<Envoy::Buffer::Instance> slice)
-      : slice_(std::move(slice)) {
-    ASSERT(slice_->getRawSlices(nullptr, 0) == 1);
+  explicit QuicMemSliceImpl(Envoy::Buffer::Instance& slice) {
+    ASSERT(slice.getRawSlices(nullptr, 0) == 1);
+    single_slice_buffer_.move(slice);
   }
 
   QuicMemSliceImpl(const QuicMemSliceImpl& other) = delete;
@@ -49,34 +49,33 @@ public:
 
   // Move constructors. |other| will not hold a reference to the data buffer
   // after this call completes.
-  QuicMemSliceImpl(QuicMemSliceImpl&& other) : slice_(std::move(other.slice_)) { other.Reset(); }
+  QuicMemSliceImpl(QuicMemSliceImpl&& other) {
+    single_slice_buffer_.move(other.single_slice_buffer_);
+    other.Reset();
+  }
 
   QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) {
     if (this != &other) {
-      slice_ = std::move(other.slice_);
-      other.Reset();
+      single_slice_buffer_.move(other.single_slice_buffer_);
     }
     return *this;
   }
 
   // Below methods implements interface needed by QuicMemSlice.
-  void Reset() { slice_ = nullptr; }
+  void Reset() { single_slice_buffer_.drain(length()); }
 
   // Returns a char pointer to the one and only slice in buffer.
   const char* data() const {
-    if (slice_ == nullptr) {
-      return nullptr;
-    }
     Envoy::Buffer::RawSlice out;
-    ASSERT(slice_->getRawSlices(&out, 1) == 1);
+    ASSERT(single_slice_buffer_.getRawSlices(&out, 1) <= 1);
     return static_cast<const char*>(out.mem_);
   }
 
-  size_t length() const { return slice_ == nullptr ? 0 : slice_->length(); }
+  size_t length() const { return single_slice_buffer_.length(); }
   bool empty() const { return length() == 0; }
 
 private:
-  std::shared_ptr<Envoy::Buffer::Instance> slice_;
+  Envoy::Buffer::OwnedImpl single_slice_buffer_;
 };
 
 } // namespace quic

@@ -486,42 +486,28 @@ TEST(QuicPlatformTest, QuicTestOutput) {
                       QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
 
-class QuicMemSliceTest : public QuicTest {
-public:
-  QuicMemSliceTest() {
-    slice_ = quic::QuicMemSlice(
-        quic::QuicMemSliceImpl(std::make_shared<Envoy::Buffer::OwnedImpl>(std::string(1024, 'a'))));
-    orig_data_ = slice_.data();
-    orig_length_ = slice_.length();
-    EXPECT_EQ(1024u, orig_length_);
-  }
-
-protected:
-  quic::QuicMemSlice slice_;
-  const char* orig_data_;
-  size_t orig_length_;
-};
-
-TEST_F(QuicMemSliceTest, Reset) {
-  slice_.Reset();
-  EXPECT_TRUE(slice_.empty());
-  EXPECT_EQ(nullptr, slice_.data());
-}
-
-TEST_F(QuicMemSliceTest, InvalidBuffer) {
+TEST(QuicPlatformTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
   Envoy::Buffer::BufferFragmentImpl fragment(
       str.data(), str.length(),
       [](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {});
-  auto buffer = std::make_shared<Envoy::Buffer::OwnedImpl>();
+  Envoy::Buffer::OwnedImpl buffer;
   EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer)}, "");
-  buffer->add(std::string(1024, 'a'));
+  std::string str2(1024, 'a');
+  buffer.add(str2);
   quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer)};
-  // Adding a fragment will invalidate slice1.
-  buffer->addBufferFragment(fragment);
-  EXPECT_DEBUG_DEATH(slice1.data(), "");
-  EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer)}, "");
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
+  slice1.Reset();
+  EXPECT_TRUE(slice1.empty());
+  EXPECT_EQ(nullptr, slice1.data());
+
+  buffer.addBufferFragment(fragment);
+  quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer)};
+  EXPECT_EQ(0, buffer.length());
+  EXPECT_EQ(str.data(), slice2.data());
+  EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));
 }
 
 class FileUtilsTest : public testing::Test {
