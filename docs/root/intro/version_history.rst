@@ -33,6 +33,9 @@ Version history
 * ext_authz: migrated from v2alpha to v2 and improved docs.
 * ext_authz: added a configurable option to make the gRPC service cross-compatible with V2Alpha. Note that this feature is already deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
 * ext_authz: migrated from v2alpha to v2 and improved the documentation.
+* dubbo_proxy: add routing capabilities for the Dubbo protocol.
+* ext_authz: added an configurable option to make the gRPC service cross-compatible with V2Alpha. Note that this feature is already deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
+* ext_authz: migrated from V2alpha to V2 and improved the documentation.
 * ext_authz: authorization request and response configuration has been separated into two distinct objects: :ref:`authorization request
   <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.authorization_request>` and :ref:`authorization response
   <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.authorization_response>`. In addition, :ref:`client headers
@@ -90,7 +93,6 @@ Version history
   Refer to :ref:`ZooKeeper proxy<config_network_filters_zookeeper_proxy>` for more details.
 * upstream: added configuration option to select any host when the fallback policy fails.
 * upstream: stopped incrementing upstream_rq_total for HTTP/1 conn pool when request is circuit broken.
-* dubbo_proxy: add routing capabilities for the Dubbo protocol.
 
 1.9.1 (Apr 2, 2019)
 ===================

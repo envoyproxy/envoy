@@ -3,9 +3,9 @@
 Dubbo proxy
 ============
 
-The Dubbo proxy filter decodes the RPC protocol between Dubbo clients
-And servers. The decoded RPC information is converted to metadata.
-The metadata includes the basic request ID, request type, serialization type,
+The dubbo proxy filter decodes the RPC protocol between dubbo clients
+and servers. the decoded RPC information is converted to metadata.
+the metadata includes the basic request ID, request type, serialization type,
 and the required service name, method name, parameter name,
 and parameter value for routing.
 
@@ -17,7 +17,7 @@ and parameter value for routing.
 Statistics
 ----------
 
-Every configured Dubbo proxy filter has statistics rooted at *redis.<stat_prefix>.* with the
+Every configured dubbo proxy filter has statistics rooted at *redis.<stat_prefix>.* with the
 following statistics:
 
 .. csv-table::
@@ -46,12 +46,12 @@ following statistics:
   cx_destroy_remote_with_active_rq, Counter, Connections destroyed remotely with an active query
 
 
-Implement custom Filter based on Dubbo Proxy Filter
-----------------------------------------------------
+Implement custom filter based on the dubbo proxy filter
+--------------------------------------------------------
 
-If you want to implement a custom Filter based on the Dubbo protocol,
-the Dubbo proxy Filter like HTTP also provides a very convenient way to expand,
-the first step is to implement the DecoderFilter interface, and give the Filter named, such as testFilter,
+If you want to implement a custom filter based on the dubbo protocol,
+the dubbo proxy filter like HTTP also provides a very convenient way to expand,
+the first step is to implement the DecoderFilter interface, and give the filter named, such as testFilter,
 the second step is to add your configuration, configuration method refer to the following sample
 
 .. code-block:: yaml
