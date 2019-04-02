@@ -57,8 +57,15 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   // RFC allows the absolute-uri to not end in /, but the absolute path form
   // must start with
   if ((u.field_set & (1 << UF_PATH)) == (1 << UF_PATH) && u.field_data[UF_PATH].len > 0) {
-    path_ = absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off,
-                              u.field_data[UF_PATH].len);
+    // Check if path contains query parameters and if so add them to path
+    if ((u.field_set & (1 << UF_QUERY)) == (1 << UF_QUERY) && u.field_data[UF_QUERY].len > 0) {
+      // u.field_data[UF_PATH].off + u.field_data[UF_PATH].len  == u.field_data[UF_QUERY].off - 1
+      path_ = absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off,
+                                u.field_data[UF_PATH].len + 1 + u.field_data[UF_QUERY].len);
+    } else {
+      path_ = absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off,
+                                u.field_data[UF_PATH].len);
+    }
   } else {
     path_ = absl::string_view(kDefaultPath, 1);
   }

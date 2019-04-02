@@ -772,6 +772,21 @@ TEST(Url, ParsingTest) {
 
   // Test https scheme
   ValidateUrl("https://www.host.com", "https", "www.host.com", "/");
+
+  // Test url with query parameter
+  ValidateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
+  ValidateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
+
+  // Test url with multi-character path and query parameter
+  ValidateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com:80",
+              "/path?query=param");
+  ValidateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param");
+
+  // Test url with multi-character path and more than one query parameter
+  ValidateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com:80",
+              "/path?query=param&query2=param2");
+  ValidateUrl("http://www.host.com/path?query=param&query2=param2", "http", "www.host.com",
+              "/path?query=param&query2=param2");
 }
 
 } // namespace Http
