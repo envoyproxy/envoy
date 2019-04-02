@@ -72,8 +72,6 @@ message RouteAction {
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
     // assigned to each cluster.
-    //
-    // .. note::
     // Currently ClusterWeight only supports the name and weight fields.
     envoy.api.v2.route.WeightedCluster weighted_clusters = 2;
   }
@@ -99,10 +97,10 @@ message MethodMatch {
       //
       // Examples:
       //
-      // * For range [-10,0), route will match for header value -1, but not for 0,
-      // "somestring", 10.9,
+      // * For range [-10,0), route will match for header value -1, but not for 0, "somestring", 10.9,
       //   "-1somestring"
       envoy.type.Int64Range range_match = 4;
+
     }
   }
 
