@@ -312,7 +312,7 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
     action->set_priority(priority);
 
     for (const auto header_value : json_route.getObjectArray("request_headers_to_add", true)) {
-      auto* header_value_option = action->mutable_request_headers_to_add()->Add();
+      auto* header_value_option = route.mutable_request_headers_to_add()->Add();
       BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
     }
 

@@ -27,7 +27,29 @@ public:
   CheckRequestUtilsTest() {
     addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
     protocol_ = Envoy::Http::Protocol::Http10;
+    buffer_ = CheckRequestUtilsTest::newTestBuffer(8192);
   };
+
+  void ExpectBasicHttp() {
+    EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
+    EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+    EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+    EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(&ssl_));
+    EXPECT_CALL(callbacks_, streamId()).Times(1).WillOnce(Return(0));
+    EXPECT_CALL(callbacks_, decodingBuffer()).WillOnce(Return(buffer_.get()));
+    EXPECT_CALL(callbacks_, streamInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
+    EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
+  }
+
+  static Buffer::InstancePtr newTestBuffer(uint64_t size) {
+    auto buffer = std::make_unique<Buffer::OwnedImpl>();
+    while (buffer->length() < size) {
+      auto new_buffer =
+          Buffer::OwnedImpl("Lorem ipsum dolor sit amet, consectetuer adipiscing elit.");
+      buffer->add(new_buffer);
+    }
+    return std::move(buffer);
+  }
 
   Network::Address::InstanceConstSharedPtr addr_;
   absl::optional<Http::Protocol> protocol_;
@@ -37,6 +59,7 @@ public:
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> req_info_;
+  Buffer::InstancePtr buffer_;
 };
 
 // Verify that createTcpCheck's dependencies are invoked when it's called.
@@ -51,19 +74,46 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
 }
 
 // Verify that createHttpCheck's dependencies are invoked when it's called.
+// Verify that check request object has no request data.
 TEST_F(CheckRequestUtilsTest, BasicHttp) {
-  Http::HeaderMapImpl headers;
-  envoy::service::auth::v2::CheckRequest request;
-  EXPECT_CALL(callbacks_, connection()).Times(2).WillRepeatedly(Return(&connection_));
-  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
-  EXPECT_CALL(Const(connection_), ssl()).Times(2).WillRepeatedly(Return(&ssl_));
-  EXPECT_CALL(callbacks_, streamId()).WillOnce(Return(0));
-  EXPECT_CALL(callbacks_, streamInfo()).Times(3).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(req_info_, protocol()).Times(2).WillRepeatedly(ReturnPointee(&protocol_));
-  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String> empty;
+  const uint64_t size = 0;
+  Http::HeaderMapImpl headers_;
+  envoy::service::auth::v2::CheckRequest request_;
 
-  CheckRequestUtils::createHttpCheck(&callbacks_, headers, std::move(empty), request);
+  ExpectBasicHttp();
+  CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
+                                     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
+                                     request_, size);
+  ASSERT_EQ(size, request_.attributes().request().http().body().size());
+  EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+}
+
+// Verify that check request object has only a portion of the request data.
+TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
+  const uint64_t size = 4049;
+  Http::HeaderMapImpl headers_;
+  envoy::service::auth::v2::CheckRequest request_;
+
+  ExpectBasicHttp();
+  CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
+                                     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
+                                     request_, size);
+  ASSERT_EQ(size, request_.attributes().request().http().body().size());
+  EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
+}
+
+// Verify that check request object has all the request data.
+TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
+  Http::HeaderMapImpl headers_;
+  envoy::service::auth::v2::CheckRequest request_;
+
+  ExpectBasicHttp();
+  CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
+                                     Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
+                                     request_, buffer_->length());
+  ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
+  EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
+            request_.attributes().request().http().body());
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
@@ -78,6 +128,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(&ssl_));
   EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
   EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(callbacks_, decodingBuffer()).Times(1);
   EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
   EXPECT_CALL(ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
   EXPECT_CALL(ssl_, uriSanLocalCertificate())
@@ -87,7 +138,7 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   context_extensions["key"] = "value";
 
   CheckRequestUtils::createHttpCheck(&callbacks_, request_headers, std::move(context_extensions),
-                                     request);
+                                     request, false);
 
   EXPECT_EQ("source", request.attributes().source().principal());
   EXPECT_EQ("destination", request.attributes().destination().principal());

@@ -332,10 +332,6 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)),
-      route_action_request_headers_parser_(
-          HeaderParser::configure(route.route().request_headers_to_add())),
-      route_action_response_headers_parser_(HeaderParser::configure(
-          route.route().response_headers_to_add(), route.route().response_headers_to_remove())),
       request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
                                                       route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
@@ -452,10 +448,8 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool insert_envoy_original_path) const {
-  // Append user-specified request headers in the following order: route-action-level headers,
-  // route-level headers, virtual host level headers and finally global connection manager level
-  // headers.
-  route_action_request_headers_parser_->evaluateHeaders(headers, stream_info);
+  // Append user-specified request headers in the following order: route-level headers, virtual
+  // host level headers and finally global connection manager level headers.
   request_headers_parser_->evaluateHeaders(headers, stream_info);
   vhost_.requestHeaderParser().evaluateHeaders(headers, stream_info);
   vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, stream_info);
@@ -471,10 +465,8 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::HeaderMap& headers,
                                                  const StreamInfo::StreamInfo& stream_info) const {
-  // Append user-specified response headers in the following order: route-action-level headers,
-  // route-level headers, virtual host level headers and finally global connection manager level
-  // headers.
-  route_action_response_headers_parser_->evaluateHeaders(headers, stream_info);
+  // Append user-specified response headers in the following order: route-level headers, virtual
+  // host level headers and finally global connection manager level headers.
   response_headers_parser_->evaluateHeaders(headers, stream_info);
   vhost_.responseHeaderParser().evaluateHeaders(headers, stream_info);
   vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, stream_info);
@@ -941,19 +933,21 @@ const RouteSpecificFilterConfig* VirtualHostImpl::perFilterConfig(const std::str
   return per_filter_configs_.get(name);
 }
 
-const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(const std::string& host) const {
-  // We do a longest wildcard suffix match against the host that's passed in.
-  // (e.g. foo-bar.baz.com should match *-bar.baz.com before matching *.baz.com)
-  // This is done by scanning the length => wildcards map looking for every
-  // wildcard whose size is < length.
-  for (const auto& iter : wildcard_virtual_host_suffixes_) {
+const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
+    const std::string& host, const RouteMatcher::WildcardVirtualHosts& wildcard_virtual_hosts,
+    RouteMatcher::SubstringFunction substring_function) const {
+  // We do a longest wildcard match against the host that's passed in
+  // (e.g. foo-bar.baz.com should match *-bar.baz.com before matching *.baz.com for suffix
+  // wildcards). This is done by scanning the length => wildcards map looking for every wildcard
+  // whose size is < length.
+  for (const auto& iter : wildcard_virtual_hosts) {
     const uint32_t wildcard_length = iter.first;
     const auto& wildcard_map = iter.second;
     // >= because *.foo.com shouldn't match .foo.com.
     if (wildcard_length >= host.size()) {
       continue;
     }
-    const auto& match = wildcard_map.find(host.substr(host.size() - wildcard_length));
+    const auto& match = wildcard_map.find(substring_function(host, wildcard_length));
     if (match != wildcard_map.end()) {
       return match->second.get();
     }
@@ -970,20 +964,26 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
                                                           factory_context, validate_clusters));
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const std::string domain = Http::LowerCaseString(domain_name).get();
+      bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {
           throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
       } else if (domain.size() > 0 && '*' == domain[0]) {
-        wildcard_virtual_host_suffixes_[domain.size() - 1].emplace(domain.substr(1), virtual_host);
+        duplicate_found = !wildcard_virtual_host_suffixes_[domain.size() - 1]
+                               .emplace(domain.substr(1), virtual_host)
+                               .second;
+      } else if (domain.size() > 0 && '*' == domain[domain.size() - 1]) {
+        duplicate_found = !wildcard_virtual_host_prefixes_[domain.size() - 1]
+                               .emplace(domain.substr(0, domain.size() - 1), virtual_host)
+                               .second;
       } else {
-        if (virtual_hosts_.find(domain) != virtual_hosts_.end()) {
-          throw EnvoyException(fmt::format(
-              "Only unique values for domains are permitted. Duplicate entry of domain {}",
-              domain));
-        }
-        virtual_hosts_.emplace(domain, virtual_host);
+        duplicate_found = !virtual_hosts_.emplace(domain, virtual_host).second;
+      }
+      if (duplicate_found) {
+        throw EnvoyException(fmt::format(
+            "Only unique values for domains are permitted. Duplicate entry of domain {}", domain));
       }
     }
   }
@@ -991,11 +991,18 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& headers,
                                                          uint64_t random_value) const {
+  // No x-forwarded-proto header. This normally only happens when ActiveStream::decodeHeaders
+  // bails early (as it rejects a request), so there is no routing is going to happen anyway.
+  const auto* forwarded_proto_header = headers.ForwardedProto();
+  if (forwarded_proto_header == nullptr) {
+    return nullptr;
+  }
+
   // First check for ssl redirect.
-  if (ssl_requirements_ == SslRequirements::ALL && headers.ForwardedProto()->value() != "https") {
+  if (ssl_requirements_ == SslRequirements::ALL && forwarded_proto_header->value() != "https") {
     return SSL_REDIRECT_ROUTE;
   } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
-             headers.ForwardedProto()->value() != "https" && !headers.EnvoyInternalRequest()) {
+             forwarded_proto_header->value() != "https" && !headers.EnvoyInternalRequest()) {
     return SSL_REDIRECT_ROUTE;
   }
 
@@ -1012,7 +1019,8 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& headers) const {
   // Fast path the case where we only have a default virtual host.
-  if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() && default_virtual_host_) {
+  if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
+      wildcard_virtual_host_prefixes_.empty()) {
     return default_virtual_host_.get();
   }
 
@@ -1024,7 +1032,17 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
     return iter->second.get();
   }
   if (!wildcard_virtual_host_suffixes_.empty()) {
-    const VirtualHostImpl* vhost = findWildcardVirtualHost(host);
+    const VirtualHostImpl* vhost = findWildcardVirtualHost(
+        host, wildcard_virtual_host_suffixes_,
+        [](const std::string& h, int l) -> std::string { return h.substr(h.size() - l); });
+    if (vhost != nullptr) {
+      return vhost;
+    }
+  }
+  if (!wildcard_virtual_host_prefixes_.empty()) {
+    const VirtualHostImpl* vhost = findWildcardVirtualHost(
+        host, wildcard_virtual_host_prefixes_,
+        [](const std::string& h, int l) -> std::string { return h.substr(0, l); });
     if (vhost != nullptr) {
       return vhost;
     }
