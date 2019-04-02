@@ -133,8 +133,8 @@ class GuardDogAlmostDeadTest : public GuardDogDeathTest {};
 
 INSTANTIATE_TEST_SUITE_P(
     TimeSystemType, GuardDogAlmostDeadTest,
-    testing::ValuesIn({ // TODO(#6464): TimeSystemType::Real -- fails in this suite 30/1000 times.
-        TimeSystemType::Simulated}));
+    testing::ValuesIn({// TODO(#6464): TimeSystemType::Real -- fails in this suite 30/1000 times.
+                       TimeSystemType::Simulated}));
 
 TEST_P(GuardDogDeathTest, KillDeathTest) {
   // Is it German for "The Function"? Almost...
