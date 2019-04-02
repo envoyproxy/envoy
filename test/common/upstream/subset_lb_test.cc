@@ -1438,6 +1438,23 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
 }
 
+// Verifies that we do *not* invoke health() on hosts when constructing the load balancer. Since
+// health is modified concurrently from multiple threads, it is not safe to call on the worker
+// threads.
+TEST_F(SubsetLoadBalancerTest, DoesNotCheckHostHealth) {
+  EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+
+  auto mock_host = std::make_shared<MockHost>();
+  HostVector hosts{mock_host};
+  host_set_.hosts_ = hosts;
+
+  EXPECT_CALL(*mock_host, weight()).WillRepeatedly(Return(1));
+
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, stats_store_, runtime_,
+                                   random_, subset_info_, ring_hash_lb_config_,
+                                   least_request_lb_config_, common_config_));
+}
+
 TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
   EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
   EXPECT_CALL(subset_info_, localityWeightAware()).WillRepeatedly(Return(true));
