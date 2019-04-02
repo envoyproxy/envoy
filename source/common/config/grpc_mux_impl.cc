@@ -70,6 +70,54 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 }
 
+GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
+                                       const std::vector<std::string>& resources,
+                                       GrpcMuxCallbacks& callbacks) {
+  auto watch =
+      std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
+  ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
+
+  // Lazily kick off the requests based on first subscription. This has the
+  // convenient side-effect that we order messages on the channel based on
+  // Envoy's internal dependency ordering.
+  // TODO(gsagula): move TokenBucketImpl params to a config.
+  if (!api_state_[type_url].subscribed_) {
+    api_state_[type_url].request_.set_type_url(type_url);
+    api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
+    api_state_[type_url].subscribed_ = true;
+    subscriptions_.emplace_back(type_url);
+  }
+
+  // This will send an updated request on each subscription.
+  // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
+  // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
+  // only send a single RDS/EDS update after the CDS/LDS update.
+  queueDiscoveryRequest(type_url);
+
+  return watch;
+}
+
+void GrpcMuxImpl::pause(const std::string& type_url) {
+  ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url);
+  ApiState& api_state = api_state_[type_url];
+  ASSERT(!api_state.paused_);
+  ASSERT(!api_state.pending_);
+  api_state.paused_ = true;
+}
+
+void GrpcMuxImpl::resume(const std::string& type_url) {
+  ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
+  ApiState& api_state = api_state_[type_url];
+  ASSERT(api_state.paused_);
+  api_state.paused_ = false;
+
+  if (api_state.pending_) {
+    ASSERT(api_state.subscribed_);
+    queueDiscoveryRequest(type_url);
+    api_state.pending_ = false;
+  }
+}
+
 void GrpcMuxImpl::handleDiscoveryResponse(
     std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
@@ -148,54 +196,6 @@ void GrpcMuxImpl::handleDiscoveryResponse(
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
   queueDiscoveryRequest(type_url);
-}
-
-GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
-                                       const std::vector<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks) {
-  auto watch =
-      std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
-  ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
-
-  // Lazily kick off the requests based on first subscription. This has the
-  // convenient side-effect that we order messages on the channel based on
-  // Envoy's internal dependency ordering.
-  // TODO(gsagula): move TokenBucketImpl params to a config.
-  if (!api_state_[type_url].subscribed_) {
-    api_state_[type_url].request_.set_type_url(type_url);
-    api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
-    api_state_[type_url].subscribed_ = true;
-    subscriptions_.emplace_back(type_url);
-  }
-
-  // This will send an updated request on each subscription.
-  // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
-  // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
-  // only send a single RDS/EDS update after the CDS/LDS update.
-  queueDiscoveryRequest(type_url);
-
-  return watch;
-}
-
-void GrpcMuxImpl::pause(const std::string& type_url) {
-  ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url);
-  ApiState& api_state = api_state_[type_url];
-  ASSERT(!api_state.paused_);
-  ASSERT(!api_state.pending_);
-  api_state.paused_ = true;
-}
-
-void GrpcMuxImpl::resume(const std::string& type_url) {
-  ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
-  ApiState& api_state = api_state_[type_url];
-  ASSERT(api_state.paused_);
-  api_state.paused_ = false;
-
-  if (api_state.pending_) {
-    ASSERT(api_state.subscribed_);
-    queueDiscoveryRequest(type_url);
-    api_state.pending_ = false;
-  }
 }
 
 void GrpcMuxImpl::handleStreamEstablished() {

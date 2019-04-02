@@ -116,34 +116,6 @@ public:
 
   envoy::api::v2::DeltaDiscoveryRequest internalRequestStateForTest() const { return request_; }
 
-  void
-  handleConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                     const std::string& version_info) {
-    callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
-    for (const auto& resource : added_resources) {
-      setResourceVersion(resource.name(), resource.version());
-    }
-    // If a resource is gone, there is no longer a meaningful version for it that makes sense to
-    // provide to the server upon stream reconnect: either it will continue to not exist, in which
-    // case saying nothing is fine, or the server will bring back something new, which we should
-    // receive regardless (which is the logic that not specifying a version will get you).
-    //
-    // So, leave the version map entry present but blank. It will be left out of
-    // initial_resource_versions messages, but will remind us to explicitly tell the server "I'm
-    // cancelling my subscription" when we lose interest.
-    for (const auto& resource_name : removed_resources) {
-      if (resource_names_.find(resource_name) != resource_names_.end()) {
-        setResourceWaitingForServer(resource_name);
-      }
-    }
-    stats_.update_success_.inc();
-    stats_.update_attempt_.inc();
-    stats_.version_.set(HashUtil::xxHash64(version_info));
-    ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url_,
-              added_resources.size(), removed_resources.size());
-  }
-
   // Config::XdsGrpcContext
   void handleStreamEstablished() override {
     // initial_resource_versions "must be populated for first request in a stream", so guarantee
@@ -230,6 +202,34 @@ public:
   }
 
 private:
+  void
+  handleConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                     const std::string& version_info) {
+    callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
+    for (const auto& resource : added_resources) {
+      setResourceVersion(resource.name(), resource.version());
+    }
+    // If a resource is gone, there is no longer a meaningful version for it that makes sense to
+    // provide to the server upon stream reconnect: either it will continue to not exist, in which
+    // case saying nothing is fine, or the server will bring back something new, which we should
+    // receive regardless (which is the logic that not specifying a version will get you).
+    //
+    // So, leave the version map entry present but blank. It will be left out of
+    // initial_resource_versions messages, but will remind us to explicitly tell the server "I'm
+    // cancelling my subscription" when we lose interest.
+    for (const auto& resource_name : removed_resources) {
+      if (resource_names_.find(resource_name) != resource_names_.end()) {
+        setResourceWaitingForServer(resource_name);
+      }
+    }
+    stats_.update_success_.inc();
+    stats_.update_attempt_.inc();
+    stats_.version_.set(HashUtil::xxHash64(version_info));
+    ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url_,
+              added_resources.size(), removed_resources.size());
+  }
+
   void disableInitFetchTimeoutTimer() {
     if (init_fetch_timeout_timer_) {
       init_fetch_timeout_timer_->disableTimer();
