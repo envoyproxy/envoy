@@ -152,9 +152,9 @@ it is not possible to fully memoize the stats at startup; there must be a
 runtime name lookup.
 
 If a PR is issued that changes the underlying representation of a stat name to
-be a symbol table entry then each stat-name will need to be transformed at
-runtime, which would add CPU overhead and lock contention in the request-path,
-violating one of the principles of Envoy's [threading
+be a symbol table entry then each stat-name will need to be transformed
+whenever names are looked up, which would add CPU overhead and lock contention
+in the request-path, violating one of the principles of Envoy's [threading
 model](https://blog.envoyproxy.io/envoy-threading-model-a8d44b922310). Before
 issuing such a PR we need to first iterate through the codebase memoizing the
 symbols that are used to form stat-names.
@@ -166,14 +166,12 @@ implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/st
 This implemenation uses elaborated strings as an underlying representation, but
 implements the same API as the ["real"
 implemention](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/symbol_table_impl.h).
-. The underlying string representation means that there is minimal runtime
+The underlying string representation means that there is minimal runtime
 overhead compared to the current state. But once all stat-allocation call-sites
 have been converted to use the abstract [SymbolTable
 API](https://github.com/envoyproxy/envoy/blob/master/include/envoy/stats/symbol_table.h),
-
-Once all the call-sites that allocate stat-names have been converted to the
-SymbolTable API, the real implementation can be swapped in, the space savings
-realized, and the fake implementation deleted.
+the real implementation can be swapped in, the space savings realized, and the
+fake implementation deleted.
 
 ## Tags and Tag Extraction
 
