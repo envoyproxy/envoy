@@ -142,7 +142,7 @@ etc, must explicitly store partial stat-names their class instances, which later
 can be composed dynamically at runtime in order to fully elaborate counters,
 gauges, etc, without taking symbol-table locks, via `SymbolTable::join()`.
 
-###Current State and Strategy To Deploy Symbol Tables
+### Current State and Strategy To Deploy Symbol Tables
 
 As of April 1, 2019, there are a fairly large number of files that directly
 lookup stats by name, e.g. via `Stats::Scope::counter(const std::string&)` in
@@ -164,7 +164,7 @@ representation without suffering a temporary loss of performance, we employ a
 ["fake" symbol table
 implementation](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/fake_symbol_table_impl.h).
 This implemenation uses elaborated strings as an underlying representation, but
-contains an identical API to the ["real"
+implements the same API as the ["real"
 implemention](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/symbol_table_impl.h).
 . The underlying string representation means that there is minimal runtime
 overhead compared to the current state. But once all stat-allocation call-sites
