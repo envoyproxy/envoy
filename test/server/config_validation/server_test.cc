@@ -9,6 +9,7 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 // Test param is the path to the config file to validate.
 class ValidationServerTest : public testing::TestWithParam<std::string> {
@@ -50,7 +51,8 @@ public:
 
 TEST_P(ValidationServerTest, Validate) {
   EXPECT_TRUE(validateConfig(options_, Network::Address::InstanceConstSharedPtr(),
-                             component_factory_, Thread::threadFactoryForTest()));
+                             component_factory_, Thread::threadFactoryForTest(),
+                             Filesystem::fileSystemForTest()));
 }
 
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
@@ -67,11 +69,13 @@ INSTANTIATE_TEST_SUITE_P(ValidConfigs, ValidationServerTest,
 // may not be successful, but there should be no crash.
 TEST_P(ValidationServerTest_1, RunWithoutCrash) {
   validateConfig(options_, Network::Address::InstanceConstSharedPtr(), component_factory_,
-                 Thread::threadFactoryForTest());
+                 Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
   SUCCEED();
 }
 
 INSTANTIATE_TEST_SUITE_P(AllConfigs, ValidationServerTest_1,
                          ::testing::ValuesIn(ValidationServerTest_1::GetAllConfigFiles()));
+
+} // namespace
 } // namespace Server
 } // namespace Envoy

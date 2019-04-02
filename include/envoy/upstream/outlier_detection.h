@@ -56,8 +56,16 @@ public:
 
   /**
    * Add a non-HTTP result for a host.
+   * Some non-HTTP codes like TIMEOUT may require special mapping to HTTP code
+   * and such code may be passed as optional parameter.
    */
-  virtual void putResult(Result result) PURE;
+  virtual void putResult(Result result, absl::optional<uint64_t> code) PURE;
+
+  /**
+   * Wrapper around putResult with 2 params when mapping to HTTP code is not
+   * required.
+   */
+  void putResult(Result result) { putResult(result, absl::nullopt); }
 
   /**
    * Add a response time for a host (in this case response time is generic and might be used for

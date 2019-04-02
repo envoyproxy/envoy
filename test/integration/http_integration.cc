@@ -41,7 +41,6 @@ using testing::Invoke;
 using testing::Not;
 
 namespace Envoy {
-
 namespace {
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
@@ -285,8 +284,9 @@ HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& ups
   if (!fake_upstream_connection_) {
     AssertionResult result = AssertionFailure();
     for (auto upstream_index : upstream_indices) {
-      result = fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_,
-                                                                      fake_upstream_connection_);
+      result = fake_upstreams_[upstream_index]->waitForHttpConnection(
+          *dispatcher_, fake_upstream_connection_, TestUtility::DefaultTimeout,
+          max_request_headers_kb_);
       if (result) {
         upstream_with_request = upstream_index;
         break;
@@ -345,7 +345,7 @@ void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
 
 IntegrationStreamDecoderPtr
 HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
-                                           int upstream_index) {
+                                           int upstream_index, const std::string& path) {
   // This is called multiple times per test in ads_integration_test. Only call
   // initialize() the first time.
   if (!initialized()) {
@@ -354,7 +354,7 @@ HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_co
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                          {":path", "/test/long/url"},
+                                          {":path", path},
                                           {":scheme", "http"},
                                           {":authority", "host"},
                                           {"x-lyft-user-id", "123"}};
@@ -363,8 +363,8 @@ HttpIntegrationTest::makeHeaderOnlyRequest(ConnectionCreationFunction* create_co
 }
 
 void HttpIntegrationTest::testRouterHeaderOnlyRequestAndResponse(
-    ConnectionCreationFunction* create_connection, int upstream_index) {
-  auto response = makeHeaderOnlyRequest(create_connection, upstream_index);
+    ConnectionCreationFunction* create_connection, int upstream_index, const std::string& path) {
+  auto response = makeHeaderOnlyRequest(create_connection, upstream_index, path);
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
@@ -579,9 +579,10 @@ void HttpIntegrationTest::testRetry() {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request
 // and updated after the request is retried.
 void HttpIntegrationTest::testRetryAttemptCountHeader() {
-  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  host.set_include_request_attempt_count(true);
+  config_helper_.addVirtualHost(host);
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response =
@@ -828,6 +829,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t max_si
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void { hcm.mutable_max_request_headers_kb()->set_value(max_size); });
+  max_request_headers_kb_ = max_size;
 
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};

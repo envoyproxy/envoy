@@ -118,6 +118,7 @@ Address::InstanceConstSharedPtr getCanonicalLoopbackAddress(Address::IpVersion v
 }
 
 namespace {
+
 // There is no portable way to initialize sockaddr_in6 with a static initializer, do it with a
 // helper function instead.
 sockaddr_in6 sockaddrIn6Any() {
@@ -127,6 +128,7 @@ sockaddr_in6 sockaddrIn6Any() {
 
   return v6any;
 }
+
 } // namespace
 
 Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, bool v4_compat) {

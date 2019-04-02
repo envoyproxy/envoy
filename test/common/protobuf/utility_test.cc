@@ -395,6 +395,34 @@ TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
                           "Unable to parse JSON as proto.*Root element must be a message.*");
 }
 
+TEST_F(ProtobufUtilityTest, GetFlowYamlStringFromMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  EXPECT_EQ("{flags_path: foo}", MessageUtil::getYamlStringFromMessage(bootstrap, false, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  EXPECT_EQ("flags_path: foo", MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+}
+
+TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromRecursiveMessage) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  bootstrap.set_flags_path("foo");
+  bootstrap.mutable_node();
+  bootstrap.mutable_static_resources()->add_listeners()->set_name("http");
+
+  const std::string expected_yaml = R"EOF(
+node:
+  {}
+static_resources:
+  listeners:
+    - name: http
+flags_path: foo)EOF";
+  EXPECT_EQ(expected_yaml, "\n" + MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
+}
+
 TEST(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;

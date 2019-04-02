@@ -10,7 +10,6 @@
 
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
@@ -105,12 +104,14 @@ public:
   MockRetryState();
   ~MockRetryState();
 
-  void expectRetry();
+  void expectHeadersRetry();
+  void expectResetRetry();
 
   MOCK_METHOD0(enabled, bool());
-  MOCK_METHOD3(shouldRetry, RetryStatus(const Http::HeaderMap* response_headers,
-                                        const absl::optional<Http::StreamResetReason>& reset_reason,
-                                        DoRetryCallback callback));
+  MOCK_METHOD2(shouldRetryHeaders,
+               RetryStatus(const Http::HeaderMap& response_headers, DoRetryCallback callback));
+  MOCK_METHOD2(shouldRetryReset,
+               RetryStatus(const Http::StreamResetReason reset_reason, DoRetryCallback callback));
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
   MOCK_METHOD2(priorityLoadForRetry,

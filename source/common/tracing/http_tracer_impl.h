@@ -20,46 +20,63 @@ namespace Tracing {
 class TracingTagValues {
 public:
   // OpenTracing standard tag names.
-  const std::string COMPONENT = "component";
-  const std::string DB_INSTANCE = "db.instance";
-  const std::string DB_STATEMENT = "db.statement";
-  const std::string DB_USER = "db.user";
-  const std::string DB_TYPE = "db.type";
-  const std::string ERROR = "error";
-  const std::string HTTP_METHOD = "http.method";
-  const std::string HTTP_STATUS_CODE = "http.status_code";
-  const std::string HTTP_URL = "http.url";
-  const std::string MESSAGE_BUS_DESTINATION = "message_bus.destination";
-  const std::string PEER_ADDRESS = "peer.address";
-  const std::string PEER_HOSTNAME = "peer.hostname";
-  const std::string PEER_IPV4 = "peer.ipv4";
-  const std::string PEER_IPV6 = "peer.ipv6";
-  const std::string PEER_PORT = "peer.port";
-  const std::string PEER_SERVICE = "peer.service";
-  const std::string SPAN_KIND = "span.kind";
+  const std::string Component = "component";
+  const std::string DbInstance = "db.instance";
+  const std::string DbStatement = "db.statement";
+  const std::string DbUser = "db.user";
+  const std::string DbType = "db.type";
+  const std::string Error = "error";
+  const std::string HttpMethod = "http.method";
+  const std::string HttpStatusCode = "http.status_code";
+  const std::string HttpUrl = "http.url";
+  const std::string MessageBusDestination = "message_bus.destination";
+  const std::string PeerAddress = "peer.address";
+  const std::string PeerHostname = "peer.hostname";
+  const std::string PeerIpv4 = "peer.ipv4";
+  const std::string PeerIpv6 = "peer.ipv6";
+  const std::string PeerPort = "peer.port";
+  const std::string PeerService = "peer.service";
+  const std::string SpanKind = "span.kind";
 
   // Non-standard tag names.
-  const std::string DOWNSTREAM_CLUSTER = "downstream_cluster";
-  const std::string GRPC_STATUS_CODE = "grpc.status_code";
-  const std::string GUID_X_CLIENT_TRACE_ID = "guid:x-client-trace-id";
-  const std::string GUID_X_REQUEST_ID = "guid:x-request-id";
-  const std::string HTTP_PROTOCOL = "http.protocol";
-  const std::string NODE_ID = "node_id";
-  const std::string REQUEST_SIZE = "request_size";
-  const std::string RESPONSE_FLAGS = "response_flags";
-  const std::string RESPONSE_SIZE = "response_size";
-  const std::string STATUS = "status";
-  const std::string UPSTREAM_CLUSTER = "upstream_cluster";
-  const std::string USER_AGENT = "user_agent";
-  const std::string ZONE = "zone";
+  const std::string DownstreamCluster = "downstream_cluster";
+  const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GuidXClientTraceId = "guid:x-client-trace-id";
+  const std::string GuidXRequestId = "guid:x-request-id";
+  const std::string HttpProtocol = "http.protocol";
+  const std::string NodeId = "node_id";
+  const std::string RequestSize = "request_size";
+  const std::string ResponseFlags = "response_flags";
+  const std::string ResponseSize = "response_size";
+  const std::string Status = "status";
+  const std::string UpstreamCluster = "upstream_cluster";
+  const std::string UserAgent = "user_agent";
+  const std::string Zone = "zone";
 
   // Tag values.
-  const std::string CANCELED = "canceled";
-  const std::string PROXY = "proxy";
-  const std::string TRUE = "true";
+  const std::string Canceled = "canceled";
+  const std::string Proxy = "proxy";
+  const std::string True = "true";
 };
 
 typedef ConstSingleton<TracingTagValues> Tags;
+
+class TracingLogValues {
+public:
+  // OpenTracing standard key names.
+  const std::string EventKey = "event";
+
+  // Event names
+  const std::string LastDownstreamRxByteReceived = "last_downstream_rx_byte_received";
+  const std::string FirstUpstreamTxByteSent = "first_upstream_tx_byte_sent";
+  const std::string LastUpstreamTxByteSent = "last_upstream_tx_byte_sent";
+  const std::string FirstUpstreamRxByteReceived = "first_upstream_rx_byte_received";
+  const std::string LastUpstreamRxByteReceived = "last_upstream_rx_byte_received";
+  const std::string FirstDownstreamTxByteSent = "first_downstream_tx_byte_sent";
+  const std::string LastDownstreamTxByteSent = "last_downstream_tx_byte_sent";
+};
+
+typedef ConstSingleton<TracingLogValues> Logs;
 
 class HttpTracerUtility {
 public:
@@ -86,8 +103,8 @@ public:
   static void finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
                            const StreamInfo::StreamInfo& stream_info, const Config& tracing_config);
 
-  static const std::string INGRESS_OPERATION;
-  static const std::string EGRESS_OPERATION;
+  static const std::string IngressOperation;
+  static const std::string EgressOperation;
 };
 
 class EgressConfigImpl : public Config {
@@ -97,6 +114,7 @@ public:
   const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override {
     return request_headers_for_tags_;
   }
+  bool verbose() const override { return false; }
 
 private:
   const std::vector<Http::LowerCaseString> request_headers_for_tags_;
@@ -114,6 +132,7 @@ public:
   // Tracing::Span
   void setOperation(const std::string&) override {}
   void setTag(const std::string&, const std::string&) override {}
+  void log(SystemTime, const std::string&) override {}
   void finishSpan() override {}
   void injectContext(Http::HeaderMap&) override {}
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {

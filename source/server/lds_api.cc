@@ -20,24 +20,21 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        Runtime::RandomGenerator& random, Init::Manager& init_manager,
                        const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                        ListenerManager& lm, Api::Api& api)
-    : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm) {
+    : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
+      init_target_("LDS", [this]() { subscription_->start({}, *this); }) {
   subscription_ =
       Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Listener>(
           lds_config, local_info, dispatcher, cm, random, *scope_,
           "envoy.api.v2.ListenerDiscoveryService.FetchListeners",
           "envoy.api.v2.ListenerDiscoveryService.StreamListeners", api);
   Config::Utility::checkLocalInfo("lds", local_info);
-  init_manager.registerTarget(*this, "LDS");
-}
-
-void LdsApiImpl::initialize(std::function<void()> callback) {
-  initialize_callback_ = callback;
-  subscription_->start({}, *this);
+  init_manager.add(init_target_);
 }
 
 void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  std::vector<std::string> exception_msgs;
   std::unordered_set<std::string> listener_names;
   for (const auto& listener : resources) {
     if (!listener_names.insert(listener.name()).second) {
@@ -75,26 +72,22 @@ void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
         ENVOY_LOG(debug, "lds: add/update listener '{}' skipped", listener_name);
       }
     } catch (const EnvoyException& e) {
-      throw EnvoyException(
-          fmt::format("Error adding/updating listener {}: {}", listener_name, e.what()));
+      exception_msgs.push_back(fmt::format("{}: {}", listener_name, e.what()));
     }
   }
 
   version_info_ = version_info;
-  runInitializeCallbackIfAny();
+  init_target_.ready();
+  if (!exception_msgs.empty()) {
+    throw EnvoyException(fmt::format("Error adding/updating listener(s) {}",
+                                     StringUtil::join(exception_msgs, ", ")));
+  }
 }
 
 void LdsApiImpl::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
-  runInitializeCallbackIfAny();
-}
-
-void LdsApiImpl::runInitializeCallbackIfAny() {
-  if (initialize_callback_) {
-    initialize_callback_();
-    initialize_callback_ = nullptr;
-  }
+  init_target_.ready();
 }
 
 } // namespace Server

@@ -24,6 +24,54 @@ typename std::enable_if<std::is_signed<T>::value, T>::type leftShift(T left, uin
   return left << bit_number;
 }
 
+inline void addByte(Buffer::Instance& buffer, const uint8_t value) { buffer.add(&value, 1); }
+
+void addSeq(Buffer::Instance& buffer, const std::initializer_list<uint8_t>& values) {
+  for (const int8_t& value : values) {
+    buffer.add(&value, 1);
+  }
+}
+
+size_t doWriteString(Buffer::Instance& instance, absl::string_view str_view) {
+  const size_t length = str_view.length();
+  constexpr size_t str_max_length = 0xffff;
+  constexpr size_t two_octet_max_lenth = 1024;
+
+  if (length < 32) {
+    addByte(instance, static_cast<uint8_t>(length));
+    instance.add(str_view.data(), str_view.length());
+    return length + sizeof(uint8_t);
+  }
+
+  if (length < two_octet_max_lenth) {
+    uint8_t code = length >> 8; // 0x30 + length / 0x100 must less than 0x34
+    uint8_t remain = length & 0xff;
+    std::initializer_list<uint8_t> values{static_cast<uint8_t>(0x30 + code), remain};
+    addSeq(instance, values);
+    instance.add(str_view.data(), str_view.length());
+    return length + values.size();
+  }
+
+  if (length <= str_max_length) {
+    uint8_t code = length >> 8;
+    uint8_t remain = length & 0xff;
+    std::initializer_list<uint8_t> values{'S', code, remain};
+    addSeq(instance, values);
+    instance.add(str_view.data(), str_view.length());
+    return length + values.size();
+  }
+
+  std::initializer_list<uint8_t> values{0x52, 0xff, 0xff};
+  addSeq(instance, values);
+  instance.add(str_view.data(), str_max_length);
+  size_t size = str_max_length + values.size();
+  ASSERT(size == (str_max_length + values.size()));
+
+  size_t child_size =
+      doWriteString(instance, str_view.substr(str_max_length, length - str_max_length));
+  return child_size + size;
+}
+
 } // namespace
 
 /*
@@ -514,6 +562,16 @@ std::string HessianUtils::readByte(Buffer::Instance& buffer) {
   std::string result(peekByte(buffer, &size));
   buffer.drain(size);
   return result;
+}
+
+size_t HessianUtils::writeString(Buffer::Instance& buffer, absl::string_view str) {
+  return doWriteString(buffer, str);
+}
+
+size_t HessianUtils::writeInt(Buffer::Instance& buffer, uint8_t value) {
+  // Compact int
+  buffer.writeByte(0x90 + value);
+  return sizeof(uint8_t);
 }
 
 } // namespace DubboProxy

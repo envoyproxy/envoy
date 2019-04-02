@@ -21,6 +21,7 @@ import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 option (gogoproto.equal_all) = true;
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: HTTP route]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -116,7 +117,7 @@ message VirtualHost {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 12 [deprecated = true];
+  map<string, google.protobuf.Struct> per_filter_config = 12;
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -189,7 +190,7 @@ message Route {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
+  map<string, google.protobuf.Struct> per_filter_config = 8;
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
@@ -286,7 +287,7 @@ message WeightedCluster {
     // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
-    map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
+    map<string, google.protobuf.Struct> per_filter_config = 8;
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
@@ -330,7 +331,7 @@ message RouteMatch {
     // regex must match the *:path* header once the query string is removed. The entire path
     // (without the query string) must match the regex. The rule will not match if only a
     // subsequence of the *:path* header matches the regex. The regex grammar is defined `here
-    // <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+    // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
     //
     // Examples:
     //
@@ -824,7 +825,7 @@ message RetryPolicy {
   message RetryPriority {
     string name = 1 [(validate.rules).string.min_bytes = 1];
     oneof config_type {
-      google.protobuf.Struct config = 2 [deprecated = true];
+      google.protobuf.Struct config = 2;
 
       google.protobuf.Any typed_config = 3;
     }
@@ -838,7 +839,7 @@ message RetryPolicy {
   message RetryHostPredicate {
     string name = 1 [(validate.rules).string.min_bytes = 1];
     oneof config_type {
-      google.protobuf.Struct config = 2 [deprecated = true];
+      google.protobuf.Struct config = 2;
 
       google.protobuf.Any typed_config = 3;
     }
@@ -983,7 +984,7 @@ message Decorator {
 message VirtualCluster {
   // Specifies a regex pattern to use for matching requests. The entire path of the request
   // must match the regex. The regex grammar used is defined `here
-  // <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+  // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
   //
   // Examples:
   //
@@ -1179,7 +1180,7 @@ message HeaderMatcher {
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
     // request header value matches the regex. The regex grammar used in the value field is defined
-    // `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+    // `here <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
     //
     // Examples:
     //
@@ -1201,7 +1202,7 @@ message HeaderMatcher {
     //   "-1somestring"
     envoy.type.Int64Range range_match = 6;
 
-    // If specified, header match will be be performed based on whether the header is in the
+    // If specified, header match will be performed based on whether the header is in the
     // request.
     bool present_match = 7;
 

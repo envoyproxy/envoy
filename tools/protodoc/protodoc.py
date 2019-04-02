@@ -1,7 +1,7 @@
 # protoc plugin to map from FileDescriptorProtos to Envoy doc style RST.
 # See https://github.com/google/protobuf/blob/master/src/google/protobuf/descriptor.proto
 # for the underlying protos mentioned in this file. See
-# http://www.sphinx-doc.org/en/stable/rest.html for Sphinx RST syntax.
+# https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html for Sphinx RST syntax.
 
 from collections import defaultdict
 import cProfile
@@ -9,8 +9,8 @@ import functools
 import os
 import pstats
 import StringIO
-import sys
 import re
+import sys
 
 from google.protobuf.compiler import plugin_pb2
 from validate import validate_pb2
@@ -68,9 +68,8 @@ INHERITED_ANNOTATIONS = set([
 ])
 
 # Template for data plane API URLs.
-# TODO(htuch): Add the ability to build a permalink by feeding a hash
-# to the tool or inferring from local tree (only really make sense in CI).
-DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/master/api/%s#L%d'
+DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d'.format(
+    os.environ['ENVOY_BLOB_SHA'])
 
 
 class ProtodocError(Exception):

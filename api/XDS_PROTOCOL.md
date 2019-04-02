@@ -151,7 +151,9 @@ For EDS/RDS, the management server does not need to supply every requested
 resource and may also supply additional, unrequested resources. `resource_names`
 is only a hint. Envoy will silently ignore any superfluous resources. When a
 requested resource is missing in a RDS or EDS update, Envoy will retain the last
-known value for this resource. The management server may be able to infer all
+known value for this resource except in the case where the `Cluster` or `Listener`
+is being warmed. See [Resource warming](#resource-warming) section below on the expectations
+during warming. The management server may be able to infer all
 the required EDS/RDS resources from the `node` identification in the
 `DiscoveryRequest`, in which case this hint may be discarded. An empty EDS/RDS
 `DiscoveryResponse` is effectively a nop from the perspective of the respective
@@ -208,6 +210,20 @@ multiple `DiscoveryRequests` at a version until a new version is ready.
 
 An implication of the above resource update sequencing is that Envoy does not
 expect a `DiscoveryResponse` for every `DiscoveryRequest` it issues.
+
+### Resource warming
+
+[`Clusters`](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/cluster_manager.html#cluster-warming)
+and [`Listeners`](https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/lds#config-listeners-lds)
+go through  `warming` before they can serve requests. This process happens both during
+[`Envoy initialization`](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/init.html#initialization)
+and when the `Cluster` or `Listener` is updated. Warming of `Cluster` is completed only when a
+`ClusterLoadAssignment` response is supplied by management server. Similarly, warming of `Listener`
+is completed only when a `RouteConfiguration` is supplied by management server if the listener
+refers to an RDS configuration. Management server is expected to provide the EDS/RDS updates during
+warming. If management server does not provide EDS/RDS responses, Envoy will not initialize
+itself during the initialization phase and the updates sent via CDS/LDS will not take effect until
+EDS/RDS responses are supplied.
 
 #### Eventual consistency considerations
 
@@ -281,6 +297,11 @@ static_resources:
         port_value: <ADS management server port>
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
+    upstream_connection_options:
+      # configure a TCP keep-alive to detect and reconnect to the admin
+      # server in the event of a TCP socket disconnection
+      tcp_keepalive:
+        ...
 admin:
   ...
 
@@ -288,35 +309,33 @@ admin:
 
 ### Incremental xDS
 
-Incremental xDS is a separate xDS endpoint available for ADS, CDS and RDS that
-allows:
+Incremental xDS is a separate xDS endpoint that:
 
-  * Incremental updates of the list of tracked resources by the xDS client.
-    This supports Envoy on-demand / lazily requesting additional resources. For
-    example, this may occur when a request corresponding to an unknown cluster
-    arrives.
-  * The xDS server can incrementally update the resources on the client.
-    This supports the goal of scalability of xDS resources. Rather than deliver
-    all 100k clusters when a single cluster is modified, the management server
-    only needs to deliver the single cluster that changed.
+  * Allows the protocol to communicate on the wire in terms of resource/resource
+    name deltas ("Delta xDS"). This supports the goal of scalability of xDS
+    resources. Rather than deliver all 100k clusters when a single cluster is
+    modified, the management server only needs to deliver the single cluster
+    that changed.
+  * Allows the Envoy to on-demand / lazily request additional resources. For
+    example, requesting a cluster only when a request for that cluster arrives.
 
-An xDS incremental session is always in the context of a gRPC bidirectional
+An Incremental xDS session is always in the context of a gRPC bidirectional
 stream. This allows the xDS server to keep track of the state of xDS clients
-connected to it. There is no REST version of Incremental xDS.
+connected to it. There is no REST version of Incremental xDS yet.
 
-In incremental xDS the nonce field is required and used to pair a
-[`IncrementalDiscoveryResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
-to a [`IncrementalDiscoveryRequest`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
+In the delta xDS wire protocol, the nonce field is required and used to pair a
+[`DeltaDiscoveryResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#deltadiscoveryresponse)
+to a [`DeltaDiscoveryRequest`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#deltadiscoveryrequest)
 ACK or NACK.
 Optionally, a response message level system_version_info is present for
 debugging purposes only.
 
-`IncrementalDiscoveryRequest` can be sent in 3 situations:
+`DeltaDiscoveryRequest` can be sent in 3 situations:
   1. Initial message in a xDS bidirectional gRPC stream.
-  2. As an ACK or NACK response to a previous `IncrementalDiscoveryResponse`.
+  2. As an ACK or NACK response to a previous `DeltaDiscoveryResponse`.
      In this case the `response_nonce` is set to the nonce value in the Response.
      ACK or NACK is determined by the absence or presence of `error_detail`.
-  3. Spontaneous `IncrementalDiscoveryRequest` from the client.
+  3. Spontaneous `DeltaDiscoveryRequest` from the client.
      This can be done to dynamically add or remove elements from the tracked
      `resource_names` set. In this case `response_nonce` must be omitted.
 
@@ -326,10 +345,28 @@ client spontaneously requests the "wc" resource.
 
 ![Incremental session example](diagrams/incremental.svg)
 
-On reconnect the xDS Incremental client may tell the server of its known resources
-to avoid resending them over the network.
+On reconnect the Incremental xDS client may tell the server of its known
+resources to avoid resending them over the network.
 
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
+
+#### Resource names
+Resources are identified by a resource name or an alias. Aliases of a resource, if present, can be
+identified by the alias field in the resource of a `DeltaDiscoveryResponse`. The resource name will
+be returned in the name field in the resource of a `DeltaDiscoveryResponse`.
+
+#### Subscribing to Resources
+Envoy can send either an alias or the name of a resource in the `resource_names_subscribe` field of
+a `DeltaDiscoveryRequest` in order to subscribe to a resource. Envoy should check both the names and
+aliases of resources in order to determine whether the entity in question has been subscribed to.
+
+#### Unsubscribing from Resources
+Envoy will keep track of a per resource reference count internally. This count will keep track of the
+total number of aliases/resource names that are currently subscribed to. When the reference count
+reaches zero, Envoy will send a `DeltaDiscoveryRequest` containing the resource name of the resource
+to unsubscribe from in the `resource_names_unsubscribe` field. When Envoy unsubscribes from a resource,
+it should check for both the resource name and all aliases and appropriately update all resources
+that reference either.
 
 ## REST-JSON polling subscriptions
 

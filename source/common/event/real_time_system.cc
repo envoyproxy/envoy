@@ -3,10 +3,7 @@
 #include <chrono>
 
 #include "common/common/assert.h"
-#include "common/event/event_impl_base.h"
 #include "common/event/timer_impl.h"
-
-#include "event2/event.h"
 
 namespace Envoy {
 namespace Event {
@@ -14,19 +11,17 @@ namespace {
 
 class RealScheduler : public Scheduler {
 public:
-  RealScheduler(Libevent::BasePtr& libevent) : libevent_(libevent) {}
-  TimerPtr createTimer(const TimerCb& cb) override {
-    return std::make_unique<TimerImpl>(libevent_, cb);
-  };
+  RealScheduler(Scheduler& base_scheduler) : base_scheduler_(base_scheduler) {}
+  TimerPtr createTimer(const TimerCb& cb) override { return base_scheduler_.createTimer(cb); };
 
 private:
-  Libevent::BasePtr& libevent_;
+  Scheduler& base_scheduler_;
 };
 
 } // namespace
 
-SchedulerPtr RealTimeSystem::createScheduler(Libevent::BasePtr& libevent) {
-  return std::make_unique<RealScheduler>(libevent);
+SchedulerPtr RealTimeSystem::createScheduler(Scheduler& base_scheduler) {
+  return std::make_unique<RealScheduler>(base_scheduler);
 }
 
 } // namespace Event

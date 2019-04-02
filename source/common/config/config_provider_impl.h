@@ -4,7 +4,7 @@
 
 #include "envoy/config/config_provider.h"
 #include "envoy/config/config_provider_manager.h"
-#include "envoy/init/init.h"
+#include "envoy/init/manager.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/config_tracker.h"
 #include "envoy/singleton/instance.h"
@@ -13,6 +13,7 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
+#include "common/init/target_impl.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -133,21 +134,14 @@ class MutableConfigProviderImplBase;
  * This class can not be instantiated directly; instead, it provides the foundation for
  * config subscription implementations which derive from it.
  */
-class ConfigSubscriptionInstanceBase : public Init::Target,
-                                       protected Logger::Loggable<Logger::Id::config> {
+class ConfigSubscriptionInstanceBase : protected Logger::Loggable<Logger::Id::config> {
 public:
   struct LastConfigInfo {
     uint64_t last_config_hash_;
     std::string last_config_version_;
   };
 
-  ~ConfigSubscriptionInstanceBase() override;
-
-  // Init::Target
-  void initialize(std::function<void()> callback) override {
-    initialize_callback_ = callback;
-    start();
-  }
+  virtual ~ConfigSubscriptionInstanceBase();
 
   /**
    * Starts the subscription corresponding to a config source.
@@ -166,14 +160,14 @@ public:
    */
   void onConfigUpdate() {
     setLastUpdated();
-    runInitializeCallbackIfAny();
+    init_target_.ready();
   }
 
   /**
    * Must be called by derived classes when the onConfigUpdateFailed() callback associated with the
    * underlying subscription is issued.
    */
-  void onConfigUpdateFailed() { runInitializeCallbackIfAny(); }
+  void onConfigUpdateFailed() { init_target_.ready(); }
 
   /**
    * Determines whether a configuration proto is a new update, and if so, propagates it to all
@@ -200,21 +194,16 @@ protected:
                                  ConfigProviderManagerImplBase& config_provider_manager,
                                  TimeSource& time_source, const SystemTime& last_updated,
                                  const LocalInfo::LocalInfo& local_info)
-      : name_(name), manager_identifier_(manager_identifier),
-        config_provider_manager_(config_provider_manager), time_source_(time_source),
-        last_updated_(last_updated) {
+      : name_(name), init_target_(fmt::format("ConfigSubscriptionInstanceBase {}", name_),
+                                  [this]() { start(); }),
+        manager_identifier_(manager_identifier), config_provider_manager_(config_provider_manager),
+        time_source_(time_source), last_updated_(last_updated) {
     Envoy::Config::Utility::checkLocalInfo(name, local_info);
   }
 
   void setLastUpdated() { last_updated_ = time_source_.systemTime(); }
 
-  void runInitializeCallbackIfAny();
-
 private:
-  void registerInitTarget(Init::Manager& init_manager) {
-    init_manager.registerTarget(*this, fmt::format("ConfigSubscriptionInstanceBase {}", name_));
-  }
-
   void bindConfigProvider(MutableConfigProviderImplBase* provider);
 
   void unbindConfigProvider(MutableConfigProviderImplBase* provider) {
@@ -222,7 +211,7 @@ private:
   }
 
   const std::string name_;
-  std::function<void()> initialize_callback_;
+  Init::TargetImpl init_target_;
   std::unordered_set<MutableConfigProviderImplBase*> mutable_config_providers_;
   const uint64_t manager_identifier_;
   ConfigProviderManagerImplBase& config_provider_manager_;
@@ -387,8 +376,7 @@ protected:
       // around it. However, since this is not a performance critical path we err on the side
       // of simplicity.
       subscription = subscription_factory_fn(manager_identifier, *this);
-
-      subscription->registerInitTarget(init_manager);
+      init_manager.add(subscription->init_target_);
 
       bindSubscription(manager_identifier, subscription);
     } else {

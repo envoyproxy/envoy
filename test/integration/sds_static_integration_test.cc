@@ -14,7 +14,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
-#include "test/mocks/init/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -38,7 +37,7 @@ class SdsStaticDownstreamIntegrationTest
       public HttpIntegrationTest {
 public:
   SdsStaticDownstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -110,7 +109,7 @@ class SdsStaticUpstreamIntegrationTest : public testing::TestWithParam<Network::
                                          public HttpIntegrationTest {
 public:
   SdsStaticUpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {

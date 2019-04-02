@@ -30,6 +30,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Upstream {
 namespace Outlier {
+namespace {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
   NiceMock<MockClusterMockPrioritySet> cluster;
@@ -1084,6 +1085,7 @@ TEST(OutlierUtility, SRThreshold) {
   EXPECT_EQ(52.0, success_rate_nums.ejection_threshold_);   // ejection threshold
 }
 
+} // namespace
 } // namespace Outlier
 } // namespace Upstream
 } // namespace Envoy

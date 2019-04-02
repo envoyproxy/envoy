@@ -7,7 +7,7 @@ set -e
 build_setup_args=""
 if [[ "$1" == "fix_format" || "$1" == "check_format" || "$1" == "check_repositories" || \
         "$1" == "check_spelling" || "$1" == "fix_spelling" || "$1" == "bazel.clang_tidy" || \
-        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" ]]; then
+        "$1" == "check_spelling_pedantic" || "$1" == "fix_spelling_pedantic" || "$1" == "bazel.compile_time_options" ]]; then
   build_setup_args="-nofetch"
 fi
 
@@ -69,14 +69,6 @@ function bazel_debug_binary_build() {
 }
 
 if [[ "$1" == "bazel.release" ]]; then
-  # The release build step still runs during tag events. Avoid rebuilding for no reason.
-  # TODO(mattklein123): Consider moving this into its own "build".
-  if [[ -n "$CIRCLE_TAG" ]]
-  then
-    echo 'Ignoring build for git tag event'
-    exit 0
-  fi
-
   setup_gcc_toolchain
   echo "bazel release build with tests..."
   bazel_release_binary_build
@@ -186,7 +178,6 @@ elif [[ "$1" == "bazel.compile_time_options" ]]; then
     --define google_grpc=disabled \
     --define boringssl=fips \
     --define log_debug_assert_in_release=enabled \
-    --define tcmalloc=debug \
     --define quiche=enabled \
   "
   setup_clang_toolchain

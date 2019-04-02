@@ -6,8 +6,8 @@ namespace Ssl {
 MockContextManager::MockContextManager() {}
 MockContextManager::~MockContextManager() {}
 
-MockConnection::MockConnection() {}
-MockConnection::~MockConnection() {}
+MockConnectionInfo::MockConnectionInfo() {}
+MockConnectionInfo::~MockConnectionInfo() {}
 
 MockClientContext::MockClientContext() {}
 MockClientContext::~MockClientContext() {}

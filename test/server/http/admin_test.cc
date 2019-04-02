@@ -50,7 +50,7 @@ namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest() : alloc_(options_) {
+  AdminStatsTest() : alloc_(options_, symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, alloc_);
     store_->addSink(sink_);
   }
@@ -63,6 +63,7 @@ public:
                                   true /*pretty_print*/);
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::StatsOptionsImpl options_;
@@ -635,7 +636,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(AdminInstanceTest, AdminProfiler) {
+TEST_P(AdminInstanceTest, AdminCpuProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
 
@@ -652,6 +653,41 @@ TEST_P(AdminInstanceTest, AdminProfiler) {
 
   EXPECT_EQ(Http::Code::OK, postCallback("/cpuprofiler?enable=n", header_map, data));
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
+}
+
+TEST_P(AdminInstanceTest, AdminHeapProfilerOnRepeatedRequest) {
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+  auto repeatResultCode = Http::Code::BadRequest;
+#ifndef PROFILER_AVAILABLE
+  repeatResultCode = Http::Code::NotImplemented;
+#endif
+
+  postCallback("/heapprofiler?enable=y", header_map, data);
+  EXPECT_EQ(repeatResultCode, postCallback("/heapprofiler?enable=y", header_map, data));
+
+  postCallback("/heapprofiler?enable=n", header_map, data);
+  EXPECT_EQ(repeatResultCode, postCallback("/heapprofiler?enable=n", header_map, data));
+}
+
+TEST_P(AdminInstanceTest, AdminHeapProfiler) {
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+
+  // The below flow need to begin with the profiler not running
+  Profiler::Heap::stopProfiler();
+
+#ifdef PROFILER_AVAILABLE
+  EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_TRUE(Profiler::Heap::isProfilerStarted());
+  EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=n", header_map, data));
+#else
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_FALSE(Profiler::Heap::isProfilerStarted());
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=n", header_map, data));
+#endif
+
+  EXPECT_FALSE(Profiler::Heap::isProfilerStarted());
 }
 
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
@@ -898,12 +934,11 @@ TEST_P(AdminInstanceTest, Runtime) {
   Runtime::MockLoader loader;
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
-  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
-      {"string_key", {"override", {}, {}, {}}}, {"extra_key", {"bar", {}, {}, {}}}};
-  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
-      {"string_key", {"foo", {}, {}, {}}},
-      {"int_key", {"1", 1, {}, {}}},
-      {"other_key", {"bar", {}, {}, {}}}};
+  Runtime::Snapshot::EntryMap entries2{{"string_key", {"override", {}, {}, {}}},
+                                       {"extra_key", {"bar", {}, {}, {}}}};
+  Runtime::Snapshot::EntryMap entries1{{"string_key", {"foo", {}, {}, {}}},
+                                       {"int_key", {"1", 1, {}, {}}},
+                                       {"other_key", {"bar", {}, {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
@@ -1175,7 +1210,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     Http::HeaderMapImpl response_headers;
     std::string body;
 
-    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::NotInitialized));
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
     envoy::admin::v2alpha::ServerInfo server_info_proto;
     EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
@@ -1245,6 +1280,8 @@ private:
 
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
+  PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
+
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     std::string tname = std::string(name);
     counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
@@ -1259,6 +1296,7 @@ protected:
     histograms_.push_back(histogram);
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   Stats::StatsOptionsImpl stats_options_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;

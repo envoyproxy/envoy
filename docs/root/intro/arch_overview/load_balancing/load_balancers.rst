@@ -34,7 +34,7 @@ weight greater than 1.
 * *all weights 1*: An O(1) algorithm which selects N random available hosts as specified in the
   :ref:`configuration <envoy_api_msg_Cluster.LeastRequestLbConfig>` (2 by default) and picks the
   host which has the fewest active requests (`Research
-  <http://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
+  <https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
   approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
   choices). The P2C load balancer has the property that a host with the highest number of active
   requests in the cluster will never receive new requests. It will be allowed to drain until it is
@@ -92,6 +92,17 @@ in replacement for the :ref:`ring hash load balancer <arch_overview_load_balanci
 any place in which consistent hashing is desired. Like the ring hash load balancer, a consistent
 hashing load balancer is only effective when protocol routing is used that specifies a value to
 hash on.
+
+The table construction algorithm places each host in the table some number of times proportional
+to its weight, until the table is completely filled. For example, if host A has a weight of 1 and
+host B has a host of 2, then host A will have 21,846 entries and host B will have 43,691 entries
+(totaling 65,537 entries). The algorithm attempts to place each host in the table at least once,
+regardless of the configured host and locality weights, so in some extreme cases the actual
+proportions may differ from the configured weights. For example, if the total number of hosts is
+larger than the fixed table size, then some hosts will get 1 entry each and the rest will get 0,
+regardless of weight. Best practice is to monitor the :ref:`min_entries_per_host and
+max_entries_per_host gauges<config_cluster_manager_cluster_stats_maglev_lb>` to ensure no hosts
+are underrepresented or missing.
 
 In general, when compared to the ring hash ("ketama") algorithm, Maglev has substantially faster
 table lookup build times as well as host selection times (approximately 10x and 5x respectively

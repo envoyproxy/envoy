@@ -31,7 +31,7 @@ public:
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
-  void putResult(Result) override {}
+  void putResult(Result, absl::optional<uint64_t>) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
@@ -151,7 +151,7 @@ public:
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
-  void putResult(Result result) override;
+  void putResult(Result result, absl::optional<uint64_t> code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override {
@@ -198,9 +198,10 @@ private:
   absl::flat_hash_map<envoy::data::cluster::v2alpha::OutlierEjectionType,
                       std::unique_ptr<SuccessRateMonitor>>
       success_rate_monitors_;
-  void putResultNoLocalExternalSplit(Result result);
-  void putResultWithLocalExternalSplit(Result result);
-  std::function<void(DetectorHostMonitorImpl*, Result)> put_result_func_;
+  void putResultNoLocalExternalSplit(Result result, absl::optional<uint64_t> code);
+  void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);
+  std::function<void(DetectorHostMonitorImpl*, Result, absl::optional<uint64_t> code)>
+      put_result_func_;
 };
 
 /**

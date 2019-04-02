@@ -5,7 +5,6 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
 
@@ -18,7 +17,7 @@ namespace Envoy {
 namespace Memory {
 namespace {
 
-class HeapShrinkerTest : public TestBase {
+class HeapShrinkerTest : public testing::Test {
 protected:
   HeapShrinkerTest()
       : api_(Api::createApiForTest(stats_, time_system_)), dispatcher_(*api_, time_system_) {}

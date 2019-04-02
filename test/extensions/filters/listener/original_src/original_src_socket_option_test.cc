@@ -102,6 +102,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestOptionDetailsNotSupported) {
 
   EXPECT_FALSE(details.has_value());
 }
+
 } // namespace
 } // namespace OriginalSrc
 } // namespace ListenerFilters

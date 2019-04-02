@@ -19,7 +19,7 @@
 
 namespace Envoy {
 /**
- * Utility class for formatting dates given a strftime style format string.
+ * Utility class for formatting dates given an absl::FormatTime style format string.
  */
 class DateFormatter {
 public:
@@ -68,8 +68,9 @@ private:
     const size_t width_;
 
     // The string before the current specifier's position and after the previous found specifier. A
-    // segment may include strftime accepted specifiers. E.g. given "%3f-this-i%s-a-segment-%4f",
-    // the current specifier is "%4f" and the segment is "-this-i%s-a-segment-".
+    // segment may include absl::FormatTime accepted specifiers. E.g. given
+    // "%3f-this-i%s-a-segment-%4f", the current specifier is "%4f" and the segment is
+    // "-this-i%s-a-segment-".
     const std::string segment_;
 
     // As an indication that this specifier is a %s (expect to be replaced by seconds since the

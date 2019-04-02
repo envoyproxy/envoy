@@ -17,10 +17,10 @@ namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-                           Api::Api& api)
-    : time_source_(api.timeSource()), miss_timeout_(config.wdMissTimeout()),
-      megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
-      multi_kill_timeout_(config.wdMultiKillTimeout()),
+                           Api::Api& api, std::unique_ptr<TestInterlockHook>&& test_interlock)
+    : test_interlock_hook_(std::move(test_interlock)), time_source_(api.timeSource()),
+      miss_timeout_(config.wdMissTimeout()), megamiss_timeout_(config.wdMegaMissTimeout()),
+      kill_timeout_(config.wdKillTimeout()), multi_kill_timeout_(config.wdMultiKillTimeout()),
       loop_interval_([&]() -> std::chrono::milliseconds {
         // The loop interval is simply the minimum of all specified intervals,
         // but we must account for the 0=disabled case. This lambda takes care
@@ -32,15 +32,28 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
       }()),
       watchdog_miss_counter_(stats_scope.counter("server.watchdog_miss")),
       watchdog_megamiss_counter_(stats_scope.counter("server.watchdog_mega_miss")),
-      run_thread_(true) {
+      dispatcher_(api.allocateDispatcher()),
+      loop_timer_(dispatcher_->createTimer([this]() { step(); })), run_thread_(true) {
   start(api);
 }
 
+GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
+                           Api::Api& api)
+    : GuardDogImpl(stats_scope, config, api, std::make_unique<TestInterlockHook>()) {}
+
 GuardDogImpl::~GuardDogImpl() { stop(); }
 
-void GuardDogImpl::threadRoutine() {
-  do {
-    const auto now = time_source_.monotonicTime();
+void GuardDogImpl::step() {
+  {
+    Thread::LockGuard guard(mutex_);
+    if (!run_thread_) {
+      return;
+    }
+  }
+
+  const auto now = time_source_.monotonicTime();
+
+  {
     bool seen_one_multi_timeout(false);
     Thread::LockGuard guard(wd_lock_);
     for (auto& watched_dog : watched_dogs_) {
@@ -79,7 +92,15 @@ void GuardDogImpl::threadRoutine() {
         }
       }
     }
-  } while (waitOrDetectStop());
+  }
+
+  {
+    Thread::LockGuard guard(mutex_);
+    test_interlock_hook_->signalFromImpl(now);
+    if (run_thread_) {
+      loop_timer_->enableTimer(loop_interval_);
+    }
+  }
 }
 
 WatchDogSharedPtr GuardDogImpl::createWatchDog(Thread::ThreadIdPtr&& thread_id) {
@@ -111,41 +132,19 @@ void GuardDogImpl::stopWatching(WatchDogSharedPtr wd) {
   }
 }
 
-bool GuardDogImpl::waitOrDetectStop() {
-  force_checked_event_.notifyAll();
-  Thread::LockGuard guard(exit_lock_);
-  // Spurious wakeups are OK without explicit handling. We'll just check
-  // earlier than strictly required for that round.
-
-  // Preferably, we should be calling
-  //   time_system_.waitFor(exit_lock_, exit_event_, loop_interval_);
-  // here, but that makes GuardDogMissTest.* very flaky. The reason that
-  // directly calling condvar waitFor works is that it doesn't advance
-  // simulated time, which the test is carefully controlling.
-  //
-  // One alternative approach that would be easier to test is to use a private
-  // dispatcher and a TimerCB to execute the loop body of threadRoutine(). In
-  // this manner, the same dynamics would occur in production, with added
-  // overhead from libevent, But then the unit-test would purely control the
-  // advancement of time, and thus be more robust. Another variation would be
-  // to run this watchdog on the main-thread dispatcher, though such an approach
-  // could not detect when the main-thread was stuck.
-  exit_event_.waitFor(exit_lock_, loop_interval_); // NO_CHECK_FORMAT(real_time)
-
-  return run_thread_;
-}
-
 void GuardDogImpl::start(Api::Api& api) {
-  run_thread_ = true;
-  thread_ = api.threadFactory().createThread([this]() -> void { threadRoutine(); });
+  Thread::LockGuard guard(mutex_);
+  thread_ = api.threadFactory().createThread(
+      [this]() -> void { dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit); });
+  loop_timer_->enableTimer(std::chrono::milliseconds(0));
 }
 
 void GuardDogImpl::stop() {
   {
-    Thread::LockGuard guard(exit_lock_);
+    Thread::LockGuard guard(mutex_);
     run_thread_ = false;
-    exit_event_.notifyAll();
   }
+  dispatcher_->exit();
   if (thread_) {
     thread_->join();
     thread_.reset();

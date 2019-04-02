@@ -26,6 +26,7 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 class EdsTest : public testing::Test {
 protected:
@@ -678,6 +679,12 @@ TEST_F(EdsTest, EndpointMoved) {
   cluster_load_assignment->clear_endpoints();
   add_endpoint(81, 0);
   add_endpoint(80, 1);
+
+  // Verify that no hosts gets added or removed to/from the PrioritySet.
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_TRUE(added.empty());
+    EXPECT_TRUE(removed.empty());
+  });
 
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
 
@@ -1467,5 +1474,6 @@ TEST_F(EdsTest, MalformedIP) {
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -68,6 +68,10 @@ for how to update or override dependencies.
     Alternatively, you can pass `--action_env` on the command line when running
     `bazel build`/`bazel test`.
 
+    Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
+    version of `ar` on the PATH, so if you run into issues building third party code like luajit
+    consider uninstalling binutils.
+
 1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
@@ -264,7 +268,7 @@ Use `RUN_REMOTE=yes` when you don't want to run against your local docker instan
 will need to override a few environment variables to set up the remote docker. The list of variables
 can be found in the [Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
 
-Use `LOCAL_MOUNT=yes` when you are not building with the envoy build container. This will ensure
+Use `LOCAL_MOUNT=yes` when you are not building with the Envoy build container. This will ensure
 that the libraries against which the tests dynamically link will be available and of the correct
 version.
 
@@ -327,6 +331,12 @@ Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wi
 bazel test -c dbg --config=clang-tsan //test/...
 ```
 
+To run the sanitizers on OS X, prefix `macos-` to the config option, e.g.:
+
+```
+bazel test -c dbg --config=macos-asan //test/...
+```
+
 ## Log Verbosity
 
 Log verbosity is controlled at runtime in all builds.
@@ -355,7 +365,7 @@ The following optional features can be enabled on the Bazel build command-line:
   `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
-  `--define tcmalloc=debug`.
+  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
 
 ## Disabling extensions
 
@@ -525,7 +535,7 @@ to run clang-format scripts on your workstation directly:
  * Type-ahead doesn't always work when waiting running a command through docker
 To run the tools directly, you must install the correct version of clang. This
 may change over time but as of January 2019,
-[clang+llvm-7.0.0](http://releases.llvm.org/download.html) works well. You must
+[clang+llvm-7.0.0](https://releases.llvm.org/download.html) works well. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:
@@ -548,28 +558,6 @@ Once this is set up, you can run clang-tidy without docker:
 
 Setting up an HTTP cache for Bazel output helps optimize Bazel performance and resource usage when
 using multiple compilation modes or multiple trees.
-
-## Setup common `envoy_deps`
-
-This step sets up the common `envoy_deps` allowing HTTP or disk cache (described below) to work
-across working trees in different paths. Also it allows new working trees to skip dependency
-compilation. The drawback is that the cached dependencies won't be updated automatically, so make
-sure all your working trees have same (or compatible) dependencies, and run this step periodically
-to update them.
-
-Make sure you don't have `--override_repository` in your `.bazelrc` when you run this step.
-
-```
-bazel fetch //test/...
-cp -LR $(bazel info output_base)/external/envoy_deps ${HOME}/envoy_deps_cache
-```
-
-Adding the following parameter to Bazel everytime or persist them in `.bazelrc`, note you will need to expand
-the environment variables for `.bazelrc`.
-
-```
---override_repository=envoy_deps=${HOME}/envoy_deps_cache
-```
 
 ## Setup local cache
 

@@ -13,6 +13,7 @@
 
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats_options.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
 #include "common/common/block_memory_hash_set.h"
@@ -97,8 +98,9 @@ using RawStatDataSet = BlockMemoryHashSet<Stats::RawStatData>;
 class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
   RawStatDataAllocator(Thread::BasicLockable& mutex, RawStatDataSet& stats_set,
-                       const StatsOptions& options)
-      : mutex_(mutex), stats_set_(stats_set), options_(options) {}
+                       const StatsOptions& options, SymbolTable& symbol_table)
+      : StatDataAllocatorImpl(symbol_table), mutex_(mutex), stats_set_(stats_set),
+        options_(options) {}
 
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return true; }

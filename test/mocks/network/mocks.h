@@ -366,12 +366,13 @@ public:
 
   MOCK_METHOD1(setTransportSocketCallbacks, void(TransportSocketCallbacks& callbacks));
   MOCK_CONST_METHOD0(protocol, std::string());
+  MOCK_CONST_METHOD0(failureReason, absl::string_view());
   MOCK_METHOD0(canFlushClose, bool());
   MOCK_METHOD1(closeSocket, void(Network::ConnectionEvent event));
   MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
   MOCK_METHOD0(onConnected, void());
-  MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
 
   TransportSocketCallbacks* callbacks_{};
 };

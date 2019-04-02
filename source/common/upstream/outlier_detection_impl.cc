@@ -127,14 +127,16 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
 
 // Method is called by putResult when external and local origin errors
 // are not treated differently. All errors are mapped to HTTP codes.
-void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result) {
-  putHttpResponseCode(enumToInt(resultToHttpCode(result)));
+void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
+                                                            absl::optional<uint64_t> code) {
+  putHttpResponseCode(code ? code.value() : enumToInt(resultToHttpCode(result)));
 }
 
 // Method is called by putResult when external and local origin errors
 // are treated separately. Local origin errors have separate counters and
 // separate success rate monitor.
-void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result) {
+void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
+                                                              absl::optional<uint64_t>) {
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
@@ -164,7 +166,9 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result) {
 // It calls putResultWithLocalExternalSplit or put putResultNoLocalExternalSplit via
 // std::function. The setting happens in constructor based on split_external_local_origin_errors
 // config parameter.
-void DetectorHostMonitorImpl::putResult(Result result) { put_result_func_(this, result); }
+void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> code) {
+  put_result_func_(this, result, code);
+}
 
 void DetectorHostMonitorImpl::localOriginFailure() {
   std::shared_ptr<DetectorImpl> detector = detector_.lock();
