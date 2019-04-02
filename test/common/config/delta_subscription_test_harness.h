@@ -22,8 +22,6 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-typedef DeltaSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> DeltaEdsSubscriptionImpl;
-
 class DeltaSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   DeltaSubscriptionTestHarness() : DeltaSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
@@ -34,7 +32,7 @@ public:
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    subscription_ = std::make_unique<DeltaEdsSubscriptionImpl>(
+    subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *method_descriptor_, random_, stats_store_, rate_limit_settings_, stats_,
         init_fetch_timeout);
@@ -139,13 +137,13 @@ public:
   Runtime::MockRandomGenerator random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Grpc::MockAsyncStream async_stream_;
-  std::unique_ptr<DeltaEdsSubscriptionImpl> subscription_;
+  std::unique_ptr<DeltaSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::vector<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
   envoy::api::v2::core::Node node_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
 };
 
 } // namespace

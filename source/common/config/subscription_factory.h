@@ -80,14 +80,14 @@ public:
         break;
       case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
         Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);
-        result.reset(new DeltaSubscriptionImpl(
-            cm.grpcDeltaXdsContext(), type_url, local_info,
-            Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
-                                                           api_config_source, scope)
-                ->create(),
-            dispatcher, *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
-            random, scope, Utility::parseRateLimitSettings(api_config_source), stats,
-            Utility::configSourceInitialFetchTimeout(config)));
+
+        //            Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
+        //            api_config_source, scope)->create(),
+        //          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
+        //        random, scope, Utility::parseRateLimitSettings(api_config_source),
+        std::cerr << "YUP making a delta sub" << std::endl;
+        result.reset(new DeltaSubscriptionImpl(cm.adsMux(), type_url, stats));
+        std::cerr << "YUP MADE a delta sub" << std::endl;
         break;
       }
       default:

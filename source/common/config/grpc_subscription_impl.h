@@ -20,8 +20,9 @@ public:
                        SubscriptionStats stats, Stats::Scope& scope,
                        const RateLimitSettings& rate_limit_settings,
                        std::chrono::milliseconds init_fetch_timeout)
-      : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope,
-                  rate_limit_settings),
+      : grpc_mux_(std::make_shared<Config::GrpcMuxImpl>(local_info, std::move(async_client),
+                                                        dispatcher, service_method, random, scope,
+                                                        rate_limit_settings)),
         grpc_mux_subscription_(grpc_mux_, stats, type_url, dispatcher, init_fetch_timeout) {}
 
   // Config::Subscription
@@ -29,17 +30,17 @@ public:
              Config::SubscriptionCallbacks& callbacks) override {
     // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
     grpc_mux_subscription_.start(resources, callbacks);
-    grpc_mux_.start();
+    grpc_mux_->start();
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
     grpc_mux_subscription_.updateResources(resources);
   }
 
-  GrpcMuxImpl& grpcMux() { return grpc_mux_; }
+  std::shared_ptr<Config::XdsGrpcContext> grpcMux() { return grpc_mux_; }
 
 private:
-  GrpcMuxImpl grpc_mux_;
+  std::shared_ptr<Config::GrpcMuxImpl> grpc_mux_;
   GrpcMuxSubscriptionImpl grpc_mux_subscription_;
 };
 

@@ -38,9 +38,8 @@ private:
   test::common::config::DummyConfig config_proto_;
 };
 
-class DummyConfigSubscription
-    : public ConfigSubscriptionInstanceBase,
-      Envoy::Config::SubscriptionCallbacks<test::common::config::DummyConfig> {
+class DummyConfigSubscription : public ConfigSubscriptionInstanceBase,
+                                Envoy::Config::SubscriptionCallbacks {
 public:
   DummyConfigSubscription(const uint64_t manager_identifier,
                           Server::Configuration::FactoryContext& factory_context,
@@ -53,7 +52,8 @@ public:
 
   // Envoy::Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override {
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
+                      const std::string& version_info) override {
     const auto& config = resources[0];
     if (checkAndApplyConfig(config, "dummy_config", version_info)) {
       config_proto_ = config;

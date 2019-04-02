@@ -20,8 +20,8 @@ class GrpcMuxSubscriptionImpl : public Subscription,
                                 GrpcMuxCallbacks,
                                 Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux, SubscriptionStats stats, absl::string_view type_url,
-                          Event::Dispatcher& dispatcher,
+  GrpcMuxSubscriptionImpl(std::shared_ptr<Config::XdsGrpcContext> grpc_mux, SubscriptionStats stats,
+                          absl::string_view type_url, Event::Dispatcher& dispatcher,
                           std::chrono::milliseconds init_fetch_timeout)
       : grpc_mux_(grpc_mux), stats_(stats),
         type_url_(type_url), // TODO TODO everwhere should pass this as
@@ -40,7 +40,7 @@ public:
       init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
     }
 
-    watch_ = grpc_mux_.subscribe(type_url_, resources, *this);
+    watch_ = grpc_mux_->subscribe(type_url_, resources, *this);
     // The attempt stat here is maintained for the purposes of having consistency between ADS and
     // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
     // "attempt" for a given xDS API combined by ADS is not really that meaningful.
@@ -48,7 +48,7 @@ public:
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
-    watch_ = grpc_mux_.subscribe(type_url_, resources, *this);
+    watch_ = grpc_mux_->subscribe(type_url_, resources, *this);
     stats_.update_attempt_.inc();
   }
 
@@ -94,7 +94,7 @@ private:
     }
   }
 
-  GrpcMux& grpc_mux_;
+  std::shared_ptr<Config::XdsGrpcContext> grpc_mux_;
   SubscriptionStats stats_;
   const std::string type_url_;
   SubscriptionCallbacks* callbacks_{};

@@ -3,6 +3,7 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_context.h"
 
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
@@ -65,6 +66,34 @@ public:
                             GrpcMuxCallbacks& callbacks);
   MOCK_METHOD1(pause, void(const std::string& type_url));
   MOCK_METHOD1(resume, void(const std::string& type_url));
+};
+
+class MockXdsGrpcContext : public XdsGrpcContext {
+public:
+  MockXdsGrpcContext();
+  virtual ~MockXdsGrpcContext();
+
+  MOCK_METHOD4(addSubscription,
+               void(const std::vector<std::string>& resources, const std::string& type_url,
+                    SubscriptionCallbacks& callbacks, SubscriptionStats stats));
+  MOCK_METHOD2(updateResources,
+               void(const std::vector<std::string>& resources, const std::string& type_url));
+
+  MOCK_METHOD1(removeSubscription, void(const std::string& type_url));
+  MOCK_METHOD1(pause, void(const std::string& type_url));
+  MOCK_METHOD1(resume, void(const std::string& type_url));
+
+  MOCK_METHOD0(drainRequests, void());
+  MOCK_METHOD0(handleStreamEstablished, void());
+  MOCK_METHOD0(handleEstablishmentFailure, void());
+
+  // GrpcMux TODO TODO remove
+  MOCK_METHOD0(start, void());
+  MOCK_METHOD3(subscribe_,
+               GrpcMuxWatch*(const std::string& type_url, const std::vector<std::string>& resources,
+                             GrpcMuxCallbacks& callbacks));
+  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
+                            GrpcMuxCallbacks& callbacks);
 };
 
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {

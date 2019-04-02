@@ -1,5 +1,6 @@
 #pragma once
 
+#include <queue>
 #include <unordered_map>
 
 #include "envoy/common/time.h"
@@ -19,11 +20,9 @@ namespace Config {
 /**
  * ADS API implementation that fetches via gRPC.
  */
-class GrpcMuxImpl
-    : public GrpcMux,
-      public GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse,
-                        std::string> // this string is a type URL
-{
+class GrpcMuxImpl : public GrpcMux,
+                    public XdsGrpcContext,
+                    public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
@@ -34,17 +33,26 @@ public:
   void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
-  void pause(const std::string& type_url) override;
-  void resume(const std::string& type_url) override;
 
-  void sendDiscoveryRequest(const std::string& type_url) override;
+  void sendDiscoveryRequest(const std::string& type_url);
 
-  // GrpcStream
-  void handleResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
+  // XdsGrpcContext
   void handleStreamEstablished() override;
   void handleEstablishmentFailure() override;
+  void pause(const std::string& type_url) override;
+  void resume(const std::string& type_url) override;
+  void drainRequests() override;
+  void addSubscription(const std::vector<std::string>&, const std::string&, SubscriptionCallbacks&,
+                       SubscriptionStats) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void updateResources(const std::vector<std::string>&, const std::string&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void removeSubscription(const std::string&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
+  void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
   void setRetryTimer();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
@@ -85,13 +93,23 @@ private:
     bool subscribed_{};
   };
 
+  // Request queue management logic.
+  void queueDiscoveryRequest(const std::string& queue_item);
+  void clearRequestQueue();
+
+  GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
+
+  // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
+  // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
+  // This string is a type URL.
+  std::queue<std::string> request_queue_;
 };
 
-class NullGrpcMuxImpl : public GrpcMux {
+class NullGrpcMuxImpl : public XdsGrpcContext {
 public:
   void start() override {}
   GrpcMuxWatchPtr subscribe(const std::string&, const std::vector<std::string>&,
@@ -100,6 +118,19 @@ public:
   }
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
+
+  void addSubscription(const std::vector<std::string>&, const std::string&, SubscriptionCallbacks&,
+                       SubscriptionStats) override {
+    throw EnvoyException("ADS must be configured to support an ADS config source");
+  }
+  void updateResources(const std::vector<std::string>&, const std::string&) override {
+    throw EnvoyException("ADS must be configured to support an ADS config source");
+  }
+
+  void removeSubscription(const std::string&) override {}
+  void drainRequests() override {}
+  void handleStreamEstablished() override {}
+  void handleEstablishmentFailure() override {}
 };
 
 } // namespace Config

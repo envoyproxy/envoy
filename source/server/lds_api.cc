@@ -36,8 +36,8 @@ void LdsApiImpl::initialize(std::function<void()> callback) {
 }
 
 void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
-  cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
-  Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  cm_.adsMux()->pause(Config::TypeUrl::get().RouteConfiguration);
+  Cleanup rds_resume([this] { cm_.adsMux()->resume(Config::TypeUrl::get().RouteConfiguration); });
 
   std::vector<envoy::api::v2::Listener> listeners;
   for (const auto& listener_blob : resources) {

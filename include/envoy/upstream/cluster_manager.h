@@ -11,6 +11,7 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
+#include "envoy/config/xds_context.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"
@@ -204,12 +205,9 @@ public:
    * the management of clusters but instead is required early in ClusterManager/server
    * initialization and in various sites that need ClusterManager for xDS API interfacing.
    *
-   * @return GrpcMux& ADS API provider referencee.
+   * @return XdsGrpcContext& ADS API provider referencee.
    */
-  virtual Config::GrpcMux& adsMux() PURE;
-
-  // TODO TODO COMMENT
-  virtual Config::GrpcDeltaXdsContext& grpcDeltaXdsContext() PURE;
+  virtual std::shared_ptr<Config::XdsGrpcContext> adsMux() PURE;
 
   /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.

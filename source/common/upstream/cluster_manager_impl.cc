@@ -19,6 +19,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
+#include "common/config/grpc_delta_xds_context.h"
 #include "common/config/utility.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
@@ -206,17 +207,36 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   // Now setup ADS if needed, this might rely on a primary cluster.
+  // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
+  // After here, we just have an AdsMux interface held in ads_mux_, which hides whether the backing
+  // implementation is delta or SotW.
   if (bootstrap.dynamic_resources().has_ads_config()) {
-    ads_mux_ = std::make_unique<Config::GrpcMuxImpl>(
-        local_info,
-        Config::Utility::factoryForGrpcApiConfigSource(
-            *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
-            ->create(),
-        main_thread_dispatcher,
-        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_,
-        Envoy::Config::Utility::parseRateLimitSettings(bootstrap.dynamic_resources().ads_config()));
+    if (bootstrap.dynamic_resources().ads_config().api_type() ==
+        envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
+      ads_mux_ = std::make_shared<Config::GrpcDeltaXdsContext>(
+          // TODO TODO should this be here rather than addSubscription? local_info,
+          Config::Utility::factoryForGrpcApiConfigSource(
+              *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
+              ->create(),
+          main_thread_dispatcher,
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+              "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
+          random_, stats_,
+          Envoy::Config::Utility::parseRateLimitSettings(
+              bootstrap.dynamic_resources().ads_config()));
+    } else {
+      ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
+          local_info,
+          Config::Utility::factoryForGrpcApiConfigSource(
+              *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
+              ->create(),
+          main_thread_dispatcher,
+          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+          random_, stats_,
+          Envoy::Config::Utility::parseRateLimitSettings(
+              bootstrap.dynamic_resources().ads_config()));
+    }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }

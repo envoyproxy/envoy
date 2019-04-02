@@ -2,6 +2,7 @@
 
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/grpc/status.h"
 
 namespace Envoy {
 namespace Config {
@@ -114,7 +115,6 @@ public:
 
   bool checkPausedDuringSendAttempt(const ResourceNameDiff& diff) {
     if (paused_) {
-      ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest().", type_url_);
       pending_ = diff; // resume() is now set to send this request.
       return true;
     }
