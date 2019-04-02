@@ -161,7 +161,17 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(lengthZeroHeader());
+  Http::HeaderMapPtr headers;
+  const uint64_t request_length = request.attributes().request().http().body().size();
+  if (request_length > 0) {
+    headers =
+        std::make_unique<Http::HeaderMapImpl,
+                         std::initializer_list<std::pair<Http::LowerCaseString, std::string>>>(
+            {{Http::Headers::get().ContentLength, std::to_string(request_length)}});
+  } else {
+    headers = std::make_unique<Http::HeaderMapImpl>(lengthZeroHeader());
+  }
+
   for (const auto& header : request.attributes().request().http().headers()) {
     const Http::LowerCaseString key{header.first};
     if (config_->requestHeaderMatchers()->matches(key.get())) {
@@ -179,8 +189,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     headers->setReference(header_to_add.first, header_to_add.second);
   }
 
+  Http::MessagePtr message = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+  if (request_length > 0) {
+    message->body() =
+        std::make_unique<Buffer::OwnedImpl>(request.attributes().request().http().body());
+  }
+
   request_ = cm_.httpAsyncClientForCluster(config_->cluster())
-                 .send(std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers)), *this,
+                 .send(std::move(message), *this,
                        Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));
 }
 

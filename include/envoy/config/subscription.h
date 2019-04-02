@@ -13,11 +13,9 @@
 namespace Envoy {
 namespace Config {
 
-template <class ResourceType> class SubscriptionCallbacks {
+class SubscriptionCallbacks {
 public:
-  typedef Protobuf::RepeatedPtrField<ResourceType> ResourceVector;
-
-  virtual ~SubscriptionCallbacks() {}
+  virtual ~SubscriptionCallbacks() = default;
 
   /**
    * Called when a configuration update is received.
@@ -27,7 +25,7 @@ public:
    *        is accepted. Accepted configurations have their version_info reflected in subsequent
    *        requests.
    */
-  virtual void onConfigUpdate(const ResourceVector& resources,
+  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) PURE;
 
   // TODO(fredlas) it is a HACK that there are two of these. After delta CDS is merged,
@@ -62,12 +60,11 @@ public:
 
 /**
  * Common abstraction for subscribing to versioned config updates. This may be implemented via bidi
- * gRPC streams, periodic/long polling REST or inotify filesystem updates. ResourceType is expected
- * to be a protobuf serializable object.
+ * gRPC streams, periodic/long polling REST or inotify filesystem updates.
  */
-template <class ResourceType> class Subscription {
+class Subscription {
 public:
-  virtual ~Subscription() {}
+  virtual ~Subscription() = default;
 
   /**
    * Start a configuration subscription asynchronously. This should be called once and will continue
@@ -77,7 +74,7 @@ public:
    *        result in the deletion of the Subscription object.
    */
   virtual void start(const std::vector<std::string>& resources,
-                     SubscriptionCallbacks<ResourceType>& callbacks) PURE;
+                     SubscriptionCallbacks& callbacks) PURE;
 
   /**
    * Update the resources to fetch.

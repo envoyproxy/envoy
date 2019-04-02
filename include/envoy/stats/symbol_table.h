@@ -93,9 +93,9 @@ public:
    * decode/encode into the elaborated form, and does not require locking the
    * SymbolTable.
    *
-   * The caveat is that this representation does not bump reference counts on
-   * the referenced Symbols in the SymbolTable, so it's only valid as long for
-   * the lifetime of the joined StatNames.
+   * Note that this method does not bump reference counts on the referenced
+   * Symbols in the SymbolTable, so it's only valid as long for the lifetime of
+   * the joined StatNames.
    *
    * This is intended for use doing cached name lookups of scoped stats, where
    * the scope prefix and the names to combine it with are already in StatName
@@ -112,11 +112,12 @@ public:
    * construction time to enable StatNameList to be instantiated directly in
    * a class that doesn't have a live SymbolTable when it is constructed.
    *
-   * @param names A pointer to the first name in an array.
+   * @param names A pointer to the first name in an array, allocated by the caller.
    * @param num_names The number of names.
    * @param symbol_table The symbol table in which to encode the names.
    */
-  virtual void populateList(absl::string_view* names, int32_t num_names, StatNameList& list) PURE;
+  virtual void populateList(const absl::string_view* names, uint32_t num_names,
+                            StatNameList& list) PURE;
 
 #ifndef ENVOY_CONFIG_COVERAGE
   virtual void debugPrint() const PURE;
@@ -132,6 +133,9 @@ public:
    * on the SymbolTable abstraction and API, without getting full benefit
    * from the improved representation.
    *
+   * TODO(#6307): Remove this when the transition from FakeSymbolTableImpl to
+   * SymbolTableImpl is complete.
+   *
    * @param stat_name The stat name.
    * @param fn The function to call with the elaborated stat name as a string_view.
    */
@@ -142,6 +146,10 @@ private:
   friend struct HeapStatData;
   friend class StatNameStorage;
   friend class StatNameList;
+
+  // The following methods are private, but are called by friend classes
+  // StatNameStorage and StatNameList, which must be friendly with SymbolTable
+  // in order to manage the reference-counted symbols they own.
 
   /**
    * Since SymbolTable does manual reference counting, a client of SymbolTable
@@ -164,7 +172,16 @@ private:
    */
   virtual void incRefCount(const StatName& stat_name) PURE;
 
-  virtual StoragePtr copyToBytes(absl::string_view name) PURE;
+  /**
+   * Encodes 'name' into the symbol table. Bumps reference counts for referenced
+   * symbols. The caller must manage the storage, and is responsible for calling
+   * SymbolTable::free() to release the reference counts.
+   *
+   * @param name The name to encode.
+   * @return The encoded name, transferring ownership to the caller.
+   *
+   */
+  virtual StoragePtr encode(absl::string_view name) PURE;
 };
 
 using SharedSymbolTable = std::shared_ptr<SymbolTable>;

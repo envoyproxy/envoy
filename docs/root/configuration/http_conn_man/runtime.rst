@@ -5,17 +5,6 @@ Runtime
 
 The HTTP connection manager supports the following runtime settings:
 
-.. _config_http_conn_man_runtime_represent_ipv4_remote_address_as_ipv4_mapped_ipv6:
-
-http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6
-  % of requests with a remote address that will have their IPv4 address mapped to IPv6. Defaults to
-  0.
-  :ref:`use_remote_address <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>`
-  must also be enabled. See
-  :ref:`represent_ipv4_remote_address_as_ipv4_mapped_ipv6
-  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6>`
-  for more details.
-
 .. _config_http_conn_man_runtime_client_enabled:
 
 tracing.client_enabled

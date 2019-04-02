@@ -698,7 +698,7 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   // just issue a warning, so that scripts using curl GET commands to mutate state can be fixed.
   EXPECT_LOG_CONTAINS("error",
                       "admin path \"" + path + "\" mutates state, method=GET rather than POST",
-                      EXPECT_EQ(Http::Code::BadRequest, getCallback(path, header_map, data)));
+                      EXPECT_EQ(Http::Code::MethodNotAllowed, getCallback(path, header_map, data)));
 }
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
