@@ -136,7 +136,7 @@ public:
   void onReset();
   void onError(const std::string& what);
   MessageMetadataSharedPtr metadata() const { return metadata_; }
-  bool pending_message_end() const { return pending_message_end_; }
+  bool pending_transport_end() const { return pending_transport_end_; }
 
 private:
   ConnectionManager& parent_;
@@ -158,7 +158,7 @@ private:
 
   Buffer::OwnedImpl response_buffer_;
 
-  bool pending_message_end_ : 1;
+  bool pending_transport_end_ : 1;
   bool local_response_sent_ : 1;
 };
 

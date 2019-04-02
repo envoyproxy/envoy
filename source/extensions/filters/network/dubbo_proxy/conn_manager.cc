@@ -128,10 +128,6 @@ void ConnectionManager::dispatch() {
       }
     }
     return;
-  } catch (const AppException& ex) {
-    ASSERT(!active_message_list_.empty());
-    stats_.request_exception_.inc();
-    sendLocalReply(*((*active_message_list_.begin())->metadata().get()), ex, true);
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "dubbo error: {}", read_callbacks_->connection(), ex.what());
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
@@ -164,7 +160,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata,
     stats_.local_response_error_.inc();
     break;
   case DubboFilters::DirectResponse::ResponseType::Exception:
-    stats_.local_response_exception_.inc();
+    stats_.local_response_business_exception_.inc();
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

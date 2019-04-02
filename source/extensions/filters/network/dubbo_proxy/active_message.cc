@@ -52,8 +52,9 @@ Network::FilterStatus ResponseDecoder::messageEnd(MessageMetadataSharedPtr metad
          metadata->message_type() == MessageType::Exception);
   ASSERT(metadata->response_status().has_value());
 
+  stats_.response_decoding_success_.inc();
   if (metadata->message_type() == MessageType::Exception) {
-    stats_.response_exception_.inc();
+    stats_.response_business_exception_.inc();
   }
 
   metadata_ = metadata;
@@ -94,7 +95,7 @@ void ActiveMessageDecoderFilter::continueDecoding() {
   const Network::FilterStatus status = parent_.applyDecoderFilters(this);
   if (status == Network::FilterStatus::Continue) {
     // All filters have been executed for the current decoder state.
-    if (parent_.pending_message_end()) {
+    if (parent_.pending_transport_end()) {
       // If the filter stack was paused during messageEnd, handle end-of-request details.
       parent_.finalizeRequest();
     }
@@ -140,7 +141,8 @@ ActiveMessage::ActiveMessage(ConnectionManager& parent)
     : parent_(parent), request_timer_(std::make_unique<Stats::Timespan>(
                            parent_.stats().request_time_ms_, parent.time_system())),
       request_id_(-1), stream_id_(parent.random_generator().random()),
-      stream_info_(parent.time_system()), pending_message_end_(false), local_response_sent_(false) {
+      stream_info_(parent.time_system()), pending_transport_end_(false),
+      local_response_sent_(false) {
   parent_.stats().request_active_.inc();
   stream_info_.setDownstreamLocalAddress(parent_.connection().localAddress());
   stream_info_.setDownstreamRemoteAddress(parent_.connection().remoteAddress());
@@ -168,7 +170,18 @@ Network::FilterStatus ActiveMessage::transportEnd() {
     return filter->transportEnd();
   };
 
-  return this->applyDecoderFilters(nullptr);
+  Network::FilterStatus status = applyDecoderFilters(nullptr);
+  if (status == Network::FilterStatus::StopIteration) {
+    pending_transport_end_ = true;
+    return status;
+  }
+
+  finalizeRequest();
+
+  ENVOY_LOG(debug, "dubbo request: complete processing of downstream request messages, id is {}",
+            request_id_);
+
+  return status;
 }
 
 Network::FilterStatus ActiveMessage::messageBegin(MessageType type, int64_t message_id,
@@ -179,7 +192,7 @@ Network::FilterStatus ActiveMessage::messageBegin(MessageType type, int64_t mess
     return filter->messageBegin(type, message_id, serialization_type);
   };
 
-  return this->applyDecoderFilters(nullptr);
+  return applyDecoderFilters(nullptr);
 }
 
 Network::FilterStatus ActiveMessage::messageEnd(MessageMetadataSharedPtr metadata) {
@@ -192,23 +205,14 @@ Network::FilterStatus ActiveMessage::messageEnd(MessageMetadataSharedPtr metadat
   ENVOY_LOG(debug, "dubbo request: start processing downstream request messages, id is {}",
             metadata->request_id());
 
+  parent_.stats().request_decoding_success_.inc();
+
   metadata_ = metadata;
   filter_action_ = [metadata](DubboFilters::DecoderFilter* filter) -> Network::FilterStatus {
     return filter->messageEnd(metadata);
   };
 
-  auto status = applyDecoderFilters(nullptr);
-  if (status == Network::FilterStatus::StopIteration) {
-    pending_message_end_ = true;
-    return status;
-  }
-
-  finalizeRequest();
-
-  ENVOY_LOG(debug, "dubbo request: complete processing of downstream request messages, id is {}",
-            request_id_);
-
-  return status;
+  return applyDecoderFilters(nullptr);
 }
 
 Network::FilterStatus ActiveMessage::transferHeaderTo(Buffer::Instance& header_buf, size_t size) {
@@ -216,6 +220,12 @@ Network::FilterStatus ActiveMessage::transferHeaderTo(Buffer::Instance& header_b
                     size](DubboFilters::DecoderFilter* filter) -> Network::FilterStatus {
     return filter->transferHeaderTo(header_buf, size);
   };
+
+  // If a local reply is generated, the filter callback is skipped and
+  // the buffer data needs to be actively released.
+  if (local_response_sent_) {
+    header_buf.drain(size);
+  }
 
   return applyDecoderFilters(nullptr);
 }
@@ -225,11 +235,17 @@ Network::FilterStatus ActiveMessage::transferBodyTo(Buffer::Instance& body_buf, 
     return filter->transferBodyTo(body_buf, size);
   };
 
+  // If a local reply is generated, the filter callback is skipped and
+  // the buffer data needs to be actively released.
+  if (local_response_sent_) {
+    body_buf.drain(size);
+  }
+
   return applyDecoderFilters(nullptr);
 }
 
 void ActiveMessage::finalizeRequest() {
-  pending_message_end_ = false;
+  pending_transport_end_ = false;
   parent_.stats().request_.inc();
   bool is_one_way = false;
   switch (metadata_->message_type()) {
@@ -297,6 +313,11 @@ Network::FilterStatus ActiveMessage::applyDecoderFilters(ActiveMessageDecoderFil
 }
 
 void ActiveMessage::sendLocalReply(const DubboFilters::DirectResponse& response, bool end_stream) {
+  if (!metadata_) {
+    // If the sendLocalReply function is called before the messageEnd callback,
+    // metadata_ is nullptr, metadata object needs to be created in order to generate a local reply.
+    metadata_ = std::make_shared<MessageMetadata>();
+  }
   metadata_->setRequestId(request_id_);
   parent_.sendLocalReply(*metadata_, response, end_stream);
 
@@ -335,14 +356,7 @@ DubboFilters::UpstreamResponseStatus ActiveMessage::upstreamData(Buffer::Instanc
   } catch (const DownstreamConnectionCloseException& ex) {
     ENVOY_CONN_LOG(error, "dubbo response: exception ({})", parent_.connection(), ex.what());
     onReset();
-    parent_.stats().response_error_.inc();
-    return DubboFilters::UpstreamResponseStatus::Reset;
-  } catch (const AppException& ex) {
-    ENVOY_LOG(error, "dubbo response: application exception ({})", ex.what());
-    parent_.stats().response_decoding_error_.inc();
-
-    sendLocalReply(ex, false);
-    onReset();
+    parent_.stats().response_error_caused_connection_close_.inc();
     return DubboFilters::UpstreamResponseStatus::Reset;
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "dubbo response: exception ({})", parent_.connection(), ex.what());

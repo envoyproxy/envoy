@@ -90,6 +90,7 @@ Version history
   Refer to :ref:`ZooKeeper proxy<config_network_filters_zookeeper_proxy>` for more details.
 * upstream: added configuration option to select any host when the fallback policy fails.
 * upstream: stopped incrementing upstream_rq_total for HTTP/1 conn pool when request is circuit broken.
+* dubbo_proxy: add routing capabilities for the Dubbo protocol.
 
 1.9.1 (Apr 2, 2019)
 ===================
