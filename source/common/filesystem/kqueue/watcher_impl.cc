@@ -17,15 +17,14 @@ namespace Envoy {
 namespace Filesystem {
 
 WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher)
-    : queue_(kqueue()),
-      kqueue_event_(dispatcher.createFileEvent(queue_,
-                                               [this](uint32_t events) -> void {
-                                                 if (events & Event::FileReadyType::Read) {
-                                                   onKqueueEvent();
-                                                 }
-                                               },
-                                               Event::FileTriggerType::Edge,
-                                               Event::FileReadyType::Read)) {}
+    : queue_(kqueue()), kqueue_event_(dispatcher.createFileEvent(
+                            queue_,
+                            [this](uint32_t events) -> void {
+                              if (events & Event::FileReadyType::Read) {
+                                onKqueueEvent();
+                              }
+                            },
+                            Event::FileTriggerType::Edge, Event::FileReadyType::Read)) {}
 
 WatcherImpl::~WatcherImpl() {
   close(queue_);
