@@ -281,9 +281,9 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
       is_reset, response_code, body_text, grpc_status, is_head_request);
 =======
 Utility::LocalReplyInfo Utility::generateLocalReplyInfo(const Http::HeaderMap& request_headers) {
-  bool is_grpc = false, is_head_request = false, accept_json_type = false;
+  bool is_head_request = false, accept_json_type = false;
 
-  is_grpc = Grpc::Utility::hasGrpcContentType(request_headers);
+  const bool is_grpc = Grpc::Utility::hasGrpcContentType(request_headers);
 
   if (Http::Headers::get().MethodValues.Head == request_headers.Method()->value().c_str()) {
     is_head_request = true;
@@ -345,18 +345,18 @@ void Utility::sendLocalReply(
 
   envoy::data::core::v2alpha::LocalReply local_reply;
   std::string json_body;
-  absl::string_view finally_body_text = body_text;
+  absl::string_view final_body_text = body_text;
 
   if (info.accept_json_type) {
-    local_reply.set_body(finally_body_text.begin(), finally_body_text.length());
+    local_reply.set_body(final_body_text.begin(), final_body_text.length());
     json_body = MessageUtil::getJsonStringFromMessage(local_reply, true, true);
     response_headers->insertContentLength().value(json_body.size());
-    finally_body_text = absl::string_view(json_body);
+    final_body_text = absl::string_view(json_body);
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Json);
   }
 
-  if (!info.accept_json_type && !finally_body_text.empty()) {
-    response_headers->insertContentLength().value(finally_body_text.size());
+  if (!info.accept_json_type && !final_body_text.empty()) {
+    response_headers->insertContentLength().value(final_body_text.size());
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
   }
 
@@ -365,10 +365,10 @@ void Utility::sendLocalReply(
     return;
   }
 
-  encode_headers(std::move(response_headers), finally_body_text.empty());
+  encode_headers(std::move(response_headers), final_body_text.empty());
   // encode_headers()) may have changed the referenced is_reset so we need to test it
-  if (!finally_body_text.empty() && !is_reset) {
-    Buffer::OwnedImpl buffer(finally_body_text);
+  if (!final_body_text.empty() && !is_reset) {
+    Buffer::OwnedImpl buffer(final_body_text);
     encode_data(buffer, true);
   }
 }

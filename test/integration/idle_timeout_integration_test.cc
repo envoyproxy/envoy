@@ -2,6 +2,7 @@
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace {
@@ -208,7 +209,10 @@ TEST_P(IdleTimeoutIntegrationTest,
             response->headers().ContentType()->value().c_str());
   envoy::data::core::v2alpha::LocalReply local_reply;
   local_reply.set_body("stream timeout");
-  EXPECT_EQ(MessageUtil::getJsonStringFromMessage(local_reply, true, true), response->body());
+  envoy::data::core::v2alpha::LocalReply receive_local_reply;
+  MessageUtil::loadFromJsonEx(response->body(), receive_local_reply,
+                              MessageUtil::proto_unknown_fields);
+  EXPECT_TRUE(TestUtility::protoEqual(local_reply, receive_local_reply));
 }
 
 // Global per-stream idle timeout applies if there is no per-stream idle timeout.

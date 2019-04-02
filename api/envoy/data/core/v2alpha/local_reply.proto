@@ -6,7 +6,7 @@ option java_outer_classname = "LocalReplyProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.core.v2alpha";
 
-// [#protodoc-title:  Local reply]
+// [#protodoc-title: Local reply]
 // Used to wrap a local response, and then convert to JSON.
 message LocalReply {
   string body = 1;
