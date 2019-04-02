@@ -1044,11 +1044,9 @@ ConnectionManagerImpl::ActiveStream::commonEncodePrefix(
   if (filter == nullptr) {
     ASSERT(!state_.local_complete_);
     state_.local_complete_ = end_stream;
-  }
-
-  if (!filter) {
     return encoder_filters_.begin();
   }
+
   if (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
       (*(filter->entry()))->iterate_from_current_filter_) {
     // The filter iteration has been stopped for all frame types, and now the iteration continues.
