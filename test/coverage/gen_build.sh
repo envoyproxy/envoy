@@ -68,4 +68,5 @@ EOF
 
 ) > "${BUILD_PATH}"
 
+echo "Generated coverage BUILD file at: ${BUILD_PATH}"
 "${BUILDIFIER_BIN}" "${BUILD_PATH}"
