@@ -583,7 +583,6 @@ envoy_cc_test(
     ],
     deps = [
         ":integration_lib",
-        "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/redis_proxy:config",
     ],
 )
