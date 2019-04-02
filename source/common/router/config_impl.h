@@ -622,8 +622,6 @@ private:
   const uint64_t total_cluster_weight_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   MetadataMatchCriteriaConstPtr metadata_match_criteria_;
-  HeaderParserPtr route_action_request_headers_parser_;
-  HeaderParserPtr route_action_response_headers_parser_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;
