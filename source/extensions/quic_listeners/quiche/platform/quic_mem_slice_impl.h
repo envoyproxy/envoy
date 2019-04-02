@@ -38,9 +38,9 @@ public:
   }
 
   // Constructs a QuicMemSliceImpl from a Buffer::Instance whose getRawSlices()
-  // returns only 1 slice.
+  // returns only 1 slice. Data will be moved from |slice|.
   explicit QuicMemSliceImpl(Envoy::Buffer::Instance& slice) {
-    ASSERT(slice.getRawSlices(nullptr, 0) == 1);
+    ASSERT(slice.getRawSlices(nullptr, 0) > 1);
     single_slice_buffer_.move(slice);
   }
 

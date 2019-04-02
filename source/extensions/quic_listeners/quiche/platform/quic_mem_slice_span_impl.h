@@ -51,13 +51,13 @@ public:
       if (slice.len_ == 0) {
         continue;
       }
-      auto single_slice_buffer = std::make_shared<Envoy::Buffer::OwnedImpl>();
+      Envoy::Buffer::OwnedImpl single_slice_buffer;
       // Move each slice into a stand-alone buffer.
       // TODO(danzh): investigate the cost of allocating one buffer per slice.
       // If it turns out to be expensive, add a new function to free data in the middle in buffer
       // interface and re-design QuicMemSliceImpl.
-      single_slice_buffer->move(buffer_, slice.len_);
-      consume(QuicMemSlice(QuicMemSliceImpl(std::move(single_slice_buffer))));
+      single_slice_buffer.move(buffer_, slice.len_);
+      consume(QuicMemSlice(QuicMemSliceImpl(single_slice_buffer)));
       saved_length += slice.len_;
     }
     return saved_length;
