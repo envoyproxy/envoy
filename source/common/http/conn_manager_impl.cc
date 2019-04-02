@@ -783,8 +783,12 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
-  std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
-      filter ? std::next(filter->entry()) : decoder_filters_.begin();
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  if (!filter) {
+    entry = decoder_filters_.begin();
+  } else {
+    entry = std::next(filter->entry());
+  }
   absl::optional<std::list<ActiveStreamDecoderFilterPtr>::iterator> continue_data_entry;
 
   for (; entry != decoder_filters_.end(); entry++) {
@@ -849,8 +853,12 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     return;
   }
 
-  std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
-      filter ? std::next(filter->entry()) : decoder_filters_.begin();
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  if (!filter) {
+    entry = decoder_filters_.begin();
+  } else {
+    entry = std::next(filter->entry());
+  }
   absl::optional<std::list<ActiveStreamDecoderFilterPtr>::iterator> continue_data_entry;
 
   const bool trailers_exists_at_start = request_trailers_ != nullptr;
