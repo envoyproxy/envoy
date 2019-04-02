@@ -51,7 +51,7 @@ public:
 
   MOCK_METHOD0(onDestroy, void());
 
-  Init::MockTarget target_;
+  Init::ExpectableTargetImpl target_;
   MockDrainManager* drain_manager_ = new MockDrainManager();
   Configuration::FactoryContext* context_{};
 };
@@ -85,7 +85,7 @@ protected:
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &context;
               if (need_init) {
-                context.initManager().registerTarget(notifier->target_, "");
+                context.initManager().add(notifier->target_);
               }
               return {[notifier](Network::FilterManager&) -> void {}};
             }));
@@ -866,7 +866,7 @@ filter_chains: {}
 
   ListenerHandle* listener_baz = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-  EXPECT_CALL(listener_baz->target_, initialize(_));
+  EXPECT_CALL(listener_baz->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_baz_yaml), "version5", true));
   EXPECT_EQ(2UL, manager_->listeners().size());
@@ -931,9 +931,9 @@ dynamic_draining_listeners:
   ListenerHandle* listener_baz_update1 = expectListenerCreate(true);
   EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
     // Call the initialize callback during destruction like RDS will.
-    listener_baz->target_.callback_();
+    listener_baz->target_.ready();
   }));
-  EXPECT_CALL(listener_baz_update1->target_, initialize(_));
+  EXPECT_CALL(listener_baz_update1->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromJson(listener_baz_update1_json), "", true));
   EXPECT_EQ(2UL, manager_->listeners().size());
@@ -941,7 +941,7 @@ dynamic_draining_listeners:
 
   // Finish initialization for baz which should make it active.
   EXPECT_CALL(*worker_, addListener(_, _));
-  listener_baz_update1->target_.callback_();
+  listener_baz_update1->target_.ready();
   EXPECT_EQ(3UL, manager_->listeners().size());
   worker_->callAddCompletion(true);
   checkStats(3, 3, 0, 0, 3, 0);
@@ -1090,7 +1090,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
 
   ListenerHandle* listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-  EXPECT_CALL(listener_foo->target_, initialize(_));
+  EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   EXPECT_EQ(0UL, manager_->listeners().size());
   checkStats(1, 0, 0, 1, 0, 0);
@@ -1104,11 +1104,11 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   // Add foo again and initialize it.
   listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true));
-  EXPECT_CALL(listener_foo->target_, initialize(_));
+  EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
   checkStats(2, 0, 1, 1, 0, 0);
   EXPECT_CALL(*worker_, addListener(_, _));
-  listener_foo->target_.callback_();
+  listener_foo->target_.ready();
   worker_->callAddCompletion(true);
   EXPECT_EQ(1UL, manager_->listeners().size());
   checkStats(2, 0, 1, 0, 1, 0);
@@ -1125,7 +1125,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
   )EOF";
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true);
-  EXPECT_CALL(listener_foo_update1->target_, initialize(_));
+  EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_update1_json), "", true));
   EXPECT_EQ(1UL, manager_->listeners().size());
@@ -1212,7 +1212,7 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
 
   ListenerHandle* listener_foo = expectListenerCreate(true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, false));
-  EXPECT_CALL(listener_foo->target_, initialize(_));
+  EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
 
   // Add bar with same non-binding address. Should fail.
@@ -1234,7 +1234,7 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
 
   // Move foo to active and then try to add again. This should still fail.
   EXPECT_CALL(*worker_, addListener(_, _));
-  listener_foo->target_.callback_();
+  listener_foo->target_.ready();
   worker_->callAddCompletion(true);
 
   listener_bar = expectListenerCreate(true);

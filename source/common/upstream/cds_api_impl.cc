@@ -40,18 +40,13 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
       Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()), api);
 }
 
-// TODO TODO this ResourceVector can become a "generic Protobuf" vector, and then have each get
-// MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource). that will allow us to detemplatize
-// SubscriptionCallbacks.
-void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
+void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                const std::string& version_info) {
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
   std::vector<envoy::api::v2::Cluster> clusters;
   for (const auto& cluster_blob : resources) {
     clusters.push_back(MessageUtil::anyConvert<envoy::api::v2::Cluster>(cluster_blob));
-  }
-  for (const auto& cluster : clusters) {
-    clusters_to_remove.erase(
-        cluster.name()); // TODO TODO can probably use resourceName here to skip the anyConvert.
+    clusters_to_remove.erase(clusters.back().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& cluster : clusters_to_remove) {

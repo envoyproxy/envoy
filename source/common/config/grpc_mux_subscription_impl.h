@@ -23,10 +23,8 @@ public:
   GrpcMuxSubscriptionImpl(std::shared_ptr<Config::XdsGrpcContext> grpc_mux, SubscriptionStats stats,
                           absl::string_view type_url, Event::Dispatcher& dispatcher,
                           std::chrono::milliseconds init_fetch_timeout)
-      : grpc_mux_(grpc_mux), stats_(stats),
-        type_url_(type_url), // TODO TODO everwhere should pass this as
-                             // Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())
-        dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout) {}
+      : grpc_mux_(grpc_mux), stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
+        init_fetch_timeout_(init_fetch_timeout) {}
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {

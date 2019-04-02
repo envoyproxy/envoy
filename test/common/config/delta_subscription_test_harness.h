@@ -34,8 +34,8 @@ public:
     EXPECT_CALL(dispatcher_, createTimer_(_));
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
-        *method_descriptor_, random_, stats_store_, rate_limit_settings_, stats_,
-        init_fetch_timeout);
+        *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, random_, stats_store_,
+        rate_limit_settings_, stats_, init_fetch_timeout);
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
@@ -71,6 +71,7 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
+    std::cerr << "EXPECTING DiscoveryRequest: " << expected_request.DebugString() << std::endl;
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 

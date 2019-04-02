@@ -7,14 +7,14 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 
 /**
  * A WatcherHandle functions as a weak reference to a Watcher. It is how an implementation of
- * SafeInit::Target would safely notify a Manager that it has initialized, and likewise it's how
- * an implementation of SafeInit::Manager would safely tell its client that all registered targets
+ * Init::Target would safely notify a Manager that it has initialized, and likewise it's how
+ * an implementation of Init::Manager would safely tell its client that all registered targets
  * have initialized, with no guarantees about the lifetimes of the manager or client. Typical usage
- * (outside of SafeInit::TargetImpl and ManagerImpl) does not require touching WatcherHandles at
+ * (outside of Init::TargetImpl and ManagerImpl) does not require touching WatcherHandles at
  * all.
  */
 struct WatcherHandle {
@@ -49,5 +49,5 @@ struct Watcher {
   virtual WatcherHandlePtr createHandle(absl::string_view name) const PURE;
 };
 
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy

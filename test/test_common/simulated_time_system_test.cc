@@ -33,12 +33,12 @@ protected:
 
   void sleepMsAndLoop(int64_t delay_ms) {
     time_system_.sleep(std::chrono::milliseconds(delay_ms));
-    base_scheduler_.nonBlockingLoop();
+    base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 
   void advanceSystemMsAndLoop(int64_t delay_ms) {
     time_system_.setSystemTime(time_system_.systemTime() + std::chrono::milliseconds(delay_ms));
-    base_scheduler_.nonBlockingLoop();
+    base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 
   LibeventScheduler base_scheduler_;
@@ -66,7 +66,7 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   std::atomic<bool> done(false);
   auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
     while (!done) {
-      base_scheduler_.blockingLoop();
+      base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
   Thread::CondVar condvar;

@@ -189,7 +189,9 @@ envoy_cc_test_library(
     hdrs = ["simulated_time_system.h"],
     deps = [
         ":test_time_system_interface",
+        "//source/common/event:event_impl_base_lib",
         "//source/common/event:real_time_system_lib",
+        "//source/common/event:timer_lib",
     ],
 )
 

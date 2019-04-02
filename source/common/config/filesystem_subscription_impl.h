@@ -18,12 +18,12 @@ namespace Config {
 /**
  * Filesystem inotify implementation of the API Subscription interface. This allows the API to be
  * consumed on filesystem changes to files containing the JSON canonical representation of
- * lists of ResourceType.
+ * lists of xDS resources.
  */
 class FilesystemSubscriptionImpl : public Config::Subscription,
                                    Logger::Loggable<Logger::Id::config> {
 public:
-  FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, const std::string& path,
+  FilesystemSubscriptionImpl(Event::Dispatcher& dispatcher, absl::string_view path,
                              SubscriptionStats stats, Api::Api& api)
       : path_(path), watcher_(dispatcher.createFilesystemWatcher()), stats_(stats), api_(api) {
     watcher_->addWatch(path_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t events) {

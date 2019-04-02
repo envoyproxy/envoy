@@ -75,13 +75,8 @@ public:
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
     MessageUtil::loadFromJson(file_json, response_pb);
-    /* TODO TODO TODO DONT CARE YET JUST WANT IT TO COMPILE    EXPECT_CALL(callbacks_,
-                    onConfigUpdate(
-                        RepeatedProtoEq(
-                            Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                                response_pb)),
-                        version))
-            .WillOnce(ThrowOnRejectedConfig(accept));*/
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
+        .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       version_ = version;
     } else {

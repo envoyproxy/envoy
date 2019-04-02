@@ -1,17 +1,17 @@
-#include "test/mocks/safe_init/mocks.h"
+#include "test/mocks/init/mocks.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace SafeInit {
+namespace Init {
 namespace {
 
-TEST(SafeInitWatcherImplTest, Name) {
+TEST(InitWatcherImplTest, Name) {
   ExpectableWatcherImpl watcher;
   EXPECT_EQ("test", watcher.name());
 }
 
-TEST(SafeInitWatcherImplTest, ReadyWhenAvailable) {
+TEST(InitWatcherImplTest, ReadyWhenAvailable) {
   ExpectableWatcherImpl watcher;
 
   // notifying the watcher through its handle should invoke ready().
@@ -19,7 +19,7 @@ TEST(SafeInitWatcherImplTest, ReadyWhenAvailable) {
   EXPECT_TRUE(watcher.createHandle("test")->ready());
 }
 
-TEST(SafeInitWatcherImplTest, ReadyWhenUnavailable) {
+TEST(InitWatcherImplTest, ReadyWhenUnavailable) {
   WatcherHandlePtr handle;
   {
     ExpectableWatcherImpl watcher;
@@ -32,5 +32,5 @@ TEST(SafeInitWatcherImplTest, ReadyWhenUnavailable) {
 }
 
 } // namespace
-} // namespace SafeInit
+} // namespace Init
 } // namespace Envoy
