@@ -207,7 +207,6 @@ public:
     stats_.update_attempt_.inc();
   }
 
-private:
   void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) {
     ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
               message->system_version_info());
@@ -230,6 +229,7 @@ private:
     queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
   }
 
+private:
   void disableInitFetchTimeoutTimer() {
     if (init_fetch_timeout_timer_) {
       init_fetch_timeout_timer_->disableTimer();

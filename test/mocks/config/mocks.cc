@@ -7,11 +7,7 @@
 namespace Envoy {
 namespace Config {
 
-MockGrpcMuxWatch::MockGrpcMuxWatch() {}
 MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
-
-MockGrpcMux::MockGrpcMux() {}
-MockGrpcMux::~MockGrpcMux() {}
 
 GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
                                        const std::vector<std::string>& resources,
@@ -39,8 +35,6 @@ MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {
             fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
       }));
 }
-
-MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
 
 } // namespace Config
 } // namespace Envoy

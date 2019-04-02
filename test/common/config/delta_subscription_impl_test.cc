@@ -28,7 +28,7 @@ TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   resource = add1_2.Add();
   resource->set_name("name2");
   resource->set_version("version2A");
-  subscription_->onConfigUpdate(add1_2, {}, "debugversion1");
+  subscription_->handleConfigUpdate(add1_2, {}, "debugversion1");
   subscription_->handleStreamEstablished();
   envoy::api::v2::DeltaDiscoveryRequest cur_request = subscription_->internalRequestStateForTest();
   EXPECT_EQ("version1A", cur_request.initial_resource_versions().at("name1"));
@@ -46,7 +46,7 @@ TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   resource->set_version("version3A");
   Protobuf::RepeatedPtrField<std::string> remove2;
   *remove2.Add() = "name2";
-  subscription_->onConfigUpdate(add1_3, remove2, "debugversion2");
+  subscription_->handleConfigUpdate(add1_3, remove2, "debugversion2");
   subscription_->handleStreamEstablished();
   cur_request = subscription_->internalRequestStateForTest();
   EXPECT_EQ("version1B", cur_request.initial_resource_versions().at("name1"));
@@ -58,7 +58,7 @@ TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   Protobuf::RepeatedPtrField<std::string> remove1_3;
   *remove1_3.Add() = "name1";
   *remove1_3.Add() = "name3";
-  subscription_->onConfigUpdate({}, remove1_3, "debugversion3");
+  subscription_->handleConfigUpdate({}, remove1_3, "debugversion3");
   subscription_->handleStreamEstablished();
   cur_request = subscription_->internalRequestStateForTest();
   EXPECT_TRUE(cur_request.initial_resource_versions().empty());

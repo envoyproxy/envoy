@@ -3,6 +3,7 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_grpc_context.h"
 
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
@@ -46,7 +47,7 @@ public:
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {
 public:
-  MockGrpcMuxWatch();
+  MockGrpcMuxWatch() = default;
   virtual ~MockGrpcMuxWatch();
 
   MOCK_METHOD0(cancel, void());
@@ -54,8 +55,8 @@ public:
 
 class MockGrpcMux : public GrpcMux {
 public:
-  MockGrpcMux();
-  virtual ~MockGrpcMux();
+  MockGrpcMux() = default;
+  virtual ~MockGrpcMux() = default;
 
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
@@ -70,12 +71,22 @@ public:
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
 public:
   MockGrpcMuxCallbacks();
-  virtual ~MockGrpcMuxCallbacks();
+  virtual ~MockGrpcMuxCallbacks() = default;
 
   MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string& version_info));
   MOCK_METHOD1(onConfigUpdateFailed, void(const EnvoyException* e));
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
+};
+
+class MockXdsGrpcContext : public XdsGrpcContext {
+public:
+  MockXdsGrpcContext() = default;
+  virtual ~MockXdsGrpcContext() = default;
+
+  MOCK_METHOD0(handleStreamEstablished, void());
+  MOCK_METHOD0(handleEstablishmentFailure, void());
+  MOCK_METHOD0(drainRequests, void());
 };
 
 } // namespace Config

@@ -43,8 +43,13 @@ public:
   void handleEstablishmentFailure() override;
   void drainRequests() override;
 
-private:
   void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
+  GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>&
+  grpcStreamTestOnly() {
+    return grpc_stream_;
+  }
+
+private:
   void setRetryTimer();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
