@@ -365,7 +365,7 @@ message MetadataRule {
   repeated string path = 2 [(validate.rules).repeated .min_items = 1];
 
   // A map of string keys to requirements. The string key is the value
-  // in the dynamic metadata specified by `filter` and `path` fields.
+  // in the dynamic metadata specified by above *filter* and *path* fields.
   map<string, JwtRequirement> requires = 3;
 }
 
@@ -465,7 +465,7 @@ message JwtAuthentication {
 
   // This message specifies Jwt requirements based on a metadata string value.
   // Other HTTP filters can use this message to specify Jwt requirements.
-  // The "rules" field above is checked first, if it could not find any matches,
+  // The *rules* field above is checked first, if it could not find any matches,
   // check this one.
   MetadataRule metadata_rules = 3;
 }

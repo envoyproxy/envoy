@@ -121,7 +121,8 @@ public:
       const auto& value =
           Envoy::Config::Metadata::metadataValue(metadata, metadata_filter_, metadata_path_);
       if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
-        ENVOY_LOG(debug, "use metadata_rules key: {}", value.string_value());
+        ENVOY_LOG(debug, "use metadata value {} to find verifier from metadata_rules.",
+                  value.string_value());
         const auto& it = metadata_verifiers_.find(value.string_value());
         if (it != metadata_verifiers_.end()) {
           return it->second.get();
