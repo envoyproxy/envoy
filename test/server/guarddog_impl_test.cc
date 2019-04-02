@@ -133,8 +133,8 @@ class GuardDogAlmostDeadTest : public GuardDogDeathTest {};
 
 INSTANTIATE_TEST_SUITE_P(
     TimeSystemType, GuardDogAlmostDeadTest,
-    testing::ValuesIn({// TimeSystemType::Real -- fails in this suite 30/1000 times.
-                       TimeSystemType::Simulated}));
+    testing::ValuesIn({ // TODO(#6464): TimeSystemType::Real -- fails in this suite 30/1000 times.
+        TimeSystemType::Simulated}));
 
 TEST_P(GuardDogDeathTest, KillDeathTest) {
   // Is it German for "The Function"? Almost...
@@ -221,7 +221,7 @@ TEST_P(GuardDogMissTest, MissTest) {
 }
 
 TEST_P(GuardDogMissTest, MegaMissTest) {
-  // This test fails in real-time 1/1000 times, but passes in simulated time.
+  // TODO(#6464): This test fails in real-time 1/1000 times, but passes in simulated time.
   if (GetParam() == TimeSystemType::Real) {
     return;
   }
@@ -245,7 +245,7 @@ TEST_P(GuardDogMissTest, MegaMissTest) {
 }
 
 TEST_P(GuardDogMissTest, MissCountTest) {
-  // This test fails in real-time 9/1000 times, but passes in simulated time.
+  // TODO(#6464): This test fails in real-time 9/1000 times, but passes in simulated time.
   if (GetParam() == TimeSystemType::Real) {
     return;
   }
