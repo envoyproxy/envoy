@@ -39,7 +39,7 @@ public:
 
   // Constructs a QuicMemSliceImpl from a Buffer::Instance with first |length| bytes in it.
   // Data will be moved from |buffer| to this mem slice.
-  // Prerequisit: |buffer| has at least |length| bytes of data and not empty.
+  // Prerequisite: |buffer| has at least |length| bytes of data and not empty.
   explicit QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length) {
 #ifndef NDEBUG
     Envoy::Buffer::RawSlice slice;
