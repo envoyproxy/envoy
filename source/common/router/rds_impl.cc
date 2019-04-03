@@ -64,7 +64,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier), time_source_(factory_context.timeSource()),
-      last_updated_(factory_context.timeSource().systemTime()), uses_vhds_(false) {
+      last_updated_(factory_context.timeSource().systemTime()) {
   Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
@@ -74,6 +74,9 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes",
       Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
       factory_context.api());
+
+  last_update_details_ =
+      std::make_unique<RdsConfigUpdateDetails>(route_config_proto_, last_updated_, config_info_);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -115,10 +118,12 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     route_config_proto_ = route_config;
     stats_.config_reload_.inc();
 
-    uses_vhds_ = route_config_proto_.has_vhds();
-    if (!uses_vhds_) {
+    if (!route_config_proto_.has_vhds()) {
       ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
                 new_hash);
+
+      last_update_details_.reset(
+          new RdsConfigUpdateDetails(route_config_proto_, last_updated_, config_info_));
       for (auto* provider : route_config_providers_) {
         provider->onConfigUpdate();
       }
@@ -127,6 +132,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       auto s = new VhdsSubscription(route_config_proto_, factory_context_, stat_prefix_, this);
       s->registerInitTargetWithInitManager(factory_context_.initManager());
       vhds_subscription_.reset(s);
+      last_update_details_.reset(new VhdsConfigUpdateDetails(*vhds_subscription_));
     }
   }
 
@@ -137,18 +143,6 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();
-}
-
-absl::optional<LastConfigInfo> RdsRouteConfigSubscription::configInfo() const {
-  return (uses_vhds_ ? vhds_subscription_->configInfo() : config_info_);
-}
-
-envoy::api::v2::RouteConfiguration& RdsRouteConfigSubscription::routeConfiguration() {
-  return (uses_vhds_ ? vhds_subscription_->routeConfiguration() : route_config_proto_);
-}
-
-SystemTime RdsRouteConfigSubscription::lastUpdated() const {
-  return (uses_vhds_ ? vhds_subscription_->lastUpdated() : last_updated_);
 }
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(

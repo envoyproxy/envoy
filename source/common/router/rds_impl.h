@@ -108,6 +108,45 @@ class RdsRouteConfigProviderImpl;
 class VhdsSubscription;
 typedef std::unique_ptr<VhdsSubscription> VhdsSubscriptionPtr;
 
+class ConfigUpdateDetails {
+public:
+  virtual ~ConfigUpdateDetails() = default;
+
+  virtual absl::optional<LastConfigInfo> configInfo() const PURE;
+  virtual envoy::api::v2::RouteConfiguration& routeConfiguration() PURE;
+  virtual SystemTime lastUpdated() const PURE;
+};
+
+class RdsConfigUpdateDetails : public ConfigUpdateDetails {
+public:
+  RdsConfigUpdateDetails(envoy::api::v2::RouteConfiguration& rc, SystemTime last_updated,
+                         absl::optional<LastConfigInfo> config_info)
+      : route_config_proto_(rc), last_updated_(last_updated), config_info_(config_info) {}
+
+  absl::optional<LastConfigInfo> configInfo() const override { return config_info_; }
+  envoy::api::v2::RouteConfiguration& routeConfiguration() override { return route_config_proto_; }
+  SystemTime lastUpdated() const override { return last_updated_; }
+
+private:
+  envoy::api::v2::RouteConfiguration& route_config_proto_;
+  SystemTime last_updated_;
+  absl::optional<LastConfigInfo> config_info_;
+};
+
+class VhdsConfigUpdateDetails : public ConfigUpdateDetails {
+public:
+  VhdsConfigUpdateDetails(ConfigUpdateDetails& subscription) : subscription_(subscription) {}
+
+  absl::optional<LastConfigInfo> configInfo() const override { return subscription_.configInfo(); }
+  envoy::api::v2::RouteConfiguration& routeConfiguration() override {
+    return subscription_.routeConfiguration();
+  }
+  SystemTime lastUpdated() const override { return subscription_.lastUpdated(); }
+
+private:
+  ConfigUpdateDetails& subscription_;
+};
+
 /**
  * A class that fetches the route configuration dynamically using the RDS API and updates them to
  * RDS config providers.
@@ -132,9 +171,11 @@ public:
   std::unordered_set<RdsRouteConfigProviderImpl*>& route_config_providers() {
     return route_config_providers_;
   }
-  absl::optional<LastConfigInfo> configInfo() const;
-  envoy::api::v2::RouteConfiguration& routeConfiguration();
-  SystemTime lastUpdated() const;
+  absl::optional<LastConfigInfo> configInfo() const { return last_update_details_->configInfo(); }
+  envoy::api::v2::RouteConfiguration& routeConfiguration() {
+    return last_update_details_->routeConfiguration();
+  }
+  SystemTime lastUpdated() const { return last_update_details_->lastUpdated(); }
 
 private:
   RdsRouteConfigSubscription(
@@ -158,7 +199,7 @@ private:
   envoy::api::v2::RouteConfiguration route_config_proto_;
   std::unordered_set<RdsRouteConfigProviderImpl*> route_config_providers_;
   VhdsSubscriptionPtr vhds_subscription_;
-  bool uses_vhds_;
+  std::unique_ptr<ConfigUpdateDetails> last_update_details_;
 
   friend class RouteConfigProviderManagerImpl;
   friend class RdsRouteConfigProviderImpl;
@@ -171,7 +212,8 @@ typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFuncti
     const std::string&, absl::string_view, Api::Api&);
 
 class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
-                         Logger::Loggable<Logger::Id::router> {
+                         Logger::Loggable<Logger::Id::router>,
+                         public ConfigUpdateDetails {
 public:
   VhdsSubscription(const envoy::api::v2::RouteConfiguration& route_configuration,
                    Server::Configuration::FactoryContext& factory_context,
