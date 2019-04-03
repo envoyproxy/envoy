@@ -2,6 +2,7 @@
 
 #include <signal.h>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -411,9 +412,13 @@ uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnectio
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-                     InitManagerImpl& init_manager, OverloadManager& overload_manager,
-                     std::function<void()> workers_start_cb) {
-
+                     Init::Manager& init_manager, OverloadManager& overload_manager,
+                     std::function<void()> workers_start_cb)
+    : init_watcher_("RunHelper", [&instance, workers_start_cb]() {
+        if (!instance.isShutdown()) {
+          workers_start_cb();
+        }
+      }) {
   // Setup signals.
   if (options.signalHandlingEnabled()) {
     sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
@@ -444,7 +449,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // this can fire immediately if all clusters have already initialized. Also note that we need
   // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
   // starts.
-  cm.setInitializedCb([&instance, &init_manager, &cm, workers_start_cb]() {
+  cm.setInitializedCb([&instance, &init_manager, &cm, this]() {
     if (instance.isShutdown()) {
       return;
     }
@@ -455,16 +460,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     cm.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
-
-    // Note: the lambda below should not capture "this" since the RunHelper object may
-    // have been destructed by the time it gets executed.
-    init_manager.initialize([&instance, workers_start_cb]() {
-      if (instance.isShutdown()) {
-        return;
-      }
-
-      workers_start_cb();
-    });
+    init_manager.initialize(init_watcher_);
 
     // Now that we're execute all the init callbacks we can resume RDS
     // as we've subscribed to all the statically defined RDS resources.
@@ -473,11 +469,10 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
 }
 
 void InstanceImpl::run() {
-  // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
-  // we save it as a member variable.
-  run_helper_ = std::make_unique<RunHelper>(*this, options_, *dispatcher_, clusterManager(),
-                                            access_log_manager_, init_manager_, overloadManager(),
-                                            [this]() -> void { startWorkers(); });
+  // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
+  // startup (see RunHelperTest in server_test.cc).
+  auto run_helper = RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_,
+                              init_manager_, overloadManager(), [this] { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
@@ -490,7 +485,6 @@ void InstanceImpl::run() {
   watchdog.reset();
 
   terminate();
-  run_helper_.reset();
 }
 
 void InstanceImpl::terminate() {
@@ -535,8 +529,7 @@ void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");
   shutdown_ = true;
   restarter_.terminateParent();
-  notifyCallbacksForStage(Stage::ShutdownExit);
-  dispatcher_->exit();
+  notifyCallbacksForStage(Stage::ShutdownExit, [this] { dispatcher_->exit(); });
 }
 
 void InstanceImpl::shutdownAdmin() {
@@ -556,13 +549,37 @@ void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {
   stage_callbacks_[stage].push_back(callback);
 }
 
-void InstanceImpl::notifyCallbacksForStage(Stage stage) {
+void InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback) {
+  ASSERT(stage == Stage::ShutdownExit);
+  stage_completable_callbacks_[stage].push_back(callback);
+}
+
+void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
   ASSERT(std::this_thread::get_id() == main_thread_id_);
   auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {
       callback();
     }
+  }
+
+  auto it2 = stage_completable_callbacks_.find(stage);
+  if (it2 != stage_completable_callbacks_.end()) {
+    ASSERT(!it2->second.empty());
+    // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
+    // have finished their work.
+    auto completion_cb_count = std::make_shared<int>(it2->second.size());
+    Event::PostCb wrapped_cb = [this, completion_cb, completion_cb_count] {
+      ASSERT(std::this_thread::get_id() == main_thread_id_);
+      if (--*completion_cb_count == 0) {
+        completion_cb();
+      }
+    };
+    for (const StageCallbackWithCompletion& callback : it2->second) {
+      callback(wrapped_cb);
+    }
+  } else {
+    completion_cb();
   }
 }
 
