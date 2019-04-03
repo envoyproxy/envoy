@@ -376,7 +376,7 @@ TEST_F(RdsImplTest, Failure) {
 }
 
 TEST_F(RdsImplTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
-  void* subscription;
+  void* subscription = nullptr;
   const auto route_config = TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(R"EOF(
 name: my_route
 vhds:
@@ -402,7 +402,7 @@ vhds:
 }
 
 TEST_F(RdsImplTest, VhdsInstantiationShouldFailWithoutDELTA_GRPC) {
-  void* subscription;
+  void* subscription = nullptr;
   const auto route_config = TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(R"EOF(
 name: my_route
 vhds:
