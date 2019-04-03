@@ -21,13 +21,16 @@ public:
         validation_visitor_(validation_visitor) {}
 
   void initializeVhosts(const envoy::api::v2::RouteConfiguration& route_configuration);
-  void removeVhosts(std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+  void collectAliasesInUpdate(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
+  bool removeVhosts(std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
   void updateVhosts(std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
   void rebuildRouteConfig(
       const std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
       envoy::api::v2::RouteConfiguration& route_config);
+  bool isAliasNotResolvedReply(const envoy::api::v2::Resource& resource) const;
 
   // Router::RouteConfigUpdateReceiver
   bool onRdsUpdate(const envoy::api::v2::RouteConfiguration& rc,
@@ -45,6 +48,7 @@ public:
     return route_config_proto_;
   }
   SystemTime lastUpdated() const override { return last_updated_; }
+  const std::set<std::string>& aliasesInLastVhdsUpdate() { return aliases_in_last_update_; }
 
 private:
   TimeSource& time_source_;
@@ -55,6 +59,7 @@ private:
   std::unordered_map<std::string, envoy::api::v2::route::VirtualHost> virtual_hosts_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  std::set<std::string> aliases_in_last_update_;
 };
 
 } // namespace Router

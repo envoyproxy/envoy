@@ -49,10 +49,16 @@ void DeltaSubscriptionState::updateSubscriptionInterest(const std::set<std::stri
   }
 }
 
+// Appends aliases passed in updates_to_these_aliases parameter to the aliases that will be sent in
+// the next update request to the management server.
+void DeltaSubscriptionState::addAliasesToResolve(const std::set<std::string>& aliases) {
+  aliases_added_.insert(aliases.begin(), aliases.end());
+}
+
 // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
 // the entirety of your interest at the start of a stream, even if nothing has changed.
 bool DeltaSubscriptionState::subscriptionUpdatePending() const {
-  return !names_added_.empty() || !names_removed_.empty() ||
+  return !aliases_added_.empty() || !names_added_.empty() || !names_removed_.empty() ||
          !any_request_sent_yet_in_current_stream_;
 }
 
@@ -77,6 +83,10 @@ void DeltaSubscriptionState::handleGoodResponse(
     if (!names_added_removed.insert(resource.name()).second) {
       throw EnvoyException(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
+    }
+    // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
+    if (!resource.has_resource() && resource.aliases_size() > 0) {
+      continue;
     }
     if (message.type_url() != resource.resource().type_url()) {
       throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
@@ -131,6 +141,29 @@ envoy::api::v2::DeltaDiscoveryRequest* DeltaSubscriptionState::getNextRequestInt
   auto* request = new envoy::api::v2::DeltaDiscoveryRequest;
   request->set_type_url(type_url());
 
+  if (!any_request_sent_yet_in_current_stream_) {
+    populateDiscoveryRequest(request);
+  } else if (!aliases_added_.empty()) {
+    populateDiscoveryRequestWithAliases(request);
+  } else {
+    populateDiscoveryRequest(request);
+  }
+
+  request.set_type_url(type_url_);
+  request.mutable_node()->MergeFrom(local_info_.node());
+  return request;
+}
+
+//
+void DeltaSubscriptionState::populateDiscoveryRequestWithAliases(
+    envoy::api::v2::DeltaDiscoveryRequest& request) {
+  std::copy(aliases_added_.begin(), aliases_added_.end(),
+            Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_subscribe()));
+  aliases_added_.clear();
+}
+
+void DeltaSubscriptionState::populateDiscoveryRequest(
+    envoy::api::v2::DeltaDiscoveryRequest& request) {
   if (!any_request_sent_yet_in_current_stream_) {
     any_request_sent_yet_in_current_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".

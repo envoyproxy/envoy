@@ -55,15 +55,20 @@ public:
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
                         Server::OverloadManager* overload_manager, TimeSource& time_system);
+
   ~ConnectionManagerImpl() override;
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
+
   static ConnectionManagerTracingStats generateTracingStats(const std::string& prefix,
                                                             Stats::Scope& scope);
+
   static void chargeTracingStats(const Tracing::Reason& tracing_reason,
                                  ConnectionManagerTracingStats& tracing_stats);
+
   static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
                                                               Stats::Scope& scope);
+
   static const HeaderMapImpl& continueHeader();
 
   // Network::ReadFilter
@@ -80,10 +85,12 @@ public:
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
+
   // Pass connection watermark events on to all the streams associated with that connection.
   void onAboveWriteBufferHighWatermark() override {
     codec_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
   }
+
   void onBelowWriteBufferLowWatermark() override {
     codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
@@ -107,9 +114,12 @@ private:
     // corresponding data. Those functions handle state updates and data storage (if needed)
     // according to the status returned by filter's callback functions.
     bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
+
     bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& headers_only);
+
     bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                        bool& buffer_was_streaming);
+
     bool commonHandleAfterTrailersCallback(FilterTrailersStatus status);
 
     // Buffers provided_data.
@@ -120,48 +130,74 @@ private:
     void commonBufferDataIfStopAll(Buffer::Instance& provided_data, bool& buffer_was_streaming);
 
     void commonContinue();
+
     virtual bool canContinue() PURE;
+
     virtual Buffer::WatermarkBufferPtr createBuffer() PURE;
+
     virtual Buffer::WatermarkBufferPtr& bufferedData() PURE;
+
     virtual bool complete() PURE;
+
     virtual void do100ContinueHeaders() PURE;
+
     virtual void doHeaders(bool end_stream) PURE;
+
     virtual void doData(bool end_stream) PURE;
+
     virtual void doTrailers() PURE;
+
     virtual const HeaderMapPtr& trailers() PURE;
+
     virtual void doMetadata() PURE;
     // TODO(soya3129): make this pure when adding impl to encoder filter.
     virtual void handleMetadataAfterHeadersCallback() PURE;
 
     // Http::StreamFilterCallbacks
     const Network::Connection* connection() override;
+
     Event::Dispatcher& dispatcher() override;
+
     void resetStream() override;
+
     Router::RouteConstSharedPtr route() override;
+
+    bool requestRouteConfigUpdate(std::function<void()> cb) override;
+
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
+
     void clearRouteCache() override;
+
     uint64_t streamId() override;
+
     StreamInfo::StreamInfo& streamInfo() override;
+
     Tracing::Span& activeSpan() override;
+
     Tracing::Config& tracingConfig() override;
+
     const ScopeTrackedObject& scope() override { return parent_; }
 
     // Functions to set or get iteration state.
     bool canIterate() { return iteration_state_ == IterationState::Continue; }
+
     bool stoppedAll() {
       return iteration_state_ == IterationState::StopAllBuffer ||
              iteration_state_ == IterationState::StopAllWatermark;
     }
+
     void allowIteration() {
       ASSERT(iteration_state_ != IterationState::Continue);
       iteration_state_ = IterationState::Continue;
     }
+
     MetadataMapVector* getSavedRequestMetadata() {
       if (saved_request_metadata_ == nullptr) {
         saved_request_metadata_ = std::make_unique<MetadataMapVector>();
       }
       return saved_request_metadata_.get();
     }
+
     MetadataMapVector* getSavedResponseMetadata() {
       if (saved_response_metadata_ == nullptr) {
         saved_response_metadata_ = std::make_unique<MetadataMapVector>();
@@ -182,7 +218,7 @@ private:
       StopAllBuffer,       // Iteration has stopped for all frame types, and following data should
                            // be buffered.
       StopAllWatermark,    // Iteration has stopped for all frame types, and following data should
-                           // be buffered until high watermark is reached.
+      // be buffered until high watermark is reached.
     };
     ActiveStream& parent_;
     IterationState iteration_state_;
@@ -219,23 +255,32 @@ private:
       // over the high watermark such that a 413 is returned.
       return !parent_.state_.local_complete_;
     }
+
     Buffer::WatermarkBufferPtr createBuffer() override;
+
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
+
     bool complete() override { return parent_.state_.remote_complete_; }
+
     void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+
     void doHeaders(bool end_stream) override {
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
     }
+
     void doData(bool end_stream) override {
       parent_.decodeData(this, *parent_.buffered_request_data_, end_stream,
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
+
     void doMetadata() override {
       if (saved_request_metadata_ != nullptr) {
         drainSavedRequestMetadata();
       }
     }
+
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
+
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
 
     void drainSavedRequestMetadata() {
@@ -245,15 +290,21 @@ private:
       }
       getSavedRequestMetadata()->clear();
     }
+
     // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
     void handleMetadataAfterHeadersCallback() override;
 
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
+
     void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
+
     HeaderMap& addDecodedTrailers() override;
+
     MetadataMapVector& addDecodedMetadata() override;
+
     void continueDecoding() override;
+
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
     }
@@ -271,19 +322,31 @@ private:
       parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
                              grpc_status, details);
     }
+
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
+
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
+
     void encodeData(Buffer::Instance& data, bool end_stream) override;
+
     void encodeTrailers(HeaderMapPtr&& trailers) override;
+
     void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
+
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
+
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
+
     void
     addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
+
     void
     removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
+
     void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
+
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
+
     bool recreateStream() override;
 
     void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
@@ -307,6 +370,7 @@ private:
     }
 
     void requestDataTooLarge();
+
     void requestDataDrained();
 
     StreamDecoderFilterSharedPtr handle_;
@@ -327,19 +391,26 @@ private:
 
     // ActiveStreamFilterBase
     bool canContinue() override { return true; }
+
     Buffer::WatermarkBufferPtr createBuffer() override;
+
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_response_data_; }
+
     bool complete() override { return parent_.state_.local_complete_; }
+
     void do100ContinueHeaders() override {
       parent_.encode100ContinueHeaders(this, *parent_.continue_headers_);
     }
+
     void doHeaders(bool end_stream) override {
       parent_.encodeHeaders(this, *parent_.response_headers_, end_stream);
     }
+
     void doData(bool end_stream) override {
       parent_.encodeData(this, *parent_.buffered_response_data_, end_stream,
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
+
     void drainSavedResponseMetadata() {
       ASSERT(saved_response_metadata_ != nullptr);
       for (auto& metadata_map : *getSavedResponseMetadata()) {
@@ -347,6 +418,7 @@ private:
       }
       getSavedResponseMetadata()->clear();
     }
+
     void handleMetadataAfterHeadersCallback() override;
 
     void doMetadata() override {
@@ -354,34 +426,74 @@ private:
         drainSavedResponseMetadata();
       }
     }
+
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
+
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
+
     void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
+
     HeaderMap& addEncodedTrailers() override;
+
     void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
+
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
+
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
+
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
+
     uint32_t encoderBufferLimit() override { return parent_.buffer_limit_; }
+
     void continueEncoding() override;
+
     const Buffer::Instance* encodingBuffer() override {
       return parent_.buffered_response_data_.get();
     }
+
     void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) override {
       ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
       callback(*parent_.buffered_response_data_.get());
     }
 
     void responseDataTooLarge();
+
     void responseDataDrained();
+
+    bool requestRouteConfigUpdate(std::function<void()>) override { return false; }
 
     StreamEncoderFilterSharedPtr handle_;
   };
 
   using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
+
+  class RouteConfigUpdateRequester {
+  public:
+    virtual ~RouteConfigUpdateRequester() = default;
+    virtual bool requestRouteConfigUpdate(const HeaderString& host, std::function<void()> cb) PURE;
+  };
+
+  class RdsRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
+  public:
+    RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
+        : route_config_provider_(route_config_provider) {}
+    virtual bool requestRouteConfigUpdate(const HeaderString& host,
+                                          std::function<void()> cb) override;
+
+  private:
+    Router::RouteConfigProvider* route_config_provider_;
+  };
+
+  class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
+  public:
+    NullRouteConfigUpdateRequester() = default;
+    virtual bool requestRouteConfigUpdate(const HeaderString&, std::function<void()>) override {
+      return false;
+    }
+  };
 
   /**
    * Wraps a single active stream on the connection. These are either full request/response pairs
@@ -502,6 +614,7 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
+    bool requestRouteConfigUpdate(std::function<void()> cb);
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
@@ -589,6 +702,7 @@ private:
     }
 
     ConnectionManagerImpl& connection_manager_;
+    Router::RouteConfigProvider* route_config_provider_;
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;
@@ -632,6 +746,7 @@ private:
     // response.
     bool encoding_headers_only_{};
     Network::Socket::OptionsSharedPtr upstream_options_;
+    std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

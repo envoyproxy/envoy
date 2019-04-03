@@ -202,6 +202,36 @@ public:
         use_rds_with_vhosts ? RdsConfigWithVhosts : RdsConfig);
   }
 
+  void notifyAboutAliasResolutionFailure(const std::string& version, FakeStreamPtr& stream,
+                                         const std::vector<std::string>& aliases = {}) {
+    envoy::api::v2::DeltaDiscoveryResponse response;
+    response.set_system_version_info("system_version_info_this_is_a_test");
+    response.set_type_url(Config::TypeUrl::get().VirtualHost);
+    auto* resource = response.add_resources();
+    resource->set_name("cannot-resolve-alias");
+    resource->set_version(version);
+    for (auto alias : aliases) {
+      resource->add_aliases(alias);
+    }
+    response.set_nonce("noncense");
+    stream->sendGrpcMessage(response);
+  }
+
+  void sendDeltaDiscoveryResponseWithUnresolvedAliases(
+      const std::vector<envoy::api::v2::route::VirtualHost>& added_or_updated,
+      const std::vector<std::string>& removed, const std::string& version, FakeStreamPtr& stream,
+      const std::vector<std::string>& aliases, const std::vector<std::string>& unresolved_aliases) {
+    auto response = createDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+        Config::TypeUrl::get().VirtualHost, added_or_updated, removed, version, aliases);
+    for (const auto& unresolved_alias : unresolved_aliases) {
+      auto* resource = response.add_resources();
+      resource->set_name(unresolved_alias);
+      resource->set_version(version);
+      resource->add_aliases(unresolved_alias);
+    }
+    stream->sendGrpcMessage(response);
+  }
+
   FakeStreamPtr vhds_stream_;
   bool use_rds_with_vhosts{false};
 };
@@ -245,8 +275,18 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
                                           {":authority", "vhost.first"},
                                           {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"vhost.first"}, {},
+                                           vhds_stream_));
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(Config::TypeUrl::get().VirtualHost,
+                                                                 {buildVirtualHost2()}, {}, "4",
+                                                                 vhds_stream_, {"vhost.first"});
+
+  waitForNextUpstreamRequest(1);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
   response->waitForHeaders();
-  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
   cleanupUpstreamAndDownstream();
 }
@@ -255,7 +295,9 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
 //  - an RDS exchange contains a non-empty virtual_hosts array
 //  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
 //  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
-//  - Upstream makes a request to an (now) unknown domain, which fails
+//  - Upstream makes a request to an (now) unknown domain
+//  - A VHDS DiscoveryReponse received containing update for the domain
+//  - Upstream receives a 200 response
 TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   // RDS exchange with a non-empty virtual_hosts field
   useRdsWithVhosts();
@@ -299,6 +341,97 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
                                           {":authority", "vhost.first"},
                                           {"x-lyft-user-id", "123"}};
   IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"vhost.first"}, {},
+                                           vhds_stream_));
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(Config::TypeUrl::get().VirtualHost,
+                                                                 {buildVirtualHost2()}, {}, "4",
+                                                                 vhds_stream_, {"vhost.first"});
+
+  waitForNextUpstreamRequest(1);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when:
+//  - an RDS exchange contains a non-empty virtual_hosts array
+//  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
+//  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
+//  - Upstream makes a request to an (now) unknown domain
+//  - A VHDS DiscoveryReponse received but contains no update for the domain (the management server
+//  couldn't resolve it)
+//  - Upstream receives a 404 response
+TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
+  // RDS exchange with a non-empty virtual_hosts field
+  useRdsWithVhosts();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // verify that rds-based virtual host can be resolved
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // Attempt to make a request to an unknown host
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/one"},
+                                          {":scheme", "http"},
+                                          {":authority", "vhost.third"},
+                                          {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"vhost.third"}, {},
+                                           vhds_stream_));
+  // Send an empty response back (the management server isn't aware of vhost.third)
+  notifyAboutAliasResolutionFailure("4", vhds_stream_, {"vhost.third"});
+
+  response->waitForHeaders();
+  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when:
+//  - an RDS exchange contains a non-empty virtual_hosts array
+//  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
+//  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
+//  - Upstream makes a request to an (now) unknown domain
+//  - A VHDS DiscoveryReponse received that contains update for vhost.first host, but vhost.third
+//  couldn't be resolved
+//  - Upstream receives a 404 response
+TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral) {
+  // RDS exchange with a non-empty virtual_hosts field
+  useRdsWithVhosts();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // verify that rds-based virtual host can be resolved
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // Attempt to make a request to an unknown host
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/one"},
+                                          {":scheme", "http"},
+                                          {":authority", "vhost.third"},
+                                          {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {"vhost.third"}, {},
+                                           vhds_stream_));
+  // Send an empty response back (the management server isn't aware of vhost.third)
+  sendDeltaDiscoveryResponseWithUnresolvedAliases({buildVirtualHost2()}, {}, "4", vhds_stream_,
+                                                  {"vhost.first"}, {"vhost.third"});
+
   response->waitForHeaders();
   EXPECT_EQ("404", response->headers().Status()->value().getStringView());
 

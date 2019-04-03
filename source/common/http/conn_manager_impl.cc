@@ -481,8 +481,16 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   }
 }
 
+bool ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
+    const HeaderString& host, std::function<void()> cb) {
+  ASSERT(!host.empty());
+  auto host_header = Http::LowerCaseString(std::string(host.getStringView())).get();
+  return route_config_provider_->requestVirtualHostsUpdate(host_header, cb);
+}
+
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
+      route_config_provider_(connection_manager.config_.routeConfigProvider()),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
@@ -495,7 +503,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
-
+  if (connection_manager.config_.routeConfigProvider() != nullptr) {
+    route_config_update_requester_ =
+        std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
+            connection_manager.config_.routeConfigProvider());
+  } else if (connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
+    route_config_update_requester_ =
+        std::make_unique<ConnectionManagerImpl::NullRouteConfigUpdateRequester>();
+  }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
 
@@ -1327,6 +1342,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
     }
     if (snapped_route_config_ != nullptr) {
       route = snapped_route_config_->route(*request_headers_, stream_info_, stream_id_);
+    } else if (route_config_provider_ != nullptr) {
+      route = route_config_provider_->config()->route(*request_headers_, stream_info_, stream_id_);
     }
   }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
@@ -1338,6 +1355,11 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
         connection_manager_.cluster_manager_.get(stream_info_.route_entry_->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
+}
+
+bool ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(std::function<void()> cb) {
+  return route_config_update_requester_->requestRouteConfigUpdate(request_headers_->Host()->value(),
+                                                                  cb);
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -2065,11 +2087,16 @@ Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBas
 }
 
 Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route() {
-  if (!parent_.cached_route_.has_value()) {
+  if (!parent_.cached_route_.has_value() || parent_.cached_route_.value() == nullptr) {
     parent_.refreshCachedRoute();
   }
 
   return parent_.cached_route_.value();
+}
+
+bool ConnectionManagerImpl::ActiveStreamFilterBase::requestRouteConfigUpdate(
+    std::function<void()> cb) {
+  return parent_.requestRouteConfigUpdate(cb);
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {

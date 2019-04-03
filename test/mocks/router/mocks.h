@@ -418,6 +418,7 @@ public:
   MOCK_CONST_METHOD0(lastUpdated, SystemTime());
   MOCK_METHOD0(onConfigUpdate, void());
   MOCK_CONST_METHOD1(validateConfig, void(const envoy::api::v2::RouteConfiguration&));
+  MOCK_METHOD2(requestVirtualHostsUpdate, bool(const std::string&, std::function<void()>));
 
   std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<MockConfig>()};
 };

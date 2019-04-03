@@ -68,6 +68,7 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
                                    absl::string_view details) {
         sendLocalReply_(code, body, modify_headers, grpc_status, details);
       }));
+  ON_CALL(*this, requestRouteConfigUpdate(_)).WillByDefault(Return(false));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;
@@ -94,6 +95,7 @@ MockStreamEncoderFilterCallbacks::MockStreamEncoderFilterCallbacks() {
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));
   ON_CALL(*this, tracingConfig()).WillByDefault(ReturnRef(tracing_config_));
   ON_CALL(*this, scope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, requestRouteConfigUpdate(_)).WillByDefault(Return(false));
 }
 
 MockStreamEncoderFilterCallbacks::~MockStreamEncoderFilterCallbacks() = default;

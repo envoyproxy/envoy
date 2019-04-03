@@ -31,7 +31,7 @@ TEST(RouterFilterConfigTest, SimpleRouterFilterConfig) {
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_)).Times(2);
   cb(filter_callback);
 }
 
@@ -78,7 +78,10 @@ TEST(RouterFilterConfigTest, RouterV2Filter) {
   RouterFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(router_config, "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_))
+      .Times(2
+
+      );
   cb(filter_callback);
 }
 
@@ -88,7 +91,7 @@ TEST(RouterFilterConfigTest, RouterFilterWithEmptyProtoConfig) {
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), "stats.", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_)).Times(2);
   cb(filter_callback);
 }
 

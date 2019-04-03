@@ -32,11 +32,23 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
+  // TODO: check if any changes have been made
+  collectAliasesInUpdate(added_resources);
   removeVhosts(virtual_hosts_, removed_resources);
   updateVhosts(virtual_hosts_, added_resources);
   rebuildRouteConfig(virtual_hosts_, route_config_proto_);
 
   return onRdsUpdate(route_config_proto_, version_info);
+}
+
+void RouteConfigUpdateReceiverImpl::collectAliasesInUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
+  aliases_in_last_update_.clear();
+  for (const auto& resource : added_resources) {
+    for (const std::string& alias : resource.aliases()) {
+      aliases_in_last_update_.insert(alias);
+    }
+  }
 }
 
 void RouteConfigUpdateReceiverImpl::initializeVhosts(
@@ -47,18 +59,24 @@ void RouteConfigUpdateReceiverImpl::initializeVhosts(
   }
 }
 
-void RouteConfigUpdateReceiverImpl::removeVhosts(
+bool RouteConfigUpdateReceiverImpl::removeVhosts(
     std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
+  bool removed_any = false;
   for (const auto& vhost_name : removed_vhost_names) {
-    vhosts.erase(vhost_name);
+    removed_any = removed_any || (vhosts.erase(vhost_name) > 0);
   }
+  return removed_any;
 }
 
 void RouteConfigUpdateReceiverImpl::updateVhosts(
     std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
   for (const auto& resource : added_resources) {
+    // the management server returns empty resources For aliases that it couldn't resolve.
+    if (isAliasNotResolvedReply(resource)) {
+      continue;
+    }
     envoy::api::v2::route::VirtualHost vhost =
         MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource.resource());
     MessageUtil::validate(vhost, validation_visitor_);
@@ -77,6 +95,11 @@ void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
   for (const auto& vhost : vhosts) {
     route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
   }
+}
+
+bool RouteConfigUpdateReceiverImpl::isAliasNotResolvedReply(
+    const envoy::api::v2::Resource& resource) const {
+  return !resource.has_resource();
 }
 
 } // namespace Router

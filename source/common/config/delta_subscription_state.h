@@ -24,6 +24,7 @@ public:
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const std::set<std::string>& cur_added,
                                   const std::set<std::string>& cur_removed) override;
+  void addAliasesToResolve(const std::set<std::string>& aliases);
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const override;
@@ -75,6 +76,8 @@ private:
   void setResourceVersion(const std::string& resource_name, const std::string& resource_version);
   void setResourceWaitingForServer(const std::string& resource_name);
   void setLostInterestInResource(const std::string& resource_name);
+  void populateDiscoveryRequest(envoy::api::v2::DeltaDiscoveryRequest& request);
+  void populateDiscoveryRequestWithAliases(envoy::api::v2::DeltaDiscoveryRequest& request);
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have
@@ -92,6 +95,8 @@ private:
   // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
+  // Tracks resource aliases in on-demand requests since the previous DeltaDiscoveryRequest we sent.
+  std::set<std::string> aliases_added_;
 };
 
 class DeltaSubscriptionStateFactory : public SubscriptionStateFactory {

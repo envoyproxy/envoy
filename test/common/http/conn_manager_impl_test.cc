@@ -66,6 +66,22 @@ namespace Http {
 
 class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
+  struct RouteConfigProvider : public Router::RouteConfigProvider {
+    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
+
+    // Router::RouteConfigProvider
+    Router::ConfigConstSharedPtr config() override { return route_config_; }
+    absl::optional<ConfigInfo> configInfo() const override { return {}; }
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    void onConfigUpdate() override {}
+    bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
+      return false;
+    }
+
+    TimeSource& time_source_;
+    std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
+  };
+
   HttpConnectionManagerImplTest()
       : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
         access_logs_{
@@ -3324,6 +3340,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _))
       .WillOnce(Return(route1))
       .WillOnce(Return(route2))
+      .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr));
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
@@ -4733,7 +4750,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteNotFound) {
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
               getRouteConfig(_))
-      .Times(2)
+      .Times(3)
       .WillRepeatedly(Return(nullptr));
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
@@ -4761,7 +4778,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
   EXPECT_CALL(*static_cast<const Router::MockScopedConfig*>(
                   scopedRouteConfigProvider()->config<Router::ScopedConfig>().get()),
               getRouteConfig(_))
-      .Times(3)
+      .Times(4)
+      .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))
       .WillOnce(Return(nullptr))        // refreshCachedRoute first time.
       .WillOnce(Return(route_config_)); // triggered by callbacks_->route(), SRDS now updated.

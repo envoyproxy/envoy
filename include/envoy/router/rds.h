@@ -53,6 +53,17 @@ public:
    * Validate if the route configuration can be applied to the context of the route config provider.
    */
   virtual void validateConfig(const envoy::api::v2::RouteConfiguration& config) const PURE;
+
+  /**
+   * Callback used to request an update to the route configuration from the management server.
+   * @param for_domain supplies the domain name that virtual hosts must match on
+   * @param cb callback to be called when the configuration update has been propagated to worker
+   * threads
+   * @return whether a request for a configuration update has been scheduled (returns false only
+   * if VHDS isn't configured)
+   */
+  virtual bool requestVirtualHostsUpdate(const std::string& for_domain,
+                                         std::function<void()> cb) PURE;
 };
 
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;

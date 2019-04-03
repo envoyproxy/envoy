@@ -45,6 +45,7 @@ bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
   return pausable_ack_queue_.paused(type_url);
 }
 
+<<<<<<< HEAD
 void NewGrpcMuxImpl::genericHandleResponse(const std::string& type_url,
                                            const void* response_proto_ptr) {
   auto sub = subscriptions_.find(type_url);
@@ -56,6 +57,17 @@ void NewGrpcMuxImpl::genericHandleResponse(const std::string& type_url,
     return;
   }
   pausable_ack_queue_.push(sub->second->handleResponse(response_proto_ptr));
+  trySendDiscoveryRequests();
+}
+
+void NewGrpcMuxImpl::requestAliasesResolution(const std::string& type_url,
+                                              const std::set<std::string>& aliases) {
+  auto sub = subscriptions_.find(type_url);
+  RELEASE_ASSERT(
+      sub != subscriptions_.end(),
+      fmt::format("Tried to resolve aliases for non-existent subscription {}.", type_url));
+
+  sub->second->sub_state_.addAliasesToResolve(aliases);
   trySendDiscoveryRequests();
 }
 

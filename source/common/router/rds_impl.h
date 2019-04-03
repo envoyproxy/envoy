@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -71,6 +72,9 @@ public:
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
   void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
+  bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
+    return false;
+  }
 
 private:
   ConfigConstSharedPtr config_;
@@ -111,6 +115,7 @@ public:
     return route_config_providers_;
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
+  void updateOnDemand(const std::set<std::string>& aliases);
 
 private:
   // Config::SubscriptionCallbacks
@@ -164,6 +169,15 @@ private:
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
 
+struct UpdateOnDemandCallback {
+  const std::set<std::string> aliases_;
+  std::function<void()> cb_;
+};
+
+struct ThreadLocalCallbacks : public ThreadLocal::ThreadLocalObject {
+  std::queue<UpdateOnDemandCallback> callbacks_;
+};
+
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
  * the subscription.
@@ -182,6 +196,7 @@ public:
   }
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override;
+  bool requestVirtualHostsUpdate(const std::string& for_domain, std::function<void()> cb) override;
   void validateConfig(const envoy::api::v2::RouteConfiguration& config) const override;
 
 private:
@@ -193,11 +208,14 @@ private:
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
                              Server::Configuration::FactoryContext& factory_context);
 
+  //  void addConfigUpdateCallback(std::function<void()> cb);
+
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   RouteConfigUpdatePtr& config_update_info_;
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotPtr config_update_callbacks_;
 
   friend class RouteConfigProviderManagerImpl;
 };

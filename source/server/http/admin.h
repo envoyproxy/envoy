@@ -181,6 +181,9 @@ private:
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
     void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
+    bool requestVirtualHostsUpdate(const std::string&, std::function<void()>) override {
+      return false;
+    }
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;

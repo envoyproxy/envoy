@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -17,7 +18,6 @@
 namespace Envoy {
 namespace Router {
 
-// Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
 VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    const std::string& stat_prefix,
@@ -45,6 +45,10 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
           *scope_, *this);
 }
 
+void VhdsSubscription::updateOnDemand(const std::set<std::string>& aliases) {
+  subscription_->addResourceAliases(aliases);
+}
+
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                                             const EnvoyException*) {
   ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
@@ -68,6 +72,5 @@ void VhdsSubscription::onConfigUpdate(
 
   init_target_.ready();
 }
-
 } // namespace Router
 } // namespace Envoy

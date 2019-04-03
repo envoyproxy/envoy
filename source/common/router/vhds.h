@@ -47,6 +47,7 @@ public:
   ~VhdsSubscription() override { init_target_.ready(); }
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
+  void updateOnDemand(const std::set<std::string>& aliases);
 
 private:
   // Config::SubscriptionCallbacks

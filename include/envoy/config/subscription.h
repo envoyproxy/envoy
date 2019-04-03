@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -90,6 +91,12 @@ public:
    * be passed to std::set_difference, which must be given sorted collections.
    */
   virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+
+  /**
+   * Add aliases for resources to fetch.
+   * @param resources set of aliases to fetch.
+   */
+  virtual void addResourceAliases(const std::set<std::string>&) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

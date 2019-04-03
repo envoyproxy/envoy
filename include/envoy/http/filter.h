@@ -152,6 +152,14 @@ public:
   virtual Router::RouteConstSharedPtr route() PURE;
 
   /**
+   * Schedules a request for a RouteConfiguration update from the management server.
+   * @param cb callback to be called when the configuration update has been propagated to the worker
+   * thread.
+   * @return whether RouteConfiguration update has been scheduled.
+   */
+  virtual bool requestRouteConfigUpdate(std::function<void()> cb) PURE;
+
+  /**
    * Returns the clusterInfo for the cached route.
    * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
    * view of clusterInfo after a route is picked/repicked.

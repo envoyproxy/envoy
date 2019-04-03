@@ -158,6 +158,13 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(
   init_target_.ready();
 }
 
+void RdsRouteConfigSubscription::updateOnDemand(const std::set<std::string>& aliases) {
+  if (vhds_subscription_.get() == nullptr) {
+    return;
+  }
+  vhds_subscription_->updateOnDemand(aliases);
+}
+
 bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
@@ -179,7 +186,8 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       config_update_info_(subscription_->routeConfigUpdate()),
       factory_context_(factory_context.getServerFactoryContext()),
       validator_(factory_context.messageValidationVisitor()),
-      tls_(factory_context.threadLocal().allocateSlot()) {
+      tls_(factory_context.threadLocal().allocateSlot(),
+      config_update_callbacks_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
     initial_config = std::make_shared<ConfigImpl>(config_update_info_->routeConfiguration(),
@@ -189,6 +197,9 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   }
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>(initial_config);
+  });
+  config_update_callbacks_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalCallbacks>();
   });
   subscription_->routeConfigProviders().insert(this);
 }
@@ -210,12 +221,58 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
     prev_config->config_ = new_config;
     return previous;
   });
+
+  const auto aliases = config_update_info_->aliasesInLastVhdsUpdate();
+  // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
+  if (aliases.empty()) {
+    return;
+  }
+
+  // Notifies connections that RouteConfiguration update has been propagated.
+  // Callbacks processing is performed in FIFO order and stops when the alias(es) used in the VHDS
+  // update request do not match the aliases in the update response. The assumption is the response
+  // to a request is not going to arrive before all requests before it have been responded to.
+  config_update_callbacks_->runOnAllThreads(
+      [aliases](ThreadLocal::ThreadLocalObjectSharedPtr previous)
+          -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        auto callbacks = std::dynamic_pointer_cast<ThreadLocalCallbacks>(previous)->callbacks_;
+        std::vector<std::string> aliases_not_in_update;
+        while (!callbacks.empty()) {
+          auto update_on_demand_callback = callbacks.front();
+          std::set_difference(update_on_demand_callback.aliases_.begin(),
+                              update_on_demand_callback.aliases_.end(), aliases.begin(),
+                              aliases.end(), std::back_inserter(aliases_not_in_update));
+          if (aliases_not_in_update.empty()) {
+            callbacks.pop();
+            update_on_demand_callback.cb_();
+            aliases_not_in_update.clear();
+          } else {
+            break;
+          }
+        }
+        return previous;
+      });
 }
 
 void RdsRouteConfigProviderImpl::validateConfig(
     const envoy::api::v2::RouteConfiguration& config) const {
   // TODO(lizan): consider cache the config here until onConfigUpdate.
   ConfigImpl validation_config(config, factory_context_, validator_, false);
+}
+
+// Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
+// response has been propagated to the worker thread that was the request origin.
+bool RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(const std::string& for_domain,
+                                                           std::function<void()> cb) {
+  if (!config()->usesVhds()) {
+    return false;
+  }
+
+  factory_context_.dispatcher().post(
+      [this, for_domain]() -> void { subscription_->updateOnDemand({for_domain}); });
+  config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push({{for_domain}, cb});
+
+  return true;
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

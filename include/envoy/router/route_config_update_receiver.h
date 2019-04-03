@@ -73,6 +73,11 @@ public:
    * @return SystemTime the time of the last update.
    */
   virtual SystemTime lastUpdated() const PURE;
+
+  /**
+   * @return aliases received with the last VHDS update.
+   */
+  virtual const std::set<std::string>& aliasesInLastVhdsUpdate() PURE;
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;
