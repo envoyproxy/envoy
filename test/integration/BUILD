@@ -125,8 +125,8 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:rds_cc",
         "@envoy_api//envoy/api/v2:discovery_cc",
+        "@envoy_api//envoy/api/v2:rds_cc",
     ],
 )
 
