@@ -108,9 +108,9 @@ Ssl::PrivateKeyOperationsProviderSharedPtr getPrivateKeyOperationsProvider(
     const envoy::api::v2::auth::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
 
-  const auto private_key_operations_config = config.private_key_operations();
+  if (config.has_private_key_operations()) {
+    const auto private_key_operations_config = config.private_key_operations();
 
-  if (private_key_operations_config.provider_name() != "") {
     return factory_context.sslContextManager()
         .privateKeyOperationsManager()
         .createPrivateKeyOperationsProvider(private_key_operations_config, factory_context);

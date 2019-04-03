@@ -63,9 +63,11 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   provider_ = ctx_->getPrivateKeyOperationsProvider();
   if (provider_) {
     ops_ = provider_->getPrivateKeyOperations(*this, callbacks_->connection().dispatcher());
-    Ssl::PrivateKeyMethodSharedPtr private_key_methods = ops_->getPrivateKeyMethods(ssl_.get());
-    if (private_key_methods) {
-      SSL_set_private_key_method(ssl_.get(), private_key_methods.get());
+    if (ops_) {
+      Ssl::PrivateKeyMethodSharedPtr private_key_methods = ops_->getPrivateKeyMethods(ssl_.get());
+      if (private_key_methods) {
+        SSL_set_private_key_method(ssl_.get(), private_key_methods.get());
+      }
     }
   }
 
@@ -134,9 +136,11 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 }
 
 void SslSocket::complete(Envoy::Ssl::PrivateKeyOperationStatus status) {
+  ASSERT(async_handshake_in_progress_);
+  async_handshake_in_progress_ = false;
+
   if (status == Envoy::Ssl::PrivateKeyOperationStatus::Success) {
     ENVOY_CONN_LOG(debug, "async handshake complete", callbacks_->connection());
-    async_handshake_in_progress_ = false;
     if (!handshake_complete_) {
       // It's possible that the async call comes in later, but the handshare has been retried from
       // doWrite or similar. */
