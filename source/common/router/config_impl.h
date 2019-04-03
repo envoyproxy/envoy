@@ -793,6 +793,7 @@ public:
 
   const std::string& name() const override { return name_; }
   bool usesVhds() const override { return false; }
+
 private:
   std::list<Http::LowerCaseString> internal_only_headers_;
   const std::string name_;
