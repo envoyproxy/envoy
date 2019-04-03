@@ -34,8 +34,9 @@ public:
     Envoy::Buffer::BufferFragmentImpl& fragment = bundle->fragment_with_padding.fragment;
     return new (&fragment) Envoy::Buffer::BufferFragmentImpl(
         bundle->buffer, length,
-        [allocator, bundle](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
-          allocator->Delete(const_cast<char*>(reinterpret_cast<const char*>(bundle)));
+        [allocator](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl* frag) {
+          // Delete will deallocate the bundle of fragment and buffer.
+          allocator->Delete(const_cast<char*>(reinterpret_cast<const char*>(frag)));
         });
   }
 
@@ -60,9 +61,7 @@ public:
 
   // Move constructors. |other| will not hold a reference to the data buffer
   // after this call completes.
-  QuicMemSliceImpl(QuicMemSliceImpl&& other) {
-    single_slice_buffer_.move(other.single_slice_buffer_);
-  }
+  QuicMemSliceImpl(QuicMemSliceImpl&& other) { *this = std::move(other); }
 
   QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) {
     if (this != &other) {

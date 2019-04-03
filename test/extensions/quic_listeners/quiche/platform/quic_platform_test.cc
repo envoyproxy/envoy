@@ -492,7 +492,7 @@ TEST(QuicPlatformTest, ConstructMemSliceFromBuffer) {
   bool fragment_releaser_called = false;
   Envoy::Buffer::BufferFragmentImpl fragment(
       str.data(), str.length(),
-      [&fragment_released](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
+      [&fragment_releaser_called](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
         // Used to verify that mem slice release appropriately.
         fragment_releaser_called = true;
       });
