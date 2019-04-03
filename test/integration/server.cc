@@ -6,7 +6,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/thread.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/local_info/local_info_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/thread_local_store.h"
@@ -15,6 +14,7 @@
 #include "server/hot_restart_nop_impl.h"
 #include "server/options_impl.h"
 
+#include "test/common/runtime/utility.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
@@ -44,44 +44,55 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
 
 } // namespace Server
 
-IntegrationTestServerPtr
-IntegrationTestServer::create(const std::string& config_path,
-                              const Network::Address::IpVersion version,
-                              std::function<void()> pre_worker_start_test_steps, bool deterministic,
-                              Event::TestTimeSystem& time_system, Api::Api& api) {
+IntegrationTestServerPtr IntegrationTestServer::create(
+    const std::string& config_path, const Network::Address::IpVersion version,
+    std::function<void()> on_server_init_function, bool deterministic,
+    Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
-  server->start(version, pre_worker_start_test_steps, deterministic);
+  server->start(version, on_server_init_function, deterministic, defer_listener_finalization);
   return server;
 }
 
+void IntegrationTestServer::waitUntilListenersReady() {
+  Thread::LockGuard guard(listeners_mutex_);
+  while (pending_listeners_ != 0) {
+    // If your test is hanging forever here, you may need to create your listener manually,
+    // after BaseIntegrationTest::initialize() is done. See cds_integration_test.cc for an example.
+    listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
+  }
+  ENVOY_LOG(info, "listener wait complete");
+}
+
 void IntegrationTestServer::start(const Network::Address::IpVersion version,
-                                  std::function<void()> pre_worker_start_test_steps,
-                                  bool deterministic) {
+                                  std::function<void()> on_server_init_function, bool deterministic,
+                                  bool defer_listener_finalization) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
   thread_ = api_.threadFactory().createThread(
       [version, deterministic, this]() -> void { threadRoutine(version, deterministic); });
 
   // If any steps need to be done prior to workers starting, do them now. E.g., xDS pre-init.
-  if (pre_worker_start_test_steps != nullptr) {
-    pre_worker_start_test_steps();
+  // Note that there is no synchronization guaranteeing this happens either
+  // before workers starting or after server start. Any needed synchronization must occur in the
+  // routines. These steps are executed at this point in the code to allow server initialization to
+  // be dependent on them (e.g. control plane peers).
+  if (on_server_init_function != nullptr) {
+    on_server_init_function();
   }
 
   // Wait for the server to be created and the number of initial listeners to wait for to be set.
   server_set_.waitReady();
 
-  // Now wait for the initial listeners to actually be listening on the worker. At this point
-  // the server is up and ready for testing.
-  Thread::LockGuard guard(listeners_mutex_);
-  while (pending_listeners_ != 0) {
-    listeners_cv_.wait(listeners_mutex_); // Safe since CondVar::wait won't throw.
+  if (!defer_listener_finalization) {
+    // Now wait for the initial listeners (if any) to actually be listening on the worker.
+    // At this point the server is up and ready for testing.
+    waitUntilListenersReady();
   }
-  ENVOY_LOG(info, "listener wait complete");
 
-  // If we are capturing, spin up tcpdump.
-  const auto capture_path = TestEnvironment::getOptionalEnvVar("CAPTURE_PATH");
-  if (capture_path) {
+  // If we are tapping, spin up tcpdump.
+  const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
+  if (tap_path) {
     std::vector<uint32_t> ports;
     for (auto listener : server().listenerManager().listeners()) {
       const auto listen_addr = listener.get().socket().localAddress();
@@ -95,7 +106,7 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
     const std::string test_id =
         std::string(test_info->name()) + "_" + std::string(test_info->test_case_name());
     const std::string pcap_path =
-        capture_path.value() + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}) + "_server.pcap";
+        tap_path.value() + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}) + "_server.pcap";
     tcp_dump_ = std::make_unique<TcpDump>(pcap_path, "lo", ports);
   }
 }
@@ -143,19 +154,30 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                           lock, *this, std::move(random_generator));
 }
 
+void IntegrationTestServer::onRuntimeCreated() {
+  // Override runtime values to by default allow all disallowed features.
+  //
+  // Per #6288 we explicitly want to allow end to end testing of disallowed features until the code
+  // is removed from Envoy.
+  //
+  // This will revert as the runtime is torn down with the test Envoy server.
+  Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed();
+}
+
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
-  Server::HotRestartNopImpl restarter;
+  Stats::FakeSymbolTableImpl symbol_table;
+  Server::HotRestartNopImpl restarter(symbol_table);
   ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
+  Stats::HeapStatDataAllocator stats_allocator(symbol_table);
   Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                               access_log_lock, component_factory, std::move(random_generator), tls,
-                              Thread::threadFactoryForTest());
+                              Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
   // This is technically thread unsafe (assigning to a shared_ptr accessed
   // across threads), but because we synchronize below through serverReady(), the only
   // consumer on the main test thread in ~IntegrationTestServerImpl will not race.

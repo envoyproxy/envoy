@@ -31,21 +31,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "ratelimit_registration_lib",
-    srcs = ["ratelimit_registration.cc"],
-    hdrs = ["ratelimit_registration.h"],
-    deps = [
-        ":ratelimit_client_interface",
-        ":ratelimit_lib",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//include/envoy/server:instance_interface",
-        "//source/common/common:assert_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "ratelimit_client_interface",
     hdrs = ["ratelimit.h"],
     external_deps = ["abseil_optional"],

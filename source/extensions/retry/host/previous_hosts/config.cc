@@ -8,9 +8,8 @@ namespace Extensions {
 namespace Retry {
 namespace Host {
 
-static Registry::RegisterFactory<PreviousHostsRetryPredicateFactory,
-                                 Upstream::RetryHostPredicateFactory>
-    register_;
+REGISTER_FACTORY(PreviousHostsRetryPredicateFactory, Upstream::RetryHostPredicateFactory);
+
 }
 } // namespace Retry
 } // namespace Extensions

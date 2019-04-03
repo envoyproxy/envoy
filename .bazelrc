@@ -1,1 +1,60 @@
-import %workspace%/tools/bazel.rc
+# Envoy specific Bazel build/test options.
+
+# Bazel doesn't need more than 200MB of memory based on memory profiling:
+# https://docs.bazel.build/versions/master/skylark/performance.html#memory-profiling
+# Limiting JVM heapsize here to let it do GC more when approaching the limit to
+# leave room for compiler/linker.
+startup --host_jvm_args=-Xmx512m
+build --workspace_status_command=bazel/get_workspace_status
+build --experimental_remap_main_repo
+
+# Basic ASAN/UBSAN that works for gcc
+build:asan --define ENVOY_CONFIG_ASAN=1
+build:asan --copt -fsanitize=address,undefined
+build:asan --linkopt -fsanitize=address,undefined
+build:asan --copt -fno-sanitize=vptr
+build:asan --linkopt -fno-sanitize=vptr
+build:asan --linkopt -ldl
+build:asan --define tcmalloc=disabled
+build:asan --build_tag_filters=-no_asan
+build:asan --test_tag_filters=-no_asan
+build:asan --define signal_trace=disabled
+build:asan --copt -DADDRESS_SANITIZER=1
+build:asan --copt -D__SANITIZE_ADDRESS__
+build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true
+build:asan --test_env=ASAN_SYMBOLIZER_PATH
+
+# Clang ASAN/UBSAN
+build:clang-asan --config=asan
+
+# macOS ASAN/UBSAN
+build:macos-asan --config=asan
+# Workaround, see https://github.com/bazelbuild/bazel/issues/6932
+build:macos-asan --copt -Wno-macro-redefined
+build:macos-asan --copt -D_FORTIFY_SOURCE=0
+
+# Clang TSAN
+build:clang-tsan --define ENVOY_CONFIG_TSAN=1
+build:clang-tsan --copt -fsanitize=thread
+build:clang-tsan --linkopt -fsanitize=thread
+build:clang-tsan --define tcmalloc=disabled
+
+# Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
+# support (see https://github.com/envoyproxy/envoy/issues/443).
+build:clang-msan --define ENVOY_CONFIG_MSAN=1
+build:clang-msan --copt -fsanitize=memory
+build:clang-msan --linkopt -fsanitize=memory
+build:clang-msan --define tcmalloc=disabled
+build:clang-msan --copt -fsanitize-memory-track-origins=2
+
+# Clang with libc++
+# TODO(cmluciano) fix and re-enable _LIBCPP_VERSION testing for TCMALLOC in Envoy::Stats::TestUtil::hasDeterministicMallocStats
+# and update stats_integration_test with appropriate m_per_cluster value
+build:libc++ --action_env=CC
+build:libc++ --action_env=CXX
+build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:libc++ --action_env=PATH
+build:libc++ --define force_libcpp=enabled
+
+# Test options
+test --test_env=HEAPCHECK=normal --test_env=PPROF_PATH

@@ -1,0 +1,102 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+      headers {
+        key: "blah"
+        value: "nosniff"
+      }
+      headers {
+        key: "cookie"
+        value: "foo=bar"
+      }
+      headers {
+        key: "cookie"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      data_value: "4\r\nWiki\r\n5\r\npedia\r\nE\r\n in\r\n\r\nchunks.\r\n0\r\n\r\n"
+    }
+  }
+}
+actions { quiesce_drain {} }
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      data: 54
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+        headers {
+          key: "content-length"
+          value: "5"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      data_value: "4\r\nWiki\r\n5\r\npedia\r\nE\r\n in\r\n\r\nchunks.\r\n0\r\n\r\n"
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      trailers {
+        headers {
+          key: "foo"
+          value: "bar"
+        }
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      trailers {
+        headers {
+          key: "foo"
+          value: "bar"
+        }
+      }
+    }
+  }
+}

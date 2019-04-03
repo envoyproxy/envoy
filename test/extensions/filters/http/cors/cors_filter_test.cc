@@ -453,6 +453,9 @@ TEST_F(CorsFilterTest, EncodeWithExposeHeaders) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_.encode100ContinueHeaders(continue_headers));
 
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
+
   Http::TestHeaderMapImpl response_headers{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("localhost", response_headers.get_("access-control-allow-origin"));

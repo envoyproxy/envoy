@@ -12,7 +12,6 @@
 #include "common/config/json_utility.h"
 #include "common/config/resources.h"
 #include "common/config/well_known_names.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -77,10 +76,10 @@ void Utility::checkLocalInfo(const std::string& error_prefix,
   }
 }
 
-void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
+void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Api::Api& api) {
   // TODO(junr03): the file might be deleted between this check and the
   // watch addition.
-  if (!Filesystem::fileExists(path)) {
+  if (!api.fileSystem().fileExists(path)) {
     throw EnvoyException(fmt::format(
         "envoy::api::v2::Path must refer to an existing path in the system: '{}' does not exist",
         path));
@@ -90,7 +89,8 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
 void Utility::checkApiConfigSourceNames(
     const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   const bool is_grpc =
-      (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
+      (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC ||
+       api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
 
   if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
     throw EnvoyException(
@@ -100,19 +100,19 @@ void Utility::checkApiConfigSourceNames(
 
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
-      throw EnvoyException(fmt::format(
-          "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(DELTA_)GRPC "
+                                       "must not have a cluster name specified: {}",
+                                       api_config_source.DebugString()));
     }
     if (api_config_source.grpc_services().size() > 1) {
-      throw EnvoyException(fmt::format(
-          "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(DELTA_)GRPC "
+                                       "must have a single gRPC service specified: {}",
+                                       api_config_source.DebugString()));
     }
   } else {
     if (!api_config_source.grpc_services().empty()) {
       throw EnvoyException(
-          fmt::format("envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have "
+          fmt::format("envoy::api::v2::core::ConfigSource, if not a gRPC type, must not have "
                       "a gRPC service specified: {}",
                       api_config_source.DebugString()));
     }
@@ -127,6 +127,7 @@ void Utility::checkApiConfigSourceNames(
 void Utility::validateClusterName(const Upstream::ClusterManager::ClusterInfoMap& clusters,
                                   const std::string& cluster_name) {
   const auto& it = clusters.find(cluster_name);
+
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
       it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
     throw EnvoyException(fmt::format(
@@ -175,6 +176,12 @@ std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
     const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   return std::chrono::milliseconds(
       PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
+}
+
+std::chrono::milliseconds
+Utility::configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSource& config_source) {
+  return std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 0));
 }
 
 void Utility::translateCdsConfig(const Json::Object& json_config,
@@ -249,8 +256,9 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
     const envoy::api::v2::core::ApiConfigSource& api_config_source, Stats::Scope& scope) {
   Utility::checkApiConfigSourceNames(api_config_source);
 
-  if (api_config_source.api_type() != envoy::api::v2::core::ApiConfigSource::GRPC) {
-    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource type must be GRPC: {}",
+  if (api_config_source.api_type() != envoy::api::v2::core::ApiConfigSource::GRPC &&
+      api_config_source.api_type() != envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
+    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource type must be gRPC: {}",
                                      api_config_source.DebugString()));
   }
 

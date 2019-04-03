@@ -2,6 +2,7 @@
 
 #include "common/event/real_time_system.h"
 
+#include "test/test_common/global.h"
 #include "test/test_common/test_time_system.h"
 
 namespace Envoy {
@@ -16,16 +17,24 @@ public:
           const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // Event::TimeSystem
-  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& libevent) override {
-    return real_time_system_.createScheduler(libevent);
+  Event::SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
+    return real_time_system_.createScheduler(base_scheduler);
   }
 
   // TimeSource
-  SystemTime systemTime() override { return real_time_system_.systemTime(); }
-  MonotonicTime monotonicTime() override { return real_time_system_.monotonicTime(); }
+  SystemTime systemTime() override;
+  MonotonicTime monotonicTime() override;
 
 private:
   Event::RealTimeSystem real_time_system_;
+};
+
+class GlobalTimeSystem : public DelegatingTestTimeSystemBase<TestTimeSystem> {
+public:
+  TestTimeSystem& timeSystem() override;
+
+private:
+  Test::Global<SingletonTimeSystemHelper> singleton_;
 };
 
 } // namespace Event
@@ -33,16 +42,15 @@ private:
 // Instantiates real-time sources for testing purposes. In general, this is a
 // bad idea, and tests should use simulated or mock time.
 //
-// TODO(#4160): change all references to this class to instantiate instead to
-// some kind of mock or simulated-time source.
+// TODO(#4160): change most references to this class to SimulatedTimeSystem.
 class DangerousDeprecatedTestTime {
 public:
   DangerousDeprecatedTestTime();
 
-  Event::TestTimeSystem& timeSystem() { return time_system_; }
+  Event::TestTimeSystem& timeSystem() { return time_system_.timeSystem(); }
 
 private:
-  Event::TestRealTimeSystem time_system_;
+  Event::DelegatingTestTimeSystem<Event::TestRealTimeSystem> time_system_;
 };
 
 } // namespace Envoy

@@ -22,7 +22,12 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SecretManagerImplTest : public testing::Test {};
+class SecretManagerImplTest : public testing::Test {
+protected:
+  SecretManagerImplTest() : api_(Api::createApiForTest()) {}
+
+  Api::ApiPtr api_;
+};
 
 // Validate that secret manager adds static TLS certificate secret successfully.
 TEST_F(SecretManagerImplTest, TlsCertificateSecretLoadSuccess) {
@@ -32,9 +37,9 @@ TEST_F(SecretManagerImplTest, TlsCertificateSecretLoadSuccess) {
 name: "abc.com"
 tls_certificate:
   certificate_chain:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
   private_key:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
 )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
@@ -44,12 +49,14 @@ tls_certificate:
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
   Ssl::TlsCertificateConfigImpl tls_config(
-      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret());
-  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
+      *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), *api_);
+  const std::string cert_pem =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config.certificateChain());
 
-  const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
+  const std::string key_pem =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
 }
@@ -63,9 +70,9 @@ TEST_F(SecretManagerImplTest, DuplicateStaticTlsCertificateSecret) {
     name: "abc.com"
     tls_certificate:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
     )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
@@ -83,7 +90,7 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
       R"EOF(
       name: "abc.com"
       validation_context:
-        trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+        trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
         allow_expired_certificate: true
       )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
@@ -93,8 +100,9 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
   ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
   Ssl::CertificateValidationContextConfigImpl cvc_config(
-      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret());
-  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
+      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_);
+  const std::string cert_pem =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             cvc_config.caCert());
 }
@@ -107,7 +115,7 @@ TEST_F(SecretManagerImplTest, DuplicateStaticCertificateValidationContextSecret)
       R"EOF(
     name: "abc.com"
     validation_context:
-      trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+      trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
       allow_expired_certificate: true
     )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
@@ -129,7 +137,7 @@ TEST_F(SecretManagerImplTest, NotImplementedException) {
 name: "abc.com"
 session_ticket_keys:
   keys:
-    - filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+    - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
 )EOF";
 
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
@@ -167,19 +175,22 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
 name: "abc.com"
 tls_certificate:
   certificate_chain:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
   private_key:
-    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
 )EOF";
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
   dynamic_cast<TlsCertificateSdsApi&>(*secret_provider).onConfigUpdate(secret_resources, "");
-  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret());
-  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
+  Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), *api_);
+  const std::string cert_pem =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config.certificateChain());
-  const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
+  const std::string key_pem =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
 }

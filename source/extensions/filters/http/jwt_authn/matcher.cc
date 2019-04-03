@@ -1,5 +1,6 @@
 #include "extensions/filters/http/jwt_authn/matcher.h"
 
+#include "common/common/logger.h"
 #include "common/router/config_impl.h"
 
 #include "absl/strings/match.h"
@@ -20,9 +21,7 @@ namespace {
  */
 class BaseMatcherImpl : public Matcher, public Logger::Loggable<Logger::Id::filter> {
 public:
-  BaseMatcherImpl(const RequirementRule& rule,
-                  const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                  const AuthFactory& factory, const Extractor& extractor)
+  BaseMatcherImpl(const RequirementRule& rule)
       : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rule.match(), case_sensitive, true)) {
 
     for (const auto& header_map : rule.match().headers()) {
@@ -32,8 +31,6 @@ public:
     for (const auto& query_parameter : rule.match().query_parameters()) {
       config_query_parameters_.push_back(query_parameter);
     }
-
-    verifier_ = Verifier::create(rule.requires(), providers, factory, extractor);
   }
 
   // Check match for HeaderMatcher and QueryParameterMatcher
@@ -50,15 +47,12 @@ public:
     return matches;
   }
 
-  const VerifierPtr& verifier() const override { return verifier_; }
-
 protected:
   const bool case_sensitive_;
 
 private:
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
   std::vector<Router::ConfigUtility::QueryParameterMatcher> config_query_parameters_;
-  VerifierPtr verifier_;
 };
 
 /**
@@ -66,10 +60,8 @@ private:
  */
 class PrefixMatcherImpl : public BaseMatcherImpl {
 public:
-  PrefixMatcherImpl(const RequirementRule& rule,
-                    const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                    const AuthFactory& factory, const Extractor& extractor)
-      : BaseMatcherImpl(rule, providers, factory, extractor), prefix_(rule.match().prefix()) {}
+  PrefixMatcherImpl(const RequirementRule& rule)
+      : BaseMatcherImpl(rule), prefix_(rule.match().prefix()) {}
 
   bool matches(const Http::HeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers) &&
@@ -92,10 +84,8 @@ private:
  */
 class PathMatcherImpl : public BaseMatcherImpl {
 public:
-  PathMatcherImpl(const RequirementRule& rule,
-                  const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                  const AuthFactory& factory, const Extractor& extractor)
-      : BaseMatcherImpl(rule, providers, factory, extractor), path_(rule.match().path()) {}
+  PathMatcherImpl(const RequirementRule& rule)
+      : BaseMatcherImpl(rule), path_(rule.match().path()) {}
 
   bool matches(const Http::HeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers)) {
@@ -122,11 +112,9 @@ private:
  */
 class RegexMatcherImpl : public BaseMatcherImpl {
 public:
-  RegexMatcherImpl(const RequirementRule& rule,
-                   const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                   const AuthFactory& factory, const Extractor& extractor)
-      : BaseMatcherImpl(rule, providers, factory, extractor),
-        regex_(RegexUtil::parseRegex(rule.match().regex())), regex_str_(rule.match().regex()) {}
+  RegexMatcherImpl(const RequirementRule& rule)
+      : BaseMatcherImpl(rule), regex_(RegexUtil::parseRegex(rule.match().regex())),
+        regex_str_(rule.match().regex()) {}
 
   bool matches(const Http::HeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers)) {
@@ -149,17 +137,14 @@ private:
 
 } // namespace
 
-MatcherConstSharedPtr
-Matcher::create(const RequirementRule& rule,
-                const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                const AuthFactory& factory, const Extractor& extractor) {
+MatcherConstPtr Matcher::create(const RequirementRule& rule) {
   switch (rule.match().path_specifier_case()) {
   case RouteMatch::PathSpecifierCase::kPrefix:
-    return std::make_shared<PrefixMatcherImpl>(rule, providers, factory, extractor);
+    return std::make_unique<PrefixMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kPath:
-    return std::make_shared<PathMatcherImpl>(rule, providers, factory, extractor);
+    return std::make_unique<PathMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kRegex:
-    return std::make_shared<RegexMatcherImpl>(rule, providers, factory, extractor);
+    return std::make_unique<RegexMatcherImpl>(rule);
   // path specifier is required.
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
   default:

@@ -1,0 +1,46 @@
+#!/bin/bash
+
+set -e
+
+# This script is invoked from quiche.BUILD to tweak QUICHE source files into a
+# form usable by Envoy. Transformations performed here:
+#
+# - Move subtree under quiche/ base dir, for clarity in #include statements.
+# - Rewrite include directives for platform/impl files to point to the directory
+#   containing Envoy's QUICHE platform implementation.
+# - Fix include directives for non-platform/impl files to remove
+#   "net/third_party" from the path. (This is an artifact of Chromium source
+#   tree structure.)
+
+# Determine base directory of unmodified QUICHE source files. In practice, this
+# ends up being "external/com_googlesource_quiche".
+src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath quic/core/quic_constants.h))))
+
+# sed commands to apply to each source file.
+cat <<EOF >sed_commands
+# Rewrite include directives for platform impl files.
+/^#include/ s!net/(http2|spdy|quic)/platform/impl/!extensions/quic_listeners/quiche/platform/!
+
+# Strip "net/third_party" from include directives to other QUICHE files.
+/^#include/ s!net/third_party/quiche/src/!quiche/!
+
+# Rewrite gtest includes.
+/^#include/ s!testing/gtest/include/gtest/!gtest/!
+
+# Rewrite third_party includes.
+/^#include/ s!third_party/boringssl/src/include/!!
+
+EOF
+
+for src_file in $(SRCS); do
+  # Extract relative path (e.g. "quic/core/quic_utils.cc") from full path in
+  # src_path (e.g. "external/com_googlesource_quiche/quic/core/quic_utils.cc").
+  src_path="$${src_file#$$src_base_dir/}"
+
+  # Map to output file with quiche/ base directory inserted in path.
+  out_file="$(@D)/quiche/$$src_path"
+  mkdir -p "$$(dirname "$$out_file")"
+
+  # Apply text substitutions. -E ensures consistent behavior on Linux vs. OS X.
+  sed -E -f sed_commands "$$src_file" > "$$out_file"
+done

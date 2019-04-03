@@ -17,11 +17,11 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class MetricsServiceIntegrationTest : public HttpIntegrationTest,
-                                      public Grpc::GrpcClientIntegrationParamTest {
+class MetricsServiceIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                      public HttpIntegrationTest {
 public:
   MetricsServiceIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -129,8 +129,8 @@ public:
   FakeStreamPtr metrics_service_request_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, MetricsServiceIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, MetricsServiceIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic metric service flow.
 TEST_P(MetricsServiceIntegrationTest, BasicFlow) {

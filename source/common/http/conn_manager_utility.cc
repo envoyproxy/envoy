@@ -36,18 +36,16 @@ std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection&
   return "";
 }
 
-ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(Network::Connection& connection,
-                                                              const Buffer::Instance& data,
-                                                              ServerConnectionCallbacks& callbacks,
-                                                              Stats::Scope& scope,
-                                                              const Http1Settings& http1_settings,
-                                                              const Http2Settings& http2_settings) {
+ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
+    Network::Connection& connection, const Buffer::Instance& data,
+    ServerConnectionCallbacks& callbacks, Stats::Scope& scope, const Http1Settings& http1_settings,
+    const Http2Settings& http2_settings, const uint32_t max_request_headers_kb) {
   if (determineNextProtocol(connection, data) == Http2::ALPN_STRING) {
-    return ServerConnectionPtr{
-        new Http2::ServerConnectionImpl(connection, callbacks, scope, http2_settings)};
+    return std::make_unique<Http2::ServerConnectionImpl>(connection, callbacks, scope,
+                                                         http2_settings, max_request_headers_kb);
   } else {
-    return ServerConnectionPtr{
-        new Http1::ServerConnectionImpl(connection, callbacks, http1_settings)};
+    return std::make_unique<Http1::ServerConnectionImpl>(connection, callbacks, http1_settings,
+                                                         max_request_headers_kb);
   }
 }
 
@@ -170,6 +168,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.removeEnvoyExpectedRequestTimeoutMs();
     request_headers.removeEnvoyForceTrace();
     request_headers.removeEnvoyIpTags();
+    request_headers.removeEnvoyOriginalUrl();
 
     for (const LowerCaseString& header : route_config.internalOnlyHeaders()) {
       request_headers.remove(header);
@@ -280,9 +279,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
   // the XFCC header.
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward ||
       config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
-    const std::string uri_san_local_cert = connection.ssl()->uriSanLocalCertificate();
-    if (!uri_san_local_cert.empty()) {
-      client_cert_details.push_back("By=" + uri_san_local_cert);
+    const auto uri_sans_local_cert = connection.ssl()->uriSanLocalCertificate();
+    if (!uri_sans_local_cert.empty()) {
+      client_cert_details.push_back("By=" + uri_sans_local_cert[0]);
     }
     const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
     if (!cert_digest.empty()) {
@@ -302,10 +301,13 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
                                       "\"");
         break;
-      case ClientCertDetailsType::URI:
+      case ClientCertDetailsType::URI: {
         // The "URI" key still exists even if the URI is empty.
-        client_cert_details.push_back("URI=" + connection.ssl()->uriSanPeerCertificate());
+        const auto sans = connection.ssl()->uriSanPeerCertificate();
+        const auto& uri_san = sans.empty() ? "" : sans[0];
+        client_cert_details.push_back("URI=" + uri_san);
         break;
+      }
       case ClientCertDetailsType::DNS: {
         const std::vector<std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
         if (!dns_sans.empty()) {

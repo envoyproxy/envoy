@@ -16,11 +16,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
+namespace {
 
 class HeaderToMetadataTest : public testing::Test {
 public:
-  HeaderToMetadataTest() {}
-
   const std::string request_config_yaml = R"EOF(
 request_rules:
   - header: x-version
@@ -117,6 +116,8 @@ response_rules:
               setDynamicMetadata("envoy.filters.http.header_to_metadata", MapEq(expected)));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(incoming_headers, false));
   EXPECT_EQ(empty_headers, incoming_headers);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 }
 
 /**
@@ -273,6 +274,7 @@ request_rules:
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
+} // namespace
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions

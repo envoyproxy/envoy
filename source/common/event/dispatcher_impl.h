@@ -14,6 +14,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+#include "common/event/libevent_scheduler.h"
 
 namespace Envoy {
 namespace Event {
@@ -23,17 +24,18 @@ namespace Event {
  */
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
 public:
-  explicit DispatcherImpl(TimeSystem& time_system, Api::Api& api);
-  DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory, Api::Api& api);
+  DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system);
+  DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
+                 Event::TimeSystem& time_system);
   ~DispatcherImpl();
 
   /**
    * @return event_base& the libevent base.
    */
-  event_base& base() { return *base_; }
+  event_base& base() { return base_scheduler_.base(); }
 
   // Event::Dispatcher
-  TimeSystem& timeSystem() override { return time_system_; }
+  TimeSource& timeSource() override { return api_.timeSource(); }
   void clearDeferredDeleteList() override;
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
@@ -51,6 +53,8 @@ public:
   Network::ListenerPtr createListener(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                       bool bind_to_port,
                                       bool hand_off_restored_destination_connections) override;
+  Network::ListenerPtr createUdpListener(Network::Socket& socket,
+                                         Network::UdpListenerCallbacks& cb) override;
   TimerPtr createTimer(TimerCb cb) override;
   void deferredDelete(DeferredDeletablePtr&& to_delete) override;
   void exit() override;
@@ -68,10 +72,9 @@ private:
   bool isThreadSafe() const { return run_tid_ == nullptr || run_tid_->isCurrentThreadId(); }
 
   Api::Api& api_;
-  TimeSystem& time_system_;
   Thread::ThreadIdPtr run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
-  Libevent::BasePtr base_;
+  LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
   TimerPtr deferred_delete_timer_;
   TimerPtr post_timer_;

@@ -37,6 +37,7 @@ envoy_cc_library(
         "grpc",
     ],
     deps = [
+        "//include/envoy/api:api_interface",
         "@envoy_api//envoy/api/v2/core:grpc_service_cc",
     ],
 )

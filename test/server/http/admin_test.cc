@@ -14,10 +14,11 @@
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/ssl/context_config_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -49,7 +50,7 @@ namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest() : alloc_(options_) {
+  AdminStatsTest() : alloc_(options_, symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, alloc_);
     store_->addSink(sink_);
   }
@@ -62,6 +63,7 @@ public:
                                   true /*pretty_print*/);
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::StatsOptionsImpl options_;
@@ -86,9 +88,9 @@ public:
   Http::TestHeaderMapImpl request_headers_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminStatsTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStatsTest, StatsAsJson) {
   InSequence s;
@@ -552,9 +554,9 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   store_->shutdownThreading();
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminFilterTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminFilterTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(AdminFilterTest, HeaderOnly) {
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
@@ -630,11 +632,11 @@ public:
   Server::AdminFilter admin_filter_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, AdminInstanceTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-TEST_P(AdminInstanceTest, AdminProfiler) {
+TEST_P(AdminInstanceTest, AdminCpuProfiler) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
 
@@ -653,15 +655,50 @@ TEST_P(AdminInstanceTest, AdminProfiler) {
   EXPECT_FALSE(Profiler::Cpu::profilerEnabled());
 }
 
+TEST_P(AdminInstanceTest, AdminHeapProfilerOnRepeatedRequest) {
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+  auto repeatResultCode = Http::Code::BadRequest;
+#ifndef PROFILER_AVAILABLE
+  repeatResultCode = Http::Code::NotImplemented;
+#endif
+
+  postCallback("/heapprofiler?enable=y", header_map, data);
+  EXPECT_EQ(repeatResultCode, postCallback("/heapprofiler?enable=y", header_map, data));
+
+  postCallback("/heapprofiler?enable=n", header_map, data);
+  EXPECT_EQ(repeatResultCode, postCallback("/heapprofiler?enable=n", header_map, data));
+}
+
+TEST_P(AdminInstanceTest, AdminHeapProfiler) {
+  Buffer::OwnedImpl data;
+  Http::HeaderMapImpl header_map;
+
+  // The below flow need to begin with the profiler not running
+  Profiler::Heap::stopProfiler();
+
+#ifdef PROFILER_AVAILABLE
+  EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_TRUE(Profiler::Heap::isProfilerStarted());
+  EXPECT_EQ(Http::Code::OK, postCallback("/heapprofiler?enable=n", header_map, data));
+#else
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=y", header_map, data));
+  EXPECT_FALSE(Profiler::Heap::isProfilerStarted());
+  EXPECT_EQ(Http::Code::NotImplemented, postCallback("/heapprofiler?enable=n", header_map, data));
+#endif
+
+  EXPECT_FALSE(Profiler::Heap::isProfilerStarted());
+}
+
 TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
   Buffer::OwnedImpl data;
   Http::HeaderMapImpl header_map;
   const std::string path("/healthcheck/fail");
   // TODO(jmarantz): the call to getCallback should be made to fail, but as an interim we will
-  // just issue a warning, so that scripts using curl GET comamnds to mutate state can be fixed.
+  // just issue a warning, so that scripts using curl GET commands to mutate state can be fixed.
   EXPECT_LOG_CONTAINS("error",
                       "admin path \"" + path + "\" mutates state, method=GET rather than POST",
-                      EXPECT_EQ(Http::Code::BadRequest, getCallback(path, header_map, data)));
+                      EXPECT_EQ(Http::Code::MethodNotAllowed, getCallback(path, header_map, data)));
 }
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
@@ -867,9 +904,9 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   // Setup a context that returns null cert details.
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString("{}");
-  Ssl::ClientContextConfigImpl cfg(*loader, factory_context);
+  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(*loader, factory_context);
   Stats::IsolatedStoreImpl store;
-  Ssl::ClientContextSharedPtr client_ctx(
+  Envoy::Ssl::ClientContextSharedPtr client_ctx(
       server_.sslContextManager().createSslClientContext(store, cfg));
 
   const std::string expected_empty_json = R"EOF({
@@ -897,10 +934,11 @@ TEST_P(AdminInstanceTest, Runtime) {
   Runtime::MockLoader loader;
   auto layer1 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
   auto layer2 = std::make_unique<NiceMock<Runtime::MockOverrideLayer>>();
-  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries2{
-      {"string_key", {"override", {}, {}}}, {"extra_key", {"bar", {}, {}}}};
-  std::unordered_map<std::string, Runtime::Snapshot::Entry> entries1{
-      {"string_key", {"foo", {}, {}}}, {"int_key", {"1", 1, {}}}, {"other_key", {"bar", {}, {}}}};
+  Runtime::Snapshot::EntryMap entries2{{"string_key", {"override", {}, {}, {}}},
+                                       {"extra_key", {"bar", {}, {}, {}}}};
+  Runtime::Snapshot::EntryMap entries1{{"string_key", {"foo", {}, {}, {}}},
+                                       {"int_key", {"1", 1, {}, {}}},
+                                       {"other_key", {"bar", {}, {}, {}}}};
 
   ON_CALL(*layer1, name()).WillByDefault(testing::ReturnRefOfCopy(std::string{"layer1"}));
   ON_CALL(*layer1, values()).WillByDefault(testing::ReturnRef(entries1));
@@ -991,7 +1029,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
 
-  NiceMock<Upstream::MockCluster> cluster;
+  NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   cluster_map.emplace(cluster.info_->name_, cluster);
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
@@ -1031,6 +1069,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
       .WillByDefault(Return(false));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
       .WillByDefault(Return(true));
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
@@ -1088,7 +1128,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       },
      ],
      "health_status": {
-      "eds_health_status": "HEALTHY",
+      "eds_health_status": "DEGRADED",
       "failed_active_health_check": true,
       "failed_outlier_check": true,
       "failed_active_degraded_check": true
@@ -1150,7 +1190,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
     Http::HeaderMapImpl response_headers;
     std::string body;
 
-    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::NotInitialized));
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
     envoy::admin::v2alpha::ServerInfo server_info_proto;
     EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
@@ -1200,9 +1240,34 @@ TEST_P(AdminInstanceTest, PostRequest) {
               HasSubstr("text/plain"));
 }
 
+class HistogramWrapper {
+public:
+  HistogramWrapper() : histogram_(hist_alloc()) {}
+
+  ~HistogramWrapper() { hist_free(histogram_); }
+
+  const histogram_t* getHistogram() { return histogram_; }
+
+  void setHistogramValues(const std::vector<uint64_t>& values) {
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram_, value, 0, 1);
+    }
+  }
+
+  void setHistogramValuesWithCounts(const std::vector<std::pair<uint64_t, uint64_t>>& values) {
+    for (std::pair<uint64_t, uint64_t> cv : values) {
+      hist_insert_intscale(histogram_, cv.first, 0, cv.second);
+    }
+  }
+
+private:
+  histogram_t* histogram_;
+};
+
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
-  PrometheusStatsFormatterTest() /*: alloc_(stats_options_)*/ {}
+  PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
+
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     std::string tname = std::string(name);
     counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
@@ -1213,10 +1278,16 @@ protected:
     gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
   }
 
+  void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {
+    histograms_.push_back(histogram);
+  }
+
+  Stats::FakeSymbolTableImpl symbol_table_;
   Stats::StatsOptionsImpl stats_options_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
+  std::vector<Stats::ParentHistogramSharedPtr> histograms_;
 };
 
 TEST_F(PrometheusStatsFormatterTest, MetricName) {
@@ -1266,7 +1337,9 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(2UL, size);
 }
 
 TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
@@ -1284,7 +1357,254 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
            {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(4UL, size);
+}
+
+TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram->name_ = "histogram1";
+  histogram->used_ = true;
+  ON_CALL(*histogram, cumulativeStatistics())
+      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+
+  addHistogram(histogram);
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+envoy_histogram1_bucket{le="0.5"} 0
+envoy_histogram1_bucket{le="1"} 0
+envoy_histogram1_bucket{le="5"} 0
+envoy_histogram1_bucket{le="10"} 0
+envoy_histogram1_bucket{le="25"} 0
+envoy_histogram1_bucket{le="50"} 0
+envoy_histogram1_bucket{le="100"} 0
+envoy_histogram1_bucket{le="250"} 0
+envoy_histogram1_bucket{le="500"} 0
+envoy_histogram1_bucket{le="1000"} 0
+envoy_histogram1_bucket{le="2500"} 0
+envoy_histogram1_bucket{le="5000"} 0
+envoy_histogram1_bucket{le="10000"} 0
+envoy_histogram1_bucket{le="30000"} 0
+envoy_histogram1_bucket{le="60000"} 0
+envoy_histogram1_bucket{le="300000"} 0
+envoy_histogram1_bucket{le="600000"} 0
+envoy_histogram1_bucket{le="1800000"} 0
+envoy_histogram1_bucket{le="3600000"} 0
+envoy_histogram1_bucket{le="+Inf"} 0
+envoy_histogram1_sum{} 0
+envoy_histogram1_count{} 0
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
+  HistogramWrapper h1_cumulative;
+
+  // Force large counts to prove that the +Inf bucket doesn't overflow to scientific notation.
+  h1_cumulative.setHistogramValuesWithCounts(std::vector<std::pair<uint64_t, uint64_t>>({
+      {1, 100000},
+      {100, 1000000},
+      {1000, 100000000},
+  }));
+
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram->name_ = "histogram1";
+  histogram->used_ = true;
+  ON_CALL(*histogram, cumulativeStatistics())
+      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+
+  addHistogram(histogram);
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+envoy_histogram1_bucket{le="0.5"} 0
+envoy_histogram1_bucket{le="1"} 0
+envoy_histogram1_bucket{le="5"} 100000
+envoy_histogram1_bucket{le="10"} 100000
+envoy_histogram1_bucket{le="25"} 100000
+envoy_histogram1_bucket{le="50"} 100000
+envoy_histogram1_bucket{le="100"} 100000
+envoy_histogram1_bucket{le="250"} 1100000
+envoy_histogram1_bucket{le="500"} 1100000
+envoy_histogram1_bucket{le="1000"} 1100000
+envoy_histogram1_bucket{le="2500"} 101100000
+envoy_histogram1_bucket{le="5000"} 101100000
+envoy_histogram1_bucket{le="10000"} 101100000
+envoy_histogram1_bucket{le="30000"} 101100000
+envoy_histogram1_bucket{le="60000"} 101100000
+envoy_histogram1_bucket{le="300000"} 101100000
+envoy_histogram1_bucket{le="600000"} 101100000
+envoy_histogram1_bucket{le="1800000"} 101100000
+envoy_histogram1_bucket{le="3600000"} 101100000
+envoy_histogram1_bucket{le="+Inf"} 101100000
+envoy_histogram1_sum{} 105105105000
+envoy_histogram1_count{} 101100000
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
+  addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
+
+  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->used_ = true;
+  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  addHistogram(histogram1);
+  EXPECT_CALL(*histogram1, cumulativeStatistics())
+      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(5UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_cx_total counter
+envoy_cluster_test_1_upstream_cx_total{a_tag_name="a.tag-value"} 0
+# TYPE envoy_cluster_test_2_upstream_cx_total counter
+envoy_cluster_test_2_upstream_cx_total{another_tag_name="another_tag-value"} 0
+# TYPE envoy_cluster_test_3_upstream_cx_total gauge
+envoy_cluster_test_3_upstream_cx_total{another_tag_name_3="another_tag_3-value"} 0
+# TYPE envoy_cluster_test_4_upstream_cx_total gauge
+envoy_cluster_test_4_upstream_cx_total{another_tag_name_4="another_tag_4-value"} 0
+# TYPE envoy_cluster_test_1_upstream_rq_time histogram
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="0.5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="25"} 1
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 2
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 4
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="250"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="2500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="30000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="60000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="300000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1800000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="3600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
+envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
+envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
+  addCounter("cluster.test_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_2.upstream_cx_total", {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_3.upstream_cx_total", {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_4.upstream_cx_total", {{"another_tag_name_4", "another_tag_4-value"}});
+
+  const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->used_ = true;
+  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  addHistogram(histogram1);
+  EXPECT_CALL(*histogram1, cumulativeStatistics())
+      .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, true);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_cluster_test_1_upstream_rq_time histogram
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="0.5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10"} 0
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="25"} 1
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="50"} 2
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="100"} 4
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="250"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="2500"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="5000"} 6
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="10000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="30000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="60000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="300000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="1800000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="3600000"} 7
+envoy_cluster_test_1_upstream_rq_time_bucket{key1="value1",key2="value2",le="+Inf"} 7
+envoy_cluster_test_1_upstream_rq_time_sum{key1="value1",key2="value2"} 5532
+envoy_cluster_test_1_upstream_rq_time_count{key1="value1",key2="value2"} 7
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
+  const std::vector<uint64_t> h1_values = {};
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(h1_values);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram1 = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram1->name_ = "cluster.test_1.upstream_rq_time";
+  histogram1->used_ = false;
+  histogram1->tags_ = {Stats::Tag{"key1", "value1"}, Stats::Tag{"key2", "value2"}};
+  addHistogram(histogram1);
+
+  {
+    const bool used_only = true;
+    EXPECT_CALL(*histogram1, cumulativeStatistics()).Times(0);
+
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, used_only);
+    EXPECT_EQ(0UL, size);
+  }
+
+  {
+    const bool used_only = false;
+    EXPECT_CALL(*histogram1, cumulativeStatistics())
+        .WillOnce(testing::ReturnRef(h1_cumulative_statistics));
+
+    Buffer::OwnedImpl response;
+    auto size = PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_,
+                                                            response, used_only);
+    EXPECT_EQ(1UL, size);
+  }
 }
 
 } // namespace Server

@@ -21,12 +21,14 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
+        "//source/common/common:matchers_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:codes_lib",
+        "//source/common/http:utility_lib",
         "//source/common/router:config_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
-        "@envoy_api//envoy/config/filter/http/ext_authz/v2alpha:ext_authz_cc",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:ext_authz_cc",
     ],
 )
 

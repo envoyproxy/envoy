@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Grpc {
 
-// Support paramaterizing over gRPC client type.
+// Support parameterizing over gRPC client type.
 enum class ClientType { EnvoyGrpc, GoogleGrpc };
 
 class BaseGrpcClientIntegrationParamTest {
@@ -41,9 +41,9 @@ class GrpcClientIntegrationParamTest
     : public BaseGrpcClientIntegrationParamTest,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
 public:
-  ~GrpcClientIntegrationParamTest() {}
+  ~GrpcClientIntegrationParamTest() override = default;
   static std::string protocolTestParamsToString(
-      const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType>>& p) {
+      const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, ClientType>>& p) {
     return absl::StrCat(
         (std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
         (std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc"));

@@ -19,9 +19,7 @@ PreviousPrioritiesRetryPriorityFactory::createRetryPriority(const Protobuf::Mess
       max_retries);
 }
 
-static Registry::RegisterFactory<PreviousPrioritiesRetryPriorityFactory,
-                                 Upstream::RetryPriorityFactory>
-    register_;
+REGISTER_FACTORY(PreviousPrioritiesRetryPriorityFactory, Upstream::RetryPriorityFactory);
 
 } // namespace Priority
 } // namespace Retry

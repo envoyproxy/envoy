@@ -4,12 +4,33 @@
 #include <string>
 
 #include "envoy/common/pure.h"
-#include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace AccessLog {
+
+class AccessLogFile {
+public:
+  virtual ~AccessLogFile() {}
+
+  /**
+   * Write data to the file.
+   */
+  virtual void write(absl::string_view) PURE;
+
+  /**
+   * Reopen the file.
+   */
+  virtual void reopen() PURE;
+
+  /**
+   * Synchronously flush all pending data to disk.
+   */
+  virtual void flush() PURE;
+};
+
+using AccessLogFileSharedPtr = std::shared_ptr<AccessLogFile>;
 
 class AccessLogManager {
 public:
@@ -25,10 +46,10 @@ public:
    * @param file_name specifies the file to create/open.
    * @return the opened file.
    */
-  virtual Filesystem::FileSharedPtr createAccessLog(const std::string& file_name) PURE;
+  virtual AccessLogFileSharedPtr createAccessLog(const std::string& file_name) PURE;
 };
 
-typedef std::unique_ptr<AccessLogManager> AccessLogManagerPtr;
+using AccessLogManagerPtr = std::unique_ptr<AccessLogManager>;
 
 /**
  * Interface for access log filters.
@@ -41,11 +62,12 @@ public:
    * Evaluate whether an access log should be written based on request and response data.
    * @return TRUE if the log should be written.
    */
-  virtual bool evaluate(const StreamInfo::StreamInfo& info,
-                        const Http::HeaderMap& request_headers) PURE;
+  virtual bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+                        const Http::HeaderMap& response_headers,
+                        const Http::HeaderMap& response_trailers) PURE;
 };
 
-typedef std::unique_ptr<Filter> FilterPtr;
+using FilterPtr = std::unique_ptr<Filter>;
 
 /**
  * Abstract access logger for requests and connections.
@@ -67,7 +89,7 @@ public:
                    const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
-typedef std::shared_ptr<Instance> InstanceSharedPtr;
+using InstanceSharedPtr = std::shared_ptr<Instance>;
 
 /**
  * Interface for access log formatter.
@@ -91,7 +113,7 @@ public:
                              const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
-typedef std::unique_ptr<Formatter> FormatterPtr;
+using FormatterPtr = std::unique_ptr<Formatter>;
 
 /**
  * Interface for access log provider.
@@ -115,7 +137,7 @@ public:
                              const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
-typedef std::unique_ptr<FormatterProvider> FormatterProviderPtr;
+using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
 
 } // namespace AccessLog
 } // namespace Envoy

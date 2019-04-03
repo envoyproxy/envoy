@@ -70,75 +70,16 @@ with the minimum required request volume in an interval is less than the
 :ref:`outlier_detection.success_rate_minimum_hosts<envoy_api_field_cluster.OutlierDetection.success_rate_minimum_hosts>`
 value.
 
+.. _arch_overview_outlier_detection_logging:
+
 Ejection event logging
 ----------------------
 
 A log of outlier ejection events can optionally be produced by Envoy. This is extremely useful
 during daily operations since global stats do not provide enough information on which hosts are
-being ejected and for what reasons. The log uses a JSON format with one object per line:
-
-.. code-block:: json
-
-  {
-    "time": "...",
-    "secs_since_last_action": "...",
-    "cluster": "...",
-    "upstream_url": "...",
-    "action": "...",
-    "type": "...",
-    "num_ejections": "...",
-    "enforced": "...",
-    "host_success_rate": "...",
-    "cluster_success_rate_average": "...",
-    "cluster_success_rate_ejection_threshold": "..."
-  }
-
-time
-  The time that the event took place.
-
-secs_since_last_action
-  The time in seconds since the last action (either an ejection or unejection)
-  took place. This value will be ``-1`` for the first ejection given there is no
-  action before the first ejection.
-
-cluster
-  The :ref:`cluster <envoy_api_msg_Cluster>` that owns the ejected host.
-
-upstream_url
-  The URL of the ejected host. E.g., ``tcp://1.2.3.4:80``.
-
-action
-  The action that took place. Either ``eject`` if a host was ejected or ``uneject`` if it was
-  brought back into service.
-
-type
-  If ``action`` is ``eject``, specifies the type of ejection that took place. Currently type can
-  be one of ``5xx``, ``GatewayFailure`` or ``SuccessRate``.
-
-num_ejections
-  If ``action`` is ``eject``, specifies the number of times the host has been ejected
-  (local to that Envoy and gets reset if the host gets removed from the upstream cluster for any
-  reason and then re-added).
-
-enforced
-  If ``action`` is ``eject``, specifies if the ejection was enforced. ``true`` means the host was ejected.
-  ``false`` means the event was logged but the host was not actually ejected.
-
-host_success_rate
-  If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies the host's success rate
-  at the time of the ejection event on a ``0-100`` range.
-
-.. _arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_average:
-
-cluster_success_rate_average
-  If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies the average success
-  rate of the hosts in the cluster at the time of the ejection event on a ``0-100`` range.
-
-.. _arch_overview_outlier_detection_ejection_event_logging_cluster_success_rate_ejection_threshold:
-
-cluster_success_rate_ejection_threshold
-  If ``action`` is ``eject``, and ``type`` is ``SuccessRate``, specifies success rate ejection
-  threshold at the time of the ejection event.
+being ejected and for what reasons. The log is structured as protobuf-based dumps of
+:ref:`OutlierDetectionEvent messages <envoy_api_msg_data.cluster.v2alpha.OutlierDetectionEvent>`.
+Ejection event logging is configured in the Cluster manager :ref:`outlier detection configuration <envoy_api_field_config.bootstrap.v2.ClusterManager.outlier_detection>`.
 
 Configuration reference
 -----------------------

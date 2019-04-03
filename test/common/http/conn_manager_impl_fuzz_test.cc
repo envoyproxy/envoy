@@ -89,8 +89,8 @@ public:
   DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
-  bool reverseEncodeOrder() override { return true; }
   bool generateRequestId() override { return true; }
+  uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -123,7 +123,6 @@ public:
   MockStreamDecoderFilter* decoder_filter_{};
   MockStreamEncoderFilter* encoder_filter_{};
   NiceMock<MockFilterChainFactory> filter_factory_;
-  absl::optional<std::chrono::milliseconds> idle_timeout_;
   Event::SimulatedTimeSystem time_system_;
   SlowDateProviderImpl date_provider_{time_system_};
   RouteConfigProvider route_config_provider_;
@@ -132,6 +131,8 @@ public:
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;
   ConnectionManagerListenerStats listener_stats_;
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
+  absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds delayed_close_timeout_{};
@@ -383,12 +384,13 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   FuzzConfig config;
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::FakeSymbolTableImpl symbol_table;
   Http::ContextImpl http_context;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
-  std::unique_ptr<Ssl::MockConnection> ssl_connection;
+  std::unique_ptr<Ssl::MockConnectionInfo> ssl_connection;
   bool connection_alive = true;
 
   ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection.get()));

@@ -141,8 +141,13 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
     return true;
   }
 
-  std::string principal = ssl->uriSanPeerCertificate();
-  principal = principal.empty() ? ssl->subjectPeerCertificate() : principal;
+  const auto uriSans = ssl->uriSanPeerCertificate();
+  std::string principal;
+  if (uriSans.empty()) {
+    principal = ssl->subjectPeerCertificate();
+  } else {
+    principal = uriSans[0];
+  }
 
   return matcher_.value().match(principal);
 }

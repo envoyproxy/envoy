@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
@@ -57,7 +58,7 @@ public:
   //
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
-  ConfigHelper(const Network::Address::IpVersion version,
+  ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
                const std::string& config = HTTP_PROXY_CONFIG);
 
   static void initializeTls(const ServerSslOptions& options,
@@ -85,6 +86,13 @@ public:
   // a string for a squash filter which can be used with addFilter()
   static const std::string DEFAULT_SQUASH_FILTER;
 
+  // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
+  // api_type should be REST, GRPC, or DELTA_GRPC.
+  static std::string discoveredClustersBootstrap(const std::string& api_type);
+  // Builds a standard Cluster config fragment, with a single endpoint (at loopback:port).
+  static envoy::api::v2::Cluster buildCluster(const std::string& name, int port,
+                                              const std::string& ip_version);
+
   // Run the final config modifiers, and then set the upstream ports based on upstream connections.
   // This is the last operation run on |bootstrap_| before it is handed to Envoy.
   // Ports are assigned by looping through clusters, hosts, and addresses in the
@@ -103,14 +111,10 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
-  // Add an additional route to the configuration.
-  void addRoute(const std::string& host, const std::string& route, const std::string& cluster,
-                bool validate_clusters,
-                envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-                envoy::api::v2::route::VirtualHost::TlsRequirementType type =
-                    envoy::api::v2::route::VirtualHost::NONE,
-                envoy::api::v2::route::RetryPolicy retry_policy = {},
-                bool include_attempt_count_header = false, const absl::string_view upgrade = "");
+  envoy::api::v2::route::VirtualHost createVirtualHost(const char* host, const char* route = "/",
+                                                       const char* cluster = "cluster_0");
+
+  void addVirtualHost(const envoy::api::v2::route::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);
@@ -142,7 +146,7 @@ private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm);
-  // Stick the contents of the procided HCM proto and stuff them into the first HCM
+  // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(
       const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
@@ -151,10 +155,10 @@ private:
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::api::v2::listener::Filter* getFilterFromListener(const std::string& name);
 
-  // Configure a capture transport socket for a cluster/filter chain.
-  void setCaptureTransportSocket(const std::string& capture_path, const std::string& type,
-                                 envoy::api::v2::core::TransportSocket& transport_socket,
-                                 const absl::optional<ProtobufWkt::Struct>& tls_config);
+  // Configure a tap transport socket for a cluster/filter chain.
+  void setTapTransportSocket(const std::string& tap_path, const std::string& type,
+                             envoy::api::v2::core::TransportSocket& transport_socket,
+                             const absl::optional<ProtobufWkt::Struct>& tls_config);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v2::Bootstrap bootstrap_;

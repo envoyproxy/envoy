@@ -12,7 +12,9 @@
 #include "test/integration/server.h"
 #include "test/integration/utility.h"
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -35,6 +37,7 @@ public:
   const Http::HeaderMap& headers() { return *headers_; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadata_map() { return *metadata_map_; }
+  uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   void waitForContinueHeaders();
   void waitForHeaders();
   // This function waits until body_ has at least size bytes in it (it might have more). clearBody()
@@ -53,7 +56,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -63,6 +67,7 @@ private:
   Http::HeaderMapPtr headers_;
   Http::HeaderMapPtr trailers_;
   Http::MetadataMapPtr metadata_map_{new Http::MetadataMap()};
+  std::unordered_map<std::string, uint64_t> duplicated_metadata_key_count_;
   bool waiting_for_end_stream_{};
   bool saw_end_stream_{};
   std::string body_;
@@ -128,21 +133,26 @@ struct ApiFilesystemConfig {
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
+  using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
 
-  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
+  // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
+  // provided IP |version|.
+  BaseIntegrationTest(Network::Address::IpVersion version,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : BaseIntegrationTest(version, config) {}
+  // Creates a test fixture with a specified |upstream_address| function that provides the IP and
+  // port to use.
+  BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
   virtual ~BaseIntegrationTest() {}
 
-  /**
-   * Helper function to create a simulated time integration test during construction.
-   */
-  static TestTimeSystemPtr simTime() { return std::make_unique<Event::SimulatedTimeSystem>(); }
-
-  /**
-   * Helper function to create a wall-clock time integration test during construction.
-   */
-  static TestTimeSystemPtr realTime() { return std::make_unique<Event::TestRealTimeSystem>(); }
+  // TODO(jmarantz): Remove this once
+  // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
+  static TestTimeSystemPtr realTime() { return TestTimeSystemPtr(); }
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
@@ -179,13 +189,58 @@ public:
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names);
 
-  Event::TestTimeSystem& timeSystem() { return *time_system_; }
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
+
+  // Functions for testing reloadable config (xDS)
+  void createXdsUpstream();
+  void createXdsConnection();
+  void cleanUpXdsConnection();
+  AssertionResult
+  compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
+                          const std::vector<std::string>& expected_resource_names,
+                          const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+                          const std::string& expected_error_message = "");
+  template <class T>
+  void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
+                             const std::string& version) {
+    envoy::api::v2::DiscoveryResponse discovery_response;
+    discovery_response.set_version_info(version);
+    discovery_response.set_type_url(type_url);
+    for (const auto& message : messages) {
+      discovery_response.add_resources()->PackFrom(message);
+    }
+    xds_stream_->sendGrpcMessage(discovery_response);
+  }
+
+  AssertionResult compareDeltaDiscoveryRequest(
+      const std::string& expected_type_url,
+      const std::vector<std::string>& expected_resource_subscriptions,
+      const std::vector<std::string>& expected_resource_unsubscriptions,
+      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const std::string& expected_error_message = "");
+  template <class T>
+  void sendDeltaDiscoveryResponse(const std::vector<T>& added_or_updated,
+                                  const std::vector<std::string>& removed,
+                                  const std::string& version) {
+    envoy::api::v2::DeltaDiscoveryResponse response;
+    response.set_system_version_info("system_version_info_this_is_a_test");
+    for (const auto& message : added_or_updated) {
+      auto* resource = response.add_resources();
+      resource->set_name(message.name());
+      resource->set_version(version);
+      resource->mutable_resource()->PackFrom(message);
+    }
+    *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+    response.set_nonce("noncense");
+    xds_stream_->sendGrpcMessage(response);
+  }
+
 private:
-  TestTimeSystemPtr time_system_;
+  Event::GlobalTimeSystem time_system_;
 
 public:
   Event::DispatcherPtr dispatcher_;
@@ -199,7 +254,7 @@ public:
    * @param port the port to connect to.
    * @param raw_http the data to send.
    * @param response the response data will be sent here
-   * @param if the connection should be terminated onece '\r\n\r\n' has been read.
+   * @param if the connection should be terminated once '\r\n\r\n' has been read.
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false);
@@ -209,17 +264,21 @@ protected:
   // Will not return until that server is listening.
   virtual IntegrationTestServerPtr
   createIntegrationTestServer(const std::string& bootstrap_path,
-                              std::function<void()> pre_worker_start_steps,
+                              std::function<void()> on_server_init_function,
                               Event::TestTimeSystem& time_system);
 
   bool initialized() const { return initialized_; }
 
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
+  // IP Address to use when binding sockets on upstreams.
+  InstanceConstSharedPtrFn upstream_address_fn_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
-  // Steps that should be done prior to the workers starting. E.g., xDS pre-init.
-  std::function<void()> pre_worker_start_test_steps_;
+
+  // Steps that should be done in parallel with the envoy server starting. E.g., xDS
+  // pre-init, control plane synchronization needed for server start.
+  std::function<void()> on_server_init_function_;
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   // Target number of upstreams.
@@ -237,6 +296,19 @@ protected:
 
   // True if test will use a fixed RNG value.
   bool deterministic_{};
+
+  // Set true when your test will itself take care of ensuring listeners are up, and registering
+  // them in the port_map_.
+  bool defer_listener_finalization_{false};
+
+  // Member variables for xDS testing.
+  FakeUpstream* xds_upstream_{};
+  FakeHttpConnectionPtr xds_connection_;
+  FakeStreamPtr xds_stream_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+  bool create_xds_upstream_{false}; // TODO(alyssawilk) true by default.
+  bool tls_xds_upstream_{false};
 
 private:
   // The type for the Envoy-to-backend connection

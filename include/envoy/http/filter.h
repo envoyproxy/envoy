@@ -87,6 +87,15 @@ enum class FilterTrailersStatus {
 };
 
 /**
+ * Return codes for encode metadata filter invocations. Metadata currently can not stop filter
+ * iteration.
+ */
+enum class FilterMetadataStatus {
+  // Continue filter chain iteration.
+  Continue,
+};
+
+/**
  * The stream filter callbacks are passed to all filters to use for writing response data and
  * interacting with the underlying stream in general.
  */
@@ -181,6 +190,12 @@ public:
   virtual const Buffer::Instance* decodingBuffer() PURE;
 
   /**
+   * Allows modifying the decoding buffer. May only be called before any data has been continued
+   * past the calling filter.
+   */
+  virtual void modifyDecodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
+
+  /**
    * Add buffered body data. This method is used in advanced cases where returning
    * StopIterationAndBuffer from decodeData() is not sufficient.
    *
@@ -202,10 +217,37 @@ public:
    *
    * It is an error to call this method in any other case.
    *
+   * See also injectDecodedDataToFilterChain() for a different way of passing data to further
+   * filters and also how the two methods are different.
+   *
    * @param data Buffer::Instance supplies the data to be decoded.
    * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
+
+  /**
+   * Decode data directly to subsequent filters in the filter chain. This method is used in
+   * advanced cases in which a filter needs full control over how subsequent filters view data,
+   * and does not want to make use of HTTP connection manager buffering. Using this method allows
+   * a filter to buffer data (or not) and then periodically inject data to subsequent filters,
+   * indicating end_stream at an appropriate time. This can be used to implement rate limiting,
+   * periodic data emission, etc.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's decodeData() call.
+   *
+   * When using this callback, filters should generally only return
+   * FilterDataStatus::StopIterationNoBuffer from their decodeData() call, since use of this method
+   * indicates that a filter does not wish to participate in standard HTTP connection manager
+   * buffering and continuation and will perform any necessary buffering and continuation on its
+   * own.
+   *
+   * This callback is different from addDecodedData() in that the specified data and end_stream
+   * status will be propagated directly to further filters in the filter chain. This is different
+   * from addDecodedData() where data is added to the HTTP connection manager's buffered data with
+   * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   */
+  virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
@@ -325,6 +367,20 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t decoderBufferLimit() PURE;
+
+  // Takes a stream, and acts as if the headers are newly arrived.
+  // On success, this will result in a creating a new filter chain and likely upstream request
+  // associated with the original downstream stream.
+  // On failure, if the preconditions outlined below are not met, the caller is
+  // responsible for handling or terminating the original stream.
+  //
+  // This is currently limited to
+  //   - streams which are completely read
+  //   - streams which do not have a request body.
+  //
+  // Note that HttpConnectionManager sanitization will *not* be performed on the
+  // recreated stream, as it is assumed that sanitization has already been done.
+  virtual bool recreateStream() PURE;
 };
 
 /**
@@ -378,6 +434,11 @@ public:
    * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(StreamDecoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Called at the end of the stream, when all data has been decoded.
+   */
+  virtual void decodeComplete() {}
 };
 
 typedef std::shared_ptr<StreamDecoderFilter> StreamDecoderFilterSharedPtr;
@@ -408,6 +469,12 @@ public:
   virtual const Buffer::Instance* encodingBuffer() PURE;
 
   /**
+   * Allows modifying the encoding buffer. May only be called before any data has been continued
+   * past the calling filter.
+   */
+  virtual void modifyEncodingBuffer(std::function<void(Buffer::Instance&)> callback) PURE;
+
+  /**
    * Add buffered body data. This method is used in advanced cases where returning
    * StopIterationAndBuffer from encodeData() is not sufficient.
    *
@@ -429,10 +496,37 @@ public:
    *
    * It is an error to call this method in any other case.
    *
+   * See also injectEncodedDataToFilterChain() for a different way of passing data to further
+   * filters and also how the two methods are different.
+   *
    * @param data Buffer::Instance supplies the data to be encoded.
    * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
+
+  /**
+   * Encode data directly to subsequent filters in the filter chain. This method is used in
+   * advanced cases in which a filter needs full control over how subsequent filters view data,
+   * and does not want to make use of HTTP connection manager buffering. Using this method allows
+   * a filter to buffer data (or not) and then periodically inject data to subsequent filters,
+   * indicating end_stream at an appropriate time. This can be used to implement rate limiting,
+   * periodic data emission, etc.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's encodeData() call.
+   *
+   * When using this callback, filters should generally only return
+   * FilterDataStatus::StopIterationNoBuffer from their encodeData() call, since use of this method
+   * indicates that a filter does not wish to participate in standard HTTP connection manager
+   * buffering and continuation and will perform any necessary buffering and continuation on its
+   * own.
+   *
+   * This callback is different from addEncodedData() in that the specified data and end_stream
+   * status will be propagated directly to further filters in the filter chain. This is different
+   * from addEncodedData() where data is added to the HTTP connection manager's buffered data with
+   * the assumption that standard HTTP connection manager buffering and continuation are being used.
+   */
+  virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
@@ -477,7 +571,7 @@ public:
  */
 class StreamEncoderFilter : public StreamFilterBase {
 public:
-  /*
+  /**
    * Called with 100-continue headers.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters
@@ -513,10 +607,24 @@ public:
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
 
   /**
+   * Called with metadata to be encoded. New metadata should be added directly to metadata_map. DO
+   * NOT call StreamDecoderFilterCallbacks::encodeMetadata() interface to add new metadata.
+   *
+   * @param metadata_map supplies the metadata to be encoded.
+   * @return FilterMetadataStatus, which currently is always FilterMetadataStatus::Continue;
+   */
+  virtual FilterMetadataStatus encodeMetadata(MetadataMap& metadata_map) PURE;
+
+  /**
    * Called by the filter manager once to initialize the filter callbacks that the filter should
    * use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setEncoderFilterCallbacks(StreamEncoderFilterCallbacks& callbacks) PURE;
+
+  /**
+   * Called at the end of the stream, when all data has been encoded.
+   */
+  virtual void encodeComplete() {}
 };
 
 typedef std::shared_ptr<StreamEncoderFilter> StreamEncoderFilterSharedPtr;

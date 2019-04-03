@@ -10,20 +10,23 @@ namespace Envoy {
 namespace Grpc {
 
 std::shared_ptr<grpc::ChannelCredentials> CredsUtility::getChannelCredentials(
-    const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc) {
+    const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc, Api::Api& api) {
   if (google_grpc.has_channel_credentials()) {
     switch (google_grpc.channel_credentials().credential_specifier_case()) {
     case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kSslCredentials: {
       const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
       const grpc::SslCredentialsOptions ssl_credentials_options = {
-          Config::DataSource::read(ssl_credentials.root_certs(), true),
-          Config::DataSource::read(ssl_credentials.private_key(), true),
-          Config::DataSource::read(ssl_credentials.cert_chain(), true),
+          Config::DataSource::read(ssl_credentials.root_certs(), true, api),
+          Config::DataSource::read(ssl_credentials.private_key(), true, api),
+          Config::DataSource::read(ssl_credentials.cert_chain(), true, api),
       };
       return grpc::SslCredentials(ssl_credentials_options);
     }
     case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kLocalCredentials: {
       return grpc::experimental::LocalCredentials(UDS);
+    }
+    case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kGoogleDefault: {
+      return grpc::GoogleDefaultCredentials();
     }
     default:
       return nullptr;
@@ -33,8 +36,8 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::getChannelCredentials(
 }
 
 std::shared_ptr<grpc::ChannelCredentials> CredsUtility::defaultSslChannelCredentials(
-    const envoy::api::v2::core::GrpcService& grpc_service_config) {
-  auto creds = getChannelCredentials(grpc_service_config.google_grpc());
+    const envoy::api::v2::core::GrpcService& grpc_service_config, Api::Api& api) {
+  auto creds = getChannelCredentials(grpc_service_config.google_grpc(), api);
   if (creds != nullptr) {
     return creds;
   }
@@ -84,9 +87,9 @@ CredsUtility::callCredentials(const envoy::api::v2::core::GrpcService::GoogleGrp
 }
 
 std::shared_ptr<grpc::ChannelCredentials> CredsUtility::defaultChannelCredentials(
-    const envoy::api::v2::core::GrpcService& grpc_service_config) {
+    const envoy::api::v2::core::GrpcService& grpc_service_config, Api::Api& api) {
   std::shared_ptr<grpc::ChannelCredentials> channel_creds =
-      getChannelCredentials(grpc_service_config.google_grpc());
+      getChannelCredentials(grpc_service_config.google_grpc(), api);
   if (channel_creds == nullptr) {
     channel_creds = grpc::InsecureChannelCredentials();
   }
@@ -112,8 +115,9 @@ class DefaultGoogleGrpcCredentialsFactory : public GoogleGrpcCredentialsFactory 
 
 public:
   std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config) override {
-    return CredsUtility::defaultChannelCredentials(grpc_service_config);
+  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+                        Api::Api& api) override {
+    return CredsUtility::defaultChannelCredentials(grpc_service_config, api);
   }
 
   std::string name() const override { return "envoy.grpc_credentials.default"; }
@@ -126,7 +130,8 @@ static Registry::RegisterFactory<DefaultGoogleGrpcCredentialsFactory, GoogleGrpc
     default_google_grpc_credentials_registered_;
 
 std::shared_ptr<grpc::ChannelCredentials>
-getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service) {
+getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service,
+                                Api::Api& api) {
   GoogleGrpcCredentialsFactory* credentials_factory = nullptr;
   const std::string& google_grpc_credentials_factory_name =
       grpc_service.google_grpc().credentials_factory_name();
@@ -141,7 +146,7 @@ getGoogleGrpcChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_se
     throw EnvoyException(fmt::format("Unknown google grpc credentials factory: {}",
                                      google_grpc_credentials_factory_name));
   }
-  return credentials_factory->getChannelCredentials(grpc_service);
+  return credentials_factory->getChannelCredentials(grpc_service, api);
 }
 
 } // namespace Grpc

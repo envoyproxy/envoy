@@ -23,6 +23,7 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "extensions/filters/common/fault/fault_config.h"
 #include "extensions/filters/network/mongo_proxy/codec.h"
 #include "extensions/filters/network/mongo_proxy/utility.h"
 
@@ -93,28 +94,10 @@ public:
 
 private:
   TimeSource& time_source_;
-  Filesystem::FileSharedPtr file_;
+  Envoy::AccessLog::AccessLogFileSharedPtr file_;
 };
 
 typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
-
-/**
- * Mongo fault configuration.
- */
-class FaultConfig {
-public:
-  FaultConfig(const envoy::config::filter::fault::v2::FaultDelay& fault_config)
-      : delay_percentage_(fault_config.percentage()),
-        duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {}
-  envoy::type::FractionalPercent delayPercentage() const { return delay_percentage_; }
-  uint64_t delayDuration() const { return duration_ms_; }
-
-private:
-  envoy::type::FractionalPercent delay_percentage_;
-  const uint64_t duration_ms_;
-};
-
-typedef std::shared_ptr<const FaultConfig> FaultConfigSharedPtr;
 
 /**
  * A sniffing filter for mongo traffic. The current implementation makes a copy of read/written
@@ -126,9 +109,10 @@ class ProxyFilter : public Network::Filter,
                     Logger::Loggable<Logger::Id::mongo> {
 public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-              AccessLogSharedPtr access_log, const FaultConfigSharedPtr& fault_config,
-              const Network::DrainDecision& drain_decision, Runtime::RandomGenerator& generator,
-              Event::TimeSystem& time_system, bool emit_dynamic_metadata);
+              AccessLogSharedPtr access_log,
+              const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
+              const Network::DrainDecision& drain_decision, TimeSource& time_system,
+              bool emit_dynamic_metadata);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -163,7 +147,7 @@ public:
 private:
   struct ActiveQuery {
     ActiveQuery(ProxyFilter& parent, const QueryMessage& query)
-        : parent_(parent), query_info_(query), start_time_(parent_.time_system_.monotonicTime()) {
+        : parent_(parent), query_info_(query), start_time_(parent_.time_source_.monotonicTime()) {
       parent_.stats_.op_query_active_.inc();
     }
 
@@ -188,7 +172,7 @@ private:
   void doDecode(Buffer::Instance& buffer);
   void logMessage(Message& message, bool full);
   void onDrainClose();
-  absl::optional<uint64_t> delayDuration();
+  absl::optional<std::chrono::milliseconds> delayDuration();
   void delayInjectionTimerCallback();
   void tryInjectDelay();
 
@@ -198,17 +182,16 @@ private:
   MongoProxyStats stats_;
   Runtime::Loader& runtime_;
   const Network::DrainDecision& drain_decision_;
-  Runtime::RandomGenerator& generator_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
   bool sniffing_{true};
   std::list<ActiveQueryPtr> active_query_list_;
   AccessLogSharedPtr access_log_;
   Network::ReadFilterCallbacks* read_callbacks_{};
-  const FaultConfigSharedPtr fault_config_;
+  const Filters::Common::Fault::FaultDelayConfigSharedPtr fault_config_;
   Event::TimerPtr delay_timer_;
   Event::TimerPtr drain_close_timer_;
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
   const bool emit_dynamic_metadata_;
 };
 

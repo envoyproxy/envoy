@@ -1,8 +1,15 @@
+#include <memory>
+
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 
 #include "common/config/well_known_names.h"
+#include "common/memory/stats.h"
 
+#include "test/common/stats/stat_test_utility.h"
+#include "test/config/utility.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -12,10 +19,10 @@
 namespace Envoy {
 namespace {
 
-class StatsIntegrationTest : public BaseIntegrationTest,
-                             public testing::TestWithParam<Network::Address::IpVersion> {
+class StatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                             public BaseIntegrationTest {
 public:
-  StatsIntegrationTest() : BaseIntegrationTest(GetParam(), realTime()) {}
+  StatsIntegrationTest() : BaseIntegrationTest(GetParam()) {}
 
   void TearDown() override {
     test_server_.reset();
@@ -25,9 +32,9 @@ public:
   void initialize() override { BaseIntegrationTest::initialize(); }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, StatsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(StatsIntegrationTest, WithDefaultConfig) {
   initialize();
@@ -127,6 +134,69 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   EXPECT_EQ(live->tags().size(), 1);
   EXPECT_EQ(live->tags()[0].name_, "test.x");
   EXPECT_EQ(live->tags()[0].value_, "xxx");
+}
+
+// TODO(cmluciano) Refactor once https://github.com/envoyproxy/envoy/issues/5624 is solved
+// TODO(cmluciano) Add options to measure multiple workers & without stats
+// This class itself does not add additional tests. It is a helper for use in other tests measuring
+// cluster overhead.
+class ClusterMemoryTestHelper : public BaseIntegrationTest {
+public:
+  ClusterMemoryTestHelper()
+      : BaseIntegrationTest(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
+
+  /**
+   *
+   * @param num_clusters number of clusters appended to bootstrap_config
+   * @param allow_stats if false, enable set_reject_all in stats_config
+   * @return size_t the total memory allocated
+   */
+  size_t ClusterMemoryHelper(int num_clusters, bool allow_stats) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      if (!allow_stats) {
+        bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
+      }
+      for (int i = 1; i < num_clusters; i++) {
+        auto* c = bootstrap.mutable_static_resources()->add_clusters();
+        c->set_name(fmt::format("cluster_{}", i));
+      }
+    });
+    initialize();
+
+    return Memory::Stats::totalCurrentlyAllocated();
+  }
+
+  static size_t computeMemory(int num_clusters) {
+    const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+    ClusterMemoryTestHelper helper;
+    size_t memory = helper.ClusterMemoryHelper(num_clusters, true);
+    EXPECT_LT(start_mem, memory);
+    return memory;
+  }
+};
+class ClusterMemoryTestRunner : public testing::TestWithParam<Network::Address::IpVersion> {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ClusterMemoryTestRunner,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
+  // Skip test if we cannot measure memory with TCMALLOC
+  if (!Stats::TestUtil::hasDeterministicMallocStats()) {
+    return;
+  }
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
+  // differing configuration. This is necessary for measuring the memory consumption
+  // between the different instances within the same test.
+  const size_t m1 = ClusterMemoryTestHelper::computeMemory(1);
+  const size_t m1001 = ClusterMemoryTestHelper::computeMemory(1001);
+  const size_t m_per_cluster = (m1001 - m1) / 1000;
+
+  EXPECT_LT(start_mem, m1);
+  EXPECT_LT(start_mem, m1001);
+  // As of 2019/03/20, m_per_cluster = 59015 (libstdc++)
+  EXPECT_LT(m_per_cluster, 59100);
 }
 
 } // namespace

@@ -4,7 +4,6 @@
 
 #include "envoy/config/accesslog/v2/file.pb.h"
 
-#include "common/filesystem/filesystem_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -101,15 +100,15 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
       proxied_headers.Connection()->value() == "upgrade" &&
       original_headers.Connection() != nullptr &&
       original_headers.Connection()->value() == "keep-alive, upgrade") {
-    // The keep-alive is implicit for HTTP/1.1, so Enovy only sets the upgrade
+    // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
     // header when converting from HTTP/1.1 to H2
     proxied_headers.Connection()->value().setCopy("keep-alive, upgrade", 19);
   }
 }
 
-INSTANTIATE_TEST_CASE_P(Protocols, WebsocketIntegrationTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, WebsocketIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
   return
@@ -282,7 +281,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 
-// Technically not a websocket tests, but verfies normal upgrades have parity
+// Technically not a websocket tests, but verifies normal upgrades have parity
 // with websocket upgrades
 TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   config_helper_.addConfigModifier(
@@ -320,9 +319,9 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
         foo_upgrade->set_upgrade_type("foo");
         foo_upgrade->mutable_enabled()->set_value(false);
       });
-  config_helper_.addRoute("host", "/websocket/test", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, {}, false, "foo");
+  auto host = config_helper_.createVirtualHost("host", "/websocket/test");
+  host.mutable_routes(0)->mutable_route()->add_upgrade_configs()->set_upgrade_type("foo");
+  config_helper_.addVirtualHost(host);
   initialize();
 
   performUpgrade(upgradeRequestHeaders("foo", 0), upgradeResponseHeaders("foo"));

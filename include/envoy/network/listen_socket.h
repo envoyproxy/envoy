@@ -7,6 +7,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+#include "envoy/network/io_handle.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -40,9 +41,14 @@ public:
   virtual void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) PURE;
 
   /**
-   * @return fd the socket's file descriptor.
+   * @return IoHandle for the underlying connection
    */
-  virtual int fd() const PURE;
+  virtual IoHandle& ioHandle() PURE;
+
+  /**
+   * @return const IoHandle for the underlying connection
+   */
+  virtual const IoHandle& ioHandle() const PURE;
 
   /**
    * @return the type (stream or datagram) of the socket.

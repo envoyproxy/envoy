@@ -34,6 +34,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
   ON_CALL(*this, signalHandlingEnabled()).WillByDefault(ReturnPointee(&signal_handling_enabled_));
   ON_CALL(*this, mutexTracingEnabled()).WillByDefault(ReturnPointee(&mutex_tracing_enabled_));
+  ON_CALL(*this, cpusetThreadsEnabled()).WillByDefault(ReturnPointee(&cpuset_threads_enabled_));
   ON_CALL(*this, toCommandLineOptions()).WillByDefault(Invoke([] {
     return std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
   }));
@@ -71,7 +72,7 @@ MockGuardDog::MockGuardDog() : watch_dog_(new NiceMock<MockWatchDog>()) {
 }
 MockGuardDog::~MockGuardDog() = default;
 
-MockHotRestart::MockHotRestart() {
+MockHotRestart::MockHotRestart() : stats_allocator_(symbol_table_.get()) {
   ON_CALL(*this, logLock()).WillByDefault(ReturnRef(log_lock_));
   ON_CALL(*this, accessLogLock()).WillByDefault(ReturnRef(access_log_lock_));
   ON_CALL(*this, statsAllocator()).WillByDefault(ReturnRef(stats_allocator_));
@@ -98,6 +99,9 @@ MockListenerComponentFactory::MockListenerComponentFactory()
 }
 MockListenerComponentFactory::~MockListenerComponentFactory() = default;
 
+MockServerLifecycleNotifier::MockServerLifecycleNotifier() = default;
+MockServerLifecycleNotifier::~MockServerLifecycleNotifier() = default;
+
 MockListenerManager::MockListenerManager() = default;
 MockListenerManager::~MockListenerManager() = default;
 
@@ -122,8 +126,8 @@ MockWorker::MockWorker() {
 MockWorker::~MockWorker() = default;
 
 MockInstance::MockInstance()
-    : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSystem()),
-      ssl_context_manager_(timeSystem()), singleton_manager_(new Singleton::ManagerImpl(
+    : secret_manager_(new Secret::SecretManagerImpl()), cluster_manager_(timeSource()),
+      ssl_context_manager_(timeSource()), singleton_manager_(new Singleton::ManagerImpl(
                                               Thread::threadFactoryForTest().currentThreadId())) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
@@ -138,6 +142,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, hotRestart()).WillByDefault(ReturnRef(hot_restart_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
+  ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, drainManager()).WillByDefault(ReturnRef(drain_manager_));
@@ -146,7 +151,6 @@ MockInstance::MockInstance()
   ON_CALL(*this, mutexTracer()).WillByDefault(Return(nullptr));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
-  // ON_CALL(*this, timeSystem()).WillByDefault(ReturnRef(test_time_.timeSystem()));;
 }
 
 MockInstance::~MockInstance() = default;
@@ -171,6 +175,7 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(*this, lifecycleNotifier()).WillByDefault(ReturnRef(lifecycle_notifier_));
   ON_CALL(*this, localInfo()).WillByDefault(ReturnRef(local_info_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_loader_));
@@ -179,14 +184,18 @@ MockFactoryContext::MockFactoryContext()
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
 }
 
 MockFactoryContext::~MockFactoryContext() = default;
 
 MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
-    : secret_manager_(new Secret::SecretManagerImpl()) {}
+    : secret_manager_(new Secret::SecretManagerImpl()) {
+  ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
+}
 
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() = default;
 

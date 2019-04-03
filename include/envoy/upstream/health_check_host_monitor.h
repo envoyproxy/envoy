@@ -10,7 +10,8 @@ namespace Upstream {
 /**
  * A monitor for "passive" health check events that might happen on every thread. For example, if a
  * special HTTP header is received, the data plane may decide to fast fail a host to avoid waiting
- * for the full HC interval to elapse before determining the host is active HC failed.
+ * for the full Health Check interval to elapse before determining the host is active health check
+ * failed.
  */
 class HealthCheckHostMonitor {
 public:

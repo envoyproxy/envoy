@@ -1,5 +1,7 @@
 #include "common/http/utility.h"
 
+#include <http_parser.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -25,6 +27,43 @@
 
 namespace Envoy {
 namespace Http {
+
+static const char kDefaultPath[] = "/";
+
+bool Utility::Url::initialize(absl::string_view absolute_url) {
+  struct http_parser_url u;
+  const bool is_connect = false;
+  http_parser_url_init(&u);
+  const int result =
+      http_parser_parse_url(absolute_url.data(), absolute_url.length(), is_connect, &u);
+
+  if (result != 0) {
+    return false;
+  }
+  if ((u.field_set & (1 << UF_HOST)) != (1 << UF_HOST) &&
+      (u.field_set & (1 << UF_SCHEMA)) != (1 << UF_SCHEMA)) {
+    return false;
+  }
+  scheme_ = absl::string_view(absolute_url.data() + u.field_data[UF_SCHEMA].off,
+                              u.field_data[UF_SCHEMA].len);
+
+  uint16_t authority_len = u.field_data[UF_HOST].len;
+  if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
+    authority_len = authority_len + u.field_data[UF_PORT].len + 1;
+  }
+  host_and_port_ =
+      absl::string_view(absolute_url.data() + u.field_data[UF_HOST].off, authority_len);
+
+  // RFC allows the absolute-uri to not end in /, but the absolute path form
+  // must start with
+  if ((u.field_set & (1 << UF_PATH)) == (1 << UF_PATH) && u.field_data[UF_PATH].len > 0) {
+    path_ = absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off,
+                              u.field_data[UF_PATH].len);
+  } else {
+    path_ = absl::string_view(kDefaultPath, 1);
+  }
+  return true;
+}
 
 void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& remote_address) {
   if (remote_address.type() != Network::Address::Type::Ip) {
@@ -190,7 +229,7 @@ bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
 uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
-  if (!header || !StringUtil::atoul(headers.Status()->value().c_str(), response_code)) {
+  if (!header || !StringUtil::atoull(headers.Status()->value().c_str(), response_code)) {
     throw CodecClientException(":status must be specified and a valid unsigned long");
   }
   return response_code;
@@ -332,7 +371,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
     // This technically requires a copy because inet_pton takes a null terminated string. In
     // practice, we are working with a view at the end of the owning string, and could pass the
     // raw pointer.
-    // TODO(mattklein123 PERF: Avoid the copy here.
+    // TODO(mattklein123) PERF: Avoid the copy here.
     return {
         Network::Utility::parseInternetAddress(std::string(xff_string.data(), xff_string.size())),
         last_comma == std::string::npos && num_to_skip == 0};
@@ -403,6 +442,27 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
     delim = "&";
   }
   return out;
+}
+
+const std::string Utility::resetReasonToString(const Http::StreamResetReason reset_reason) {
+  switch (reset_reason) {
+  case Http::StreamResetReason::ConnectionFailure:
+    return "connection failure";
+  case Http::StreamResetReason::ConnectionTermination:
+    return "connection termination";
+  case Http::StreamResetReason::LocalReset:
+    return "local reset";
+  case Http::StreamResetReason::LocalRefusedStreamReset:
+    return "local refused stream reset";
+  case Http::StreamResetReason::Overflow:
+    return "overflow";
+  case Http::StreamResetReason::RemoteReset:
+    return "remote reset";
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+    return "remote refused stream reset";
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {

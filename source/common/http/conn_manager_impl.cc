@@ -37,6 +37,37 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
+
+template <class T> using FilterList = std::list<std::unique_ptr<T>>;
+
+// Shared helper for recording the latest filter used.
+template <class T>
+void recordLatestDataFilter(const typename FilterList<T>::iterator current_filter,
+                            T*& latest_filter, const FilterList<T>& filters) {
+  // If this is the first time we're calling onData, just record the current filter.
+  if (latest_filter == nullptr) {
+    latest_filter = current_filter->get();
+    return;
+  }
+
+  // We want to keep this pointing at the latest filter in the filter list that has received the
+  // onData callback. To do so, we compare the current latest with the *previous* filter. If they
+  // match, then we must be processing a new filter for the first time. We omit this check if we're
+  // the first filter, since the above check handles that case.
+  //
+  // We compare against the previous filter to avoid multiple filter iterations from reseting the
+  // pointer: If we just set latest to current, then the first onData filter iteration would
+  // correctly iterate over the filters and set latest, but on subsequent onData iterations
+  // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
+  // though filter M > N was the filter that inserted data into the buffer.
+  if (current_filter != filters.begin() && latest_filter == std::prev(current_filter)->get()) {
+    latest_filter = current_filter->get();
+  }
+}
+
+} // namespace
+
 ConnectionManagerStats ConnectionManagerImpl::generateStats(const std::string& prefix,
                                                             Stats::Scope& scope) {
   return {
@@ -63,9 +94,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
                                              Server::OverloadManager* overload_manager,
-                                             Event::TimeSystem& time_system)
+                                             TimeSource& time_source)
     : config_(config), stats_(config_.stats()),
-      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_, time_system)),
+      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_, time_source)),
       drain_close_(drain_close), random_generator_(random_generator), http_context_(http_context),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
@@ -77,7 +108,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().DisableHttpKeepAlive)
                            : Server::OverloadManager::getInactiveState()),
-      time_system_(time_system) {}
+      time_source_(time_source) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
@@ -142,7 +173,12 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   // must be done after deleting the stream since the stream refers to the connection and must be
   // deleted first.
   bool reset_stream = false;
-  if (!stream.state_.remote_complete_ || !stream.state_.local_complete_) {
+  // If the response encoder is still associated with the stream, reset the stream. The exception
+  // here is when Envoy "ends" the stream by calling recreateStream at which point recreateStream
+  // explicitly nulls out response_encoder to avoid the downstream being notified of the
+  // Envoy-internal stream instance being ended.
+  if (stream.response_encoder_ != nullptr &&
+      (!stream.state_.remote_complete_ || !stream.state_.local_complete_)) {
     // Indicate local is complete at this point so that if we reset during a continuation, we don't
     // raise further data or trailers.
     stream.state_.local_complete_ = true;
@@ -196,13 +232,15 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
 }
 
-StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder) {
+StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
+                                                bool is_internally_created) {
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
 
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
   ActiveStreamPtr new_stream(new ActiveStream(*this));
+  new_stream->state_.is_internally_created_ = is_internally_created;
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
@@ -272,7 +310,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
 void ConnectionManagerImpl::resetAllStreams() {
   while (!streams_.empty()) {
     // Mimic a downstream reset in this case.
-    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination);
+    streams_.front()->onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
   }
 }
 
@@ -362,8 +400,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::Timespan(
-          connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSystem())),
-      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSystem()) {
+          connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {
@@ -381,6 +419,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   // prevents surprises for logging code in edge cases.
   stream_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
+
+  stream_info_.setDownstreamSslConnection(connection_manager_.read_callbacks_->connection().ssl());
 
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
@@ -451,6 +491,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
     // or gRPC status code, and/or set H2 RST_STREAM error.
     connection_manager_.doEndStream(*this);
   } else {
+    stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
     sendLocalReply(
         request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_),
         Http::Code::RequestTimeout, "stream timeout", nullptr, is_head_request_, absl::nullopt);
@@ -475,11 +516,7 @@ void ConnectionManagerImpl::ActiveStream::addStreamEncoderFilterWorker(
     StreamEncoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamEncoderFilterPtr wrapper(new ActiveStreamEncoderFilter(*this, filter, dual_filter));
   filter->setEncoderFilterCallbacks(*wrapper);
-  if (connection_manager_.config_.reverseEncodeOrder()) {
-    wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
-  } else {
-    wrapper->moveIntoListBack(std::move(wrapper), encoder_filters_);
-  }
+  wrapper->moveIntoList(std::move(wrapper), encoder_filters_);
 }
 
 void ConnectionManagerImpl::ActiveStream::addAccessLogHandler(
@@ -491,7 +528,7 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) 
   uint64_t response_code = Utility::getResponseStatus(headers);
   stream_info_.response_code_ = response_code;
 
-  if (stream_info_.hc_request_) {
+  if (stream_info_.health_check_request_) {
     return;
   }
 
@@ -610,14 +647,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     }
   }
 
-  // Check for maximum incoming header size. Both codecs have some amount of checking for maximum
-  // header size. For HTTP/1.1 the entire headers data has be less than ~80K (hard coded in
-  // http_parser). For HTTP/2 the default allowed header block length is 64k.
-  // In order to have generally uniform behavior we also check total header size here and keep it
-  // under 60K. Ultimately it would be nice to have a configuration option ranging from the largest
-  // header size http_parser and nghttp2 will allow, down to 16k or 8k for
-  // envoy users who do not wish to proxy large headers.
-  if (request_headers_->byteSize() > (60 * 1024)) {
+  ASSERT(connection_manager_.config_.maxRequestHeadersKb() > 0);
+  if (request_headers_->byteSize() > (connection_manager_.config_.maxRequestHeadersKb() * 1024)) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
                    Code::RequestHeaderFieldsTooLarge, "", nullptr, is_head_request_, absl::nullopt);
     return;
@@ -641,11 +672,13 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     state_.saw_connection_close_ = true;
   }
 
-  // Modify the downstream remote address depending on configuration and headers.
-  stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
-      *request_headers_, connection_manager_.read_callbacks_->connection(),
-      connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-      connection_manager_.runtime_, connection_manager_.local_info_));
+  if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
+    // Modify the downstream remote address depending on configuration and headers.
+    stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
+        *request_headers_, connection_manager_.read_callbacks_->connection(),
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
+        connection_manager_.runtime_, connection_manager_.local_info_));
+  }
   ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
@@ -746,9 +779,6 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
       request_headers_->removeEnvoyDecoratorOperation();
     }
   }
-
-  // Inject the active span's tracing context into the request headers.
-  active_span_->injectContext(*request_headers_);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
@@ -835,7 +865,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   for (; entry != decoder_filters_.end(); entry++) {
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
     //
-    // In following case, ActiveStreamFilterBase::commonContine() could be called recursively and
+    // In following case, ActiveStreamFilterBase::commonContinue() could be called recursively and
     // its doData() is called with wrong data.
     //
     //  There are 3 decode filters and "wrapper" refers to ActiveStreamFilter object.
@@ -874,9 +904,15 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
+
+    recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
+
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     (*entry)->end_stream_ = end_stream && !request_trailers_;
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
+    if ((*entry)->end_stream_) {
+      (*entry)->handle_->decodeComplete();
+    }
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
@@ -971,6 +1007,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
+    (*entry)->handle_->decodeComplete();
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
@@ -1024,7 +1061,10 @@ void ConnectionManagerImpl::startDrainSequence() {
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
-  Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
+  Router::RouteConstSharedPtr route;
+  if (request_headers_ != nullptr) {
+    route = snapped_route_config_->route(*request_headers_, stream_id_);
+  }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
   if (nullptr == stream_info_.route_entry_) {
@@ -1115,6 +1155,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     (*entry)->end_stream_ =
         encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end());
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
+    if ((*entry)->end_stream_) {
+      (*entry)->handle_->encodeComplete();
+    }
     state_.filter_call_state_ &= ~FilterCallState::EncodeHeaders;
     ENVOY_STREAM_LOG(trace, "encode headers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1243,23 +1286,26 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeMetadata(ActiveStreamEncoderFilter* filter,
-                                                         MetadataMapPtr&& metadata_map) {
+                                                         MetadataMapPtr&& metadata_map_ptr) {
   resetIdleTimer();
 
-  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
+  // Metadata currently go through all filters.
+  ASSERT(filter == nullptr);
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = encoder_filters_.begin();
   for (; entry != encoder_filters_.end(); entry++) {
-    // TODO(soya3129): Add filters here.
+    FilterMetadataStatus status = (*entry)->handle_->encodeMetadata(*metadata_map_ptr);
+    ENVOY_STREAM_LOG(trace, "encode metadata called: filter={} status={}", *this,
+                     static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
   }
-
-  ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *metadata_map);
+  // TODO(soya3129): update stats with metadata.
 
   // Now encode metadata via the codec.
-  if (!metadata_map->empty()) {
+  if (!metadata_map_ptr->empty()) {
+    ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, *metadata_map_ptr);
     MetadataMapVector metadata_map_vector;
-    metadata_map_vector.push_back(std::move(metadata_map));
+    metadata_map_vector.emplace_back(std::move(metadata_map_ptr));
     response_encoder_->encodeMetadata(metadata_map_vector);
   }
-  // metadata_map destroyed when function returns.
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
@@ -1322,8 +1368,14 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
+
+    recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
+
     (*entry)->end_stream_ = end_stream && !response_trailers_;
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
+    if ((*entry)->end_stream_) {
+      (*entry)->handle_->encodeComplete();
+    }
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
@@ -1371,6 +1423,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
+    (*entry)->handle_->encodeComplete();
     (*entry)->end_stream_ = true;
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
     ENVOY_STREAM_LOG(trace, "encode trailers called: filter={} status={}", *this,
@@ -1394,7 +1447,7 @@ void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason) {
+void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl::string_view) {
   // NOTE: This function gets called in all of the following cases:
   //       1) We TX an app level reset
   //       2) The codec TX a codec level reset
@@ -1423,6 +1476,10 @@ ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
   return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
 }
 
+bool ConnectionManagerImpl::ActiveStream::verbose() const {
+  return connection_manager_.config_.tracingConfig()->verbose_;
+}
+
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
   ++high_watermark_count_;
   if (watermark_callbacks_) {
@@ -1439,6 +1496,7 @@ void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
 }
 
 void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
+  ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
     buffered_request_data_->setWatermarks(buffer_limit_);
@@ -1681,6 +1739,11 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::In
   parent_.addDecodedData(*this, data, streaming);
 }
 
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
+  parent_.decodeData(this, data, end_stream);
+}
+
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encode100ContinueHeaders(
@@ -1711,8 +1774,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapP
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeMetadata(
-    MetadataMapPtr&& metadata_map) {
-  parent_.encodeMetadata(nullptr, std::move(metadata_map));
+    MetadataMapPtr&& metadata_map_ptr) {
+  parent_.encodeMetadata(nullptr, std::move(metadata_map_ptr));
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::
@@ -1763,6 +1826,28 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermark
   parent_.watermark_callbacks_ = nullptr;
 }
 
+bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
+  // Because the filter's and the HCM view of if the stream has a body and if
+  // the stream is complete may differ, re-check bytesReceived() to make sure
+  // there was no body from the HCM's point of view.
+  if (!complete() || parent_.stream_info_.bytesReceived() != 0) {
+    return false;
+  }
+  // n.b. we do not currently change the codecs to point at the new stream
+  // decoder because the decoder callbacks are complete. It would be good to
+  // null out that pointer but should not be necessary.
+  HeaderMapPtr request_headers(std::move(parent_.request_headers_));
+  StreamEncoder* response_encoder = parent_.response_encoder_;
+  parent_.response_encoder_ = nullptr;
+  // This functionally deletes the stream (via deferred delete) so do not
+  // reference anything beyond this point.
+  parent_.connection_manager_.doEndStream(this->parent_);
+
+  StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
+  new_stream.decodeHeaders(std::move(request_headers), true);
+  return true;
+}
+
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
   auto buffer = new Buffer::WatermarkBuffer([this]() -> void { this->responseDataDrained(); },
                                             [this]() -> void { this->responseDataTooLarge(); });
@@ -1773,6 +1858,11 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data,
                                                                       bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
+}
+
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
+  parent_.encodeData(this, data, end_stream);
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {

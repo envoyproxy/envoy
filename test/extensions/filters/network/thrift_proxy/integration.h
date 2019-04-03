@@ -50,7 +50,7 @@ struct PayloadOptions {
 class BaseThriftIntegrationTest : public BaseIntegrationTest {
 public:
   BaseThriftIntegrationTest()
-      : BaseIntegrationTest(Network::Address::IpVersion::v4, realTime(), thrift_config_) {}
+      : BaseIntegrationTest(Network::Address::IpVersion::v4, thrift_config_) {}
 
   /**
    * Given PayloadOptions, generate a client request and server response and store the
@@ -60,7 +60,7 @@ public:
                        Buffer::Instance& response_buffer);
 
 protected:
-  // Tests should use a static SetUpTestCase method to initialize this field with a suitable
+  // Tests should use a static SetUpTestSuite method to initialize this field with a suitable
   // configuration.
   static std::string thrift_config_;
 

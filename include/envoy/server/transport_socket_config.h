@@ -3,13 +3,15 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/init/init.h"
+#include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/singleton/manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/protobuf/protobuf.h"
@@ -24,6 +26,11 @@ namespace Configuration {
 class TransportSocketFactoryContext {
 public:
   virtual ~TransportSocketFactoryContext() {}
+
+  /**
+   * @return Server::Admin& the server's admin interface.
+   */
+  virtual Server::Admin& admin() PURE;
 
   /**
    * @return Ssl::ContextManager& the SSL context manager.
@@ -76,6 +83,21 @@ public:
    * if not set.
    */
   virtual Init::Manager* initManager() PURE;
+
+  /**
+   * @return the server's singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
+
+  /**
+   * @return the server's TLS slot allocator.
+   */
+  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+
+  /**
+   * @return reference to the Api object
+   */
+  virtual Api::Api& api() PURE;
 };
 
 class TransportSocketConfigFactory {

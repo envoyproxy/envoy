@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/config/overload/v2alpha/overload.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/overload_manager.h"
@@ -52,11 +53,12 @@ class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadM
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       ThreadLocal::SlotAllocator& slot_allocator,
-                      const envoy::config::overload::v2alpha::OverloadManager& config);
+                      const envoy::config::overload::v2alpha::OverloadManager& config,
+                      Api::Api& api);
 
   // Server::OverloadManager
   void start() override;
-  void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
+  bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
   ThreadLocalOverloadState& getThreadLocalOverloadState() override;
 

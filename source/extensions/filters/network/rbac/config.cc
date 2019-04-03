@@ -85,9 +85,8 @@ RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
 /**
  * Static registration for the RBAC network filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RoleBasedAccessControlNetworkFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(RoleBasedAccessControlNetworkFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace RBACFilter
 } // namespace NetworkFilters

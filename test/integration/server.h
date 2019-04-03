@@ -85,17 +85,22 @@ public:
     return wrapped_scope_->gauge(name);
   }
 
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
+
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogram(name);
   }
 
+  const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
+  SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
   const StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
   StatsOptionsImpl stats_options_;
+  NullGaugeImpl null_gauge_;
 };
 
 /**
@@ -119,6 +124,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauge(name);
   }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
@@ -149,11 +155,15 @@ public:
   void mergeHistograms(PostMergeCb) override {}
   Source& source() override { return source_; }
 
+  const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
+  SymbolTable& symbolTable() override { return store_.symbolTable(); }
+
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   SourceImpl source_;
   StatsOptionsImpl stats_options_;
+  NullGaugeImpl null_gauge_;
 };
 
 } // namespace Stats
@@ -174,22 +184,27 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
 public:
   static IntegrationTestServerPtr create(const std::string& config_path,
                                          const Network::Address::IpVersion version,
-                                         std::function<void()> pre_worker_start_test_steps,
+                                         std::function<void()> on_server_init_function,
                                          bool deterministic, Event::TestTimeSystem& time_system,
-                                         Api::Api& api);
+                                         Api::Api& api, bool defer_listener_finalization = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer();
 
+  void waitUntilListenersReady();
+
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
-    on_worker_listener_added_cb_ = on_worker_listener_added;
+    on_worker_listener_added_cb_ = std::move(on_worker_listener_added);
   }
   void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
-    on_worker_listener_removed_cb_ = on_worker_listener_removed;
+    on_worker_listener_removed_cb_ = std::move(on_worker_listener_removed);
   }
+  void onRuntimeCreated() override;
+
   void start(const Network::Address::IpVersion version,
-             std::function<void()> pre_worker_start_test_steps, bool deterministic);
+             std::function<void()> on_server_init_function, bool deterministic,
+             bool defer_listener_finalization);
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {

@@ -81,7 +81,7 @@ public:
     return socket_->localAddress();
   }
   void setConnectionStats(const ConnectionStats& stats) override;
-  const Ssl::Connection* ssl() const override { return transport_socket_->ssl(); }
+  const Ssl::ConnectionInfo* ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
@@ -94,8 +94,7 @@ public:
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
-  void setWriteFilterOrder(bool reversed) override { reverse_write_filter_order_ = reversed; }
-  bool reverseWriteFilterOrder() const override { return reverse_write_filter_order_; }
+  absl::string_view transportFailureReason() const override;
 
   // Network::BufferSource
   BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
@@ -104,7 +103,8 @@ public:
   }
 
   // Network::TransportSocketCallbacks
-  int fd() const override { return socket_->fd(); }
+  IoHandle& ioHandle() override { return socket_->ioHandle(); }
+  const IoHandle& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
   void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
@@ -192,7 +192,6 @@ private:
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
   uint32_t read_disable_count_{0};
-  bool reverse_write_filter_order_{false};
 };
 
 /**

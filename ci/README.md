@@ -2,16 +2,16 @@
 
 Two flavors of Envoy Docker images, based on Ubuntu and Alpine Linux, are built.
 
-## Ubuntu envoy image
+## Ubuntu Envoy image
 The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CircleCI checks,
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/master/ci/envoy_build_sha.sh). Developers
 may work with `envoyproxy/envoy-build:latest` to provide a self-contained environment for building Envoy binaries and
 running tests that reflects the latest built Ubuntu Envoy image. Moreover, the Docker image
 at [`envoyproxy/envoy:<hash>`](https://hub.docker.com/r/envoyproxy/envoy/) is an image that has an Envoy binary at `/usr/local/bin/envoy`. The `<hash>`
-corresponds to the master commit at which the binary was compiled. Lastly, `envoyproxy/envoy:latest` contains an Envoy
+corresponds to the master commit at which the binary was compiled. Lastly, `envoyproxy/envoy-dev:latest` contains an Envoy
 binary built from the latest tip of master that passed tests.
 
-## Alpine envoy image
+## Alpine Envoy image
 
 Minimal images based on Alpine Linux allow for quicker deployment of Envoy. Two Alpine based images are built,
 one with an Envoy binary with debug (`envoyproxy/envoy-alpine-debug`) symbols and one stripped of them (`envoyproxy/envoy-alpine`).
@@ -36,7 +36,6 @@ An example basic invocation to build a developer version of the Envoy static bin
 ```
 
 The build image defaults to `envoyproxy/envoy-build-ubuntu`, but you can choose build image by setting `IMAGE_NAME` in the environment.
-```
 
 In case your setup is behind a proxy, set `http_proxy` and `https_proxy` to the proxy servers before invoking the build.
 
@@ -70,6 +69,13 @@ For a debug version of the Envoy binary you can run:
 The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/envoy-debug` (or wherever
 `$ENVOY_DOCKER_BUILD_DIR` points).
 
+To leverage a [bazel remote cache](https://github.com/envoyproxy/envoy/tree/master/bazel#advanced-caching-setup) add the http_remote_cache endpoint to
+the BAZEL_BUILD_OPTIONS environment variable
+
+```bash
+BAZEL_BUILD_OPTIONS='--remote_http_cache=http://127.0.0.1:28080' ./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release'
+```
+
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 * `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang.
@@ -85,10 +91,11 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
 * `bazel.compile_time_options` &mdash; build Envoy and test with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
-* `check_format`&mdash; run `clang-format-6.0` and `buildifier` on entire source tree.
-* `fix_format`&mdash; run and enforce `clang-format-6.0` and `buildifier` on entire source tree.
+* `check_format`&mdash; run `clang-format-7` and `buildifier` on entire source tree.
+* `fix_format`&mdash; run and enforce `clang-format-7` and `buildifier` on entire source tree.
 * `check_spelling`&mdash; run `misspell` on entire project.
 * `fix_spelling`&mdash; run and enforce `misspell` on entire project.
+* `check_spelling_pedantic`&mdash; run `aspell` on C++ and proto comments.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 # Testing changes to the build image as a developer

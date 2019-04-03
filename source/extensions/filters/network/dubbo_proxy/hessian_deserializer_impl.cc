@@ -14,20 +14,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-enum class RpcResponseType : uint8_t {
-  ResponseWithException = 0,
-  ResponseWithValue = 1,
-  ResponseWithNullValue = 2,
-  ResponseWithExceptionWithAttachments = 3,
-  ResponseValueWithAttachments = 4,
-  ResponseNullValueWithAttachments = 5,
-};
-
 RpcInvocationPtr HessianDeserializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
                                                                    size_t body_size) {
   ASSERT(buffer.length() >= body_size);
   size_t total_size = 0, size;
-  // TODO(zyfjeff:) Add format checker
+  // TODO(zyfjeff): Add format checker
   std::string dubbo_version = HessianUtils::peekString(buffer, &size);
   total_size = total_size + size;
   std::string service_name = HessianUtils::peekString(buffer, &size, total_size);
@@ -57,9 +48,9 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
   switch (type) {
   case RpcResponseType::ResponseWithException:
   case RpcResponseType::ResponseWithExceptionWithAttachments:
+  case RpcResponseType::ResponseWithValue:
     result = std::make_unique<RpcResultImpl>(true);
     break;
-  case RpcResponseType::ResponseWithValue:
   case RpcResponseType::ResponseWithNullValue:
     has_value = false;
     FALLTHRU;
@@ -85,6 +76,23 @@ RpcResultPtr HessianDeserializerImpl::deserializeRpcResult(Buffer::Instance& buf
   return result;
 }
 
+size_t HessianDeserializerImpl::serializeRpcResult(Buffer::Instance& output_buffer,
+                                                   const std::string& content,
+                                                   RpcResponseType type) {
+  size_t origin_length = output_buffer.length();
+
+  // The serialized response type is compact int.
+  size_t serialized_size = HessianUtils::writeInt(
+      output_buffer, static_cast<std::underlying_type<RpcResponseType>::type>(type));
+
+  // Serialized response content.
+  serialized_size += HessianUtils::writeString(output_buffer, content);
+
+  ASSERT((output_buffer.length() - origin_length) == serialized_size);
+
+  return serialized_size;
+}
+
 class HessianDeserializerConfigFactory : public DeserializerFactoryBase<HessianDeserializerImpl> {
 public:
   HessianDeserializerConfigFactory() : DeserializerFactoryBase(SerializationType::Hessian) {}
@@ -93,8 +101,7 @@ public:
 /**
  * Static registration for the Hessian protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<HessianDeserializerConfigFactory, NamedDeserializerConfigFactory>
-    register_;
+REGISTER_FACTORY(HessianDeserializerConfigFactory, NamedDeserializerConfigFactory);
 
 } // namespace DubboProxy
 } // namespace NetworkFilters

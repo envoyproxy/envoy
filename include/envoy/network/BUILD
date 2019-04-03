@@ -11,7 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "address_interface",
     hdrs = ["address.h"],
-    deps = ["//include/envoy/api:os_sys_calls_interface"],
+    deps = [
+        ":io_handle_interface",
+        "//include/envoy/api:os_sys_calls_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -62,10 +65,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "io_handle_interface",
+    hdrs = ["io_handle.h"],
+    deps = [
+        "//include/envoy/api:io_error_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "listen_socket_interface",
     hdrs = ["listen_socket.h"],
     deps = [
-        "//include/envoy/network:address_interface",
+        ":address_interface",
+        ":io_handle_interface",
         "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
@@ -74,6 +87,7 @@ envoy_cc_library(
     name = "transport_socket_interface",
     hdrs = ["transport_socket.h"],
     deps = [
+        ":io_handle_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/ssl:connection_interface",
     ],

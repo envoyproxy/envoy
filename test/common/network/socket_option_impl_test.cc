@@ -61,6 +61,7 @@ TEST_F(SocketOptionImplTest, GetUnsupportedOptReturnsNullopt) {
       socket_option.getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_LISTENING);
   EXPECT_FALSE(result.has_value());
 }
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

@@ -109,24 +109,13 @@ protected:
     const LowerCaseString* key_;
   };
 
-  struct StaticLookupEntry {
-    typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
-
-    EntryCb cb_{};
-    std::array<std::unique_ptr<StaticLookupEntry>, 256> entries_;
-  };
+  typedef StaticLookupResponse (*EntryCb)(HeaderMapImpl&);
 
   /**
    * This is the static lookup table that is used to determine whether a header is one of the O(1)
    * headers. This uses a trie for lookup time at most equal to the size of the incoming string.
    */
-  struct StaticLookupTable {
-    StaticLookupTable();
-    void add(const char* key, StaticLookupEntry::EntryCb cb);
-    StaticLookupEntry::EntryCb find(const char* key) const;
-
-    StaticLookupEntry root_;
-  };
+  struct StaticLookupTable; // Defined in header_map_impl.cc.
 
   struct AllInlineHeaders {
     ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_STRUCT)

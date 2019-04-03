@@ -45,6 +45,7 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/network:socket_option_factory_lib",
     ],
 )
 

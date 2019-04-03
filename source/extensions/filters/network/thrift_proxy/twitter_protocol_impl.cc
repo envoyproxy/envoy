@@ -1158,8 +1158,7 @@ public:
 /**
  * Static registration for the Twitter protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<TwitterProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_;
+REGISTER_FACTORY(TwitterProtocolConfigFactory, NamedProtocolConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

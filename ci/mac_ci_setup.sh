@@ -3,6 +3,10 @@
 # Installs the dependencies required for a macOS build via homebrew.
 # Tools are not upgraded to new versions.
 
+# Setup bazelbuild tap
+brew tap bazelbuild/tap
+brew tap-pin bazelbuild/tap
+
 function is_installed {
     brew ls --versions "$1" >/dev/null
 }

@@ -1,8 +1,10 @@
 syntax = "proto3";
 
 package envoy.config.filter.network.http_connection_manager.v2;
-option java_package = "io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2";
+
+option java_outer_classname = "HttpConnectionManagerProto";
 option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/core/config_source.proto";
@@ -22,7 +24,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 29]
+// [#comment:next free field: 31]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -114,6 +116,10 @@ message HttpConnectionManager {
     // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
     // Default: 100%
     envoy.type.Percent overall_sampling = 5;
+
+    // Whether to annotate spans with additional data. If true, spans will include logs for stream
+    // events.
+    bool verbose = 6;
   }
 
   // Presence of the object defines whether the connection manager
@@ -130,6 +136,14 @@ message HttpConnectionManager {
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.
   string server_name = 10;
+
+  // The maximum request headers size for incoming connections.
+  // If unconfigured, the default max request headers allowed is 60 KiB.
+  // Requests that exceed this limit will receive a 431 response.
+  // The max configurable limit is 96 KiB, based on current implementation
+  // constraints.
+  google.protobuf.UInt32Value max_request_headers_kb = 29
+      [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 96];
 
   // The idle timeout for connections managed by the connection manager. The
   // idle timeout is defined as the period in which there are no active
@@ -189,7 +203,7 @@ message HttpConnectionManager {
   // during which Envoy will flush the write buffers for the connection and await the peer to close
   // (i.e., a TCP FIN/RST is received by Envoy from the downstream connection).
   //
-  // Delaying Envoy's connection close and giving the peer the opportunity to initate the close
+  // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
   // data in a connection's receive buffer after a remote close has been detected via a socket
   // write(). This race leads to such clients failing to process the response code sent by Envoy,
@@ -331,6 +345,7 @@ message HttpConnectionManager {
   // :ref:`http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6
   // <config_http_conn_man_runtime_represent_ipv4_remote_address_as_ipv4_mapped_ipv6>` for runtime
   // control.
+  // [#not-implemented-hide:]
   bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6 = 20;
 
   // The configuration for HTTP upgrades.
@@ -356,21 +371,17 @@ message HttpConnectionManager {
     // HTTP connections will be used for this upgrade type.
     repeated HttpFilter filters = 2;
     // Determines if upgrades are enabled or disabled by default. Defaults to true.
-    // This can be overriden on a per-route basis with :ref:`cluster
+    // This can be overridden on a per-route basis with :ref:`cluster
     // <envoy_api_field_route.RouteAction.upgrade_configs>` as documented in the
     // :ref:`upgrade documentation <arch_overview_websocket>`.
     google.protobuf.BoolValue enabled = 3;
   };
   repeated UpgradeConfig upgrade_configs = 23;
 
-  // If true, the order of encoder filters will be reversed to that of filters
-  // configured in the HTTP filter chain. Otherwise, it will keep the existing
-  // order.
-  // Note: this is a bug fix for Envoy, which is designed to have the reversed
-  // order of encode filters to that of decode ones, (see
-  // https://github.com/envoyproxy/envoy/issues/4599 for details). When we remove this field, envoy
-  // will have the same behavior when it sets true.
-  google.protobuf.BoolValue bugfix_reverse_encode_order = 27 [deprecated = true];
+  reserved 27;
+
+  // This is reserved for a pending security fix.
+  reserved 30;
 }
 
 message Rds {
@@ -392,14 +403,20 @@ message HttpFilter {
   // [#comment:TODO(mattklein123): Auto generate the following list]
   // * :ref:`envoy.buffer <config_http_filters_buffer>`
   // * :ref:`envoy.cors <config_http_filters_cors>`
+  // * :ref:`envoy.ext_authz <config_http_filters_ext_authz>`
   // * :ref:`envoy.fault <config_http_filters_fault_injection>`
+  // * :ref:`envoy.filters.http.header_to_metadata <config_http_filters_header_to_metadata>`
+  // * :ref:`envoy.filters.http.grpc_http1_reverse_bridge \
+  //   <config_http_filters_grpc_http1_reverse_bridge>`
+  // * :ref:`envoy.filters.http.jwt_authn <config_http_filters_jwt_authn>`
+  // * :ref:`envoy.filters.http.rbac <config_http_filters_rbac>`
+  // * :ref:`envoy.filters.http.tap <config_http_filters_tap>`
   // * :ref:`envoy.gzip <config_http_filters_gzip>`
   // * :ref:`envoy.http_dynamo_filter <config_http_filters_dynamo>`
   // * :ref:`envoy.grpc_http1_bridge <config_http_filters_grpc_bridge>`
   // * :ref:`envoy.grpc_json_transcoder <config_http_filters_grpc_json_transcoder>`
   // * :ref:`envoy.grpc_web <config_http_filters_grpc_web>`
   // * :ref:`envoy.health_check <config_http_filters_health_check>`
-  // * :ref:`envoy.header_to_metadata <config_http_filters_header_to_metadata>`
   // * :ref:`envoy.ip_tagging <config_http_filters_ip_tagging>`
   // * :ref:`envoy.lua <config_http_filters_lua>`
   // * :ref:`envoy.rate_limit <config_http_filters_rate_limit>`
@@ -410,7 +427,7 @@ message HttpFilter {
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
+    google.protobuf.Struct config = 2;
 
     google.protobuf.Any typed_config = 4;
   }

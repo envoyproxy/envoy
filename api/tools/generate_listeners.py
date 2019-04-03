@@ -47,7 +47,7 @@ def GenerateListeners(listeners_pb_path, output_pb_path, output_json_path, fragm
 
   for filter_chain in listener.filter_chains:
     for f in filter_chain.filters:
-      f.config.CopyFrom(ProtoToStruct(ParseProto(fragments.next(), f.name)))
+      f.config.CopyFrom(ProtoToStruct(ParseProto(next(fragments), f.name)))
 
   with open(output_pb_path, 'w') as f:
     f.write(str(listener))

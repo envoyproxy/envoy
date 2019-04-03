@@ -4,7 +4,7 @@
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/http/mocks.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace {
 

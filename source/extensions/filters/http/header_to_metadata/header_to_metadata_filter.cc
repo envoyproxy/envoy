@@ -147,8 +147,8 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
 
     if (header_entry != nullptr && rule.has_on_header_present()) {
       const auto& keyval = rule.on_header_present();
-      absl::string_view value =
-          keyval.value().empty() ? header_entry->value().getStringView() : keyval.value();
+      absl::string_view value = keyval.value().empty() ? header_entry->value().getStringView()
+                                                       : absl::string_view(keyval.value());
 
       if (!value.empty()) {
         const auto& nspace = decideNamespace(keyval.metadata_namespace());

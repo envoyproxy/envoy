@@ -12,6 +12,7 @@
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 /**
@@ -48,27 +49,19 @@ public:
   // where timer callbacks are triggered by the advancement of time. This implementation
   // matches recent behavior, where real-time timers were created directly in libevent
   // by dispatcher_impl.cc.
-  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& base) override {
-    return test_time_.timeSystem().createScheduler(base);
+  Event::SchedulerPtr createScheduler(Event::Scheduler& base_scheduler) override {
+    return real_time_.createScheduler(base_scheduler);
   }
-  void sleep(const Duration& duration) override { test_time_.timeSystem().sleep(duration); }
+  void sleep(const Duration& duration) override { real_time_.sleep(duration); }
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
           const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return test_time_.timeSystem().waitFor(mutex, condvar, duration);
+    return real_time_.waitFor(mutex, condvar, duration); // NO_CHECK_FORMAT(real_time)
   }
   MOCK_METHOD0(systemTime, SystemTime());
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 
-  DangerousDeprecatedTestTime test_time_;
-};
-
-class MockTokenBucket : public TokenBucket {
-public:
-  MockTokenBucket();
-  ~MockTokenBucket();
-
-  MOCK_METHOD1(consume, bool(uint64_t));
+  Event::TestRealTimeSystem real_time_; // NO_CHECK_FORMAT(real_time)
 };
 
 // Captures absl::string_view parameters into temp strings, for use

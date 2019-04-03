@@ -21,7 +21,7 @@ namespace JwtAuthn {
 namespace {
 
 /**
- * Contant values
+ * Constant values
  */
 struct JwtConstValueStruct {
   // The header value prefix for Authorization.

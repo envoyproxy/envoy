@@ -23,6 +23,23 @@ namespace Http {
 namespace Utility {
 
 /**
+ * Given a fully qualified URL, splits the string_view provided into scheme,
+ * host and path components.
+ */
+class Url {
+public:
+  bool initialize(absl::string_view absolute_url);
+  absl::string_view scheme() { return scheme_; }
+  absl::string_view host_and_port() { return host_and_port_; }
+  absl::string_view path() { return path_; }
+
+private:
+  absl::string_view scheme_;
+  absl::string_view host_and_port_;
+  absl::string_view path_;
+};
+
+/**
  * Append to x-forwarded-for header.
  * @param headers supplies the headers to append to.
  * @param remote_address supplies the remote address to append.
@@ -213,6 +230,11 @@ MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
 std::string queryParamsToString(const QueryParams& query_params);
 
 /**
+ * Returns string representation of StreamResetReason.
+ */
+const std::string resetReasonToString(const Http::StreamResetReason reset_reason);
+
+/**
  * Transforms the supplied headers from an HTTP/1 Upgrade request to an H2 style upgrade.
  * Changes the method to connection, moves the Upgrade to a :protocol header,
  * @param headers the headers to convert.
@@ -249,7 +271,7 @@ resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
                                           const Router::RouteConstSharedPtr& route);
 
 /**
- * Retreives the route specific config. Route specific config can be in a few
+ * Retrieves the route specific config. Route specific config can be in a few
  * places, that are checked in order. The first config found is returned. The
  * order is:
  * - the routeEntry() (for config that's applied on weighted clusters)

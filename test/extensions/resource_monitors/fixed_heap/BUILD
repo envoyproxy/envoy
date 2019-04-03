@@ -27,6 +27,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.resource_monitors.fixed_heap",
     deps = [
         "//include/envoy/registry",
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/fixed_heap:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",

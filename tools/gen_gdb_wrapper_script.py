@@ -5,6 +5,8 @@
 # in the bazel test environment. This is a workaround for the fact that --run_under does not attach
 # stdin.
 
+from __future__ import print_function
+
 import os
 import pipes
 import string
@@ -15,7 +17,7 @@ GDB_RUNNER_SCRIPT = string.Template("""#!/usr/bin/env python
 import os
 
 env = ${b64env}
-for k, v in env.iteritems():
+for k, v in env.items():
   os.environ[k] = v
 
 os.system("${gdb} --fullname --args ${test_args}")
@@ -33,5 +35,5 @@ if __name__ == '__main__':
             gdb=gdb,
             test_args=' '.join(pipes.quote(arg) for arg in test_args)))
   # To make bazel consider the test a failure we exit non-zero.
-  print 'Test was not run, instead a gdb wrapper script was produced in %s' % generated_path
+  print('Test was not run, instead a gdb wrapper script was produced in %s' % generated_path)
   sys.exit(1)

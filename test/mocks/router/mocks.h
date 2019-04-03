@@ -10,7 +10,6 @@
 
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/init/init.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
@@ -66,6 +65,20 @@ public:
   bool shadow_enabled_{};
 };
 
+class TestHedgePolicy : public HedgePolicy {
+public:
+  // Router::HedgePolicy
+  uint32_t initialRequests() const override { return initial_requests_; }
+  const envoy::type::FractionalPercent& additionalRequestChance() const override {
+    return additional_request_chance_;
+  }
+  bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout; }
+
+  uint32_t initial_requests_{};
+  envoy::type::FractionalPercent additional_request_chance_{};
+  bool hedge_on_per_try_timeout{};
+};
+
 class TestRetryPolicy : public RetryPolicy {
 public:
   // Router::RetryPolicy
@@ -91,16 +104,19 @@ public:
   MockRetryState();
   ~MockRetryState();
 
-  void expectRetry();
+  void expectHeadersRetry();
+  void expectResetRetry();
 
   MOCK_METHOD0(enabled, bool());
-  MOCK_METHOD3(shouldRetry, RetryStatus(const Http::HeaderMap* response_headers,
-                                        const absl::optional<Http::StreamResetReason>& reset_reason,
-                                        DoRetryCallback callback));
+  MOCK_METHOD2(shouldRetryHeaders,
+               RetryStatus(const Http::HeaderMap& response_headers, DoRetryCallback callback));
+  MOCK_METHOD2(shouldRetryReset,
+               RetryStatus(const Http::StreamResetReason reset_reason, DoRetryCallback callback));
   MOCK_METHOD1(onHostAttempted, void(Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Upstream::Host& host));
-  MOCK_METHOD2(priorityLoadForRetry, Upstream::PriorityLoad&(const Upstream::PrioritySet&,
-                                                             const Upstream::PriorityLoad&));
+  MOCK_METHOD2(priorityLoadForRetry,
+               const Upstream::HealthyAndDegradedLoad&(const Upstream::PrioritySet&,
+                                                       const Upstream::HealthyAndDegradedLoad&));
   MOCK_CONST_METHOD0(hostSelectionMaxAttempts, uint32_t());
 
   DoRetryCallback callback_;
@@ -243,6 +259,7 @@ public:
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
                      void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info));
   MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
+  MOCK_CONST_METHOD0(hedgePolicy, const HedgePolicy&());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(priority, Upstream::ResourcePriority());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
@@ -264,11 +281,13 @@ public:
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
+  MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
   TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
+  TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestShadowPolicy shadow_policy_;
   testing::NiceMock<MockVirtualHost> virtual_host_;

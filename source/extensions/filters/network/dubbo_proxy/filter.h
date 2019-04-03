@@ -15,40 +15,12 @@
 #include "extensions/filters/network/dubbo_proxy/decoder.h"
 #include "extensions/filters/network/dubbo_proxy/deserializer.h"
 #include "extensions/filters/network/dubbo_proxy/protocol.h"
+#include "extensions/filters/network/dubbo_proxy/stats.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
-
-/**
- * All dubbo filter stats. @see stats_macros.h
- */
-// clang-format off
-#define ALL_DUBBO_FILTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                          \
-  COUNTER(request)                                                                                 \
-  COUNTER(request_twoway)                                                                          \
-  COUNTER(request_oneway)                                                                          \
-  COUNTER(request_event)                                                                           \
-  COUNTER(request_invalid_type)                                                                    \
-  COUNTER(request_decoding_error)                                                                  \
-  GAUGE(request_active)                                                                            \
-  HISTOGRAM(request_time_ms)                                                                       \
-  COUNTER(response)                                                                                \
-  COUNTER(response_success)                                                                        \
-  COUNTER(response_error)                                                                          \
-  COUNTER(response_exception)                                                                      \
-  COUNTER(response_decoding_error)                                                                 \
-  COUNTER(cx_destroy_local_with_active_rq)                                                         \
-  COUNTER(cx_destroy_remote_with_active_rq)                                                        \
-// clang-format on
-
-/**
- * Struct definition for all dubbo proxy stats. @see stats_macros.h
- */
-struct DubboFilterStats {
-  ALL_DUBBO_FILTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
-};
 
 class Filter : public Network::Filter,
                public Network::ConnectionCallbacks,
@@ -56,12 +28,12 @@ class Filter : public Network::Filter,
                public DecoderCallbacks,
                Logger::Loggable<Logger::Id::dubbo> {
 public:
-  using ConfigProtocolType = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_ProtocolType;
-  using ConfigSerializationType = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_SerializationType;
+  using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType;
+  using ConfigSerializationType =
+      envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType;
 
   Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
-         ConfigSerializationType serialization_type, Stats::Scope& scope,
-         TimeSource& time_source);
+         ConfigSerializationType serialization_type, Stats::Scope& scope, TimeSource& time_source);
   virtual ~Filter();
 
   // Network::ReadFilter
@@ -93,8 +65,8 @@ private:
   // ActiveMessage tracks downstream requests for which no response has been received.
   struct ActiveMessage {
     ActiveMessage(Filter& parent, int32_t request_id)
-        : parent_(parent),
-          request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_, parent_.time_source_)),
+        : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_,
+                                                              parent_.time_source_)),
           request_id_(request_id) {
       parent_.stats_.request_active_.inc();
     }
@@ -109,9 +81,6 @@ private:
     absl::optional<bool> success_{};
   };
   typedef std::unique_ptr<ActiveMessage> ActiveMessagePtr;
-
-  DubboFilterStats generateStats(const std::string& prefix,
-                                 Stats::Scope& scope);
 
   // Downstream request decoder, callbacks, and buffer.
   DecoderPtr request_decoder_;

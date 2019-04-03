@@ -29,9 +29,7 @@ ProtobufTypes::MessagePtr OriginalSrcConfigFactory::createEmptyConfigProto() {
 /**
  * Static registration for the original_src filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<OriginalSrcConfigFactory,
-                                 Server::Configuration::NamedListenerFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(OriginalSrcConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory);
 
 } // namespace OriginalSrc
 } // namespace ListenerFilters

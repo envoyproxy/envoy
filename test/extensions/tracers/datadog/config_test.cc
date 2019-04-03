@@ -13,6 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
+namespace {
 
 TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   NiceMock<Server::MockInstance> server;
@@ -37,6 +38,7 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   EXPECT_NE(nullptr, datadog_tracer);
 }
 
+} // namespace
 } // namespace Datadog
 } // namespace Tracers
 } // namespace Extensions

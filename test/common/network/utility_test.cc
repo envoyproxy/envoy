@@ -17,6 +17,7 @@
 
 namespace Envoy {
 namespace Network {
+namespace {
 
 TEST(NetworkUtility, Url) {
   EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
@@ -156,9 +157,9 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
 
-INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityGetLocalAddress,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
@@ -459,5 +460,6 @@ TEST(AbslUint128, TestByteOrder) {
   }
 }
 
+} // namespace
 } // namespace Network
 } // namespace Envoy

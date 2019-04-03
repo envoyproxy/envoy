@@ -5,6 +5,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "test/mocks/upstream/cluster_info.h"
@@ -35,9 +36,10 @@ public:
   MockEventLogger();
   ~MockEventLogger();
 
-  MOCK_METHOD4(logEject, void(HostDescriptionConstSharedPtr host, Detector& detector,
-                              EjectionType type, bool enforced));
-  MOCK_METHOD1(logUneject, void(HostDescriptionConstSharedPtr host));
+  MOCK_METHOD4(logEject,
+               void(const HostDescriptionConstSharedPtr& host, Detector& detector,
+                    envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced));
+  MOCK_METHOD1(logUneject, void(const HostDescriptionConstSharedPtr& host));
 };
 
 class MockDetector : public Detector {
@@ -94,7 +96,7 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
   testing::NiceMock<MockClusterInfo> cluster_;
-  Stats::IsolatedStoreImpl stats_store_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };
 
@@ -164,7 +166,7 @@ public:
 
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   HostStats stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_), POOL_GAUGE(stats_store_))};
 };
 

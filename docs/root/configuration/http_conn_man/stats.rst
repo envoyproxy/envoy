@@ -34,7 +34,7 @@ statistics:
    downstream_cx_tx_bytes_buffered, Gauge, Total sent bytes currently buffered
    downstream_cx_drain_close, Counter, Total connections closed due to draining
    downstream_cx_idle_timeout, Counter, Total connections closed due to idle timeout
-   downstream_cx_overload_disable_keepalive, Counter, Total connections for which HTTP 1.x keepalive has been disabled due to envoy overload
+   downstream_cx_overload_disable_keepalive, Counter, Total connections for which HTTP 1.x keepalive has been disabled due to Envoy overload
    downstream_flow_control_paused_reading_total, Counter, Total number of times reads were disabled due to flow control
    downstream_flow_control_resumed_reading_total, Counter, Total number of times reads were enabled on the connection due to flow control
    downstream_rq_total, Counter, Total requests
@@ -56,7 +56,7 @@ statistics:
    downstream_rq_time, Histogram, Total time for request and response (milliseconds)
    downstream_rq_idle_timeout, Counter, Total requests closed due to idle timeout
    downstream_rq_timeout, Counter, Total requests closed due to a timeout on the request path
-   downstream_rq_overload_close, Counter, Total requests closed due to envoy overload
+   downstream_rq_overload_close, Counter, Total requests closed due to Envoy overload
    rs_too_large, Counter, Total response errors due to buffering an overly large body
 
 Per user agent statistics
@@ -109,7 +109,7 @@ All http2 statistics are rooted at *http2.*
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   header_overflow, Counter, Total number of connections reset due to the headers being larger than `Envoy::Http::Http2::ConnectionImpl::StreamImpl::MAX_HEADER_SIZE` (63k)
+   header_overflow, Counter, Total number of connections reset due to the headers being larger than the :ref:`configured value <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.max_request_headers_kb>`.
    headers_cb_no_stream, Counter, Total number of errors where a header callback is called without an associated stream. This tracks an unexpected occurrence due to an as yet undiagnosed bug
    rx_messaging_error, Counter, Total number of invalid received frames that violated `section 8 <https://tools.ietf.org/html/rfc7540#section-8>`_ of the HTTP/2 spec. This will result in a *tx_reset*
    rx_reset, Counter, Total number of reset stream frames received by Envoy

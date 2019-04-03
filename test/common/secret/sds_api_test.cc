@@ -26,7 +26,12 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SdsApiTest : public testing::Test {};
+class SdsApiTest : public testing::Test {
+protected:
+  SdsApiTest() : api_(Api::createApiForTest()) {}
+
+  Api::ApiPtr api_;
+};
 
 // Validate that SdsApi object is created and initialized successfully.
 TEST_F(SdsApiTest, BasicTest) {
@@ -34,7 +39,12 @@ TEST_F(SdsApiTest, BasicTest) {
   const envoy::service::discovery::v2::SdsDummy dummy;
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
-  EXPECT_CALL(init_manager, registerTarget(_));
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
+  Init::TargetHandlePtr init_target_handle;
+  EXPECT_CALL(init_manager, add(_))
+      .WillOnce(Invoke([&init_target_handle](const Init::Target& target) {
+        init_target_handle = target.createHandle("test");
+      }));
 
   envoy::api::v2::core::ConfigSource config_source;
   config_source.mutable_api_config_source()->set_api_type(
@@ -45,7 +55,7 @@ TEST_F(SdsApiTest, BasicTest) {
   google_grpc->set_stat_prefix("test");
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, *api_);
 
   NiceMock<Grpc::MockAsyncClient>* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
   NiceMock<Grpc::MockAsyncClientFactory>* factory{new NiceMock<Grpc::MockAsyncClientFactory>()};
@@ -56,8 +66,8 @@ TEST_F(SdsApiTest, BasicTest) {
   EXPECT_CALL(*factory, create()).WillOnce(Invoke([grpc_client] {
     return Grpc::AsyncClientPtr{grpc_client};
   }));
-  EXPECT_CALL(init_manager.initialized_, ready());
-  init_manager.initialize();
+  EXPECT_CALL(init_watcher, ready());
+  init_target_handle->initialize(init_watcher);
 }
 
 // Validate that TlsCertificateSdsApi updates secrets successfully if a good secret
@@ -68,7 +78,7 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, *api_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -79,23 +89,26 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   name: "abc.com"
   tls_certificate:
     certificate_chain:
-      filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
     private_key:
-      filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
     )EOF";
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
-  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret());
-  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
+  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), *api_);
+  const std::string cert_pem =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config.certificateChain());
 
-  const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
+  const std::string key_pem =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             tls_config.privateKey());
 
@@ -110,7 +123,7 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   envoy::api::v2::core::ConfigSource config_source;
   CertificateValidationContextSdsApi sds_api(
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -120,18 +133,20 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
       R"EOF(
   name: "abc.com"
   validation_context:
-    trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+    trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
     allow_expired_certificate: true
   )EOF";
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   sds_api.onConfigUpdate(secret_resources, "");
 
-  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret());
-  const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
+  Ssl::CertificateValidationContextConfigImpl cvc_config(*sds_api.secret(), *api_);
+  const std::string ca_cert =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
 
@@ -160,7 +175,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   envoy::api::v2::core::ConfigSource config_source;
   CertificateValidationContextSdsApi sds_api(
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -171,19 +186,21 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
         validation_callback.validateCvc(cvc);
       });
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto* secret_config = secret_resources.Add();
-  secret_config->set_name("abc.com");
-  auto* dynamic_cvc = secret_config->mutable_validation_context();
+  envoy::api::v2::auth::Secret typed_secret;
+  typed_secret.set_name("abc.com");
+  auto* dynamic_cvc = typed_secret.mutable_validation_context();
   dynamic_cvc->set_allow_expired_certificate(false);
-  dynamic_cvc->mutable_trusted_ca()->set_filename(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  dynamic_cvc->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   dynamic_cvc->add_verify_subject_alt_name("second san");
   const std::string dynamic_verify_certificate_spki =
       "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=";
   dynamic_cvc->add_verify_certificate_spki(dynamic_verify_certificate_spki);
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   EXPECT_CALL(validation_callback, validateCvc(_));
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
   sds_api.onConfigUpdate(secret_resources, "");
 
   const std::string default_verify_certificate_hash =
@@ -195,12 +212,13 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   default_cvc.add_verify_certificate_hash(default_verify_certificate_hash);
   envoy::api::v2::auth::CertificateValidationContext merged_cvc = default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
-  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc);
+  Ssl::CertificateValidationContextConfigImpl cvc_config(merged_cvc, *api_);
   // Verify that merging CertificateValidationContext applies logical OR to bool
   // field.
   EXPECT_TRUE(cvc_config.allowExpiredCertificate());
   // Verify that singular fields are overwritten.
-  const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
+  const std::string ca_cert =
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
   // Verify that repeated fields are concatenated.
@@ -227,9 +245,9 @@ TEST_F(SdsApiTest, EmptyResource) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, *api_);
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
 
   EXPECT_THROW_WITH_MESSAGE(sds_api.onConfigUpdate(secret_resources, ""), EnvoyException,
                             "Missing SDS resources for abc.com in onConfigUpdate()");
@@ -242,23 +260,23 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, *api_);
 
   std::string yaml =
       R"EOF(
     name: "abc.com"
     tls_certificate:
       certificate_chain:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
       private_key:
-        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
       )EOF";
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config_1 = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config_1);
-  auto secret_config_2 = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config_2);
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
+  secret_resources.Add()->PackFrom(typed_secret);
 
   EXPECT_THROW_WITH_MESSAGE(sds_api.onConfigUpdate(secret_resources, ""), EnvoyException,
                             "Unexpected SDS secrets length: 2");
@@ -272,21 +290,22 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
                                server.stats(), server.clusterManager(), init_manager, config_source,
-                               "abc.com", []() {});
+                               "abc.com", []() {}, *api_);
 
   std::string yaml =
       R"EOF(
       name: "wrong.name.com"
       tls_certificate:
         certificate_chain:
-          filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
         private_key:
-          filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+          filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
         )EOF";
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
 
   EXPECT_THROW_WITH_MESSAGE(sds_api.onConfigUpdate(secret_resources, ""), EnvoyException,
                             "Unexpected SDS secret (expecting abc.com): wrong.name.com");

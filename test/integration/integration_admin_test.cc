@@ -16,11 +16,11 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_CASE_P(Protocols, IntegrationAdminTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                            {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                            {FakeHttpConnection::Type::HTTP1})),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
+                             {FakeHttpConnection::Type::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(IntegrationAdminTest, HealthCheck) {
   initialize();
@@ -96,7 +96,7 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 
-  const char* level_name = spdlog::level::level_names[default_log_level_];
+  spdlog::string_view_t level_name = spdlog::level::level_string_views[default_log_level_];
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 fmt::format("/logging?level={}", level_name), "",
                                                 downstreamProtocol(), version_);
@@ -163,14 +163,14 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
-  // Testing a fitler with no matches
+  // Testing a filter with no matches
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=foo", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
-  // Testing a fitler with matches
+  // Testing a filter with matches
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=server",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -416,11 +416,10 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-class IntegrationAdminIpv4Ipv6Test : public HttpIntegrationTest, public testing::Test {
+class IntegrationAdminIpv4Ipv6Test : public testing::Test, public HttpIntegrationTest {
 public:
   IntegrationAdminIpv4Ipv6Test()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
-                            realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -450,12 +449,12 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 // Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
 // restrictions on their names.
 class StatsMatcherIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::Test,
+    : public testing::Test,
+      public Event::TestUsingSimulatedTime,
+      public HttpIntegrationTest,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
-  StatsMatcherIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), simTime()) {}
+  StatsMatcherIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -474,9 +473,9 @@ public:
   BufferingStreamDecoderPtr response_;
   envoy::config::metrics::v2::StatsMatcher stats_matcher_;
 };
-INSTANTIATE_TEST_CASE_P(IpVersions, StatsMatcherIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsMatcherIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Verify that StatsMatcher prevents the printing of uninstantiated stats.
 TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {

@@ -14,9 +14,11 @@ filters.
   echo_filter
   ext_authz_filter
   mongo_proxy_filter
+  mysql_proxy_filter
   rate_limit_filter
   rbac_filter
   redis_proxy_filter
   tcp_proxy_filter
   thrift_proxy_filter
   sni_cluster_filter
+  zookeeper_proxy_filter

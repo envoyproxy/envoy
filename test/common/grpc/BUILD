@@ -78,8 +78,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "google_grpc_creds_test",
     srcs = envoy_select_google_grpc(["google_grpc_creds_test.cc"]),
+    data = [":service_key.json"],
     deps = [
         ":utility_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_grpc_creds_lib"]),
 )
 
@@ -106,6 +109,7 @@ envoy_cc_test_library(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",
         "//test/proto:helloworld_proto_cc",
+        "//test/test_common:global_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],

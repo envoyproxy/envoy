@@ -25,11 +25,12 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
+namespace {
 
 class DogStatsdConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, DogStatsdConfigLoopbackTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, DogStatsdConfigLoopbackTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = StatsSinkNames::get().DogStatsd;
@@ -95,6 +96,7 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
 }
 
+} // namespace
 } // namespace DogStatsd
 } // namespace StatSinks
 } // namespace Extensions

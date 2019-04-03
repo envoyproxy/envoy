@@ -8,11 +8,10 @@
 namespace Envoy {
 namespace {
 
-class LuaIntegrationTest : public HttpIntegrationTest,
-                           public testing::TestWithParam<Network::Address::IpVersion> {
+class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                           public HttpIntegrationTest {
 public:
-  LuaIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -92,9 +91,9 @@ public:
   FakeStreamPtr lua_request_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, LuaIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, LuaIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Basic request and response.
 TEST_P(LuaIntegrationTest, RequestAndResponse) {

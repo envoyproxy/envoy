@@ -54,8 +54,8 @@ public:
   const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     return upstream_local_address_;
   }
-  bool healthCheck() const override { return hc_request_; }
-  void healthCheck(bool is_hc) override { hc_request_ = is_hc; }
+  bool healthCheck() const override { return health_check_request_; }
+  void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
   void setDownstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& downstream_local_address) override {
@@ -79,6 +79,14 @@ public:
     return downstream_remote_address_;
   }
 
+  void setDownstreamSslConnection(const Ssl::ConnectionInfo* connection_info) override {
+    downstream_connection_info_ = connection_info;
+  }
+
+  const Ssl::ConnectionInfo* downstreamSslConnection() const override {
+    return downstream_connection_info_;
+  }
+
   const Router::RouteEntry* routeEntry() const override { return route_entry_; }
 
   absl::optional<std::chrono::nanoseconds>
@@ -100,35 +108,18 @@ public:
   }
 
   absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
-    return duration(first_upstream_tx_byte_sent_);
-  }
-
-  void onFirstUpstreamTxByteSent() override {
-    first_upstream_tx_byte_sent_ = timeSystem().monotonicTime();
+    return duration(upstream_timing_.first_upstream_tx_byte_sent_);
   }
 
   absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
-    return duration(last_upstream_tx_byte_sent_);
+    return duration(upstream_timing_.last_upstream_tx_byte_sent_);
   }
-
-  void onLastUpstreamTxByteSent() override {
-    last_upstream_tx_byte_sent_ = timeSystem().monotonicTime();
-  }
-
   absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
-    return duration(first_upstream_rx_byte_received_);
-  }
-
-  void onFirstUpstreamRxByteReceived() override {
-    first_upstream_rx_byte_received_ = timeSystem().monotonicTime();
+    return duration(upstream_timing_.first_upstream_rx_byte_received_);
   }
 
   absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
-    return duration(last_upstream_rx_byte_received_);
-  }
-
-  void onLastUpstreamRxByteReceived() override {
-    last_upstream_rx_byte_received_ = timeSystem().monotonicTime();
+    return duration(upstream_timing_.last_upstream_rx_byte_received_);
   }
 
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
@@ -149,11 +140,8 @@ public:
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
 
-  void resetUpstreamTimings() override {
-    first_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
-    last_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
-    first_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
-    last_upstream_rx_byte_received_ = absl::optional<MonotonicTime>{};
+  void setUpstreamTiming(const Envoy::StreamInfo::UpstreamTiming& upstream_timing) override {
+    upstream_timing_ = upstream_timing;
   }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
@@ -176,6 +164,14 @@ public:
 
   const std::string& requestedServerName() const override { return requested_server_name_; }
 
+  void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
+    upstream_transport_failure_reason_ = std::string(failure_reason);
+  }
+
+  const std::string& upstreamTransportFailureReason() const override {
+    return upstream_transport_failure_reason_;
+  }
+
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
   SystemTime start_time_;
@@ -194,15 +190,18 @@ public:
   absl::optional<uint32_t> response_code_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
-  bool hc_request_{};
+  bool health_check_request_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_direct_remote_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  const Ssl::ConnectionInfo* downstream_connection_info_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateImpl filter_state_{};
+  Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
+  std::string upstream_transport_failure_reason_;
   DangerousDeprecatedTestTime test_time_;
 };
 

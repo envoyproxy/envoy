@@ -1,18 +1,19 @@
 #include <vector>
 
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
+#include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
-#include "test/test_common/tls_utility.h"
 
+#include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
-#include "testing/base/public/benchmark.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -77,7 +78,8 @@ static void BM_TlsInspector(benchmark::State& state) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
   ConfigSharedPtr cfg(std::make_shared<Config>(store));
-  Network::ConnectionSocketImpl socket(-1, nullptr, nullptr);
+  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>();
+  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket, dispatcher);
 

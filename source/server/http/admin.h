@@ -97,9 +97,9 @@ public:
   Http::DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
-  bool reverseEncodeOrder() override { return false; }
   bool generateRequestId() override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
@@ -209,6 +209,9 @@ private:
                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                 Buffer::Instance& response, AdminStream&);
+  Http::Code handlerHeapProfiler(absl::string_view path_and_query,
+                                 Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                 AdminStream&);
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
                                     Http::HeaderMap& response_headers, Buffer::Instance& response,
                                     AdminStream&);
@@ -267,7 +270,6 @@ private:
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
-    bool reverseWriteFilterOrder() const override { return false; }
 
     AdminImpl& parent_;
     const std::string name_;
@@ -304,6 +306,7 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;
+  const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
@@ -373,7 +376,8 @@ public:
    */
   static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                    Buffer::Instance& response);
+                                    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                                    Buffer::Instance& response, const bool used_only);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.
@@ -389,6 +393,14 @@ private:
    * Take a string and sanitize it according to Prometheus conventions.
    */
   static std::string sanitizeName(const std::string& name);
+
+  /*
+   * Determine whether a metric has never been emitted and choose to
+   * not show it if we only wanted used metrics.
+   */
+  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only) {
+    return !used_only || metric->used();
+  }
 };
 
 } // namespace Server

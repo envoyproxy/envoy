@@ -22,6 +22,8 @@ public:
   const std::string HttpConnectionManager = "envoy.http_connection_manager";
   // Mongo proxy filter
   const std::string MongoProxy = "envoy.mongo_proxy";
+  // MySQL proxy filter
+  const std::string MySQLProxy = "envoy.filters.network.mysql_proxy";
   // Rate limit filter
   const std::string RateLimit = "envoy.ratelimit";
   // Redis proxy filter
@@ -36,6 +38,8 @@ public:
   const std::string Rbac = "envoy.filters.network.rbac";
   // SNI Cluster filter
   const std::string SniCluster = "envoy.filters.network.sni_cluster";
+  // ZooKeeper proxy filter
+  const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;

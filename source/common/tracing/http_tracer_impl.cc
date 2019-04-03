@@ -39,15 +39,15 @@ static std::string buildUrl(const Http::HeaderMap& request_headers) {
                      valueOrDefault(request_headers.Host(), ""), path);
 }
 
-const std::string HttpTracerUtility::INGRESS_OPERATION = "ingress";
-const std::string HttpTracerUtility::EGRESS_OPERATION = "egress";
+const std::string HttpTracerUtility::IngressOperation = "ingress";
+const std::string HttpTracerUtility::EgressOperation = "egress";
 
 const std::string& HttpTracerUtility::toString(OperationName operation_name) {
   switch (operation_name) {
   case OperationName::Ingress:
-    return INGRESS_OPERATION;
+    return IngressOperation;
   case OperationName::Egress:
-    return EGRESS_OPERATION;
+    return EgressOperation;
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -55,7 +55,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
 
 Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
                                       const Http::HeaderMap& request_headers) {
-  // Exclude HC requests immediately.
+  // Exclude health check requests immediately.
   if (stream_info.healthCheck()) {
     return {Reason::HealthCheck, false};
   }
@@ -82,25 +82,64 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
+static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_info) {
+  const auto start_time = stream_info.startTime();
+  if (stream_info.lastDownstreamRxByteReceived()) {
+    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
+                              *stream_info.lastDownstreamRxByteReceived()),
+             Tracing::Logs::get().LastDownstreamRxByteReceived);
+  }
+  if (stream_info.firstUpstreamTxByteSent()) {
+    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
+                              *stream_info.firstUpstreamTxByteSent()),
+             Tracing::Logs::get().FirstUpstreamTxByteSent);
+  }
+  if (stream_info.lastUpstreamTxByteSent()) {
+    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
+                              *stream_info.lastUpstreamTxByteSent()),
+             Tracing::Logs::get().LastUpstreamTxByteSent);
+  }
+  if (stream_info.firstUpstreamRxByteReceived()) {
+    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
+                              *stream_info.firstUpstreamRxByteReceived()),
+             Tracing::Logs::get().FirstUpstreamRxByteReceived);
+  }
+  if (stream_info.lastUpstreamRxByteReceived()) {
+    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
+                              *stream_info.lastUpstreamRxByteReceived()),
+             Tracing::Logs::get().LastUpstreamRxByteReceived);
+  }
+  if (stream_info.firstDownstreamTxByteSent()) {
+    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
+                              *stream_info.firstDownstreamTxByteSent()),
+             Tracing::Logs::get().FirstDownstreamTxByteSent);
+  }
+  if (stream_info.lastDownstreamTxByteSent()) {
+    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
+                              *stream_info.lastDownstreamTxByteSent()),
+             Tracing::Logs::get().LastDownstreamTxByteSent);
+  }
+}
+
 void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,
                                      const StreamInfo::StreamInfo& stream_info,
                                      const Config& tracing_config) {
   // Pre response data.
   if (request_headers) {
     if (request_headers->RequestId()) {
-      span.setTag(Tracing::Tags::get().GUID_X_REQUEST_ID,
+      span.setTag(Tracing::Tags::get().GuidXRequestId,
                   std::string(request_headers->RequestId()->value().c_str()));
     }
-    span.setTag(Tracing::Tags::get().HTTP_URL, buildUrl(*request_headers));
-    span.setTag(Tracing::Tags::get().HTTP_METHOD, request_headers->Method()->value().c_str());
-    span.setTag(Tracing::Tags::get().DOWNSTREAM_CLUSTER,
+    span.setTag(Tracing::Tags::get().HttpUrl, buildUrl(*request_headers));
+    span.setTag(Tracing::Tags::get().HttpMethod, request_headers->Method()->value().c_str());
+    span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
-    span.setTag(Tracing::Tags::get().USER_AGENT, valueOrDefault(request_headers->UserAgent(), "-"));
-    span.setTag(Tracing::Tags::get().HTTP_PROTOCOL,
+    span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
+    span.setTag(Tracing::Tags::get().HttpProtocol,
                 AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol()));
 
     if (request_headers->ClientTraceId()) {
-      span.setTag(Tracing::Tags::get().GUID_X_CLIENT_TRACE_ID,
+      span.setTag(Tracing::Tags::get().GuidXClientTraceId,
                   std::string(request_headers->ClientTraceId()->value().c_str()));
     }
 
@@ -112,21 +151,24 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
       }
     }
   }
-  span.setTag(Tracing::Tags::get().REQUEST_SIZE, std::to_string(stream_info.bytesReceived()));
+  span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
 
   if (nullptr != stream_info.upstreamHost()) {
-    span.setTag(Tracing::Tags::get().UPSTREAM_CLUSTER,
-                stream_info.upstreamHost()->cluster().name());
+    span.setTag(Tracing::Tags::get().UpstreamCluster, stream_info.upstreamHost()->cluster().name());
   }
 
   // Post response data.
-  span.setTag(Tracing::Tags::get().HTTP_STATUS_CODE, buildResponseCode(stream_info));
-  span.setTag(Tracing::Tags::get().RESPONSE_SIZE, std::to_string(stream_info.bytesSent()));
-  span.setTag(Tracing::Tags::get().RESPONSE_FLAGS,
+  span.setTag(Tracing::Tags::get().HttpStatusCode, buildResponseCode(stream_info));
+  span.setTag(Tracing::Tags::get().ResponseSize, std::to_string(stream_info.bytesSent()));
+  span.setTag(Tracing::Tags::get().ResponseFlags,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
 
+  if (tracing_config.verbose()) {
+    annotateVerbose(span, stream_info);
+  }
+
   if (!stream_info.responseCode() || Http::CodeUtility::is5xx(stream_info.responseCode().value())) {
-    span.setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
+    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
 
   span.finishSpan();
@@ -148,9 +190,9 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
   SpanPtr active_span = driver_->startSpan(config, request_headers, span_name,
                                            stream_info.startTime(), tracing_decision);
   if (active_span) {
-    active_span->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
-    active_span->setTag(Tracing::Tags::get().NODE_ID, local_info_.nodeName());
-    active_span->setTag(Tracing::Tags::get().ZONE, local_info_.zoneName());
+    active_span->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+    active_span->setTag(Tracing::Tags::get().NodeId, local_info_.nodeName());
+    active_span->setTag(Tracing::Tags::get().Zone, local_info_.zoneName());
   }
 
   return active_span;

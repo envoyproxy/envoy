@@ -29,6 +29,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",

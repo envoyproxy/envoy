@@ -90,24 +90,24 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
     if (b3_trace_id_entry->value().size() == 32) {
       const std::string high_tid = tid.substr(0, 16);
       const std::string low_tid = tid.substr(16, 16);
-      if (!StringUtil::atoul(high_tid.c_str(), trace_id_high, 16) ||
-          !StringUtil::atoul(low_tid.c_str(), trace_id, 16)) {
+      if (!StringUtil::atoull(high_tid.c_str(), trace_id_high, 16) ||
+          !StringUtil::atoull(low_tid.c_str(), trace_id, 16)) {
         throw ExtractorException(
             fmt::format("Invalid traceid_high {} or tracid {}", high_tid.c_str(), low_tid.c_str()));
       }
-    } else if (!StringUtil::atoul(tid.c_str(), trace_id, 16)) {
+    } else if (!StringUtil::atoull(tid.c_str(), trace_id, 16)) {
       throw ExtractorException(fmt::format("Invalid trace_id {}", tid.c_str()));
     }
 
     const std::string spid = b3_span_id_entry->value().c_str();
-    if (!StringUtil::atoul(spid.c_str(), span_id, 16)) {
+    if (!StringUtil::atoull(spid.c_str(), span_id, 16)) {
       throw ExtractorException(fmt::format("Invalid span id {}", spid.c_str()));
     }
 
     auto b3_parent_id_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID);
-    if (b3_parent_id_entry) {
+    if (b3_parent_id_entry && b3_parent_id_entry->value().size() > 0) {
       const std::string pspid = b3_parent_id_entry->value().c_str();
-      if (!StringUtil::atoul(pspid.c_str(), parent_id, 16)) {
+      if (!StringUtil::atoull(pspid.c_str(), parent_id, 16)) {
         throw ExtractorException(fmt::format("Invalid parent span id {}", pspid.c_str()));
       }
     }
@@ -150,18 +150,18 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
 
   const std::string trace_id_str = b3.substr(pos, 16);
   if (b3[pos + 32] == '-') {
-    if (!StringUtil::atoul(trace_id_str.c_str(), trace_id_high, 16)) {
+    if (!StringUtil::atoull(trace_id_str.c_str(), trace_id_high, 16)) {
       throw ExtractorException(
           fmt::format("Invalid input: invalid trace id high {}", trace_id_str.c_str()));
     }
     pos += 16;
     const std::string trace_id_low_str = b3.substr(pos, 16);
-    if (!StringUtil::atoul(trace_id_low_str.c_str(), trace_id, 16)) {
+    if (!StringUtil::atoull(trace_id_low_str.c_str(), trace_id, 16)) {
       throw ExtractorException(
           fmt::format("Invalid input: invalid trace id {}", trace_id_low_str.c_str()));
     }
   } else {
-    if (!StringUtil::atoul(trace_id_str.c_str(), trace_id, 16)) {
+    if (!StringUtil::atoull(trace_id_str.c_str(), trace_id, 16)) {
       throw ExtractorException(
           fmt::format("Invalid input: invalid trace id {}", trace_id_str.c_str()));
     }
@@ -173,7 +173,7 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
   }
 
   const std::string span_id_str = b3.substr(pos, 16);
-  if (!StringUtil::atoul(span_id_str.c_str(), span_id, 16)) {
+  if (!StringUtil::atoull(span_id_str.c_str(), span_id, 16)) {
     throw ExtractorException(fmt::format("Invalid input: invalid span id {}", span_id_str.c_str()));
   }
   pos += 16; // spanId ended
@@ -212,7 +212,7 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
       pos++;
 
       const std::string parent_id_str = b3.substr(pos, b3.length() - pos);
-      if (!StringUtil::atoul(parent_id_str.c_str(), parent_id, 16)) {
+      if (!StringUtil::atoull(parent_id_str.c_str(), parent_id, 16)) {
         throw ExtractorException(
             fmt::format("Invalid input: invalid parent id {}", parent_id_str.c_str()));
       }

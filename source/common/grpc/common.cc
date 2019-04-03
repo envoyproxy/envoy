@@ -57,7 +57,7 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
       .inc();
   uint64_t grpc_status_code;
   const bool success =
-      StringUtil::atoul(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
+      StringUtil::atoull(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
   chargeStat(cluster, protocol, grpc_service, grpc_method, success);
 }
 
@@ -85,7 +85,7 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
   if (!grpc_status_header || grpc_status_header->value().empty()) {
     return absl::optional<Status::GrpcStatus>();
   }
-  if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) ||
+  if (!StringUtil::atoull(grpc_status_header->value().c_str(), grpc_status_code) ||
       grpc_status_code > Status::GrpcStatus::MaximumValid) {
     return absl::optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }
@@ -139,7 +139,7 @@ std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_header
   if (header_grpc_timeout_entry) {
     uint64_t grpc_timeout;
     const char* unit =
-        StringUtil::strtoul(header_grpc_timeout_entry->value().c_str(), grpc_timeout);
+        StringUtil::strtoull(header_grpc_timeout_entry->value().c_str(), grpc_timeout);
     if (unit != nullptr && *unit != '\0') {
       switch (*unit) {
       case 'H':

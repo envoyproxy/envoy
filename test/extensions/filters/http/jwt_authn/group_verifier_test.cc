@@ -15,6 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
+
 const char AllWithAny[] = R"(
 providers:
   provider_1:
@@ -64,7 +65,7 @@ typedef std::unordered_map<std::string, const Status&> StatusMap;
 
 constexpr auto allowfailed = "_allow_failed_";
 
-class GroupVerifierTest : public ::testing::Test {
+class GroupVerifierTest : public testing::Test {
 public:
   void createVerifier() {
     ON_CALL(mock_factory_, create(_, _, _))
@@ -128,7 +129,7 @@ public:
   }
 
   JwtAuthentication proto_config_;
-  VerifierPtr verifier_;
+  VerifierConstPtr verifier_;
   MockVerifierCallbacks mock_cb_;
   std::unordered_map<std::string, std::unique_ptr<MockAuthenticator>> mock_auths_;
   NiceMock<MockAuthFactory> mock_factory_;
@@ -286,7 +287,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllMissing) {
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
 }
 
-// Test requrires all and mock auths simulate cache misses and async return of failure statuses.
+// Test requires all and mock auths simulate cache misses and async return of failure statuses.
 TEST_F(GroupVerifierTest, TestRequiresAllBothFailed) {
   MessageUtil::loadFromYaml(RequiresAllConfig, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
@@ -370,7 +371,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyAllAuthFailed) {
 }
 
 // Test contains a 2 provider_name in a require any along with another provider_name in require all.
-// Test simulates first require any is OK and proivder_name is OK.
+// Test simulates first require any is OK and provider_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
   MessageUtil::loadFromYaml(AllWithAny, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"provider_1", Status::Ok}, {"provider_3", Status::Ok}});
@@ -386,7 +387,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
 }
 
 // Test contains a 2 provider_name in a require any along with another provider_name in require all.
-// Test simulates first require any is OK and proivder_name is OK.
+// Test simulates first require any is OK and provider_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
   MessageUtil::loadFromYaml(AllWithAny, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"provider_1", Status::JwtUnknownIssuer},
@@ -404,7 +405,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
 }
 
 // Test contains a 2 provider_name in a require any along with another provider_name in require all.
-// Test simulates all require any OK and proivder_name is OK.
+// Test simulates all require any OK and provider_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyIsOk) {
   MessageUtil::loadFromYaml(AllWithAny, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(
@@ -422,7 +423,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyIsOk) {
 }
 
 // Test contains a 2 provider_name in a require any along with another provider_name in require all.
-// Test simulates all require any failed and proivder_name is OK.
+// Test simulates all require any failed and provider_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyFailed) {
   MessageUtil::loadFromYaml(AllWithAny, proto_config_);
   auto callbacks = createAsyncMockAuthsAndVerifier(

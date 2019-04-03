@@ -29,7 +29,7 @@ template <typename T> class InjectFactory;
  * Note: This class is not thread safe, so registration should only occur in a single threaded
  * environment, which is guaranteed by the static instantiation mentioned above.
  *
- * Exaple lookup: BaseFactoryType *factory =
+ * Example lookup: BaseFactoryType *factory =
  * FactoryRegistry<BaseFactoryType>::getFactory("example_factory_name");
  */
 template <class Base> class FactoryRegistry {
@@ -118,13 +118,21 @@ private:
 template <class T, class Base> class RegisterFactory {
 public:
   /**
-   * Contructor that registers an instance of the factory with the FactoryRegistry.
+   * Constructor that registers an instance of the factory with the FactoryRegistry.
    */
   RegisterFactory() { FactoryRegistry<Base>::registerFactory(instance_); }
 
 private:
   T instance_{};
 };
+
+/**
+ * Macro used for static registration.
+ */
+#define REGISTER_FACTORY(FACTORY, BASE)                                                            \
+  static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
+                                          FACTORY, BASE>                                           \
+      FACTORY##_registered
 
 } // namespace Registry
 } // namespace Envoy

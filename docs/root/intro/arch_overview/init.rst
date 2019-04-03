@@ -1,3 +1,5 @@
+.. _arch_overview_initialization:
+
 Initialization
 ==============
 
@@ -11,7 +13,7 @@ accepting new connections.
   :ref:`CDS <arch_overview_dynamic_config_cds>` if applicable, waits for one response (or failure),
   and does the same primary/secondary initialization of CDS provided clusters.
 * If clusters use :ref:`active health checking <arch_overview_health_checking>`, Envoy also does a
-  single active HC round.
+  single active health check round.
 * Once cluster manager initialization is done, :ref:`RDS <arch_overview_dynamic_config_rds>` and
   :ref:`LDS <arch_overview_dynamic_config_lds>` initialize (if applicable). The server
   doesn't start accepting connections until there has been at least one response (or failure) for
@@ -22,3 +24,6 @@ accepting new connections.
 * After all of the previous steps have taken place, the listeners start accepting new connections.
   This flow ensures that during hot restart the new process is fully capable of accepting and
   processing new connections before the draining of the old process begins.
+
+All mentioned "waiting for one response" periods can be limited by setting corresponding
+:ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`.

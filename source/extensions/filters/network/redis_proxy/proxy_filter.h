@@ -13,7 +13,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/network/redis_proxy/codec.h"
+#include "extensions/filters/network/common/redis/codec.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 
 namespace Envoy {
@@ -69,14 +69,14 @@ typedef std::shared_ptr<ProxyFilterConfig> ProxyFilterConfigSharedPtr;
 
 /**
  * A redis multiplexing proxy filter. This filter will take incoming redis pipelined commands, and
- * mulitplex them onto a consistently hashed connection pool of backend servers.
+ * multiplex them onto a consistently hashed connection pool of backend servers.
  */
 class ProxyFilter : public Network::ReadFilter,
-                    public DecoderCallbacks,
+                    public Common::Redis::DecoderCallbacks,
                     public Network::ConnectionCallbacks {
 public:
-  ProxyFilter(DecoderFactory& factory, EncoderPtr&& encoder, CommandSplitter::Instance& splitter,
-              ProxyFilterConfigSharedPtr config);
+  ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
+              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config);
   ~ProxyFilter();
 
   // Network::ReadFilter
@@ -89,8 +89,8 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  // RedisProxy::DecoderCallbacks
-  void onRespValue(RespValuePtr&& value) override;
+  // Common::Redis::DecoderCallbacks
+  void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
 private:
   struct PendingRequest : public CommandSplitter::SplitCallbacks {
@@ -98,17 +98,19 @@ private:
     ~PendingRequest();
 
     // RedisProxy::CommandSplitter::SplitCallbacks
-    void onResponse(RespValuePtr&& value) override { parent_.onResponse(*this, std::move(value)); }
+    void onResponse(Common::Redis::RespValuePtr&& value) override {
+      parent_.onResponse(*this, std::move(value));
+    }
 
     ProxyFilter& parent_;
-    RespValuePtr pending_response_;
+    Common::Redis::RespValuePtr pending_response_;
     CommandSplitter::SplitRequestPtr request_handle_;
   };
 
-  void onResponse(PendingRequest& request, RespValuePtr&& value);
+  void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
 
-  DecoderPtr decoder_;
-  EncoderPtr encoder_;
+  Common::Redis::DecoderPtr decoder_;
+  Common::Redis::EncoderPtr encoder_;
   CommandSplitter::Instance& splitter_;
   ProxyFilterConfigSharedPtr config_;
   Buffer::OwnedImpl encoder_buffer_;

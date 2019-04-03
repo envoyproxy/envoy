@@ -408,7 +408,7 @@ public:
 /**
  * Static registration for the binary protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<BinaryProtocolConfigFactory, NamedProtocolConfigFactory> register_;
+REGISTER_FACTORY(BinaryProtocolConfigFactory, NamedProtocolConfigFactory);
 
 class LaxBinaryProtocolConfigFactory : public ProtocolFactoryBase<LaxBinaryProtocolImpl> {
 public:
@@ -418,8 +418,7 @@ public:
 /**
  * Static registration for the auto protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<LaxBinaryProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_lax_;
+REGISTER_FACTORY(LaxBinaryProtocolConfigFactory, NamedProtocolConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

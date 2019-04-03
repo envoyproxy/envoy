@@ -12,6 +12,7 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
 #include "common/common/hash.h"
 
 #include "absl/strings/string_view.h"
@@ -25,16 +26,23 @@ namespace Http {
  */
 class LowerCaseString {
 public:
-  LowerCaseString(LowerCaseString&& rhs) : string_(std::move(rhs.string_)) {}
-  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) {}
-  explicit LowerCaseString(const std::string& new_string) : string_(new_string) { lower(); }
+  LowerCaseString(LowerCaseString&& rhs) : string_(std::move(rhs.string_)) { ASSERT(valid()); }
+  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) { ASSERT(valid()); }
+  explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
+    ASSERT(valid());
+    lower();
+  }
 
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
   bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
+  bool operator<(const LowerCaseString& rhs) const { return string_.compare(rhs.string_) < 0; }
 
 private:
   void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
+  // Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
+  // never contain embedded NULLs.
+  bool valid() const { return string_.find('\0') == std::string::npos; }
 
   std::string string_;
 };
@@ -50,6 +58,12 @@ struct LowerCaseStringHash {
  * Convenient type for unordered set of lower case string.
  */
 typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUnorderedSet;
+
+/**
+ * Convenient type for a vector of lower case string and string pair.
+ */
+typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>>
+    LowerCaseStrPairVector;
 
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for
@@ -169,6 +183,9 @@ private:
   };
 
   void freeDynamic();
+  // Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
+  // never contain embedded NULLs.
+  bool valid() const;
 
   uint32_t string_length_;
   Type type_;
@@ -259,6 +276,7 @@ private:
   HEADER_FUNC(EnvoyIpTags)                                                                         \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyOverloaded)                                                                     \
   HEADER_FUNC(EnvoyRateLimited)                                                                    \
   HEADER_FUNC(EnvoyRetryOn)                                                                        \
@@ -283,6 +301,7 @@ private:
   HEADER_FUNC(Host)                                                                                \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(LastModified)                                                                        \
+  HEADER_FUNC(Location)                                                                            \
   HEADER_FUNC(Method)                                                                              \
   HEADER_FUNC(NoChunks)                                                                            \
   HEADER_FUNC(Origin)                                                                              \

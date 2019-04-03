@@ -57,7 +57,7 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
   if (!formatter_) {
     lock.Release();
-    sink_->log(absl::string_view(msg.raw.data(), msg.raw.size()));
+    sink_->log(absl::string_view(msg.payload.data(), msg.payload.size()));
     return;
   }
 

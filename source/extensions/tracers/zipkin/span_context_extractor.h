@@ -29,7 +29,7 @@ public:
 
 private:
   /*
-   * Use to SpanContext extraced from B3 single format Http header
+   * Use to SpanContext extracted from B3 single format Http header
    * b3: {x-b3-traceid}-{x-b3-spanid}-{if x-b3-flags 'd' else x-b3-sampled}-{x-b3-parentspanid}
    * See: "https://github.com/openzipkin/b3-propagation
    */

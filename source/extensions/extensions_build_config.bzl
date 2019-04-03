@@ -42,6 +42,7 @@ EXTENSIONS = {
     "envoy.filters.http.rbac":                          "//source/extensions/filters/http/rbac:config",
     "envoy.filters.http.router":                        "//source/extensions/filters/http/router:config",
     "envoy.filters.http.squash":                        "//source/extensions/filters/http/squash:config",
+    "envoy.filters.http.tap":                           "//source/extensions/filters/http/tap:config",
 
     #
     # Listener filters
@@ -69,12 +70,14 @@ EXTENSIONS = {
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
+    "envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",
     "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.rbac":                       "//source/extensions/filters/network/rbac:config",
     "envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
     "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
+    "envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
 
     #
     # Resource monitors
@@ -113,7 +116,7 @@ EXTENSIONS = {
     #
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
-    "envoy.transport_sockets.capture":                  "//source/extensions/transport_sockets/capture:config",
+    "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
 
     # Retry host predicates
     "envoy.retry_host_predicates.previous_hosts":          "//source/extensions/retry/host/previous_hosts:config",
@@ -186,11 +189,13 @@ WINDOWS_EXTENSIONS = {
     #"envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     #"envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
     #"envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
+    #"envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",
     #"envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
     #"envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     #"envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
     #"envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
+    #"envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
 
     #
     # Stat sinks
@@ -212,5 +217,5 @@ WINDOWS_EXTENSIONS = {
     # Transport sockets
     #
 
-    #"envoy.transport_sockets.capture":                  "//source/extensions/transport_sockets/capture:config",
+    #"envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
 }

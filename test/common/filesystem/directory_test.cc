@@ -126,7 +126,7 @@ TEST_F(DirectoryTest, DirectoryWithFileInSubDirectory) {
   EXPECT_EQ(expected, getDirectoryContents(dir_path_, false));
 }
 
-// Test that when recursively creating DirectoryIterators, they do not interfere with eachother
+// Test that when recursively creating DirectoryIterators, they do not interfere with each other
 TEST_F(DirectoryTest, RecursionIntoSubDirectory) {
   addSubDirs({"sub_dir"});
   addFiles({"file", "sub_dir/sub_file"});

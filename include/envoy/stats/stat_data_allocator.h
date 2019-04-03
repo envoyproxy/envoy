@@ -10,6 +10,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
@@ -52,8 +53,11 @@ public:
    */
   virtual bool requiresBoundedStatNameSize() const PURE;
 
+  virtual const SymbolTable& symbolTable() const PURE;
+  virtual SymbolTable& symbolTable() PURE;
+
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
-  // the moment, histograms don't fit the same pattern of counters and gaugaes
+  // the moment, histograms don't fit the same pattern of counters and gauges
   // as they are not actually created in the context of a stats allocator.
 };
 

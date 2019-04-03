@@ -12,7 +12,7 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Classes and methods for manipulating and chcecking HTTP headers.
+ * Classes and methods for manipulating and checking HTTP headers.
  */
 class HeaderUtility {
 public:

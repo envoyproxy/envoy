@@ -37,7 +37,7 @@ public:
   AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
                            Type type, AutonomousUpstream& upstream);
 
-  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
+  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
 
 private:
   AutonomousUpstream& upstream_;
@@ -49,6 +49,9 @@ typedef std::unique_ptr<AutonomousHttpConnection> AutonomousHttpConnectionPtr;
 // An upstream which creates AutonomousHttpConnection for new incoming connections.
 class AutonomousUpstream : public FakeUpstream {
 public:
+  AutonomousUpstream(const Network::Address::InstanceConstSharedPtr& address,
+                     FakeHttpConnection::Type type, Event::TestTimeSystem& time_system)
+      : FakeUpstream(address, type, time_system) {}
   AutonomousUpstream(uint32_t port, FakeHttpConnection::Type type,
                      Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
       : FakeUpstream(port, type, version, time_system) {}

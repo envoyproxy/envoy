@@ -323,7 +323,7 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
 }
 
 // Test to verify that on stack denied response from the authorization service does
-// result in stopage of the filter chain.
+// result in stoppage of the filter chain.
 TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
   InSequence s;
 

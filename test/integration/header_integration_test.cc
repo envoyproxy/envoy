@@ -16,11 +16,11 @@ namespace Envoy {
 namespace {
 
 std::string ipSuppressEnvoyHeadersTestParamsToString(
-    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
   return fmt::format(
       "{}_{}",
       TestUtility::ipTestParamsToString(
-          testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
+          ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
       std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router");
 }
 
@@ -121,10 +121,10 @@ route_config:
         - match: { prefix: "/test" }
           route:
             cluster: cluster_0
-            request_headers_to_add:
-              - header:
-                  key: "x-real-ip"
-                  value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+          request_headers_to_add:
+            - header:
+                key: "x-real-ip"
+                value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     - name: append-same-headers
       domains: ["append-same-headers.com"]
       request_headers_to_add:
@@ -138,23 +138,23 @@ route_config:
         - match: { prefix: "/test" }
           route:
             cluster: cluster_0
-            request_headers_to_add:
-              - header:
-                  key: "x-foo"
-                  value: "value2"
-              - header:
-                  key: "authorization"
-                  value: "token2"
+          request_headers_to_add:
+            - header:
+                key: "x-foo"
+                value: "value2"
+            - header:
+                key: "authorization"
+                value: "token2"
 )EOF";
 
 } // namespace
 
 class HeaderIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   HeaderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
 
   bool routerSuppressEnvoyHeaders() const { return std::get<1>(GetParam()); }
 
@@ -175,7 +175,6 @@ public:
     }
     cleanupUpstreamAndDownstream();
     test_server_.reset();
-    fake_upstream_connection_.reset();
     fake_upstreams_.clear();
   }
 
@@ -312,9 +311,6 @@ public:
               if (route.has_route()) {
                 auto* route_action = route.mutable_route();
 
-                disableHeaderValueOptionAppend(*route_action->mutable_request_headers_to_add());
-                disableHeaderValueOptionAppend(*route_action->mutable_response_headers_to_add());
-
                 if (route_action->has_weighted_clusters()) {
                   for (auto& c : *route_action->mutable_weighted_clusters()->mutable_clusters()) {
                     disableHeaderValueOptionAppend(*c.mutable_request_headers_to_add());
@@ -340,7 +336,7 @@ public:
 
   void initialize() override {
     if (use_eds_) {
-      pre_worker_start_test_steps_ = [this]() {
+      on_server_init_function_ = [this]() {
         AssertionResult result =
             fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, eds_connection_);
         RELEASE_ASSERT(result, result.message());
@@ -420,10 +416,10 @@ protected:
   FakeStreamPtr eds_stream_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
-                        testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                         testing::Bool()),
-                        ipSuppressEnvoyHeadersTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    ipSuppressEnvoyHeadersTestParamsToString);
 
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.

@@ -62,6 +62,14 @@ public:
     EXPECT_EQ(connected_state, stats_store_.gauge("control_plane.connected_state").value());
   }
 
+  virtual void expectConfigUpdateFailed() PURE;
+
+  virtual void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) PURE;
+
+  virtual void expectDisableInitFetchTimeoutTimer() PURE;
+
+  virtual void callInitFetchTimeoutCb() PURE;
+
   Stats::IsolatedStoreImpl stats_store_;
   SubscriptionStats stats_;
 };

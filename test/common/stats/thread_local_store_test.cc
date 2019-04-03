@@ -36,7 +36,7 @@ namespace Stats {
 class StatsThreadLocalStoreTest : public testing::Test {
 public:
   void SetUp() override {
-    alloc_ = std::make_unique<MockedTestAllocator>(options_);
+    alloc_ = std::make_unique<MockedTestAllocator>(options_, symbol_table_);
     resetStoreWithAlloc(*alloc_);
   }
 
@@ -45,6 +45,7 @@ public:
     store_->addSink(sink_);
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -73,9 +74,9 @@ private:
 
 class HistogramTest : public testing::Test {
 public:
-  typedef std::map<std::string, ParentHistogramSharedPtr> NameHistogramMap;
+  using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
-  HistogramTest() : alloc_(options_) {}
+  HistogramTest() : alloc_(options_, symbol_table_) {}
 
   void SetUp() override {
     store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc_);
@@ -129,13 +130,21 @@ public:
 
     NameHistogramMap name_histogram_map = makeHistogramMap(histogram_list);
     const ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
-    EXPECT_EQ(h1->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
-    EXPECT_EQ(h1->intervalStatistics().summary(), h1_interval_statistics.summary());
+    EXPECT_EQ(h1->cumulativeStatistics().quantileSummary(),
+              h1_cumulative_statistics.quantileSummary());
+    EXPECT_EQ(h1->intervalStatistics().quantileSummary(), h1_interval_statistics.quantileSummary());
+    EXPECT_EQ(h1->cumulativeStatistics().bucketSummary(), h1_cumulative_statistics.bucketSummary());
+    EXPECT_EQ(h1->intervalStatistics().bucketSummary(), h1_interval_statistics.bucketSummary());
 
     if (histogram_list.size() > 1) {
       const ParentHistogramSharedPtr& h2 = name_histogram_map["h2"];
-      EXPECT_EQ(h2->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
-      EXPECT_EQ(h2->intervalStatistics().summary(), h2_interval_statistics.summary());
+      EXPECT_EQ(h2->cumulativeStatistics().quantileSummary(),
+                h2_cumulative_statistics.quantileSummary());
+      EXPECT_EQ(h2->intervalStatistics().quantileSummary(),
+                h2_interval_statistics.quantileSummary());
+      EXPECT_EQ(h2->cumulativeStatistics().bucketSummary(),
+                h2_cumulative_statistics.bucketSummary());
+      EXPECT_EQ(h2->intervalStatistics().bucketSummary(), h2_interval_statistics.bucketSummary());
     }
 
     h1_interval_values_.clear();
@@ -160,6 +169,7 @@ public:
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
   MOCK_METHOD1(free, void(RawStatData& data));
 
+  FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -468,7 +478,6 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  StatsMatcherTLSTest() : StatsThreadLocalStoreTest() {}
   envoy::config::metrics::v2::StatsConfig stats_config_;
 };
 
@@ -614,8 +623,157 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   store_->shutdownThreading();
 }
 
+// Tests the logic for caching the stats-matcher results, and in particular the
+// private impl method checkAndRememberRejection(). That method behaves
+// differently depending on whether TLS is enabled or not, so we parameterize
+// the test accordingly; GetParam()==true means we want a TLS cache. In either
+// case, we should never be calling the stats-matcher rejection logic more than
+// once on given stat name.
+class RememberStatsMatcherTest : public testing::TestWithParam<bool> {
+public:
+  RememberStatsMatcherTest()
+      : heap_alloc_(symbol_table_), store_(options_, heap_alloc_),
+        scope_(store_.createScope("scope.")) {
+    if (GetParam()) {
+      store_.initializeThreading(main_thread_dispatcher_, tls_);
+    }
+  }
+
+  ~RememberStatsMatcherTest() override {
+    store_.shutdownThreading();
+    tls_.shutdownThread();
+  }
+
+  using LookupStatFn = std::function<std::string(const std::string&)>;
+
+  // Helper function to test the rejection cache. The goal here is to use
+  // mocks to ensure that we don't call rejects() more than once on any of the
+  // stats, even with 5 name-based lookups.
+  void testRememberMatcher(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    EXPECT_CALL(*matcher, rejects("stats.overflow")).WillRepeatedly(Return(false));
+
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    EXPECT_CALL(*matcher, rejects("scope.reject")).WillOnce(Return(true));
+    EXPECT_CALL(*matcher, rejects("scope.ok")).WillOnce(Return(false));
+
+    for (int j = 0; j < 5; ++j) {
+      EXPECT_EQ("", lookup_stat("reject"));
+      EXPECT_EQ("scope.ok", lookup_stat("ok"));
+    }
+  }
+
+  void testRejectsAll(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    EXPECT_CALL(*matcher, rejects("stats.overflow")).WillRepeatedly(Return(false));
+    matcher->rejects_all_ = true;
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    ScopePtr scope = store_.createScope("scope.");
+
+    for (int j = 0; j < 5; ++j) {
+      // Note: zero calls to reject() are made, as reject-all should short-circuit.
+      EXPECT_EQ("", lookup_stat("reject"));
+    }
+  }
+
+  void testAcceptsAll(const LookupStatFn lookup_stat) {
+    InSequence s;
+
+    MockStatsMatcher* matcher = new MockStatsMatcher;
+    EXPECT_CALL(*matcher, rejects("stats.overflow")).WillRepeatedly(Return(false));
+    matcher->accepts_all_ = true;
+    StatsMatcherPtr matcher_ptr(matcher);
+    store_.setStatsMatcher(std::move(matcher_ptr));
+
+    for (int j = 0; j < 5; ++j) {
+      // Note: zero calls to reject() are made, as accept-all should short-circuit.
+      EXPECT_EQ("scope.ok", lookup_stat("ok"));
+    }
+  }
+
+  LookupStatFn lookupCounterFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->counter(stat_name).name();
+    };
+  }
+
+  LookupStatFn lookupGaugeFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->gauge(stat_name).name();
+    };
+  }
+
+// TODO(jmarantz): restore BoolIndicator tests when https://github.com/envoyproxy/envoy/pull/6280
+// is reverted.
+#define HAS_BOOL_INDICATOR 0
+#if HAS_BOOL_INDICATOR
+  LookupStatFn lookupBoolIndicator() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->boolIndicator(stat_name).name();
+    };
+  }
+#endif
+
+  LookupStatFn lookupHistogramFn() {
+    return [this](const std::string& stat_name) -> std::string {
+      return scope_->histogram(stat_name).name();
+    };
+  }
+
+  Stats::FakeSymbolTableImpl symbol_table_;
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  StatsOptionsImpl options_;
+  HeapStatDataAllocator heap_alloc_;
+  ThreadLocalStoreImpl store_;
+  ScopePtr scope_;
+};
+
+INSTANTIATE_TEST_CASE_P(RememberStatsMatcherTest, RememberStatsMatcherTest,
+                        testing::ValuesIn({false, true}));
+
+// Tests that the logic for remembering rejected stats works properly, both
+// with and without threading.
+TEST_P(RememberStatsMatcherTest, CounterRejectOne) { testRememberMatcher(lookupCounterFn()); }
+
+TEST_P(RememberStatsMatcherTest, CounterRejectsAll) { testRejectsAll(lookupCounterFn()); }
+
+TEST_P(RememberStatsMatcherTest, CounterAcceptsAll) { testAcceptsAll(lookupCounterFn()); }
+
+TEST_P(RememberStatsMatcherTest, GaugeRejectOne) { testRememberMatcher(lookupGaugeFn()); }
+
+TEST_P(RememberStatsMatcherTest, GaugeRejectsAll) { testRejectsAll(lookupGaugeFn()); }
+
+TEST_P(RememberStatsMatcherTest, GaugeAcceptsAll) { testAcceptsAll(lookupGaugeFn()); }
+
+#if HAS_BOOL_INDICATOR
+TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectOne) {
+  testRememberMatcher(lookupBoolIndicator());
+}
+
+TEST_P(RememberStatsMatcherTest, BoolIndicatorRejectsAll) { testRejectsAll(lookupBoolIndicator()); }
+
+TEST_P(RememberStatsMatcherTest, BoolIndicatorAcceptsAll) { testAcceptsAll(lookupBoolIndicator()); }
+#endif
+
+TEST_P(RememberStatsMatcherTest, HistogramRejectOne) { testRememberMatcher(lookupHistogramFn()); }
+
+TEST_P(RememberStatsMatcherTest, HistogramRejectsAll) { testRejectsAll(lookupHistogramFn()); }
+
+TEST_P(RememberStatsMatcherTest, HistogramAcceptsAll) { testAcceptsAll(lookupHistogramFn()); }
+
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
 public:
+  HeapStatsThreadLocalStoreTest() : heap_alloc_(symbol_table_) {}
+
   void SetUp() override {
     resetStoreWithAlloc(heap_alloc_);
     // Note: we do not call StatsThreadLocalStoreTest::SetUp here as that
@@ -671,7 +829,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   store_->counter(name_1);
 
   // This works fine, and we can find it by its long name because heap-stats do not
-  // get truncsated.
+  // get truncated.
   EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 }
 
@@ -850,8 +1008,18 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   const std::string h1_expected_summary =
       "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
       "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
-  const std::string h2_expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, "
-                                          "P99: 99, P99.5: 99.5, P99.9: 99.9, P100: 100";
+  const std::string h2_expected_summary =
+      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, "
+      "P99.5: 99.5, P99.9: 99.9, P100: 100";
+
+  const std::string h1_expected_buckets =
+      "B0.5: 0, B1: 0, B5: 1, B10: 1, B25: 1, B50: 1, B100: 1, B250: 1, "
+      "B500: 1, B1000: 1, B2500: 1, B5000: 1, B10000: 1, B30000: 1, B60000: 1, "
+      "B300000: 1, B600000: 1, B1.8e+06: 1, B3.6e+06: 1";
+  const std::string h2_expected_buckets =
+      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
+      "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
   for (size_t i = 0; i < 100; ++i) {
     expectCallAndAccumulate(h2, i);
@@ -860,8 +1028,12 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
   EXPECT_EQ(2, validateMerge());
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
-  EXPECT_EQ(h1_expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
-  EXPECT_EQ(h2_expected_summary, name_histogram_map["h2"]->cumulativeStatistics().summary());
+  EXPECT_EQ(h1_expected_summary,
+            name_histogram_map["h1"]->cumulativeStatistics().quantileSummary());
+  EXPECT_EQ(h2_expected_summary,
+            name_histogram_map["h2"]->cumulativeStatistics().quantileSummary());
+  EXPECT_EQ(h1_expected_buckets, name_histogram_map["h1"]->cumulativeStatistics().bucketSummary());
+  EXPECT_EQ(h2_expected_buckets, name_histogram_map["h2"]->cumulativeStatistics().bucketSummary());
 }
 
 // Validates the summary after known value merge in to same histogram.
@@ -880,9 +1052,15 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
 
   const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
                                        "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
+  const std::string expected_bucket_summary =
+      "B0.5: 1, B1: 1, B5: 5, B10: 10, B25: 25, B50: 50, B100: 100, B250: 100, "
+      "B500: 100, B1000: 100, B2500: 100, B5000: 100, B10000: 100, B30000: 100, "
+      "B60000: 100, B300000: 100, B600000: 100, B1.8e+06: 100, B3.6e+06: 100";
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
-  EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
+  EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().quantileSummary());
+  EXPECT_EQ(expected_bucket_summary,
+            name_histogram_map["h1"]->cumulativeStatistics().bucketSummary());
 }
 
 TEST_F(HistogramTest, BasicHistogramUsed) {
@@ -918,13 +1096,15 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
 
 class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
 protected:
-  TruncatingAllocTest() : test_alloc_(options_), long_name_(options_.maxNameLength() + 1, 'A') {}
+  TruncatingAllocTest()
+      : test_alloc_(options_, symbol_table_), long_name_(options_.maxNameLength() + 1, 'A') {}
 
   void SetUp() override {
     store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
     // Do not call superclass SetUp.
   }
 
+  FakeSymbolTableImpl symbol_table_;
   TestAllocator test_alloc_;
   std::string long_name_;
 };
