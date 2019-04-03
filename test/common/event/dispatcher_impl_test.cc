@@ -8,12 +8,16 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
+using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Event {
@@ -89,6 +93,16 @@ protected:
   bool work_finished_;
   TimerPtr keepalive_timer_;
 };
+
+TEST_F(DispatcherImplTest, InitializeStats) {
+  Stats::MockStore parent_scope;
+  // NiceMock because deliverHistogramToSinks may or may not be called, depending on timing.
+  auto* scope = new NiceMock<Stats::MockStore>();
+  EXPECT_CALL(parent_scope, createScope_(_)).WillOnce(Return(scope));
+  EXPECT_CALL(*scope, histogram("loop_duration_us"));
+  EXPECT_CALL(*scope, histogram("poll_delay_us"));
+  dispatcher_->initializeStats(parent_scope);
+}
 
 TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {

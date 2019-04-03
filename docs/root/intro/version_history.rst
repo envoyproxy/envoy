@@ -3,6 +3,7 @@ Version history
 
 1.11.0 (Pending)
 ================
+* event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 
 1.10.0 (Apr 5, 2019)
 ====================

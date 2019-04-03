@@ -3,6 +3,8 @@
 #include "common/common/assert.h"
 #include "common/event/timer_impl.h"
 
+#include "event2/util.h"
+
 namespace Envoy {
 namespace Event {
 
@@ -40,6 +42,50 @@ void LibeventScheduler::run(Dispatcher::RunType mode) {
 }
 
 void LibeventScheduler::loopExit() { event_base_loopexit(libevent_.get(), nullptr); }
+
+void LibeventScheduler::initializeStats(DispatcherStats* stats) {
+  stats_ = stats;
+  evwatch_prepare_new(libevent_.get(), &onPrepare, this);
+  evwatch_check_new(libevent_.get(), &onCheck, this);
+}
+
+void LibeventScheduler::onPrepare(evwatch*, const evwatch_prepare_cb_info* info, void* arg) {
+  // `self` is `this`, passed in from evwatch_prepare_new.
+  auto self = static_cast<LibeventScheduler*>(arg);
+
+  // Record poll timeout and prepare time for this iteration of the event loop. The timeout is the
+  // expected polling duration, whereas the actual polling duration will be the difference measured
+  // between the prepare time and the check time immediately after polling. These are compared in
+  // onCheck to compute the poll_delay stat.
+  self->timeout_set_ = evwatch_prepare_get_timeout(info, &self->timeout_);
+  evutil_gettimeofday(&self->prepare_time_, NULL);
+
+  // If we have a check time available from a previous iteration of the event loop (that is, all but
+  // the first), compute the loop_duration stat.
+  if (self->check_time_.tv_sec != 0) {
+    timeval delta;
+    evutil_timersub(&self->prepare_time_, &self->check_time_, &delta);
+    self->stats_->loop_duration_us_.recordValue(delta.tv_sec * 1000000 + delta.tv_usec);
+  }
+}
+
+void LibeventScheduler::onCheck(evwatch*, const evwatch_check_cb_info*, void* arg) {
+  // `self` is `this`, passed in from evwatch_check_new.
+  auto self = static_cast<LibeventScheduler*>(arg);
+
+  // Record check time for this iteration of the event loop. Use this together with prepare time
+  // from above to compute the actual polling duration, and store it for the next iteration of the
+  // event loop to compute the loop duration.
+  evutil_gettimeofday(&self->check_time_, NULL);
+  if (self->timeout_set_) {
+    timeval delta, delay;
+    evutil_timersub(&self->check_time_, &self->prepare_time_, &delta);
+    evutil_timersub(&delta, &self->timeout_, &delay);
+    if (delay.tv_sec >= 0) {
+      self->stats_->poll_delay_us_.recordValue(delay.tv_sec * 1000000 + delay.tv_usec);
+    }
+  }
+}
 
 } // namespace Event
 } // namespace Envoy

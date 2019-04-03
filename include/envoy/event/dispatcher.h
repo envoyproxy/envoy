@@ -17,10 +17,28 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {
 namespace Event {
+
+/**
+ * All dispatcher stats. @see stats_macros.h
+ */
+// clang-format off
+#define ALL_DISPATCHER_STATS(HISTOGRAM)                                                            \
+  HISTOGRAM(loop_duration_us)                                                                      \
+  HISTOGRAM(poll_delay_us)
+// clang-format on
+
+/**
+ * Struct definition for all dispatcher stats. @see stats_macros.h
+ */
+struct DispatcherStats {
+  ALL_DISPATCHER_STATS(GENERATE_HISTOGRAM_STRUCT)
+};
 
 /**
  * Callback invoked when a dispatcher post() runs.
@@ -38,6 +56,12 @@ public:
    * Returns a time-source to use with this dispatcher.
    */
   virtual TimeSource& timeSource() PURE;
+
+  /**
+   * Start writing stats once thread-local storage is ready to receive them (see
+   * ThreadLocalStoreImpl::initializeThreading).
+   */
+  virtual void initializeStats(Stats::Scope& parent_scope) PURE;
 
   /**
    * Clear any items in the deferred deletion queue.

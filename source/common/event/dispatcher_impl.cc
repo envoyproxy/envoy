@@ -41,6 +41,14 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
 
 DispatcherImpl::~DispatcherImpl() {}
 
+void DispatcherImpl::initializeStats(Stats::Scope& parent_scope) {
+  std::string thread_id = api_.threadFactory().currentThreadId()->debugString();
+  scope_ = parent_scope.createScope(fmt::format("dispatcher.{}.", thread_id));
+  stats_ = std::make_unique<DispatcherStats>(
+      DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM(*scope_))});
+  base_scheduler_.initializeStats(stats_.get());
+}
+
 void DispatcherImpl::clearDeferredDeleteList() {
   ASSERT(isThreadSafe());
   std::vector<DeferredDeletablePtr>* to_delete = current_to_delete_;

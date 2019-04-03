@@ -137,6 +137,7 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsCache>();
   });
+  tls_->runOnAllThreads([this, &tls] { tls.dispatcher().initializeStats(*this); });
 }
 
 void ThreadLocalStoreImpl::shutdownThreading() {
