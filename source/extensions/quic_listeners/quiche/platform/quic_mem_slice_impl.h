@@ -13,27 +13,36 @@
 #include "common/common/assert.h"
 
 #include "quiche/quic/core/quic_buffer_allocator.h"
+#include "quiche/quic/platform/api/quic_logging.h"
 
 namespace quic {
 
 // Implements the interface required by
 // https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/quic_mem_slice.h
-// Note the Quic plugin strategy relies on link-time binding rather than inheritance.
 class QuicMemSliceImpl {
 public:
   // Constructs an empty QuicMemSliceImpl.
   QuicMemSliceImpl() = default;
 
+  // A helper function to construct a buffer fragment and the buffer of given length the fragment
+  // points to with the guarantee that buffer and fragment are both aligned according to
+  // max_align_t.
+  static Envoy::Buffer::BufferFragmentImpl*
+  allocateBufferAndFragment(QuicBufferAllocator* allocator, size_t length) {
+    auto bundle = reinterpret_cast<BufferFragmentBundle*>(
+        allocator->New(sizeof(BufferFragmentBundle) + length));
+    Envoy::Buffer::BufferFragmentImpl& fragment = bundle->fragment_with_padding.fragment;
+    return new (&fragment) Envoy::Buffer::BufferFragmentImpl(
+        bundle->buffer, length,
+        [allocator, bundle](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
+          allocator->Delete(const_cast<char*>(reinterpret_cast<const char*>(bundle)));
+        });
+  }
+
   // Constructs a QuicMemSliceImpl by let |allocator| allocate a data buffer of
   // |length|.
   QuicMemSliceImpl(QuicBufferAllocator* allocator, size_t length) {
-    size_t total_length = sizeof(Envoy::Buffer::BufferFragmentImpl) + length;
-    char* mem = allocator->New(total_length);
-    auto fragment = new (mem + length) Envoy::Buffer::BufferFragmentImpl(
-        mem, length,
-        [allocator](const void* data, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
-          allocator->Delete(const_cast<char*>(static_cast<const char*>(data)));
-        });
+    Envoy::Buffer::BufferFragmentImpl* fragment = allocateBufferAndFragment(allocator, length);
     single_slice_buffer_.addBufferFragment(*fragment);
   }
 
@@ -41,11 +50,7 @@ public:
   // Data will be moved from |buffer| to this mem slice.
   // Prerequisite: |buffer| has at least |length| bytes of data and not empty.
   explicit QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length) {
-#ifndef NDEBUG
-    Envoy::Buffer::RawSlice slice;
-    ASSERT(buffer.getRawSlices(&slice, 1) != 0);
-    ASSERT(slice.len_ == length);
-#endif
+    DCHECK_EQ(length, firstSliceLength(buffer));
     single_slice_buffer_.move(buffer, length);
     ASSERT(single_slice_buffer_.getRawSlices(nullptr, 0) == 1);
   }
@@ -57,7 +62,6 @@ public:
   // after this call completes.
   QuicMemSliceImpl(QuicMemSliceImpl&& other) {
     single_slice_buffer_.move(other.single_slice_buffer_);
-    other.Reset();
   }
 
   QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) {
@@ -81,6 +85,24 @@ public:
   bool empty() const { return length() == 0; }
 
 private:
+  // Used to align both fragment and buffer at max aligned address.
+  struct BufferFragmentBundle {
+    // Wrap fragment in a nested struct so that it can be padded according to
+    // its alignment requirement: max_align_t. This ensures buffer to start at a
+    // max aligned address.
+    struct {
+      alignas(std::max_align_t) Envoy::Buffer::BufferFragmentImpl fragment;
+    } fragment_with_padding;
+    char buffer[0];
+  };
+
+  // Prerequisite: buffer has at least one slice.
+  size_t firstSliceLength(Envoy::Buffer::Instance& buffer) {
+    Envoy::Buffer::RawSlice slice;
+    ASSERT(buffer.getRawSlices(&slice, 1) != 0);
+    return slice.len_;
+  }
+
   Envoy::Buffer::OwnedImpl single_slice_buffer_;
 };
 

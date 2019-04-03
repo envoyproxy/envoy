@@ -489,9 +489,13 @@ TEST(QuicPlatformTest, QuicTestOutput) {
 TEST(QuicPlatformTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
+  bool fragment_releaser_called = false;
   Envoy::Buffer::BufferFragmentImpl fragment(
       str.data(), str.length(),
-      [](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {});
+      [&fragment_released](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
+        // Used to verify that mem slice release appropriately.
+        fragment_releaser_called = true;
+      });
   Envoy::Buffer::OwnedImpl buffer;
   EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
@@ -510,6 +514,10 @@ TEST(QuicPlatformTest, ConstructMemSliceFromBuffer) {
   EXPECT_EQ(0, buffer.length());
   EXPECT_EQ(str.data(), slice2.data());
   EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));
+  slice2.Reset();
+  EXPECT_TRUE(slice2.empty());
+  EXPECT_EQ(nullptr, slice2.data());
+  EXPECT_TRUE(fragment_releaser_called);
 }
 
 class FileUtilsTest : public testing::Test {

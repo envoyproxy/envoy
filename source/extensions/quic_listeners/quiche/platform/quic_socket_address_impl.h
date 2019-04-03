@@ -38,7 +38,7 @@ public:
   QuicIpAddressImpl host() const { return QuicIpAddressImpl(); }
   uint16_t port() const { return 0; }
 
-  sockaddr_storage generic_address() const { return sockaddr_storage(); }
+  sockaddr_storage generic_address() const { return sockaddr_storage{}; }
 };
 
 } // namespace quic

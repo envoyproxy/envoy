@@ -431,6 +431,5 @@ envoy_cc_test(
         ":quic_platform",
         ":quic_platform_mem_slice_span_lib",
         ":quic_platform_mem_slice_storage_lib",
-        ":spdy_platform",
     ],
 )

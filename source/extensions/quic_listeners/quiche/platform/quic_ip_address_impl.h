@@ -41,7 +41,7 @@ public:
   QuicIpAddressImpl Normalized() const { return QuicIpAddressImpl(); }
   QuicIpAddressImpl DualStacked() const { return QuicIpAddressImpl(); }
   bool FromPackedString(const char*, size_t) { return false; }
-  bool FromString(std::string) { return false; }
+  bool FromString(const std::string&) { return false; }
   bool IsIPv4() const { return true; }
   bool IsIPv6() const { return false; }
 

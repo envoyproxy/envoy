@@ -95,8 +95,8 @@ envoy_cc_library(
         "quic_reference_counted_impl.h",
         "quic_ptr_util_impl.h",
         "quic_server_stats_impl.h",
-        "quic_string_piece_impl.h",
         "quic_socket_address_impl.h",
+        "quic_string_piece_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
         "quic_expect_bug_impl.h",
@@ -118,13 +118,13 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "@com_googlesource_quiche//:quic_platform_export",
         "@com_googlesource_quiche//:quic_buffer_allocator_lib",
+        "@com_googlesource_quiche//:quic_platform_export",
         "@com_googlesource_quiche//:quic_platform_ip_address_family",
     ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
-        "//source/common/buffer:buffer_lib",
         "//include/envoy/thread:thread_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/server:backtrace_lib",
     ]),
@@ -182,8 +182,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_mem_slice_storage_impl_lib",
-    srcs =
-        envoy_select_quiche(["quic_mem_slice_storage_impl.cc"]),
+    srcs = envoy_select_quiche(["quic_mem_slice_storage_impl.cc"]),
     hdrs = envoy_select_quiche(["quic_mem_slice_storage_impl.h"]),
     copts = ["-Wno-error=invalid-offsetof"],
     visibility = ["//visibility:public"],
