@@ -13,8 +13,6 @@ MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
 MockGrpcMux::MockGrpcMux() {}
 MockGrpcMux::~MockGrpcMux() {}
 
-MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
-
 MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() {}
 MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() {}
 
@@ -44,6 +42,8 @@ MockGrpcMuxCallbacks::MockGrpcMuxCallbacks() {
             fmt::format("Unknown type URL {} in DiscoveryResponse", resource.type_url()));
       }));
 }
+
+MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
 
 } // namespace Config
 } // namespace Envoy
