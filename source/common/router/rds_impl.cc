@@ -271,7 +271,7 @@ void VhdsSubscription::removeVhosts(
 void VhdsSubscription::updateVhosts(
     std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
-  // TODO validate aaded_resources
+  // TODO (dmitri-d) validate added_resources?
   for (const auto& resource : added_resources) {
     envoy::api::v2::route::VirtualHost vhost =
         MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource.resource());
