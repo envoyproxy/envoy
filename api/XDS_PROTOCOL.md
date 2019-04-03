@@ -45,6 +45,7 @@ correspondence between an xDS API and a resource type. That is:
 
 * [LDS: `envoy.api.v2.Listener`](envoy/api/v2/lds.proto)
 * [RDS: `envoy.api.v2.RouteConfiguration`](envoy/api/v2/rds.proto)
+* [VHDS: `envoy.api.v2.Vhds`](envoy/api/v2/rds.proto)
 * [CDS: `envoy.api.v2.Cluster`](envoy/api/v2/cds.proto)
 * [EDS: `envoy.api.v2.ClusterLoadAssignment`](envoy/api/v2/eds.proto)
 * [SDS: `envoy.api.v2.Auth.Secret`](envoy/api/v2/auth/cert.proto)
@@ -245,7 +246,8 @@ In general, to avoid traffic drop, sequencing of updates should follow a
 * CDS updates (if any) must always be pushed first.
 * EDS updates (if any) must arrive after CDS updates for the respective clusters.
 * LDS updates must arrive after corresponding CDS/EDS updates.
-* RDS updates related to the newly added listeners must arrive in the end.
+* RDS updates related to the newly added listeners must arrive after CDS/EDS/LDS updates.
+* VHDS updates (if any) related to the newly added RouteConfigurations must arrive after RDS updates.
 * Stale CDS clusters and related EDS endpoints (ones no longer being
   referenced) can then be removed.
 
