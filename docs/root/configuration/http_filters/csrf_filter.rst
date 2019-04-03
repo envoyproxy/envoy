@@ -14,8 +14,8 @@ This filter employs a stateless mitigation pattern known as origin verification.
 
 For this pattern to work it relies on two pieces of information used in determining if
 a request originated from the same host.
-  * The origin that the request is coming from (source origin).
-  * The origin that the request is going to (target origin).
+* The origin that the request is coming from (source origin).
+* The origin that the request is going to (target origin).
 
 When the filter is evaluating a request it ensures both pieces of information are present
 and compares their values. If the source origin is missing or the origins do not match
