@@ -19,22 +19,20 @@ template <class RequestProto, class ResponseProto>
 class GrpcStream : public Grpc::TypedAsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcStream(XdsGrpcContext* owning_context, Grpc::AsyncClientPtr async_client,
+  GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::AsyncClientPtr async_client,
              const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
              Event::Dispatcher& dispatcher, Stats::Scope& scope,
-             const RateLimitSettings& rate_limit_settings,
-             std::function<void(std::unique_ptr<ResponseProto>&&)> handle_response_cb)
-      : owning_context_(owning_context), async_client_(std::move(async_client)),
+             const RateLimitSettings& rate_limit_settings)
+      : callbacks_(callbacks), async_client_(std::move(async_client)),
         service_method_(service_method), control_plane_stats_(generateControlPlaneStats(scope)),
         random_(random), time_source_(dispatcher.timeSource()),
-        rate_limiting_enabled_(rate_limit_settings.enabled_),
-        handle_response_cb_(handle_response_cb) {
+        rate_limiting_enabled_(rate_limit_settings.enabled_) {
     retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
     if (rate_limiting_enabled_) {
       // Default Bucket contains 100 tokens maximum and refills at 10 tokens/sec.
       limit_request_ = std::make_unique<TokenBucketImpl>(
           rate_limit_settings.max_tokens_, time_source_, rate_limit_settings.fill_rate_);
-      drain_request_timer_ = dispatcher.createTimer([this]() { owning_context_->drainRequests(); });
+      drain_request_timer_ = dispatcher.createTimer([this]() { callbacks_->onWriteable(); });
     }
     backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
                                                                   RETRY_MAX_DELAY_MS, random_);
@@ -49,12 +47,12 @@ public:
     stream_ = async_client_->start(service_method_, *this);
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
-      owning_context_->handleEstablishmentFailure();
+      callbacks_->onEstablishmentFailure();
       setRetryTimer();
       return;
     }
     control_plane_stats_.connected_state_.set(1);
-    owning_context_->handleStreamEstablished();
+    callbacks_->onStreamEstablished();
   }
 
   bool grpcStreamAvailable() const { return stream_ != nullptr; }
@@ -77,7 +75,7 @@ public:
     // have 0 until it is reconnected. Setting here ensures that it is consistent with the state of
     // management server connection.
     control_plane_stats_.connected_state_.set(1);
-    handle_response_cb_(std::move(message));
+    callbacks_->onDiscoveryResponse(std::move(message));
   }
 
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override {
@@ -88,7 +86,7 @@ public:
     ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
     stream_ = nullptr;
     control_plane_stats_.connected_state_.set(0);
-    owning_context_->handleEstablishmentFailure();
+    callbacks_->onEstablishmentFailure();
     setRetryTimer();
   }
 
@@ -127,7 +125,7 @@ private:
                                     POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
   }
 
-  XdsGrpcContext* const owning_context_;
+  GrpcStreamCallbacks<ResponseProto>* const callbacks_;
 
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
@@ -148,8 +146,6 @@ private:
   TokenBucketPtr limit_request_;
   const bool rate_limiting_enabled_;
   Event::TimerPtr drain_request_timer_;
-
-  std::function<void(std::unique_ptr<ResponseProto>&&)> handle_response_cb_;
 };
 
 } // namespace Config

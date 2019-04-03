@@ -21,7 +21,7 @@ namespace Config {
  * ADS API implementation that fetches via gRPC.
  */
 class GrpcMuxImpl : public GrpcMux,
-                    public XdsGrpcContext,
+                    public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                     public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
@@ -38,12 +38,12 @@ public:
 
   void sendDiscoveryRequest(const std::string& type_url);
 
-  // Config::XdsGrpcContext
-  void handleStreamEstablished() override;
-  void handleEstablishmentFailure() override;
-  void drainRequests() override;
+  // Config::GrpcStreamCallbacks
+  void onStreamEstablished() override;
+  void onEstablishmentFailure() override;
+  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
+  void onWriteable() override;
 
-  void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>&
   grpcStreamTestOnly() {
     return grpc_stream_;
@@ -93,6 +93,7 @@ private:
   // Request queue management logic.
   void queueDiscoveryRequest(const std::string& queue_item);
   void clearRequestQueue();
+  void drainRequests();
 
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;

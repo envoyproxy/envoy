@@ -14,11 +14,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                   rate_limit_settings,
-                   // callback for handling receipt of DiscoveryResponse protos.
-                   [this](std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
-                     handleDiscoveryResponse(std::move(message));
-                   }),
+                   rate_limit_settings),
 
       local_info_(local_info) {
   Config::Utility::checkLocalInfo("ads", local_info);
@@ -118,7 +114,7 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
   }
 }
 
-void GrpcMuxImpl::handleDiscoveryResponse(
+void GrpcMuxImpl::onDiscoveryResponse(
     std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
@@ -198,13 +194,15 @@ void GrpcMuxImpl::handleDiscoveryResponse(
   queueDiscoveryRequest(type_url);
 }
 
-void GrpcMuxImpl::handleStreamEstablished() {
+void GrpcMuxImpl::onWriteable() { drainRequests(); }
+
+void GrpcMuxImpl::onStreamEstablished() {
   for (const auto type_url : subscriptions_) {
     queueDiscoveryRequest(type_url);
   }
 }
 
-void GrpcMuxImpl::handleEstablishmentFailure() {
+void GrpcMuxImpl::onEstablishmentFailure() {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {
       watch->callbacks_.onConfigUpdateFailed(nullptr);

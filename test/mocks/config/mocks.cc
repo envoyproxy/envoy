@@ -7,7 +7,16 @@
 namespace Envoy {
 namespace Config {
 
+MockGrpcMuxWatch::MockGrpcMuxWatch() {}
 MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
+
+MockGrpcMux::MockGrpcMux() {}
+MockGrpcMux::~MockGrpcMux() {}
+
+MockGrpcMuxCallbacks::~MockGrpcMuxCallbacks() {}
+
+MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() {}
+MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() {}
 
 GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
                                        const std::vector<std::string>& resources,

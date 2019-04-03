@@ -10,27 +10,47 @@ namespace Config {
 
 /**
  * Interface to an object that uses a Config::GrpcStream to carry out the xDS protocol.
+ * TODO(fredlas) implement delta ADS with this interface. Regular ADS (GrpcMux) should also fit this
+interface. class XdsGrpcContext { public: virtual ~XdsGrpcContext() {} virtual void
+addSubscription(const std::vector<std::string>& resources, const std::string& type_url,
+                               SubscriptionCallbacks& callbacks,
+                               SubscriptionStats stats) PURE;
+  virtual void pauseSubscription(const std::string& type_url) PURE;
+  virtual void resumeSubscription(const std::string& type_url) PURE;
+  virtual void updateResources(const std::vector<std::string>& resources,
+                               const std::string& type_url) PURE;
+  virtual void removeSubscription(const std::string& type_url) PURE;
+};
+*/
+
+/**
+ * A grouping of callbacks that an XdsGrpcContext should provide to its GrpcStream.
  */
-class XdsGrpcContext {
+template <class ResponseProto> class GrpcStreamCallbacks {
 public:
-  virtual ~XdsGrpcContext() = default;
+  virtual ~GrpcStreamCallbacks() {}
 
   /**
    * For the GrpcStream to prompt the context to take appropriate action in response to the
    * gRPC stream having been successfully established.
    */
-  virtual void handleStreamEstablished() PURE;
+  virtual void onStreamEstablished() PURE;
 
   /**
    * For the GrpcStream to prompt the context to take appropriate action in response to
    * failure to establish the gRPC stream.
    */
-  virtual void handleEstablishmentFailure() PURE;
+  virtual void onEstablishmentFailure() PURE;
+
+  /**
+   * For the GrpcStream to pass received protos to the context.
+   */
+  virtual void onDiscoveryResponse(std::unique_ptr<ResponseProto>&& message) PURE;
 
   /**
    * For the GrpcStream to call when its rate limiting logic allows more requests to be sent.
    */
-  virtual void drainRequests() PURE;
+  virtual void onWriteable() PURE;
 };
 
 } // namespace Config

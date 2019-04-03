@@ -47,7 +47,7 @@ public:
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {
 public:
-  MockGrpcMuxWatch() = default;
+  MockGrpcMuxWatch();
   virtual ~MockGrpcMuxWatch();
 
   MOCK_METHOD0(cancel, void());
@@ -55,8 +55,8 @@ public:
 
 class MockGrpcMux : public GrpcMux {
 public:
-  MockGrpcMux() = default;
-  virtual ~MockGrpcMux() = default;
+  MockGrpcMux();
+  virtual ~MockGrpcMux();
 
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
@@ -71,7 +71,7 @@ public:
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
 public:
   MockGrpcMuxCallbacks();
-  virtual ~MockGrpcMuxCallbacks() = default;
+  virtual ~MockGrpcMuxCallbacks();
 
   MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string& version_info));
@@ -79,14 +79,16 @@ public:
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
-class MockXdsGrpcContext : public XdsGrpcContext {
+class MockGrpcStreamCallbacks : public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
-  MockXdsGrpcContext() = default;
-  virtual ~MockXdsGrpcContext() = default;
+  MockGrpcStreamCallbacks();
+  virtual ~MockGrpcStreamCallbacks();
 
-  MOCK_METHOD0(handleStreamEstablished, void());
-  MOCK_METHOD0(handleEstablishmentFailure, void());
-  MOCK_METHOD0(drainRequests, void());
+  MOCK_METHOD0(onStreamEstablished, void());
+  MOCK_METHOD0(onEstablishmentFailure, void());
+  MOCK_METHOD1(onDiscoveryResponse,
+               void(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message));
+  MOCK_METHOD0(onWriteable, void());
 };
 
 } // namespace Config

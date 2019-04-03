@@ -24,34 +24,19 @@ protected:
   GrpcStreamTest()
       : async_client_owner_(std::make_unique<Grpc::MockAsyncClient>()),
         async_client_(async_client_owner_.get()),
-        grpc_stream_(&xds_grpc_context_, std::move(async_client_owner_),
+        grpc_stream_(&callbacks_, std::move(async_client_owner_),
                      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                          "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints"),
-                     random_, dispatcher_, stats_, rate_limit_settings_,
-                     [this](std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
-                       received_message_ = *message;
-                     }) {}
+                     random_, dispatcher_, stats_, rate_limit_settings_) {}
 
-  //  std::string version_;
-  //  const Protobuf::MethodDescriptor* method_descriptor_;
-  //  NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  //  Event::MockTimer* timer_;
-  //  Event::TimerCb timer_cb_;
-  //  envoy::api::v2::core::Node node_;
-  //  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   Grpc::MockAsyncStream async_stream_;
-  //  std::string last_response_nonce_;
-  //  std::vector<std::string> last_cluster_names_;
-  //  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  //  Event::MockTimer* init_timeout_timer_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
-  NiceMock<MockXdsGrpcContext> xds_grpc_context_;
+  NiceMock<MockGrpcStreamCallbacks> callbacks_;
   std::unique_ptr<Grpc::MockAsyncClient> async_client_owner_;
   Grpc::MockAsyncClient* async_client_;
-  envoy::api::v2::DiscoveryResponse received_message_;
 
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
 };
@@ -63,14 +48,14 @@ TEST_F(GrpcStreamTest, EstablishNewStream) {
   // Successful establishment
   {
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-    EXPECT_CALL(xds_grpc_context_, handleStreamEstablished());
+    EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
   }
   // Idempotency: do nothing (other than logging a warning) if already connected
   {
     EXPECT_CALL(*async_client_, start(_, _)).Times(0);
-    EXPECT_CALL(xds_grpc_context_, handleStreamEstablished()).Times(0);
+    EXPECT_CALL(callbacks_, onStreamEstablished()).Times(0);
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
   }
@@ -79,19 +64,23 @@ TEST_F(GrpcStreamTest, EstablishNewStream) {
   // Successful re-establishment
   {
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-    EXPECT_CALL(xds_grpc_context_, handleStreamEstablished());
+    EXPECT_CALL(callbacks_, onStreamEstablished());
     grpc_stream_.establishNewStream();
     EXPECT_TRUE(grpc_stream_.grpcStreamAvailable());
   }
 }
 
+// A failure in the underlying gRPC machinery should result in grpcStreamAvailable() false. Calling
+// sendMessage would segfault.
 TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
-  EXPECT_CALL(xds_grpc_context_, handleEstablishmentFailure());
+  EXPECT_CALL(callbacks_, onEstablishmentFailure());
   grpc_stream_.establishNewStream();
   EXPECT_FALSE(grpc_stream_.grpcStreamAvailable());
 }
 
+// Checks that sendMessage correctly passes a DiscoveryRequest down to the underlying gRPC
+// machinery.
 TEST_F(GrpcStreamTest, SendMessage) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   grpc_stream_.establishNewStream();
@@ -101,14 +90,24 @@ TEST_F(GrpcStreamTest, SendMessage) {
   grpc_stream_.sendMessage(request);
 }
 
+// Tests that, upon a call of the GrpcStream::onReceiveMessage() callback, which is called by the
+// underlying gRPC machinery, the received proto will make it up to the GrpcStreamCallbacks that the
+// GrpcStream was given.
 TEST_F(GrpcStreamTest, ReceiveMessage) {
   envoy::api::v2::DiscoveryResponse response_copy;
   response_copy.set_type_url("faketypeURL");
   auto response = std::make_unique<envoy::api::v2::DiscoveryResponse>(response_copy);
+  envoy::api::v2::DiscoveryResponse received_message;
+  EXPECT_CALL(callbacks_, onDiscoveryResponse(_))
+      .WillOnce([&received_message](std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
+        received_message = *message;
+      });
   grpc_stream_.onReceiveMessage(std::move(response));
-  EXPECT_TRUE(TestUtility::protoEqual(response_copy, received_message_));
+  EXPECT_TRUE(TestUtility::protoEqual(response_copy, received_message));
 }
 
+// If the value has only ever been 0, the stat should remain unused, including after an attempt to
+// write a 0 to it.
 TEST_F(GrpcStreamTest, QueueSizeStat) {
   grpc_stream_.maybeUpdateQueueSizeStat(0);
   EXPECT_FALSE(stats_.gauge("control_plane.pending_requests").used());
