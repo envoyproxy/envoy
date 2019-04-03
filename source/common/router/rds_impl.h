@@ -244,9 +244,9 @@ public:
   void rebuildRouteConfig(
       const std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
       envoy::api::v2::RouteConfiguration& route_config);
-  absl::optional<LastConfigInfo> configInfo() const { return config_info_; }
-  envoy::api::v2::RouteConfiguration& routeConfiguration() { return route_config_proto_; }
-  SystemTime lastUpdated() const { return last_updated_; }
+  absl::optional<LastConfigInfo> configInfo() const override { return config_info_; }
+  envoy::api::v2::RouteConfiguration& routeConfiguration() override { return route_config_proto_; }
+  SystemTime lastUpdated() const override { return last_updated_; }
 
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   envoy::api::v2::RouteConfiguration route_config_proto_;
