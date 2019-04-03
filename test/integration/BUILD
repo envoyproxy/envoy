@@ -579,7 +579,6 @@ envoy_cc_test(
     size = "small",
     srcs = [
         "redis_proxy_integration_test.cc",
-        "redis_proxy_integration_test.h",
     ],
     deps = [
         ":integration_lib",
