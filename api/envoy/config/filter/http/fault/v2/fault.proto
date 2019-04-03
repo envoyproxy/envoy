@@ -80,7 +80,9 @@ message HTTPFault {
   //   amount due to the implementation details.
   google.protobuf.UInt32Value max_active_faults = 6;
 
-  // The response rate limit to be applied to the response body of the stream.
+  // The response rate limit to be applied to the response body of the stream. When configured,
+  // the percentage can be overridden by the :ref:`fault.http.rate_limit.response_percent
+  // <config_http_filters_fault_injection_runtime>` runtime key.
   //
   // .. attention::
   //  This is a per-stream limit versus a connection level limit. This means that concurrent streams

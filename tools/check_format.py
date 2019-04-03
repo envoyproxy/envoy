@@ -388,7 +388,8 @@ def checkSourceLine(line, file_path, reportError):
     # legitimately show up in comments, for example this one.
     reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
   if not whitelistedForRealTime(file_path) and not 'NO_CHECK_FORMAT(real_time)' in line:
-    if 'RealTimeSource' in line or 'RealTimeSystem' in line or \
+    if 'RealTimeSource' in line or \
+       ('RealTimeSystem' in line and not 'TestRealTimeSystem' in line) or \
        'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
        'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")

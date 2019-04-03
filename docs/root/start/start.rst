@@ -22,10 +22,12 @@ the same configuration.
 
 A very minimal Envoy configuration that can be used to validate basic plain HTTP
 proxying is available in :repo:`configs/google_com_proxy.v2.yaml`. This is not
-intended to represent a realistic Envoy deployment::
+intended to represent a realistic Envoy deployment:
 
-  $ docker pull envoyproxy/envoy-dev:latest
-  $ docker run --rm -d -p 10000:10000 envoyproxy/envoy-dev:latest
+.. substitution-code-block:: none
+
+  $ docker pull envoyproxy/|envoy_docker_image|
+  $ docker run --rm -d -p 10000:10000 envoyproxy/|envoy_docker_image|
   $ curl -v localhost:10000
 
 The Docker image used will contain the latest version of Envoy
@@ -113,9 +115,9 @@ Using the Envoy Docker Image
 Create a simple Dockerfile to execute Envoy, which assumes that envoy.yaml (described above) is in your local directory.
 You can refer to the :ref:`Command line options <operations_cli>`.
 
-.. code-block:: none
+.. substitution-code-block:: none
 
-  FROM envoyproxy/envoy-dev:latest
+  FROM envoyproxy/|envoy_docker_image|
   COPY envoy.yaml /etc/envoy/envoy.yaml
 
 Build the Docker image that runs your configuration using::
@@ -133,12 +135,12 @@ And finally, test it using::
 If you would like to use Envoy with docker-compose you can overwrite the provided configuration file
 by using a volume.
 
-.. code-block: yaml
+.. substitution-code-block: yaml
 
   version: '3'
   services:
     envoy:
-      image: envoyproxy/envoy-dev:latest
+      image: envoyproxy/|envoy_docker_image|
       ports:
         - "10000:10000"
       volumes:
@@ -157,14 +159,14 @@ features. The following sandboxes are available:
     :maxdepth: 1
 
     sandboxes/cors
-    Fault Injection <https://github.com/envoyproxy/envoy/tree/master/examples/fault-injection>
+    sandboxes/fault_injection
     sandboxes/front_proxy
     sandboxes/grpc_bridge
     sandboxes/jaeger_native_tracing
     sandboxes/jaeger_tracing
-    Lua <https://github.com/envoyproxy/envoy/tree/master/examples/lua>
-    MySQL <https://github.com/envoyproxy/envoy/tree/master/examples/mysql>
-    Redis <https://github.com/envoyproxy/envoy/tree/master/examples/redis>
+    sandboxes/lua
+    sandboxes/mysql
+    sandboxes/redis
     sandboxes/zipkin_tracing
 
 Other use cases

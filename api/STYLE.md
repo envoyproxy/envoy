@@ -123,7 +123,7 @@ In addition, the following conventions should be followed:
   ```
 
 * The [Breaking Change
-  Policy](https://github.com/envoyproxy/envoy/blob/master//CONTRIBUTING.md#breaking-change-policy) describes
+  Policy](https://github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md#breaking-change-policy) describes
   API versioning, deprecation and compatibility.
 
 ## Package organization
