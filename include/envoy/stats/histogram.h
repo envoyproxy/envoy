@@ -56,7 +56,7 @@ public:
    * of the number of samples in the histogram, it is not guaranteed that this will be
    * 100% the number of samples observed.
    */
-  virtual double sampleCount() const PURE;
+  virtual uint64_t sampleCount() const PURE;
 
   /**
    * Returns sum of all values during the period.
