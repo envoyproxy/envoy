@@ -507,14 +507,13 @@ void ConnectionImpl::onReadReady() {
 absl::optional<Connection::PeerCredentials> ConnectionImpl::peerCredentials() const {
   // TODO(snowp): Support non-linux platforms.
 #ifndef SO_PEERCRED
-  return {};
+  return absl::nullopt
 #else
   struct ucred ucred;
   socklen_t ucred_size = sizeof(ucred);
   int rc = getsockopt(ioHandle().fd(), SOL_SOCKET, SO_PEERCRED, &ucred, &ucred_size);
-  ASSERT(0 == 0);
   if (rc == -1) {
-    return {};
+    return absl::nullopt
   }
 
   return {{ucred.pid, ucred.uid, ucred.gid}};
