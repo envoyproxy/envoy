@@ -122,13 +122,15 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
                 new_hash);
 
-      last_update_details_ = std::make_unique<RdsConfigUpdateDetails>(route_config_proto_, last_updated_, config_info_);
+      last_update_details_ = std::make_unique<RdsConfigUpdateDetails>(route_config_proto_,
+                                                                      last_updated_, config_info_);
       for (auto* provider : route_config_providers_) {
         provider->onConfigUpdate();
       }
       vhds_subscription_.release();
     } else {
-      auto s = new VhdsSubscription(route_config_proto_, factory_context_, stat_prefix_, this);
+      auto s = new VhdsSubscription(route_config_proto_, factory_context_, stat_prefix_,
+                                    route_config_providers_);
       s->registerInitTargetWithInitManager(factory_context_.initManager());
       vhds_subscription_.reset(s);
       last_update_details_ = std::make_unique<VhdsConfigUpdateDetails>(*vhds_subscription_);
@@ -186,18 +188,18 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
       [this, new_config]() -> void { tls_->getTyped<ThreadLocalConfig>().config_ = new_config; });
 }
 
-VhdsSubscription::VhdsSubscription(const envoy::api::v2::RouteConfiguration& route_configuration,
-                                   Server::Configuration::FactoryContext& factory_context,
-                                   const std::string& stat_prefix,
-                                   RdsRouteConfigSubscription* rds_subscription,
-                                   SubscriptionFactoryFunction factory_function)
+VhdsSubscription::VhdsSubscription(
+    const envoy::api::v2::RouteConfiguration& route_configuration,
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    std::unordered_set<RdsRouteConfigProviderImpl*>& route_config_providers,
+    SubscriptionFactoryFunction factory_function)
     : route_config_proto_(route_configuration), route_config_name_(route_configuration.name()),
       init_target_(fmt::format("VhdsConfigSubscription {}", route_config_name_),
                    [this]() { subscription_->start({}, *this); }),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." + route_config_name_ + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}), time_source_(factory_context.timeSource()),
       last_updated_(factory_context.timeSource().systemTime()),
-      rds_subscription_(rds_subscription) {
+      route_config_providers_(route_config_providers) {
   Envoy::Config::Utility::checkLocalInfo("vhds", factory_context.localInfo());
   const auto& config_source =
       route_configuration.vhds().config_source().api_config_source().api_type();
@@ -235,7 +237,7 @@ void VhdsSubscription::onConfigUpdate(
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}", route_config_name_,
               new_hash);
-    for (auto* provider : rds_subscription_->route_config_providers()) {
+    for (auto* provider : route_config_providers_) {
       provider->onConfigUpdate();
     }
   }
@@ -268,6 +270,10 @@ void VhdsSubscription::updateVhosts(
   for (const auto& resource : added_resources) {
     envoy::api::v2::route::VirtualHost vhost =
         MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource.resource());
+    auto found = vhosts.find(vhost.name());
+    if (found != vhosts.end()) {
+      vhosts.erase(found);
+    }
     vhosts.emplace(vhost.name(), vhost);
   }
 }

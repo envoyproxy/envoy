@@ -121,7 +121,8 @@ class RdsConfigUpdateDetails : public ConfigUpdateDetails {
 public:
   RdsConfigUpdateDetails(envoy::api::v2::RouteConfiguration& rc, SystemTime last_updated,
                          absl::optional<LastConfigInfo> config_info)
-      : route_config_proto_(rc), last_updated_(last_updated), config_info_(std::move(config_info)) {}
+      : route_config_proto_(rc), last_updated_(last_updated), config_info_(std::move(config_info)) {
+  }
 
   absl::optional<LastConfigInfo> configInfo() const override { return config_info_; }
   envoy::api::v2::RouteConfiguration& routeConfiguration() override { return route_config_proto_; }
@@ -167,9 +168,6 @@ public:
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
-  }
-  std::unordered_set<RdsRouteConfigProviderImpl*>& route_config_providers() {
-    return route_config_providers_;
   }
   absl::optional<LastConfigInfo> configInfo() const { return last_update_details_->configInfo(); }
   envoy::api::v2::RouteConfiguration& routeConfiguration() {
@@ -217,7 +215,8 @@ class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
 public:
   VhdsSubscription(const envoy::api::v2::RouteConfiguration& route_configuration,
                    Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix, RdsRouteConfigSubscription* rds_subscription,
+                   const std::string& stat_prefix,
+                   std::unordered_set<RdsRouteConfigProviderImpl*>& route_config_providers,
                    SubscriptionFactoryFunction factory_function =
                        Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource);
   ~VhdsSubscription() override { init_target_.ready(); }
@@ -256,7 +255,7 @@ public:
   VhdsStats stats_;
   TimeSource& time_source_;
   SystemTime last_updated_;
-  RdsRouteConfigSubscription* rds_subscription_;
+  std::unordered_set<RdsRouteConfigProviderImpl*>& route_config_providers_;
   std::unordered_map<std::string, envoy::api::v2::route::VirtualHost> virtual_hosts_;
   absl::optional<LastConfigInfo> config_info_;
 };
