@@ -8,24 +8,11 @@
 namespace Envoy {
 namespace Stats {
 
-// Variant of ScopePrefixer that owns the scope being prefixed, and will
-// delete it upon destruction.
-ScopePrefixer::ScopePrefixer(absl::string_view prefix, Scope* scope)
-    : prefix_(Utility::sanitizeStatsName(prefix)), scope_(scope), owns_scope_(true) {}
-
-// Variant of ScopePrefixer that references the scope being prefixed, but does
-// not own it.
 ScopePrefixer::ScopePrefixer(absl::string_view prefix, Scope& scope)
-    : prefix_(Utility::sanitizeStatsName(prefix)), scope_(&scope), owns_scope_(false) {}
-
-ScopePrefixer::~ScopePrefixer() {
-  if (owns_scope_) {
-    delete scope_;
-  }
-}
+    : prefix_(Utility::sanitizeStatsName(prefix)), scope_(scope) {}
 
 ScopePtr ScopePrefixer::createScope(const std::string& name) {
-  return std::make_unique<ScopePrefixer>(prefix_ + name, *scope_);
+  return std::make_unique<ScopePrefixer>(prefix_ + name, scope_);
 }
 
 Counter& ScopePrefixer::counterFromStatName(StatName name) {
@@ -41,7 +28,7 @@ Histogram& ScopePrefixer::histogramFromStatName(StatName name) {
 }
 
 void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {
-  scope_->deliverHistogramToSinks(histograms, val);
+  scope_.deliverHistogramToSinks(histograms, val);
 }
 
 } // namespace Stats
