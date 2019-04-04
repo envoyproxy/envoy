@@ -51,8 +51,6 @@ public:
     return vec;
   }
 
-  void clear() { stats_.clear(); }
-
 private:
   absl::flat_hash_map<std::string, std::shared_ptr<Base>> stats_;
   Allocator alloc_;
@@ -78,8 +76,6 @@ public:
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     return std::vector<ParentHistogramSharedPtr>{};
   }
-
-  void clear();
 
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);

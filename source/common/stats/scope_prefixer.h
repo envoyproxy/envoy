@@ -28,14 +28,8 @@ public:
   }
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
   Counter& counterFromStatName(StatName name) override;
-  //    return counter(symbolTable().toString(name));
-  //}
   Gauge& gaugeFromStatName(StatName name) override;
-  // return gauge(symbolTable().toString(name));
-  //}
   Histogram& histogramFromStatName(StatName name) override;
-  // return histogram(symbolTable().toString(name));
-  //}
 
   const Stats::StatsOptions& statsOptions() const override { return scope_->statsOptions(); }
   const SymbolTable& symbolTable() const override { return scope_->symbolTable(); }
