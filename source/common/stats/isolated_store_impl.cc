@@ -16,7 +16,7 @@ namespace Stats {
 
 IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(std::make_unique<SymbolTableImpl>()) {}
 
-IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable> symbol_table)
+IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table)
     : IsolatedStoreImpl(*symbol_table) {
   symbol_table_storage_ = std::move(symbol_table);
 }
@@ -42,11 +42,13 @@ ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);
 }
 
+/*
 void IsolatedStoreImpl::clear() {
   counters_.clear();
   gauges_.clear();
   histograms_.clear();
 }
+*/
 
 } // namespace Stats
 } // namespace Envoy
