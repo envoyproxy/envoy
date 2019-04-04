@@ -97,7 +97,7 @@ MockStore::~MockStore() {}
 
 MockIsolatedStatsStore::MockIsolatedStatsStore()
     : IsolatedStoreImpl(Test::Global<Stats::FakeSymbolTableImpl>::get()) {}
-MockIsolatedStatsStore::~MockIsolatedStatsStore() { IsolatedStoreImpl::clear(); }
+MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
 
 MockStatsMatcher::MockStatsMatcher() {}
 MockStatsMatcher::~MockStatsMatcher() {}
