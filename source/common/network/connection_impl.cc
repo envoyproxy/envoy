@@ -110,8 +110,12 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
     if (type == ConnectionCloseType::FlushWriteAndDelay && delayed_close_timeout_set) {
       // The socket is being closed and there is no more data to write. Since a delayed close has
-      // been requested, start the delayed close timer.
-      initializeDelayedCloseTimer();
+      // been requested, start the delayed close timer if it hasn't been done already by a previous
+      // close().
+      if (!inDelayedClose()) {
+        initializeDelayedCloseTimer();
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndTimeout;
+      }
     } else {
       closeSocket(ConnectionEvent::LocalClose);
     }
@@ -119,8 +123,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     ASSERT(type == ConnectionCloseType::FlushWrite ||
            type == ConnectionCloseType::FlushWriteAndDelay);
 
-    // No need to continue if a FlushWrite/FlushWriteAndDelay has already been issued and there is a
-    // pending delayed close.
+    // If there is a pending delayed close, simply update the delayed close state.
     //
     // An example of this condition manifests when a downstream connection is closed early by Envoy,
     // such as when a route can't be matched:
@@ -131,6 +134,10 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     //     2) A second close is issued by a subsequent call to
     //        ConnectionManagerImpl::checkForDeferredClose() prior to returning from onData()
     if (inDelayedClose()) {
+      ASSERT(!delayed_close_timeout_set || delayed_close_timer_ != nullptr);
+      delayed_close_state_ = (type == ConnectionCloseType::FlushWrite || !delayed_close_timeout_set)
+                                 ? DelayedCloseState::CloseAfterFlush
+                                 : DelayedCloseState::CloseAfterFlushAndTimeout;
       return;
     }
 
@@ -138,13 +145,13 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     // data can be written. However, we do want to stop reading to apply TCP backpressure.
     read_enabled_ = false;
 
-    if (!delayed_close_timeout_set || type == ConnectionCloseType::FlushWrite) {
-      // Force a closeSocket() after the write buffer is flushed if the close_type calls for it or
-      // if no delayed close timeout is set.
-      delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
+    if (delayed_close_timeout_set) {
+      initializeDelayedCloseTimer();
+      delayed_close_state_ = (type == ConnectionCloseType::FlushWrite)
+                                 ? DelayedCloseState::CloseAfterFlush
+                                 : DelayedCloseState::CloseAfterFlushAndTimeout;
     } else {
-      // A delayed close timer will be scheduled when the flush is completed.
-      delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndTimeout;
+      delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
     }
 
     file_event_->setEnabled(Event::FileReadyType::Write |
@@ -522,6 +529,12 @@ void ConnectionImpl::onWriteReady() {
     }
   }
 
+  // Disable the delayed close timer since data is still being flushed. The timer should only
+  // trigger after a delayedCloseTimeout() period of inactivity.
+  if (delayed_close_timer_ != nullptr) {
+    delayed_close_timer_->disableTimer();
+  }
+
   IoResult result = transport_socket_->doWrite(*write_buffer_, write_end_stream_);
   ASSERT(!result.end_stream_read_); // The interface guarantees that only read operations set this.
   uint64_t new_buffer_size = write_buffer_->length();
@@ -535,18 +548,25 @@ void ConnectionImpl::onWriteReady() {
   } else if ((inDelayedClose() && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
     if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndTimeout) {
-      initializeDelayedCloseTimer();
+      ASSERT(delayed_close_timer_ != nullptr);
+      delayed_close_timer_->enableTimer(delayedCloseTimeout());
     } else {
       ASSERT(bothSidesHalfClosed() || delayed_close_state_ == DelayedCloseState::CloseAfterFlush);
       closeSocket(ConnectionEvent::LocalClose);
     }
-  } else if (result.action_ == PostIoAction::KeepOpen && result.bytes_processed_ > 0) {
-    for (BytesSentCb& cb : bytes_sent_callbacks_) {
-      cb(result.bytes_processed_);
+  } else {
+    ASSERT(result.action_ == PostIoAction::KeepOpen);
+    if (delayed_close_timer_ != nullptr) {
+      delayed_close_timer_->enableTimer(delayedCloseTimeout());
+    }
+    if (result.bytes_processed_ > 0) {
+      for (BytesSentCb& cb : bytes_sent_callbacks_) {
+        cb(result.bytes_processed_);
 
-      // If a callback closes the socket, stop iterating.
-      if (!ioHandle().isOpen()) {
-        return;
+        // If a callback closes the socket, stop iterating.
+        if (!ioHandle().isOpen()) {
+          return;
+        }
       }
     }
   }
@@ -595,7 +615,7 @@ void ConnectionImpl::onDelayedCloseTimeout() {
 
 void ConnectionImpl::initializeDelayedCloseTimer() {
   const auto timeout = delayedCloseTimeout().count();
-  ASSERT(timeout > 0);
+  ASSERT(delayed_close_timer_ == nullptr && timeout > 0);
   delayed_close_timer_ = dispatcher_.createTimer([this]() -> void { onDelayedCloseTimeout(); });
   ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {} ms", *this, timeout);
   delayed_close_timer_->enableTimer(delayedCloseTimeout());
