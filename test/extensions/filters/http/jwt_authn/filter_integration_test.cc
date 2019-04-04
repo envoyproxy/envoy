@@ -17,9 +17,11 @@ using ::envoy::config::filter::network::http_connection_manager::v2::HttpFilter;
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace HeaderToFilterStateFilter {
+namespace JwtAuthn {
+namespace {
 
-const std::string HeaderToFilterStateName = "envoy.filters.http.header_to_filter_state";
+const std::string HeaderToFilterStateFilterName =
+    "envoy.filters.http.header_to_filter_state_for_test";
 
 // This filter extracts a string header from "header" and
 // save it into FilterState as name "state" as read-only Router::StringAccessor.
@@ -45,7 +47,8 @@ private:
 
 class HeaderToFilterStateFilterConfig : public Common::EmptyHttpFilterConfig {
 public:
-  HeaderToFilterStateFilterConfig() : Common::EmptyHttpFilterConfig(HeaderToFilterStateName) {}
+  HeaderToFilterStateFilterConfig()
+      : Common::EmptyHttpFilterConfig(HeaderToFilterStateFilterName) {}
 
   Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
@@ -59,11 +62,6 @@ public:
 static Registry::RegisterFactory<HeaderToFilterStateFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-
-} // namespace HeaderToFilterStateFilter
-
-namespace JwtAuthn {
-namespace {
 
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
@@ -203,10 +201,6 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
 
 // This test verifies JwtRequirement specified from filer state rules
 TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
-  const std::string header_to_filter_state_conf = R"(
-name: %s
-)";
-
   // A config with metadata rules.
   const std::string auth_filter_conf = R"(
   providers:
@@ -222,8 +216,7 @@ name: %s
 )";
 
   config_helper_.addFilter(getAuthFilterConfig(auth_filter_conf, true));
-  config_helper_.addFilter(fmt::sprintf(header_to_filter_state_conf,
-                                        HeaderToFilterStateFilter::HeaderToFilterStateName));
+  config_helper_.addFilter(fmt::sprintf("name: %s", HeaderToFilterStateFilterName));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
