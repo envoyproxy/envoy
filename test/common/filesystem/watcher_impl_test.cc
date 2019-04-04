@@ -98,7 +98,6 @@ TEST_F(WatcherImplTest, Modify) {
   std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
 
   WatchCallback callback;
-  EXPECT_CALL(callback, called(Watcher::Events::Modified));
   watcher->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
                     Watcher::Events::Modified, [&](uint32_t events) -> void {
                       callback.called(events);
@@ -107,6 +106,7 @@ TEST_F(WatcherImplTest, Modify) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   file << "text" << std::flush;
+  EXPECT_CALL(callback, called(Watcher::Events::Modified));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
