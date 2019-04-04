@@ -126,9 +126,10 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
     assignment_timeout_.reset();
   }
   // Check if endopint_stale_after is set.
-  const int64_t stale_after_ms = PROTOBUF_GET_MS_OR_DEFAULT(cluster_load_assignment.policy(), endpoint_stale_after, 0);
+  const int64_t stale_after_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(cluster_load_assignment.policy(), endpoint_stale_after, 0);
   if (stale_after_ms > 0) {
-    assignment_timeout_ = dispatcher_.createTimer([this] () -> void { onAssignmentTimeout(); });
+    assignment_timeout_ = dispatcher_.createTimer([this]() -> void { onAssignmentTimeout(); });
     assignment_timeout_->enableTimer(std::chrono::milliseconds(stale_after_ms));
   }
 
@@ -136,8 +137,7 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   priority_set_.batchHostUpdate(helper);
 }
 
-void EdsClusterImpl::onAssignmentTimeout() {
-}
+void EdsClusterImpl::onAssignmentTimeout() {}
 
 bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, const uint32_t overprovisioning_factor, const HostVector& new_hosts,
