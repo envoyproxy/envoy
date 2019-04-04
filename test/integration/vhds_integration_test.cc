@@ -114,7 +114,7 @@ public:
     fake_upstreams_.clear();
   }
 
-  std::string virtualHostYaml(std::string name, std::string domain) {
+  std::string virtualHostYaml(const std::string& name, const std::string& domain) {
     return fmt::format(R"EOF(
       name: {}
       domains: [{}]

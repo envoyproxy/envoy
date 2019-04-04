@@ -122,8 +122,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
                 new_hash);
 
-      last_update_details_.reset(
-          new RdsConfigUpdateDetails(route_config_proto_, last_updated_, config_info_));
+      last_update_details_ = std::make_unique<RdsConfigUpdateDetails>(route_config_proto_, last_updated_, config_info_);
       for (auto* provider : route_config_providers_) {
         provider->onConfigUpdate();
       }
@@ -132,7 +131,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       auto s = new VhdsSubscription(route_config_proto_, factory_context_, stat_prefix_, this);
       s->registerInitTargetWithInitManager(factory_context_.initManager());
       vhds_subscription_.reset(s);
-      last_update_details_.reset(new VhdsConfigUpdateDetails(*vhds_subscription_));
+      last_update_details_ = std::make_unique<VhdsConfigUpdateDetails>(*vhds_subscription_);
     }
   }
 
@@ -257,7 +256,7 @@ void VhdsSubscription::initializeVhosts(
 void VhdsSubscription::removeVhosts(
     std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
-  for (const auto vhost_name : removed_vhost_names) {
+  for (const auto& vhost_name : removed_vhost_names) {
     vhosts.erase(vhost_name);
   }
 }

@@ -106,7 +106,7 @@ struct LastConfigInfo {
 
 class RdsRouteConfigProviderImpl;
 class VhdsSubscription;
-typedef std::unique_ptr<VhdsSubscription> VhdsSubscriptionPtr;
+using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;
 
 class ConfigUpdateDetails {
 public:
@@ -121,7 +121,7 @@ class RdsConfigUpdateDetails : public ConfigUpdateDetails {
 public:
   RdsConfigUpdateDetails(envoy::api::v2::RouteConfiguration& rc, SystemTime last_updated,
                          absl::optional<LastConfigInfo> config_info)
-      : route_config_proto_(rc), last_updated_(last_updated), config_info_(config_info) {}
+      : route_config_proto_(rc), last_updated_(last_updated), config_info_(std::move(config_info)) {}
 
   absl::optional<LastConfigInfo> configInfo() const override { return config_info_; }
   envoy::api::v2::RouteConfiguration& routeConfiguration() override { return route_config_proto_; }
@@ -205,7 +205,7 @@ private:
   friend class RdsRouteConfigProviderImpl;
 };
 
-typedef std::shared_ptr<RdsRouteConfigSubscription> RdsRouteConfigSubscriptionSharedPtr;
+using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
 typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFunction)(
     const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
     Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
@@ -220,7 +220,7 @@ public:
                    const std::string& stat_prefix, RdsRouteConfigSubscription* rds_subscription,
                    SubscriptionFactoryFunction factory_function =
                        Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource);
-  ~VhdsSubscription() { init_target_.ready(); }
+  ~VhdsSubscription() override { init_target_.ready(); }
 
   // Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
@@ -262,7 +262,7 @@ public:
 };
 
 struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-  ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(initial_config) {}
+  ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(std::move(initial_config)) {}
   ConfigConstSharedPtr config_;
 };
 
