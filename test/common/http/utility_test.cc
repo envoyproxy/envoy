@@ -766,9 +766,21 @@ TEST(Url, ParsingTest) {
   ValidateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/");
   ValidateUrl("http://www.host.com/", "http", "www.host.com", "/");
 
+  // Test url with "?".
+  ValidateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/");
+  ValidateUrl("http://www.host.com/?", "http", "www.host.com", "/");
+
+  // Test url with "?" but without slash.
+  ValidateUrl("http://www.host.com:80?", "http", "www.host.com:80", "/");
+  ValidateUrl("http://www.host.com?", "http", "www.host.com", "/");
+
   // Test url with multi-character path
   ValidateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
   ValidateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
+
+  // Test url with multi-character path and ? at the end
+  ValidateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path");
+  ValidateUrl("http://www.host.com/path?", "http", "www.host.com", "/path");
 
   // Test https scheme
   ValidateUrl("https://www.host.com", "https", "www.host.com", "/");
@@ -776,6 +788,10 @@ TEST(Url, ParsingTest) {
   // Test url with query parameter
   ValidateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
   ValidateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
+
+  // Test url with query parameter but without slash
+  ValidateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
+  ValidateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param");
 
   // Test url with multi-character path and query parameter
   ValidateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com:80",

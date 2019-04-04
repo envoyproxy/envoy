@@ -63,6 +63,11 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
     }
     path_and_query_params_ =
         absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off, path_len);
+  } else if ((u.field_set & (1 << UF_QUERY)) == (1 << UF_QUERY) && u.field_data[UF_QUERY].len > 0) {
+    // Http parser skips question mark and starts count from first character after ?
+    // so we need to move left by one
+    path_and_query_params_ = absl::string_view(absolute_url.data() + u.field_data[UF_QUERY].off - 1,
+                                               u.field_data[UF_QUERY].len + 1);
   } else {
     path_and_query_params_ = absl::string_view(kDefaultPath, 1);
   }
