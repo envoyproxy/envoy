@@ -43,7 +43,7 @@ public:
   void resume(const std::string& type_url) override;
   void drainRequests() override;
   void addSubscription(const std::vector<std::string>&, const std::string&, SubscriptionCallbacks&,
-                       SubscriptionStats) override {
+                       SubscriptionStats&, std::chrono::milliseconds) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void updateResources(const std::vector<std::string>&, const std::string&) override {
@@ -120,7 +120,7 @@ public:
   void resume(const std::string&) override {}
 
   void addSubscription(const std::vector<std::string>&, const std::string&, SubscriptionCallbacks&,
-                       SubscriptionStats) override {
+                       SubscriptionStats&, std::chrono::milliseconds) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
   void updateResources(const std::vector<std::string>&, const std::string&) override {

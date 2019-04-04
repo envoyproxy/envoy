@@ -155,7 +155,6 @@ public:
       ::google::rpc::Status* error_detail = request_.mutable_error_detail();
       error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
       error_detail->set_message(e.what());
-
       disableInitFetchTimeoutTimer();
       stats_.update_rejected_.inc();
       ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());

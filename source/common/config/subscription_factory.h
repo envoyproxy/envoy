@@ -77,18 +77,19 @@ public:
             dispatcher, random,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), type_url,
             stats, scope, Utility::parseRateLimitSettings(api_config_source),
-            Utility::configSourceInitialFetchTimeout(config)));
+            Utility::configSourceInitialFetchTimeout(config));
         break;
       case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
         Utility::checkApiConfigSourceSubscriptionBackingCluster(cm.clusters(), api_config_source);
-
-        //            Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
-        //            api_config_source, scope)->create(),
-        //          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
-        //        random, scope, Utility::parseRateLimitSettings(api_config_source),
-        std::cerr << "YUP making a delta sub" << std::endl;
-        result.reset(new DeltaSubscriptionImpl(cm.adsMux(), type_url, stats));
-        std::cerr << "YUP MADE a delta sub" << std::endl;
+        result = std::make_unique<DeltaSubscriptionImpl>(
+            std::make_shared<Config::GrpcDeltaXdsContext>(
+                Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
+                                                               api_config_source, scope)
+                    ->create(),
+                dispatcher,
+                *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), random,
+                scope, Utility::parseRateLimitSettings(api_config_source), local_info),
+            type_url, stats, Utility::configSourceInitialFetchTimeout(config));
         break;
       }
       default:
@@ -98,7 +99,7 @@ public:
     }
     case envoy::api::v2::core::ConfigSource::kAds: {
       result = std::make_unique<GrpcMuxSubscriptionImpl>(
-          cm.adsMux(), stats, type_url, dispatcher,
+          cm.xdsGrpcContext(), stats, type_url, dispatcher,
           Utility::configSourceInitialFetchTimeout(config));
       break;
     }

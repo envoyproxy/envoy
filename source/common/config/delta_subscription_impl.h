@@ -22,8 +22,9 @@ namespace Config {
 class DeltaSubscriptionImpl : public Subscription {
 public:
   DeltaSubscriptionImpl(std::shared_ptr<XdsGrpcContext> context, absl::string_view type_url,
-                        SubscriptionStats stats)
-      : context_(context), type_url_(type_url), stats_(stats) {}
+                        SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout)
+      : context_(context), type_url_(type_url), stats_(stats),
+        init_fetch_timeout_(init_fetch_timeout) {}
 
   ~DeltaSubscriptionImpl() {
     context_->removeSubscription(type_url_);
@@ -41,7 +42,7 @@ public:
 
   // Config::DeltaSubscription
   void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
-    context_->addSubscription(resources, type_url_, callbacks, stats_);
+    context_->addSubscription(resources, type_url_, callbacks, stats_, init_fetch_timeout_);
   }
 
   void updateResources(const std::vector<std::string>& resources) override {
@@ -52,6 +53,7 @@ private:
   std::shared_ptr<XdsGrpcContext> context_;
   const std::string type_url_;
   SubscriptionStats stats_;
+  const std::chrono::milliseconds init_fetch_timeout_;
 };
 
 } // namespace Config

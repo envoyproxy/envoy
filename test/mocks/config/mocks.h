@@ -73,9 +73,10 @@ public:
   MockXdsGrpcContext();
   virtual ~MockXdsGrpcContext();
 
-  MOCK_METHOD4(addSubscription,
+  MOCK_METHOD5(addSubscription,
                void(const std::vector<std::string>& resources, const std::string& type_url,
-                    SubscriptionCallbacks& callbacks, SubscriptionStats stats));
+                    SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
+                    std::chrono::milliseconds init_fetch_timeout));
   MOCK_METHOD2(updateResources,
                void(const std::vector<std::string>& resources, const std::string& type_url));
 

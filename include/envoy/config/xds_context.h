@@ -15,7 +15,8 @@ public:
   virtual ~XdsGrpcContext() {}
   virtual void addSubscription(const std::vector<std::string>& resources,
                                const std::string& type_url, SubscriptionCallbacks& callbacks,
-                               SubscriptionStats stats) PURE;
+                               SubscriptionStats& stats,
+                               std::chrono::milliseconds init_fetch_timeout) PURE;
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
   // added to the passed 'resources' argument, relative to resource_versions_.
@@ -25,7 +26,6 @@ public:
   virtual void removeSubscription(const std::string& type_url) PURE;
 
   virtual void pause(const std::string& type_url) PURE;
-
   virtual void resume(const std::string& type_url) PURE;
 
   virtual void drainRequests() PURE;

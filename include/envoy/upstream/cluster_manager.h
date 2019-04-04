@@ -200,14 +200,14 @@ public:
   virtual const envoy::api::v2::core::BindConfig& bindConfig() const PURE;
 
   /**
-   * Return a reference to the singleton ADS provider for upstream control plane muxing of xDS. This
-   * is treated somewhat as a special case in ClusterManager, since it does not relate logically to
-   * the management of clusters but instead is required early in ClusterManager/server
+   * Return a reference to the singleton xDS-over-gRPC provider for upstream control plane muxing of
+   * xDS. This is treated somewhat as a special case in ClusterManager, since it does not relate
+   * logically to the management of clusters but instead is required early in ClusterManager/server
    * initialization and in various sites that need ClusterManager for xDS API interfacing.
    *
    * @return XdsGrpcContext& ADS API provider referencee.
    */
-  virtual std::shared_ptr<Config::XdsGrpcContext> adsMux() PURE;
+  virtual std::shared_ptr<Config::XdsGrpcContext> xdsGrpcContext() PURE;
 
   /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.

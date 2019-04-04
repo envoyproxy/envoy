@@ -204,14 +204,14 @@ public:
   bool removeCluster(const std::string& cluster) override;
   void shutdown() override {
     cds_api_.reset();
-    ads_mux_.reset(); // TODO TODO doesn't have the effect of actually destroying this thing now
-                      // that it's a shared_ptr; check if that's ok
+    xds_grpc_context_.reset(); // TODO TODO doesn't have the effect of actually destroying this
+                               // thing now that it's a shared_ptr; check if that's ok
     active_clusters_.clear();
   }
 
   const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
 
-  std::shared_ptr<Config::AdsMux> adsMux() override { return ads_mux_; }
+  std::shared_ptr<Config::XdsGrpcContext> xdsGrpcContext() override { return xds_grpc_context_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const std::string& localClusterName() const override { return local_cluster_name_; }
@@ -453,7 +453,9 @@ private:
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
   ClusterManagerInitHelper init_helper_;
-  std::shared_ptr<Config::XdsGrpcContext> ads_mux_;
+  std::shared_ptr<Config::XdsGrpcContext>
+      xds_grpc_context_; // TODO actually probably should have "ADS" in the name after all, maybe
+                         // ads_context_.
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined, else the empty string.
   std::string local_cluster_name_;

@@ -222,6 +222,7 @@ public:
       const std::vector<std::string>& expected_resource_unsubscriptions,
       const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
       const std::string& expected_error_message = "");
+
   template <class T>
   void sendDeltaDiscoveryResponse(const std::vector<T>& added_or_updated,
                                   const std::vector<std::string>& removed,
@@ -236,6 +237,7 @@ public:
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
     response.set_nonce("noncense");
+    response.set_type_url(Grpc::Common::typeUrl(T().GetDescriptor()->full_name()));
     xds_stream_->sendGrpcMessage(response);
   }
 

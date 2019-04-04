@@ -208,24 +208,28 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   // Now setup ADS if needed, this might rely on a primary cluster.
   // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
-  // After here, we just have an AdsMux interface held in ads_mux_, which hides whether the backing
-  // implementation is delta or SotW.
+  // After here, we just have an XdsGrpcContext interface held in xds_grpc_context_, which hides
+  // whether the backing implementation is delta or SotW.
   if (bootstrap.dynamic_resources().has_ads_config()) {
     if (bootstrap.dynamic_resources().ads_config().api_type() ==
         envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
-      ads_mux_ = std::make_shared<Config::GrpcDeltaXdsContext>(
-          // TODO TODO should this be here rather than addSubscription? local_info,
-          Config::Utility::factoryForGrpcApiConfigSource(
-              *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
+      auto& api_config_source =
+          bootstrap.dynamic_resources().has_ads_config()
+              ? bootstrap.dynamic_resources().ads_config()
+              : bootstrap.dynamic_resources().cds_config().api_config_source();
+      xds_grpc_context_ = std::make_shared<Config::GrpcDeltaXdsContext>(
+          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, api_config_source,
+                                                         stats)
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
           random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(
-              bootstrap.dynamic_resources().ads_config()));
+              bootstrap.dynamic_resources().ads_config()),
+          local_info);
     } else {
-      ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
+      xds_grpc_context_ = std::make_shared<Config::GrpcMuxImpl>(
           local_info,
           Config::Utility::factoryForGrpcApiConfigSource(
               *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
@@ -238,7 +242,7 @@ ClusterManagerImpl::ClusterManagerImpl(
               bootstrap.dynamic_resources().ads_config()));
     }
   } else {
-    ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
+    xds_grpc_context_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
 
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
@@ -288,7 +292,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   // clusters have already initialized. (E.g., if all static).
   init_helper_.onStaticLoadComplete();
 
-  ads_mux_->start();
+  xds_grpc_context_->start();
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();

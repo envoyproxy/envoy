@@ -33,8 +33,9 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
 
 void LdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                 const std::string& version_info) {
-  cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
-  Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  cm_.xdsGrpcContext()->pause(Config::TypeUrl::get().RouteConfiguration);
+  Cleanup rds_resume(
+      [this] { cm_.xdsGrpcContext()->resume(Config::TypeUrl::get().RouteConfiguration); });
 
   std::vector<envoy::api::v2::Listener> listeners;
   for (const auto& listener_blob : resources) {
