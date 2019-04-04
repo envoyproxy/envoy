@@ -1,3 +1,5 @@
+#include "common/stream_info/filter_state_impl.h"
+#include "common/router/string_accessor_impl.h"
 #include "extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
@@ -35,32 +37,23 @@ rules:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterConfig filter_conf(proto_config, "", context);
 
-  envoy::api::v2::core::Metadata metadata;
+  StreamInfo::FilterStateImpl filter_state;
   EXPECT_TRUE(filter_conf.findVerifier(
                   Http::TestHeaderMapImpl{
                       {":method", "GET"},
                       {":path", "/path1"},
                   },
-                  metadata) != nullptr);
+                  filter_state) != nullptr);
 
   EXPECT_TRUE(filter_conf.findVerifier(
                   Http::TestHeaderMapImpl{
                       {":method", "GET"},
                       {":path", "/path2"},
                   },
-                  metadata) == nullptr);
+                  filter_state) == nullptr);
 }
 
-void setStringMetadata(Metadata& metadata, const std::string& filter, const std::string& key,
-                       const std::string& value) {
-  ProtobufWkt::Value proto_value;
-  proto_value.set_string_value(value);
-  ProtobufWkt::Struct md;
-  (*md.mutable_fields())[key] = proto_value;
-  (*metadata.mutable_filter_metadata())[filter].MergeFrom(md);
-}
-
-TEST(HttpJwtAuthnFilterConfigTest, FindByMetadata) {
+TEST(HttpJwtAuthnFilterConfigTest, FindByFilterState) {
   const char config[] = R"(
 providers:
   provider1:
@@ -71,10 +64,8 @@ providers:
     issuer: issuer2
     local_jwks:
       inline_string: jwks
-metadata_rules:
-  filter: selector_filter
-  path:
-  - selector
+filter_state_rules:
+  name: jwt_selector
   requires:
     selector1:
       provider_name: provider1
@@ -88,21 +79,28 @@ metadata_rules:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterConfig filter_conf(proto_config, "", context);
 
-  envoy::api::v2::core::Metadata metadata;
-  // Empty metadata
-  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), metadata) == nullptr);
+  // Empty filter_state
+  StreamInfo::FilterStateImpl filter_state1;
+  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state1) == nullptr);
 
   // Wrong selector
-  setStringMetadata(metadata, "selector_filter", "selector", "wrong_selector");
-  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), metadata) == nullptr);
+  StreamInfo::FilterStateImpl filter_state2;
+  filter_state2.setData("jwt_selector",
+                        std::make_unique<Router::StringAccessorImpl>("wrong_selector"),
+                        StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state2) == nullptr);
 
   // correct selector
-  setStringMetadata(metadata, "selector_filter", "selector", "selector1");
-  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), metadata) != nullptr);
+  StreamInfo::FilterStateImpl filter_state3;
+  filter_state3.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector1"),
+                        StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state3) != nullptr);
 
   // correct selector
-  setStringMetadata(metadata, "selector_filter", "selector", "selector2");
-  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), metadata) != nullptr);
+  StreamInfo::FilterStateImpl filter_state4;
+  filter_state4.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector2"),
+                        StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state4) != nullptr);
 }
 
 } // namespace

@@ -32,7 +32,7 @@ public:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : FilterConfig(proto_config, stats_prefix, context) {}
   MOCK_CONST_METHOD2(findVerifier, const Verifier*(const Http::HeaderMap& headers,
-                                                   const envoy::api::v2::core::Metadata& metadata));
+                                                   const StreamInfo::FilterState& filter_state));
 };
 
 class FilterTest : public testing::Test {
@@ -47,7 +47,7 @@ public:
 
   void setupMockConfig() {
     EXPECT_CALL(*mock_config_.get(), findVerifier(_, _))
-        .WillOnce(Invoke([&](const Http::HeaderMap&, const envoy::api::v2::core::Metadata&) {
+        .WillOnce(Invoke([&](const Http::HeaderMap&, const StreamInfo::FilterState&) {
           return mock_verifier_.get();
         }));
   }
@@ -178,8 +178,8 @@ TEST_F(FilterTest, OutBoundFailure) {
 // Test verifies that if no route matched requirement, then request is allowed.
 TEST_F(FilterTest, TestNoRouteMatched) {
   EXPECT_CALL(*mock_config_.get(), findVerifier(_, _))
-      .WillOnce(Invoke(
-          [&](const Http::HeaderMap&, const envoy::api::v2::core::Metadata&) { return nullptr; }));
+      .WillOnce(
+          Invoke([&](const Http::HeaderMap&, const StreamInfo::FilterState&) { return nullptr; }));
 
   auto headers = Http::TestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

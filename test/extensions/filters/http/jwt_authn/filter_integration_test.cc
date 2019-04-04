@@ -1,5 +1,8 @@
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 
+#include "common/router/string_accessor_impl.h"
+#include "extensions/filters/http/common/empty_http_filter_config.h"
+#include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
@@ -13,6 +16,51 @@ using ::envoy::config::filter::network::http_connection_manager::v2::HttpFilter;
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
+namespace HeaderToFilterStateFilter {
+
+const std::string HeaderToFilterStateName = "envoy.filters.http.header_to_filter_state";
+
+// This filter extracts a string header from "header" and
+// save it into FilterState as name "state" as read-only Router::StringAccessor.
+class HeaderToFilterStateFilter : public Http::PassThroughDecoderFilter {
+public:
+  HeaderToFilterStateFilter(const std::string& header, const std::string& state)
+      : header_(header), state_(state) {}
+
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool) override {
+    const Http::HeaderEntry* entry = headers.get(header_);
+    if (entry) {
+      decoder_callbacks_->streamInfo().filterState().setData(
+          state_, std::make_unique<Router::StringAccessorImpl>(entry->value().getStringView()),
+          StreamInfo::FilterState::StateType::ReadOnly);
+    }
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+private:
+  Http::LowerCaseString header_;
+  std::string state_;
+};
+
+class HeaderToFilterStateFilterConfig : public Common::EmptyHttpFilterConfig {
+public:
+  HeaderToFilterStateFilterConfig() : Common::EmptyHttpFilterConfig(HeaderToFilterStateName) {}
+
+  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      callbacks.addStreamDecoderFilter(
+          std::make_shared<HeaderToFilterStateFilter>("jwt_selector", "jwt_selector"));
+    };
+  }
+};
+
+// perform static registration
+static Registry::RegisterFactory<HeaderToFilterStateFilterConfig,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_;
+
+} // namespace HeaderToFilterStateFilter
+
 namespace JwtAuthn {
 namespace {
 
@@ -152,16 +200,10 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
-// This test verifies JwtRequirement specified from metadata
-TEST_P(LocalJwksIntegrationTest, MetadataRequirement) {
-  const std::string meta_filter_conf = R"(
+// This test verifies JwtRequirement specified from filer state rules
+TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
+  const std::string header_to_filter_state_conf = R"(
 name: %s
-config:
-  request_rules:
-    - header: selector
-      on_header_present:
-        metadata_namespace: selector_filter
-        key: selector
 )";
 
   // A config with metadata rules.
@@ -171,17 +213,16 @@ config:
       issuer: https://example.com
       audiences:
       - example_service
-  metadata_rules:
-    filter: selector_filter
-    path:
-    - selector
+  filter_state_rules:
+    name: jwt_selector
     requires:
       example_provider:
         provider_name: example_provider
 )";
 
   config_helper_.addFilter(getAuthFilterConfig(auth_filter_conf, true));
-  config_helper_.addFilter(fmt::sprintf(meta_filter_conf, HttpFilterNames::get().HeaderToMetadata));
+  config_helper_.addFilter(fmt::sprintf(header_to_filter_state_conf,
+                                        HeaderToFilterStateFilter::HeaderToFilterStateName));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -203,7 +244,7 @@ config:
       {
           // selector header, but not token header
           {
-              {"selector", "example_provider"},
+              {"jwt_selector", "example_provider"},
           },
           "401",
       },
@@ -212,7 +253,7 @@ config:
       {
           // selector header, and token header
           {
-              {"selector", "example_provider"},
+              {"jwt_selector", "example_provider"},
               {"Authorization", "Bearer " + std::string(GoodToken)},
           },
           "200",

@@ -339,33 +339,29 @@ message RequirementRule {
   JwtRequirement requires = 2;
 }
 
-// This message specifies Jwt requirements based on a Metadata string value
-// Other HTTP filters can use this message to specify Jwt requirement.
+// This message specifies Jwt requirements based on stream_info.filterState.
+// This FilterState should use StringAccessor object to set a string value.
+// Other HTTP filters can use it to specify Jwt requirements dynamically.
 //
 // Example:
 //
 // .. code-block:: yaml
 //
-//    filter: foo
-//    path:
-//      - jwt_selector
+//    name: jwt_selector
 //    requires:
 //      issuer_1:
 //        provider_name: issuer1
 //      issuer_2:
 //        provider_name: issuer2
 //
-// If the filter "foo" sets {"jwt_selector": "issuer_1"} to the dynamicMetadata for a request,
+// If a filter set "jwt_selector" with "issuer_1" to FilterState for a request,
 // jwt_authn filter will use JwtRequirement{"provider_name": "issuer1"} to verify.
-message MetadataRule {
-  // The filter name to retrieve the dynamic metadata.
-  string filter = 1 [(validate.rules).string.min_bytes = 1];
+message FilterStateRule {
+  // The filter state name to retrieve the StringAccessor object.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
 
-  // The path to retrieve a string value from the dynamic metadata.
-  repeated string path = 2 [(validate.rules).repeated .min_items = 1];
-
-  // A map of string keys to requirements. The string key is the value
-  // in the dynamic metadata specified by above *filter* and *path* fields.
+  // A map of string keys to requirements. The string key is the string value
+  // in the FilterState with the name specified in the *name* field above.
   map<string, JwtRequirement> requires = 3;
 }
 
@@ -463,9 +459,9 @@ message JwtAuthentication {
   //
   repeated RequirementRule rules = 2;
 
-  // This message specifies Jwt requirements based on a metadata string value.
-  // Other HTTP filters can use this message to specify Jwt requirements.
+  // This message specifies Jwt requirements based on stream_info.filterState.
+  // Other HTTP filters can use it to specify Jwt requirements dynamically.
   // The *rules* field above is checked first, if it could not find any matches,
   // check this one.
-  MetadataRule metadata_rules = 3;
+  FilterStateRule filter_state_rules = 3;
 }

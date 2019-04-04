@@ -1,15 +1,16 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/router/string_accessor.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/config/metadata.h"
-
 #include "extensions/filters/http/jwt_authn/matcher.h"
 #include "extensions/filters/http/jwt_authn/verifier.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -80,14 +81,12 @@ public:
           Verifier::create(rule.requires(), proto_config_.providers(), *this, getExtractor()));
     }
 
-    if (proto_config_.has_metadata_rules()) {
-      metadata_filter_ = proto_config_.metadata_rules().filter();
-      for (const auto& path : proto_config_.metadata_rules().path()) {
-        metadata_path_.push_back(path);
-      }
-      for (const auto& it : proto_config_.metadata_rules().requires()) {
-        metadata_verifiers_.emplace(it.first, Verifier::create(it.second, proto_config_.providers(),
-                                                               *this, getExtractor()));
+    if (proto_config_.has_filter_state_rules()) {
+      filter_state_name_ = proto_config_.filter_state_rules().name();
+      for (const auto& it : proto_config_.filter_state_rules().requires()) {
+        filter_state_verifiers_.emplace(
+            it.first,
+            Verifier::create(it.second, proto_config_.providers(), *this, getExtractor()));
       }
     }
   }
@@ -111,22 +110,19 @@ public:
 
   // Finds the matcher that matched the header
   virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
-                                       const envoy::api::v2::core::Metadata& metadata) const {
+                                       const StreamInfo::FilterState& filter_state) const {
     for (const auto& pair : rule_pairs_) {
       if (pair.matcher_->matches(headers)) {
         return pair.verifier_.get();
       }
     }
-    if (metadata_path_.size() > 0 && metadata_verifiers_.size() > 0) {
-      const auto& value =
-          Envoy::Config::Metadata::metadataValue(metadata, metadata_filter_, metadata_path_);
-      if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
-        ENVOY_LOG(debug, "use metadata value {} to find verifier from metadata_rules.",
-                  value.string_value());
-        const auto& it = metadata_verifiers_.find(value.string_value());
-        if (it != metadata_verifiers_.end()) {
-          return it->second.get();
-        }
+    if (filter_state_name_.size() > 0 && filter_state_verifiers_.size() > 0 &&
+        filter_state.hasData<Router::StringAccessor>(filter_state_name_)) {
+      const auto& state = filter_state.getDataReadOnly<Router::StringAccessor>(filter_state_name_);
+      ENVOY_LOG(debug, "use filter state value {} to find verifier.", state.asString());
+      const auto& it = filter_state_verifiers_.find(state.asString());
+      if (it != filter_state_verifiers_.end()) {
+        return it->second.get();
       }
     }
     return nullptr;
@@ -165,12 +161,10 @@ private:
   ExtractorConstPtr extractor_;
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
-  // The metadata filter name.
-  std::string metadata_filter_;
-  // The metadata path.
-  std::vector<std::string> metadata_path_;
-  // The metadata verifier map.
-  std::unordered_map<std::string, VerifierConstPtr> metadata_verifiers_;
+  // The filter state name to lookup filter_state_rules.
+  std::string filter_state_name_;
+  // The filter state verifier map from filter_state_rules.
+  absl::flat_hash_map<std::string, VerifierConstPtr> filter_state_verifiers_;
   TimeSource& time_source_;
   Api::Api& api_;
 };
