@@ -124,9 +124,17 @@ protected:
   WatchDogSharedPtr second_dog_;
 };
 
+INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogDeathTest,
+                         testing::ValuesIn({TimeSystemType::Real, TimeSystemType::Simulated}));
+
 // These tests use threads, and need to run after the real death tests, so we need to call them
 // a different name.
 class GuardDogAlmostDeadTest : public GuardDogDeathTest {};
+
+INSTANTIATE_TEST_SUITE_P(
+    TimeSystemType, GuardDogAlmostDeadTest,
+    testing::ValuesIn({// TODO(#6464): TimeSystemType::Real -- fails in this suite 30/1000 times.
+                       TimeSystemType::Simulated}));
 
 TEST_P(GuardDogDeathTest, KillDeathTest) {
   // Is it German for "The Function"? Almost...
@@ -190,6 +198,9 @@ protected:
   NiceMock<Configuration::MockMain> config_mega_;
 };
 
+INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogMissTest,
+                         testing::ValuesIn({TimeSystemType::Real, TimeSystemType::Simulated}));
+
 TEST_P(GuardDogMissTest, MissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
@@ -210,6 +221,11 @@ TEST_P(GuardDogMissTest, MissTest) {
 }
 
 TEST_P(GuardDogMissTest, MegaMissTest) {
+  // TODO(#6464): This test fails in real-time 1/1000 times, but passes in simulated time.
+  if (GetParam() == TimeSystemType::Real) {
+    return;
+  }
+
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
   initGuardDog(stats_store_, config_mega_);
@@ -229,6 +245,11 @@ TEST_P(GuardDogMissTest, MegaMissTest) {
 }
 
 TEST_P(GuardDogMissTest, MissCountTest) {
+  // TODO(#6464): This test fails in real-time 9/1000 times, but passes in simulated time.
+  if (GetParam() == TimeSystemType::Real) {
+    return;
+  }
+
   // This tests a flake discovered in the MissTest where real timeout or
   // spurious condition_variable wakeup causes the counter to get incremented
   // more than it should be.

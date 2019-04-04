@@ -443,7 +443,8 @@ def envoy_cc_test(
         args = [],
         shard_count = None,
         coverage = True,
-        local = False):
+        local = False,
+        size = "medium"):
     test_lib_tags = []
     if coverage:
         test_lib_tags.append("coverage_test_lib")
@@ -472,6 +473,7 @@ def envoy_cc_test(
         tags = tags + ["coverage_test"],
         local = local,
         shard_count = shard_count,
+        size = size,
     )
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
