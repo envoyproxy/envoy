@@ -10,6 +10,7 @@
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/protobuf.h"
 #include "common/router/rds_impl.h"
 
 #include "server/http/admin.h"
@@ -86,7 +87,7 @@ public:
   Envoy::Router::SubscriptionFactoryFunction factory_function_;
   const std::string context_ = "vhds_test";
   std::unordered_set<Envoy::Router::RdsRouteConfigProviderImpl*> providers_;
-  google::protobuf::util::MessageDifferencer messageDifferencer_;
+  Protobuf::util::MessageDifferencer messageDifferencer_;
 };
 
 // verify that api_type: DELTA_GRPC passes validation
