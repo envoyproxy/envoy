@@ -90,6 +90,7 @@ envoy_cc_library(
         ":admin_interface",
         ":drain_manager_interface",
         ":hot_restart_interface",
+        ":lifecycle_notifier_interface",
         ":listener_manager_interface",
         ":options_interface",
         "//include/envoy/access_log:access_log_interface",
@@ -98,7 +99,7 @@ envoy_cc_library(
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:query_params_interface",
-        "//include/envoy/init:init_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
@@ -144,12 +145,13 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         ":admin_interface",
+        ":lifecycle_notifier_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",
-        "//include/envoy/init:init_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
@@ -163,6 +165,14 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "lifecycle_notifier_interface",
+    hdrs = ["lifecycle_notifier.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
     ],
 )
 
@@ -186,7 +196,7 @@ envoy_cc_library(
     hdrs = ["transport_socket_config.h"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/init:init_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/runtime:runtime_interface",

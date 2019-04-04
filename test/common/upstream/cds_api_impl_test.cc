@@ -186,8 +186,9 @@ TEST_F(CdsApiImplTest, ValidateFail) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
-  clusters.Add();
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
+  envoy::api::v2::Cluster cluster;
+  clusters.Add()->PackFrom(cluster);
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
   EXPECT_CALL(initialized_, ready());
@@ -201,12 +202,11 @@ TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
-  auto* cluster_1 = clusters.Add();
-  cluster_1->set_name("duplicate_cluster");
-
-  auto* cluster_2 = clusters.Add();
-  cluster_2->set_name("duplicate_cluster");
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
+  envoy::api::v2::Cluster cluster_1;
+  cluster_1.set_name("duplicate_cluster");
+  clusters.Add()->PackFrom(cluster_1);
+  clusters.Add()->PackFrom(cluster_1);
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
   EXPECT_CALL(initialized_, ready());
@@ -226,7 +226,7 @@ TEST_F(CdsApiImplTest, EmptyConfigUpdate) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
   dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, "");
 }
 
@@ -240,13 +240,16 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
-  auto* cluster_1 = clusters.Add();
-  cluster_1->set_name("cluster_1");
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
+
+  envoy::api::v2::Cluster cluster_1;
+  cluster_1.set_name("cluster_1");
+  clusters.Add()->PackFrom(cluster_1);
   cm_.expectAdd("cluster_1");
 
-  auto* cluster_2 = clusters.Add();
-  cluster_2->set_name("cluster_2");
+  envoy::api::v2::Cluster cluster_2;
+  cluster_2.set_name("cluster_2");
+  clusters.Add()->PackFrom(cluster_2);
   cm_.expectAdd("cluster_2");
 
   dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, "");
@@ -262,17 +265,21 @@ TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
-  auto* cluster_1 = clusters.Add();
-  cluster_1->set_name("cluster_1");
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
+
+  envoy::api::v2::Cluster cluster_1;
+  cluster_1.set_name("cluster_1");
+  clusters.Add()->PackFrom(cluster_1);
   cm_.expectAddToThrow("cluster_1", "An exception");
 
-  auto* cluster_2 = clusters.Add();
-  cluster_2->set_name("cluster_2");
+  envoy::api::v2::Cluster cluster_2;
+  cluster_2.set_name("cluster_2");
+  clusters.Add()->PackFrom(cluster_2);
   cm_.expectAdd("cluster_2");
 
-  auto* cluster_3 = clusters.Add();
-  cluster_3->set_name("cluster_3");
+  envoy::api::v2::Cluster cluster_3;
+  cluster_3.set_name("cluster_3");
+  clusters.Add()->PackFrom(cluster_3);
   cm_.expectAddToThrow("cluster_3", "Another exception");
 
   EXPECT_THROW_WITH_MESSAGE(

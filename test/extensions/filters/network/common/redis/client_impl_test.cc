@@ -46,13 +46,8 @@ public:
   ~RedisClientImplTest() {
     client_.reset();
 
-    // Make sure all gauges are 0.
-    for (const Stats::GaugeSharedPtr& gauge : host_->cluster_.stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
-    }
-    for (const Stats::GaugeSharedPtr& gauge : host_->stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
-    }
+    EXPECT_TRUE(TestUtility::gaugesZeroed(host_->cluster_.stats_store_.gauges()));
+    EXPECT_TRUE(TestUtility::gaugesZeroed(host_->stats_store_.gauges()));
   }
 
   void setup() {

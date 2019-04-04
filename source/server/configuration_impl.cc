@@ -56,11 +56,6 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(bootstrap);
 
-  // TODO(ramaraochavali): remove this dependency on extension when rate limit service config is
-  // deprecated and removed from bootstrap. For now, just call in to extensions to register the rate
-  // limit service config, so that extensions can build rate limit client.
-  ratelimit_client_factory_ = Envoy::Extensions::Filters::Common::RateLimit::rateLimitClientFactory(
-      server, cluster_manager_->grpcAsyncClientManager(), bootstrap);
   const auto& listeners = bootstrap.static_resources().listeners();
   ENVOY_LOG(info, "loading {} listener(s)", listeners.size());
   for (ssize_t i = 0; i < listeners.size(); i++) {

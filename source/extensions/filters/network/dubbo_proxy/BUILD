@@ -35,6 +35,7 @@ envoy_cc_library(
     deps = [
         ":buffer_helper_lib",
         ":message_lib",
+        ":metadata_lib",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
@@ -133,7 +134,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":message_lib",
-        ":protocol_interface",
         "//source/common/http:header_map_lib",
     ],
 )
@@ -159,5 +159,20 @@ envoy_cc_library(
     deps = [
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "app_exception_lib",
+    srcs = ["app_exception.cc"],
+    hdrs = ["app_exception.h"],
+    deps = [
+        ":deserializer_interface",
+        ":message_lib",
+        ":metadata_lib",
+        ":protocol_interface",
+        "//include/envoy/buffer:buffer_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
     ],
 )

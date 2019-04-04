@@ -14,9 +14,10 @@ namespace {
 
 class RawStatDataTest : public testing::Test {
 public:
-  RawStatDataTest() : allocator_(stats_options_) {}
+  RawStatDataTest() : allocator_(stats_options_, symbol_table_) {}
 
   StatsOptionsImpl stats_options_;
+  FakeSymbolTableImpl symbol_table_;
   TestAllocator allocator_; // This is RawStatDataAllocator with some size settings.
 };
 

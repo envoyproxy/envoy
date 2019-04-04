@@ -37,16 +37,6 @@ genrule(
 )
 
 config_setting(
-    name = "windows_x86_64",
-    values = {"cpu": "x64_windows"},
-)
-
-config_setting(
-    name = "linux_ppc",
-    values = {"cpu": "ppc"},
-)
-
-config_setting(
     name = "windows_opt_build",
     values = {
         "cpu": "x64_windows",
@@ -163,6 +153,26 @@ alias(
         "//bazel:boringssl_fips": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
     }),
+)
+
+config_setting(
+    name = "linux_x86_64",
+    values = {"cpu": "k8"},
+)
+
+config_setting(
+    name = "linux_aarch64",
+    values = {"cpu": "aarch64"},
+)
+
+config_setting(
+    name = "linux_ppc",
+    values = {"cpu": "ppc"},
+)
+
+config_setting(
+    name = "windows_x86_64",
+    values = {"cpu": "x64_windows"},
 )
 
 # Configuration settings to make doing selects for Apple vs non-Apple platforms

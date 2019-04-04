@@ -26,6 +26,10 @@ cat <<EOF >sed_commands
 
 # Rewrite gtest includes.
 /^#include/ s!testing/gtest/include/gtest/!gtest/!
+
+# Rewrite third_party includes.
+/^#include/ s!third_party/boringssl/src/include/!!
+
 EOF
 
 for src_file in $(SRCS); do

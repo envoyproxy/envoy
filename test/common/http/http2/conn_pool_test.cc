@@ -68,10 +68,7 @@ public:
         pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
 
   ~Http2ConnPoolImplTest() {
-    // Make sure all gauges are 0.
-    for (const Stats::GaugeSharedPtr& gauge : cluster_->stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
-    }
+    EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 
   // Creates a new test client, expecting a new connection to be created and associated
@@ -440,7 +437,7 @@ TEST_F(Http2ConnPoolImplTest, LocalReset) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_tx_reset_.value());
-  EXPECT_FALSE(cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, RemoteReset) {
@@ -581,7 +578,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
 TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   InSequence s;
 
-  EXPECT_FALSE(cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -591,7 +588,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
-  EXPECT_FALSE(cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
 
   expectClientCreate();
   ActiveTestRequest r2(*this, 1, false);
@@ -612,7 +609,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
 }
 
 TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
-  cluster_->resetResourceManager(1024, 1024, 1, 1);
+  cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
   InSequence s;
 
   expectClientCreate();
