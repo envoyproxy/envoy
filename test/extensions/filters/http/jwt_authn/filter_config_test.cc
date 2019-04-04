@@ -1,5 +1,6 @@
-#include "common/stream_info/filter_state_impl.h"
 #include "common/router/string_accessor_impl.h"
+#include "common/stream_info/filter_state_impl.h"
+
 #include "extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"

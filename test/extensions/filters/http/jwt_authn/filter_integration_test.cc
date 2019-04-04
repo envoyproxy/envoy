@@ -1,6 +1,7 @@
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 
 #include "common/router/string_accessor_impl.h"
+
 #include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/well_known_names.h"
