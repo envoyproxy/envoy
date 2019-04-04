@@ -4,7 +4,7 @@ set -e
 
 cd $(dirname $0)/..
 
-rm -rf generated/*
+rm -rf gen/*
 
 # generate the protobufs
 protoc --go_out=plugins=grpc:./gen \

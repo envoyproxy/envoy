@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_options_impl.h"
 #include "common/stats/symbol_table_impl.h"

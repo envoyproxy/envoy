@@ -89,7 +89,10 @@ envoy_cc_posix_library(
     name = "platform_impl_lib",
     hdrs = ["posix/platform_impl.h"],
     strip_include_prefix = "posix",
-    deps = ["//source/common/common:thread_lib"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//source/common/filesystem:filesystem_lib",
+    ],
 )
 
 envoy_cc_win32_library(
@@ -99,6 +102,7 @@ envoy_cc_win32_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
+        "//source/common/filesystem:filesystem_lib",
     ],
 )
 

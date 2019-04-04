@@ -25,7 +25,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("c1", c1.tagExtractedName());
   EXPECT_EQ("scope1.c2", c2.tagExtractedName());
   EXPECT_EQ(0, c1.tags().size());
-  EXPECT_EQ(0, c2.tags().size());
+  EXPECT_EQ(0, c1.tags().size());
 
   Gauge& g1 = store_.gauge("g1");
   Gauge& g2 = scope1->gauge("g2");
@@ -82,16 +82,14 @@ TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
  * Test stats macros. @see stats_macros.h
  */
 // clang-format off
-#define ALL_TEST_STATS(COUNTER, GAUGE, BOOL_INDICATOR, HISTOGRAM)              \
-  COUNTER       (test_counter)                                                 \
-  GAUGE         (test_gauge)                                                   \
-  BOOL_INDICATOR(test_bool_indicator)                                          \
-  HISTOGRAM     (test_histogram)
+#define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM)                                                  \
+  COUNTER  (test_counter)                                                                          \
+  GAUGE    (test_gauge)                                                                            \
+  HISTOGRAM(test_histogram)
 // clang-format on
 
 struct TestStats {
-  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_BOOL_INDICATOR_STRUCT,
-                 GENERATE_HISTOGRAM_STRUCT)
+  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
@@ -104,9 +102,6 @@ TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
 
   Gauge& gauge = test_stats.test_gauge_;
   EXPECT_EQ("test.test_gauge", gauge.name());
-
-  BoolIndicator& boolIndicator = test_stats.test_bool_indicator_;
-  EXPECT_EQ("test.test_bool_indicator", boolIndicator.name());
 
   Histogram& histogram = test_stats.test_histogram_;
   EXPECT_EQ("test.test_histogram", histogram.name());

@@ -10,6 +10,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
@@ -46,17 +47,6 @@ public:
    */
   virtual GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
                                    const std::vector<Tag>& tags) PURE;
-
-  /**
-   * @param name the full name of the stat.
-   * @param tag_extracted_name the name of the stat with tag-values stripped out.
-   * @param tags the extracted tag values.
-   * @return BoolIndicatorSharedPtr a bool, or nullptr if allocation failed, in which case
-   *     tag_extracted_name and tags are not moved.
-   */
-  virtual BoolIndicatorSharedPtr makeBoolIndicator(StatName name,
-                                                   absl::string_view tag_extracted_name,
-                                                   const std::vector<Tag>& tags) PURE;
 
   /**
    * Determines whether this stats allocator requires bounded stat-name size.

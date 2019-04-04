@@ -198,64 +198,6 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr));
 }
 
-#if __GLIBCXX__ >= 20130411 && __GLIBCXX__ <= 20180726
-// Run similar tests with the default hash algorithm for GCC 5.
-// TODO(danielhochman): After v1 is deprecated this test can be deleted since std::hash will no
-// longer be in use.
-TEST_P(RingHashLoadBalancerTest, BasicWithStdHash) {
-  hostSet().hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
-      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
-  hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().runCallbacks({}, {});
-
-  config_ = envoy::api::v2::Cluster::RingHashLbConfig();
-  config_.value().mutable_deprecated_v1()->mutable_use_std_hash()->set_value(true);
-  config_.value().mutable_minimum_ring_size()->set_value(12);
-  init();
-  EXPECT_EQ(12, lb_->stats().size_.value());
-  EXPECT_EQ(2, lb_->stats().min_hashes_per_host_.value());
-  EXPECT_EQ(2, lb_->stats().max_hashes_per_host_.value());
-
-  // This is the hash ring built using the default hash (probably murmur2) on GCC 5.4.
-  // ring hash: host=127.0.0.1:85 hash=1358027074129602068
-  // ring hash: host=127.0.0.1:83 hash=4361834613929391114
-  // ring hash: host=127.0.0.1:84 hash=7224494972555149682
-  // ring hash: host=127.0.0.1:81 hash=7701421856454313576
-  // ring hash: host=127.0.0.1:82 hash=8649315368077433379
-  // ring hash: host=127.0.0.1:84 hash=8739448859063030639
-  // ring hash: host=127.0.0.1:81 hash=9887544217113020895
-  // ring hash: host=127.0.0.1:82 hash=10150910876324007731
-  // ring hash: host=127.0.0.1:83 hash=15168472011420622455
-  // ring hash: host=127.0.0.1:80 hash=15427156902705414897
-  // ring hash: host=127.0.0.1:85 hash=16375050414328759093
-  // ring hash: host=127.0.0.1:80 hash=17613279263364193813
-  LoadBalancerPtr lb = lb_->factory()->create();
-  {
-    TestLoadBalancerContext context(0);
-    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
-  }
-  {
-    TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
-    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
-  }
-  {
-    TestLoadBalancerContext context(1358027074129602068);
-    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
-  }
-  {
-    TestLoadBalancerContext context(1358027074129602069);
-    EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context));
-  }
-  {
-    EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
-    EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(nullptr));
-  }
-  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
-}
-#endif
-
 // Expect reasonable results with Murmur2 hash.
 TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
   hostSet().hosts_ = {

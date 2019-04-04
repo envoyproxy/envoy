@@ -4,10 +4,12 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Assign;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
+using testing::ReturnPointee;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -23,12 +25,16 @@ MockDispatcher::MockDispatcher() {
 
 MockDispatcher::~MockDispatcher() {}
 
-MockTimer::MockTimer() {}
+MockTimer::MockTimer() {
+  ON_CALL(*this, enableTimer(_)).WillByDefault(Assign(&enabled_, true));
+  ON_CALL(*this, disableTimer()).WillByDefault(Assign(&enabled_, false));
+  ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
+}
 
 // Ownership of each MockTimer instance is transferred to the (caller of) dispatcher's
 // createTimer_(), so to avoid destructing it twice, the MockTimer must have been dynamically
 // allocated and must not be deleted by it's creator.
-MockTimer::MockTimer(MockDispatcher* dispatcher) {
+MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
   EXPECT_CALL(*dispatcher, createTimer_(_))
       .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
       .RetiresOnSaturation();

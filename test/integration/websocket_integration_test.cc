@@ -319,9 +319,9 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
         foo_upgrade->set_upgrade_type("foo");
         foo_upgrade->mutable_enabled()->set_value(false);
       });
-  config_helper_.addRoute("host", "/websocket/test", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, {}, false, "foo");
+  auto host = config_helper_.createVirtualHost("host", "/websocket/test");
+  host.mutable_routes(0)->mutable_route()->add_upgrade_configs()->set_upgrade_type("foo");
+  config_helper_.addVirtualHost(host);
   initialize();
 
   performUpgrade(upgradeRequestHeaders("foo", 0), upgradeResponseHeaders("foo"));

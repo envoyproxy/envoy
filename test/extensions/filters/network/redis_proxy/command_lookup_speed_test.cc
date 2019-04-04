@@ -69,7 +69,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   Event::SimulatedTimeSystem time_system_;
   CommandSplitter::InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.",
-                                          time_system_};
+                                          time_system_, false};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };

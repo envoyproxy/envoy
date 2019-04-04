@@ -13,6 +13,7 @@
 
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats_options.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
 #include "common/common/block_memory_hash_set.h"
@@ -143,11 +144,6 @@ public:
   GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
                            const std::vector<Tag>& tags) override {
     return makeStat<GaugeImpl<RawStatData>>(name, tag_extracted_name, tags);
-  }
-
-  BoolIndicatorSharedPtr makeBoolIndicator(StatName name, absl::string_view tag_extracted_name,
-                                           const std::vector<Tag>& tags) override {
-    return makeStat<BoolIndicatorImpl<RawStatData>>(name, tag_extracted_name, tags);
   }
 
 private:

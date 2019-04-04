@@ -11,6 +11,7 @@
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/network/dubbo_proxy/message.h"
+#include "extensions/filters/network/dubbo_proxy/metadata.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,6 +70,8 @@ public:
   struct Context {
     bool is_request_ = false;
     size_t body_size_ = 0;
+    size_t header_size_ = 0;
+    bool is_heartbeat_ = false;
   };
   virtual ~Protocol() {}
   Protocol() {}
@@ -80,6 +83,10 @@ public:
   virtual ProtocolType type() const PURE;
 
   /*
+   * This interface will be deprecated,
+   * it is reserved for the purpose of compatibility with the existing Filter implementation,
+   * this interface will be deleted after the new Filter implementation code is submitted.
+   *
    * decodes the dubbo protocol message, potentially invoking callbacks.
    * If successful, the message is removed from the buffer.
    *
@@ -90,6 +97,30 @@ public:
    * @throws EnvoyException if the data is not valid for this protocol.
    */
   virtual bool decode(Buffer::Instance& buffer, Context* context) PURE;
+
+  /*
+   * decodes the dubbo protocol message, potentially invoking callbacks.
+   * If successful, the message is removed from the buffer.
+   *
+   * @param buffer the currently buffered dubbo data.
+   * @param context save the meta data of current messages.
+   * @param metadata the meta data of current messages
+   * @return bool true if a complete message was successfully consumed, false if more data
+   *                 is required.
+   * @throws EnvoyException if the data is not valid for this protocol.
+   */
+  virtual bool decode(Buffer::Instance& buffer, Context* context,
+                      MessageMetadataSharedPtr metadata) PURE;
+
+  /*
+   * encodes the dubbo protocol message.
+   *
+   * @param buffer save the currently buffered dubbo data.
+   * @param metadata the meta data of dubbo protocol
+   * @return bool true if the protocol coding succeeds.
+   */
+  virtual bool encode(Buffer::Instance& buffer, int32_t body_size,
+                      const MessageMetadata& metadata) PURE;
 };
 
 typedef std::unique_ptr<Protocol> ProtocolPtr;
@@ -103,11 +134,21 @@ public:
   virtual ~NamedProtocolConfigFactory() {}
 
   /**
+   * This interface will be deprecated,
+   * it is reserved for the purpose of compatibility with the existing Filter implementation,
+   * this interface will be deleted after the new Filter implementation code is submitted.
+   *
    * Create a particular Dubbo protocol.
    * @param callbacks the callbacks to be notified of protocol decodes.
    * @return protocol instance pointer.
    */
   virtual ProtocolPtr createProtocol(ProtocolCallbacks& callbacks) PURE;
+
+  /**
+   * Create a particular Dubbo protocol.
+   * @return protocol instance pointer.
+   */
+  virtual ProtocolPtr createProtocol() PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of Dubbo protocol
@@ -131,8 +172,10 @@ public:
  */
 template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
   ProtocolPtr createProtocol(ProtocolCallbacks& callbacks) override {
-    return std::make_unique<ProtocolImpl>(callbacks);
+    return std::make_unique<ProtocolImpl>(&callbacks);
   }
+
+  ProtocolPtr createProtocol() override { return std::make_unique<ProtocolImpl>(); }
 
   std::string name() override { return name_; }
 

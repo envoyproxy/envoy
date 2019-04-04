@@ -5,6 +5,7 @@
 
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
 #include "common/stats/metric_impl.h"
@@ -30,15 +31,6 @@ namespace Stats {
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   explicit StatDataAllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
-
-  /**
-   * @param name the full name of the stat.
-   * @return StatData* a data block for a given stat name or nullptr if there is no more memory
-   *         available for stats. The allocator should return a reference counted data location
-   *         by name if one already exists with the same name. This is used for intra-process
-   *         scope swapping as well as inter-process hot restart.
-   */
-  // virtual StatData* alloc(StatName name) PURE;
 
   /**
    * Free a raw stat data block. The allocator should handle reference counting and only truly
@@ -69,7 +61,7 @@ public:
   CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
               absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
-  ~CounterImpl() {
+  ~CounterImpl() override {
     alloc_.free(data_);
     MetricImpl::clear();
   }
@@ -102,7 +94,7 @@ protected:
 class NullCounterImpl : public Counter, NullMetricImpl {
 public:
   explicit NullCounterImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
-  ~NullCounterImpl() { MetricImpl::clear(); }
+  ~NullCounterImpl() override { MetricImpl::clear(); }
 
   void add(uint64_t) override {}
   void inc() override {}
@@ -119,7 +111,7 @@ public:
   GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
             absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
-  ~GaugeImpl() {
+  ~GaugeImpl() override {
     alloc_.free(data_);
     MetricImpl::clear();
   }
@@ -158,7 +150,7 @@ protected:
 class NullGaugeImpl : public Gauge, NullMetricImpl {
 public:
   explicit NullGaugeImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
-  ~NullGaugeImpl() { MetricImpl::clear(); }
+  ~NullGaugeImpl() override { MetricImpl::clear(); }
 
   void add(uint64_t) override {}
   void inc() override {}
@@ -166,49 +158,6 @@ public:
   void set(uint64_t) override {}
   void sub(uint64_t) override {}
   uint64_t value() const override { return 0; }
-};
-
-/**
- * BoolIndicator implementation that wraps a StatData.
- */
-template <class StatData> class BoolIndicatorImpl : public BoolIndicator, public MetricImpl {
-public:
-  BoolIndicatorImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-                    absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
-      : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
-  ~BoolIndicatorImpl() {
-    alloc_.free(data_);
-    MetricImpl::clear();
-  }
-
-  // Stats::BoolIndicator
-  virtual void set(bool value) override {
-    data_.value_ = value ? 1 : 0;
-    data_.flags_ |= Flags::Used;
-  }
-  virtual bool value() const override { return data_.value_; }
-  bool used() const override { return data_.flags_ & Flags::Used; }
-
-  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
-  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
-
-protected:
-  StatData& data_;
-  StatDataAllocatorImpl<StatData>& alloc_;
-};
-
-/**
- * Null bool implementation.
- * No-ops on all calls and requires no underlying metric or data.
- */
-class NullBoolIndicatorImpl : public BoolIndicator, public NullMetricImpl {
-public:
-  explicit NullBoolIndicatorImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
-  ~NullBoolIndicatorImpl() { MetricImpl::clear(); }
-
-  void set(bool) override {}
-  bool used() const override { return false; }
-  bool value() const override { return false; }
 };
 
 } // namespace Stats

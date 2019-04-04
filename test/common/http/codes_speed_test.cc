@@ -10,6 +10,7 @@
 
 #include "common/common/empty_string.h"
 #include "common/http/codes.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "benchmark/benchmark.h"

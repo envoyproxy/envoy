@@ -4,6 +4,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_options_impl.h"
 #include "common/stats/tag_producer_impl.h"

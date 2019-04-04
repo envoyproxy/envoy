@@ -36,6 +36,7 @@
 #include "common/network/utility.h"
 #include "common/stats/stats_options_impl.h"
 #include "common/filesystem/directory.h"
+#include "common/filesystem/filesystem_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -98,23 +99,30 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
     return false;
   }
 
+  // Check whether the two buffers contain the same content. It is valid for the content
+  // to be arranged differently in the buffers. For example, lhs could have one slice
+  // containing 10 bytes while rhs has ten slices containing one byte each.
   uint64_t lhs_num_slices = lhs.getRawSlices(nullptr, 0);
   uint64_t rhs_num_slices = rhs.getRawSlices(nullptr, 0);
-  if (lhs_num_slices != rhs_num_slices) {
-    return false;
-  }
-
   STACK_ARRAY(lhs_slices, Buffer::RawSlice, lhs_num_slices);
   lhs.getRawSlices(lhs_slices.begin(), lhs_num_slices);
   STACK_ARRAY(rhs_slices, Buffer::RawSlice, rhs_num_slices);
   rhs.getRawSlices(rhs_slices.begin(), rhs_num_slices);
-  for (size_t i = 0; i < lhs_num_slices; i++) {
-    if (lhs_slices[i].len_ != rhs_slices[i].len_) {
-      return false;
-    }
-
-    if (0 != memcmp(lhs_slices[i].mem_, rhs_slices[i].mem_, lhs_slices[i].len_)) {
-      return false;
+  size_t rhs_slice = 0;
+  size_t rhs_offset = 0;
+  for (size_t lhs_slice = 0; lhs_slice < lhs_num_slices; lhs_slice++) {
+    for (size_t lhs_offset = 0; lhs_offset < lhs_slices[lhs_slice].len_; lhs_offset++) {
+      while (rhs_offset >= rhs_slices[rhs_slice].len_) {
+        rhs_slice++;
+        ASSERT(rhs_slice < rhs_num_slices);
+        rhs_offset = 0;
+      }
+      auto lhs_str = static_cast<const uint8_t*>(lhs_slices[lhs_slice].mem_);
+      auto rhs_str = static_cast<const uint8_t*>(rhs_slices[rhs_slice].mem_);
+      if (lhs_str[lhs_offset] != rhs_str[rhs_offset]) {
+        return false;
+      }
+      rhs_offset++;
     }
   }
 
@@ -139,11 +147,6 @@ Stats::CounterSharedPtr TestUtility::findCounter(Stats::Store& store, const std:
 
 Stats::GaugeSharedPtr TestUtility::findGauge(Stats::Store& store, const std::string& name) {
   return findByName(store.gauges(), name);
-}
-
-Stats::BoolIndicatorSharedPtr TestUtility::findBoolIndicator(Stats::Store& store,
-                                                             const std::string& name) {
-  return findByName(store.boolIndicators(), name);
 }
 
 std::list<Network::Address::InstanceConstSharedPtr>
@@ -256,6 +259,19 @@ std::string TestUtility::formatTime(const SystemTime input, const std::string& o
 std::string TestUtility::convertTime(const std::string& input, const std::string& input_format,
                                      const std::string& output_format) {
   return TestUtility::formatTime(TestUtility::parseTime(input, input_format), output_format);
+}
+
+// static
+bool TestUtility::gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges) {
+  // Returns true if all gauges are 0 except the circuit_breaker remaining resource
+  // gauges which default to the resource max.
+  std::regex omitted(".*circuit_breakers\\..*\\.remaining.*");
+  for (const Stats::GaugeSharedPtr& gauge : gauges) {
+    if (!std::regex_match(gauge->name(), omitted) && gauge->value() != 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 void ConditionalInitializer::setReady() {
@@ -399,6 +415,21 @@ ThreadFactory& threadFactoryForTest() {
 
 } // namespace Thread
 
+namespace Filesystem {
+
+// TODO(sesmith177) Tests should get the Filesystem::Instance from the same location as the main
+// code
+Instance& fileSystemForTest() {
+#ifdef WIN32
+  static InstanceImplWin32* file_system = new InstanceImplWin32();
+#else
+  static InstanceImplPosix* file_system = new InstanceImplPosix();
+#endif
+  return *file_system;
+}
+
+} // namespace Filesystem
+
 namespace Api {
 
 class TestImplProvider {
@@ -409,26 +440,34 @@ protected:
 
 class TestImpl : public TestImplProvider, public Impl {
 public:
-  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store)
-      : Impl(thread_factory, stats_store, global_time_system_) {}
-  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system)
-      : Impl(thread_factory, default_stats_store_, time_system) {}
-  TestImpl(Thread::ThreadFactory& thread_factory)
-      : Impl(thread_factory, default_stats_store_, global_time_system_) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
+           Filesystem::Instance& file_system)
+      : Impl(thread_factory, stats_store, global_time_system_, file_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Event::TimeSystem& time_system,
+           Filesystem::Instance& file_system)
+      : Impl(thread_factory, default_stats_store_, time_system, file_system) {}
+  TestImpl(Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
+      : Impl(thread_factory, default_stats_store_, global_time_system_, file_system) {}
 };
 
-ApiPtr createApiForTest() { return std::make_unique<TestImpl>(Thread::threadFactoryForTest()); }
+ApiPtr createApiForTest() {
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(),
+                                    Filesystem::fileSystemForTest());
+}
 
 ApiPtr createApiForTest(Stats::Store& stat_store) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), stat_store,
+                                    Filesystem::fileSystemForTest());
 }
 
 ApiPtr createApiForTest(Event::TimeSystem& time_system) {
-  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system);
+  return std::make_unique<TestImpl>(Thread::threadFactoryForTest(), time_system,
+                                    Filesystem::fileSystemForTest());
 }
 
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system) {
-  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system);
+  return std::make_unique<Impl>(Thread::threadFactoryForTest(), stat_store, time_system,
+                                Filesystem::fileSystemForTest());
 }
 
 } // namespace Api

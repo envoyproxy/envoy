@@ -496,6 +496,27 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   EXPECT_TRUE(zipkin_span->span().sampled());
 }
 
+TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
+  setupValidDriver();
+
+  // Root span so have same trace and span id
+  const std::string id = Hex::uint64ToHex(generateRandom64());
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, id);
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, id);
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
+                                   ZipkinCoreConstants::get().SAMPLED);
+
+  // Set parent span id to empty string, to ensure it is ignored
+  const std::string parent_span_id = "";
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID, parent_span_id);
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                             start_time_, {Tracing::Reason::Sampling, true});
+
+  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+  EXPECT_TRUE(zipkin_span->span().sampled());
+}
+
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
   setupValidDriver();
 

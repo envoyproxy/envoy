@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/hash.h"
 #include "common/common/thread.h"
@@ -67,7 +68,7 @@ public:
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
   HeapStatDataAllocator(SymbolTable& symbol_table) : StatDataAllocatorImpl(symbol_table) {}
-  virtual ~HeapStatDataAllocator();
+  ~HeapStatDataAllocator() override;
 
   HeapStatData& alloc(StatName name);
   void free(HeapStatData& data) override;

@@ -67,9 +67,7 @@ public:
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gaugeFromStatName(StatName name) override { return gauges_.get(name); }
-  BoolIndicator& boolIndicatorFromStatName(StatName name) override {
-    return bool_indicators_.get(name);
-  }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   Histogram& histogramFromStatName(StatName name) override { return histograms_.get(name); }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   const SymbolTable& symbolTable() const override { return symbol_table_; }
@@ -78,9 +76,6 @@ public:
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
   std::vector<GaugeSharedPtr> gauges() const override { return gauges_.toVector(); }
-  std::vector<BoolIndicatorSharedPtr> boolIndicators() const override {
-    return bool_indicators_.toVector();
-  }
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     return std::vector<ParentHistogramSharedPtr>{};
   }
@@ -112,9 +107,9 @@ private:
   HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
-  IsolatedStatsCache<BoolIndicator> bool_indicators_;
   IsolatedStatsCache<Histogram> histograms_;
   const StatsOptionsImpl stats_options_;
+  NullGaugeImpl null_gauge_;
 };
 
 } // namespace Stats

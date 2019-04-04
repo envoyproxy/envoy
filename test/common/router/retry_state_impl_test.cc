@@ -424,7 +424,7 @@ TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
 }
 
 TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
-  cluster_.resetResourceManager(0, 0, 0, 0);
+  cluster_.resetResourceManager(0, 0, 0, 0, 0);
 
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"}};
   setup(request_headers);
@@ -435,6 +435,8 @@ TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
 }
 
 TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
+  // The max retries header will take precedence over the policy
+  policy_.num_retries_ = 4;
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"},
                                           {"x-envoy-retry-grpc-on", "cancelled"},
                                           {"x-envoy-max-retries", "3"}};
@@ -459,7 +461,7 @@ TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {
   EXPECT_CALL(callback_ready_, ready());
   retry_timer_->callback_();
 
-  EXPECT_TRUE(cluster_.circuit_breakers_stats_.rq_retry_open_.value());
+  EXPECT_EQ(1UL, cluster_.circuit_breakers_stats_.rq_retry_open_.value());
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(connect_failure_, callback_));
 
@@ -499,7 +501,7 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_success_.value());
-  EXPECT_FALSE(cluster_.circuit_breakers_stats_.rq_retry_open_.value());
+  EXPECT_EQ(0UL, cluster_.circuit_breakers_stats_.rq_retry_open_.value());
 }
 
 TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {
@@ -520,6 +522,20 @@ TEST_F(RouterRetryStateImplTest, Cancel) {
 
   expectTimerCreateAndEnable();
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, ZeroMaxRetriesHeader) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"},
+                                          {"x-envoy-retry-grpc-on", "cancelled"},
+                                          {"x-envoy-max-retries", "0"}};
+  setup(request_headers);
+  EXPECT_FALSE(request_headers.has("x-envoy-retry-on"));
+  EXPECT_FALSE(request_headers.has("x-envoy-retry-grpc-on"));
+  EXPECT_FALSE(request_headers.has("x-envoy-max-retries"));
+  EXPECT_TRUE(state_->enabled());
+
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
+            state_->shouldRetryReset(connect_failure_, callback_));
 }
 
 } // namespace

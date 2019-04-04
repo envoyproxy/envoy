@@ -29,10 +29,6 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       gauges_([this](StatName name) -> GaugeSharedPtr {
         return alloc_.makeGauge(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
       }),
-      bool_indicators_([this](StatName name) -> BoolIndicatorSharedPtr {
-        return alloc_.makeBoolIndicator(name, alloc_.symbolTable().toString(name),
-                                        std::vector<Tag>());
-      }),
       histograms_([this](StatName name) -> HistogramSharedPtr {
         return std::make_shared<HistogramImpl>(name, *this, alloc_.symbolTable().toString(name),
                                                std::vector<Tag>());
@@ -41,14 +37,6 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);
 }
-
-/*
-void IsolatedStoreImpl::clear() {
-  counters_.clear();
-  gauges_.clear();
-  histograms_.clear();
-}
-*/
 
 } // namespace Stats
 } // namespace Envoy

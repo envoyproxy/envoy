@@ -83,6 +83,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
     deps = [
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/mocks/server:server_mocks",
     ],
@@ -102,5 +103,16 @@ envoy_extension_cc_test_binary(
         "//source/extensions/filters/network/redis_proxy:command_splitter_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "redis_proxy_integration_test",
+    size = "small",
+    srcs = ["redis_proxy_integration_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
+    deps = [
+        "//source/extensions/filters/network/redis_proxy:config",
+        "//test/integration:integration_lib",
     ],
 )

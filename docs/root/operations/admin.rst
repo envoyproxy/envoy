@@ -61,7 +61,7 @@ modify different aspects of the server:
   Cluster manager information
     - ``version_info`` string -- the version info string of the last loaded
       :ref:`CDS<config_cluster_manager_cds>` update.
-      If envoy does not have :ref:`CDS<config_cluster_manager_cds>` setup, the
+      If Envoy does not have :ref:`CDS<config_cluster_manager_cds>` setup, the
       output will read ``version_info::static``.
 
   Cluster wide information
@@ -236,7 +236,7 @@ explanation of the output.
   Histograms will output the computed quantiles i.e P0,P25,P50,P75,P90,P99,P99.9 and P100.
   The output for each quantile will be in the form of (interval,cumulative) where interval value
   represents the summary since last flush interval and cumulative value represents the
-  summary since the start of envoy instance. "No recorded values" in the histogram output indicates
+  summary since the start of Envoy instance. "No recorded values" in the histogram output indicates
   that it has not been updated with a value.
   See :ref:`here <operations_stats>` for more information.
 
@@ -380,7 +380,7 @@ explanation of the output.
 
   This endpoint is intended to be used as the stream source for
   `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
-  a GET to this endpoint will trigger a stream of statistics from envoy in
+  a GET to this endpoint will trigger a stream of statistics from Envoy in
   `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
   format, as expected by the Hystrix dashboard.
 

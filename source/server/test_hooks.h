@@ -21,6 +21,11 @@ public:
    * Called when a worker has removed a listener and it is no longer listening.
    */
   virtual void onWorkerListenerRemoved() PURE;
+
+  /**
+   * Called when the Runtime::ScopedLoaderSingleton is created by the server.
+   */
+  virtual void onRuntimeCreated() PURE;
 };
 
 /**
@@ -31,6 +36,7 @@ public:
   // TestHooks
   void onWorkerListenerAdded() override {}
   void onWorkerListenerRemoved() override {}
+  void onRuntimeCreated() override {}
 };
 
 } // namespace Envoy

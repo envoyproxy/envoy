@@ -37,7 +37,7 @@ public:
   MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
                  Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
-                 Thread::ThreadFactory& thread_factory);
+                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
   ~MainCommonBase();
 
   bool run();
@@ -65,9 +65,10 @@ public:
 
 protected:
   const Envoy::OptionsImpl& options_;
-  Stats::SymbolTableImpl symbol_table_;
+  Stats::FakeSymbolTableImpl symbol_table_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
+  Filesystem::Instance& file_system_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
