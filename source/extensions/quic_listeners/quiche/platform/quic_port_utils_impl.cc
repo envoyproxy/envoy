@@ -24,6 +24,7 @@ int QuicPickUnusedPortOrDieImpl() {
     uint32_t port = 0;
     bool available = true;
     for (auto ip_version : supported_versions) {
+      // Check availability of a port for all supported address families.
       auto addr_port = Envoy::Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:{}", Envoy::Network::Test::getAnyAddressUrlString(ip_version), port),
           /*v6only*/ false);
@@ -35,7 +36,8 @@ int QuicPickUnusedPortOrDieImpl() {
         break;
       }
       if (port == 0) {
-        // Assign port for checking in the rest address families.
+        // Just get a port from findOrCheckFreePort(), check its usability in the rest address
+        // families.
         port = addr_port->ip()->port();
       } else {
         ASSERT(port == addr_port->ip()->port());

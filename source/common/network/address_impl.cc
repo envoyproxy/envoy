@@ -326,8 +326,7 @@ IoHandlePtr Ipv6Instance::socket(SocketType type) const {
   // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
   RELEASE_ASSERT(
-      ::setsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1,
-      strerror(errno));
+      ::setsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
   return io_handle;
 }
 

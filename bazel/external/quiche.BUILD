@@ -29,7 +29,6 @@ load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
-    "envoy_cc_test_library",
     "envoy_select_quiche",
 )
 
@@ -141,9 +140,15 @@ cc_library(
 cc_library(
     name = "quic_platform_port_utils",
     testonly = 1,
-    hdrs = ["quiche/quic/platform/api/quic_port_utils.h"],
+    hdrs = envoy_select_quiche(
+        ["quiche/quic/platform/api/quic_port_utils.h"],
+        "@envoy",
+    ),
     visibility = ["//visibility:public"],
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
+    deps = envoy_select_quiche(
+        ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
+        "@envoy",
+    ),
 )
 
 cc_library(
@@ -160,7 +165,6 @@ cc_library(
         "quiche/quic/platform/api/quic_flag_utils.h",
         "quiche/quic/platform/api/quic_iovec.h",
         "quiche/quic/platform/api/quic_map_util.h",
-        "quiche/quic/platform/api/quic_port_utils.h",
         "quiche/quic/platform/api/quic_prefetch.h",
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_reference_counted.h",
