@@ -1,8 +1,8 @@
 Version history
 ---------------
 
-1.10.0 (pending)
-================
+1.10.0 (Apr 5, 2019)
+====================
 * access log: added a new flag for upstream retry count exceeded.
 * access log: added a :ref:`gRPC filter <envoy_api_msg_config.filter.accesslog.v2.GrpcStatusFilter>` to allow filtering on gRPC status.
 * access log: added a new flag for stream idle timeout.
