@@ -26,40 +26,78 @@ namespace Csrf {
 
 class CsrfFilterTest : public testing::Test {
 public:
-  CsrfFilterTest() : config_(new CsrfFilterConfig("test.", stats_)), filter_(config_) {
-    csrf_policy_ = std::make_unique<Router::TestCsrfPolicy>();
-    csrf_policy_->enabled_ = true;
-    csrf_policy_->shadow_enabled_ = false;
+  CsrfFilterConfigSharedPtr setupConfig() {
+    envoy::config::filter::http::csrf::v2::CsrfPolicy policy;
+    policy.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
+    policy.mutable_filter_enabled()->mutable_default_value()->set_denominator(
+        envoy::type::FractionalPercent::HUNDRED);
+    policy.mutable_filter_enabled()->set_runtime_key("csrf.enabled");
 
-    ON_CALL(decoder_callbacks_.route_->route_entry_, csrfPolicy())
-        .WillByDefault(Return(csrf_policy_.get()));
+    policy.mutable_shadow_enabled()->mutable_default_value()->set_numerator(0);
+    policy.mutable_shadow_enabled()->mutable_default_value()->set_denominator(
+        envoy::type::FractionalPercent::HUNDRED);
+    policy.mutable_shadow_enabled()->set_runtime_key("csrf.shadow_enabled");
+    return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);
+  }
 
-    ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, csrfPolicy())
-        .WillByDefault(Return(csrf_policy_.get()));
+  CsrfFilterTest() : config_(setupConfig()), filter_(config_) {}
+
+  void SetUp() {
+    setRoutePolicy(config_->policy());
+    setVirtualHostPolicy(config_->policy());
+
+    setFilterEnabled(true);
+    setShadowEnabled(false);
 
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
+  void setRoutePolicy(const CsrfPolicy* policy) {
+    ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(filter_name_))
+        .WillByDefault(Return(policy));
+  }
+
+  void setVirtualHostPolicy(const CsrfPolicy* policy) {
+    ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(filter_name_))
+        .WillByDefault(Return(policy));
+  }
+
+  void setFilterEnabled(bool enabled) {
+    ON_CALL(
+        runtime_.snapshot_,
+        featureEnabled("csrf.enabled", testing::Matcher<const envoy::type::FractionalPercent&>(_)))
+        .WillByDefault(Return(enabled));
+  }
+
+  void setShadowEnabled(bool enabled) {
+    ON_CALL(runtime_.snapshot_,
+            featureEnabled("csrf.shadow_enabled",
+                           testing::Matcher<const envoy::type::FractionalPercent&>(_)))
+        .WillByDefault(Return(enabled));
+  }
+
+  const std::string filter_name_ = "envoy.csrf";
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
-  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
-  Stats::IsolatedStoreImpl stats_;
-  CsrfFilterConfigSharedPtr config_;
-  CsrfFilter filter_;
   Buffer::OwnedImpl data_;
-  Http::TestHeaderMapImpl request_headers_;
-  std::unique_ptr<Router::TestCsrfPolicy> csrf_policy_;
   Router::MockDirectResponseEntry direct_response_entry_;
+  Stats::IsolatedStoreImpl stats_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  CsrfFilterConfigSharedPtr config_;
+
+  CsrfFilter filter_;
+  Http::TestHeaderMapImpl request_headers_;
 };
 
 TEST_F(CsrfFilterTest, RequestWithNonMutableMethod) {
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RequestWithoutOrigin) {
@@ -67,11 +105,15 @@ TEST_F(CsrfFilterTest, RequestWithoutOrigin) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(1, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
+  // EXPECT_EQ(1, stats_.counter("test.csrf.missing_source_origin").value());
+  // EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
+  // EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(1U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RequestWithoutDestination) {
@@ -79,11 +121,12 @@ TEST_F(CsrfFilterTest, RequestWithoutDestination) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(1, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOrigin) {
@@ -99,11 +142,12 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOrigin) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(1, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RequestWithValidOrigin) {
@@ -111,65 +155,67 @@ TEST_F(CsrfFilterTest, RequestWithValidOrigin) {
       {":method", "PUT"}, {"origin", "localhost"}, {"host", "localhost"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(1, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(1U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfDisabledShadowDisabled) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {"host", "localhost"}};
 
-  csrf_policy_->enabled_ = false;
+  setFilterEnabled(false);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfDisabledShadowEnabled) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {"host", "localhost"}};
 
-  csrf_policy_->enabled_ = false;
-  csrf_policy_->shadow_enabled_ = true;
+  setFilterEnabled(false);
+  setShadowEnabled(true);
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(1, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RequestWithValidOriginCsrfDisabledShadowEnabled) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "localhost"}, {"host", "localhost"}};
 
-  csrf_policy_->enabled_ = false;
-  csrf_policy_->shadow_enabled_ = true;
+  setFilterEnabled(false);
+  setShadowEnabled(true);
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(1, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(1U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfEnabledShadowEnabled) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {"host", "localhost"}};
 
-  csrf_policy_->shadow_enabled_ = true;
+  setShadowEnabled(true);
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "403"},
@@ -180,26 +226,27 @@ TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfEnabledShadowEnabled) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(1, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RequestWithValidOriginCsrfEnabledShadowEnabled) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "localhost"}, {"host", "localhost"}};
 
-  csrf_policy_->shadow_enabled_ = true;
+  setShadowEnabled(true);
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(1, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(1U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, RedirectRoute) {
@@ -210,9 +257,9 @@ TEST_F(CsrfFilterTest, RedirectRoute) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, EmptyRoute) {
@@ -222,9 +269,9 @@ TEST_F(CsrfFilterTest, EmptyRoute) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, EmptyRouteEntry) {
@@ -234,55 +281,55 @@ TEST_F(CsrfFilterTest, EmptyRouteEntry) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, NoCsrfEntry) {
   Http::TestHeaderMapImpl request_headers{
       {":method", "PUT"}, {"origin", "cross-origin"}, {"host", "localhost"}};
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, csrfPolicy()).WillByDefault(Return(nullptr));
+  setRoutePolicy(nullptr);
+  setVirtualHostPolicy(nullptr);
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, csrfPolicy())
-      .WillByDefault(Return(nullptr));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers));
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, NoRouteCsrfEntry) {
-  Http::TestHeaderMapImpl request_headers{{":method", "OPTIONS"}, {"origin", "localhost"}};
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"}, {"origin", "localhost"}};
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_, csrfPolicy()).WillByDefault(Return(nullptr));
+  setRoutePolicy(nullptr);
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
 TEST_F(CsrfFilterTest, NoVHostCsrfEntry) {
-  Http::TestHeaderMapImpl request_headers{{":method", "OPTIONS"}, {"origin", "localhost"}};
+  Http::TestHeaderMapImpl request_headers{{":method", "DELETE"}, {"origin", "localhost"}};
 
-  ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_, csrfPolicy())
-      .WillByDefault(Return(nullptr));
+  setVirtualHostPolicy(nullptr);
 
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 
-  EXPECT_EQ(0, stats_.counter("test.csrf.missing_source_origin").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
+  EXPECT_EQ(0U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(1U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 } // namespace Csrf
 } // namespace HttpFilters

@@ -109,12 +109,6 @@ private:
     static const absl::optional<bool> allow_credentials_;
   };
 
-  struct NullCsrfPolicy : public Router::CsrfPolicy {
-    // Router::CsrfPolicy
-    bool enabled() const override { return false; };
-    bool shadowEnabled() const override { return false; };
-  };
-
   struct NullHedgePolicy : public Router::HedgePolicy {
     // Router::HedgePolicy
     uint32_t initialRequests() const override { return 1; }
@@ -187,7 +181,6 @@ private:
     const std::string& name() const override { return EMPTY_STRING; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    const Router::CsrfPolicy* csrfPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
@@ -214,7 +207,6 @@ private:
       return Http::Code::InternalServerError;
     }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    const Router::CsrfPolicy* csrfPolicy() const override { return nullptr; }
     void finalizeRequestHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
     void finalizeResponseHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&) const override {}

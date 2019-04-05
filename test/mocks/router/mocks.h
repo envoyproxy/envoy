@@ -65,16 +65,6 @@ public:
   bool shadow_enabled_{};
 };
 
-class TestCsrfPolicy : public CsrfPolicy {
-public:
-  // Router::CsrfPolicy
-  bool enabled() const override { return enabled_; };
-  bool shadowEnabled() const override { return shadow_enabled_; };
-
-  bool enabled_{};
-  bool shadow_enabled_{};
-};
-
 class TestHedgePolicy : public HedgePolicy {
 public:
   // Router::HedgePolicy
@@ -208,7 +198,6 @@ public:
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
-  MOCK_CONST_METHOD0(csrfPolicy, const CsrfPolicy*());
   MOCK_CONST_METHOD0(routeConfig, const Config&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
@@ -218,7 +207,6 @@ public:
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   TestCorsPolicy cors_policy_;
-  TestCsrfPolicy csrf_policy_;
 };
 
 class MockHashPolicy : public HashPolicy {
@@ -287,7 +275,6 @@ public:
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
-  MOCK_CONST_METHOD0(csrfPolicy, const CsrfPolicy*());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
   MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
@@ -307,7 +294,6 @@ public:
   MockHashPolicy hash_policy_;
   MockMetadataMatchCriteria metadata_matches_criteria_;
   TestCorsPolicy cors_policy_;
-  TestCsrfPolicy csrf_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
   envoy::api::v2::core::Metadata metadata_;
   UpgradeMap upgrade_map_;

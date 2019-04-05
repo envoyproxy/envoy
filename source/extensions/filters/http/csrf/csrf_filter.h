@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/http/csrf/v2/csrf.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -29,19 +31,57 @@ struct CsrfStats {
 };
 
 /**
+ * Configuration for CSRF policy.
+ */
+class CsrfPolicy : public Router::RouteSpecificFilterConfig {
+public:
+  CsrfPolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
+             Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {}
+
+  bool enabled() const {
+    const auto& filter_enabled = policy_.filter_enabled();
+    return runtime_.snapshot().featureEnabled(filter_enabled.runtime_key(),
+                                              filter_enabled.default_value());
+  }
+
+  bool shadowEnabled() const {
+    if (!policy_.has_shadow_enabled()) {
+      return false;
+    }
+    const auto& shadow_enabled = policy_.shadow_enabled();
+    return runtime_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
+                                              shadow_enabled.default_value());
+  }
+
+private:
+  const envoy::config::filter::http::csrf::v2::CsrfPolicy policy_;
+  Runtime::Loader& runtime_;
+};
+
+/**
  * Configuration for the CSRF filter.
  */
 class CsrfFilterConfig {
 public:
-  CsrfFilterConfig(const std::string& stats_prefix, Stats::Scope& scope);
+  CsrfFilterConfig(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
+                   const std::string& stats_prefix, Stats::Scope& scope,
+                   Runtime::Loader& runtime);
+
   CsrfStats& stats() { return stats_; }
+  const CsrfPolicy* policy() { return &policy_; }
 
 private:
   static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+    const std::string final_prefix = prefix + "csrf.";
+    return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+  static const CsrfPolicy generatePolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
+                                         Runtime::Loader& runtime) {
+    return CsrfPolicy(policy, runtime);
   }
 
   CsrfStats stats_;
+  const CsrfPolicy policy_;
 };
 typedef std::shared_ptr<CsrfFilterConfig> CsrfFilterConfigSharedPtr;
 
@@ -61,22 +101,19 @@ public:
     return Http::FilterTrailersStatus::Continue;
   };
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
-    decoder_callbacks_ = &callbacks;
+    callbacks_ = &callbacks;
   };
 
 private:
-  friend class CsrfFilterTest;
-
   bool modifyMethod(const Http::HeaderMap& headers);
   absl::string_view sourceOriginValue(const Http::HeaderMap& headers);
   absl::string_view targetOriginValue(const Http::HeaderMap& headers);
   absl::string_view hostAndPort(const Envoy::Http::HeaderEntry* header);
-  bool shadowEnabled();
-  bool enabled();
+  void determinePolicy();
 
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
-  std::array<const Envoy::Router::CsrfPolicy*, 2> policies_;
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
   CsrfFilterConfigSharedPtr config_;
+  const CsrfPolicy* policy_;
 };
 
 } // namespace Csrf

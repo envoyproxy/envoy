@@ -3368,7 +3368,6 @@ virtual_hosts:
     EXPECT_TRUE(route_entry->includeVirtualHostRateLimits());
     EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
     EXPECT_EQ(nullptr, route_entry->corsPolicy());
-    EXPECT_EQ(nullptr, route_entry->csrfPolicy());
     EXPECT_EQ("test_value",
               Envoy::Config::Metadata::metadataValue(route_entry->metadata(), "com.bar.foo", "baz")
                   .string_value());
@@ -4136,130 +4135,6 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
   EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
   EXPECT_EQ(cors_policy->allowCredentials(), true);
-}
-
-TEST_F(RoutePropertyTest, TestBadCorsConfig) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: default
-  domains:
-  - "*"
-  routes:
-  - match:
-      prefix: "/api"
-    route:
-      cluster: ats
-      cors:
-        enabled: 0
-        allow_credentials: true
-)EOF";
-
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
-}
-
-TEST_F(RoutePropertyTest, TestVHostCsrfConfig) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: "default"
-    domains: ["*"]
-    csrf:
-      filter_enabled:
-        runtime_key: "csrf.www.enabled"
-        default_value:
-          numerator: 0
-          denominator: "HUNDRED"
-      shadow_enabled:
-        runtime_key: "csrf.www.shadow_enabled"
-        default_value:
-          numerator: 100
-          denominator: "HUNDRED"
-    routes:
-      - match:
-          prefix: "/api"
-        route:
-          cluster: "ats"
-)EOF";
-
-  Runtime::MockSnapshot snapshot;
-  EXPECT_CALL(snapshot,
-              featureEnabled("csrf.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillOnce(Return(false));
-  EXPECT_CALL(snapshot, featureEnabled("csrf.www.shadow_enabled",
-                                       Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillOnce(Return(true));
-  EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
-
-  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, false);
-
-  const Router::CsrfPolicy* csrf_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)
-          ->routeEntry()
-          ->virtualHost()
-          .csrfPolicy();
-
-  EXPECT_EQ(csrf_policy->enabled(), false);
-  EXPECT_EQ(csrf_policy->shadowEnabled(), true);
-}
-
-TEST_F(RoutePropertyTest, TestRouteCsrfConfig) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: "default"
-    domains: ["*"]
-    routes:
-      - match:
-          prefix: "/api"
-        route:
-          cluster: "ats"
-          csrf:
-            filter_enabled:
-              runtime_key: "csrf.www.enabled"
-              default_value:
-                numerator: 0
-                denominator: "HUNDRED"
-            shadow_enabled:
-              runtime_key: "csrf.www.shadow_enabled"
-              default_value:
-                numerator: 100
-                denominator: "HUNDRED"
-)EOF";
-
-  Runtime::MockSnapshot snapshot;
-  EXPECT_CALL(snapshot,
-              featureEnabled("csrf.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillOnce(Return(false));
-  EXPECT_CALL(snapshot, featureEnabled("csrf.www.shadow_enabled",
-                                       Matcher<const envoy::type::FractionalPercent&>(_)))
-      .WillOnce(Return(true));
-  EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
-
-  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, false);
-
-  const Router::CsrfPolicy* csrf_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->csrfPolicy();
-
-  EXPECT_EQ(csrf_policy->enabled(), false);
-  EXPECT_EQ(csrf_policy->shadowEnabled(), true);
-}
-
-TEST_F(RoutePropertyTest, TestBadCsrfConfig) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: default
-  domains:
-  - "*"
-  routes:
-  - match:
-      prefix: "/api"
-    route:
-      cluster: ats
-      csrf:
-        filter_enabled: true
-)EOF";
-
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
 }
 
 TEST_F(RouteMatcherTest, Decorator) {

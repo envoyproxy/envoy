@@ -142,24 +142,6 @@ public:
 };
 
 /**
- * CsrfPolicy for Route and VirtualHost.
- */
-class CsrfPolicy {
-public:
-  virtual ~CsrfPolicy() {}
-
-  /**
-   * @return bool Whether CSRF is enabled for the route or virtual host.
-   */
-  virtual bool enabled() const PURE;
-
-  /**
-   * @return bool Whether CSRF policies are evaluated when filter is off.
-   */
-  virtual bool shadowEnabled() const PURE;
-};
-
-/**
  * Route level retry policy.
  */
 class RetryPolicy {
@@ -372,11 +354,6 @@ public:
   virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
-   * @return const CsrfPolicy* the CSRF policy for this virtual host.
-   */
-  virtual const CsrfPolicy* csrfPolicy() const PURE;
-
-  /**
    * @return const std::string& the name of the virtual host.
    */
   virtual const std::string& name() const PURE;
@@ -570,11 +547,6 @@ public:
    * @return const CorsPolicy* the CORS policy for this virtual host.
    */
   virtual const CorsPolicy* corsPolicy() const PURE;
-
-  /**
-   * @return const CsrfPolicy* the CSRF policy for this virtual host.
-   */
-  virtual const CsrfPolicy* csrfPolicy() const PURE;
 
   /**
    * Do potentially destructive header transforms on request headers prior to forwarding. For

@@ -3,34 +3,28 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
-#include "common/common/enum_to_int.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+
+#include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Csrf {
 
-CsrfFilterConfig::CsrfFilterConfig(const std::string& stats_prefix, Stats::Scope& scope)
-    : stats_(generateStats(stats_prefix + "csrf.", scope)) {}
+CsrfFilterConfig::CsrfFilterConfig(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
+                                   const std::string& stats_prefix, Stats::Scope& scope,
+                                   Runtime::Loader& runtime)
+    : stats_(generateStats(stats_prefix, scope)), policy_(generatePolicy(policy, runtime)) {}
 
-CsrfFilter::CsrfFilter(CsrfFilterConfigSharedPtr config)
-    : policies_({{nullptr, nullptr}}), config_(std::move(config)) {}
+CsrfFilter::CsrfFilter(const CsrfFilterConfigSharedPtr config) : config_(config) {}
 
 Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
-  if (decoder_callbacks_->route() == nullptr ||
-      decoder_callbacks_->route()->routeEntry() == nullptr) {
-    return Http::FilterHeadersStatus::Continue;
-  }
+  determinePolicy();
 
-  policies_ = {{
-      decoder_callbacks_->route()->routeEntry()->csrfPolicy(),
-      decoder_callbacks_->route()->routeEntry()->virtualHost().csrfPolicy(),
-  }};
-
-  if (!enabled() && !shadowEnabled()) {
+  if (!policy_->enabled() && !policy_->shadowEnabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -38,30 +32,29 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  bool is_valid = true;
+  bool isValid = true;
   const auto& sourceOrigin = sourceOriginValue(headers);
   if (sourceOrigin == EMPTY_STRING) {
-    is_valid = false;
+    isValid = false;
     config_->stats().missing_source_origin_.inc();
   }
 
   const auto& targetOrigin = targetOriginValue(headers);
   if (sourceOrigin != targetOrigin) {
-    is_valid = false;
+    isValid = false;
     config_->stats().request_invalid_.inc();
   }
 
-  if (is_valid == true) {
+  if (isValid == true) {
     config_->stats().request_valid_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (shadowEnabled() && !enabled()) {
+  if (policy_->shadowEnabled() && !policy_->enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  decoder_callbacks_->sendLocalReply(Http::Code::Forbidden, "Invalid origin", nullptr,
-                                     absl::nullopt);
+  callbacks_->sendLocalReply(Http::Code::Forbidden, "Invalid origin", nullptr, absl::nullopt);
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -99,22 +92,20 @@ absl::string_view CsrfFilter::hostAndPort(const Http::HeaderEntry* header) {
   return EMPTY_STRING;
 }
 
-bool CsrfFilter::shadowEnabled() {
-  for (const auto policy : policies_) {
-    if (policy) {
-      return policy->shadowEnabled();
-    }
-  }
-  return false;
-}
+void CsrfFilter::determinePolicy() {
+  // Prioritize global config first.
+  policy_ = config_->policy();
+  // If the route has a policy use that.
+  if (callbacks_->route() && callbacks_->route()->routeEntry()) {
+    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Csrf;
+    const auto* route_entry = callbacks_->route()->routeEntry();
 
-bool CsrfFilter::enabled() {
-  for (const auto policy : policies_) {
-    if (policy) {
-      return policy->enabled();
-    }
+    const CsrfPolicy* route_policy = route_entry->perFilterConfigTyped<CsrfPolicy>(name);
+    const CsrfPolicy* per_route_policy =
+        route_policy ? route_policy
+                     : route_entry->virtualHost().perFilterConfigTyped<CsrfPolicy>(name);
+    policy_ = per_route_policy ? per_route_policy : policy_;
   }
-  return false;
 }
 
 } // namespace Csrf

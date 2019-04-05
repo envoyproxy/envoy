@@ -1,59 +1,52 @@
-#include "test/integration/http_integration.h"
-#include "test/mocks/http/mocks.h"
-#include "test/test_common/utility.h"
-
-#include "gtest/gtest.h"
+#include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
+namespace {
+const std::string CSRF_ENABLED_CONFIG = R"EOF(
+name: envoy.csrf
+config:
+  filter_enabled:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  shadow_enabled:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+)EOF";
 
-class CsrfFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                  public HttpIntegrationTest {
-public:
-  CsrfFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+const std::string CSRF_FILTER_ENABLED_CONFIG = R"EOF(
+name: envoy.csrf
+config:
+  filter_enabled:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+)EOF";
 
-  void initialize() override {
-    config_helper_.addFilter("name: envoy.csrf");
-    config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-            -> void {
-          auto* route_config = hcm.mutable_route_config();
-          auto* virtual_host = route_config->mutable_virtual_hosts(0);
-          {
-            auto* route = virtual_host->mutable_routes(0);
-            route->mutable_match()->set_prefix("/csrf-vhost-config");
-            route->mutable_route()
-                ->mutable_csrf()
-                ->mutable_filter_enabled()
-                ->mutable_default_value()
-                ->set_numerator(100);
-          }
+const std::string CSRF_SHADOW_ENABLED_CONFIG = R"EOF(
+name: envoy.csrf
+config:
+  filter_enabled:
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+  shadow_enabled:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+)EOF";
 
-          {
-            auto* route = virtual_host->add_routes();
-            route->mutable_match()->set_prefix("/no-csrf");
-            route->mutable_route()->set_cluster("cluster_0");
-            route->mutable_route()
-                ->mutable_csrf()
-                ->mutable_filter_enabled()
-                ->mutable_default_value()
-                ->set_numerator(0);
-          }
+const std::string CSRF_DISABLED_CONFIG = R"EOF(
+name: envoy.csrf
+config:
+  filter_enabled:
+    default_value:
+      numerator: 0
+      denominator: HUNDRED
+)EOF";
 
-          {
-            auto* route = virtual_host->add_routes();
-            route->mutable_match()->set_prefix("/csrf-route-config");
-            route->mutable_route()->set_cluster("cluster_0");
-            route->mutable_route()
-                ->mutable_csrf()
-                ->mutable_filter_enabled()
-                ->mutable_default_value()
-                ->set_numerator(100);
-          }
-        });
-    HttpIntegrationTest::initialize();
-  }
-
+class CsrfFilterIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
   void testNormalRequest(Http::TestHeaderMapImpl&& request_headers,
                          const char* expected_response_code) {
@@ -80,99 +73,128 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, CsrfFilterIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, CsrfFilterIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(CsrfFilterIntegrationTest, TestVHostConfigSuccess) {
+TEST_P(CsrfFilterIntegrationTest, TestCsrfSuccess) {
+  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "PUT"},
-          {":path", "/csrf-vhost-config/test"},
+          {":path", "/"},
+          {":scheme", "http"},
           {"origin", "localhost"},
           {"host", "localhost"},
       },
       "200");
 }
 
-TEST_P(CsrfFilterIntegrationTest, TestRouteConfigSuccess) {
-  testNormalRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "PUT"},
-          {":path", "/csrf-route-config/test"},
-          {"origin", "https://192.168.99.100:8000"},
-          {"host", "192.168.99.100:8000"},
-      },
-      "200");
-}
-
 TEST_P(CsrfFilterIntegrationTest, TestCsrfDisabled) {
+  config_helper_.addFilter(CSRF_DISABLED_CONFIG);
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "PUT"},
-          {":path", "/no-csrf/test"},
+          {":path", "/"},
+          {":scheme", "http"},
           {"origin", "cross-origin"},
           {"host", "test-origin"},
       },
       "200");
 }
 
-TEST_P(CsrfFilterIntegrationTest, TestRouteConfigNonMutationMethod) {
+TEST_P(CsrfFilterIntegrationTest, TestNonMutationMethod) {
+  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "GET"},
-          {":path", "/csrf-route-config/test"},
+          {":path", "/"},
+          {":scheme", "http"},
           {"origin", "cross-origin"},
           {"host", "test-origin"},
       },
       "200");
 }
 
-TEST_P(CsrfFilterIntegrationTest, TestRouteConfigOriginMismatch) {
+TEST_P(CsrfFilterIntegrationTest, TestOriginMismatch) {
+  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
   testInvalidRequest(
       Http::TestHeaderMapImpl{
           {":method", "PUT"},
-          {":path", "/csrf-route-config/test"},
+          {":path", "/"},
+          {":scheme", "http"},
           {"origin", "cross-origin"},
           {"host", "test-origin"},
       },
       "403");
 }
 
-TEST_P(CsrfFilterIntegrationTest, TestRouteConfigEnforcesPost) {
+TEST_P(CsrfFilterIntegrationTest, TestEnforcesPost) {
+  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
   testInvalidRequest(
       Http::TestHeaderMapImpl{
           {":method", "POST"},
-          {":path", "/csrf-route-config/test"},
+          {":path", "/"},
+          {":scheme", "http"},
           {"origin", "cross-origin"},
           {"host", "test-origin"},
       },
       "403");
 }
 
-TEST_P(CsrfFilterIntegrationTest, TestRouteConfigEnforcesDelete) {
+TEST_P(CsrfFilterIntegrationTest, TestEnforcesDelete) {
+  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
   testInvalidRequest(
       Http::TestHeaderMapImpl{
           {":method", "DELETE"},
-          {":path", "/csrf-route-config/test"},
+          {":path", "/"},
+          {":scheme", "http"},
           {"origin", "cross-origin"},
           {"host", "test-origin"},
       },
       "403");
 }
 
-TEST_P(CsrfFilterIntegrationTest, TestRouteConfigRefererFallback) {
+TEST_P(CsrfFilterIntegrationTest, TestRefererFallback) {
+  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
   testNormalRequest(Http::TestHeaderMapImpl{{":method", "DELETE"},
-                                            {":path", "/csrf-route-config/test"},
+                                            {":path", "/"},
+                                            {":scheme", "http"},
                                             {"referer", "test-origin"},
                                             {"host", "test-origin"}},
                     "200");
 }
 
-TEST_P(CsrfFilterIntegrationTest, TestRouteConfigMissingOrigin) {
-  testInvalidRequest(Http::TestHeaderMapImpl{{":method", "DELETE"},
-                                             {":path", "/csrf-route-config/test"},
-                                             {"host", "test-origin"}},
-                     "403");
+TEST_P(CsrfFilterIntegrationTest, TestMissingOrigin) {
+  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  testInvalidRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "DELETE"}, {":path", "/"}, {":scheme", "http"}, {"host", "test-origin"}},
+      "403");
 }
+TEST_P(CsrfFilterIntegrationTest, TestShadowOnlyMode) {
+  config_helper_.addFilter(CSRF_SHADOW_ENABLED_CONFIG);
+  testNormalRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "PUT"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {"origin", "cross-origin"},
+          {"host", "localhost"},
+      },
+      "200");
+}
+TEST_P(CsrfFilterIntegrationTest, TestFilterAndShadowEnabled) {
+  config_helper_.addFilter(CSRF_ENABLED_CONFIG);
+  testInvalidRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "PUT"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {"origin", "cross-origin"},
+          {"host", "localhost"},
+      },
+      "403");
+}
+} // namespace
 } // namespace Envoy
