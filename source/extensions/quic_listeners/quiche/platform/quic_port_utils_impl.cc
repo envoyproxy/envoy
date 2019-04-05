@@ -24,7 +24,6 @@ int QuicPickUnusedPortOrDieImpl() {
     uint32_t port = 0;
     bool available = true;
     for (auto ip_version : supported_versions) {
-      std::cerr << "get or verify port " << port << "\n";
       auto addr_port = Envoy::Network::Utility::parseInternetAddressAndPort(
           fmt::format("{}:{}", Envoy::Network::Test::getAnyAddressUrlString(ip_version), port),
           /*v6only*/ false);
