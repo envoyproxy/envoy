@@ -10,6 +10,7 @@
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -29,11 +30,11 @@ using testing::Return;
 namespace Envoy {
 namespace Config {
 
-typedef HttpSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> HttpEdsSubscriptionImpl;
-
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  HttpSubscriptionTestHarness()
+  HttpSubscriptionTestHarness() : HttpSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
+
+  HttpSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
@@ -43,9 +44,9 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_ = std::make_unique<HttpEdsSubscriptionImpl>(
+    subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_, stats_);
+        std::chrono::milliseconds(1000), *method_descriptor_, stats_, init_fetch_timeout);
   }
 
   ~HttpSubscriptionTestHarness() {
@@ -112,16 +113,11 @@ public:
     response_json.pop_back();
     response_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(response_json, &response_pb).ok());
+    MessageUtil::loadFromJson(response_json, response_pb);
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
-    EXPECT_CALL(callbacks_,
-                onConfigUpdate(
-                    RepeatedProtoEq(
-                        Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                            response_pb)),
-                    version))
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (!accept) {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
@@ -135,6 +131,21 @@ public:
     request_in_progress_ = false;
     timerTick();
   }
+
+  void expectConfigUpdateFailed() override {
+    EXPECT_CALL(callbacks_, onConfigUpdateFailed(nullptr));
+  }
+
+  void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) override {
+    init_timeout_timer_ = new Event::MockTimer(&dispatcher_);
+    EXPECT_CALL(*init_timeout_timer_, enableTimer(std::chrono::milliseconds(timeout)));
+  }
+
+  void expectDisableInitFetchTimeoutTimer() override {
+    EXPECT_CALL(*init_timeout_timer_, disableTimer());
+  }
+
+  void callInitFetchTimeoutCb() override { init_timeout_timer_->callback_(); }
 
   void timerTick() {
     expectSendMessage(cluster_names_, version_);
@@ -154,8 +165,9 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;
+  std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  Event::MockTimer* init_timeout_timer_;
 };
 
 } // namespace Config

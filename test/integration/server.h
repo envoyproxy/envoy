@@ -75,26 +75,39 @@ public:
     wrapped_scope_->deliverHistogramToSinks(histogram, value);
   }
 
+  Counter& counterFromStatName(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->counterFromStatName(name);
+  }
+
+  Gauge& gaugeFromStatName(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->gaugeFromStatName(name);
+  }
+
+  Histogram& histogramFromStatName(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->histogramFromStatName(name);
+  }
+  NullGaugeImpl& nullGauge(const std::string& str) override {
+    return wrapped_scope_->nullGauge(str);
+  }
+
   Counter& counter(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->counter(name);
+    StatNameTempStorage storage(name, symbolTable());
+    return counterFromStatName(storage.statName());
   }
-
   Gauge& gauge(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->gauge(name);
+    StatNameTempStorage storage(name, symbolTable());
+    return gaugeFromStatName(storage.statName());
   }
-
-  BoolIndicator& boolIndicator(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->boolIndicator(name);
-  }
-
   Histogram& histogram(const std::string& name) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->histogram(name);
+    StatNameTempStorage storage(name, symbolTable());
+    return histogramFromStatName(storage.statName());
   }
 
+  const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
+  SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
   const StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
@@ -111,6 +124,10 @@ class TestIsolatedStoreImpl : public StoreRoot {
 public:
   TestIsolatedStoreImpl() : source_(*this) {}
   // Stats::Scope
+  Counter& counterFromStatName(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return store_.counterFromStatName(name);
+  }
   Counter& counter(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counter(name);
@@ -120,19 +137,26 @@ public:
     return ScopePtr{new TestScopeWrapper(lock_, store_.createScope(name))};
   }
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
+  Gauge& gaugeFromStatName(StatName name) override {
+    Thread::LockGuard lock(lock_);
+    return store_.gaugeFromStatName(name);
+  }
   Gauge& gauge(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.gauge(name);
   }
-  BoolIndicator& boolIndicator(const std::string& name) override {
+  Histogram& histogramFromStatName(StatName name) override {
     Thread::LockGuard lock(lock_);
-    return store_.boolIndicator(name);
+    return store_.histogramFromStatName(name);
   }
+  NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
   const StatsOptions& statsOptions() const override { return stats_options_; }
+  const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
+  SymbolTable& symbolTable() override { return store_.symbolTable(); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override {
@@ -143,10 +167,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.gauges();
   }
-  std::vector<BoolIndicatorSharedPtr> boolIndicators() const override {
-    Thread::LockGuard lock(lock_);
-    return store_.boolIndicators();
-  }
+
   std::vector<ParentHistogramSharedPtr> histograms() const override {
     Thread::LockGuard lock(lock_);
     return store_.histograms();
@@ -197,20 +218,16 @@ public:
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
-    on_worker_listener_added_cb_ = on_worker_listener_added;
+    on_worker_listener_added_cb_ = std::move(on_worker_listener_added);
   }
   void setOnWorkerListenerRemovedCb(std::function<void()> on_worker_listener_removed) {
-    on_worker_listener_removed_cb_ = on_worker_listener_removed;
+    on_worker_listener_removed_cb_ = std::move(on_worker_listener_removed);
   }
+  void onRuntimeCreated() override;
+
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization);
-
-  void waitForBoolIndicatorEq(const std::string& name, uint64_t value) {
-    while (boolIndicator(name) == nullptr || boolIndicator(name)->value() != value) {
-      time_system_.sleep(std::chrono::milliseconds(10));
-    }
-  }
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
@@ -228,12 +245,6 @@ public:
     while (gauge(name) == nullptr || gauge(name)->value() != value) {
       time_system_.sleep(std::chrono::milliseconds(10));
     }
-  }
-
-  Stats::BoolIndicatorSharedPtr boolIndicator(const std::string& name) {
-    // When using the thread local store, only boolIndicators() is thread safe. This also allows us
-    // to test if an indicator exists at all versus just defaulting to false.
-    return TestUtility::findBoolIndicator(stat_store(), name);
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {

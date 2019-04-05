@@ -77,7 +77,7 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
   // Replace the original host, scheme and path.
   downstream_headers.insertScheme().value(std::string(absolute_url.scheme()));
   downstream_headers.insertHost().value(std::string(absolute_url.host_and_port()));
-  downstream_headers.insertPath().value(std::string(absolute_url.path()));
+  downstream_headers.insertPath().value(std::string(absolute_url.path_and_query_params()));
 
   return true;
 }
@@ -974,7 +974,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
         parent.timeSource().systemTime());
-    span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
+    span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());

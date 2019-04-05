@@ -34,13 +34,12 @@
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
+#include "common/init/manager_impl.h"
 #include "common/network/utility.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
-
-#include "server/init_manager_impl.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -304,7 +303,8 @@ public:
     return *degraded_hosts_per_locality_;
   }
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
-  absl::optional<uint32_t> chooseLocality() override;
+  absl::optional<uint32_t> chooseHealthyLocality() override;
+  absl::optional<uint32_t> chooseDegradedLocality() override;
   uint32_t priority() const override { return priority_; }
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
 
@@ -387,8 +387,10 @@ private:
       HostsPerLocalityConstSharedPtr all_hosts_per_locality,
       LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
 
-  std::vector<std::shared_ptr<LocalityEntry>> locality_entries_;
-  std::unique_ptr<EdfScheduler<LocalityEntry>> locality_scheduler_;
+  static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
+
+  std::vector<std::shared_ptr<LocalityEntry>> healthy_locality_entries_;
+  std::unique_ptr<EdfScheduler<LocalityEntry>> healthy_locality_scheduler_;
   std::vector<std::shared_ptr<LocalityEntry>> degraded_locality_entries_;
   std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
 };
@@ -490,7 +492,8 @@ public:
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
   static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
-                                                                  const std::string& stat_prefix);
+                                                                  const std::string& stat_prefix,
+                                                                  bool track_remaining);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
@@ -669,8 +672,16 @@ protected:
    */
   void onInitDone();
 
+  // This init manager is shared via TransportSocketFactoryContext. The initialization targets that
+  // register with this init manager are expected to be for implementations of SdsApi (see
+  // SdsApi::init_target_).
+  Init::ManagerImpl init_manager_;
+
+  // Once all targets are initialized (i.e. once all dynamic secrets are loaded), this watcher calls
+  // onInitDone() above.
+  Init::WatcherImpl init_watcher_;
+
   Runtime::Loader& runtime_;
-  Server::InitManagerImpl init_manager_;
   ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;

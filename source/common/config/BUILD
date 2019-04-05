@@ -391,11 +391,12 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/config:config_provider_interface",
         "//include/envoy/config:config_provider_manager_interface",
-        "//include/envoy/init:init_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:config_tracker_interface",
         "//include/envoy/singleton:instance_interface",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/init:target_lib",
         "//source/common/protobuf",
     ],
 )

@@ -27,19 +27,19 @@ namespace Config {
  * canonical representation of DiscoveryResponse. This implementation is responsible for translating
  * between the proto serializable objects in the Subscription API and the REST JSON representation.
  */
-template <class ResourceType>
 class HttpSubscriptionImpl : public Http::RestApiFetcher,
-                             public Config::Subscription<ResourceType>,
+                             public Config::Subscription,
                              Logger::Loggable<Logger::Id::config> {
 public:
   HttpSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Upstream::ClusterManager& cm,
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
                        std::chrono::milliseconds request_timeout,
-                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
+                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats,
+                       std::chrono::milliseconds init_fetch_timeout)
       : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
                              request_timeout),
-        stats_(stats) {
+        stats_(stats), dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout) {
     request_.mutable_node()->CopyFrom(local_info.node());
     ASSERT(service_method.options().HasExtension(google::api::http));
     const auto& http_rule = service_method.options().GetExtension(google::api::http);
@@ -49,8 +49,17 @@ public:
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
-             Config::SubscriptionCallbacks<ResourceType>& callbacks) override {
+             Config::SubscriptionCallbacks& callbacks) override {
     ASSERT(callbacks_ == nullptr);
+
+    if (init_fetch_timeout_.count() > 0) {
+      init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
+        ENVOY_LOG(warn, "REST config: initial fetch timed out for", path_);
+        callbacks_->onConfigUpdateFailed(nullptr);
+      });
+      init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
+    }
+
     Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(resources.begin(),
                                                                        resources.end());
     request_.mutable_resource_names()->Swap(&resources_vector);
@@ -78,16 +87,17 @@ public:
   }
 
   void parseResponse(const Http::Message& response) override {
+    disableInitFetchTimeoutTimer();
     envoy::api::v2::DiscoveryResponse message;
-    const auto status = Protobuf::util::JsonStringToMessage(response.bodyAsString(), &message);
-    if (!status.ok()) {
-      ENVOY_LOG(warn, "REST config JSON conversion error: {}", status.ToString());
+    try {
+      MessageUtil::loadFromJson(response.bodyAsString(), message);
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG(warn, "REST config JSON conversion error: {}", e.what());
       handleFailure(nullptr);
       return;
     }
-    const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
     try {
-      callbacks_->onConfigUpdate(typed_resources, message.version_info());
+      callbacks_->onConfigUpdate(message.resources(), message.version_info());
       request_.set_version_info(message.version_info());
       stats_.version_.set(HashUtil::xxHash64(request_.version_info()));
       stats_.update_success_.inc();
@@ -101,6 +111,7 @@ public:
   void onFetchComplete() override {}
 
   void onFetchFailure(const EnvoyException* e) override {
+    disableInitFetchTimeoutTimer();
     ENVOY_LOG(warn, "REST config update failed: {}", e != nullptr ? e->what() : "fetch failure");
     handleFailure(e);
   }
@@ -111,11 +122,21 @@ private:
     callbacks_->onConfigUpdateFailed(e);
   }
 
+  void disableInitFetchTimeoutTimer() {
+    if (init_fetch_timeout_timer_) {
+      init_fetch_timeout_timer_->disableTimer();
+      init_fetch_timeout_timer_.reset();
+    }
+  }
+
   std::string path_;
   Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_;
-  Config::SubscriptionCallbacks<ResourceType>* callbacks_{};
+  Config::SubscriptionCallbacks* callbacks_{};
   envoy::api::v2::DiscoveryRequest request_;
   SubscriptionStats stats_;
+  Event::Dispatcher& dispatcher_;
+  std::chrono::milliseconds init_fetch_timeout_;
+  Event::TimerPtr init_fetch_timeout_timer_;
 };
 
 } // namespace Config

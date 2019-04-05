@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -13,6 +14,16 @@ exports_files(["filesystem_setup.sh"])
 filegroup(
     name = "filesystem_test_data",
     srcs = glob(["test_data/**"]),
+)
+
+envoy_cc_test_library(
+    name = "utility_lib",
+    hdrs = [
+        "utility.h",
+    ],
+    deps = [
+        "//source/common/runtime:runtime_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -28,6 +39,18 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "runtime_flag_override_test",
+    srcs = ["runtime_flag_override_test.cc"],
+    args = [
+        "--runtime-feature-override-for-tests=envoy.reloadable_features.test_feature_false",
+    ],
+    coverage = False,
+    deps = [
+        "//source/common/runtime:runtime_lib",
     ],
 )
 

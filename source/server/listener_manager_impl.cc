@@ -168,6 +168,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), modifiable_(modifiable),
       workers_started_(workers_started), hash_(hash),
       dynamic_init_manager_(fmt::format("Listener {}", name)),
+      init_watcher_(std::make_unique<Init::WatcherImpl>(
+          "ListenerImpl", [this] { parent_.onListenerWarmed(*this); })),
       local_drain_manager_(parent.factory_.createDrainManager(config.drain_type())),
       config_(config), version_info_(version_info),
       listener_filters_timeout_(
@@ -317,9 +319,9 @@ ListenerImpl::~ListenerImpl() {
   // The filter factories may have pending initialize actions (like in the case of RDS). Those
   // actions will fire in the destructor to avoid blocking initial server startup. If we are using
   // a local init manager we should block the notification from trying to move us from warming to
-  // active. This is done here explicitly by setting a boolean and then clearing the factory
+  // active. This is done here explicitly by resetting the watcher and then clearing the factory
   // vector for clarity.
-  initialize_canceled_ = true;
+  init_watcher_.reset();
   destination_ports_map_.clear();
 }
 
@@ -629,13 +631,9 @@ void ListenerImpl::initialize() {
   last_updated_ = timeSource().systemTime();
   // If workers have already started, we shift from using the global init manager to using a local
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
-  // with initialize_canceled_.
+  // by resetting the watcher.
   if (workers_started_) {
-    dynamic_init_manager_.initialize([this]() -> void {
-      if (!initialize_canceled_) {
-        parent_.onListenerWarmed(*this);
-      }
-    });
+    dynamic_init_manager_.initialize(*init_watcher_);
   }
 }
 

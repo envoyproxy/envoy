@@ -45,6 +45,7 @@ correspondence between an xDS API and a resource type. That is:
 
 * [LDS: `envoy.api.v2.Listener`](envoy/api/v2/lds.proto)
 * [RDS: `envoy.api.v2.RouteConfiguration`](envoy/api/v2/rds.proto)
+* [VHDS: `envoy.api.v2.Vhds`](envoy/api/v2/rds.proto)
 * [CDS: `envoy.api.v2.Cluster`](envoy/api/v2/cds.proto)
 * [EDS: `envoy.api.v2.ClusterLoadAssignment`](envoy/api/v2/eds.proto)
 * [SDS: `envoy.api.v2.Auth.Secret`](envoy/api/v2/auth/cert.proto)
@@ -151,7 +152,7 @@ For EDS/RDS, the management server does not need to supply every requested
 resource and may also supply additional, unrequested resources. `resource_names`
 is only a hint. Envoy will silently ignore any superfluous resources. When a
 requested resource is missing in a RDS or EDS update, Envoy will retain the last
-known value for this resource except in the case where the `Cluster` or `Listener` 
+known value for this resource except in the case where the `Cluster` or `Listener`
 is being warmed. See [Resource warming](#resource-warming) section below on the expectations
 during warming. The management server may be able to infer all
 the required EDS/RDS resources from the `node` identification in the
@@ -213,13 +214,13 @@ expect a `DiscoveryResponse` for every `DiscoveryRequest` it issues.
 
 ### Resource warming
 
-[`Clusters`](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/cluster_manager.html#cluster-warming) 
+[`Clusters`](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/cluster_manager.html#cluster-warming)
 and [`Listeners`](https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/lds#config-listeners-lds)
-go through  `warming` before they can serve requests. This process happens both during 
-[`Envoy initialization`](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/init.html#initialization) 
-and when the `Cluster` or `Listener` is updated. Warming of `Cluster` is completed only when a 
+go through  `warming` before they can serve requests. This process happens both during
+[`Envoy initialization`](https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/init.html#initialization)
+and when the `Cluster` or `Listener` is updated. Warming of `Cluster` is completed only when a
 `ClusterLoadAssignment` response is supplied by management server. Similarly, warming of `Listener`
-is completed only when a `RouteConfiguration` is supplied by management server if the listener 
+is completed only when a `RouteConfiguration` is supplied by management server if the listener
 refers to an RDS configuration. Management server is expected to provide the EDS/RDS updates during
 warming. If management server does not provide EDS/RDS responses, Envoy will not initialize
 itself during the initialization phase and the updates sent via CDS/LDS will not take effect until
@@ -245,7 +246,8 @@ In general, to avoid traffic drop, sequencing of updates should follow a
 * CDS updates (if any) must always be pushed first.
 * EDS updates (if any) must arrive after CDS updates for the respective clusters.
 * LDS updates must arrive after corresponding CDS/EDS updates.
-* RDS updates related to the newly added listeners must arrive in the end.
+* RDS updates related to the newly added listeners must arrive after CDS/EDS/LDS updates.
+* VHDS updates (if any) related to the newly added RouteConfigurations must arrive after RDS updates.
 * Stale CDS clusters and related EDS endpoints (ones no longer being
   referenced) can then be removed.
 
@@ -297,6 +299,11 @@ static_resources:
         port_value: <ADS management server port>
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {}
+    upstream_connection_options:
+      # configure a TCP keep-alive to detect and reconnect to the admin
+      # server in the event of a TCP socket disconnection
+      tcp_keepalive:
+        ...
 admin:
   ...
 
@@ -344,6 +351,24 @@ On reconnect the Incremental xDS client may tell the server of its known
 resources to avoid resending them over the network.
 
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
+
+#### Resource names
+Resources are identified by a resource name or an alias. Aliases of a resource, if present, can be
+identified by the alias field in the resource of a `DeltaDiscoveryResponse`. The resource name will
+be returned in the name field in the resource of a `DeltaDiscoveryResponse`.
+
+#### Subscribing to Resources
+Envoy can send either an alias or the name of a resource in the `resource_names_subscribe` field of
+a `DeltaDiscoveryRequest` in order to subscribe to a resource. Envoy should check both the names and
+aliases of resources in order to determine whether the entity in question has been subscribed to.
+
+#### Unsubscribing from Resources
+Envoy will keep track of a per resource reference count internally. This count will keep track of the
+total number of aliases/resource names that are currently subscribed to. When the reference count
+reaches zero, Envoy will send a `DeltaDiscoveryRequest` containing the resource name of the resource
+to unsubscribe from in the `resource_names_unsubscribe` field. When Envoy unsubscribes from a resource,
+it should check for both the resource name and all aliases and appropriately update all resources
+that reference either.
 
 ## REST-JSON polling subscriptions
 
