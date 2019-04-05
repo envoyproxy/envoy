@@ -1,8 +1,11 @@
 Version history
 ---------------
 
-1.10.0 (pending)
+1.11.0 (Pending)
 ================
+
+1.10.0 (Apr 5, 2019)
+====================
 * access log: added a new flag for upstream retry count exceeded.
 * access log: added a :ref:`gRPC filter <envoy_api_msg_config.filter.accesslog.v2.GrpcStatusFilter>` to allow filtering on gRPC status.
 * access log: added a new flag for stream idle timeout.
@@ -10,6 +13,7 @@ Version history
   :ref:`gRPC access logger<envoy_api_field_data.accesslog.v2.AccessLogCommon.upstream_transport_failure_reason>` for HTTP access logs.
 * access log: added new fields for downstream x509 information (URI sans and subject) to file and gRPC access logger.
 * admin: the admin server can now be accessed via HTTP/2 (prior knowledge).
+* admin: changed HTTP response status code from 400 to 405 when attempting to GET a POST-only route (such as /quitquitquit).
 * buffer: fix vulnerabilities when allocation fails.
 * build: releases are built with GCC-7 and linked with LLD.
 * build: dev docker images :ref:`have been split <install_binaries>` from tagged images for easier
@@ -24,8 +28,10 @@ Version history
 * config: use Envoy cpuset size to set the default number or worker threads if :option:`--cpuset-threads` is enabled.
 * config: added support for :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`. The timeout is disabled by default.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
-* ext_authz: added an configurable option to make the gRPC service cross-compatible with V2Alpha. Note that this feature is already deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
-* ext_authz: migrated from V2alpha to V2 and improved the documentation.
+* ext_authz: added support for buffering request body.
+* ext_authz: migrated from v2alpha to v2 and improved docs.
+* ext_authz: added a configurable option to make the gRPC service cross-compatible with V2Alpha. Note that this feature is already deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
+* ext_authz: migrated from v2alpha to v2 and improved the documentation.
 * ext_authz: authorization request and response configuration has been separated into two distinct objects: :ref:`authorization request
   <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.authorization_request>` and :ref:`authorization response
   <envoy_api_field_config.filter.http.ext_authz.v2.HttpService.authorization_response>`. In addition, :ref:`client headers
@@ -54,7 +60,6 @@ Version history
 * ratelimit: removed deprecated rate limit configuration from bootstrap.
 * redis: added :ref:`hashtagging <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_hashtagging>` to guarantee a given key's upstream.
 * redis: added :ref:`latency stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
-* redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
 * redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * redis: migrate hash function for host selection to `MurmurHash2 <https://sites.google.com/site/murmurhash>`_ from std::hash. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 * redis: added :ref:`latency_in_micros <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.latency_in_micros>` to specify the redis commands stats time unit in microseconds.
@@ -67,6 +72,9 @@ Version history
 * server: stats are now preserved across hot restart by being explicitly communicated through the hot
           restart protocol, rather than living in shared memory.
 * server: hot restart version incremented to 11.
+* router: removed deprecated route-action level headers_to_add/remove.
+* router: made :ref: `max retries header <config_http_filters_router_x-envoy-max-retries>` take precedence over the number of retries in route and virtual host retry policies.
+* router: added support for prefix wildcards in :ref:`virtual host domains<envoy_api_field_route.VirtualHost.domains>`
 * stats: added support for histograms in prometheus
 * stats: added usedonly flag to prometheus stats to only output metrics which have been
   updated at least once.
@@ -81,9 +89,17 @@ Version history
 * tracing: added :ref:`verbose <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` to support logging annotations on spans.
 * upstream: added support for host weighting and :ref:`locality weighting <arch_overview_load_balancing_locality_weighted_lb>` in the :ref:`ring hash load balancer <arch_overview_load_balancing_types_ring_hash>`, and added a :ref:`maximum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.maximum_ring_size>` config parameter to strictly bound the ring size.
 * zookeeper: added a ZooKeeper proxy filter that parses ZooKeeper messages (requests/responses/events).
-  Refer to ::ref:`ZooKeeper proxy<config_network_filters_zookeeper_proxy>` for more details.
+  Refer to :ref:`ZooKeeper proxy<config_network_filters_zookeeper_proxy>` for more details.
 * upstream: added configuration option to select any host when the fallback policy fails.
 * upstream: stopped incrementing upstream_rq_total for HTTP/1 conn pool when request is circuit broken.
+
+1.9.1 (Apr 2, 2019)
+===================
+* http: fixed CVE-2019-9900 by rejecting HTTP/1.x headers with embedded NUL characters.
+* http: fixed CVE-2019-9901 by normalizing HTTP paths prior to routing or L7 data plane processing.
+  This defaults off and is configurable via either HTTP connection manager :ref:`normalize_path
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.normalize_path>`
+  or the :ref:`runtime <config_http_conn_man_runtime_normalize_path>`.
 
 1.9.0 (Dec 20, 2018)
 ====================

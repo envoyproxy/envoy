@@ -24,9 +24,6 @@ using testing::Return;
 namespace Envoy {
 namespace Config {
 
-typedef FilesystemSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment>
-    FilesystemEdsSubscriptionImpl;
-
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   FilesystemSubscriptionTestHarness()
@@ -78,12 +75,7 @@ public:
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
     MessageUtil::loadFromJson(file_json, response_pb);
-    EXPECT_CALL(callbacks_,
-                onConfigUpdate(
-                    RepeatedProtoEq(
-                        Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                            response_pb)),
-                    version))
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       version_ = version;
@@ -123,7 +115,7 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
-  FilesystemEdsSubscriptionImpl subscription_;
+  FilesystemSubscriptionImpl subscription_;
   bool file_at_start_{false};
 };
 

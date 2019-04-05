@@ -16,20 +16,18 @@ namespace Config {
 /**
  * Adapter from typed Subscription to untyped GrpcMux. Also handles per-xDS API stats/logging.
  */
-template <class ResourceType>
-class GrpcMuxSubscriptionImpl : public Subscription<ResourceType>,
+class GrpcMuxSubscriptionImpl : public Subscription,
                                 GrpcMuxCallbacks,
                                 Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux, SubscriptionStats stats, Event::Dispatcher& dispatcher,
+  GrpcMuxSubscriptionImpl(GrpcMux& grpc_mux, SubscriptionStats stats, absl::string_view type_url,
+                          Event::Dispatcher& dispatcher,
                           std::chrono::milliseconds init_fetch_timeout)
-      : grpc_mux_(grpc_mux), stats_(stats),
-        type_url_(Grpc::Common::typeUrl(ResourceType().GetDescriptor()->full_name())),
-        dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout) {}
+      : grpc_mux_(grpc_mux), stats_(stats), type_url_(type_url), dispatcher_(dispatcher),
+        init_fetch_timeout_(init_fetch_timeout) {}
 
   // Config::Subscription
-  void start(const std::vector<std::string>& resources,
-             SubscriptionCallbacks<ResourceType>& callbacks) override {
+  void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
     callbacks_ = &callbacks;
 
     if (init_fetch_timeout_.count() > 0) {
@@ -56,21 +54,16 @@ public:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override {
     disableInitFetchTimeoutTimer();
-    Protobuf::RepeatedPtrField<ResourceType> typed_resources;
-    std::transform(resources.cbegin(), resources.cend(),
-                   Protobuf::RepeatedPtrFieldBackInserter(&typed_resources),
-                   MessageUtil::anyConvert<ResourceType>);
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we need to
     // supply those versions to onConfigUpdate() along with the xDS response ("system")
     // version_info. This way, both types of versions can be tracked and exposed for debugging by
     // the configuration update targets.
-    callbacks_->onConfigUpdate(typed_resources, version_info);
+    callbacks_->onConfigUpdate(resources, version_info);
     stats_.update_success_.inc();
     stats_.update_attempt_.inc();
     stats_.version_.set(HashUtil::xxHash64(version_info));
     ENVOY_LOG(debug, "gRPC config for {} accepted with {} resources with version {}", type_url_,
               resources.size(), version_info);
-    ENVOY_LOG(trace, "resources: {}", RepeatedPtrUtil::debugString(typed_resources));
   }
 
   void onConfigUpdateFailed(const EnvoyException* e) override {
@@ -102,7 +95,7 @@ private:
   GrpcMux& grpc_mux_;
   SubscriptionStats stats_;
   const std::string type_url_;
-  SubscriptionCallbacks<ResourceType>* callbacks_{};
+  SubscriptionCallbacks* callbacks_{};
   GrpcMuxWatchPtr watch_{};
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;

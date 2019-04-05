@@ -257,6 +257,7 @@ public:
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
+  bool shouldNormalizePath() const override { return normalize_path_; }
 
   DangerousDeprecatedTestTime test_time_;
   RouteConfigProvider route_config_provider_;
@@ -302,6 +303,7 @@ public:
   ConnectionManagerListenerStats listener_stats_;
   bool proxy_100_continue_ = false;
   Http::Http1Settings http1_settings_;
+  bool normalize_path_ = false;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
 
@@ -536,6 +538,115 @@ TEST_F(HttpConnectionManagerImplTest, InvalidPathWithDualFilter) {
       }));
   EXPECT_CALL(*filter, onDestroy());
 
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Invalid paths are rejected with 400.
+TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
+  InSequence s;
+  setup(false, "");
+  // Enable path sanitizer
+  normalize_path_ = true;
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"},
+                              {":path", "/ab%00c"}, // "%00" is not valid in path according to RFC
+                              {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+  }));
+
+  // This test also verifies that decoder/encoder filters have onDestroy() called only once.
+  MockStreamFilter* filter = new MockStreamFilter();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+      }));
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
+
+  EXPECT_CALL(*filter, encodeHeaders(_, true));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_STREQ("400", headers.Status()->value().c_str());
+      }));
+  EXPECT_CALL(*filter, onDestroy());
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Filters observe normalized paths, not the original path, when path
+// normalization is configured.
+TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
+  setup(false, "");
+  // Enable path sanitizer
+  normalize_path_ = true;
+  const std::string original_path = "/x/%2E%2e/z";
+  const std::string normalized_path = "/z";
+
+  MockStreamFilter* filter = new MockStreamFilter();
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
+      }));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillRepeatedly(Invoke([&](HeaderMap& header_map, bool) -> FilterHeadersStatus {
+        EXPECT_EQ(normalized_path, header_map.Path()->value().c_str());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{new TestHeaderMapImpl{
+        {":authority", "host"}, {":path", original_path}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// The router observes normalized paths, not the original path, when path
+// normalization is configured.
+TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
+  setup(false, "");
+  // Enable path sanitizer
+  normalize_path_ = true;
+  const std::string original_path = "/x/%2E%2e/z";
+  const std::string normalized_path = "/z";
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{new TestHeaderMapImpl{
+        {":authority", "host"}, {":path", original_path}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+
+  const std::string fake_cluster_name = "fake_cluster";
+
+  std::shared_ptr<Upstream::MockThreadLocalCluster> fake_cluster =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  std::shared_ptr<Router::MockRoute> route = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(route->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster_name));
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _))
+      .WillOnce(Invoke([&](const Http::HeaderMap& header_map, uint64_t) {
+        EXPECT_EQ(normalized_path, header_map.Path()->value().c_str());
+        return route;
+      }));
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks&) -> void {}));
+
+  // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 }
@@ -3905,6 +4016,5 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false); // kick off request
 }
-
 } // namespace Http
 } // namespace Envoy

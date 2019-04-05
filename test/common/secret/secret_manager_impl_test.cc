@@ -179,9 +179,10 @@ tls_certificate:
   private_key:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
 )EOF";
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
   dynamic_cast<TlsCertificateSdsApi&>(*secret_provider).onConfigUpdate(secret_resources, "");
   Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), *api_);
   const std::string cert_pem =
