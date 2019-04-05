@@ -45,7 +45,7 @@ public:
   void onWriteable() override;
 
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>&
-  grpcStreamTestOnly() {
+  grpcStreamForTest() {
     return grpc_stream_;
   }
 

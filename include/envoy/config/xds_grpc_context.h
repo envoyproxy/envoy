@@ -9,21 +9,6 @@ namespace Envoy {
 namespace Config {
 
 /**
- * Interface to an object that uses a Config::GrpcStream to carry out the xDS protocol.
- * TODO(fredlas) implement delta ADS with this interface. Regular ADS (GrpcMux) should also fit this
-interface. class XdsGrpcContext { public: virtual ~XdsGrpcContext() {} virtual void
-addSubscription(const std::vector<std::string>& resources, const std::string& type_url,
-                               SubscriptionCallbacks& callbacks,
-                               SubscriptionStats stats) PURE;
-  virtual void pauseSubscription(const std::string& type_url) PURE;
-  virtual void resumeSubscription(const std::string& type_url) PURE;
-  virtual void updateResources(const std::vector<std::string>& resources,
-                               const std::string& type_url) PURE;
-  virtual void removeSubscription(const std::string& type_url) PURE;
-};
-*/
-
-/**
  * A grouping of callbacks that an XdsGrpcContext should provide to its GrpcStream.
  */
 template <class ResponseProto> class GrpcStreamCallbacks {
