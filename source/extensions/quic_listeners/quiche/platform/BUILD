@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_quiche",
 )
@@ -63,6 +64,17 @@ envoy_cc_library(
     name = "quic_platform_export_impl_lib",
     hdrs = ["quic_export_impl.h"],
     visibility = ["//visibility:public"],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_port_utils_impl_lib",
+    srcs = ["quic_port_utils_impl.cc"],
+    hdrs = ["quic_port_utils_impl.h"],
+    include_prefix = "extensions/quic_listeners/quiche/platform",
+    deps = [
+        "//source/common/network:utility_lib",
+        "//test/test_common:environment_lib",
+    ],
 )
 
 envoy_cc_library(

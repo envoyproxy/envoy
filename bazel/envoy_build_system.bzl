@@ -484,7 +484,8 @@ def envoy_cc_test_infrastructure_library(
         external_deps = [],
         deps = [],
         repository = "",
-        tags = []):
+        tags = [],
+        include_prefix = None):
     native.cc_library(
         name = name,
         srcs = srcs,
@@ -496,6 +497,7 @@ def envoy_cc_test_infrastructure_library(
             envoy_external_dep_path("googletest"),
         ],
         tags = tags,
+        include_prefix = include_prefix,
         alwayslink = 1,
         linkstatic = 1,
     )
@@ -510,7 +512,8 @@ def envoy_cc_test_library(
         external_deps = [],
         deps = [],
         repository = "",
-        tags = []):
+        tags = [],
+        include_prefix = None):
     deps = deps + [
         repository + "//test/test_common:printers_includes",
     ]
@@ -523,6 +526,7 @@ def envoy_cc_test_library(
         deps,
         repository,
         tags,
+        include_prefix,
     )
 
 # Envoy test binaries should be specified with this function.

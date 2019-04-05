@@ -152,10 +152,12 @@ bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   IoHandlePtr io_handle = addr->socket(Address::SocketType::Stream);
   if (0 != addr->bind(io_handle->fd()).rc_) {
+    std::cerr << "fail to bind\n";
     // Socket bind failed.
     RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
     return false;
   }
+  std::cerr << "supportsIpVersion is v4: " << (version == Address::IpVersion::v4) << "\n";
   RELEASE_ASSERT(io_handle->close().err_ == nullptr, "");
   return true;
 }

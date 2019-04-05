@@ -219,9 +219,9 @@ bool Ipv4Instance::operator==(const Instance& rhs) const {
 }
 
 Api::SysCallIntResult Ipv4Instance::bind(int fd) const {
-  const int rc = ::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                        sizeof(ip_.ipv4_.address_));
-  return {rc, errno};
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  return os_syscalls.bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
+                          sizeof(ip_.ipv4_.address_));
 }
 
 Api::SysCallIntResult Ipv4Instance::connect(int fd) const {
@@ -310,9 +310,9 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
 }
 
 Api::SysCallIntResult Ipv6Instance::bind(int fd) const {
-  const int rc = ::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
-                        sizeof(ip_.ipv6_.address_));
-  return {rc, errno};
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  return os_syscalls.bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
+                          sizeof(ip_.ipv6_.address_));
 }
 
 Api::SysCallIntResult Ipv6Instance::connect(int fd) const {
@@ -326,7 +326,8 @@ IoHandlePtr Ipv6Instance::socket(SocketType type) const {
   // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
   RELEASE_ASSERT(
-      ::setsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
+      ::setsockopt(io_handle->fd(), IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1,
+      strerror(errno));
   return io_handle;
 }
 
@@ -370,17 +371,16 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
 Api::SysCallIntResult PipeInstance::bind(int fd) const {
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
   if (abstract_namespace_) {
-    const int rc = ::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
-                          offsetof(struct sockaddr_un, sun_path) + address_length_);
-    return {rc, errno};
+    return os_syscalls.bind(fd, reinterpret_cast<const sockaddr*>(&address_),
+                            offsetof(struct sockaddr_un, sun_path) + address_length_);
   }
   // Try to unlink an existing filesystem object at the requested path. Ignore
   // errors -- it's fine if the path doesn't exist, and if it exists but can't
   // be unlinked then `::bind()` will generate a reasonable errno.
   unlink(address_.sun_path);
-  const int rc = ::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
-  return {rc, errno};
+  return os_syscalls.bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
 }
 
 Api::SysCallIntResult PipeInstance::connect(int fd) const {
