@@ -574,7 +574,7 @@ TEST(QuicPlatformTest, FailToPickUnsedPort) {
     int fd = ::socket(domain, type, protocol);
     return Envoy::Api::SysCallIntResult{fd, errno};
   });
-  // Fail bind call's to mimic port exhausion.
+  // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
       .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
   EXPECT_DEATH(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
