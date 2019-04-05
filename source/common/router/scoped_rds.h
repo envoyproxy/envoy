@@ -33,7 +33,7 @@ class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigPr
 public:
   InlineScopedRoutesConfigProvider(
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
-      Server::Configuration::FactoryContext& factory_context,
+      const std::string& name, Server::Configuration::FactoryContext& factory_context,
       ScopedRoutesConfigProviderManager& config_provider_manager,
       const envoy::api::v2::core::ConfigSource& rds_config_source,
       const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
@@ -41,10 +41,12 @@ public:
 
   ~InlineScopedRoutesConfigProvider() override = default;
 
+  const std::string& name() const { return name_; }
+
   // Envoy::Config::ConfigProvider
   const Protobuf::Message* getConfigProto() const override { return nullptr; }
-  const std::vector<const Protobuf::Message*> getConfigProtos() const override {
-    std::vector<const Protobuf::Message*> out_protos;
+  const Envoy::Config::ConfigProvider::ConfigProtoVector getConfigProtos() const override {
+    Envoy::Config::ConfigProvider::ConfigProtoVector out_protos;
     std::for_each(config_protos_.begin(), config_protos_.end(),
                   [&out_protos](const std::unique_ptr<const Protobuf::Message>& message) {
                     out_protos.push_back(message.get());
@@ -56,6 +58,7 @@ public:
   ConfigConstSharedPtr getConfig() const override { return config_; }
 
 private:
+  const std::string name_;
   ConfigConstSharedPtr config_;
   const std::vector<std::unique_ptr<const Protobuf::Message>> config_protos_;
   const envoy::api::v2::core::ConfigSource rds_config_source_;
@@ -85,10 +88,13 @@ public:
 
   ScopedRdsConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::ScopedRds& scoped_rds,
-      const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
-      const std::string& stat_prefix, ScopedRoutesConfigProviderManager& config_provider_manager);
+      const std::string& manager_identifier, const std::string& name,
+      Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+      ScopedRoutesConfigProviderManager& config_provider_manager);
 
   ~ScopedRdsConfigSubscription() override = default;
+
+  const std::string& name() const { return name_; }
 
   // Envoy::Config::ConfigSubscriptionInstanceBase
   void start() override { subscription_->start({}, *this); }
@@ -101,17 +107,16 @@ public:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
   }
-
-  const ScopedRouteConfigurationMap& scopedRouteConfigurations() const {
-    return scoped_route_configurations_;
+  const ScopedConfigManager::ScopedRouteMap& scopedRouteMap() const {
+    return scoped_config_manager_.scopedRouteMap();
   }
 
 private:
+  const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::ScopedRouteConfiguration>>
       subscription_;
   Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
-  ScopedRouteConfigurationMap scoped_route_configurations_;
   ScopedConfigManager scoped_config_manager_;
 };
 
@@ -137,17 +142,16 @@ public:
 
   // Envoy::Config::ConfigProvider
   const Protobuf::Message* getConfigProto() const override { return nullptr; }
-  const std::vector<const Protobuf::Message*> getConfigProtos() const override {
-    const ScopedRdsConfigSubscription::ScopedRouteConfigurationMap& scoped_route_configurations =
-        subscription_->scopedRouteConfigurations();
-    if (scoped_route_configurations.empty()) {
+  const Envoy::Config::ConfigProvider::ConfigProtoVector getConfigProtos() const override {
+    const ScopedConfigManager::ScopedRouteMap& scoped_route_map = subscription_->scopedRouteMap();
+    if (scoped_route_map.empty()) {
       return {};
     }
 
-    std::vector<const Protobuf::Message*> config_protos(scoped_route_configurations.size());
-    for (auto it = scoped_route_configurations.begin(); it != scoped_route_configurations.end();
-         ++it) {
-      config_protos.push_back(&it->second);
+    Envoy::Config::ConfigProvider::ConfigProtoVector config_protos(scoped_route_map.size());
+    for (ScopedConfigManager::ScopedRouteMap::const_iterator it = scoped_route_map.begin();
+         it != scoped_route_map.end(); ++it) {
+      config_protos.push_back(&it->second->config_proto_);
     }
     return config_protos;
   }
@@ -204,11 +208,14 @@ class ScopedRoutesConfigProviderManagerOptArg
     : public Envoy::Config::ConfigProviderManager::OptionalArg {
 public:
   ScopedRoutesConfigProviderManagerOptArg(
+      const std::string& scoped_routes_name,
       const envoy::api::v2::core::ConfigSource& rds_config_source,
       const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
           ScopeKeyBuilder& scope_key_builder)
-      : rds_config_source_(rds_config_source), scope_key_builder_(scope_key_builder) {}
+      : scoped_routes_name_(scoped_routes_name), rds_config_source_(rds_config_source),
+        scope_key_builder_(scope_key_builder) {}
 
+  const std::string scoped_routes_name_;
   const envoy::api::v2::core::ConfigSource& rds_config_source_;
   const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder&
       scope_key_builder_;

@@ -63,9 +63,21 @@ api_config_source:
 
   ~ScopedRoutesTestBase() override { factory_context_.thread_local_.shutdownThread(); }
 
+  void setupMockClusterMap() {
+    InSequence s;
+    cluster_map_.emplace("foo_cluster", cluster_);
+    EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map_));
+    EXPECT_CALL(cluster_, info());
+    EXPECT_CALL(*cluster_.info_, addedViaApi());
+    EXPECT_CALL(cluster_, info());
+    EXPECT_CALL(*cluster_.info_, type());
+  }
+
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Upstream::ClusterManager::ClusterInfoMap cluster_map_;
+  Upstream::MockCluster cluster_;
   std::unique_ptr<ScopedRoutesConfigProviderManager> config_provider_manager_;
   Event::SimulatedTimeSystem time_system_;
   envoy::api::v2::core::ConfigSource rds_config_source_;
@@ -80,16 +92,9 @@ protected:
   void setup() {
     InSequence s;
 
-    Upstream::ClusterManager::ClusterInfoMap cluster_map;
-    Upstream::MockCluster cluster;
-    cluster_map.emplace("foo_cluster", cluster);
-    EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
-    EXPECT_CALL(cluster, info());
-    EXPECT_CALL(*cluster.info_, addedViaApi());
-    EXPECT_CALL(cluster, info());
-    EXPECT_CALL(*cluster.info_, type());
-
+    setupMockClusterMap();
     const std::string config_yaml = R"EOF(
+name: foo_scoped_routes
 scope_key_builder:
   fragments:
     - header_value_extractor: { name: X-Google-VIP }
@@ -111,7 +116,8 @@ scoped_rds:
     MessageUtil::loadFromYaml(config_yaml, scoped_routes_config);
     provider_ = config_provider_manager_->createXdsConfigProvider(
         scoped_routes_config.scoped_rds(), factory_context_, "foo.",
-        ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.rds_config_source(),
+        ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
+                                                scoped_routes_config.rds_config_source(),
                                                 scoped_routes_config.scope_key_builder()));
     subscription_ = &dynamic_cast<ScopedRdsConfigProvider&>(*provider_).subscription();
   }
@@ -142,7 +148,7 @@ key:
 
   // 'route_configuration_name' validation: value must be > 1 byte.
   const std::string config_yaml2 = R"EOF(
-name: foo_scope_set
+name: foo_scope
 route_configuration_name:
 key:
   fragments:
@@ -154,7 +160,7 @@ key:
 
   // 'key' validation: must define at least 1 fragment.
   const std::string config_yaml3 = R"EOF(
-name: foo_scope_set
+name: foo_scope
 route_configuration_name: foo_routes
 key:
 )EOF";
@@ -169,7 +175,9 @@ TEST_F(ScopedRdsTest, EmptyResource) {
 
   Protobuf::RepeatedPtrField<envoy::api::v2::ScopedRouteConfiguration> resources;
   subscription().onConfigUpdate(resources, "1");
-  EXPECT_EQ(1UL, factory_context_.scope_.counter("foo.scoped_rds.update_empty").value());
+  EXPECT_EQ(
+      1UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.update_empty").value());
 }
 
 // Tests that multiple uniquely named resources are allowed in config updates.
@@ -194,7 +202,9 @@ key:
 )EOF";
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
   EXPECT_NO_THROW(subscription().onConfigUpdate(resources, "1"));
-  EXPECT_EQ(1UL, factory_context_.scope_.counter("foo.scoped_rds.config_reload").value());
+  EXPECT_EQ(
+      1UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
 }
 
 // Tests that only one resource is provided during a config update.
@@ -218,6 +228,7 @@ key:
 // Tests that defining an invalid cluster in the SRDS config results in an error.
 TEST_F(ScopedRdsTest, UnknownCluster) {
   const std::string config_yaml = R"EOF(
+name: foo_scoped_routes
 scope_key_builder:
   fragments:
     - header_value_extractor: { name: X-Google-VIP }
@@ -243,7 +254,8 @@ scoped_rds:
   EXPECT_THROW_WITH_MESSAGE(
       config_provider_manager_->createXdsConfigProvider(
           scoped_routes_config.scoped_rds(), factory_context_, "foo.",
-          ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.rds_config_source(),
+          ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
+                                                  scoped_routes_config.rds_config_source(),
                                                   scoped_routes_config.scope_key_builder())),
       EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
@@ -304,29 +316,95 @@ fragments:
   Envoy::Config::ConfigProviderPtr inline_config =
       config_provider_manager_->createStaticConfigProvider(
           std::move(config_protos), factory_context_,
-          ScopedRoutesConfigProviderManagerOptArg(rds_config_source_, scope_key_builder));
+          ScopedRoutesConfigProviderManagerOptArg("foo-scoped-routes", rds_config_source_,
+                                                  scope_key_builder));
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump2 =
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   MessageUtil::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
-  scoped_route_configs:
-    - name: foo
-      route_configuration_name: foo-route-config
-      key:
-        fragments: { string_key: "172.10.10.10" }
-    - name: foo2
-      route_configuration_name: foo-route-config2
-      key:
-        fragments: { string_key: "172.10.10.20" }
-  last_updated:
-    seconds: 1234567891
-    nanos: 234000000
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo
+       route_configuration_name: foo-route-config
+       key:
+         fragments: { string_key: "172.10.10.10" }
+     - name: foo2
+       route_configuration_name: foo-route-config2
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
 dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump2.DebugString());
+
+  setupMockClusterMap();
+  envoy::config::filter::network::http_connection_manager::v2::ScopedRds scoped_rds_config;
+  const std::string config_source_yaml = R"EOF(
+scoped_rds_config_source:
+  api_config_source:
+    api_type: REST
+    cluster_names:
+      - foo_cluster
+    refresh_delay: { seconds: 1, nanos: 0 }
+)EOF";
+  MessageUtil::loadFromYaml(config_source_yaml, scoped_rds_config);
+  Envoy::Config::ConfigProviderPtr dynamic_provider =
+      config_provider_manager_->createXdsConfigProvider(
+          scoped_rds_config, factory_context_, "foo.",
+          ScopedRoutesConfigProviderManagerOptArg("foo-dynamic-scoped-routes", rds_config_source_,
+                                                  scope_key_builder));
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::ScopedRouteConfiguration> resources;
+  resources.Add()->MergeFrom(parseScopedRouteConfigurationFromYaml(R"EOF(
+name: dynamic-foo
+route_configuration_name: dynamic-foo-route-config
+key:
+  fragments: { string_key: "172.30.30.10" }
+)EOF"));
+
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891567));
+  ScopedRdsConfigSubscription& subscription =
+      dynamic_cast<ScopedRdsConfigProvider&>(*dynamic_provider).subscription();
+  subscription.onConfigUpdate(resources, "1");
+
+  MessageUtil::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo
+       route_configuration_name: foo-route-config
+       key:
+         fragments: { string_key: "172.10.10.10" }
+     - name: foo2
+       route_configuration_name: foo-route-config2
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+  - name: foo-dynamic-scoped-routes
+    scoped_route_configs:
+      - name: dynamic-foo
+        route_configuration_name: dynamic-foo-route-config
+        key:
+          fragments: { string_key: "172.30.30.10" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 567000000
+    version_info: "1"
+)EOF",
+                            expected_config_dump);
+  message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+  const auto& scoped_routes_config_dump3 =
+      MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  EXPECT_EQ(expected_config_dump.DebugString(), scoped_routes_config_dump3.DebugString());
 }
 
 } // namespace

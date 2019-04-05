@@ -409,6 +409,8 @@ message ScopedRouteConfigurationsList {
 }
 
 message ScopedRoutes {
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
   // TODO(AndresGuedez):
   // Specifies the mechanism for constructing keys based on request attributes to match
   // :ref:`scopes <envoy_api_field_ScopedRouteConfigurationsSet.scopes>` against.
@@ -473,12 +475,12 @@ message ScopedRoutes {
     repeated FragmentBuilder fragments = 1 [(validate.rules).repeated .min_items = 1];
   }
 
-  ScopeKeyBuilder scope_key_builder = 1 [(validate.rules).message.required = true];
+  ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message.required = true];
 
   // Configuration source specifier for RDS.
   // This config source is used to subscribe to RouteConfiguration resources specified in
   // ScopedRouteConfiguration messages.
-  envoy.api.v2.core.ConfigSource rds_config_source = 2
+  envoy.api.v2.core.ConfigSource rds_config_source = 3
       [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 
   oneof config_specifier {
@@ -487,12 +489,12 @@ message ScopedRoutes {
     // The set of routing scopes corresponding to the HCM. A scope is assigned to a request by
     // matching a key constructed from the request's attributes according to the algorithm specified
     // by the :ref:`ScopeKeyBuilder<envoy_api_msg_ScopedRoutes.ScopeKeyBuilder>` in this message.
-    ScopedRouteConfigurationsList scoped_route_configurations_list = 3;
+    ScopedRouteConfigurationsList scoped_route_configurations_list = 4;
 
     // The connection manager's route table will be dynamically loaded via the SRDS API; the
     // :ref:`<ScopedRouteConfigurationsSet<envoy_api_msg_ScopedRouteConfigurationsSet>` received via
     // SRDS will specify a set of routing scopes, each containing .
-    ScopedRds scoped_rds = 4;
+    ScopedRds scoped_rds = 5;
   }
 }
 

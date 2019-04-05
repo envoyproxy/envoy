@@ -54,6 +54,7 @@ fragments:
               scope_key_builder;
           MessageUtil::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
           auto* scoped_routes = http_connection_manager.mutable_scoped_routes();
+          scoped_routes->set_name("foo-scoped-routes");
           *scoped_routes->mutable_scope_key_builder() = scope_key_builder;
 
           envoy::api::v2::core::ApiConfigSource* rds_api_config_source =
@@ -169,10 +170,11 @@ key:
   };
   initialize();
 
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.update_attempt", 1);
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.update_success", 1);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt", 1);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 1);
   // The version gauge should be set to xxHash64("1").
-  test_server_->waitForGaugeEq("http.config_test.scoped_rds.version", 13237225503670494420UL);
+  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
+                               13237225503670494420UL);
 
   const std::string scope_route3 = R"EOF(
 name: foo_scope3
@@ -183,9 +185,10 @@ key:
 )EOF";
   sendScopedRdsResponse({scope_route3}, "2");
 
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.update_attempt", 2);
-  test_server_->waitForCounterGe("http.config_test.scoped_rds.update_success", 2);
-  test_server_->waitForGaugeEq("http.config_test.scoped_rds.version", 6927017134761466251UL);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt", 2);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
+  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
+                               6927017134761466251UL);
 
   // TODO(AndresGuedez): test actual scoped routing logic; only the config handling is implemented
   // at this point.

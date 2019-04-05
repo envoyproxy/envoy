@@ -56,11 +56,12 @@ public:
     std::string version_;
   };
 
+  using ConfigProtoVector = std::vector<const Protobuf::Message*>;
   /**
    *
    */
-  struct ConfigProtoInfoVec {
-    const std::vector<const Protobuf::Message*> config_protos_;
+  struct ConfigProtoInfoVector {
+    const ConfigProtoVector config_protos_;
 
     // Only populated by dynamic config providers.
     std::string version_;
@@ -89,12 +90,12 @@ public:
     return ConfigProtoInfo<P>{*config_proto, getConfigVersion()};
   }
 
-  absl::optional<ConfigProtoInfoVec> configProtoInfoVec() const {
-    const std::vector<const Protobuf::Message*> config_protos = getConfigProtos();
+  absl::optional<ConfigProtoInfoVector> configProtoInfoVector() const {
+    const ConfigProtoVector config_protos = getConfigProtos();
     if (config_protos.empty()) {
       return absl::nullopt;
     }
-    return ConfigProtoInfoVec{std::move(config_protos), getConfigVersion()};
+    return ConfigProtoInfoVector{std::move(config_protos), getConfigVersion()};
   }
 
   /**
@@ -125,7 +126,7 @@ protected:
   /**
    *
    */
-  virtual const std::vector<const Protobuf::Message*> getConfigProtos() const PURE;
+  virtual const ConfigProtoVector getConfigProtos() const PURE;
 
   /**
    * Returns the config version associated with the provider.
