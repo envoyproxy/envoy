@@ -139,6 +139,8 @@ public:
   void callWithStringView(StatName stat_name,
                           const std::function<void(absl::string_view)>& fn) const override;
 
+  void encode(absl::string_view name, Encoding& encoding);
+
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
@@ -474,6 +476,49 @@ struct StatNameLessThan {
   }
 
   const SymbolTable& symbol_table_;
+};
+
+using SharedStatNameStorage = std::shared_ptr<StatNameStorage>;
+
+struct HeterogeneousStatNameHash {
+  // Specifying is_transparent indicates to the library infrastructure that
+  // type-conversions should not be applied when calling find(), but instead
+  // pass the actual types of the contained and searched-for objects directly to
+  // these functors. See
+  // https://en.cppreference.com/w/cpp/utility/functional/less_void for an
+  // official reference, and https://abseil.io/tips/144 for a description of
+  // using it in the context of absl.
+  using is_transparent = void;
+
+  size_t operator()(StatName a) const { return a.hash(); }
+  size_t operator()(const SharedStatNameStorage& a) const { return a->statName().hash(); }
+};
+
+struct HeterogeneousStatNameEqual {
+  // See description for HeterogeneousStatNameHash::is_transparent.
+  using is_transparent = void;
+
+  size_t operator()(StatName a, StatName b) const { return a == b; }
+  size_t operator()(const SharedStatNameStorage& a, const SharedStatNameStorage& b) const {
+    return a->statName() == b->statName();
+  }
+  size_t operator()(StatName a, const SharedStatNameStorage& b) const { return a == b->statName(); }
+  size_t operator()(const SharedStatNameStorage& a, StatName b) const { return a->statName() == b; }
+};
+
+// Encapsulates a set of shared_ptr<StatNameStorage>. We use a subclass here
+// rather than a 'using' alias because we need to ensure that when the set is
+// destructed, StatNameStorage::free(symbol_table) is called on each entry. It
+// is a little easier at the call-site in thread_local_store.cc to implement
+// this an explicit free() method, analogous to StatNameStorage::free(),
+// compared to storing a SymbolTable reference in the class and doing the free
+// in the destructor, like StatNameTempStorage.
+class SharedStatNameStorageSet
+    : public absl::flat_hash_set<SharedStatNameStorage, HeterogeneousStatNameHash,
+                                 HeterogeneousStatNameEqual> {
+public:
+  ~SharedStatNameStorageSet();
+  void free(SymbolTable& symbol_table);
 };
 
 } // namespace Stats
