@@ -9,6 +9,8 @@ option go_package = "v2alpha";
 
 import "google/protobuf/duration.proto";
 
+import "validate/validate.proto";
+
 // Out-of-band (OOB) load reporting service for frontends to periodically get
 // load information from backends.
 service OpenRCAService {
@@ -27,18 +29,19 @@ message LoadReportRequest {
 message LoadReport {
   // CPU utilization expressed as a fraction of available CPU resources. This
   // should be derived from a sample or measurement taken during the request.
-  double cpu_utilization = 1;
+  double cpu_utilization = 1 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
 
   // Memory utilization expressed as a fraction of available memory
   // resources. This should be derived from a sample or measurement taken
   // during the request.
-  double mem_utilization = 2;
+  double mem_utilization = 2 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
 
   // NIC inbound/outbound utilization expressed as a fraction of available NIC
   // bandwidth. The request in/out bytes can be inferred by Envoy, but not the
   // NIC availability at the endpoint, hence reporting
-  double nic_in_utilization = 3;
-  double nic_out_utilization = 4;
+  double nic_in_utilization = 3 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
+
+  double nic_out_utilization = 4 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
 
   // Application specific requests costs. Values may be absolute costs (e.g.
   // 3487 bytes of storage) associated with the cost or utilization,
