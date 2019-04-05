@@ -478,7 +478,7 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
                       QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
 
-TEST(QuicPlatformTest, ConstructMemSliceFromBuffer) {
+TEST_F(QuicPlatformTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
   bool fragment_releaser_called = false;
