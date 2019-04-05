@@ -3,6 +3,11 @@ Version history
 
 1.11.0 (Pending)
 ================
+* hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC.
+* server: changed protocol that hot restart children/parents use; now protobuf based.
+* server: stats are now preserved across hot restart by being explicitly communicated through the hot
+          restart protocol, rather than living in shared memory.
+* server: hot restart version incremented to 11.
 
 1.10.0 (Apr 5, 2019)
 ====================
@@ -48,7 +53,6 @@ Version history
   <config_http_filters_fault_injection_http_header>` to the HTTP fault filter.
 * governance: extending Envoy deprecation policy from 1 release (0-3 months) to 2 releases (3-6 months).
 * health check: expected response codes in http health checks are now :ref:`configurable <envoy_api_msg_core.HealthCheck.HttpHealthCheck>`.
-* hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC. No longer necessary `--max-stats` command line flag removed.
 * http: added new grpc_http1_reverse_bridge filter for converting gRPC requests into HTTP/1.1 requests.
 * http: fixed a bug where Content-Length:0 was added to HTTP/1 204 responses.
 * http: added :ref:`max request headers size <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.max_request_headers_kb>`. The default behaviour is unchanged.
@@ -68,10 +72,6 @@ Version history
 * router: added reset reason to response body when upstream reset happens. After this change, the response body will be of the form `upstream connect error or disconnect/reset before headers. reset reason:`
 * router: added :ref:`rq_reset_after_downstream_response_started <config_http_filters_router_stats>` counter stat to router stats.
 * router: added per-route configuration of :ref:`internal redirects <envoy_api_field_route.RouteAction.internal_redirect_action>`.
-* server: changed protocol that hot restart children/parents use; now protobuf based.
-* server: stats are now preserved across hot restart by being explicitly communicated through the hot
-          restart protocol, rather than living in shared memory.
-* server: hot restart version incremented to 11.
 * router: removed deprecated route-action level headers_to_add/remove.
 * router: made :ref: `max retries header <config_http_filters_router_x-envoy-max-retries>` take precedence over the number of retries in route and virtual host retry policies.
 * router: added support for prefix wildcards in :ref:`virtual host domains<envoy_api_field_route.VirtualHost.domains>`
