@@ -340,6 +340,11 @@ public:
    * @return supplies the http1 settings.
    */
   virtual const Http::Http1Settings& http1Settings() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should normalize url following RFC3986
+   */
+  virtual bool shouldNormalizePath() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

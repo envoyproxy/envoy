@@ -69,7 +69,7 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(const std::string& path, uint32_
   watch->callback_ = cb;
   watch->watching_dir_ = watching_dir;
 
-  int flags = NOTE_DELETE | NOTE_RENAME;
+  u_int flags = NOTE_DELETE | NOTE_RENAME | NOTE_WRITE;
   if (watching_dir) {
     flags = NOTE_DELETE | NOTE_WRITE;
   }
@@ -149,6 +149,9 @@ void WatcherImpl::onKqueueEvent() {
 
       if (event.fflags & NOTE_RENAME) {
         events |= Events::MovedTo;
+      }
+      if (event.fflags & NOTE_WRITE) {
+        events |= Events::Modified;
       }
     }
 
