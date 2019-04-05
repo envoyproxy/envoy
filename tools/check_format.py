@@ -43,6 +43,9 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
 SERIALIZE_AS_STRING_WHITELIST = ('./test/common/protobuf/utility_test.cc',
                                  './test/common/grpc/codec_test.cc')
 
+# Files in these paths can use Protobuf::util::JsonStringToMessage
+JSON_STRING_TO_MESSAGE_WHITELIST = ('./source/common/protobuf/utility.cc')
+
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
@@ -224,6 +227,10 @@ def whitelistedForSerializeAsString(file_path):
   return file_path in SERIALIZE_AS_STRING_WHITELIST
 
 
+def whitelistedForJsonStringToMessage(file_path):
+  return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
     text = f.read()
@@ -381,7 +388,8 @@ def checkSourceLine(line, file_path, reportError):
     # legitimately show up in comments, for example this one.
     reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
   if not whitelistedForRealTime(file_path) and not 'NO_CHECK_FORMAT(real_time)' in line:
-    if 'RealTimeSource' in line or 'RealTimeSystem' in line or \
+    if 'RealTimeSource' in line or \
+       ('RealTimeSystem' in line and not 'TestRealTimeSystem' in line) or \
        'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
        'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
@@ -430,6 +438,10 @@ def checkSourceLine(line, file_path, reportError):
     reportError(
         "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
     )
+  if not whitelistedForJsonStringToMessage(file_path) and 'JsonStringToMessage' in line:
+    # Centralize all usage of JSON parsing so it is easier to make changes in JSON parsing
+    # behavior.
+    reportError("Don't use Protobuf::util::JsonStringToMessage, use MessageUtil::loadFromJson.")
 
 
 def checkBuildLine(line, file_path, reportError):

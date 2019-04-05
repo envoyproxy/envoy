@@ -198,7 +198,7 @@ message TransportSocket {
   // Implementation specific configuration which depends on the implementation being instantiated.
   // See the supported transport socket implementations for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
+    google.protobuf.Struct config = 2;
 
     google.protobuf.Any typed_config = 3;
   }

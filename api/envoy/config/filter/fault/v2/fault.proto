@@ -19,19 +19,25 @@ import "gogoproto/gogo.proto";
 // Delay specification is used to inject latency into the
 // HTTP/gRPC/Mongo/Redis operation or delay proxying of TCP connections.
 message FaultDelay {
+  // Fault delays are controlled via an HTTP header (if applicable). See the
+  // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
+  // more information.
+  message HeaderDelay {
+  }
+
   enum FaultDelayType {
-    // Fixed delay (step function).
+    // Unused and deprecated.
     FIXED = 0;
   }
 
-  // Delay type to use (fixed|exponential|..). Currently, only fixed delay (step function) is
-  // supported.
-  FaultDelayType type = 1 [(validate.rules).enum.defined_only = true];
+  // Unused and deprecated. Will be removed in the next release.
+  FaultDelayType type = 1 [deprecated = true];
 
   reserved 2;
 
   oneof fault_delay_secifier {
     option (validate.required) = true;
+
     // Add a fixed delay before forwarding the operation upstream. See
     // https://developers.google.com/protocol-buffers/docs/proto3#json for
     // the JSON/YAML Duration mapping. For HTTP/Mongo/Redis, the specified
@@ -40,6 +46,9 @@ message FaultDelay {
     // for the specified period. This is required if type is FIXED.
     google.protobuf.Duration fixed_delay = 3
         [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+
+    // Fault delays are controlled via an HTTP header (if applicable).
+    HeaderDelay header_delay = 5;
   }
 
   // The percentage of operations/connections/requests on which the delay will be injected.
@@ -54,11 +63,20 @@ message FaultRateLimit {
     uint64 limit_kbps = 1 [(validate.rules).uint64.gte = 1];
   }
 
+  // Rate limits are controlled via an HTTP header (if applicable). See the
+  // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
+  // more information.
+  message HeaderLimit {
+  }
+
   oneof limit_type {
     option (validate.required) = true;
 
     // A fixed rate limit.
     FixedLimit fixed_limit = 1;
+
+    // Rate limits are controlled via an HTTP header (if applicable).
+    HeaderLimit header_limit = 3;
   }
 
   // The percentage of operations/connections/requests on which the rate limit will be injected.

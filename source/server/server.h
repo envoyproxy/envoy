@@ -21,6 +21,7 @@
 #include "common/common/logger_delegates.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/context_impl.h"
+#include "common/init/manager_impl.h"
 #include "common/memory/heap_shrinker.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
@@ -28,15 +29,14 @@
 
 #include "server/configuration_impl.h"
 #include "server/http/admin.h"
-#include "server/init_manager_impl.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit_registration.h"
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -123,10 +123,11 @@ class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
   RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
             Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-            InitManagerImpl& init_manager, OverloadManager& overload_manager,
+            Init::Manager& init_manager, OverloadManager& overload_manager,
             std::function<void()> workers_start_cb);
 
 private:
+  Init::WatcherImpl init_watcher_;
   Event::SignalEventPtr sigterm_;
   Event::SignalEventPtr sigint_;
   Event::SignalEventPtr sig_usr_1_;
@@ -148,7 +149,7 @@ public:
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
-               Thread::ThreadFactory& thread_factory);
+               Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
 
   ~InstanceImpl() override;
 
@@ -195,22 +196,23 @@ public:
 
   // ServerLifecycleNotifier
   void registerCallback(Stage stage, StageCallback callback) override;
+  void registerCallback(Stage stage, StageCallbackWithCompletion callback) override;
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory);
+                  ComponentFactory& component_factory, TestHooks& hooks);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(Stage stage);
+  void notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb = [] {});
 
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
-  // occur at any point during member lifetime.
-  InitManagerImpl init_manager_{"Server"};
+  // occur at any point during member lifetime. This init manager is populated with LdsApi targets.
+  Init::ManagerImpl init_manager_{"Server"};
   // secret_manager_ must come before listener_manager_, config_ and dispatcher_, and destructed
   // only after these members can no longer reference it, since:
   // - There may be active filter chains referencing it in listener_manager_.
@@ -255,12 +257,12 @@ private:
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
-  std::unique_ptr<RunHelper> run_helper_;
   Envoy::MutexTracer* mutex_tracer_;
   Http::ContextImpl http_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
-  std::unordered_map<Stage, std::vector<StageCallback>> stage_callbacks_;
+  absl::flat_hash_map<Stage, std::vector<StageCallback>> stage_callbacks_;
+  absl::flat_hash_map<Stage, std::vector<StageCallbackWithCompletion>> stage_completable_callbacks_;
 };
 
 } // namespace Server

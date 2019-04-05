@@ -12,7 +12,6 @@ import "envoy/api/v2/core/http_uri.proto";
 import "envoy/api/v2/route/route.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
-import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 

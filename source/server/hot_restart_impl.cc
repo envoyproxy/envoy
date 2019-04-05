@@ -122,7 +122,7 @@ std::string SharedMemory::version(uint64_t max_num_stats,
                      stats_options.maxNameLength());
 }
 
-HotRestartImpl::HotRestartImpl(const Options& options)
+HotRestartImpl::HotRestartImpl(const Options& options, Stats::SymbolTable& symbol_table)
     : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(
           Stats::RawStatDataSet::numBytes(stats_set_options_, options_.statsOptions()), options_)),
@@ -136,8 +136,8 @@ HotRestartImpl::HotRestartImpl(const Options& options)
         std::make_unique<Stats::RawStatDataSet>(stats_set_options_, options.restartEpoch() == 0,
                                                 shmem_.stats_set_data_, options_.statsOptions());
   }
-  stats_allocator_ = std::make_unique<Stats::RawStatDataAllocator>(stat_lock_, *stats_set_,
-                                                                   options_.statsOptions());
+  stats_allocator_ = std::make_unique<Stats::RawStatDataAllocator>(
+      stat_lock_, *stats_set_, options_.statsOptions(), symbol_table);
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   initDomainSocketAddress(&parent_address_);

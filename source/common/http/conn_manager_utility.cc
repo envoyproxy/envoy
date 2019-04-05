@@ -10,6 +10,7 @@
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/runtime/uuid_util.h"
@@ -279,9 +280,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
   // the XFCC header.
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward ||
       config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
-    const std::string uri_san_local_cert = connection.ssl()->uriSanLocalCertificate();
-    if (!uri_san_local_cert.empty()) {
-      client_cert_details.push_back("By=" + uri_san_local_cert);
+    const auto uri_sans_local_cert = connection.ssl()->uriSanLocalCertificate();
+    if (!uri_sans_local_cert.empty()) {
+      client_cert_details.push_back("By=" + uri_sans_local_cert[0]);
     }
     const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
     if (!cert_digest.empty()) {
@@ -301,10 +302,13 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
                                       "\"");
         break;
-      case ClientCertDetailsType::URI:
+      case ClientCertDetailsType::URI: {
         // The "URI" key still exists even if the URI is empty.
-        client_cert_details.push_back("URI=" + connection.ssl()->uriSanPeerCertificate());
+        const auto sans = connection.ssl()->uriSanPeerCertificate();
+        const auto& uri_san = sans.empty() ? "" : sans[0];
+        client_cert_details.push_back("URI=" + uri_san);
         break;
+      }
       case ClientCertDetailsType::DNS: {
         const std::vector<std::string> dns_sans = connection.ssl()->dnsSansPeerCertificate();
         if (!dns_sans.empty()) {
@@ -359,6 +363,16 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);
   }
+}
+
+/* static */
+bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
+                                                  const ConnectionManagerConfig& config) {
+  ASSERT(request_headers.Path());
+  if (config.shouldNormalizePath()) {
+    return PathUtil::canonicalPath(*request_headers.Path());
+  }
+  return true;
 }
 
 } // namespace Http

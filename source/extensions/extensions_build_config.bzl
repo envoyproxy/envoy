@@ -82,6 +82,7 @@ EXTENSIONS = {
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
     "envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
+    "envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
 
     #
     # Resource monitors
@@ -199,6 +200,7 @@ WINDOWS_EXTENSIONS = {
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     #"envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
     #"envoy.filters.network.sni_cluster":                "//source/extensions/filters/network/sni_cluster:config",
+    #"envoy.filters.network.zookeeper_proxy":            "//source/extensions/filters/network/zookeeper_proxy:config",
 
     #
     # Stat sinks

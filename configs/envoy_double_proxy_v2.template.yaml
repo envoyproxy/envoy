@@ -25,7 +25,8 @@
     {%endif -%}
     filters:
     - name: envoy.http_connection_manager
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
         codec_type: AUTO
         stat_prefix: router
         route_config:
@@ -42,14 +43,18 @@
                 timeout: 20s
         http_filters:
         - name: envoy.health_check
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
             pass_through_mode: false
-            endpoint: /healthcheck
-          name: envoy.buffer
-          config:
+            headers:
+              - exact_match: /healthcheck
+                name: :path
+        - name: envoy.buffer
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
             max_request_bytes: 5242880
-          name: envoy.router
-          config: {}
+        - name: envoy.router
+          typed_config: {}
         tracing:
           operation_name: INGRESS
         idle_timeout: 840s
@@ -71,7 +76,8 @@
                         default_value: 1000
                         runtime_key: access_log.access_error.duration
                 - traceable_filter: {}
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
             path: /var/log/envoy/access_error.log
             format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
         {% if proxy_proto %}
@@ -91,20 +97,30 @@ static_resources:
     type: STATIC
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
-    hosts:
-      - socket_address:
-          protocol: TCP
-          address: 127.0.0.1
-          port_value: 8125
+    load_assignment:
+      cluster_name: statsd
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8125
+                protocol: TCP
   - name: backhaul
     type: STRICT_DNS
     connect_timeout: 1s
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: front-proxy.yourcompany.net
-        port_value: 9400
+    load_assignment:
+      cluster_name: backhaul
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: front-proxy.yourcompany.net
+                port_value: 9400
+                protocol: TCP
     # There are so few connections going back
     # that we can get some imbalance. Until we come up
     # with a better solution just limit the requests
@@ -127,11 +143,16 @@ static_resources:
     type: LOGICAL_DNS
     connect_timeout: 1s
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: collector-grpc.lightstep.com
-        port_value: 443
+    load_assignment:
+      cluster_name: lightstep_saas
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: collector-grpc.lightstep.com
+                port_value: 443
+                protocol: TCP
     http2_protocol_options: {}
     tls_context:
       common_tls_context:
@@ -143,12 +164,14 @@ static_resources:
 flags_path: "/etc/envoy/flags"
 stats_sinks:
 - name: envoy.statsd
-  config: 
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.metrics.v2.StatsdSink
     tcp_cluster_name: statsd
 tracing:
   http:
     name: envoy.lightstep
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
       access_token_file: "/etc/envoy/lightstep_access_token"
       collector_cluster: lightstep_saas
 runtime:
@@ -156,7 +179,7 @@ runtime:
   subdirectory: envoy
   override_subdirectory: envoy_override
 admin:
-  access_log_path: "var/log/envoy/admin_access.log"
+  access_log_path: "/var/log/envoy/admin_access.log"
   address:
     socket_address:
       protocol: TCP

@@ -7,6 +7,7 @@
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/utility.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -22,9 +23,6 @@ using testing::Return;
 
 namespace Envoy {
 namespace Config {
-
-typedef FilesystemSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment>
-    FilesystemEdsSubscriptionImpl;
 
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
@@ -76,13 +74,8 @@ public:
     file_json.pop_back();
     file_json += "]}";
     envoy::api::v2::DiscoveryResponse response_pb;
-    EXPECT_TRUE(Protobuf::util::JsonStringToMessage(file_json, &response_pb).ok());
-    EXPECT_CALL(callbacks_,
-                onConfigUpdate(
-                    RepeatedProtoEq(
-                        Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                            response_pb)),
-                    version))
+    MessageUtil::loadFromJson(file_json, response_pb);
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       version_ = version;
@@ -122,7 +115,7 @@ public:
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
-  FilesystemEdsSubscriptionImpl subscription_;
+  FilesystemSubscriptionImpl subscription_;
   bool file_at_start_{false};
 };
 

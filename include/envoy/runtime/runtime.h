@@ -12,6 +12,7 @@
 #include "common/common/assert.h"
 #include "common/singleton/threadsafe_singleton.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -52,7 +53,7 @@ public:
     absl::optional<bool> bool_value_;
   };
 
-  typedef std::unordered_map<std::string, Entry> EntryMap;
+  typedef absl::flat_hash_map<std::string, Entry> EntryMap;
 
   /**
    * A provider of runtime values. One or more of these compose the snapshot's source of values,
@@ -63,9 +64,9 @@ public:
     virtual ~OverrideLayer() {}
 
     /**
-     * @return const std::unordered_map<std::string, Entry>& the values in this layer.
+     * @return const absl::flat_hash_map<std::string, Entry>& the values in this layer.
      */
-    virtual const std::unordered_map<std::string, Snapshot::Entry>& values() const PURE;
+    virtual const EntryMap& values() const PURE;
 
     /**
      * @return const std::string& a user-friendly alias for this layer, e.g. "admin" or "disk".
@@ -88,7 +89,7 @@ public:
   // Runtime features are used to easily allow switching between old and new code paths for high
   // risk changes. The intent is for the old code path to be short lived - the old code path is
   // deprecated as the feature is defaulted true, and removed with the following Envoy release.
-  virtual bool runtimeFeatureEnabled(const std::string& key) const PURE;
+  virtual bool runtimeFeatureEnabled(absl::string_view key) const PURE;
 
   /**
    * Test if a feature is enabled using the built in random generator. This is done by generating

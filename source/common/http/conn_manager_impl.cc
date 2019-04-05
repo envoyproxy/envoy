@@ -29,9 +29,11 @@
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -420,6 +422,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   stream_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
 
+  stream_info_.setDownstreamSslConnection(connection_manager_.read_callbacks_->connection().ssl());
+
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
@@ -661,6 +665,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    is_head_request_, absl::nullopt);
+    return;
+  }
+
+  // Path sanitization should happen before any path access other than the above sanity check.
+  if (!ConnectionManagerUtility::maybeNormalizePath(*request_headers_,
+                                                    connection_manager_.config_)) {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+                   nullptr, is_head_request_, absl::nullopt);
     return;
   }
 
@@ -1059,7 +1071,10 @@ void ConnectionManagerImpl::startDrainSequence() {
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
-  Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
+  Router::RouteConstSharedPtr route;
+  if (request_headers_ != nullptr) {
+    route = snapped_route_config_->route(*request_headers_, stream_id_);
+  }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
   if (nullptr == stream_info_.route_entry_) {

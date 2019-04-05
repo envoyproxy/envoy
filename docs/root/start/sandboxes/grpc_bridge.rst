@@ -36,6 +36,7 @@ run::
 
   $ pwd
   envoy/examples/grpc-bridge
+  $ docker-compose pull
   $ docker-compose up --build
 
 Sending requests to the Key/Value store
