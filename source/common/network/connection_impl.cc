@@ -134,10 +134,14 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     //     2) A second close is issued by a subsequent call to
     //        ConnectionManagerImpl::checkForDeferredClose() prior to returning from onData()
     if (inDelayedClose()) {
+      // Validate that a delayed close timer is already enabled unless it was disabled via
+      // configuration.
       ASSERT(!delayed_close_timeout_set || delayed_close_timer_ != nullptr);
-      delayed_close_state_ = (type == ConnectionCloseType::FlushWrite || !delayed_close_timeout_set)
-                                 ? DelayedCloseState::CloseAfterFlush
-                                 : DelayedCloseState::CloseAfterFlushAndTimeout;
+      if (type == ConnectionCloseType::FlushWrite || !delayed_close_timeout_set) {
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
+      } else {
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndTimeout;
+      }
       return;
     }
 

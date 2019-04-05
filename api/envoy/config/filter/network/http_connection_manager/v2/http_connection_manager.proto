@@ -202,10 +202,12 @@ message HttpConnectionManager {
   // It is defined as a grace period after connection close processing has been locally initiated
   // during which Envoy will wait for the peer to close (i.e., a TCP FIN/RST is received by Envoy
   // from the downstream connection) prior to Envoy closing the socket associated with that
-  // connection. Note that this timeout may trigger a socket close even when Envoy's write
-  // buffer has not been fully flushed after close processing is initiated; this happens when Envoy
-  // is unable to write data to the socket for an interval greater than or equal to this timeout
-  // value.
+  // connection.
+  // NOTE: This timeout is enforced even when the socket associated with the downstream connection
+  // is pending a flush of the write buffer. However, any progress made writing data to the socket
+  // will restart the timer associated with this timeout. This means that the total grace period for
+  // a socket in this state will be
+  // <delayed_close_timeout>+<total_time_waiting_for_write_buffer_flushes>.
   //
   // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
