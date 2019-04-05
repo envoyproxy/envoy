@@ -5,6 +5,7 @@ def _default_envoy_api_impl(ctx):
         "bazel",
         "envoy",
         "examples",
+        "pb",
         "test",
         "tools",
         "versioning",

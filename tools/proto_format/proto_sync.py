@@ -316,6 +316,7 @@ def GenerateCurrentApiDir(api_dir, dst_dir):
     api_dir: the original api directory
     dst_dir: the api directory to be compared in temporary directory
   """
+  shutil.copytree(str(api_dir.joinpath("pb")), str(dst_dir.joinpath("pb")))
   dst = dst_dir.joinpath("envoy")
   shutil.copytree(str(api_dir.joinpath("envoy")), str(dst))
 

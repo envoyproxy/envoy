@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package pb.lyft.ratelimit;
+
+import "envoy/service/ratelimit/v2/rls.proto";
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.pb.lyft.ratelimit";
+option java_outer_classname = "RlsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.service.ratelimit.v3";
+option (udpa.annotations.file_status).package_version_status = FROZEN;
+
+// [#protodoc-title: Rate Limit Service (RLS)]
+
+service RateLimitService {
+  rpc ShouldRateLimit(envoy.service.ratelimit.v2.RateLimitRequest) returns (envoy.service.ratelimit.v2.RateLimitResponse) {
+  }
+}

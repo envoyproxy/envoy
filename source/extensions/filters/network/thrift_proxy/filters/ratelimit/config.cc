@@ -35,7 +35,8 @@ RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     callbacks.addDecoderFilter(std::make_shared<Filter>(
         config, Filters::Common::RateLimit::rateLimitClient(
                     context, proto_config.rate_limit_service().grpc_service(), timeout,
-                    proto_config.rate_limit_service().transport_api_version())));
+                    proto_config.rate_limit_service().transport_api_version(),
+                    proto_config.rate_limit_service().use_alpha())));
   };
 }
 

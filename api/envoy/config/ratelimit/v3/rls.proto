@@ -29,6 +29,13 @@ message RateLimitServiceConfig {
   core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
 
   // API version for rate limit transport protocol. This describes the rate limit gRPC endpoint and
-  // version of messages used on the wire.
+  // version of messages used on the wire.  If set to `V2`, then the `use_alpha` option will instead
+  // select the old alpha protocol.
   core.v3.ApiVersion transport_api_version = 4 [(validate.rules).enum = {defined_only: true}];
+
+  // API version for rate limit transport protocol. If `transport_api_version` is set to `V2`, then
+  // this will instead select the alpha version of the V2 API; `pb.lyft.ratelimit.RateLimitService`
+  // rather than the final V2 API `envoy.service.ratelimit.v2.RateLimitService`.  This setting has
+  // no affect if `transport_api_version` is set to `V3`.
+  bool use_alpha = 5;
 }

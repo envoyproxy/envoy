@@ -47,7 +47,7 @@ class GrpcClientImpl : public Client,
 public:
   GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout,
-                 envoy::config::core::v3::ApiVersion transport_api_version);
+                 envoy::config::core::v3::ApiVersion transport_api_version, bool use_alpha);
   ~GrpcClientImpl() override;
 
   static void createRequest(envoy::service::ratelimit::v3::RateLimitRequest& request,
@@ -84,7 +84,8 @@ private:
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
                           const envoy::config::core::v3::GrpcService& grpc_service,
                           const std::chrono::milliseconds timeout,
-                          envoy::config::core::v3::ApiVersion transport_api_version);
+                          envoy::config::core::v3::ApiVersion transport_api_version,
+                          bool use_alpha);
 
 } // namespace RateLimit
 } // namespace Common
