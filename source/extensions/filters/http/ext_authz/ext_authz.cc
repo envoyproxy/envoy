@@ -188,12 +188,18 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the intended
       // combined headers: {{"original": "true"}, {"append": "1"}, {"append": "2"}}) to the request
       // to upstream server by only sets `headers_to_append`.
+      //
+      // FIXME(lukeshu): Invert the above comment; add a flag to disable appending to non-existent
+      // headers; for Ambassador we patch Envoy to always enable appending to non-existent headers
+      // https://github.com/datawire/ambassador/issues/1313
       if (header_to_modify != nullptr) {
         ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
         // The current behavior of appending is by combining entries with the same key, into one
         // entry. The value of that combined entry is separated by ",".
         // TODO(dio): Consider to use addCopy instead.
         request_headers_->appendCopy(header.first, header.second);
+      } else {
+        request_headers_->addCopy(header.first, header.second);
       }
     }
     if (cluster_) {

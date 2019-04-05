@@ -191,8 +191,12 @@ public:
       // request, we expect those headers to be absent in the modified outgoing (upstream) request.
       // So let's verify that new_headers_from_upstream has headers that are not in
       // upstream_request_->headers().
-      EXPECT_THAT(new_headers_from_upstream,
-                  Not(Http::IsSubsetOfHeaders(upstream_request_->headers())));
+      //
+      // FIXME(lukeshu): For Ambassador we patch Envoy to unconditionally enable the "append-if-set
+      // or set-if-unset" behavior; we always do the thing that dio has a TODO to add a flag for.
+      // So we need to disable this check.  https://github.com/datawire/ambassador/issues/1313
+      //EXPECT_THAT(new_headers_from_upstream,
+      //            Not(Http::IsSubsetOfHeaders(upstream_request_->headers())));
     }
 
     if (!headers_to_append_multiple.empty()) {
