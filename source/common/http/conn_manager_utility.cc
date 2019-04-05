@@ -10,6 +10,7 @@
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/runtime/uuid_util.h"
@@ -362,6 +363,16 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);
   }
+}
+
+/* static */
+bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
+                                                  const ConnectionManagerConfig& config) {
+  ASSERT(request_headers.Path());
+  if (config.shouldNormalizePath()) {
+    return PathUtil::canonicalPath(*request_headers.Path());
+  }
+  return true;
 }
 
 } // namespace Http

@@ -15,9 +15,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-MockRouter::MockRouter() {}
-MockRouter::~MockRouter() {}
-
 namespace ConnPool {
 
 MockInstance::MockInstance() {}

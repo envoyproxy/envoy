@@ -59,9 +59,8 @@ message StatsConfig {
   //   If any default tags are specified twice, the config will be considered
   //   invalid.
   //
-  // See `well_known_names.h
-  // <https://github.com/envoyproxy/envoy/blob/master/source/common/config/well_known_names.h>`_
-  // for a list of the default tags in Envoy.
+  // See :repo:`well_known_names.h <source/common/config/well_known_names.h>` for a list of the
+  // default tags in Envoy.
   //
   // If not provided, the value is assumed to be true.
   google.protobuf.BoolValue use_all_default_tags = 2;
@@ -166,9 +165,8 @@ message StatsMatcher {
 message TagSpecifier {
   // Attaches an identifier to the tag values to identify the tag being in the
   // sink. Envoy has a set of default names and regexes to extract dynamic
-  // portions of existing stats, which can be found in `well_known_names.h
-  // <https://github.com/envoyproxy/envoy/blob/master/source/common/config/well_known_names.h>`_
-  // in the Envoy repository. If a :ref:`tag_name
+  // portions of existing stats, which can be found in :repo:`well_known_names.h
+  // <source/common/config/well_known_names.h>` in the Envoy repository. If a :ref:`tag_name
   // <envoy_api_field_config.metrics.v2.TagSpecifier.tag_name>` is provided in the config and
   // neither :ref:`regex <envoy_api_field_config.metrics.v2.TagSpecifier.regex>` or
   // :ref:`fixed_value <envoy_api_field_config.metrics.v2.TagSpecifier.fixed_value>` were specified,

@@ -72,7 +72,7 @@ MockSource::~MockSource() {}
 MockSink::MockSink() {}
 MockSink::~MockSink() {}
 
-MockStore::MockStore() {
+MockStore::MockStore() : StoreImpl(*fake_symbol_table_) {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, histogram(_)).WillByDefault(Invoke([this](const std::string& name) -> Histogram& {
     auto* histogram = new NiceMock<MockHistogram>;
