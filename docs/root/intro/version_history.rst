@@ -1,6 +1,9 @@
 Version history
 ---------------
 
+1.11.0 (Pending)
+================
+
 1.10.0 (Apr 5, 2019)
 ====================
 * access log: added a new flag for upstream retry count exceeded.
