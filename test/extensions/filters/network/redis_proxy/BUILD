@@ -105,3 +105,14 @@ envoy_extension_cc_test_binary(
         "//test/test_common:simulated_time_system_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "redis_proxy_integration_test",
+    size = "small",
+    srcs = ["redis_proxy_integration_test.cc"],
+    extension_name = "envoy.filters.network.redis_proxy",
+    deps = [
+        "//source/extensions/filters/network/redis_proxy:config",
+        "//test/integration:integration_lib",
+    ],
+)

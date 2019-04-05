@@ -76,6 +76,7 @@ public:
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
+  MOCK_CONST_METHOD0(shouldNormalizePath, bool());
 
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
       std::make_unique<DefaultInternalAddressConfig>();
@@ -1099,6 +1100,39 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
 
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
+}
+
+// maybeNormalizePath() does nothing by default.
+TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/../a"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(original_headers, header_map);
+}
+
+// maybeNormalizePath() leaves already normal paths alone.
+TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(original_headers, header_map);
+}
+
+// maybeNormalizePath() normalizes relative paths.
+TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/../abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
 
 } // namespace Http
