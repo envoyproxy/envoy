@@ -30,14 +30,6 @@ namespace ExtAuthz {
 
 typedef Grpc::AsyncRequestCallbacks<envoy::service::auth::v2::CheckResponse> ExtAuthzAsyncCallbacks;
 
-struct ConstantValues {
-  const std::string TraceStatus = "ext_authz_status";
-  const std::string TraceUnauthz = "ext_authz_unauthorized";
-  const std::string TraceOk = "ext_authz_ok";
-};
-
-typedef ConstSingleton<ConstantValues> Constants;
-
 /*
  * This client implementation is used when the Ext_Authz filter needs to communicate with an gRPC
  * authorization server. Unlike the HTTP client, the gRPC allows the server to define response

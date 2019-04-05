@@ -5,16 +5,30 @@
 #include <string>
 #include <vector>
 
+#include "common/singleton/const_singleton.h"
+
 #include "envoy/common/pure.h"
 #include "envoy/http/codes.h"
 #include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
+
 
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
+
+/**
+ * Tracing statuses. 
+ */
+struct ConstantValues {
+  const std::string TraceStatus = "ext_authz_status";
+  const std::string TraceUnauthz = "ext_authz_unauthorized";
+  const std::string TraceOk = "ext_authz_ok";
+};
+
+typedef ConstSingleton<ConstantValues> Constants;
 
 /**
  * Possible async results for a check call.

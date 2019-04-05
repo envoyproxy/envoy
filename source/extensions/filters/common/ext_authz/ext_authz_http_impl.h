@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
@@ -146,6 +147,8 @@ private:
   ClientConfigSharedPtr config_;
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
+  RealTimeSource real_time_;
+  Tracing::SpanPtr span_;
 };
 
 } // namespace ExtAuthz
