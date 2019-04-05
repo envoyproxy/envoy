@@ -78,6 +78,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
+    srcs = envoy_select_quiche(["quic_mem_slice_impl.cc"]),
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",

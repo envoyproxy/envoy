@@ -47,7 +47,7 @@ public:
     Envoy::STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
     buffer_.getRawSlices(slices.begin(), num_slices);
     size_t saved_length = 0;
-    for (auto slice : slices) {
+    for (auto& slice : slices) {
       if (slice.len_ == 0) {
         continue;
       }

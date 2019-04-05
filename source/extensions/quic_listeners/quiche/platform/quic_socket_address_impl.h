@@ -14,6 +14,8 @@
 
 namespace quic {
 
+// Implements the interface required by
+// https://quiche.googlesource.com/quiche/+/refs/heads/master/quic/platform/api/quic_socket_address.h
 // This is a dummy implementation which just allows its dependency to build.
 // TODO(vasilvv) Remove this impl once QuicSocketAddress and QuicIpAddress are
 // removed from platform API.
