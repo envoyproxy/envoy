@@ -1,0 +1,14 @@
+load("@envoy_api//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal")
+
+licenses(["notice"])  # Apache 2
+
+api_proto_library_internal(
+    name = "orca",
+    srcs = ["orca.proto"],
+    has_services = 1,
+)
+
+api_go_grpc_library(
+    name = "orca",
+    proto = ":orca",
+)
