@@ -61,7 +61,7 @@ private:
     bool enableHashtagging() const override { return false; }
     bool enableRedirection() const override {
       return true;
-    } // redirection errors are treated as check successes
+    } // Redirection errors are treated as check successes.
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;

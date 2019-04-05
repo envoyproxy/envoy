@@ -153,9 +153,9 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
           host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
         }
       }
-      if (!redirected) {
-        request.callbacks_.onResponse(std::move(value));
-      }
+    }
+    if (!redirected) {
+      request.callbacks_.onResponse(std::move(value));
     }
   } else {
     request.callbacks_.onResponse(std::move(value));

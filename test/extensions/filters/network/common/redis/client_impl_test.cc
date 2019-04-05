@@ -391,9 +391,9 @@ TEST_F(RedisClientImplTest, AskRedirection) {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     response1->type(Common::Redis::RespType::Error);
-    // exact values of hash slot and ip info not important
+    // The exact values of the hash slot and IP info are not important.
     response1->asString() = "ASK 1111 10.1.2.3:4321";
-    // simulate redirection failure
+    // Simulate redirection failure.
     EXPECT_CALL(callbacks1, onRedirection(Ref(*response1))).WillOnce(Return(false));
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
@@ -404,7 +404,7 @@ TEST_F(RedisClientImplTest, AskRedirection) {
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
-    // exact values of hash slot and ip info not important
+    // The exact values of the hash slot and IP info are not important.
     response2->asString() = "ASK 2222 10.1.2.4:4321";
     EXPECT_CALL(callbacks2, onRedirection(Ref(*response2))).WillOnce(Return(true));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -449,9 +449,9 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     response1->type(Common::Redis::RespType::Error);
-    // exact values of hash slot and ip info not important
+    // The exact values of the hash slot and IP info are not important.
     response1->asString() = "MOVED 1111 10.1.2.3:4321";
-    // simulate redirection failure
+    // Simulate redirection failure.
     EXPECT_CALL(callbacks1, onRedirection(Ref(*response1))).WillOnce(Return(false));
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
@@ -462,7 +462,7 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
-    // exact values of hash slot and ip info not important
+    // The exact values of the hash slot and IP info are not important.
     response2->asString() = "MOVED 2222 10.1.2.4:4321";
     EXPECT_CALL(callbacks2, onRedirection(Ref(*response2))).WillOnce(Return(true));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -507,9 +507,9 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     response1->type(Common::Redis::RespType::Error);
-    // exact values of hash slot and ip info not important
+    // The exact values of the hash slot and IP info are not important.
     response1->asString() = "ASK 1111 10.1.2.3:4321";
-    // simulate redirection failure
+    // Simulate redirection failure.
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
     EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
@@ -520,7 +520,7 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
-    // exact values of hash slot and ip info not important
+    // The exact values of the hash slot and IP info are not important.
     response2->asString() = "ASK 2222 10.1.2.4:4321";
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -566,7 +566,7 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     response1->type(Common::Redis::RespType::Error);
-    // exact values of hash slot and ip info not important
+    // The exact values of the hash slot and IP info are not important.
     response1->asString() = "MOVED 1111 10.1.2.3:4321";
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
@@ -578,7 +578,7 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
-    // exact values of hash slot and ip info not important
+    // The exact values of the hash slot and IP info are not important.
     response2->asString() = "MOVED 2222 10.1.2.4:4321";
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());

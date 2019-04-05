@@ -38,8 +38,9 @@ public:
   /**
    * Makes a redis request based on IP address and TCP port of the upstream host (e.g., moved/ask
    * cluster redirection).
-   * @param host_address the address of the host to receive the request
-   * @param request supplies the request to make.
+   * @param host_address supplies the IP address and TCP port of the upstream host to receive the
+   * request.
+   * @param request supplies the Redis request to make.
    * @param callbacks supplies the request completion callbacks.
    * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
    *         for some reason.

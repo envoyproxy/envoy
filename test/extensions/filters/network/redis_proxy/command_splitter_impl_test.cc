@@ -376,12 +376,11 @@ TEST_F(RedisSingleServerRequestTest, MovedRedirectionFailure) {
   makeRequest("foo", std::move(request));
   EXPECT_NE(nullptr, handle_);
 
-  // bad format
+  // Test a truncated MOVED error response that cannot be parsed properly.
   Common::Redis::RespValue moved_response;
   moved_response.type(Common::Redis::RespType::Error);
   moved_response.asString() = "MOVED 1111";
   EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
-  // bad response type
   moved_response.type(Common::Redis::RespType::Integer);
   moved_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
@@ -397,12 +396,12 @@ TEST_F(RedisSingleServerRequestTest, RedirectionFailure) {
   makeRequest("foo", std::move(request));
   EXPECT_NE(nullptr, handle_);
 
-  // bad error (but could be valid moved or ask error)
+  // Test an error that looks like it might be a MOVED or ASK redirection error except for the first
+  // non-whitespace substring.
   Common::Redis::RespValue moved_response;
   moved_response.type(Common::Redis::RespType::Error);
   moved_response.asString() = "NOTMOVEDORASK 1111 1.1.1.1:1";
   EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
-  // bad response type
   moved_response.type(Common::Redis::RespType::Integer);
   moved_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
@@ -426,7 +425,7 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionSuccess) {
       .WillOnce(
           Invoke([&](const std::string& host_address, const Common::Redis::RespValue& request,
                      Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-            // verify that the request has been properly modified in place with an "asking" prefix
+            // Verify that the request has been properly modified in place with an "asking" prefix.
             std::vector<std::string> commands = {"asking", "get", "foo"};
             EXPECT_EQ(host_address, "10.1.2.3:4000");
             EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
@@ -438,7 +437,6 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionSuccess) {
             return &pool_request2;
           }));
   EXPECT_TRUE(pool_callbacks_->onRedirection(ask_response));
-  // cleanup...
   respond();
 };
 
@@ -452,11 +450,10 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionFailure) {
 
   Common::Redis::RespValue ask_response;
 
-  // bad format
+  // Test a truncated ASK error response that cannot be parsed properly.
   ask_response.type(Common::Redis::RespType::Error);
   ask_response.asString() = "ASK 1111";
   EXPECT_FALSE(pool_callbacks_->onRedirection(ask_response));
-  // bad response type
   ask_response.type(Common::Redis::RespType::Integer);
   ask_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_->onRedirection(ask_response));
@@ -670,16 +667,16 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithMovedRedirection) {
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
 
-  // bad moved response
+  // Test with a non-error response.
   Common::Redis::RespValue bad_moved_response;
   bad_moved_response.type(Common::Redis::RespType::Integer);
   bad_moved_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_moved_response));
 
-  // good responses...
+  // Test with a valid MOVED response.
   Common::Redis::RespValue moved_response;
   moved_response.type(Common::Redis::RespType::Error);
-  moved_response.asString() = "MOVED 1234 192.168.0.1:5000"; // exact values not important
+  moved_response.asString() = "MOVED 1234 192.168.0.1:5000"; // Exact values are not important.
   for (unsigned int i = 0; i < 2; i++) {
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(
@@ -731,16 +728,16 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithAskRedirection) {
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
 
-  // bad moved response
+  // Test with an non-error response.
   Common::Redis::RespValue bad_ask_response;
   bad_ask_response.type(Common::Redis::RespType::Integer);
   bad_ask_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_ask_response));
 
-  // good responses...
+  // Test with a valid ASK response.
   Common::Redis::RespValue ask_response;
   ask_response.type(Common::Redis::RespType::Error);
-  ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // exact values not important
+  ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // Exact values are not important.
   for (unsigned int i = 0; i < 2; i++) {
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(
@@ -919,16 +916,16 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithMovedRedirection) {
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
 
-  // bad moved response
+  // Test with a non-error response.
   Common::Redis::RespValue bad_moved_response;
   bad_moved_response.type(Common::Redis::RespType::Integer);
   bad_moved_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_moved_response));
 
-  // good responses...
+  // Test with a valid MOVED response.
   Common::Redis::RespValue moved_response;
   moved_response.type(Common::Redis::RespType::Error);
-  moved_response.asString() = "MOVED 1234 192.168.0.1:5000"; // exact values not important
+  moved_response.asString() = "MOVED 1234 192.168.0.1:5000"; // Exact values are not important.
   for (unsigned int i = 0; i < 2; i++) {
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(
@@ -978,16 +975,16 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithAskRedirection) {
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
 
-  // bad moved response
+  // Test with a non-error response.
   Common::Redis::RespValue bad_ask_response;
   bad_ask_response.type(Common::Redis::RespType::Integer);
   bad_ask_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_ask_response));
 
-  // good responses...
+  // Test with a valid ASK response.
   Common::Redis::RespValue ask_response;
   ask_response.type(Common::Redis::RespType::Error);
-  ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // exact values not important
+  ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // Exact values are not important.
   for (unsigned int i = 0; i < 2; i++) {
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(
@@ -1144,16 +1141,16 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithMovedRedirection) {
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
 
-  // bad moved response
+  // Test with a non-error response.
   Common::Redis::RespValue bad_moved_response;
   bad_moved_response.type(Common::Redis::RespType::Integer);
   bad_moved_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_moved_response));
 
-  // good responses...
+  // Test with a valid MOVED response.
   Common::Redis::RespValue moved_response;
   moved_response.type(Common::Redis::RespType::Error);
-  moved_response.asString() = "MOVED 1234 192.168.0.1:5000"; // exact values not important
+  moved_response.asString() = "MOVED 1234 192.168.0.1:5000"; // Exact values are not important.
   for (unsigned int i = 0; i < 2; i++) {
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(
@@ -1202,16 +1199,16 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithAskRedirection) {
   setup(2, {});
   EXPECT_NE(nullptr, handle_);
 
-  // bad moved response
+  // Test with a non-error response.
   Common::Redis::RespValue bad_ask_response;
   bad_ask_response.type(Common::Redis::RespType::Integer);
   bad_ask_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_[0]->onRedirection(bad_ask_response));
 
-  // good responses...
+  // Test with a valid ASK response.
   Common::Redis::RespValue ask_response;
   ask_response.type(Common::Redis::RespType::Error);
-  ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // exact values not important
+  ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // Exact values are not important.
   for (unsigned int i = 0; i < 2; i++) {
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(

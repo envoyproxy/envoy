@@ -147,7 +147,7 @@ TEST_F(RedisConnPoolImplTest, Hashtagging) {
 TEST_F(RedisConnPoolImplTest, HashtaggingNotEnabled) {
   InSequence s;
 
-  setup(true, false); // hashtagging not enabled
+  setup(true, false); // Test with hashtagging not enabled.
 
   Common::Redis::RespValue value;
   Common::Redis::Client::MockPoolCallbacks callbacks;
@@ -332,9 +332,9 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHost) {
   Upstream::HostConstSharedPtr host1;
   Upstream::HostConstSharedPtr host2;
 
-  // no cluster
+  // There is no cluster yet, so makeRequestToHost() should fail.
   EXPECT_EQ(nullptr, conn_pool_->makeRequestToHost("10.0.0.1:3000", value, callbacks1));
-  // add cluster
+  // Add the cluster now.
   update_callbacks_->onClusterAddOrUpdate(cm_.thread_local_cluster_);
 
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host1), Return(client1)));
@@ -345,8 +345,9 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHost) {
   EXPECT_EQ(&active_request1, request1);
   EXPECT_EQ(host1->address()->asString(), "10.0.0.1:3000");
 
-  // IPv6 scenario ... IPv6 address returned from Redis server will not have square brackets
-  // around it, while Envoy resolves Address::Ipv6Instance addresses with square brackets...
+  // IPv6 address returned from Redis server will not have square brackets
+  // around it, while Envoy represents Address::Ipv6Instance addresses with square brackets around
+  // the address.
   EXPECT_CALL(*this, create_(_)).WillOnce(DoAll(SaveArg<0>(&host2), Return(client2)));
   EXPECT_CALL(*client2, makeRequest(Ref(value), Ref(callbacks2)))
       .WillOnce(Return(&active_request2));
@@ -355,20 +356,20 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHost) {
   EXPECT_EQ(&active_request2, request2);
   EXPECT_EQ(host2->address()->asString(), "[2001:470:813b::1]:3333");
 
-  // bad format -- no colon
+  // Test with a badly specified host address (no colon, no address, no port).
   EXPECT_EQ(conn_pool_->makeRequestToHost("bad", value, callbacks1), nullptr);
-  // bad IPv4 address
+  // Test with a badly specified IPv4 address.
   EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.bad:3000", value, callbacks1), nullptr);
-  // bad port
+  // Test with a badly specified TCP port.
   EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:bad", value, callbacks1), nullptr);
-  // port out of range
+  // Test with a TCP port outside of the acceptable range for a 32-bit integer.
   EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:4294967297", value, callbacks1),
             nullptr); // 2^32 + 1
-  // port > 65535
+  // Test with a TCP port outside of the acceptable range for a TCP port (0 .. 65535).
   EXPECT_EQ(conn_pool_->makeRequestToHost("10.0.0.1:65536", value, callbacks1), nullptr);
-  // bad IPv6 address
+  // Test with a badly specified IPv6-like address.
   EXPECT_EQ(conn_pool_->makeRequestToHost("bad:ipv6:3000", value, callbacks1), nullptr);
-  // IPv6 address with bad port (out of range)
+  // Test with a valid IPv6 address and a badly specified TCP port (out of range).
   EXPECT_EQ(conn_pool_->makeRequestToHost("2001:470:813b:::70000", value, callbacks1), nullptr);
 
   EXPECT_CALL(*client2, close());

@@ -78,7 +78,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
       });
 
   ASSERT(host_address_map_.empty());
-  for (unsigned int i = 0; i < cluster_->prioritySet().hostSetsPerPriority().size(); i++) {
+  for (uint32_t i = 0; i < cluster_->prioritySet().hostSetsPerPriority().size(); i++) {
     for (auto& host : cluster_->prioritySet().hostSetsPerPriority()[i]->hosts()) {
       host_address_map_[host->address()->asString()] = host;
     }
@@ -138,7 +138,7 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     client->redis_client_->addConnectionCallbacks(*client);
   }
 
-  // cache host for quick lookup via address for redirection support
+  // Keep host_address_map_ in sync with client_map_.
   auto host_cached_by_address = host_address_map_.find(host->address()->asString());
   if (host_cached_by_address == host_address_map_.end()) {
     host_address_map_[host->address()->asString()] = host;
@@ -162,26 +162,22 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     return nullptr;
   }
 
-  std::string ip_address = host_address.substr(0, colon_pos);
-  bool ipv6 = (ip_address.find(":") != std::string::npos);
+  const std::string ip_address = host_address.substr(0, colon_pos);
+  const bool ipv6 = (ip_address.find(":") != std::string::npos);
   std::string host_address_map_key;
   Network::Address::InstanceConstSharedPtr address_ptr;
 
   if (!ipv6) {
     host_address_map_key = host_address;
   } else {
-    // find our canonical IPv6 address string representation by
-    // creating the address from the Redis server info...
-    std::string ip_port = host_address.substr(colon_pos + 1);
+    const std::string ip_port = host_address.substr(colon_pos + 1);
     uint64_t ip_port_number;
     if (!StringUtil::atoull(ip_port.c_str(), ip_port_number) || (ip_port_number > 65535)) {
-      // bad port number conversion or out of range for a TCP port
       return nullptr;
     }
     try {
       address_ptr = std::make_shared<Network::Address::Ipv6Instance>(ip_address, ip_port_number);
     } catch (const EnvoyException&) {
-      // bad IPv6 address
       return nullptr;
     }
     host_address_map_key = address_ptr->asString();
@@ -189,19 +185,20 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
 
   auto it = host_address_map_.find(host_address_map_key);
   if (it == host_address_map_.end()) {
-    // not known to the cluster manager, create a new host and insert it into the map
+    // This host is not known to the cluster manager. Create a new host and insert it into the map.
+    // TODO(msukalski): Add logic to track the number of these "unknown" host connections,
+    // cap the number of these connections, and implement time-out and cleaning logic, etc.
+
     if (!ipv6) {
-      // only create an IPv4 address instance if we need a new Upstream::HostImpl
-      std::string ip_port = host_address.substr(colon_pos + 1);
+      // Only create an IPv4 address instance if we need a new Upstream::HostImpl.
+      const std::string ip_port = host_address.substr(colon_pos + 1);
       uint64_t ip_port_number;
       if (!StringUtil::atoull(ip_port.c_str(), ip_port_number) || (ip_port_number > 65535)) {
-        // bad port number conversion or out of range for a TCP port
         return nullptr;
       }
       try {
         address_ptr = std::make_shared<Network::Address::Ipv4Instance>(ip_address, ip_port_number);
       } catch (const EnvoyException&) {
-        // bad IPv4 address
         return nullptr;
       }
     }

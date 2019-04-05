@@ -79,8 +79,11 @@ TEST_F(RedisRespValueTest, EqualityTestingAndCopyingTest) {
   makeArray(value8,
             {bulkstring_value, simplestring_value, error_value, integer_value, null_value, value3});
 
+  // This may look weird, but it is a way to actually do self-assignment without generating compiler
+  // warnings. Self-assignment should succeed without changing the RespValue, and therefore no
+  // expectations should change.
   RespValue* value6_ptr = &value6;
-  value6 = *value6_ptr; // self-assignment, no expectations change...
+  value6 = *value6_ptr;
   EXPECT_EQ(value6, value7);
   EXPECT_NE(value6, value8);
   EXPECT_NE(value7, value8);

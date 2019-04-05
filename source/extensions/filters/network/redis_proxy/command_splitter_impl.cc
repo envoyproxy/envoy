@@ -26,14 +26,22 @@ Common::Redis::RespValuePtr Utility::makeError(const std::string& error) {
 }
 
 namespace {
-auto redirectionArgsInvalid = [](const Common::Redis::RespValue* original_request,
-                                 const Common::Redis::RespValue& error_response,
-                                 std::vector<absl::string_view>& error_substrings,
-                                 bool& ask_redirection) -> bool {
-  if ((original_request == nullptr) ||
-      (original_request->type() != Common::Redis::RespType::Array) ||
-      (original_request->asArray().size() == 0) ||
-      (error_response.type() != Common::Redis::RespType::Error)) {
+
+/**
+ * Validate the received moved/ask redirection error and the original redis request.
+ * @param[in] original_request supplies the incoming request associated with the command splitter
+ * request.
+ * @param[in] error_response supplies the moved/ask redirection response from the upstream Redis
+ * server.
+ * @param[out] error_substrings the non-whitespace substrings of error_response.
+ * @param[out] ask_redirection true if error_response is an ASK redirection error, false otherwise.
+ * @return bool true if the original_request or error_response are not valid, false otherwise.
+ */
+bool redirectionArgsInvalid(const Common::Redis::RespValue* original_request,
+                            const Common::Redis::RespValue& error_response,
+                            std::vector<absl::string_view>& error_substrings,
+                            bool& ask_redirection) {
+  if ((original_request == nullptr) || (error_response.type() != Common::Redis::RespType::Error)) {
     return true;
   }
   error_substrings = StringUtil::splitToken(error_response.asString(), " ", false);
@@ -45,13 +53,14 @@ auto redirectionArgsInvalid = [](const Common::Redis::RespValue* original_reques
   } else if (error_substrings[0] == "MOVED") {
     ask_redirection = false;
   } else {
-    // the first substring must be MOVED or ASK...
+    // The first substring must be MOVED or ASK.
     return true;
   }
-  // other validation done later to avoid duplicate processing
+  // Other validation done later to avoid duplicate processing.
   return false;
-};
 }
+
+} // namespace
 
 void SplitRequestBase::onWrongNumberOfArguments(SplitCallbacks& callbacks,
                                                 const Common::Redis::RespValue& request) {
@@ -265,10 +274,11 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 }
 
 void MGETRequest::recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking) {
-  int num_values = prepend_asking ? 3 : 2;
+  static const uint32_t GET_COMMAND_SUBSTRINGS = 2;
+  uint32_t num_values = prepend_asking ? (GET_COMMAND_SUBSTRINGS + 1) : GET_COMMAND_SUBSTRINGS;
   std::vector<Common::Redis::RespValue> values(num_values);
 
-  for (int i = 0; i < num_values; i++) {
+  for (uint32_t i = 0; i < num_values; i++) {
     values[i].type(Common::Redis::RespType::BulkString);
   }
   values[--num_values].asString() = incoming_request_->asArray()[index + 1].asString();
@@ -379,10 +389,11 @@ void MSETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 }
 
 void MSETRequest::recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking) {
-  int num_values = prepend_asking ? 4 : 3;
+  static const uint32_t SET_COMMAND_SUBSTRINGS = 3;
+  uint32_t num_values = prepend_asking ? (SET_COMMAND_SUBSTRINGS + 1) : SET_COMMAND_SUBSTRINGS;
   std::vector<Common::Redis::RespValue> values(num_values);
 
-  for (int i = 0; i < num_values; i++) {
+  for (uint32_t i = 0; i < num_values; i++) {
     values[i].type(Common::Redis::RespType::BulkString);
   }
   values[--num_values].asString() = incoming_request_->asArray()[(index * 2) + 2].asString();
@@ -487,10 +498,11 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
 
 void SplitKeysSumResultRequest::recreate(Common::Redis::RespValue& request, uint32_t index,
                                          bool prepend_asking) {
-  int num_values = prepend_asking ? 3 : 2;
+  static const uint32_t BASE_COMMAND_SUBSTRINGS = 2;
+  uint32_t num_values = prepend_asking ? (BASE_COMMAND_SUBSTRINGS + 1) : BASE_COMMAND_SUBSTRINGS;
   std::vector<Common::Redis::RespValue> values(num_values);
 
-  for (int i = 0; i < num_values; i++) {
+  for (uint32_t i = 0; i < num_values; i++) {
     values[i].type(Common::Redis::RespType::BulkString);
   }
   values[--num_values].asString() = incoming_request_->asArray()[index + 1].asString();
