@@ -53,6 +53,15 @@ message ExtAuthz {
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   BufferSettings with_request_body = 5;
+
+  // Enable this setting when using the authorization header's metadata for performing route
+  // matching. Filter will clear chached routes when:
+  //
+  // 1. This field is set *true*.
+  // 2. Authorization response status is *OK*.
+  // 3. At least *one authorization response header* is addressed to the upstream.
+  //
+  bool clear_route_cache = 6;
 }
 
 // Configuration for buffering the request data.
