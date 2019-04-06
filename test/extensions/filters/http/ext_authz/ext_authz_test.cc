@@ -500,8 +500,10 @@ TEST_F(HttpFilterTest, HeaderOnlyRequestWithStream) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
 }
 
-
-// Test that filter clears the route cache.
+// Verifies that the filter clears the route cache when an authorization response:
+// 1. is an OK response.
+// 2. has headers to append.
+// 3. has headers to add.
 TEST_F(HttpFilterTest, ClearCache) {
   InSequence s;
 
@@ -537,7 +539,10 @@ TEST_F(HttpFilterTest, ClearCache) {
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
 }
 
-// Test that filter clears the route cache.
+// Verifies that the filter clears the route cache when an authorization response:
+// 1. is an OK response.
+// 2. has headers to append.
+// 3. has NO headers to add.
 TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   InSequence s;
 
@@ -572,7 +577,10 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
 }
 
-// Test that filter clears the route cache.
+// Verifies that the filter clears the route cache when an authorization response:
+// 1. is an OK response.
+// 2. has headers to add.
+// 3. has NO headers to append.
 TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   InSequence s;
 
@@ -607,8 +615,9 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
 }
 
-
-// Test that clear cache route doesn't get called.
+// Verifies that the filter DOES NOT clear the route cache when an authorization response:
+// 1. is an OK response.
+// 2. has NO headers to add or to append.
 TEST_F(HttpFilterTest, NoClearCacheRoute) {
   InSequence s;
 
@@ -642,8 +651,7 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
 }
 
-
-// Test that filter clears the route cache.
+// Verifies that the filter DOES NOT clear the route cache when clear_route_cache is set to false.
 TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   InSequence s;
 
@@ -678,7 +686,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
 }
 
-// Test that filter clears the route cache.
+// Verifies that the filter DOES NOT clear the route cache when authorization response is NOT OK.
 TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   InSequence s;
 
@@ -695,8 +703,6 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
   response.status_code = Http::Code::Unauthorized;
   response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
-  response.body = std::string{"baz"};
-
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
   EXPECT_CALL(*client_, check(_, _, _))
