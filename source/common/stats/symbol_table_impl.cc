@@ -273,10 +273,6 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
 #ifndef ENVOY_CONFIG_COVERAGE
 void SymbolTableImpl::debugPrint() const {
   Thread::LockGuard lock(lock_);
-  debugPrintLockHeld();
-}
-
-void SymbolTableImpl::debugPrintLockHeld() const {
   std::vector<Symbol> symbols;
   for (const auto& p : decode_map_) {
     symbols.push_back(p.first);
@@ -319,6 +315,38 @@ StatNameStorage::~StatNameStorage() {
 void StatNameStorage::free(SymbolTable& table) {
   table.free(statName());
   bytes_.reset();
+}
+
+SharedStatNameStorageSet::~SharedStatNameStorageSet() {
+  // free() must be called before destructing SharedStatNameStorageSet to
+  // decrement references to all symbols.
+  ASSERT(empty());
+}
+
+void SharedStatNameStorageSet::free(SymbolTable& symbol_table) {
+  // We must free() all symbols referenced in the set, otherwise the symbols
+  // will leak when the flat_hash_map superclass is destructed. They cannot
+  // self-destruct without an explicit free() as each individual StatNameStorage
+  // object does not have a reference to the symbol table, which would waste 8
+  // bytes per stat-name. So we must iterate over the set and free it. But we
+  // don't want to mutate objects while they are in a set, so we just copy them,
+  // which is easy because they are shared_ptr<StatNameStorage>.
+
+  size_t sz = size();
+  STACK_ARRAY(storage, SharedStatNameStorage, sz);
+  size_t i = 0;
+  for (const SharedStatNameStorage& name : *this) {
+    storage[i++] = name;
+  }
+  clear();
+
+  // Now that the associative container is clear, we can free all the referenced
+  // symbols.
+  for (i = 0; i < sz; ++i) {
+    SharedStatNameStorage& shared_stat_storage = storage[i];
+    RELEASE_ASSERT(shared_stat_storage.use_count() == 1, "Freeing symbol that's in use");
+    shared_stat_storage->free(symbol_table);
+  }
 }
 
 SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_names) const {

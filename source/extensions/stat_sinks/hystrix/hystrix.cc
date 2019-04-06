@@ -268,7 +268,7 @@ const std::string HystrixSink::printRollingWindows() {
 HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
     : server_(server), current_index_(num_buckets > 0 ? num_buckets : DEFAULT_NUM_BUCKETS),
       window_size_(current_index_ + 1),
-      cluster_upstream_rq_time_("cluster.upstream_rq_time", server.api().symbolTable()) {
+      cluster_upstream_rq_time_("cluster.upstream_rq_time", server.stats().symbolTable()) {
   Server::Admin& admin = server_.admin();
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
@@ -276,7 +276,7 @@ HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
                    MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
 }
 
-HystrixSink::~HystrixSink() { cluster_upstream_rq_time_.free(server_.api().symbolTable()); }
+HystrixSink::~HystrixSink() { cluster_upstream_rq_time_.free(server_.stats().symbolTable()); }
 
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Http::HeaderMap& response_headers,

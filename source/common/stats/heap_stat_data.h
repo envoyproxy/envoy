@@ -88,12 +88,6 @@ public:
                                                                tag_extracted_name, tags);
   }
 
-  BoolIndicatorSharedPtr makeBoolIndicator(StatName name, absl::string_view tag_extracted_name,
-                                           const std::vector<Tag>& tags) override {
-    return std::make_shared<HeapStat<BoolIndicatorImpl<HeapStatData>>>(alloc(name), *this,
-                                                                       tag_extracted_name, tags);
-  }
-
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
 #endif

@@ -32,7 +32,8 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       histograms_([this](StatName name) -> HistogramSharedPtr {
         return std::make_shared<HistogramImpl>(name, *this, alloc_.symbolTable().toString(name),
                                                std::vector<Tag>());
-      }) {}
+                  }),
+      null_gauge_(alloc_.symbolTable()) {}
 
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);

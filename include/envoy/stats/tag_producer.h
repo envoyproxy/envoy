@@ -7,6 +7,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/tag.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -20,8 +22,7 @@ public:
    * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
    * @param tags std::vector a set of Stats::Tag.
    */
-  virtual std::string produceTags(const std::string& metric_name,
-                                  std::vector<Tag>& tags) const PURE;
+  virtual std::string produceTags(absl::string_view metric_name, std::vector<Tag>& tags) const PURE;
 };
 
 typedef std::unique_ptr<const TagProducer> TagProducerPtr;

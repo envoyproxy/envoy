@@ -90,12 +90,7 @@ public:
     return wrapped_scope_->histogramFromStatName(name);
   }
 
-  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
-
-  BoolIndicator& boolIndicatorFromStatName(StatName name) override {
-    Thread::LockGuard lock(lock_);
-    return wrapped_scope_->boolIndicatorFromStatName(name);
-  }
+  NullGaugeImpl& nullGauge(const std::string& s) override { return wrapped_scope_->nullGauge(s); }
 
   Counter& counter(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
@@ -104,10 +99,6 @@ public:
   Gauge& gauge(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName());
-  }
-  BoolIndicator& boolIndicator(const std::string& name) override {
-    StatNameTempStorage storage(name, symbolTable());
-    return boolIndicatorFromStatName(storage.statName());
   }
   Histogram& histogram(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
@@ -122,7 +113,6 @@ private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
   StatsOptionsImpl stats_options_;
-  NullGaugeImpl null_gauge_;
 };
 
 /**
@@ -158,7 +148,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogramFromStatName(name);
   }
-  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
+  NullGaugeImpl& nullGauge(const std::string& s) override { return store_.nullGauge(s); }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
@@ -191,15 +181,11 @@ public:
   void mergeHistograms(PostMergeCb) override {}
   Source& source() override { return source_; }
 
-  const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
-  SymbolTable& symbolTable() override { return store_.symbolTable(); }
-
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   SourceImpl source_;
   StatsOptionsImpl stats_options_;
-  NullGaugeImpl null_gauge_;
 };
 
 } // namespace Stats

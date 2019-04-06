@@ -130,7 +130,7 @@ public:
    * @return a ThreadLocalHistogram within the scope's namespace.
    * @param name name of the histogram with scope prefix attached.
    */
-  virtual Histogram& tlsHistogramFromStatName(StatName name, ParentHistogramImpl& parent) PURE;
+  virtual Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) PURE;
 };
 
 /**
@@ -159,10 +159,10 @@ public:
     return default_scope_->histogramFromStatName(name);
   }
   Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
-  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
@@ -198,17 +198,17 @@ private:
     // We keep a TLS cache of rejected stat names. This costs memory, but
     // reduces runtime overhead running the matcher. Moreover, once symbol
     // tables are integrated, rejection will need the fully elaborated string,
-    // and it we need to take a global symbol-table lock to run. We keep
-    // this char* map here in the TLS cache to avoid taking a lock to compute
+    // and it we need to take a global symbol-table lock to run. We keep this
+    // StatName set here in the TLS cache to avoid taking a lock to compute
     // rejection.
-    SharedStringSet rejected_stats_;
+    StatNameHashSet rejected_stats_;
   };
 
   struct CentralCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
-    SharedStringSet rejected_stats_;
+    SharedStatNameStorageSet rejected_stats_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -219,12 +219,8 @@ private:
     Counter& counterFromStatName(StatName name) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatName(StatName name) override;
-    BoolIndicator& boolIndicatorFromStatName(StatName name) override;
     Histogram& histogramFromStatName(StatName name) override;
-    Histogram& tlsHistogramFromStatName(StatName name, ParentHistogramImpl& parent) override;
-
-    NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
-
+    Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
@@ -240,14 +236,12 @@ private:
       StatNameTempStorage storage(name, symbolTable());
       return gaugeFromStatName(storage.statName());
     }
-    BoolIndicator& boolIndicator(const std::string& name) override {
-      StatNameTempStorage storage(name, symbolTable());
-      return boolIndicatorFromStatName(storage.statName());
-    }
     Histogram& histogram(const std::string& name) override {
       StatNameTempStorage storage(name, symbolTable());
       return histogramFromStatName(storage.statName());
     }
+
+    NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
 
     template <class StatType>
     using MakeStatFn = std::function<std::shared_ptr<StatType>(StatDataAllocator&, StatName name,
@@ -272,6 +266,10 @@ private:
                            StatMap<std::shared_ptr<StatType>>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
+    void extractTagsAndTruncate(StatName& name,
+                                std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
+                                std::vector<Tag>& tags, std::string& tag_extracted_name);
+
     static std::atomic<uint64_t> next_scope_id_;
 
     const uint64_t scope_id_;
@@ -292,16 +290,15 @@ private:
   };
 
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
-  void clearScopeFromCaches(uint64_t scope_id);
+  void clearScopeFromCaches(uint64_t scope_id, const Event::PostCb& clean_central_cache);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
-  absl::string_view truncateStatNameIfNeeded(absl::string_view name);
-  bool rejects(const std::string& name) const;
+  bool rejects(StatName name) const;
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
-  bool checkAndRememberRejection(const std::string& name, SharedStringSet& central_rejected_stats,
-                                 SharedStringSet* tls_rejected_stats);
+  bool checkAndRememberRejection(StatName name, SharedStatNameStorageSet& central_rejected_stats,
+                                 StatNameHashSet* tls_rejected_stats);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
@@ -319,11 +316,9 @@ private:
   Counter& num_last_resort_stats_;
   HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
-  NullGaugeImpl null_gauge_;
 
   NullCounterImpl null_counter_;
   NullGaugeImpl null_gauge_;
-  NullBoolIndicatorImpl null_bool_;
   NullHistogramImpl null_histogram_;
 
   // Retain storage for deleted stats; these are no longer in maps because the

@@ -18,15 +18,15 @@ MetricImpl::MetricImpl(absl::string_view tag_extracted_name, const std::vector<T
                        SymbolTable& symbol_table) {
   // Encode all the names and tags into transient storage so we can count the
   // required bytes.
-  std::vector<absl::string_view> names;
-  names.resize(1 /* tag_extracted_name */ + 2 * tags.size());
+  uint32_t num_names = 1 /* tag_extracted_name */ + 2 * tags.size();
+  STACK_ARRAY(names, absl::string_view, num_names);
   names[0] = tag_extracted_name;
   int index = 0;
   for (auto& tag : tags) {
     names[++index] = tag.name_;
     names[++index] = tag.value_;
   }
-  stat_names_.populate(names, symbol_table);
+  symbol_table.populateList(names.begin(), num_names, stat_names_);
 }
 
 void MetricImpl::clear() { stat_names_.clear(symbolTable()); }

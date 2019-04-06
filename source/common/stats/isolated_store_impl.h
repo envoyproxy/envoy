@@ -88,10 +88,6 @@ public:
     StatNameTempStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName());
   }
-  BoolIndicator& boolIndicator(const std::string& name) override {
-    StatNameTempStorage storage(name, symbolTable());
-    return boolIndicatorFromStatName(storage.statName());
-  }
   Histogram& histogram(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName());

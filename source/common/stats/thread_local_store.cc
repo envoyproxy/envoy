@@ -30,8 +30,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
       stats_overflow_("stats.overflow", alloc.symbolTable()),
       num_last_resort_stats_(default_scope_->counterFromStatName(stats_overflow_.statName())),
       heap_allocator_(alloc.symbolTable()), source_(*this), null_counter_(alloc.symbolTable()),
-      null_gauge_(alloc.symbolTable()), null_bool_(alloc.symbolTable()),
-      null_histogram_(alloc.symbolTable()) {}
+      null_gauge_(alloc.symbolTable()), null_histogram_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);
@@ -67,10 +66,10 @@ void ThreadLocalStoreImpl::removeRejectedStats(StatMapClass& map, StatListClass&
     }
   }
   for (StatName stat_name : remove_list) {
-    auto p = map.find(stat_name);
-    ASSERT(p != map.end());
-    list.push_back(p->second); // Save SharedPtr to the list to avoid invalidating refs to stat.
-    map.erase(p);
+    auto iter = map.find(stat_name);
+    ASSERT(iter != map.end());
+    list.push_back(iter->second); // Save SharedPtr to the list to avoid invalidating refs to stat.
+    map.erase(iter);
   }
 }
 
@@ -198,28 +197,40 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
 
+  // This is called directly from the ScopeImpl destructor, but we can't delay
+  // the destruction of scope->central_cache_.central_cache_.rejected_stats_
+  // to wait for all the TLS rejected_stats_ caches are destructed, as those
+  // reference elements of SharedStatNameStorageSet. So simply swap out the set
+  // contents into a local that we can hold onto until the TLS cache is cleared
+  // of all references.
+  auto rejected_stats = new SharedStatNameStorageSet;
+  rejected_stats->swap(scope->central_cache_.rejected_stats_);
+  const uint64_t scope_id = scope->scope_id_;
+  auto clean_central_cache = [this, rejected_stats]() {
+    rejected_stats->free(symbolTable());
+    delete rejected_stats;
+  };
+
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
-    main_thread_dispatcher_->post(
-        [this, scope_id = scope->scope_id_]() -> void { clearScopeFromCaches(scope_id); });
+    main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {
+      clearScopeFromCaches(scope_id, clean_central_cache);
+    });
+  } else {
+    clean_central_cache();
   }
 }
 
-/*
-std::string ThreadLocalStoreImpl::getTagsForName(const std::string& name,
-                                                 std::vector<Tag>& tags) const {
-  return tag_producer_->produceTags(name, tags);
-}
-*/
-
-void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
+void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
+                                                const Event::PostCb& clean_central_cache) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
     tls_->runOnAllThreads(
-        [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); });
+        [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); },
+        clean_central_cache);
   }
 }
 
@@ -251,31 +262,15 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   prefix_.free(symbolTable());
 }
 
-/*
-void ThreadLocalStoreImpl::ScopeImpl::extractTagsAndTruncate(
-    StatName& name, std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
-    std::vector<Tag>& tags,
-    std::string& tag_extracted_name) {
-
-  // Tag extraction occurs on the original, untruncated name so the extraction
-  // can complete properly, even if the tag values are partially truncated.
-  std::string name_str = name.toString(parent_.symbolTable());
-  tag_extracted_name = parent_.getTagsForName(name_str, tags);
-  absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name_str);
-  if (truncated_name.size() < name_str.size()) {
-    truncated_name_storage = std::make_unique<StatNameTempStorage>(truncated_name, symbolTable());
-    name = truncated_name_storage->statName();
-  }
-  }*/
-
 // Manages the truncation and tag-extration of stat names. Tag extraction occurs
 // on the original, untruncated name so the extraction can complete properly,
 // even if the tag values are partially truncated.
 class TagExtraction {
 public:
   TagExtraction(ThreadLocalStoreImpl& tls, StatName name) {
-    std::string name_str = tls.symbolTable().toString(name);
-    tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags_);
+    tls.symbolTable().callWithStringView(name, [this, &tls](absl::string_view name_str) {
+      tag_extracted_name_ = tls.tagProducer().produceTags(name_str, tags_);
+    });
   }
 
   const std::vector<Tag>& tags() { return tags_; }
@@ -286,26 +281,26 @@ private:
   std::string tag_extracted_name_;
 };
 
-bool ThreadLocalStoreImpl::checkAndRememberRejection(const std::string& name,
-                                                     SharedStringSet& central_rejected_stats,
-                                                     SharedStringSet* tls_rejected_stats) {
+bool ThreadLocalStoreImpl::checkAndRememberRejection(
+    StatName name, SharedStatNameStorageSet& central_rejected_stats,
+    StatNameHashSet* tls_rejected_stats) {
   if (stats_matcher_->acceptsAll()) {
     return false;
   }
 
   auto iter = central_rejected_stats.find(name);
-  SharedString rejected_name;
+  SharedStatNameStorage rejected_name;
   if (iter != central_rejected_stats.end()) {
     rejected_name = *iter;
   } else {
     if (rejects(name)) {
-      rejected_name = std::make_shared<std::string>(name);
+      rejected_name = std::make_shared<StatNameStorage>(name, symbolTable());
       central_rejected_stats.insert(rejected_name);
     }
   }
   if (rejected_name != nullptr) {
     if (tls_rejected_stats != nullptr) {
-      tls_rejected_stats->insert(rejected_name);
+      tls_rejected_stats->insert(rejected_name->statName());
     }
     return true;
   }

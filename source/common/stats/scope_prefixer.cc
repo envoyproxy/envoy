@@ -46,12 +46,6 @@ Gauge& ScopePrefixer::gaugeFromStatName(StatName name) {
   return scope_->gaugeFromStatName(StatName(stat_name_storage.get()));
 }
 
-BoolIndicator& ScopePrefixer::boolIndicatorFromStatName(StatName name) {
-  Stats::SymbolTable::StoragePtr stat_name_storage =
-      scope_->symbolTable().join({prefix_.statName(), name});
-  return scope_->boolIndicatorFromStatName(StatName(stat_name_storage.get()));
-}
-
 Histogram& ScopePrefixer::histogramFromStatName(StatName name) {
   Stats::SymbolTable::StoragePtr stat_name_storage =
       scope_->symbolTable().join({prefix_.statName(), name});
