@@ -504,13 +504,13 @@ struct HeterogeneousStatNameEqual {
   size_t operator()(const StatNameStorage& a, StatName b) const { return a.statName() == b; }
 };
 
-// Encapsulates a set of shared_ptr<StatNameStorage>. We use a subclass here
-// rather than a 'using' alias because we need to ensure that when the set is
-// destructed, StatNameStorage::free(symbol_table) is called on each entry. It
-// is a little easier at the call-site in thread_local_store.cc to implement
-// this an explicit free() method, analogous to StatNameStorage::free(),
-// compared to storing a SymbolTable reference in the class and doing the free
-// in the destructor, like StatNameTempStorage.
+// Encapsulates a set<StatNameStorage>. We use a subclass here rather than a
+// 'using' alias because we need to ensure that when the set is destructed,
+// StatNameStorage::free(symbol_table) is called on each entry. It is a little
+// easier at the call-sites in thread_local_store.cc to implement this an
+// explicit free() method, analogous to StatNameStorage::free(), compared to
+// storing a SymbolTable reference in the class and doing the free in the
+// destructor, like StatNameTempStorage.
 class StatNameStorageSet : public absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash,
                                                       HeterogeneousStatNameEqual> {
 public:
