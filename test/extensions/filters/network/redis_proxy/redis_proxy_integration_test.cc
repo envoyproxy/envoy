@@ -320,7 +320,7 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToUnknownServer) {
                     makeBulkStringArray({"asking", "get", "foo"}), "$3\r\nbar\r\n");
 }
 
-// This test verfies that various forms of bad MOVED/ASK redirection errors
+// This test verifies that various forms of bad MOVED/ASK redirection errors
 // from a fake Redis server are not acted upon, and are passed unchanged
 // to the fake Redis client.
 
