@@ -198,8 +198,8 @@ private:
     // We keep a TLS cache of rejected stat names. This costs memory, but
     // reduces runtime overhead running the matcher. Moreover, once symbol
     // tables are integrated, rejection will need the fully elaborated string,
-    // and it we need to take a global symbol-table lock to run. We keep
-    // this char* map here in the TLS cache to avoid taking a lock to compute
+    // and it we need to take a global symbol-table lock to run. We keep this
+    // StatName set here in the TLS cache to avoid taking a lock to compute
     // rejection.
     StatNameHashSet rejected_stats_;
   };
@@ -208,7 +208,7 @@ private:
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
-    SharedStatNameStorageSet rejected_stats_;
+    StatNameStorageSet rejected_stats_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -261,7 +261,7 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                           SharedStatNameStorageSet& central_rejected_stats,
+                           StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat,
                            StatMap<std::shared_ptr<StatType>>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
@@ -297,7 +297,7 @@ private:
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
-  bool checkAndRememberRejection(StatName name, SharedStatNameStorageSet& central_rejected_stats,
+  bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
 
   const Stats::StatsOptions& stats_options_;

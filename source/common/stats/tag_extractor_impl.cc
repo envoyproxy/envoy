@@ -77,7 +77,6 @@ bool TagExtractorImpl::extractTag(absl::string_view stat_name, std::vector<Tag>&
 
   std::match_results<absl::string_view::iterator> match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  // std::string stat_name_str = std::string(stat_name);
   if (std::regex_search<absl::string_view::iterator>(stat_name.begin(), stat_name.end(), match,
                                                      regex_) &&
       match.size() > 1) {
