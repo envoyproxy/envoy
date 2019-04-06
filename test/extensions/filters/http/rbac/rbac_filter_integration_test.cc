@@ -19,6 +19,18 @@ config:
           - any: true
 )EOF";
 
+const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
+name: envoy.filters.http.rbac
+config:
+  rules:
+    policies:
+      foo:
+        permissions:
+          - header: { name: ":path", prefix_match: "/foo" }
+        principals:
+          - any: true
+)EOF";
+
 typedef HttpProtocolIntegrationTest RBACIntegrationTest;
 
 INSTANTIATE_TEST_SUITE_P(Protocols, RBACIntegrationTest,
@@ -63,6 +75,58 @@ TEST_P(RBACIntegrationTest, Denied) {
           {"x-forwarded-for", "10.0.0.1"},
       },
       1024);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("403", response->headers().Status()->value().c_str());
+}
+
+TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
+        cfg.mutable_normalize_path()->set_value(false);
+      });
+  config_helper_.addFilter(RBAC_CONFIG_WITH_PREFIX_MATCH);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/foo/../bar"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
+TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
+        cfg.mutable_normalize_path()->set_value(true);
+      });
+  config_helper_.addFilter(RBAC_CONFIG_WITH_PREFIX_MATCH);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/foo/../bar"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_STREQ("403", response->headers().Status()->value().c_str());
