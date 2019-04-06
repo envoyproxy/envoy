@@ -121,9 +121,10 @@ elif [[ "$1" == "bazel.asan" ]]; then
   echo "Building and testing envoy tests..."
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan //test/...
   echo "Building and testing envoy-filter-example tests..."
-  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
+  pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan \
     //:echo2_integration_test //:envoy_binary_test
+  popd
   # Also validate that integration test traffic tapping (useful when debugging etc.)
   # works. This requires that we set TAP_PATH. We do this under bazel.asan to
   # ensure a debug build in CI.
