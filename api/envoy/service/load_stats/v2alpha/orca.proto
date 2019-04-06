@@ -14,7 +14,7 @@ import "validate/validate.proto";
 // Out-of-band (OOB) load reporting service for frontends to periodically get
 // load information from backends.
 service OpenRCAService {
-  rpc StreamCoreMetrics (stream LoadReportRequest) returns (stream LoadReport);
+  rpc StreamCoreMetrics(stream LoadReportRequest) returns (stream LoadReport);
 }
 
 message LoadReportRequest {
