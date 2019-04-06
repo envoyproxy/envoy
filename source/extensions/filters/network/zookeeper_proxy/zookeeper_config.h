@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/filter/network/zookeeper_proxy/v1alpha1/zookeeper_proxy.pb.h"
+#include "envoy/config/filter/network/zookeeper_proxy/v1alpha1/zookeeper_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
