@@ -250,10 +250,7 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
-  # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
-  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt='-Wl,--allow-multiple-definition'"
-  cd "${ENVOY_CI_DIR}"
-  ./run_clang_tidy.sh
+  ci/run_clang_tidy.sh
   exit 0
 elif [[ "$1" == "bazel.coverity" ]]; then
   # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
