@@ -1,5 +1,7 @@
 #include "extensions/filters/network/zookeeper_proxy/zookeeper_utils.h"
 
+#include <string>
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -63,7 +67,7 @@ struct ZooKeeperProxyStats {
  */
 class ZooKeeperFilterConfig {
 public:
-  ZooKeeperFilterConfig(const std::string &stat_prefix, uint32_t max_packet_bytes, Stats::Scope& scope);
+  ZooKeeperFilterConfig(const std::string& stat_prefix, uint32_t max_packet_bytes, Stats::Scope& scope);
 
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }

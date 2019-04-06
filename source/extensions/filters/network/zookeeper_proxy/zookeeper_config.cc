@@ -18,8 +18,7 @@ namespace ZooKeeperProxy {
 /**
  * Config registration for the ZooKeeper proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-Network::FilterFactoryCb
-NetworkFilters::ZooKeeperProxy::ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
+Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::zookeeper_proxy::v1alpha1::ZooKeeperProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 

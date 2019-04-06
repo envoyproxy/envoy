@@ -1,5 +1,8 @@
 #include "extensions/filters/network/zookeeper_proxy/zookeeper_filter.h"
 
+#include <string>
+#include <vector>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
