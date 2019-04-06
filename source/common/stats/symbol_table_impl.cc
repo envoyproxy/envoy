@@ -317,35 +317,32 @@ void StatNameStorage::free(SymbolTable& table) {
   bytes_.reset();
 }
 
-SharedStatNameStorageSet::~SharedStatNameStorageSet() {
-  // free() must be called before destructing SharedStatNameStorageSet to
-  // decrement references to all symbols.
+StatNameStorageSet::~StatNameStorageSet() {
+  // free() must be called before destructing StatNameStorageSet to decrement
+  // references to all symbols.
   ASSERT(empty());
 }
 
-void SharedStatNameStorageSet::free(SymbolTable& symbol_table) {
+void StatNameStorageSet::free(SymbolTable& symbol_table) {
   // We must free() all symbols referenced in the set, otherwise the symbols
   // will leak when the flat_hash_map superclass is destructed. They cannot
   // self-destruct without an explicit free() as each individual StatNameStorage
   // object does not have a reference to the symbol table, which would waste 8
-  // bytes per stat-name. So we must iterate over the set and free it. But we
-  // don't want to mutate objects while they are in a set, so we just copy them,
-  // which is easy because they are shared_ptr<StatNameStorage>.
+  // bytes per stat-name. The easiest way to safely free all the contents of the
+  // symbol table set is to use flat_hash_map::extract(), which removes and
+  // returns an element from the set without destructing the element
+  // immediately. This gives us a chance to call free() on each one before they
+  // are destroyed.
+  //
+  // One risk here is if removing elements via flat_hash_set::begin() is
+  // inefficient to use in a loop like this. One can imagine a hash-table
+  // implementation where the performance if this usage-model would be
+  // poor. However, tests with 100k elements appeared to run quickly when
+  // compiled for optimization, so at present this is not a performance issue.
 
-  size_t sz = size();
-  STACK_ARRAY(storage, SharedStatNameStorage, sz);
-  size_t i = 0;
-  for (const SharedStatNameStorage& name : *this) {
-    storage[i++] = name;
-  }
-  clear();
-
-  // Now that the associative container is clear, we can free all the referenced
-  // symbols.
-  for (i = 0; i < sz; ++i) {
-    SharedStatNameStorage& shared_stat_storage = storage[i];
-    RELEASE_ASSERT(shared_stat_storage.use_count() == 1, "Freeing symbol that's in use");
-    shared_stat_storage->free(symbol_table);
+  while (!empty()) {
+    auto storage = extract(begin());
+    storage.value().free(symbol_table);
   }
 }
 
