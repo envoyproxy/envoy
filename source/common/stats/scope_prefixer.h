@@ -10,7 +10,10 @@ namespace Stats {
 class ScopePrefixer : public Scope {
 public:
   ScopePrefixer(absl::string_view prefix, Scope& scope);
-  virtual ~ScopePrefixer();
+  ScopePrefixer(StatName prefix, Scope& scope);
+  ~ScopePrefixer() override;
+
+  ScopePtr createScopeFromStatName(StatName name);
 
   // Scope
   ScopePtr createScope(const std::string& name) override;
@@ -39,8 +42,8 @@ public:
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
 private:
-  StatNameStorage prefix_;
   Scope& scope_;
+  StatNameStorage prefix_;
 };
 
 } // namespace Stats

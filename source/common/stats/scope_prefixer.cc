@@ -9,17 +9,21 @@ namespace Envoy {
 namespace Stats {
 
 ScopePrefixer::ScopePrefixer(absl::string_view prefix, Scope& scope)
-    : prefix_(Utility::sanitizeStatsName(prefix), scope.symbolTable()), scope_(scope) {}
+    : scope_(scope), prefix_(Utility::sanitizeStatsName(prefix), symbolTable()) {}
 
-ScopePrefixer::~ScopePrefixer() {
-  prefix_.free(scope_.symbolTable());
+ScopePrefixer::ScopePrefixer(StatName prefix, Scope& scope)
+    : scope_(scope), prefix_(prefix, symbolTable()) {}
+
+ScopePrefixer::~ScopePrefixer() { prefix_.free(symbolTable()); }
+
+ScopePtr ScopePrefixer::createScopeFromStatName(StatName name) {
+  SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
+  return std::make_unique<ScopePrefixer>(StatName(joined.get()), scope_);
 }
 
 ScopePtr ScopePrefixer::createScope(const std::string& name) {
-  // StatNameStorage scope_stat_name(name, symbolTable());  // Takes a lock.
-  // StatNameStorage joiner(prefix_.statName(), scope_stat_name.statName());
-  return std::make_unique<ScopePrefixer>(symbolTable().toString(prefix_.statName()) + "." + name,
-                                         scope_);
+  StatNameTempStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
+  return createScopeFromStatName(stat_name_storage.statName());
 }
 
 Counter& ScopePrefixer::counterFromStatName(StatName name) {
