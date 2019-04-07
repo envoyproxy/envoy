@@ -1254,6 +1254,12 @@ public:
     }
   }
 
+  void setHistogramValuesWithCounts(const std::vector<std::pair<uint64_t, uint64_t>>& values) {
+    for (std::pair<uint64_t, uint64_t> cv : values) {
+      hist_insert_intscale(histogram_, cv.first, 0, cv.second);
+    }
+  }
+
 private:
   histogram_t* histogram_;
 };
@@ -1397,6 +1403,59 @@ envoy_histogram1_bucket{le="3600000"} 0
 envoy_histogram1_bucket{le="+Inf"} 0
 envoy_histogram1_sum{} 0
 envoy_histogram1_count{} 0
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
+  HistogramWrapper h1_cumulative;
+
+  // Force large counts to prove that the +Inf bucket doesn't overflow to scientific notation.
+  h1_cumulative.setHistogramValuesWithCounts(std::vector<std::pair<uint64_t, uint64_t>>({
+      {1, 100000},
+      {100, 1000000},
+      {1000, 100000000},
+  }));
+
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram());
+
+  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram->name_ = "histogram1";
+  histogram->used_ = true;
+  ON_CALL(*histogram, cumulativeStatistics())
+      .WillByDefault(testing::ReturnRef(h1_cumulative_statistics));
+
+  addHistogram(histogram);
+
+  Buffer::OwnedImpl response;
+  auto size =
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, response, false);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+envoy_histogram1_bucket{le="0.5"} 0
+envoy_histogram1_bucket{le="1"} 0
+envoy_histogram1_bucket{le="5"} 100000
+envoy_histogram1_bucket{le="10"} 100000
+envoy_histogram1_bucket{le="25"} 100000
+envoy_histogram1_bucket{le="50"} 100000
+envoy_histogram1_bucket{le="100"} 100000
+envoy_histogram1_bucket{le="250"} 1100000
+envoy_histogram1_bucket{le="500"} 1100000
+envoy_histogram1_bucket{le="1000"} 1100000
+envoy_histogram1_bucket{le="2500"} 101100000
+envoy_histogram1_bucket{le="5000"} 101100000
+envoy_histogram1_bucket{le="10000"} 101100000
+envoy_histogram1_bucket{le="30000"} 101100000
+envoy_histogram1_bucket{le="60000"} 101100000
+envoy_histogram1_bucket{le="300000"} 101100000
+envoy_histogram1_bucket{le="600000"} 101100000
+envoy_histogram1_bucket{le="1800000"} 101100000
+envoy_histogram1_bucket{le="3600000"} 101100000
+envoy_histogram1_bucket{le="+Inf"} 101100000
+envoy_histogram1_sum{} 105105105000
+envoy_histogram1_count{} 101100000
 )EOF";
 
   EXPECT_EQ(expected_output, response.toString());

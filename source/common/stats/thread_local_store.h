@@ -270,6 +270,7 @@ private:
                                 std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
                                 std::vector<Tag>& tags, std::string& tag_extracted_name);
 
+
     static std::atomic<uint64_t> next_scope_id_;
 
     const uint64_t scope_id_;

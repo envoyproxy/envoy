@@ -9,14 +9,7 @@ namespace Stats {
 // prior to creation.
 class ScopePrefixer : public Scope {
 public:
-  // Variant of ScopePrefixer that owns the scope being prefixed, and will
-  // delete it upon destruction.
-  ScopePrefixer(absl::string_view prefix, Scope* scope);
-
-  // Variant of ScopePrefixer that references the scope being prefixed, but does
-  // not own it.
   ScopePrefixer(absl::string_view prefix, Scope& scope);
-
   virtual ~ScopePrefixer();
 
   // Scope
@@ -39,16 +32,15 @@ public:
     return histogramFromStatName(storage.statName());
   }
 
-  const Stats::StatsOptions& statsOptions() const override { return scope_->statsOptions(); }
-  const SymbolTable& symbolTable() const override { return scope_->symbolTable(); }
-  virtual SymbolTable& symbolTable() override { return scope_->symbolTable(); }
+  const Stats::StatsOptions& statsOptions() const override { return scope_.statsOptions(); }
+  const SymbolTable& symbolTable() const override { return scope_.symbolTable(); }
+  virtual SymbolTable& symbolTable() override { return scope_.symbolTable(); }
 
-  NullGaugeImpl& nullGauge(const std::string& str) override { return scope_->nullGauge(str); }
+  NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
 private:
   StatNameStorage prefix_;
-  Scope* scope_;
-  const bool owns_scope_;
+  Scope& scope_;
 };
 
 } // namespace Stats

@@ -91,8 +91,8 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
 * `bazel.compile_time_options` &mdash; build Envoy and test with various compile-time options toggled to their non-default state, to ensure they still build.
 * `bazel.clang_tidy` &mdash; build and run clang-tidy over all source files.
-* `check_format`&mdash; run `clang-format-6.0` and `buildifier` on entire source tree.
-* `fix_format`&mdash; run and enforce `clang-format-6.0` and `buildifier` on entire source tree.
+* `check_format`&mdash; run `clang-format-7` and `buildifier` on entire source tree.
+* `fix_format`&mdash; run and enforce `clang-format-7` and `buildifier` on entire source tree.
 * `check_spelling`&mdash; run `misspell` on entire project.
 * `fix_spelling`&mdash; run and enforce `misspell` on entire project.
 * `check_spelling_pedantic`&mdash; run `aspell` on C++ and proto comments.

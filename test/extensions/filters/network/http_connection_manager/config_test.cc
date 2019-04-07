@@ -186,6 +186,77 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   EXPECT_EQ(0, config.streamIdleTimeout().count());
 }
 
+// Validated that by default we don't normalize paths
+TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_FALSE(config.shouldNormalizePath());
+}
+
+// Validated that we normalize paths with runtime override when not specified.
+TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.normalize_path", 0))
+      .WillOnce(Return(true));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_TRUE(config.shouldNormalizePath());
+}
+
+// Validated that when configured, we normalize paths, ignoring runtime.
+TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  normalize_path: true
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.normalize_path", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_TRUE(config.shouldNormalizePath());
+}
+
+// Validated that when explicitly set false, we don't normalize, ignoring runtime.
+TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  normalize_path: false
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.normalize_path", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_FALSE(config.shouldNormalizePath());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http

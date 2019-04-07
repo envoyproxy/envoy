@@ -18,6 +18,7 @@
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/stats/store_impl.h"
 
 #include "test/test_common/global.h"
 
@@ -162,7 +163,12 @@ public:
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
 };
 
-class MockStore : public Store {
+class SymbolTableProvider {
+public:
+  Test::Global<FakeSymbolTableImpl> fake_symbol_table_;
+};
+
+class MockStore : public SymbolTableProvider, public StoreImpl {
 public:
   MockStore();
   ~MockStore();

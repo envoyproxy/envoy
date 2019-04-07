@@ -12,6 +12,7 @@
 #include "common/common/utility.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_options_impl.h"
+#include "common/stats/store_impl.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
@@ -55,7 +56,7 @@ private:
   Allocator alloc_;
 };
 
-class IsolatedStoreImpl : public Store {
+class IsolatedStoreImpl : public StoreImpl {
 public:
   IsolatedStoreImpl();
   explicit IsolatedStoreImpl(SymbolTable& symbol_table);
@@ -71,8 +72,6 @@ public:
     return histogram;
   }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
-  const SymbolTable& symbolTable() const override { return symbol_table_; }
-  virtual SymbolTable& symbolTable() override { return symbol_table_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -98,7 +97,6 @@ private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 
   std::unique_ptr<SymbolTable> symbol_table_storage_;
-  SymbolTable& symbol_table_;
   HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;

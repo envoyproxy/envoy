@@ -23,7 +23,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table
 }
 
 IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
-    : symbol_table_(symbol_table), alloc_(symbol_table_),
+    : StoreImpl(symbol_table), alloc_(symbol_table),
       counters_([this](StatName name) -> CounterSharedPtr {
         return alloc_.makeCounter(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
       }),
