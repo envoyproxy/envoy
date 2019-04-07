@@ -14,7 +14,7 @@
 #include "common/chromium_url/envoy_shim.h"
 #include "common/chromium_url/url_parse.h"
 
-namespace url {
+namespace chromium_url {
 
 // Canonicalizer output -------------------------------------------------------
 
@@ -181,6 +181,6 @@ COMPONENT_EXPORT(URL)
 bool CanonicalizePath(const char* spec, const Component& path, CanonOutput* output,
                       Component* out_path);
 
-} // namespace url
+} // namespace chromium_url
 
 #endif // URL_URL_CANON_H_

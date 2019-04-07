@@ -7,7 +7,7 @@
 
 #include "common/chromium_url/url_canon_internal.h"
 
-namespace url {
+namespace chromium_url {
 
 // See the header file for this array's declaration.
 const unsigned char kSharedCharTypeTable[0x100] = {
@@ -292,4 +292,4 @@ const char kCharToHexLookup[8] = {
     0,        // 0xE0 - 0xFF
 };
 
-} // namespace url
+} // namespace chromium_url
