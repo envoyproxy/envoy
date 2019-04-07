@@ -513,70 +513,80 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
                                                 const HostVector& hosts_removed,
                                                 std::function<bool(const Host&)> predicate) {
-  std::unordered_set<HostSharedPtr> predicate_added;
-
-  HostVector filtered_added;
-  for (const auto host : hosts_added) {
-    if (predicate(*host)) {
-      predicate_added.insert(host);
-      filtered_added.emplace_back(host);
-    }
-  }
-
-  HostVector filtered_removed;
-  for (const auto host : hosts_removed) {
-    if (predicate(*host)) {
-      filtered_removed.emplace_back(host);
-    }
-  }
-
-  HostVectorSharedPtr hosts(new HostVector());
-  HostVectorSharedPtr healthy_hosts(new HostVector());
-  HostVectorSharedPtr degraded_hosts(new HostVector());
-
-  // It's possible that hosts_added == original_host_set_.hosts(), e.g.: when
-  // calling refreshSubsets() if only metadata change. If so, we can avoid the
-  // predicate() call.
-  for (const auto host : original_host_set_.hosts()) {
-    bool host_seen = predicate_added.count(host) == 1;
-    if (host_seen || predicate(*host)) {
-      hosts->emplace_back(host);
-      switch (host->health()) {
-      case Host::Health::Healthy:
-        healthy_hosts->emplace_back(host);
-        break;
-      case Host::Health::Degraded:
-        degraded_hosts->emplace_back(host);
-        break;
-      case Host::Health::Unhealthy:
-        break;
-      }
-    }
-  }
-
-  // Calling predicate() is expensive since it involves metadata lookups; so we
-  // avoid it in the 2nd call to filter() by using the result from the first call
-  // to filter() as the starting point.
+  // We cache the result of matching the host against the predicate. This ensures
+  // that we maintain a consistent view of the metadata and saves on computation
+  // since metadata lookups can be expensive.
   //
-  // Also, if we only have one locality we can avoid the first call to filter() by
+  // We use an unordered_set because this can potentially be in the tens of thousands.
+  std::unordered_set<const Host*> matching_hosts;
+
+  auto cached_predicate = [&matching_hosts](const auto& host) {
+    return matching_hosts.count(&host) == 1;
+  };
+
+  // TODO(snowp): If we had a unhealthyHosts() function we could avoid potentially traversing
+  // the list of hosts twice.
+  auto hosts = std::make_shared<HostVector>();
+  hosts->reserve(original_host_set_.hosts().size());
+  for (const auto& host : original_host_set_.hosts()) {
+    if (predicate(*host)) {
+      matching_hosts.insert(host.get());
+      hosts->emplace_back(host);
+    }
+  }
+
+  auto healthy_hosts = std::make_shared<HostVector>();
+  healthy_hosts->reserve(original_host_set_.healthyHosts().size());
+  for (const auto& host : original_host_set_.healthyHosts()) {
+    if (cached_predicate(*host)) {
+      healthy_hosts->emplace_back(host);
+    }
+  }
+
+  auto degraded_hosts = std::make_shared<HostVector>();
+  degraded_hosts->reserve(original_host_set_.degradedHosts().size());
+  for (const auto& host : original_host_set_.degradedHosts()) {
+    if (cached_predicate(*host)) {
+      degraded_hosts->emplace_back(host);
+    }
+  }
+
+  // If we only have one locality we can avoid the first call to filter() by
   // just creating a new HostsPerLocality from the list of all hosts.
   //
   // TODO(rgs1): merge these two filter() calls in one loop.
   HostsPerLocalityConstSharedPtr hosts_per_locality;
 
   if (original_host_set_.hostsPerLocality().get().size() == 1) {
-    hosts_per_locality.reset(
-        new HostsPerLocalityImpl(*hosts, original_host_set_.hostsPerLocality().hasLocalLocality()));
+    hosts_per_locality = std::make_shared<HostsPerLocalityImpl>(
+        *hosts, original_host_set_.hostsPerLocality().hasLocalLocality());
   } else {
-    hosts_per_locality = original_host_set_.hostsPerLocality().filter(predicate);
+    hosts_per_locality = original_host_set_.hostsPerLocality().filter(cached_predicate);
   }
 
-  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality = hosts_per_locality->filter(
-      [](const Host& host) { return host.health() == Host::Health::Healthy; });
-  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality = hosts_per_locality->filter(
-      [](const Host& host) { return host.health() == Host::Health::Degraded; });
+  HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
+      original_host_set_.healthyHostsPerLocality().filter(cached_predicate);
+  HostsPerLocalityConstSharedPtr degraded_hosts_per_locality =
+      original_host_set_.degradedHostsPerLocality().filter(cached_predicate);
 
-  // TODO(snowp): Use partitionHosts here.
+  // We can use the cached predicate here, since we trust that the hosts in hosts_added were also
+  // present in the list of all hosts.
+  HostVector filtered_added;
+  for (const auto& host : hosts_added) {
+    if (cached_predicate(*host)) {
+      filtered_added.emplace_back(host);
+    }
+  }
+
+  // Since the removed hosts would not be present in the list of all hosts, we need to evaluate the
+  // predicate directly for these hosts.
+  HostVector filtered_removed;
+  for (const auto& host : hosts_removed) {
+    if (predicate(*host)) {
+      filtered_removed.emplace_back(host);
+    }
+  }
+
   HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
                                hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
                                degraded_hosts, degraded_hosts_per_locality),

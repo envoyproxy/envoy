@@ -48,6 +48,7 @@ envoy_cc_library(
         ":scope_prefixer_lib",
         ":stats_lib",
         ":stats_options_lib",
+        ":store_impl_lib",
         "//include/envoy/stats:stats_macros",
         "//source/common/stats:heap_stat_data_lib",
     ],
@@ -61,6 +62,15 @@ envoy_cc_library(
         ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "store_impl_lib",
+    hdrs = ["store_impl.h"],
+    deps = [
+        ":symbol_table_lib",
+        "//include/envoy/stats:stats_interface",
     ],
 )
 

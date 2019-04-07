@@ -116,6 +116,7 @@ public:
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
+  bool shouldNormalizePath() const override { return false; }
 
   const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager config_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
@@ -142,9 +143,10 @@ public:
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
   TracingConnectionManagerConfigPtr tracing_config_;
-  bool proxy_100_continue_ = true;
+  bool proxy_100_continue_{true};
   Http::Http1Settings http1_settings_;
   Http::DefaultInternalAddressConfig internal_address_config_;
+  bool normalize_path_{true};
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks

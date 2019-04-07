@@ -89,8 +89,9 @@ public:
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->histogramFromStatName(name);
   }
-
-  NullGaugeImpl& nullGauge(const std::string& s) override { return wrapped_scope_->nullGauge(s); }
+  NullGaugeImpl& nullGauge(const std::string& str) override {
+    return wrapped_scope_->nullGauge(str);
+  }
 
   Counter& counter(const std::string& name) override {
     StatNameTempStorage storage(name, symbolTable());
@@ -148,7 +149,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogramFromStatName(name);
   }
-  NullGaugeImpl& nullGauge(const std::string& s) override { return store_.nullGauge(s); }
+  NullGaugeImpl& nullGauge(const std::string& name) override { return store_.nullGauge(name); }
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);

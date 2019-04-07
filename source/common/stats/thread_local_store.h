@@ -270,6 +270,16 @@ private:
                                 std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
                                 std::vector<Tag>& tags, std::string& tag_extracted_name);
 
+    Counter& counterFromStatName(StatName name) override {
+      return counter(symbolTable().toString(name));
+    }
+
+    Gauge& gaugeFromStatName(StatName name) override { return gauge(symbolTable().toString(name)); }
+
+    Histogram& histogramFromStatName(StatName name) override {
+      return histogram(symbolTable().toString(name));
+    }
+
     static std::atomic<uint64_t> next_scope_id_;
 
     const uint64_t scope_id_;

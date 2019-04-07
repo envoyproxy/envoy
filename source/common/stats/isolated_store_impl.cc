@@ -14,7 +14,8 @@
 namespace Envoy {
 namespace Stats {
 
-IsolatedStoreImpl::IsolatedStoreImpl() : IsolatedStoreImpl(std::make_unique<SymbolTableImpl>()) {}
+IsolatedStoreImpl::IsolatedStoreImpl()
+    : IsolatedStoreImpl(std::make_unique<FakeSymbolTableImpl>()) {}
 
 IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table)
     : IsolatedStoreImpl(*symbol_table) {
@@ -22,7 +23,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table
 }
 
 IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
-    : symbol_table_(symbol_table), alloc_(symbol_table_),
+    : StoreImpl(symbol_table), alloc_(symbol_table),
       counters_([this](StatName name) -> CounterSharedPtr {
         return alloc_.makeCounter(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
       }),
@@ -32,8 +33,8 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
       histograms_([this](StatName name) -> HistogramSharedPtr {
         return std::make_shared<HistogramImpl>(name, *this, alloc_.symbolTable().toString(name),
                                                std::vector<Tag>());
-                  }),
-      null_gauge_(alloc_.symbolTable()) {}
+      }),
+      null_gauge_(symbol_table) {}
 
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);
