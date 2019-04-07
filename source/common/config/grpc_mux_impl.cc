@@ -229,6 +229,7 @@ void GrpcMuxImpl::populateControlPlaneInfo(const envoy::api::v2::DiscoveryRespon
     for (auto& config_control_plane : GrpcMuxImpl::per_service_control_plane_info_[service_name_]) {
       if (message_differencer.Compare(grpc_service_, config_control_plane.grpc_service())) {
         config_source_control_plane_info = config_control_plane;
+        config_exists = true;
         break;
       }
     }

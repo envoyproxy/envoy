@@ -216,6 +216,49 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
   cleanupUpstreamAndDownstream();
 }
 
+// Tests that ControlPlaneConfigDump is generated correctly.
+TEST_P(CdsIntegrationTest, ControlPlaneConfigDump) {
+  // Calls our initialize(), which includes establishing a listener, route, and cluster.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // Tell Envoy that cluster_2 is here.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {cluster1_, cluster2_}, "42");
+  // The '3' includes the fake CDS server.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+
+  // A request for cluster_2 should be fine.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex2, "/cluster2");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/config_dump", "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  const std::string control_plane_config_dump = R"EOF(
+   "service_control_plane_info": [
+    {
+     "service": "envoy.api.v2.ClusterDiscoveryService",
+     "config_source_control_plane": [
+      {
+       "grpc_service": {
+        "envoy_grpc": {
+         "cluster_name": "my_cds_cluster"
+        }
+       },
+       "control_plane": {
+        "identifier": "control_plane_1"
+       },
+  )EOF";
+  EXPECT_THAT(response->body(), testing::HasSubstr(control_plane_config_dump));
+  cleanupUpstreamAndDownstream();
+}
+
 class DeltaCdsIntegrationTest : public CdsIntegrationTest {
 public:
   DeltaCdsIntegrationTest()
