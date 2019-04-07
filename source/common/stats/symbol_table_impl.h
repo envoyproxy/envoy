@@ -478,8 +478,6 @@ struct StatNameLessThan {
   const SymbolTable& symbol_table_;
 };
 
-using SharedStatNameStorage = std::shared_ptr<StatNameStorage>;
-
 struct HeterogeneousStatNameHash {
   // Specifying is_transparent indicates to the library infrastructure that
   // type-conversions should not be applied when calling find(), but instead
@@ -491,7 +489,7 @@ struct HeterogeneousStatNameHash {
   using is_transparent = void;
 
   size_t operator()(StatName a) const { return a.hash(); }
-  size_t operator()(const SharedStatNameStorage& a) const { return a->statName().hash(); }
+  size_t operator()(const StatNameStorage& a) const { return a.statName().hash(); }
 };
 
 struct HeterogeneousStatNameEqual {
@@ -499,25 +497,24 @@ struct HeterogeneousStatNameEqual {
   using is_transparent = void;
 
   size_t operator()(StatName a, StatName b) const { return a == b; }
-  size_t operator()(const SharedStatNameStorage& a, const SharedStatNameStorage& b) const {
-    return a->statName() == b->statName();
+  size_t operator()(const StatNameStorage& a, const StatNameStorage& b) const {
+    return a.statName() == b.statName();
   }
-  size_t operator()(StatName a, const SharedStatNameStorage& b) const { return a == b->statName(); }
-  size_t operator()(const SharedStatNameStorage& a, StatName b) const { return a->statName() == b; }
+  size_t operator()(StatName a, const StatNameStorage& b) const { return a == b.statName(); }
+  size_t operator()(const StatNameStorage& a, StatName b) const { return a.statName() == b; }
 };
 
-// Encapsulates a set of shared_ptr<StatNameStorage>. We use a subclass here
-// rather than a 'using' alias because we need to ensure that when the set is
-// destructed, StatNameStorage::free(symbol_table) is called on each entry. It
-// is a little easier at the call-site in thread_local_store.cc to implement
-// this an explicit free() method, analogous to StatNameStorage::free(),
-// compared to storing a SymbolTable reference in the class and doing the free
-// in the destructor, like StatNameTempStorage.
-class SharedStatNameStorageSet
-    : public absl::flat_hash_set<SharedStatNameStorage, HeterogeneousStatNameHash,
-                                 HeterogeneousStatNameEqual> {
+// Encapsulates a set<StatNameStorage>. We use a subclass here rather than a
+// 'using' alias because we need to ensure that when the set is destructed,
+// StatNameStorage::free(symbol_table) is called on each entry. It is a little
+// easier at the call-sites in thread_local_store.cc to implement this an
+// explicit free() method, analogous to StatNameStorage::free(), compared to
+// storing a SymbolTable reference in the class and doing the free in the
+// destructor, like StatNameTempStorage.
+class StatNameStorageSet : public absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash,
+                                                      HeterogeneousStatNameEqual> {
 public:
-  ~SharedStatNameStorageSet();
+  ~StatNameStorageSet();
   void free(SymbolTable& symbol_table);
 };
 

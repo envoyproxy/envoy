@@ -199,11 +199,11 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
 
   // This is called directly from the ScopeImpl destructor, but we can't delay
   // the destruction of scope->central_cache_.central_cache_.rejected_stats_
-  // to wait for all the TLS rejected_stats_ caches are destructed, as those
+  // to wait for all the TLS rejected_stats_ caches to be destructed, as those
   // reference elements of SharedStatNameStorageSet. So simply swap out the set
   // contents into a local that we can hold onto until the TLS cache is cleared
   // of all references.
-  auto rejected_stats = new SharedStatNameStorageSet;
+  auto rejected_stats = new StatNameStorageSet;
   rejected_stats->swap(scope->central_cache_.rejected_stats_);
   const uint64_t scope_id = scope->scope_id_;
   auto clean_central_cache = [this, rejected_stats]() {
@@ -281,21 +281,22 @@ private:
   std::string tag_extracted_name_;
 };
 
-bool ThreadLocalStoreImpl::checkAndRememberRejection(
-    StatName name, SharedStatNameStorageSet& central_rejected_stats,
-    StatNameHashSet* tls_rejected_stats) {
+bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
+                                                     StatNameStorageSet& central_rejected_stats,
+                                                     StatNameHashSet* tls_rejected_stats) {
   if (stats_matcher_->acceptsAll()) {
     return false;
   }
 
   auto iter = central_rejected_stats.find(name);
-  SharedStatNameStorage rejected_name;
+  const StatNameStorage* rejected_name = nullptr;
   if (iter != central_rejected_stats.end()) {
-    rejected_name = *iter;
+    rejected_name = &(*iter);
   } else {
     if (rejects(name)) {
-      rejected_name = std::make_shared<StatNameStorage>(name, symbolTable());
-      central_rejected_stats.insert(rejected_name);
+      auto insertion = central_rejected_stats.insert(StatNameStorage(name, symbolTable()));
+      const StatNameStorage& rejected_name_ref = *(insertion.first);
+      rejected_name = &rejected_name_ref;
     }
   }
   if (rejected_name != nullptr) {
@@ -310,7 +311,7 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-    SharedStatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
+    StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
     StatMap<std::shared_ptr<StatType>>* tls_cache, StatNameHashSet* tls_rejected_stats,
     StatType& null_stat) {
 

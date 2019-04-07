@@ -208,7 +208,7 @@ private:
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
-    SharedStatNameStorageSet rejected_stats_;
+    StatNameStorageSet rejected_stats_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -261,7 +261,7 @@ private:
      */
     template <class StatType>
     StatType& safeMakeStat(StatName name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                           SharedStatNameStorageSet& central_rejected_stats,
+                           StatNameStorageSet& central_rejected_stats,
                            MakeStatFn<StatType> make_stat,
                            StatMap<std::shared_ptr<StatType>>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
@@ -269,16 +269,6 @@ private:
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
                                 std::vector<Tag>& tags, std::string& tag_extracted_name);
-
-    Counter& counterFromStatName(StatName name) override {
-      return counter(symbolTable().toString(name));
-    }
-
-    Gauge& gaugeFromStatName(StatName name) override { return gauge(symbolTable().toString(name)); }
-
-    Histogram& histogramFromStatName(StatName name) override {
-      return histogram(symbolTable().toString(name));
-    }
 
     static std::atomic<uint64_t> next_scope_id_;
 
@@ -307,7 +297,7 @@ private:
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
-  bool checkAndRememberRejection(StatName name, SharedStatNameStorageSet& central_rejected_stats,
+  bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
 
   const Stats::StatsOptions& stats_options_;
