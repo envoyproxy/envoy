@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -12,7 +14,7 @@ class Utility {
 public:
   // ':' is a reserved char in statsd. Do a character replacement to avoid costly inline
   // translations later.
-  static std::string sanitizeStatsName(const std::string& name);
+  static std::string sanitizeStatsName(const absl::string_view name);
 };
 
 } // namespace Stats

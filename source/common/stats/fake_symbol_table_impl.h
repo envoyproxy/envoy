@@ -44,12 +44,57 @@ namespace Stats {
  * that backs each StatName, so there is no sharing or memory savings, but also
  * no state associated with the SymbolTable, and thus no locks needed.
  *
- * TODO(jmarantz): delete this class once SymbolTable is fully deployed in the
+ * TODO(#6307): delete this class once SymbolTable is fully deployed in the
  * Envoy codebase.
  */
 class FakeSymbolTableImpl : public SymbolTable {
 public:
-  SymbolEncoding encode(absl::string_view name) override { return encodeHelper(name); }
+  // SymbolTable
+  void populateList(const absl::string_view* names, uint32_t num_names,
+                    StatNameList& list) override {
+    // This implementation of populateList is similar to
+    // SymbolTableImpl::populateList. This variant is more efficient for
+    // FakeSymbolTableImpl, because it avoid "encoding" each name in names. The
+    // strings are laid out abutting each other with 2-byte length prefixes, so
+    // encoding isn't needed, and doing a dummy encoding step would cost one
+    // memory allocation per element, adding significant overhead as measured by
+    // thread_local_store_speed_test.
+
+    // We encode the number of names in a single byte, thus there must be less
+    // than 256 of them.
+    RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
+
+    // First encode all the names. The '1' here represents the number of
+    // names. The num_names * StatNameSizeEncodingBytes reserves space for the
+    // lengths of each name.
+    size_t total_size_bytes = 1 + num_names * StatNameSizeEncodingBytes;
+
+    for (uint32_t i = 0; i < num_names; ++i) {
+      total_size_bytes += names[i].size();
+    }
+
+    // Now allocate the exact number of bytes required and move the encodings
+    // into storage.
+    auto storage = std::make_unique<Storage>(total_size_bytes);
+    uint8_t* p = &storage[0];
+    *p++ = num_names;
+    for (uint32_t i = 0; i < num_names; ++i) {
+      auto& name = names[i];
+      size_t sz = name.size();
+      p = SymbolTableImpl::writeLengthReturningNext(sz, p);
+      if (!name.empty()) {
+        memcpy(p, name.data(), sz * sizeof(uint8_t));
+        p += sz;
+      }
+    }
+
+    // This assertion double-checks the arithmetic where we computed
+    // total_size_bytes. After appending all the encoded data into the
+    // allocated byte array, we should wind up with a pointer difference of
+    // total_size_bytes from the beginning of the allocation.
+    ASSERT(p == &storage[0] + total_size_bytes);
+    list.moveStorageIntoList(std::move(storage));
+  }
 
   std::string toString(const StatName& stat_name) const override {
     return std::string(toStringView(stat_name));
@@ -60,6 +105,7 @@ public:
   }
   void free(const StatName&) override {}
   void incRefCount(const StatName&) override {}
+  StoragePtr encode(absl::string_view name) override { return encodeHelper(name); }
   SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {
@@ -68,28 +114,27 @@ public:
         strings.push_back(str);
       }
     }
-    return stringToStorage(absl::StrJoin(strings, "."));
+    return encodeHelper(absl::StrJoin(strings, "."));
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override {}
 #endif
 
-private:
-  SymbolEncoding encodeHelper(absl::string_view name) const {
-    SymbolEncoding encoding;
-    encoding.addStringForFakeSymbolTable(name);
-    return encoding;
+  void callWithStringView(StatName stat_name,
+                          const std::function<void(absl::string_view)>& fn) const override {
+    fn(toStringView(stat_name));
   }
 
+private:
   absl::string_view toStringView(const StatName& stat_name) const {
     return {reinterpret_cast<const char*>(stat_name.data()), stat_name.dataSize()};
   }
 
-  SymbolTable::StoragePtr stringToStorage(absl::string_view name) const {
-    SymbolEncoding encoding = encodeHelper(name);
-    auto bytes = std::make_unique<uint8_t[]>(encoding.bytesRequired());
-    encoding.moveToStorage(bytes.get());
+  StoragePtr encodeHelper(absl::string_view name) const {
+    auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
+    uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
+    memcpy(buffer, name.data(), name.size());
     return bytes;
   }
 };

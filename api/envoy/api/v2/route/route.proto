@@ -639,14 +639,9 @@ message RouteAction {
   // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
   core.RoutingPriority priority = 11;
 
-  // [#not-implemented-hide:]
-  repeated core.HeaderValueOption request_headers_to_add = 12 [deprecated = true];
-
-  // [#not-implemented-hide:]
-  repeated core.HeaderValueOption response_headers_to_add = 18 [deprecated = true];
-
-  // [#not-implemented-hide:]
-  repeated string response_headers_to_remove = 19 [deprecated = true];
+  reserved 12;
+  reserved 18;
+  reserved 19;
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.

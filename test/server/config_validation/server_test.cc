@@ -55,6 +55,20 @@ TEST_P(ValidationServerTest, Validate) {
                              Filesystem::fileSystemForTest()));
 }
 
+TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+  server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [] { FAIL(); });
+  server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
+                          [](Event::PostCb) { FAIL(); });
+  server.shutdown();
+}
+
 // TODO(rlazarus): We'd like use this setup to replace //test/config_test (that is, run it against
 // all the example configs) but can't until light validation is implemented, mocking out access to
 // the filesystem for TLS certs, etc. In the meantime, these are the example configs that work
