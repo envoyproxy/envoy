@@ -59,8 +59,8 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   uint64_t path_len =
       absolute_url.length() - (u.field_data[UF_HOST].off + host_and_port().length());
   if (path_len > 0) {
-    uint64_t path_begining = u.field_data[UF_HOST].off + host_and_port().length();
-    path_and_query_params_ = absl::string_view(absolute_url.data() + path_begining, path_len);
+    uint64_t path_beginning = u.field_data[UF_HOST].off + host_and_port().length();
+    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
   } else {
     path_and_query_params_ = absl::string_view(kDefaultPath, 1);
   }
