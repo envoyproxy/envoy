@@ -224,5 +224,5 @@ experimental:
     branches:
       only:
         - master
-    webhooks:
-       -url: https://api.opsgenie.com/v1/json/circleci?apiKey=f45d58a7-15a4-4800-8d2c-f460ec02cf71
+      webhooks:
+         -url: https://api.opsgenie.com/v1/json/circleci?apiKey=f45d58a7-15a4-4800-8d2c-f460ec02cf71
