@@ -50,7 +50,6 @@ constexpr const char* disallowed_features[] = {
     "envoy.deprecated_features.config_source.proto:UNSUPPORTED_REST_LEGACY",
     "envoy.deprecated_features.ext_authz.proto:use_alpha",
     "envoy.deprecated_features.route.proto:enabled",
-    "envoy.deprecated_features.lds.proto:use_original_dst",
     "envoy.deprecated_features.tcp_proxy.proto:deprecated_v1",
     "envoy.deprecated_features.fault.proto:type",
     "envoy.deprecated_features.cds.proto:hosts",
