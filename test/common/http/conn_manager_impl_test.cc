@@ -168,22 +168,40 @@ public:
     EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
   }
 
-  void setUpEncoderAndDecoder() {
+  // If request_with_data_and_trailers is true, includes data and trailers in the request. If
+  // decode_headers_stop_all is true, decoder_filters_[0]'s callback decodeHeaders() returns
+  // StopAllIterationAndBuffer.
+  void setUpEncoderAndDecoder(bool request_with_data_and_trailers, bool decode_headers_stop_all) {
     setUpBufferLimits();
-    EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-      StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
-      HeaderMapPtr headers{
-          new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-      decoder->decodeHeaders(std::move(headers), true);
-    }));
+    EXPECT_CALL(*codec_, dispatch(_))
+        .WillOnce(Invoke([&, request_with_data_and_trailers](Buffer::Instance&) -> void {
+          StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+          HeaderMapPtr headers{
+              new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+          if (request_with_data_and_trailers) {
+            decoder->decodeHeaders(std::move(headers), false);
+
+            Buffer::OwnedImpl fake_data("12345");
+            decoder->decodeData(fake_data, false);
+
+            HeaderMapPtr trailers{new TestHeaderMapImpl{{"foo", "bar"}}};
+            decoder->decodeTrailers(std::move(trailers));
+          } else {
+            decoder->decodeHeaders(std::move(headers), true);
+          }
+        }));
 
     setupFilterChain(2, 2);
 
-    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
-        .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, _))
+        .WillOnce(InvokeWithoutArgs([&, decode_headers_stop_all]() -> FilterHeadersStatus {
           Buffer::OwnedImpl data("hello");
           decoder_filters_[0]->callbacks_->addDecodedData(data, true);
-          return FilterHeadersStatus::Continue;
+          if (decode_headers_stop_all) {
+            return FilterHeadersStatus::StopAllIterationAndBuffer;
+          } else {
+            return FilterHeadersStatus::Continue;
+          }
         }));
     EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   }
@@ -436,7 +454,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
 TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFiltersProxyingDisabled) {
   proxy_100_continue_ = false;
   setup(false, "envoy-custom-server", false);
-  setUpEncoderAndDecoder();
+  setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
   // Akin to 100ContinueResponseWithEncoderFilters below, but with
@@ -460,7 +478,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFiltersProxy
 TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFilters) {
   proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
-  setUpEncoderAndDecoder();
+  setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
   EXPECT_CALL(*encoder_filters_[0], encode100ContinueHeaders(_))
@@ -483,7 +501,7 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFilters) {
 TEST_F(HttpConnectionManagerImplTest, PauseResume100Continue) {
   proxy_100_continue_ = true;
   setup(false, "envoy-custom-server", false);
-  setUpEncoderAndDecoder();
+  setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
   // Stop the 100-Continue at encoder filter 1. Encoder filter 0 should not yet receive the
@@ -2853,7 +2871,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 
 TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   setup(false, "");
-  setUpEncoderAndDecoder();
+  setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
   // Mimic the upstream connection backing up. The router would call
@@ -3018,7 +3036,7 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
 TEST_F(HttpConnectionManagerImplTest, AlterFilterWatermarkLimits) {
   initial_buffer_limit_ = 100;
   setup(false, "");
-  setUpEncoderAndDecoder();
+  setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
   // Check initial limits.
@@ -3047,7 +3065,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   initial_buffer_limit_ = 1;
   streaming_filter_ = true;
   setup(false, "");
-  setUpEncoderAndDecoder();
+  setUpEncoderAndDecoder(false, false);
 
   // The filter is a streaming filter. Sending 4 bytes should hit the
   // watermark limit and disable reads on the stream.
@@ -3087,7 +3105,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
   initial_buffer_limit_ = 10;
   streaming_filter_ = false;
   setup(false, "");
-  setUpEncoderAndDecoder();
+  setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
   // Set the filter to be a buffering filter. Sending any data will hit the
@@ -3148,7 +3166,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
 TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
   initial_buffer_limit_ = 10;
   setup(false, "");
-  setUpEncoderAndDecoder();
+  setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
   // Start the response without processing the request headers through all
@@ -3182,7 +3200,7 @@ TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsBeforeHeaders) {
 TEST_F(HttpConnectionManagerImplTest, HitResponseBufferLimitsAfterHeaders) {
   initial_buffer_limit_ = 10;
   setup(false, "");
-  setUpEncoderAndDecoder();
+  setUpEncoderAndDecoder(false, false);
   sendRequestHeadersAndData();
 
   // Start the response, and make sure the request headers are fully processed.
@@ -4015,6 +4033,92 @@ TEST_F(HttpConnectionManagerImplTest, OverlyLongHeadersAcceptedIfConfigured) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false); // kick off request
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathFirstFilter) {
+  setup(false, "envoy-custom-server", false);
+  setUpEncoderAndDecoder(true, true);
+
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // Verify that once the decoder_filters_[0]'s contineDecoding() is called, decoder_filters_[1]'s
+  // decodeHeaders() is called, and both filters receive data and trailers consequently.
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, _))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  decoder_filters_[0]->callbacks_->continueDecoding();
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathSecondFilter) {
+  setup(false, "envoy-custom-server", false);
+  setUpEncoderAndDecoder(true, false);
+
+  // Verify headers go through both filters, and data and trailers go through the first filter only.
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, _))
+      .WillOnce(Return(FilterHeadersStatus::StopAllIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
+  // Kick off the incoming data.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  // Verify that once the decoder_filters_[1]'s contineDecoding() is called, both data and trailers
+  // go through the second filter.
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  decoder_filters_[1]->callbacks_->continueDecoding();
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnEncodingPath) {
+  setup(false, "envoy-custom-server", false);
+  setUpEncoderAndDecoder(false, false);
+  sendRequestHeadersAndData();
+
+  // encoder_filters_[1] is the first filter in the chain.
+  EXPECT_CALL(*encoder_filters_[1], encodeHeaders(_, false))
+      .WillOnce(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopAllIterationAndBuffer;
+      }));
+  HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), false);
+
+  // Invoke encodeData while all iteration is stopped and make sure the filters do not have
+  // encodeData called.
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, _)).Times(0);
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, _)).Times(0);
+  Buffer::OwnedImpl response_body("response");
+  decoder_filters_[0]->callbacks_->encodeData(response_body, false);
+  decoder_filters_[0]->callbacks_->encodeTrailers(
+      HeaderMapPtr{new TestHeaderMapImpl{{"some", "trailer"}}});
+
+  // Verify that once encoder_filters_[1]'s continueEncoding() is called, encoder_filters_[0]'s
+  // encodeHeaders() is called, and both filters receive data and trailers consequently.
+  EXPECT_CALL(*encoder_filters_[0], encodeHeaders(_, _))
+      .WillOnce(Return(FilterHeadersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeData(_, _)).WillOnce(Return(FilterDataStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeData(_, _));
+  EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(response_encoder_, encodeTrailers(_));
+  EXPECT_CALL(*encoder_filters_[0], encodeComplete());
+  EXPECT_CALL(*encoder_filters_[1], encodeComplete());
+  expectOnDestroy();
+  encoder_filters_[1]->callbacks_->continueEncoding();
 }
 } // namespace Http
 } // namespace Envoy
