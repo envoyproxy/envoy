@@ -11,11 +11,110 @@
 
 #include "gtest/gtest.h"
 
+using testing::InSequence;
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
+
+class RedisRespValueTest : public testing::Test {
+public:
+  void makeBulkStringArray(RespValue& value, const std::vector<std::string>& strings) {
+    std::vector<RespValue> values(strings.size());
+    for (uint64_t i = 0; i < strings.size(); i++) {
+      values[i].type(RespType::BulkString);
+      values[i].asString() = strings[i];
+    }
+
+    value.type(RespType::Array);
+    value.asArray().swap(values);
+  }
+
+  void makeArray(RespValue& value, const std::vector<RespValue> items) {
+    value.type(RespType::Array);
+    value.asArray().insert(value.asArray().end(), items.begin(), items.end());
+  }
+};
+
+TEST_F(RedisRespValueTest, EqualityTestingAndCopyingTest) {
+  InSequence s;
+
+  RespValue value1, value2, value3;
+
+  makeBulkStringArray(value1, {"get", "foo", "bar", "now"});
+  makeBulkStringArray(value2, {"get", "foo", "bar", "now"});
+  makeBulkStringArray(value3, {"get", "foo", "bar", "later"});
+
+  EXPECT_TRUE(value1 == value2);
+  EXPECT_FALSE(value1 == value3);
+
+  RespValue value4, value5;
+  value4.type(RespType::Array);
+  value4.asArray() = {value1, value2};
+  value5.type(RespType::Array);
+  value5.asArray() = {value1, value3};
+
+  EXPECT_FALSE(value4 == value5);
+  EXPECT_TRUE(value4 == value4);
+  EXPECT_TRUE(value5 == value5);
+
+  RespValue bulkstring_value, simplestring_value, error_value, integer_value, null_value;
+  bulkstring_value.type(RespType::BulkString);
+  simplestring_value.type(RespType::SimpleString);
+  error_value.type(RespType::Error);
+  integer_value.type(RespType::Integer);
+
+  EXPECT_NE(bulkstring_value, simplestring_value);
+  EXPECT_NE(bulkstring_value, error_value);
+  EXPECT_NE(bulkstring_value, integer_value);
+  EXPECT_NE(bulkstring_value, null_value);
+
+  RespValue value6, value7, value8;
+  makeArray(value6,
+            {bulkstring_value, simplestring_value, error_value, integer_value, null_value, value1});
+  makeArray(value7,
+            {bulkstring_value, simplestring_value, error_value, integer_value, null_value, value2});
+  makeArray(value8,
+            {bulkstring_value, simplestring_value, error_value, integer_value, null_value, value3});
+
+  // This may look weird, but it is a way to actually do self-assignment without generating compiler
+  // warnings. Self-assignment should succeed without changing the RespValue, and therefore no
+  // expectations should change.
+  RespValue* value6_ptr = &value6;
+  value6 = *value6_ptr;
+  EXPECT_EQ(value6, value7);
+  EXPECT_NE(value6, value8);
+  EXPECT_NE(value7, value8);
+  EXPECT_EQ(value6.asArray()[5].asArray()[3].asString(), "now");
+  EXPECT_EQ(value7.asArray()[5].asArray()[3].asString(), "now");
+  EXPECT_EQ(value8.asArray()[5].asArray()[3].asString(), "later");
+
+  value8 = value1;
+  EXPECT_EQ(value8.type(), RespType::Array);
+  EXPECT_EQ(value8.asArray().size(), value1.asArray().size());
+  EXPECT_EQ(value8.asArray().size(), 4);
+  for (unsigned int i = 0; i < value8.asArray().size(); i++) {
+    EXPECT_EQ(value8.asArray()[i].type(), RespType::BulkString);
+    EXPECT_EQ(value8.asArray()[i].asString(), value1.asArray()[i].asString());
+  }
+  value7 = value1;
+  EXPECT_EQ(value7, value8);
+  value7 = value3;
+  EXPECT_NE(value7, value8);
+
+  value8 = bulkstring_value;
+  EXPECT_EQ(value8.type(), RespType::BulkString);
+  value8 = simplestring_value;
+  EXPECT_EQ(value8.type(), RespType::SimpleString);
+  value8 = error_value;
+  EXPECT_EQ(value8.type(), RespType::Error);
+  value8 = integer_value;
+  EXPECT_EQ(value8.type(), RespType::Integer);
+  value8 = null_value;
+  EXPECT_EQ(value8.type(), RespType::Null);
+}
 
 class RedisEncoderDecoderImplTest : public testing::Test, public DecoderCallbacks {
 public:
