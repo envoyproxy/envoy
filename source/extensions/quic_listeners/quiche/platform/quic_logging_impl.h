@@ -61,8 +61,10 @@
 
 #ifdef NDEBUG
 // Release build
-#define DCHECK(condition) QUIC_COMPILED_OUT_LOG()
 #define QUIC_COMPILED_OUT_LOG() QUIC_LOG_IMPL_INTERNAL(false, quic::NullLogStream().stream())
+#define DCHECK(condition)                                                                          \
+  while (false && (condition))                                                                     \
+  QUIC_COMPILED_OUT_LOG()
 #define QUIC_DVLOG_IMPL(verbosity) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DLOG_IMPL(severity) QUIC_COMPILED_OUT_LOG()
