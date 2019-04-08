@@ -1,3 +1,9 @@
+// [#protodoc-title: Redis Cluster Configuration]
+
+// To properly support Redis Cluster it is necessary to store the current topology of the cluster.
+// A random node in the cluster can be queried for the topology using the
+// `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_.
+
 syntax = "proto3";
 
 package envoy.config.cluster.redis;
@@ -14,9 +20,11 @@ import "gogoproto/gogo.proto";
 
 message RedisClusterConfig {
 
+  // The interval for making a topology refresh request.
   google.protobuf.Duration cluster_refresh_rate = 1
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
+  // Timeout for topology refresh request.
   google.protobuf.Duration cluster_refresh_timeout = 2
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 }
