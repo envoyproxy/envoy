@@ -1,8 +1,4 @@
-// [#protodoc-title: Redis Cluster Configuration]
 
-// To properly support Redis Cluster it is necessary to store the current topology of the cluster.
-// A random node in the cluster can be queried for the topology using the
-// `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_.
 
 syntax = "proto3";
 
@@ -18,13 +14,37 @@ import "google/protobuf/duration.proto";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
+// [#protodoc-title: Redis Cluster Configuration]
+// To properly support Redis Cluster it is necessary to store the current topology of the cluster.
+// A random node in the cluster can be queried for the topology using the
+// `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_.
+//
+// Example:
+//
+// .. code-block:: yaml
+//
+//     name: name
+//     connect_timeout: 0.25s
+//     dns_lookup_family: V4_ONLY
+//     hosts:
+//     - socket_address:
+//       address: foo.bar.com
+//        port_value: 22120
+//     cluster_type:
+//     name: envoy.clusters.redis
+//     typed_config:
+//       "@type": type.googleapis.com/google.protobuf.Struct
+//       value:
+//         cluster_refresh_rate: 30s
+//         cluster_refresh_timeout: 0.5s
+
 message RedisClusterConfig {
 
-  // The interval for making a topology refresh request.
+  // Interval between successive topology refresh requests. If not set, this defaults to 5s.
   google.protobuf.Duration cluster_refresh_rate = 1
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
-  // Timeout for topology refresh request.
+  // Timeout for topology refresh request. If not set, this defaults to 3s.
   google.protobuf.Duration cluster_refresh_timeout = 2
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 }
