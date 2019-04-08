@@ -303,8 +303,7 @@ cc_library(
         "@envoy",
     ),
     # Need to use same compiler options as envoy_cc_library uses to enforce compiler version and c++ version.
-    # QUIC uses offsetof() to optimize memory usage in frames.
-    copts = envoy_copts("@envoy") + ["-Wno-error=invalid-offsetof","-Wno-error=unused-but-set-variable",],
+    copts = envoy_copts("@envoy"),
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",

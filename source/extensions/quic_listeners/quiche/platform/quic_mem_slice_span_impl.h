@@ -35,7 +35,7 @@ public:
     ASSERT(num_slices > index);
     Envoy::STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);
     buffer_.getRawSlices(slices.begin(), num_slices);
-    return QuicStringPiece(reinterpret_cast<char*>(slices[index].mem_), slices[index].len_);
+    return {reinterpret_cast<char*>(slices[index].mem_), slices[index].len_};
   }
 
   QuicByteCount total_length() { return buffer_.length(); };
