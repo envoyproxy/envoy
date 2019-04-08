@@ -7,8 +7,8 @@
 // porting layer for QUICHE.
 
 #include <string>
-#include <unordered_map>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 
 namespace quiche {
@@ -37,7 +37,7 @@ private:
   FlagRegistry() = default;
 
   mutable absl::Mutex mutex_;
-  std::unordered_map<std::string, Flag*> flags_ GUARDED_BY(mutex_);
+  absl::flat_hash_map<std::string, Flag*> flags_ GUARDED_BY(mutex_);
 };
 
 // Abstract class for QUICHE protocol and feature flags.

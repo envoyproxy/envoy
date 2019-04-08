@@ -42,13 +42,11 @@ template <> bool TypedFlag<bool>::SetValueFromString(const std::string& value_st
   static const auto* kFalseValues = new std::set<std::string>({"0", "f", "false", "n", "no"});
   auto lower = absl::AsciiStrToLower(value_str);
   if (kTrueValues->find(lower) != kTrueValues->end()) {
-    absl::MutexLock lock(&mutex_);
-    value_ = true;
+    SetValue(true);
     return true;
   }
   if (kFalseValues->find(lower) != kFalseValues->end()) {
-    absl::MutexLock lock(&mutex_);
-    value_ = false;
+    SetValue(false);
     return true;
   }
   return false;
@@ -57,8 +55,7 @@ template <> bool TypedFlag<bool>::SetValueFromString(const std::string& value_st
 template <> bool TypedFlag<int32_t>::SetValueFromString(const std::string& value_str) {
   int32_t value;
   if (absl::SimpleAtoi(value_str, &value)) {
-    absl::MutexLock lock(&mutex_);
-    value_ = value;
+    SetValue(value);
     return true;
   }
   return false;
@@ -67,8 +64,7 @@ template <> bool TypedFlag<int32_t>::SetValueFromString(const std::string& value
 template <> bool TypedFlag<int64_t>::SetValueFromString(const std::string& value_str) {
   int64_t value;
   if (absl::SimpleAtoi(value_str, &value)) {
-    absl::MutexLock lock(&mutex_);
-    value_ = value;
+    SetValue(value);
     return true;
   }
   return false;
@@ -77,16 +73,14 @@ template <> bool TypedFlag<int64_t>::SetValueFromString(const std::string& value
 template <> bool TypedFlag<double>::SetValueFromString(const std::string& value_str) {
   double value;
   if (absl::SimpleAtod(value_str, &value)) {
-    absl::MutexLock lock(&mutex_);
-    value_ = value;
+    SetValue(value);
     return true;
   }
   return false;
 }
 
 template <> bool TypedFlag<std::string>::SetValueFromString(const std::string& value_str) {
-  absl::MutexLock lock(&mutex_);
-  value_ = value_str;
+  SetValue(value_str);
   return true;
 }
 

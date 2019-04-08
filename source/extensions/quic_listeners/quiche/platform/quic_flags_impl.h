@@ -24,6 +24,7 @@
 
 #define SetQuicRestartFlagImpl(flag, value) quiche::FLAGS_quic_restart_flag_##flag->SetValue(value)
 
+// Not wired into command-line parsing.
 #define DEFINE_QUIC_COMMAND_LINE_FLAG_IMPL(type, flag, value, help)                                \
   quiche::TypedFlag<type>* FLAGS_##flag = new TypedFlag<type>(#flag, value, help);
 
