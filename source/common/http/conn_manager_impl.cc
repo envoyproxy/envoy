@@ -1891,7 +1891,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  // This is called exactly once per stream, by the router filter. Therefore we
+  // This is called exactly once per upstream-stream, by the router filter. Therefore, we
   // expect the same callbacks to not be registered twice.
   ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
                    &watermark_callbacks) == parent_.watermark_callbacks_.end());

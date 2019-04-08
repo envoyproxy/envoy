@@ -95,8 +95,10 @@ Request Hedging
 
 Envoy supports request hedging via specifying a :ref:`hedge policy
 <envoy_api_msg_route.HedgePolicy>`. This means that Envoy will race multiple
-simultaneous upstream requests and return the first valid response to the
-downstream according to retry policy.
+simultaneous upstream requests and return the response associated with the
+first acceptable response headers to the downstream. The retry policy is used
+to determine whether a response should be returned or whether more responses
+should be awaited.
 
 Currently hedging can only be applied to retries performed in response to a
 request timeout. The implementation ensures that the same upstream request is
