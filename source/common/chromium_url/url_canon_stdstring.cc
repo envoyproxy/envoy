@@ -7,7 +7,7 @@
 
 #include "common/chromium_url/url_canon_stdstring.h"
 
-namespace url {
+namespace chromium_url {
 
 StdStringCanonOutput::StdStringCanonOutput(std::string* str) : CanonOutput(), str_(str) {
   cur_len_ = static_cast<int>(str_->size()); // Append to existing data.
@@ -30,4 +30,4 @@ void StdStringCanonOutput::Resize(int sz) {
   buffer_len_ = sz;
 }
 
-} // namespace url
+} // namespace chromium_url

@@ -6,6 +6,8 @@ As of release 1.3.0, Envoy will follow a
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 A logged warning is expected for each deprecated item that is in deprecation window.
 
+## Version 1.11.0 (Pending)
+
 ## Version 1.10.0 (Apr 5, 2019)
 * Use of `use_alpha` in [Ext-Authz Authorization Service](https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/auth/v2/external_auth.proto) is deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
 * Use of `enabled` in `CorsPolicy`, found in
