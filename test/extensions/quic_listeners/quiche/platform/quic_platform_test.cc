@@ -542,7 +542,7 @@ TEST_F(FileUtilsTest, ReadFileContents) {
   EXPECT_EQ(data, output);
 }
 
-TEST(QuicPlatformTest, PickUnsedPort) {
+TEST_F(QuicPlatformTest, PickUnsedPort) {
   int port = QuicPickUnusedPortOrDie();
   std::vector<Envoy::Network::Address::IpVersion> supported_versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
