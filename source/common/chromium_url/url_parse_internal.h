@@ -8,11 +8,11 @@
 #ifndef URL_URL_PARSE_INTERNAL_H_
 #define URL_URL_PARSE_INTERNAL_H_
 
-namespace url {
+namespace chromium_url {
 
 // We treat slashes and backslashes the same for IE compatibility.
 inline bool IsURLSlash(char ch) { return ch == '/' || ch == '\\'; }
 
-} // namespace url
+} // namespace chromium_url
 
 #endif // URL_URL_PARSE_INTERNAL_H_
