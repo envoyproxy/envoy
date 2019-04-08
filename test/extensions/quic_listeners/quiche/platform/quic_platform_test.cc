@@ -558,7 +558,7 @@ TEST(QuicPlatformTest, PickUnsedPort) {
   }
 }
 
-TEST(QuicPlatformTest, FailToPickUnsedPort) {
+TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   Envoy::Api::MockOsSysCalls os_sys_calls;
   Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   // Actually create sockets.
@@ -569,7 +569,7 @@ TEST(QuicPlatformTest, FailToPickUnsedPort) {
   // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
       .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
-  EXPECT_DEATH(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
+  EXPECT_DEATH_LOG_TO_STDERR(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
 }
 
 } // namespace
