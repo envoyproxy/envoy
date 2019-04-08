@@ -18,6 +18,7 @@ envoy_cc_test(
     srcs = envoy_select_quiche(["http2_platform_test.cc"]),
     external_deps = ["quiche_http2_platform"],
     deps = [
+        "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
@@ -31,6 +32,7 @@ envoy_cc_test(
     ],
     external_deps = ["quiche_quic_platform"],
     deps = [
+        "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
@@ -43,6 +45,7 @@ envoy_cc_test(
     srcs = envoy_select_quiche(["spdy_platform_test.cc"]),
     external_deps = ["quiche_spdy_platform"],
     deps = [
+        "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],

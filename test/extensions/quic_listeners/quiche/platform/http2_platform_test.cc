@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+
 #include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
@@ -7,6 +9,7 @@
 #include "quiche/http2/platform/api/http2_bug_tracker.h"
 #include "quiche/http2/platform/api/http2_containers.h"
 #include "quiche/http2/platform/api/http2_estimate_memory_usage.h"
+#include "quiche/http2/platform/api/http2_flags.h"
 #include "quiche/http2/platform/api/http2_logging.h"
 #include "quiche/http2/platform/api/http2_optional.h"
 #include "quiche/http2/platform/api/http2_ptr_util.h"
@@ -94,6 +97,20 @@ TEST(Http2PlatformTest, Http2StringPiece) {
   http2::Http2String s = "bar";
   http2::Http2StringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
+}
+
+TEST(Http2PlatformTest, Http2Flags) {
+  auto& flag_registry = quiche::FlagRegistry::GetInstance();
+  flag_registry.ResetFlags();
+  EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+  SetHttp2ReloadableFlag(http2_testonly_default_false, true);
+  EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+
+  flag_registry.ResetFlags();
+  EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+  flag_registry.FindFlag("http2_reloadable_flag_http2_testonly_default_false")
+      ->SetValueFromString("true");
+  EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
 }
 
 } // namespace

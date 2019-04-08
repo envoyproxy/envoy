@@ -56,13 +56,13 @@ cc_library(
         "quiche/http2/platform/api/http2_estimate_memory_usage.h",
         "quiche/http2/platform/api/http2_export.h",
         "quiche/http2/platform/api/http2_flag_utils.h",
+        "quiche/http2/platform/api/http2_flags.h",
         "quiche/http2/platform/api/http2_macros.h",
         "quiche/http2/platform/api/http2_optional.h",
         "quiche/http2/platform/api/http2_ptr_util.h",
         "quiche/http2/platform/api/http2_string.h",
         "quiche/http2/platform/api/http2_string_piece.h",
         # TODO: uncomment the following files as implementations are added.
-        # "quiche/http2/platform/api/http2_flags.h",
         # "quiche/http2/platform/api/http2_reconstruct_object.h",
         # "quiche/http2/platform/api/http2_test_helpers.h",
     ] + envoy_select_quiche(
@@ -85,12 +85,11 @@ cc_library(
         "quiche/spdy/platform/api/spdy_endianness_util.h",
         "quiche/spdy/platform/api/spdy_estimate_memory_usage.h",
         "quiche/spdy/platform/api/spdy_export.h",
+        "quiche/spdy/platform/api/spdy_flags.h",
         "quiche/spdy/platform/api/spdy_mem_slice.h",
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
         "quiche/spdy/platform/api/spdy_string_piece.h",
-        # TODO: uncomment the following files as implementations are added.
-        # "quiche/spdy/platform/api/spdy_flags.h",
     ] + envoy_select_quiche(
         [
             "quiche/spdy/platform/api/spdy_bug_tracker.h",
@@ -149,6 +148,7 @@ cc_library(
         "quiche/quic/platform/api/quic_exported_stats.h",
         "quiche/quic/platform/api/quic_fallthrough.h",
         "quiche/quic/platform/api/quic_flag_utils.h",
+        "quiche/quic/platform/api/quic_flags.h",
         "quiche/quic/platform/api/quic_iovec.h",
         "quiche/quic/platform/api/quic_map_util.h",
         "quiche/quic/platform/api/quic_prefetch.h",
@@ -160,7 +160,6 @@ cc_library(
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_clock.h",
-        # "quiche/quic/platform/api/quic_flags.h",
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
         # "quiche/quic/platform/api/quic_goog_cc_sender.h",
         # "quiche/quic/platform/api/quic_ip_address_family.h",
