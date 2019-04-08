@@ -106,6 +106,7 @@ protected:
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Event::MockTimer* interval_timer_;
   Api::ApiPtr api_;
 };
 
@@ -1428,6 +1429,52 @@ TEST_F(EdsTest, MalformedIP) {
   EXPECT_THROW_WITH_MESSAGE(cluster_->onConfigUpdate(resources, ""), EnvoyException,
                             "malformed IP address: foo.bar.com. Consider setting resolver_name or "
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
+}
+
+// Test that assignment timeout is called and removes all the endpoints.
+TEST_F(EdsTest, AssignmentTimeout) {
+  interval_timer_ = new Event::MockTimer(&dispatcher_);
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  cluster_load_assignment.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(1));
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto add_endpoint = [&cluster_load_assignment](int port) {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  // Add two endpoints to the cluster assignment.
+  add_endpoint(80);
+  add_endpoint(81);
+
+  // Expect the timer to be enabled once.
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+  }
+  // Expect the timer to be disabled when stale assignments are removed.
+  EXPECT_CALL(*interval_timer_, disableTimer());
+  // Call the timer callback to indicate timeout, and test that stale endpoints
+  // are removed.
+  interval_timer_->callback_();
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 0);
+  }
 }
 
 } // namespace

@@ -119,13 +119,12 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
                                      cluster_load_assignment.cluster_name()));
   }
 
-  // Reset assignment timeout if previously set, as we have received new
-  // assignment.
+  // Reset assignment timeout (if set) as we have received new assignment.
   if (assignment_timeout_) {
     assignment_timeout_->disableTimer();
     assignment_timeout_.reset();
   }
-  // Check if endopint_stale_after is set.
+  // Check if endpoint_stale_after is set.
   const int64_t stale_after_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(cluster_load_assignment.policy(), endpoint_stale_after, 0);
   if (stale_after_ms > 0) {
@@ -137,7 +136,16 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   priority_set_.batchHostUpdate(helper);
 }
 
-void EdsClusterImpl::onAssignmentTimeout() {}
+void EdsClusterImpl::onAssignmentTimeout() {
+  // We can no longer use the assignments, remove them.
+  // (TODO) This is not going to work for incremental updates, and we need to
+  // instead change the health status to indicate the assignments are stale.
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  envoy::api::v2::ClusterLoadAssignment resource;
+  resource.set_cluster_name(cluster_name_);
+  resources.Add()->PackFrom(resource);
+  onConfigUpdate(resources, "");
+}
 
 bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, const uint32_t overprovisioning_factor, const HostVector& new_hosts,

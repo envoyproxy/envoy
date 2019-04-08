@@ -53,7 +53,6 @@ private:
 
   // ClusterImplBase
   void startPreInit() override;
-
   void onAssignmentTimeout();
 
   class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
