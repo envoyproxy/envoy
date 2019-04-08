@@ -101,6 +101,7 @@ public:
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
+  const LowerCaseString XAmznTraceId{"x-amzn-trace-id"};
 
   struct {
     const std::string Close{"close"};

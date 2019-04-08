@@ -319,7 +319,8 @@ private:
   HEADER_FUNC(Upgrade)                                                                             \
   HEADER_FUNC(UserAgent)                                                                           \
   HEADER_FUNC(Vary)                                                                                \
-  HEADER_FUNC(Via)
+  HEADER_FUNC(Via)                                                                                 \
+  HEADER_FUNC(XAmznTraceId)
 
 /**
  * The following functions are defined for each inline header above. E.g., for ContentLength we
