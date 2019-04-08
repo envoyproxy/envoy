@@ -179,7 +179,6 @@ envoy_cc_test(
     external_deps = ["abseil_optional"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
