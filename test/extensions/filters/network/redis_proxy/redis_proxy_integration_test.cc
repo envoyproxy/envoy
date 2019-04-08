@@ -89,7 +89,7 @@ TEST_P(RedisProxyIntegrationTest, SimpleRequestAndResponse) {
   std::string client_to_proxy = makeBulkStringArray({"get", "foo"});
   std::string proxy_to_server;
 
-  EXPECT_TRUE(client_to_proxy.size() > 0);
+  EXPECT_TRUE(!client_to_proxy.empty());
   EXPECT_TRUE(client_to_proxy.find("get") != std::string::npos);
   EXPECT_TRUE(client_to_proxy.find("foo") != std::string::npos);
   tcp_client->write(client_to_proxy);
@@ -119,7 +119,7 @@ TEST_P(RedisProxyIntegrationTest, InvalidRequest) {
 
   std::string client_to_proxy = makeBulkStringArray({"foo"});
 
-  EXPECT_TRUE(client_to_proxy.size() > 0);
+  EXPECT_TRUE(!client_to_proxy.empty());
   EXPECT_TRUE(client_to_proxy.find("foo") != std::string::npos);
   tcp_client->write(client_to_proxy);
 

@@ -120,7 +120,7 @@ private:
     // if(>0 || used) to keep this stat from being wrongly marked interesting by a pointless set(0)
     // and needlessly taking up space. The first time we set(123), used becomes true, and so we will
     // subsequently always do the set (including set(0)).
-    if (request_queue_.size() > 0 || control_plane_stats_.pending_requests_.used()) {
+    if (!request_queue_.empty() || control_plane_stats_.pending_requests_.used()) {
       control_plane_stats_.pending_requests_.set(request_queue_.size());
     }
   }
