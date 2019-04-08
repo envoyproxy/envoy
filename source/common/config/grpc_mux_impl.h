@@ -94,7 +94,7 @@ private:
   std::unordered_map<std::string, ApiState> api_state_;
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
-  const std::string& service_name_;
+  const std::string& server_type_url_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   TimeSource& time_source_;
   envoy::api::v2::core::GrpcService grpc_service_;

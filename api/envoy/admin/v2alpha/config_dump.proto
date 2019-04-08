@@ -32,8 +32,8 @@ message ConfigDump {
   //
   // * *bootstrap*: :ref:`BootstrapConfigDump <envoy_api_msg_admin.v2alpha.BootstrapConfigDump>`
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`
-  // * *control plane*: :ref:
-  // `ControlPlaneConfigDump <envoy_api_msg_admin.v2alpha.ControlPlaneConfigDump>`
+  // * *control plane*:
+  //   :ref:`ControlPlaneConfigDump <envoy_api_msg_admin.v2alpha.ControlPlaneConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v2alpha.RoutesConfigDump>`
   repeated google.protobuf.Any configs = 1 [(gogoproto.nullable) = false];
@@ -208,7 +208,7 @@ message ControlPlaneConfigDump {
     // The xDS service this control plane information belongs to. For example
     // envoy.api.v2.EndpointDiscoveryService represents control plane info that Envoy has been
     // configured for EndpointDiscoveryService.
-    string service = 1;
+    string server_type_url = 1;
 
     // The list of control plane information that Envoy has been configured to connect with for this
     // service.
