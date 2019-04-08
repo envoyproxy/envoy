@@ -289,6 +289,67 @@ TEST_F(Http1ServerConnectionImplTest, HostHeaderTranslation) {
   EXPECT_EQ(0U, buffer.length());
 }
 
+// Regression test for http-parser allowing embedded NULs in header values,
+// verify we reject them.
+TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
+  initialize();
+
+  InSequence sequence;
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer(
+      absl::StrCat("GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: bar", std::string(1, '\0'), "baz\r\n"));
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: header value contains NUL");
+}
+
+// Mutate an HTTP GET with embedded NULs, this should always be rejected in some
+// way (not necessarily with "head value contains NUL" though).
+TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedNul) {
+  const std::string example_input = "GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: barbaz\r\n";
+
+  for (size_t n = 1; n < example_input.size(); ++n) {
+    initialize();
+
+    InSequence sequence;
+
+    Http::MockStreamDecoder decoder;
+    EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+    Buffer::OwnedImpl buffer(
+        absl::StrCat(example_input.substr(0, n), std::string(1, '\0'), example_input.substr(n)));
+    EXPECT_THROW_WITH_REGEX(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error:");
+  }
+}
+
+// Mutate an HTTP GET with CR or LF. These can cause an exception or maybe
+// result in a valid decodeHeaders(). In any case, the validHeaderString()
+// ASSERTs should validate we never have any embedded CR or LF.
+TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedCRLF) {
+  const std::string example_input = "GET / HTTP/1.1\r\nHOST: h.com\r\nfoo: barbaz\r\n";
+
+  for (const char c : {'\r', '\n'}) {
+    for (size_t n = 1; n < example_input.size(); ++n) {
+      initialize();
+
+      InSequence sequence;
+
+      NiceMock<Http::MockStreamDecoder> decoder;
+      EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+      Buffer::OwnedImpl buffer(
+          absl::StrCat(example_input.substr(0, n), std::string(1, c), example_input.substr(n)));
+      try {
+        codec_->dispatch(buffer);
+      } catch (CodecProtocolException) {
+      }
+    }
+  }
+}
+
 TEST_F(Http1ServerConnectionImplTest, CloseDuringHeadersComplete) {
   initialize();
 

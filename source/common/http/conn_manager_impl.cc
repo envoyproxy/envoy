@@ -29,9 +29,11 @@
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
 
 namespace Envoy {
@@ -420,6 +422,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   stream_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
 
+  stream_info_.setDownstreamSslConnection(connection_manager_.read_callbacks_->connection().ssl());
+
   if (connection_manager_.config_.streamIdleTimeout().count()) {
     idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     stream_idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
@@ -664,6 +668,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     return;
   }
 
+  // Path sanitization should happen before any path access other than the above sanity check.
+  if (!ConnectionManagerUtility::maybeNormalizePath(*request_headers_,
+                                                    connection_manager_.config_)) {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+                   nullptr, is_head_request_, absl::nullopt);
+    return;
+  }
+
   if (protocol == Protocol::Http11 && request_headers_->Connection() &&
       absl::EqualsIgnoreCase(request_headers_->Connection()->value().getStringView(),
                              Http::Headers::get().ConnectionValues.Close)) {
@@ -781,13 +793,10 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
-  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  // Headers filter iteration should always start with the next filter if available.
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
+      commonDecodePrefix(filter, FilterIterationStartState::AlwaysStartFromNext);
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
-  if (!filter) {
-    entry = decoder_filters_.begin();
-  } else {
-    entry = std::next(filter->entry());
-  }
 
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
@@ -818,9 +827,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 
   if (continue_data_entry != decoder_filters_.end()) {
     // We use the continueDecoding() code since it will correctly handle not calling
-    // decodeHeaders() again. Fake setting stopped_ since the continueDecoding() code expects it.
+    // decodeHeaders() again. Fake setting StopSingleIteration since the continueDecoding() code
+    // expects it.
     ASSERT(buffered_request_data_);
-    (*continue_data_entry)->stopped_ = true;
+    (*continue_data_entry)->iteration_state_ =
+        ActiveStreamFilterBase::IterationState::StopSingleIteration;
     (*continue_data_entry)->continueDecoding();
   }
 
@@ -833,11 +844,12 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
 
-  decodeData(nullptr, data, end_stream);
+  decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
 }
 
-void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
-                                                     Buffer::Instance& data, bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::decodeData(
+    ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream,
+    FilterIterationStartState filter_iteration_start_state) {
   resetIdleTimer();
 
   // If we previously decided to decode only the headers, do nothing here.
@@ -851,16 +863,17 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     return;
   }
 
-  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   auto trailers_added_entry = decoder_filters_.end();
   const bool trailers_exists_at_start = request_trailers_ != nullptr;
-  if (!filter) {
-    entry = decoder_filters_.begin();
-  } else {
-    entry = std::next(filter->entry());
-  }
+  // Filter iteration may start at the current filter.
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
+      commonDecodePrefix(filter, filter_iteration_start_state);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    // If the filter pointed by entry has stopped for all frame types, return now.
+    if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
+      return;
+    }
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
     //
     // In following case, ActiveStreamFilterBase::commonContinue() could be called recursively and
@@ -967,7 +980,7 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
   } else if (state_.filter_call_state_ & FilterCallState::DecodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
-    decodeData(&filter, data, false);
+    decodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -994,14 +1007,16 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     return;
   }
 
-  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
-  if (!filter) {
-    entry = decoder_filters_.begin();
-  } else {
-    entry = std::next(filter->entry());
-  }
+  // Filter iteration may start at the current filter.
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
+      commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    // If the filter pointed by entry has stopped for all frame type, return now.
+    if ((*entry)->stoppedAll()) {
+      return;
+    }
+
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
@@ -1033,20 +1048,39 @@ void ConnectionManagerImpl::ActiveStream::disarmRequestTimeout() {
 }
 
 std::list<ConnectionManagerImpl::ActiveStreamEncoderFilterPtr>::iterator
-ConnectionManagerImpl::ActiveStream::commonEncodePrefix(ActiveStreamEncoderFilter* filter,
-                                                        bool end_stream) {
+ConnectionManagerImpl::ActiveStream::commonEncodePrefix(
+    ActiveStreamEncoderFilter* filter, bool end_stream,
+    FilterIterationStartState filter_iteration_start_state) {
   // Only do base state setting on the initial call. Subsequent calls for filtering do not touch
   // the base state.
   if (filter == nullptr) {
     ASSERT(!state_.local_complete_);
     state_.local_complete_ = end_stream;
+    return encoder_filters_.begin();
   }
 
-  if (!filter) {
-    return encoder_filters_.begin();
-  } else {
-    return std::next(filter->entry());
+  if (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
+      (*(filter->entry()))->iterate_from_current_filter_) {
+    // The filter iteration has been stopped for all frame types, and now the iteration continues.
+    // The current filter's encoding callback has not be called. Call it now.
+    return filter->entry();
   }
+  return std::next(filter->entry());
+}
+
+std::list<ConnectionManagerImpl::ActiveStreamDecoderFilterPtr>::iterator
+ConnectionManagerImpl::ActiveStream::commonDecodePrefix(
+    ActiveStreamDecoderFilter* filter, FilterIterationStartState filter_iteration_start_state) {
+  if (!filter) {
+    return decoder_filters_.begin();
+  }
+  if (filter_iteration_start_state == FilterIterationStartState::CanStartFromCurrent &&
+      (*(filter->entry()))->iterate_from_current_filter_) {
+    // The filter iteration has been stopped for all frame types, and now the iteration continues.
+    // The current filter's callback function has not been called. Call it now.
+    return filter->entry();
+  }
+  return std::next(filter->entry());
 }
 
 void ConnectionManagerImpl::startDrainSequence() {
@@ -1059,7 +1093,10 @@ void ConnectionManagerImpl::startDrainSequence() {
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
-  Router::RouteConstSharedPtr route = snapped_route_config_->route(*request_headers_, stream_id_);
+  Router::RouteConstSharedPtr route;
+  if (request_headers_ != nullptr) {
+    route = snapped_route_config_->route(*request_headers_, stream_id_);
+  }
   stream_info_.route_entry_ = route ? route->routeEntry() : nullptr;
   cached_route_ = std::move(route);
   if (nullptr == stream_info_.route_entry_) {
@@ -1094,7 +1131,8 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
                           [this](Buffer::Instance& data, bool end_stream) -> void {
                             // TODO: Start encoding from the last decoder filter that saw the
                             // request instead.
-                            encodeData(nullptr, data, end_stream);
+                            encodeData(nullptr, data, end_stream,
+                                       FilterIterationStartState::CanStartFromCurrent);
                           },
                           state_.destroyed_, code, body, grpc_status, is_head_request);
 }
@@ -1110,7 +1148,9 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   // filter. This is simpler than that case because 100 continue implies no
   // end-stream, and because there are normal headers coming there's no need for
   // complex continuation logic.
-  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, false);
+  // 100-continue filter iteration should always start with the next filter if available.
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
+      commonEncodePrefix(filter, false, FilterIterationStartState::AlwaysStartFromNext);
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::Encode100ContinueHeaders));
     state_.filter_call_state_ |= FilterCallState::Encode100ContinueHeaders;
@@ -1141,7 +1181,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   resetIdleTimer();
   disarmRequestTimeout();
 
-  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
+  // Headers filter iteration should always start with the next filter if available.
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
+      commonEncodePrefix(filter, end_stream, FilterIterationStartState::AlwaysStartFromNext);
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
 
   for (; entry != encoder_filters_.end(); entry++) {
@@ -1269,9 +1311,11 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       encoding_headers_only_ || (end_stream && continue_data_entry == encoder_filters_.end()));
   if (continue_data_entry != encoder_filters_.end()) {
     // We use the continueEncoding() code since it will correctly handle not calling
-    // encodeHeaders() again. Fake setting stopped_ since the continueEncoding() code expects it.
+    // encodeHeaders() again. Fake setting StopSingleIteration since the continueEncoding() code
+    // expects it.
     ASSERT(buffered_response_data_);
-    (*continue_data_entry)->stopped_ = true;
+    (*continue_data_entry)->iteration_state_ =
+        ActiveStreamFilterBase::IterationState::StopSingleIteration;
     (*continue_data_entry)->continueEncoding();
   } else {
     // End encoding if this is a header only response, either due to a filter converting it to one
@@ -1327,7 +1371,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
   } else if (state_.filter_call_state_ & FilterCallState::EncodeTrailers) {
     // In this case we need to inline dispatch the data to further filters. If those filters
     // choose to buffer/stop iteration that's fine.
-    encodeData(&filter, data, false);
+    encodeData(&filter, data, false, FilterIterationStartState::AlwaysStartFromNext);
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
@@ -1335,8 +1379,9 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* filter,
-                                                     Buffer::Instance& data, bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::encodeData(
+    ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream,
+    FilterIterationStartState filter_iteration_start_state) {
   resetIdleTimer();
 
   // If we previously decided to encode only the headers, do nothing here.
@@ -1344,11 +1389,17 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     return;
   }
 
-  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
+  // Filter iteration may start at the current filter.
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
+      commonEncodePrefix(filter, end_stream, filter_iteration_start_state);
   auto trailers_added_entry = encoder_filters_.end();
 
   const bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
+    // If the filter pointed by entry has stopped for all frame type, return now.
+    if (handleDataIfStopAll(**entry, data, state_.encoder_filters_streaming_)) {
+      return;
+    }
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.
     // For details, please see the comment in the ActiveStream::decodeData() function.
     if ((*entry)->end_stream_) {
@@ -1413,8 +1464,14 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
     return;
   }
 
-  std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, true);
+  // Filter iteration may start at the current filter.
+  std::list<ActiveStreamEncoderFilterPtr>::iterator entry =
+      commonEncodePrefix(filter, true, FilterIterationStartState::CanStartFromCurrent);
   for (; entry != encoder_filters_.end(); entry++) {
+    // If the filter pointed by entry has stopped for all frame type, return now.
+    if ((*entry)->stoppedAll()) {
+      return;
+    }
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
     FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
@@ -1440,6 +1497,19 @@ void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
     request_response_timespan_->complete();
     connection_manager_.doEndStream(*this);
   }
+}
+
+bool ConnectionManagerImpl::ActiveStream::handleDataIfStopAll(ActiveStreamFilterBase& filter,
+                                                              Buffer::Instance& data,
+                                                              bool& filter_streaming) {
+  if (filter.stoppedAll()) {
+    ASSERT(!filter.canIterate());
+    filter_streaming =
+        filter.iteration_state_ == ActiveStreamFilterBase::IterationState::StopAllWatermark;
+    filter.commonHandleBufferData(data);
+    return true;
+  }
+  return false;
 }
 
 void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason, absl::string_view) {
@@ -1544,8 +1614,13 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
 
   ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", parent_,
                    static_cast<const void*>(this));
-  ASSERT(stopped_);
-  stopped_ = false;
+  ASSERT(!canIterate());
+  // If iteration has stopped for all frame types, set iterate_from_current_filter_ to true so the
+  // filter iteration starts with the current filter instead of the next one.
+  if (stoppedAll()) {
+    iterate_from_current_filter_ = true;
+  }
+  allowIteration();
 
   // Only resume with do100ContinueHeaders() if we've actually seen a 100-Continue.
   if (parent_.has_continue_headers_ && !continue_headers_continued_) {
@@ -1575,16 +1650,18 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   if (trailers()) {
     doTrailers();
   }
+
+  iterate_from_current_filter_ = false;
 }
 
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100ContinueHeadersCallback(
     FilterHeadersStatus status) {
   ASSERT(parent_.has_continue_headers_);
   ASSERT(!continue_headers_continued_);
-  ASSERT(!stopped_);
+  ASSERT(canIterate());
 
   if (status == FilterHeadersStatus::StopIteration) {
-    stopped_ = true;
+    iteration_state_ = IterationState::StopSingleIteration;
     return false;
   } else {
     ASSERT(status == FilterHeadersStatus::Continue);
@@ -1596,10 +1673,16 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfter100Continue
 bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCallback(
     FilterHeadersStatus status, bool& headers_only) {
   ASSERT(!headers_continued_);
-  ASSERT(!stopped_);
+  ASSERT(canIterate());
 
   if (status == FilterHeadersStatus::StopIteration) {
-    stopped_ = true;
+    iteration_state_ = IterationState::StopSingleIteration;
+    return false;
+  } else if (status == FilterHeadersStatus::StopAllIterationAndBuffer) {
+    iteration_state_ = IterationState::StopAllBuffer;
+    return false;
+  } else if (status == FilterHeadersStatus::StopAllIterationAndWatermark) {
+    iteration_state_ = IterationState::StopAllWatermark;
     return false;
   } else if (status == FilterHeadersStatus::ContinueAndEndStream) {
     // Set headers_only to true so we know to end early if necessary,
@@ -1635,7 +1718,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
     FilterDataStatus status, Buffer::Instance& provided_data, bool& buffer_was_streaming) {
 
   if (status == FilterDataStatus::Continue) {
-    if (stopped_) {
+    if (iteration_state_ == IterationState::StopSingleIteration) {
       commonHandleBufferData(provided_data);
       commonContinue();
       return false;
@@ -1643,7 +1726,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterDataCallbac
       ASSERT(headers_continued_);
     }
   } else {
-    stopped_ = true;
+    iteration_state_ = IterationState::StopSingleIteration;
     if (status == FilterDataStatus::StopIterationAndBuffer ||
         status == FilterDataStatus::StopIterationAndWatermark) {
       buffer_was_streaming = status == FilterDataStatus::StopIterationAndWatermark;
@@ -1660,7 +1743,7 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterTrailersCal
     FilterTrailersStatus status) {
 
   if (status == FilterTrailersStatus::Continue) {
-    if (stopped_) {
+    if (iteration_state_ == IterationState::StopSingleIteration) {
       commonContinue();
       return false;
     } else {
@@ -1734,6 +1817,12 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::In
   parent_.addDecodedData(*this, data, streaming);
 }
 
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
+  parent_.decodeData(this, data, end_stream,
+                     ActiveStream::FilterIterationStartState::CanStartFromCurrent);
+}
+
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encode100ContinueHeaders(
@@ -1755,7 +1844,8 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeHeaders(HeaderMapPt
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeData(Buffer::Instance& data,
                                                                   bool end_stream) {
-  parent_.encodeData(nullptr, data, end_stream);
+  parent_.encodeData(nullptr, data, end_stream,
+                     ActiveStream::FilterIterationStartState::CanStartFromCurrent);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapPtr&& trailers) {
@@ -1851,6 +1941,12 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::In
   return parent_.addEncodedData(*this, data, streaming);
 }
 
+void ConnectionManagerImpl::ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(
+    Buffer::Instance& data, bool end_stream) {
+  parent_.encodeData(this, data, end_stream,
+                     ActiveStream::FilterIterationStartState::CanStartFromCurrent);
+}
+
 HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
   return parent_.addEncodedTrailers();
 }
@@ -1879,7 +1975,7 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
     if (!headers_continued_) {
       // Make sure we won't end up with nested watermark calls from the body buffer.
       parent_.state_.encoder_filters_streaming_ = true;
-      stopped_ = false;
+      allowIteration();
 
       Http::Utility::sendLocalReply(
           Grpc::Common::hasGrpcContentType(*parent_.request_headers_),

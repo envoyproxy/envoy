@@ -1,4 +1,4 @@
-FROM envoyproxy/envoy:latest
+FROM envoyproxy/envoy-dev:latest
 
 RUN mkdir /var/log/envoy/
 COPY ./bin/service /usr/local/bin/srv

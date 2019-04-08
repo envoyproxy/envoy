@@ -11,38 +11,52 @@
 namespace Envoy {
 namespace Stats {
 
-TEST(StatsIsolatedStoreImplTest, All) {
-  IsolatedStoreImpl store;
+class StatsIsolatedStoreImplTest : public testing::Test {
+protected:
+  ~StatsIsolatedStoreImplTest() override { clearStorage(); }
 
-  ScopePtr scope1 = store.createScope("scope1.");
-  Counter& c1 = store.counter("c1");
+  void clearStorage() {
+    for (auto& stat_name_storage : stat_name_storage_) {
+      stat_name_storage.free(store_.symbolTable());
+    }
+    stat_name_storage_.clear();
+    EXPECT_EQ(0, store_.symbolTable().numSymbols());
+  }
+
+  StatName makeStatName(absl::string_view name) {
+    stat_name_storage_.emplace_back(makeStatStorage(name));
+    return stat_name_storage_.back().statName();
+  }
+
+  StatNameStorage makeStatStorage(absl::string_view name) {
+    return StatNameStorage(name, store_.symbolTable());
+  }
+
+  IsolatedStoreImpl store_;
+  std::vector<StatNameStorage> stat_name_storage_;
+};
+
+TEST_F(StatsIsolatedStoreImplTest, All) {
+  ScopePtr scope1 = store_.createScope("scope1.");
+  Counter& c1 = store_.counter("c1");
   Counter& c2 = scope1->counter("c2");
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
   EXPECT_EQ("c1", c1.tagExtractedName());
   EXPECT_EQ("scope1.c2", c2.tagExtractedName());
   EXPECT_EQ(0, c1.tags().size());
-  EXPECT_EQ(0, c2.tags().size());
+  EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store.gauge("g1");
+  Gauge& g1 = store_.gauge("g1");
   Gauge& g2 = scope1->gauge("g2");
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
   EXPECT_EQ("g1", g1.tagExtractedName());
   EXPECT_EQ("scope1.g2", g2.tagExtractedName());
   EXPECT_EQ(0, g1.tags().size());
-  EXPECT_EQ(0, g2.tags().size());
+  EXPECT_EQ(0, g1.tags().size());
 
-  BoolIndicator& b1 = store.boolIndicator("b1");
-  BoolIndicator& b2 = scope1->boolIndicator("b2");
-  EXPECT_EQ("b1", b1.name());
-  EXPECT_EQ("scope1.b2", b2.name());
-  EXPECT_EQ("b1", b1.tagExtractedName());
-  EXPECT_EQ("scope1.b2", b2.tagExtractedName());
-  EXPECT_EQ(0, b1.tags().size());
-  EXPECT_EQ(0, b2.tags().size());
-
-  Histogram& h1 = store.histogram("h1");
+  Histogram& h1 = store_.histogram("h1");
   Histogram& h2 = scope1->histogram("h2");
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
@@ -61,17 +75,58 @@ TEST(StatsIsolatedStoreImplTest, All) {
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
 
-  EXPECT_EQ(4UL, store.counters().size());
-  EXPECT_EQ(2UL, store.gauges().size());
-  EXPECT_EQ(2UL, store.boolIndicators().size());
+  EXPECT_EQ(4UL, store_.counters().size());
+  EXPECT_EQ(2UL, store_.gauges().size());
 }
 
-TEST(StatsIsolatedStoreImplTest, LongStatName) {
-  IsolatedStoreImpl store;
+TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
+  ScopePtr scope1 = store_.createScope("scope1.");
+  Counter& c1 = store_.counterFromStatName(makeStatName("c1"));
+  Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
+  EXPECT_EQ("c1", c1.name());
+  EXPECT_EQ("scope1.c2", c2.name());
+  EXPECT_EQ("c1", c1.tagExtractedName());
+  EXPECT_EQ("scope1.c2", c2.tagExtractedName());
+  EXPECT_EQ(0, c1.tags().size());
+  EXPECT_EQ(0, c1.tags().size());
+
+  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"));
+  Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"));
+  EXPECT_EQ("g1", g1.name());
+  EXPECT_EQ("scope1.g2", g2.name());
+  EXPECT_EQ("g1", g1.tagExtractedName());
+  EXPECT_EQ("scope1.g2", g2.tagExtractedName());
+  EXPECT_EQ(0, g1.tags().size());
+  EXPECT_EQ(0, g1.tags().size());
+
+  Histogram& h1 = store_.histogramFromStatName(makeStatName("h1"));
+  Histogram& h2 = scope1->histogramFromStatName(makeStatName("h2"));
+  scope1->deliverHistogramToSinks(h2, 0);
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+  EXPECT_EQ("h1", h1.tagExtractedName());
+  EXPECT_EQ("scope1.h2", h2.tagExtractedName());
+  EXPECT_EQ(0, h1.tags().size());
+  EXPECT_EQ(0, h2.tags().size());
+  h1.recordValue(200);
+  h2.recordValue(200);
+
+  ScopePtr scope2 = scope1->createScope("foo.");
+  EXPECT_EQ("scope1.foo.bar", scope2->counterFromStatName(makeStatName("bar")).name());
+
+  // Validate that we sanitize away bad characters in the stats prefix.
+  ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
+  EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
+
+  EXPECT_EQ(4UL, store_.counters().size());
+  EXPECT_EQ(2UL, store_.gauges().size());
+}
+
+TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
   Stats::StatsOptionsImpl stats_options;
   const std::string long_string(stats_options.maxNameLength() + 1, 'A');
 
-  ScopePtr scope = store.createScope("scope.");
+  ScopePtr scope = store_.createScope("scope.");
   Counter& counter = scope->counter(long_string);
   EXPECT_EQ(absl::StrCat("scope.", long_string), counter.name());
 }
@@ -80,33 +135,26 @@ TEST(StatsIsolatedStoreImplTest, LongStatName) {
  * Test stats macros. @see stats_macros.h
  */
 // clang-format off
-#define ALL_TEST_STATS(COUNTER, GAUGE, BOOL_INDICATOR, HISTOGRAM)              \
-  COUNTER       (test_counter)                                                 \
-  GAUGE         (test_gauge)                                                   \
-  BOOL_INDICATOR(test_bool_indicator)                                          \
-  HISTOGRAM     (test_histogram)
+#define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM)                                                  \
+  COUNTER  (test_counter)                                                                          \
+  GAUGE    (test_gauge)                                                                            \
+  HISTOGRAM(test_histogram)
 // clang-format on
 
 struct TestStats {
-  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_BOOL_INDICATOR_STRUCT,
-                 GENERATE_HISTOGRAM_STRUCT)
+  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
-TEST(StatsMacros, All) {
-  IsolatedStoreImpl stats_store;
-  TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(stats_store, "test."),
-                                      POOL_GAUGE_PREFIX(stats_store, "test."),
-                                      POOL_BOOL_INDICATOR_PREFIX(stats_store, "test."),
-                                      POOL_HISTOGRAM_PREFIX(stats_store, "test."))};
+TEST_F(StatsIsolatedStoreImplTest, StatsMacros) {
+  TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(store_, "test."),
+                                      POOL_GAUGE_PREFIX(store_, "test."),
+                                      POOL_HISTOGRAM_PREFIX(store_, "test."))};
 
   Counter& counter = test_stats.test_counter_;
   EXPECT_EQ("test.test_counter", counter.name());
 
   Gauge& gauge = test_stats.test_gauge_;
   EXPECT_EQ("test.test_gauge", gauge.name());
-
-  BoolIndicator& boolIndicator = test_stats.test_bool_indicator_;
-  EXPECT_EQ("test.test_bool_indicator", boolIndicator.name());
 
   Histogram& histogram = test_stats.test_histogram_;
   EXPECT_EQ("test.test_histogram", histogram.name());

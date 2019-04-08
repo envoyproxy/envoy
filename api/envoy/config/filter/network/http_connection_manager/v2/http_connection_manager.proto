@@ -24,7 +24,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 30]
+// [#comment:next free field: 31]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -345,6 +345,7 @@ message HttpConnectionManager {
   // :ref:`http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6
   // <config_http_conn_man_runtime_represent_ipv4_remote_address_as_ipv4_mapped_ipv6>` for runtime
   // control.
+  // [#not-implemented-hide:]
   bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6 = 20;
 
   // The configuration for HTTP upgrades.
@@ -378,6 +379,19 @@ message HttpConnectionManager {
   repeated UpgradeConfig upgrade_configs = 23;
 
   reserved 27;
+
+  // Should paths be normalized according to RFC 3986 before any processing of
+  // requests by HTTP filters or routing? This affects the upstream *:path* header
+  // as well. For paths that fail this check, Envoy will respond with 400 to
+  // paths that are malformed. This defaults to false currently but will default
+  // true in the future. When not specified, this value may be overridden by the
+  // runtime variable
+  // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
+  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`
+  // for details of normalization.
+  // Note that Envoy does not perform
+  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
+  google.protobuf.BoolValue normalize_path = 30;
 }
 
 message Rds {
@@ -423,7 +437,7 @@ message HttpFilter {
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
+    google.protobuf.Struct config = 2;
 
     google.protobuf.Any typed_config = 4;
   }

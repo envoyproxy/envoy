@@ -66,6 +66,8 @@ bool ConnPoolImpl::hasActiveConnections() const {
 void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) {
   ASSERT(!client.stream_wrapper_);
+  host_->cluster().stats().upstream_rq_total_.inc();
+  host_->stats().rq_total_.inc();
   client.stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, client);
   callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_);
 }
@@ -90,8 +92,6 @@ void ConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
-  host_->cluster().stats().upstream_rq_total_.inc();
-  host_->stats().rq_total_.inc();
   if (!ready_clients_.empty()) {
     ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_clients_.front()->codec_client_);

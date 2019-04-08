@@ -17,6 +17,8 @@ public:
   virtual RpcInvocationPtr deserializeRpcInvocation(Buffer::Instance& buffer,
                                                     size_t body_size) override;
   virtual RpcResultPtr deserializeRpcResult(Buffer::Instance& buffer, size_t body_size) override;
+  virtual size_t serializeRpcResult(Buffer::Instance& output_buffer, const std::string& content,
+                                    RpcResponseType type) override;
 };
 
 } // namespace DubboProxy

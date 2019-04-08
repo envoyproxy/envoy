@@ -6,13 +6,17 @@ As of release 1.3.0, Envoy will follow a
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 A logged warning is expected for each deprecated item that is in deprecation window.
 
-## Version 1.10.0 (pending)
+## Version 1.11.0 (Pending)
+
+## Version 1.10.0 (Apr 5, 2019)
 * Use of `use_alpha` in [Ext-Authz Authorization Service](https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/auth/v2/external_auth.proto) is deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
 * Use of `enabled` in `CorsPolicy`, found in
   [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
   Set the `filter_enabled` field instead.
-* Use of google.protobuf.Struct for extension opaque configs is deprecated. Use google.protobuf.Any instead or pack
-google.protobuf.Struct in google.protobuf.Any.
+* Use of the `type` field in the `FaultDelay` message (found in
+  [fault.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto))
+  has been deprecated. It was never used and setting it has no effect. It will be removed in the
+  following release.
 
 ## Version 1.9.0 (Dec 20, 2018)
 

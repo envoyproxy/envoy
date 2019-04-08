@@ -11,6 +11,7 @@
 #include "server/options_impl.h"
 
 #if defined(__linux__)
+#include <sched.h>
 #include "server/options_impl_platform_linux.h"
 #endif
 #include "test/mocks/api/mocks.h"
@@ -93,6 +94,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_EQ(true, options->hotRestartDisabled());
+  EXPECT_EQ(true, options->libeventBufferEnabled());
   EXPECT_EQ(true, options->cpusetThreadsEnabled());
 
   options = createOptionsImpl("envoy --mode init_only");
@@ -216,11 +218,12 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   Server::CommandLineOptionsPtr command_line_options = options->toCommandLineOptions();
   // Failure of this condition indicates that the server_info proto is not in sync with the options.
   // If an option is added/removed, please update server_info proto as well to keep it in sync.
-  // Currently the following 3 options are not defined in proto, hence the count differs by 3.
-  // 2. version        - default TCLAP argument.
-  // 3. help           - default TCLAP argument.
-  // 4. ignore_rest    - default TCLAP argument.
-  EXPECT_EQ(options->count() - 3, command_line_options->GetDescriptor()->field_count());
+  // Currently the following 4 options are not defined in proto, hence the count differs by 5.
+  // 1. version        - default TCLAP argument.
+  // 2. help           - default TCLAP argument.
+  // 3. ignore_rest    - default TCLAP argument.
+  // 4. use-libevent-buffers  - short-term override for rollout of new buffer implementation.
+  EXPECT_EQ(options->count() - 4, command_line_options->GetDescriptor()->field_count());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {
@@ -332,7 +335,9 @@ TEST_F(OptionsImplTest, SetBothConcurrencyAndCpuset) {
 
 #if defined(__linux__)
 
+using testing::DoAll;
 using testing::Return;
+using testing::SetArgPointee;
 
 class OptionsImplPlatformLinuxTest : public testing::Test {
 public:
@@ -340,37 +345,73 @@ public:
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest1) {
   // Success case: cpuset size and hardware thread count are the same.
-  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
-  unsigned int fake_hw_threads = fake_cpuset_size;
+  unsigned int fake_hw_threads = 4;
+  cpu_set_t test_set;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
 
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
+  // Set cpuset size to be four.
+  CPU_ZERO(&test_set);
+  for (int i = 0; i < 4; i++) {
+    CPU_SET(i, &test_set);
+  }
+
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), 4);
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest2) {
   // Success case: cpuset size is half of the hardware thread count.
-  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
-  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
+  unsigned int fake_hw_threads = 16;
+  cpu_set_t test_set;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
 
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_cpuset_size);
+  // Set cpuset size to be eight.
+  CPU_ZERO(&test_set);
+  for (int i = 0; i < 8; i++) {
+    CPU_SET(i, &test_set);
+  }
+
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), 8);
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest3) {
   // Failure case: cpuset size is bigger than the hardware thread count.
-  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
-  unsigned int fake_hw_threads = fake_cpuset_size - 1;
+  unsigned int fake_hw_threads = 4;
+  cpu_set_t test_set;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
 
+  // Set cpuset size to be eight.
+  CPU_ZERO(&test_set);
+  for (int i = 0; i < 8; i++) {
+    CPU_SET(i, &test_set);
+  }
+
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
   EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
   // When sched_getaffinity() fails, expect to get the hardware thread count.
-  unsigned int fake_cpuset_size = std::thread::hardware_concurrency();
-  unsigned int fake_hw_threads = 2 * fake_cpuset_size;
+  unsigned int fake_hw_threads = 8;
+  cpu_set_t test_set;
   Api::MockLinuxOsSysCalls linux_os_sys_calls;
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
 
+  // Set cpuset size to be four.
+  CPU_ZERO(&test_set);
+  for (int i = 0; i < 4; i++) {
+    CPU_SET(i, &test_set);
+  }
+
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
-      .WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{-1, 0})));
   EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
 }
 

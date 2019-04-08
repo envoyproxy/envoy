@@ -754,7 +754,7 @@ void ValidateUrl(absl::string_view raw_url, absl::string_view expected_scheme,
   ASSERT_TRUE(url.initialize(raw_url)) << "Failed to initialize " << raw_url;
   EXPECT_EQ(url.scheme(), expected_scheme);
   EXPECT_EQ(url.host_and_port(), expected_host_port);
-  EXPECT_EQ(url.path(), expected_path);
+  EXPECT_EQ(url.path_and_query_params(), expected_path);
 }
 
 TEST(Url, ParsingTest) {
@@ -766,12 +766,43 @@ TEST(Url, ParsingTest) {
   ValidateUrl("http://www.host.com:80/", "http", "www.host.com:80", "/");
   ValidateUrl("http://www.host.com/", "http", "www.host.com", "/");
 
+  // Test url with "?".
+  ValidateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/");
+  ValidateUrl("http://www.host.com/?", "http", "www.host.com", "/");
+
+  // Test url with "?" but without slash.
+  ValidateUrl("http://www.host.com:80?", "http", "www.host.com:80", "/");
+  ValidateUrl("http://www.host.com?", "http", "www.host.com", "/");
+
   // Test url with multi-character path
   ValidateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
   ValidateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
 
+  // Test url with multi-character path and ? at the end
+  ValidateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path");
+  ValidateUrl("http://www.host.com/path?", "http", "www.host.com", "/path");
+
   // Test https scheme
   ValidateUrl("https://www.host.com", "https", "www.host.com", "/");
+
+  // Test url with query parameter
+  ValidateUrl("http://www.host.com:80/?query=param", "http", "www.host.com:80", "/?query=param");
+  ValidateUrl("http://www.host.com/?query=param", "http", "www.host.com", "/?query=param");
+
+  // Test url with query parameter but without slash
+  ValidateUrl("http://www.host.com:80?query=param", "http", "www.host.com:80", "?query=param");
+  ValidateUrl("http://www.host.com?query=param", "http", "www.host.com", "?query=param");
+
+  // Test url with multi-character path and query parameter
+  ValidateUrl("http://www.host.com:80/path?query=param", "http", "www.host.com:80",
+              "/path?query=param");
+  ValidateUrl("http://www.host.com/path?query=param", "http", "www.host.com", "/path?query=param");
+
+  // Test url with multi-character path and more than one query parameter
+  ValidateUrl("http://www.host.com:80/path?query=param&query2=param2", "http", "www.host.com:80",
+              "/path?query=param&query2=param2");
+  ValidateUrl("http://www.host.com/path?query=param&query2=param2", "http", "www.host.com",
+              "/path?query=param&query2=param2");
 }
 
 } // namespace Http

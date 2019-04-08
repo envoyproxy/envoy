@@ -37,7 +37,7 @@ message AccessLog {
   // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
   //    <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`
   oneof config_type {
-    google.protobuf.Struct config = 3 [deprecated = true];
+    google.protobuf.Struct config = 3;
 
     google.protobuf.Any typed_config = 4;
   }

@@ -22,6 +22,16 @@
 namespace Envoy {
 namespace Runtime {
 
+bool runtimeFeatureEnabled(absl::string_view feature) {
+  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->snapshot().runtimeFeatureEnabled(feature);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
+}
+
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
 uint64_t RandomGeneratorImpl::random() {
@@ -148,11 +158,10 @@ std::string RandomGeneratorImpl::uuid() {
 
 bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
   bool allowed = false;
-  // See if this value is explicitly set as a runtime boolean.
-  bool stored = getBoolean(key, allowed);
-  // If not, the default value is based on disallowedByDefault.
-  if (!stored) {
-    allowed = !DisallowedFeaturesDefaults::get().disallowedByDefault(key);
+  // If the value is not explicitly set as a runtime boolean, the default value is based on
+  // disallowedByDefault.
+  if (!getBoolean(key, allowed)) {
+    allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
   }
 
   if (!allowed) {
@@ -163,6 +172,17 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
   // is about to be used, so increment the feature use stat.
   stats_.deprecated_feature_use_.inc();
   return true;
+}
+
+bool SnapshotImpl::runtimeFeatureEnabled(absl::string_view key) const {
+  bool enabled = false;
+  // If the value is not explicitly set as a runtime boolean, the default value is based on
+  // disallowedByDefault.
+  if (!getBoolean(key, enabled)) {
+    enabled = RuntimeFeaturesDefaults::get().enabledByDefault(key);
+  }
+
+  return enabled;
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
@@ -237,7 +257,7 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
-bool SnapshotImpl::getBoolean(const std::string& key, bool& value) const {
+bool SnapshotImpl::getBoolean(absl::string_view key, bool& value) const {
   auto entry = values_.find(key);
   if (entry != values_.end() && entry->second.bool_value_.has_value()) {
     value = entry->second.bool_value_.value();
@@ -319,7 +339,7 @@ void AdminLayer::mergeValues(const std::unordered_map<std::string, std::string>&
       values_.emplace(kv.first, SnapshotImpl::createEntry(kv.second));
     }
   }
-  stats_.admin_overrides_active_.set(!values_.empty());
+  stats_.admin_overrides_active_.set(values_.empty() ? 0 : 1);
 }
 
 DiskLayer::DiskLayer(const std::string& name, const std::string& path, Api::Api& api)
@@ -429,9 +449,8 @@ DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
 
 RuntimeStats LoaderImpl::generateStats(Stats::Store& store) {
   std::string prefix = "runtime.";
-  RuntimeStats stats{ALL_RUNTIME_STATS(POOL_BOOL_INDICATOR_PREFIX(store, prefix),
-                                       POOL_COUNTER_PREFIX(store, prefix),
-                                       POOL_GAUGE_PREFIX(store, prefix))};
+  RuntimeStats stats{
+      ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
   return stats;
 }
 

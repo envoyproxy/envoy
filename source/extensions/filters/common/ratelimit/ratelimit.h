@@ -76,27 +76,6 @@ public:
 
 typedef std::unique_ptr<Client> ClientPtr;
 
-/**
- * An interface for creating a rate limit client.
- */
-class ClientFactory : public Singleton::Instance {
-public:
-  virtual ~ClientFactory() {}
-
-  /**
-   * Returns rate limit client from singleton manager.
-   */
-  virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
-
-  /**
-   * Returns configuration with which the factory has been built.
-   */
-  virtual const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>&
-  rateLimitConfig() const PURE;
-};
-
-typedef std::shared_ptr<ClientFactory> ClientFactoryPtr;
-
 } // namespace RateLimit
 } // namespace Common
 } // namespace Filters

@@ -17,10 +17,8 @@ envoy_cc_test(
     deps = [
         ":route_fuzz_proto_cc",
         "//source/common/config:metadata_lib",
-        "//source/common/config:rds_json_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/router:config_lib",
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/fuzz:utility_lib",
@@ -28,6 +26,8 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
     ],
 )
 
@@ -62,7 +62,6 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/router:rds_lib",
         "//source/server/http:admin_lib",
-        "//test/mocks/init:init_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -138,7 +137,7 @@ envoy_cc_test(
     srcs = ["router_ratelimit_test.cc"],
     deps = [
         "//source/common/http:header_map_lib",
-        "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/router:router_ratelimit_lib",
         "//test/mocks/http:http_mocks",
@@ -180,7 +179,6 @@ envoy_cc_test(
     external_deps = ["abseil_optional"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/common/config:filter_json_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:upstream_includes",
