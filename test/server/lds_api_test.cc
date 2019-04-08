@@ -113,14 +113,15 @@ public:
     EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(refs));
   }
 
-  void addListener(Protobuf::RepeatedPtrField<envoy::api::v2::Listener>& listeners,
+  void addListener(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& listeners,
                    const std::string& listener_name) {
-    auto listener = listeners.Add();
-    listener->set_name(listener_name);
-    auto socket_address = listener->mutable_address()->mutable_socket_address();
+    envoy::api::v2::Listener listener;
+    listener.set_name(listener_name);
+    auto socket_address = listener.mutable_address()->mutable_socket_address();
     socket_address->set_address(listener_name);
     socket_address->set_port_value(1);
-    listener->add_filter_chains();
+    listener.add_filter_chains();
+    listeners.Add()->PackFrom(listener);
   }
 
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -148,8 +149,9 @@ TEST_F(LdsApiTest, ValidateFail) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
-  listeners.Add();
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
+  envoy::api::v2::Listener listener;
+  listeners.Add()->PackFrom(listener);
 
   EXPECT_THROW(lds_->onConfigUpdate(listeners, ""), ProtoValidationException);
   EXPECT_CALL(request_, cancel());
@@ -183,16 +185,16 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   // Construct a minimal listener that would pass proto validation.
-  auto listener = listeners.Add();
-  listener->set_name("invalid-listener");
-  auto socket_address = listener->mutable_address()->mutable_socket_address();
+  envoy::api::v2::Listener listener;
+  listener.set_name("invalid-listener");
+  auto socket_address = listener.mutable_address()->mutable_socket_address();
   socket_address->set_address("invalid-address");
   socket_address->set_port_value(1);
-  listener->add_filter_chains();
+  listener.add_filter_chains();
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
 
@@ -200,6 +202,7 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
       .WillOnce(Throw(EnvoyException("something is wrong")));
   EXPECT_CALL(init_watcher_, ready());
 
+  listeners.Add()->PackFrom(listener);
   EXPECT_THROW_WITH_MESSAGE(
       lds_->onConfigUpdate(listeners, ""), EnvoyException,
       "Error adding/updating listener(s) invalid-listener: something is wrong");
@@ -211,7 +214,7 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
@@ -227,7 +230,7 @@ TEST_F(LdsApiTest, ListenerCreationContinuesEvenAfterException) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   // Add 4 listeners - 2 valid and 2 invalid.
@@ -258,12 +261,9 @@ TEST_F(LdsApiTest, ValidateDuplicateListeners) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
-  auto* listener_1 = listeners.Add();
-  listener_1->set_name("duplicate_listener");
-
-  auto* listener_2 = listeners.Add();
-  listener_2->set_name("duplicate_listener");
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
+  addListener(listeners, "duplicate_listener");
+  addListener(listeners, "duplicate_listener");
 
   EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
                             "duplicate listener duplicate_listener found");

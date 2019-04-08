@@ -256,6 +256,11 @@ We are definitely willing to help!
 > 8. Have someone already on the list vouch for the person requesting membership
      on behalf of your distribution.
 
-CrashOverride will vouch for Acidburn joining the list on behalf of the "Seven"
-distribution.
+CrashOverride will vouch for the "Seven" distribution joining the distribution list.
+
+> 9. Nominate an e-mail alias or list for your organization to receive updates. This should not be
+     an individual user address, but instead a list that can be maintained by your organization as
+     individuals come and go. A good example is envoy-security@seven.com, a bad example is
+     acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
+     e-mail updates.
 ```
