@@ -5036,8 +5036,10 @@ virtual_hosts:
           idle_timeout: 0s
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeout), EnvoyException,
-                          "value must be greater than \" \"0s");
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeout), factory_context_, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(0, route_entry->idleTimeout().value().count());
 }
 
 TEST_F(RouteConfigurationV2, ExplicitIdleTimeout) {
