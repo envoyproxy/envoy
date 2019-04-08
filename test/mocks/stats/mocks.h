@@ -18,6 +18,7 @@
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/stats/store_impl.h"
 
 #include "test/test_common/global.h"
 
@@ -150,7 +151,12 @@ public:
   MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
 };
 
-class MockStore : public Store {
+class SymbolTableProvider {
+public:
+  Test::Global<FakeSymbolTableImpl> fake_symbol_table_;
+};
+
+class MockStore : public SymbolTableProvider, public StoreImpl {
 public:
   MockStore();
   ~MockStore();
@@ -168,10 +174,6 @@ public:
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
   MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 
-  SymbolTable& symbolTable() override { return symbol_table_.get(); }
-  const SymbolTable& symbolTable() const override { return symbol_table_.get(); }
-
-  Test::Global<FakeSymbolTableImpl> symbol_table_;
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
   StatsOptionsImpl stats_options_;

@@ -39,7 +39,7 @@ function bazel_with_collection() {
 
 function bazel_release_binary_build() {
   echo "Building..."
-  cd "${ENVOY_CI_DIR}"
+  pushd "${ENVOY_CI_DIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static
   collect_build_profile release_build
   # Copy the envoy-static binary somewhere that we can access outside of the
@@ -54,6 +54,9 @@ function bazel_release_binary_build() {
   cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${ENVOY_SRCDIR}"/build_release
   mkdir -p "${ENVOY_SRCDIR}"/build_release_stripped
   strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${ENVOY_SRCDIR}"/build_release_stripped/envoy
+  # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
+  bazel clean
+  popd
 }
 
 function bazel_debug_binary_build() {
@@ -231,11 +234,8 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # relocatable and hermetic-ish .par file.
   cd "${ENVOY_SRCDIR}"
   bazel build @com_github_gcovr_gcovr//:gcovr.par
-  export GCOVR="${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par"
-
-  export GCOVR_DIR="${ENVOY_BUILD_DIR}/bazel-envoy"
-  export TESTLOGS_DIR="${ENVOY_BUILD_DIR}/bazel-testlogs"
-  export WORKSPACE=ci
+  export GCOVR="/tmp/gcovr.par"
+  cp -f "${ENVOY_SRCDIR}/bazel-bin/external/com_github_gcovr_gcovr/gcovr.par" ${GCOVR}
 
   # Reduce the amount of memory and number of cores Bazel tries to use to
   # prevent it from launching too many subprocesses. This should prevent the
@@ -245,21 +245,13 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   # after 0.21.
   [ -z "$CIRCLECI" ] || export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=12288,4,1"
 
-  # There is a bug in gcovr 3.3, where it takes the -r path,
-  # in our case /source, and does a regex replacement of various
-  # source file paths during HTML generation. It attempts to strip
-  # out the prefix (e.g. /source), but because it doesn't do a match
-  # and only strip at the start of the string, it removes /source from
-  # the middle of the string, corrupting the path. The workaround is
-  # to point -r in the gcovr invocation in run_envoy_bazel_coverage.sh at
-  # some Bazel created symlinks to the source directory in its output
-  # directory. Wow.
-  cd "${ENVOY_BUILD_DIR}"
-  SRCDIR="${GCOVR_DIR}" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh
+  test/run_envoy_bazel_coverage.sh
   collect_build_profile coverage
   exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
+  # TODO(wu-bin): Remove once https://github.com/envoyproxy/envoy/pull/6229 is merged.
+  export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --linkopt='-Wl,--allow-multiple-definition'"
   cd "${ENVOY_CI_DIR}"
   ./run_clang_tidy.sh
   exit 0

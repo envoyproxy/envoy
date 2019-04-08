@@ -80,7 +80,7 @@ namespace Envoy {
 */
 #define EXPECT_DEATH_LOG_TO_STDERR(statement, message)                                             \
   do {                                                                                             \
-    Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink());                           \
+    Envoy::Logger::StderrSinkDelegate stderr_sink(Envoy::Logger::Registry::getSink());             \
     EXPECT_DEATH(statement, message);                                                              \
   } while (false)
 

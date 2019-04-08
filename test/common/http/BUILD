@@ -321,3 +321,12 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "path_utility_test",
+    srcs = ["path_utility_test.cc"],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/http:path_utility_lib",
+    ],
+)

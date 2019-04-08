@@ -43,8 +43,7 @@ public:
     if (!cluster_exists) {
       EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
     }
-
-    conn_pool_ = std::make_shared<InstanceImpl>(cluster_name_, cm_, *this, tls_,
+    conn_pool_ = std::make_unique<InstanceImpl>(cluster_name_, cm_, *this, tls_,
                                                 Common::Redis::Client::createConnPoolSettings());
   }
 
@@ -75,7 +74,7 @@ public:
   const std::string cluster_name_{"fake_cluster"};
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  InstanceSharedPtr conn_pool_;
+  InstancePtr conn_pool_;
   Upstream::ClusterUpdateCallbacks* update_callbacks_{};
   Common::Redis::Client::MockClient* client_{};
 };
