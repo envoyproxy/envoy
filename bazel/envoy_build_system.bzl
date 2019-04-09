@@ -83,7 +83,8 @@ def envoy_copts(repository, test = False):
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
-           envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository)
+           envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
+           envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
@@ -646,6 +647,13 @@ def envoy_select_hot_restart(xs, repository = ""):
         repository + "//bazel:disable_hot_restart": [],
         repository + "//bazel:apple": [],
         "//conditions:default": xs,
+    })
+
+# Select the given values if default path normalization is on in the current build.
+def envoy_select_path_normalization_by_default(xs, repository = ""):
+    return select({
+        repository + "//bazel:enable_path_normalization_by_default": xs,
+        "//conditions:default": [],
     })
 
 def envoy_select_perf_annotation(xs):
