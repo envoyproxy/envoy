@@ -71,6 +71,10 @@ def main():
   else:
     argv += sys.argv[1:]
 
+  # Enforce LLD if LLD is in argv, by default the latest -fuse-ld will be used
+  if "-fuse-ld=lld" in argv:
+    argv.append("-fuse-ld=lld")
+
   # Add compiler-specific options
   if "clang" in compiler:
     # This ensures that STL symbols are included.
