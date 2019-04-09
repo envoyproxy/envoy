@@ -46,6 +46,13 @@ message RedisProxy {
     // * '{user1000}.following' and '{user1000}.followers' **will** be sent to the same upstream
     // * '{user1000}.following' and '{user1001}.following' **might** be sent to the same upstream
     bool enable_hashtagging = 2;
+
+    // Accept `moved and ask redirection
+    // <https://redis.io/topics/cluster-spec#redirection-and-resharding>`_ errors from upstream
+    // redis servers, and retry commands to the specified target server. The target server does not
+    // need to be known to the cluster manager. If the command cannot be redirected, then the
+    // original error is passed downstream unchanged. By default, this support is not enabled.
+    bool enable_redirection = 3;
   }
 
   // Network settings for the connection pool to the upstream cluster.
