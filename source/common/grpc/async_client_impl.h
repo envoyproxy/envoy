@@ -23,8 +23,12 @@ public:
                      const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                      Tracing::Span& parent_span,
                      const absl::optional<std::chrono::milliseconds>& timeout) override;
-  AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
-                     AsyncStreamCallbacks& callbacks) override;
+  AsyncRequest* sendRaw(absl::string_view service_full_name, absl::string_view method_name,
+                        Buffer::InstancePtr request, RawAsyncRequestCallbacks& callbacks,
+                        Tracing::Span& parent_span,
+                        const absl::optional<std::chrono::milliseconds>& timeout) override;
+  AsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
+                        RawAsyncStreamCallbacks& callbacks) override;
 
 private:
   Upstream::ClusterManager& cm_;
@@ -45,6 +49,9 @@ public:
   AsyncStreamImpl(AsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
                   AsyncStreamCallbacks& callbacks,
                   const absl::optional<std::chrono::milliseconds>& timeout);
+  AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
+                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
+                  const absl::optional<std::chrono::milliseconds>& timeout);
 
   virtual void initialize(bool buffer_body_for_retry);
 
@@ -56,6 +63,7 @@ public:
 
   // Grpc::AsyncStream
   void sendMessage(const Protobuf::Message& request, bool end_stream) override;
+  void sendRawMessage(Buffer::InstancePtr request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
 
@@ -72,8 +80,9 @@ private:
   Event::Dispatcher* dispatcher_{};
   Http::MessagePtr headers_message_;
   AsyncClientImpl& parent_;
-  const Protobuf::MethodDescriptor& service_method_;
-  AsyncStreamCallbacks& callbacks_;
+  std::string service_full_name_;
+  std::string method_name_;
+  RawAsyncStreamCallbacks& callbacks_;
   const absl::optional<std::chrono::milliseconds>& timeout_;
   bool http_reset_{};
   Http::AsyncClient::Stream* stream_{};
@@ -84,11 +93,15 @@ private:
   friend class AsyncClientImpl;
 };
 
-class AsyncRequestImpl : public AsyncRequest, public AsyncStreamImpl, AsyncStreamCallbacks {
+class AsyncRequestImpl : public AsyncRequest, public AsyncStreamImpl, RawAsyncStreamCallbacks {
 public:
   AsyncRequestImpl(AsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
                    const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                    Tracing::Span& parent_span,
+                   const absl::optional<std::chrono::milliseconds>& timeout);
+  AsyncRequestImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
+                   absl::string_view method_name, Buffer::InstancePtr request,
+                   RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
                    const absl::optional<std::chrono::milliseconds>& timeout);
 
   void initialize(bool buffer_body_for_retry) override;
@@ -101,14 +114,14 @@ private:
   ProtobufTypes::MessagePtr createEmptyResponse() override;
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
-  void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) override;
+  bool onReceiveRawMessage(Buffer::InstancePtr response) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
-  const Protobuf::Message& request_;
-  AsyncRequestCallbacks& callbacks_;
+  Buffer::InstancePtr request_;
+  RawAsyncRequestCallbacks& callbacks_;
   Tracing::SpanPtr current_span_;
-  ProtobufTypes::MessagePtr response_;
+  Buffer::InstancePtr response_;
 };
 
 } // namespace Grpc

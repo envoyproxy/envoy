@@ -13,6 +13,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
+#include "grpcpp/grpcpp.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -119,9 +120,14 @@ public:
                                       std::string* method);
 
   /**
-   * Serialize protobuf message.
+   * Serialize protobuf message. With grpc header.
    */
   static Buffer::InstancePtr serializeBody(const Protobuf::Message& message);
+
+  /**
+   * Serialize protobuf message. Without grpc header.
+   */
+  static Buffer::InstancePtr serializeMessage(const Protobuf::Message& message);
 
   /**
    * Prepare headers for protobuf service.
@@ -147,6 +153,21 @@ public:
    * @return qualified_name prefixed with typeUrlPrefix + "/".
    */
   static std::string typeUrl(const std::string& qualified_name);
+
+  /**
+   * BUild grpc::ByteBuffer which aliases the data in a Buffer::InstancePtr.
+   * @param bufferInstance source data container.
+   * @return byteBuffer target container aliased to the data in Buffer::Instance and owning the
+   * Buffer::Instance.
+   */
+  static grpc::ByteBuffer makeByteBuffer(Buffer::InstancePtr bufferInstance);
+
+  /**
+   * BUild Buffer::Instance which aliases the data in a grpc::ByteBuffer.
+   * @param byteBuffer source data container.
+   * @param Buffer::InstancePtr target container aliased to the data in grpc::ByteBuffer.
+   */
+  static Buffer::InstancePtr makeBufferInstance(const grpc::ByteBuffer& byteBuffer);
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);

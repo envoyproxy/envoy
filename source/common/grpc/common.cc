@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -12,6 +13,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
+#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -126,6 +128,21 @@ Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
   const uint32_t nsize = htonl(size);
   std::memcpy(current, reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
   current += sizeof(uint32_t);
+  Protobuf::io::ArrayOutputStream stream(current, size, -1);
+  Protobuf::io::CodedOutputStream codec_stream(&stream);
+  message.SerializeWithCachedSizes(&codec_stream);
+  body->commit(&iovec, 1);
+  return body;
+}
+
+Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
+  Buffer::InstancePtr body(new Buffer::OwnedImpl());
+  const uint32_t size = message.ByteSize();
+  Buffer::RawSlice iovec;
+  body->reserve(size, &iovec, 1);
+  ASSERT(iovec.len_ >= size);
+  iovec.len_ = size;
+  uint8_t* current = reinterpret_cast<uint8_t*>(iovec.mem_);
   Protobuf::io::ArrayOutputStream stream(current, size, -1);
   Protobuf::io::CodedOutputStream codec_stream(&stream);
   message.SerializeWithCachedSizes(&codec_stream);
@@ -267,6 +284,91 @@ const std::string& Common::typeUrlPrefix() {
 
 std::string Common::typeUrl(const std::string& qualified_name) {
   return typeUrlPrefix() + "/" + qualified_name;
+}
+
+struct BufferInstanceContainer {
+  BufferInstanceContainer(int ref_count, Buffer::InstancePtr buffer)
+      : ref_count_(ref_count), buffer_(std::move(buffer)) {}
+  std::atomic<int> ref_count_;
+  Buffer::InstancePtr buffer_;
+};
+
+static void derefBufferInstanceContainer(void* container_ptr) {
+  auto container = reinterpret_cast<BufferInstanceContainer*>(container_ptr);
+  container->ref_count_--;
+  if (container->ref_count_ <= 0) {
+    delete container;
+  }
+}
+
+grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr bufferInstance) {
+  if (!bufferInstance) {
+    return {};
+  }
+  Buffer::RawSlice oneRawSlice;
+  // NB: we need to pass in >= 1 in order to get the real "n" (see Buffer::Instance for details).
+  int nSlices = bufferInstance->getRawSlices(&oneRawSlice, 1);
+  if (nSlices <= 0) {
+    return {};
+  }
+  auto container = new BufferInstanceContainer{nSlices, std::move(bufferInstance)};
+  if (nSlices == 1) {
+    grpc::Slice oneSlice(oneRawSlice.mem_, oneRawSlice.len_, &derefBufferInstanceContainer,
+                         container);
+    return {&oneSlice, 1};
+  }
+  STACK_ARRAY(manyRawSlices, Buffer::RawSlice, nSlices);
+  bufferInstance->getRawSlices(manyRawSlices.begin(), nSlices);
+  std::vector<grpc::Slice> slices;
+  slices.reserve(nSlices);
+  for (int i = 0; i < nSlices; i++) {
+    slices.emplace_back(manyRawSlices[i].mem_, manyRawSlices[i].len_, &derefBufferInstanceContainer,
+                        container);
+  }
+  return {&slices[0], slices.size()};
+}
+
+struct ByteBufferContainer {
+  ByteBufferContainer(int ref_count) : ref_count_(ref_count) {}
+  ~ByteBufferContainer() { ::free(fragments); }
+  std::atomic<int> ref_count_;
+  Buffer::BufferFragmentImpl* fragments = nullptr;
+  std::vector<grpc::Slice> slices_;
+};
+
+Buffer::InstancePtr Common::makeBufferInstance(const grpc::ByteBuffer& byteBuffer) {
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  if (byteBuffer.Length() == 0) {
+    return buffer;
+  }
+  // NB: ByteBuffer::Dump moves the data out of the ByteBuffer so we need to ensure that the
+  // lifetime of the Slice(s) exceeds our Buffer::Instance.
+  std::vector<grpc::Slice> slices;
+  byteBuffer.Dump(&slices);
+  if (slices.size() == 0) {
+    return buffer;
+  }
+  auto container = new ByteBufferContainer(static_cast<int>(slices.size()));
+  std::function<void(const void*, size_t, const Buffer::BufferFragmentImpl*)> releaser =
+      [container](const void*, size_t, const Buffer::BufferFragmentImpl*) {
+        container->ref_count_--;
+        if (container->ref_count_ <= 0) {
+          delete container;
+        }
+      };
+  // NB: addBufferFragment takes a pointer alias to the BufferFragmentImpl which is passed in so we
+  // need to ensure that the lifetime of those objects exceeds that of the Buffer::Instance.
+  container->fragments = static_cast<Buffer::BufferFragmentImpl*>(
+      ::malloc(sizeof(Buffer::BufferFragmentImpl) * slices.size()));
+  for (size_t i = 0; i < slices.size(); i++) {
+    new (&container->fragments[i])
+        Buffer::BufferFragmentImpl(slices[i].begin(), slices[i].size(), releaser);
+  }
+  for (size_t i = 0; i < slices.size(); i++) {
+    buffer->addBufferFragment(container->fragments[i]);
+  }
+  container->slices_ = std::move(slices);
+  return buffer;
 }
 
 } // namespace Grpc

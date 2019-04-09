@@ -349,5 +349,15 @@ TEST(GrpcCommonTest, ValidateResponse) {
   }
 }
 
+TEST(GrpcCommonTest, MakeBufferInstance) {
+  grpc::ByteBuffer byteBuffer;
+  Common::makeBufferInstance(byteBuffer);
+}
+
+TEST(GrpcCommonTest, MakeByteBuffer) {
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  Common::makeByteBuffer(std::move(buffer));
+}
+
 } // namespace Grpc
 } // namespace Envoy

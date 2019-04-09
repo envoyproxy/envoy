@@ -5,6 +5,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/lock_guard.h"
 #include "common/config/datasource.h"
+#include "common/grpc/common.h"
 #include "common/grpc/google_grpc_creds_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -98,8 +99,17 @@ GoogleAsyncClientImpl::send(const Protobuf::MethodDescriptor& service_method,
                             const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
                             Tracing::Span& parent_span,
                             const absl::optional<std::chrono::milliseconds>& timeout) {
-  auto* const async_request =
-      new GoogleAsyncRequestImpl(*this, service_method, request, callbacks, parent_span, timeout);
+  return sendRaw(service_method.service()->full_name(), service_method.name(),
+                 Common::serializeMessage(request), callbacks, parent_span, timeout);
+}
+
+AsyncRequest*
+GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name, absl::string_view method_name,
+                               Buffer::InstancePtr request, RawAsyncRequestCallbacks& callbacks,
+                               Tracing::Span& parent_span,
+                               const absl::optional<std::chrono::milliseconds>& timeout) {
+  auto* const async_request = new GoogleAsyncRequestImpl(
+      *this, service_full_name, method_name, std::move(request), callbacks, parent_span, timeout);
   std::unique_ptr<GoogleAsyncStreamImpl> grpc_stream{async_request};
 
   grpc_stream->initialize(true);
@@ -111,11 +121,12 @@ GoogleAsyncClientImpl::send(const Protobuf::MethodDescriptor& service_method,
   return async_request;
 }
 
-AsyncStream* GoogleAsyncClientImpl::start(const Protobuf::MethodDescriptor& service_method,
-                                          AsyncStreamCallbacks& callbacks) {
+AsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_name,
+                                             absl::string_view method_name,
+                                             RawAsyncStreamCallbacks& callbacks) {
   const absl::optional<std::chrono::milliseconds> no_timeout;
-  auto grpc_stream =
-      std::make_unique<GoogleAsyncStreamImpl>(*this, service_method, callbacks, no_timeout);
+  auto grpc_stream = std::make_unique<GoogleAsyncStreamImpl>(*this, service_full_name, method_name,
+                                                             callbacks, no_timeout);
 
   grpc_stream->initialize(false);
   if (grpc_stream->call_failed()) {
@@ -127,14 +138,25 @@ AsyncStream* GoogleAsyncClientImpl::start(const Protobuf::MethodDescriptor& serv
 }
 
 GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(
+    GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
+    absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
+    const absl::optional<std::chrono::milliseconds>& timeout)
+    : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
+      service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
+      timeout_(timeout) {}
+
+GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(
     GoogleAsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
     AsyncStreamCallbacks& callbacks, const absl::optional<std::chrono::milliseconds>& timeout)
-    : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
-      service_method_(service_method), callbacks_(callbacks), timeout_(timeout) {}
+    : GoogleAsyncStreamImpl(parent, service_method.service()->full_name(), service_method.name(),
+                            callbacks, timeout) {}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
 }
+
+GoogleAsyncStreamImpl::PendingMessage::PendingMessage(Buffer::InstancePtr request, bool end_stream)
+    : buf_(Common::makeByteBuffer(std::move(request))), end_stream_(end_stream) {}
 
 // TODO(htuch): figure out how to propagate "this request should be buffered for
 // retry" bit to Google gRPC library.
@@ -161,9 +183,8 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
       },
       &ctxt_);
   // Invoke stub call.
-  rw_ = parent_.stub_->PrepareCall(
-      &ctxt_, "/" + service_method_.service()->full_name() + "/" + service_method_.name(),
-      &parent_.tls_.completionQueue());
+  rw_ = parent_.stub_->PrepareCall(&ctxt_, "/" + service_full_name_ + "/" + method_name_,
+                                   &parent_.tls_.completionQueue());
   if (rw_ == nullptr) {
     notifyRemoteClose(Status::GrpcStatus::Unavailable, nullptr, EMPTY_STRING);
     call_failed_ = true;
@@ -193,7 +214,11 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
 }
 
 void GoogleAsyncStreamImpl::sendMessage(const Protobuf::Message& request, bool end_stream) {
-  write_pending_queue_.emplace(request, end_stream);
+  sendRawMessage(Common::serializeMessage(request), end_stream);
+}
+
+void GoogleAsyncStreamImpl::sendRawMessage(Buffer::InstancePtr request, bool end_stream) {
+  write_pending_queue_.emplace(std::move(request), end_stream);
   ENVOY_LOG(trace, "Queued message to write ({} bytes)",
             write_pending_queue_.back().buf_.value().Length());
   writeQueued();
@@ -309,20 +334,12 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   }
   case GoogleAsyncTag::Operation::Read: {
     ASSERT(ok);
-    ProtobufTypes::MessagePtr response = callbacks_.createEmptyResponse();
-    {
-      // reader must be destructed before we queue up read_buf_ for the next
-      // Read op, otherwise we can race between this thread in the reader
-      // destructor and the gRPC op thread.
-      grpc::ProtoBufferReader reader(&read_buf_);
-      if (!response->ParseFromZeroCopyStream(&reader)) {
-        // This is basically streamError in Grpc::AsyncClientImpl.
-        notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
-        resetStream();
-        break;
-      };
+    if (!callbacks_.onReceiveRawMessage(Common::makeBufferInstance(read_buf_))) {
+      // This is basically streamError in Grpc::AsyncClientImpl.
+      notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
+      resetStream();
+      break;
     }
-    callbacks_.onReceiveMessageUntyped(std::move(response));
     rw_->Read(&read_buf_, &read_tag_);
     ++inflight_tags_;
     break;
@@ -384,11 +401,11 @@ void GoogleAsyncStreamImpl::cleanup() {
 }
 
 GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
-    GoogleAsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
-    const Protobuf::Message& request, AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-    const absl::optional<std::chrono::milliseconds>& timeout)
-    : GoogleAsyncStreamImpl(parent, service_method, *this, timeout), request_(request),
-      callbacks_(callbacks) {
+    GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
+    absl::string_view method_name, Buffer::InstancePtr request, RawAsyncRequestCallbacks& callbacks,
+    Tracing::Span& parent_span, const absl::optional<std::chrono::milliseconds>& timeout)
+    : GoogleAsyncStreamImpl(parent, service_full_name, method_name, *this, timeout),
+      request_(std::move(request)), callbacks_(callbacks) {
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.stat_prefix_ + " egress",
                                          parent.timeSource().systemTime());
@@ -396,12 +413,20 @@ GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
   current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 }
 
+GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
+    GoogleAsyncClientImpl& parent, const Protobuf::MethodDescriptor& service_method,
+    const Protobuf::Message& request, AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+    const absl::optional<std::chrono::milliseconds>& timeout)
+    : GoogleAsyncRequestImpl(parent, service_method.service()->full_name(), service_method.name(),
+                             Common::serializeMessage(std::move(request)), callbacks, parent_span,
+                             timeout) {}
+
 void GoogleAsyncRequestImpl::initialize(bool buffer_body_for_retry) {
   GoogleAsyncStreamImpl::initialize(buffer_body_for_retry);
   if (this->call_failed()) {
     return;
   }
-  this->sendMessage(request_, true);
+  this->sendRawMessage(std::move(request_), true);
 }
 
 void GoogleAsyncRequestImpl::cancel() {
@@ -417,8 +442,9 @@ void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) 
 
 void GoogleAsyncRequestImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&&) {}
 
-void GoogleAsyncRequestImpl::onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) {
-  response_ = std::move(message);
+bool GoogleAsyncRequestImpl::onReceiveRawMessage(Buffer::InstancePtr response) {
+  response_ = std::move(response);
+  return true;
 }
 
 void GoogleAsyncRequestImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&&) {}
@@ -438,7 +464,7 @@ void GoogleAsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
   } else {
-    callbacks_.onSuccessUntyped(std::move(response_), *current_span_);
+    callbacks_.onSuccessRaw(std::move(response_), *current_span_);
   }
 
   current_span_->finishSpan();
