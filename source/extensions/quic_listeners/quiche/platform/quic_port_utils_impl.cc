@@ -17,34 +17,28 @@
 namespace quic {
 
 int QuicPickUnusedPortOrDieImpl() {
-  // Only try to get a port for limited times.
   std::vector<Envoy::Network::Address::IpVersion> supported_versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
+  ASSERT(!supported_versions.empty());
+  Envoy::Network::Address::IpVersion ip_version = supported_versions.size() == 1
+                                                      ? supported_versions[0]
+                                                      : Envoy::Network::Address::IpVersion::v6;
+  // Only try to get a port for limited times.
   for (size_t i = 0; i < 300; ++i) {
-    uint32_t port = 0;
-    bool available = true;
-    for (auto ip_version : supported_versions) {
-      // Check availability of a port for all supported address families.
-      auto addr_port = Envoy::Network::Utility::parseInternetAddressAndPort(
-          fmt::format("{}:{}", Envoy::Network::Test::getAnyAddressUrlString(ip_version), port),
-          /*v6only*/ false);
-      ASSERT(addr_port != nullptr);
-      addr_port = Envoy::Network::Test::findOrCheckFreePort(
-          addr_port, Envoy::Network::Address::SocketType::Datagram);
-      if (addr_port == nullptr || addr_port->ip() == nullptr) {
-        available = false;
-        break;
-      }
-      if (port == 0) {
-        // Just get a port from findOrCheckFreePort(), check its usability in the other address
-        // families.
-        port = addr_port->ip()->port();
-      } else {
-        ASSERT(port == addr_port->ip()->port());
-      }
-    }
-    if (available) {
-      return port;
+    // Checking availability under corresponding supported version if test
+    // supports v4 only or v6 only.
+    // If it supports both v4 and v6, checking availability under v6 with IPV6_V6ONLY
+    // set to false is sufficient because such socket can be used on v4-mapped
+    // v6 address.
+    auto addr_port = Envoy::Network::Utility::parseInternetAddressAndPort(
+        fmt::format("{}:{}", Envoy::Network::Test::getAnyAddressUrlString(ip_version), /*port*/ 0),
+        /*v6only*/ false);
+    ASSERT(addr_port != nullptr);
+    addr_port = Envoy::Network::Test::findOrCheckFreePort(
+        addr_port, Envoy::Network::Address::SocketType::Datagram);
+    if (addr_port != nullptr && addr_port->ip() != nullptr) {
+      // Find a port.
+      return addr_port->ip()->port();
     }
   }
   RELEASE_ASSERT(false, "Failed to pick a port for test.");
