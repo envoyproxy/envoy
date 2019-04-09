@@ -310,15 +310,9 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToUnknownServer) {
   FakeUpstreamPtr target_server{
       new FakeUpstream(endpoint, upstreamProtocol(), timeSystem(), enable_half_close_)};
 
-<<<<<<< HEAD
-  EXPECT_TRUE(!client_to_proxy.empty());
-  EXPECT_TRUE(client_to_proxy.find("foo") != std::string::npos);
-  tcp_client->write(client_to_proxy);
-=======
   std::stringstream redirection_error;
   redirection_error << "-MOVED 1111 " << redisAddressAndPort(target_server) << "\r\n";
   simpleRedirection(target_server, request, redirection_error.str(), request, "$3\r\nbar\r\n");
->>>>>>> master
 
   redirection_error.str("");
   redirection_error << "-ASK 1111 " << redisAddressAndPort(target_server) << "\r\n";
