@@ -116,6 +116,83 @@ void RespValue::type(RespType type) {
   }
 }
 
+RespValue::RespValue(const RespValue& other) : type_(RespType::Null) {
+  this->type(other.type());
+  switch (type_) {
+  case RespType::Array: {
+    this->asArray() = other.asArray();
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    this->asString() = other.asString();
+    break;
+  }
+  case RespType::Integer: {
+    this->asInteger() = other.asInteger();
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+}
+
+RespValue& RespValue::operator=(const RespValue& other) {
+  if (&other == this) {
+    return *this;
+  }
+  this->type(other.type());
+  switch (type_) {
+  case RespType::Array: {
+    this->asArray() = other.asArray();
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    this->asString() = other.asString();
+    break;
+  }
+  case RespType::Integer: {
+    this->asInteger() = other.asInteger();
+    break;
+  }
+  case RespType::Null:
+    break;
+  }
+  return *this;
+}
+
+bool RespValue::operator==(const RespValue& other) const {
+  bool result = false;
+  if (type_ != other.type()) {
+    return result;
+  }
+
+  switch (type_) {
+  case RespType::Array: {
+    result = (this->asArray() == other.asArray());
+    break;
+  }
+  case RespType::SimpleString:
+  case RespType::BulkString:
+  case RespType::Error: {
+    result = (this->asString() == other.asString());
+    break;
+  }
+  case RespType::Integer: {
+    result = (this->asInteger() == other.asInteger());
+    break;
+  }
+  case RespType::Null: {
+    result = true;
+    break;
+  }
+  }
+  return result;
+}
+
 void DecoderImpl::decode(Buffer::Instance& data) {
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
   STACK_ARRAY(slices, Buffer::RawSlice, num_slices);

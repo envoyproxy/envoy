@@ -212,9 +212,23 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    if (!cluster->hosts().empty() && cluster->mutable_hosts(0)->has_socket_address()) {
-      auto host_socket_addr = cluster->mutable_hosts(0)->mutable_socket_address();
-      host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+    if (!cluster->hosts().empty()) {
+      for (int j = 0; j < cluster->hosts().size(); j++) {
+        if (cluster->mutable_hosts(j)->has_socket_address()) {
+          auto host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
+          host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+        }
+      }
+    }
+    for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
+      auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
+      for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
+        auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+        if (lb_endpoint->endpoint().address().has_socket_address()) {
+          lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+              Network::Test::getLoopbackAddressString(version));
+        }
+      }
     }
   }
 }
