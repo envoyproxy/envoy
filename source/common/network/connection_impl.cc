@@ -153,6 +153,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     // data can be written. However, we do want to stop reading to apply TCP backpressure.
     read_enabled_ = false;
 
+    // NOTE: At this point, it's already been validated that the connection is not already in
+    // delayed close processing and therefore the timer has not yet been created.
     if (delayed_close_timeout_set) {
       initializeDelayedCloseTimer();
       delayed_close_state_ = (type == ConnectionCloseType::FlushWrite)

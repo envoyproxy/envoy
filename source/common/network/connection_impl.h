@@ -122,6 +122,8 @@ public:
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override {
+    // Validate that this is only called prior to issuing a close() or closeSocket().
+    ASSERT(delayed_close_timer_ == nullptr && ioHandle().isOpen());
     delayed_close_timeout_ = timeout;
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
