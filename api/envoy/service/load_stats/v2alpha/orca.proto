@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.load_stats.v2alpha;
 
-option java_outer_classname = "OpenRCAProto";
+option java_outer_classname = "OpenRcaProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.service.load_stats.v2alpha";
 option go_package = "v2alpha";
@@ -13,11 +13,11 @@ import "validate/validate.proto";
 
 // Out-of-band (OOB) load reporting service for frontends to periodically get
 // load information from backends.
-service OpenRCAService {
-  rpc StreamCoreMetrics(stream LoadReportRequest) returns (stream LoadReport);
+service OpenRcaService {
+  rpc StreamCoreMetrics(OrcaLoadReportRequest) returns (stream OrcaLoadReport);
 }
 
-message LoadReportRequest {
+message OrcaLoadReportRequest {
   // Interval for generating Open RCA core metric responses.
   google.protobuf.Duration report_interval = 1;
   // Request costs to collect. If this is empty, all known requests costs tracked by
@@ -26,7 +26,7 @@ message LoadReportRequest {
   repeated string request_cost_names = 2;
 }
 
-message LoadReport {
+message OrcaLoadReport {
   // CPU utilization expressed as a fraction of available CPU resources. This
   // should be derived from a sample or measurement taken during the request.
   double cpu_utilization = 1 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
