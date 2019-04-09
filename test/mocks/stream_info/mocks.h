@@ -18,6 +18,7 @@ public:
 
   // StreamInfo::StreamInfo
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
+  MOCK_METHOD1(setResponseCodeDetails, void(const std::string&));
   MOCK_CONST_METHOD1(intersectResponseFlags, bool(uint64_t));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
@@ -44,6 +45,7 @@ public:
   MOCK_CONST_METHOD0(protocol, absl::optional<Http::Protocol>());
   MOCK_METHOD1(protocol, void(Http::Protocol protocol));
   MOCK_CONST_METHOD0(responseCode, absl::optional<uint32_t>());
+  MOCK_CONST_METHOD0(responseCodeDetails, const absl::optional<std::string>&());
   MOCK_METHOD1(addBytesSent, void(uint64_t));
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
   MOCK_CONST_METHOD1(hasResponseFlag, bool(ResponseFlag));

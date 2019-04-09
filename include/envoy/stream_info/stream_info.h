@@ -14,6 +14,7 @@
 
 #include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
+#include "common/singleton/const_singleton.h"
 
 #include "absl/types/optional.h"
 
@@ -63,6 +64,12 @@ enum ResponseFlag {
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
   LastFlag = StreamIdleTimeout
 };
+
+struct ResponseCodeDetailValues {
+  const std::string RC_SET_BY_UPSTREAM = "response_code_set_by_upstream";
+};
+
+typedef ConstSingleton<ResponseCodeDetailValues> ResponseCodeDetails;
 
 struct UpstreamTiming {
   /**
@@ -117,6 +124,11 @@ public:
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
+   * @param rc_details the response code details string to set for this request.
+   */
+  virtual void setResponseCodeDetails(const std::string& rc_details) PURE;
+
+  /**
    * @param response_flags the response_flags to intersect with.
    * @return true if the intersection of the response_flags argument and the currently set response
    * flags is non-empty.
@@ -152,6 +164,11 @@ public:
    * @return the response code.
    */
   virtual absl::optional<uint32_t> responseCode() const PURE;
+
+  /**
+   * @return the response code details.
+   */
+  virtual const absl::optional<std::string>& responseCodeDetails() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.
