@@ -56,6 +56,7 @@
 #define QUIC_LOG_WARNING_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::WARNING)
 #define QUIC_LOG_ERROR_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::ERROR)
 
+// (D)CHECK's are only used by quiche code, use ASSERT instead in envoy code.
 #define CHECK(condition)                                                                           \
   QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << "CHECK failed: " #condition "."
 
