@@ -84,7 +84,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   corrections.
 * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
   "1.6.0". Also remove the "Pending" tag from the top of the [release notes](docs/root/intro/version_history.rst)
-  and [DEPRECATED.md](DEPRECATED.md). Get a review and merge.
+  and [deprecated log](docs/root/intro/deprecated.rst). Get a review and merge.
 * **Wait for tests to pass on
   [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
@@ -99,7 +99,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
   Envoy account post).
 * Do a new PR to update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". At
   the same time, also add a new empty "pending" section to the [release
-  notes](docs/root/intro/version_history.rst) and to [DEPRECATED.md](DEPRECATED.md) for the
+  notes](docs/root/intro/version_history.rst) and to [deprecated log](docs/root/intro/deprecated.rst) for the
   following version. E.g., "1.7.0 (pending)".
 * Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh 1.8.0 1.10.0`)
   to file tracking issues for code which can be removed.
