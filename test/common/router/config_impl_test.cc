@@ -4137,6 +4137,26 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
+TEST_F(RoutePropertyTest, TestBadCorsConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/api"
+    route:
+      cluster: ats
+      cors:
+        enabled: 0
+        allow_credentials: true
+)EOF";
+
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+               EnvoyException);
+}
+
 TEST_F(RouteMatcherTest, Decorator) {
   const std::string yaml = R"EOF(
 virtual_hosts:
