@@ -13,6 +13,7 @@ using ::google::jwt_verify::Status;
 
 using testing::_;
 using testing::Invoke;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
@@ -46,10 +47,7 @@ public:
   }
 
   void setupMockConfig() {
-    EXPECT_CALL(*mock_config_.get(), findVerifier(_, _))
-        .WillOnce(Invoke([&](const Http::HeaderMap&, const StreamInfo::FilterState&) {
-          return mock_verifier_.get();
-        }));
+    EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(mock_verifier_.get()));
   }
 
   JwtAuthentication proto_config_;
@@ -177,9 +175,7 @@ TEST_F(FilterTest, OutBoundFailure) {
 
 // Test verifies that if no route matched requirement, then request is allowed.
 TEST_F(FilterTest, TestNoRouteMatched) {
-  EXPECT_CALL(*mock_config_.get(), findVerifier(_, _))
-      .WillOnce(
-          Invoke([&](const Http::HeaderMap&, const StreamInfo::FilterState&) { return nullptr; }));
+  EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(nullptr));
 
   auto headers = Http::TestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));

@@ -9,8 +9,6 @@
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
 
-#include "fmt/printf.h"
-
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::envoy::config::filter::network::http_connection_manager::v2::HttpFilter;
 
@@ -58,9 +56,8 @@ public:
 };
 
 // perform static registration
-static Registry::RegisterFactory<HeaderToFilterStateFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(HeaderToFilterStateFilterConfig,
+                 Server::Configuration::NamedHttpFilterConfigFactory);
 
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks) {
   JwtAuthentication proto_config;
@@ -215,7 +212,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
 )";
 
   config_helper_.addFilter(getAuthFilterConfig(auth_filter_conf, true));
-  config_helper_.addFilter(fmt::sprintf("name: %s", HeaderToFilterStateFilterName));
+  config_helper_.addFilter(absl::StrCat("name: ", HeaderToFilterStateFilterName));
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
