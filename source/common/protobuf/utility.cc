@@ -166,7 +166,7 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
     if (field->options().deprecated()) {
       std::string err = fmt::format(
           "Using deprecated option '{}' from file {}. This configuration will be removed from "
-          "Envoy soon. Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md "
+          "Envoy soon. Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
           "for details.",
           field->full_name(), filename);
       if (warn_only) {
