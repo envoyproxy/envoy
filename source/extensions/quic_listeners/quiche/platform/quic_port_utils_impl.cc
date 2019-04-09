@@ -20,16 +20,16 @@ int QuicPickUnusedPortOrDieImpl() {
   std::vector<Envoy::Network::Address::IpVersion> supported_versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
   ASSERT(!supported_versions.empty());
+  // Checking availability under corresponding supported version if test
+  // supports v4 only or v6 only.
+  // If it supports both v4 and v6, checking availability under v6 with IPV6_V6ONLY
+  // set to false is sufficient because such socket can be used on v4-mapped
+  // v6 address.
   Envoy::Network::Address::IpVersion ip_version = supported_versions.size() == 1
                                                       ? supported_versions[0]
                                                       : Envoy::Network::Address::IpVersion::v6;
   // Only try to get a port for limited times.
   for (size_t i = 0; i < 300; ++i) {
-    // Checking availability under corresponding supported version if test
-    // supports v4 only or v6 only.
-    // If it supports both v4 and v6, checking availability under v6 with IPV6_V6ONLY
-    // set to false is sufficient because such socket can be used on v4-mapped
-    // v6 address.
     auto addr_port = Envoy::Network::Utility::parseInternetAddressAndPort(
         fmt::format("{}:{}", Envoy::Network::Test::getAnyAddressUrlString(ip_version), /*port*/ 0),
         /*v6only*/ false);
