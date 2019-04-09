@@ -498,8 +498,7 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   retry_timer_->callback_();
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(RetryStatus::No,
-            state_->shouldRetryHeaders(response_headers, callback_));
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(response_headers, callback_));
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_success_.value());
@@ -549,12 +548,10 @@ TEST_F(RouterRetryStateImplTest, NoPreferredOverLimitExceeded) {
 
   Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
   expectTimerCreateAndEnable();
-  EXPECT_EQ(RetryStatus::Yes,
-            state_->shouldRetryHeaders(bad_response_headers, callback_));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(bad_response_headers, callback_));
 
   Http::TestHeaderMapImpl good_response_headers{{":status", "200"}};
-  EXPECT_EQ(RetryStatus::No,
-            state_->shouldRetryHeaders(good_response_headers, callback_));
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(good_response_headers, callback_));
 }
 
 } // namespace
