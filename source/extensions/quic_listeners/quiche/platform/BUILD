@@ -183,7 +183,7 @@ envoy_cc_library(
     hdrs = envoy_select_quiche(["quic_test_mem_slice_vector_impl.h"]),
     visibility = ["//visibility:public"],
     deps = envoy_select_quiche([
-        ":quic_platform_mem_slice_span_impl_lib",
+        "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
         "//include/envoy/buffer:buffer_interface",
     ]),
 )
