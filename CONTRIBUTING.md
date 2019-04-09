@@ -51,7 +51,7 @@ maximize the chances of your PR being merged.
   deprecation window. Within this window, a warning of deprecation should be carefully logged (some
   features might need rate limiting for logging this). We make no guarantees about code or deployments
   that rely on undocumented behavior.
-* All deprecations/breaking changes will be clearly listed in [DEPRECATED.md](DEPRECATED.md).
+* All deprecations/breaking changes will be clearly listed in the [deprecated log](docs/root/intro/deprecated.rst).
 * High risk deprecations//breaking changes may be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
   it is expected the multi-phase warn-by-default/fail-by-default is sufficient to warn users to move
@@ -132,7 +132,8 @@ maximize the chances of your PR being merged.
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
   Closing stale PRs helps us to keep on top of all of the work currently in flight.
 * If a commit deprecates a feature, the commit message must mention what has been deprecated.
-  Additionally, [DEPRECATED.md](DEPRECATED.md) must be updated as part of the commit.
+  Additionally, the [deprecated log](docs/root/intro/deprecated.rst) must be updated with relevant
+  RST links for fields and messages as part of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
   mailing list.
 * If your PR involves any changes to
