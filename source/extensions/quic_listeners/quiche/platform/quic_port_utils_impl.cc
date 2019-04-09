@@ -20,7 +20,7 @@ int QuicPickUnusedPortOrDieImpl() {
   // Only try to get a port for limited times.
   std::vector<Envoy::Network::Address::IpVersion> supported_versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
-  for (size_t i = 0; i < 30000; ++i) {
+  for (size_t i = 0; i < 300; ++i) {
     uint32_t port = 0;
     bool available = true;
     for (auto ip_version : supported_versions) {
@@ -36,7 +36,7 @@ int QuicPickUnusedPortOrDieImpl() {
         break;
       }
       if (port == 0) {
-        // Just get a port from findOrCheckFreePort(), check its usability in the rest address
+        // Just get a port from findOrCheckFreePort(), check its usability in the other address
         // families.
         port = addr_port->ip()->port();
       } else {
