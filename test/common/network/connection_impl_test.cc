@@ -1114,51 +1114,6 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   server_connection->close(ConnectionCloseType::NoFlush);
 }
 
-// Test that the delayed close timer is created when a connection is closed while having a write
-// buffer pending to flush.
-TEST_P(ConnectionImplTest, DelayedCloseTimerSetWithPendingWriteBufferFlush) {
-  ConnectionMocks mocks = createConnectionMocks();
-  MockTransportSocket* transport_socket = mocks.transport_socket_.get();
-  IoHandlePtr io_handle = std::make_unique<IoSocketHandleImpl>(0);
-  auto server_connection = std::make_unique<Network::ConnectionImpl>(
-      *mocks.dispatcher_,
-      std::make_unique<ConnectionSocketImpl>(std::move(io_handle), nullptr, nullptr),
-      std::move(mocks.transport_socket_), true);
-
-  InSequence s1;
-  // The actual timeout is insignificant, we just need to enable delayed close processing by
-  // setting it to > 0.
-  auto timeout = std::chrono::milliseconds(100);
-  server_connection->setDelayedCloseTimeout(timeout);
-
-  EXPECT_CALL(*mocks.file_event_, activate(Event::FileReadyType::Write))
-      .WillOnce(Invoke(*mocks.file_ready_cb_));
-  EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("data"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> IoResult {
-        // Do not drain the buffer and return 0 bytes processed to simulate backpressure.
-        return IoResult{PostIoAction::KeepOpen, 0, false};
-      }));
-  Buffer::OwnedImpl data("data");
-  server_connection->write(data, false);
-
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
-  server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
-
-  // The buffer will be fully drained when the onWriteReady() cb is called, but the connection won't
-  // be closed and the timer will be reset to its original value since the close() type is
-  // FlushWriteAndDelay.
-  EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("data"), _))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> IoResult {
-        buffer.drain(buffer.length());
-        return IoResult{PostIoAction::KeepOpen, buffer.length(), false};
-      }));
-  EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
-  (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
-
-  // Force the delayed close timeout to trigger so the connection is cleaned up.
-  mocks.timer_->callback_();
-}
-
 // Test that the delayed close timer is reset while write flushes are happening when a connection is
 // in delayed close mode.
 TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) {
@@ -1193,14 +1148,17 @@ TEST_P(ConnectionImplTest, DelayedCloseTimerResetWithPendingWriteBufferFlushes) 
   // timeout value to avoid triggering while the write buffer is being actively flushed.
   EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("data"), _))
       .WillOnce(Invoke([&](Buffer::Instance&, bool) -> IoResult {
+        // Partial flush.
         return IoResult{PostIoAction::KeepOpen, 1, false};
       }));
   EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
 
   EXPECT_CALL(*transport_socket, doWrite(BufferStringEqual("data"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> IoResult {
-        return IoResult{PostIoAction::KeepOpen, 1, false};
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> IoResult {
+        // Flush the entire buffer.
+        buffer.drain(buffer.length());
+        return IoResult{PostIoAction::KeepOpen, buffer.length(), false};
       }));
   EXPECT_CALL(*mocks.timer_, enableTimer(timeout)).Times(1);
   (*mocks.file_ready_cb_)(Event::FileReadyType::Write);
