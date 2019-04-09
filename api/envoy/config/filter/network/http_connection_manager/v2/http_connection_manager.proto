@@ -219,8 +219,10 @@ message HttpConnectionManager {
   //
   // The default timeout is 1000 ms if this option is not specified.
   //
-  // A value of 0 will completely disable delayed close processing, and the downstream connection's
-  // socket will be closed immediately after the write flush is completed.
+  // .. WARNING::
+  //    A value of 0 will completely disable delayed close processing. When disabled, the downstream
+  //    connection's socket will be closed immediately after the write flush is completed or will
+  //    never close if the write flush does not complete.
   google.protobuf.Duration delayed_close_timeout = 26 [(gogoproto.stdduration) = true];
 
   // Configuration for :ref:`HTTP access logs <arch_overview_access_logs>`

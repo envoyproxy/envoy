@@ -613,7 +613,7 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 }
 
 void ConnectionImpl::onDelayedCloseTimeout() {
-  delayed_close_timer_.reset(nullptr);
+  delayed_close_timer_.reset();
   ENVOY_CONN_LOG(debug, "triggered delayed close", *this);
   if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
     connection_stats_->delayed_close_timeouts_->inc();
