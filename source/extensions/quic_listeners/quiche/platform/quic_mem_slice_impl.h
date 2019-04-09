@@ -40,10 +40,10 @@ public:
   QuicMemSliceImpl(const QuicMemSliceImpl& other) = delete;
   // Move constructors. |other| will not hold a reference to the data buffer
   // after this call completes.
-  QuicMemSliceImpl(QuicMemSliceImpl&& other) { *this = std::move(other); }
+  QuicMemSliceImpl(QuicMemSliceImpl&& other) noexcept { *this = std::move(other); }
 
   QuicMemSliceImpl& operator=(const QuicMemSliceImpl& other) = delete;
-  QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) {
+  QuicMemSliceImpl& operator=(QuicMemSliceImpl&& other) noexcept {
     if (this != &other) {
       single_slice_buffer_.move(other.single_slice_buffer_);
     }

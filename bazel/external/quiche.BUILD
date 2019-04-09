@@ -177,7 +177,6 @@ cc_library(
         "quiche/quic/platform/api/quic_server_stats.h",
         "quiche/quic/platform/api/quic_socket_address.h",
         "quiche/quic/platform/api/quic_string_piece.h",
-        "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
         "quiche/quic/platform/api/quic_test_output.h",
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
@@ -260,9 +259,18 @@ cc_library(
 
 cc_library(
     name = "quic_platform_mem_slice_span_lib",
-    hdrs = ["quiche/quic/platform/api/quic_mem_slice_span.h"],
+    hdrs = [
+        "quiche/quic/platform/api/quic_mem_slice_span.h",
+    ],
     visibility = ["//visibility:public"],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_span_impl_lib"],
+)
+
+cc_library(
+    name = "quic_platform_test_mem_slice_vector_lib",
+    hdrs = ["quiche/quic/platform/api/quic_test_mem_slice_vector.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_test_mem_slice_vector_impl_lib"],
 )
 
 cc_library(
@@ -430,5 +438,6 @@ envoy_cc_test(
         ":quic_platform",
         ":quic_platform_mem_slice_span_lib",
         ":quic_platform_mem_slice_storage_lib",
+        ":quic_platform_test_mem_slice_vector_lib",
     ],
 )
