@@ -116,7 +116,7 @@ public:
         return pair.verifier_.get();
       }
     }
-    if (filter_state_name_.size() > 0 && filter_state_verifiers_.size() > 0 &&
+    if (!filter_state_name_.empty() && !filter_state_verifiers_.empty() &&
         filter_state.hasData<Router::StringAccessor>(filter_state_name_)) {
       const auto& state = filter_state.getDataReadOnly<Router::StringAccessor>(filter_state_name_);
       ENVOY_LOG(debug, "use filter state value {} to find verifier.", state.asString());

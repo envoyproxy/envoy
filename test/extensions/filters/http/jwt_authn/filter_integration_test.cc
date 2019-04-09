@@ -20,8 +20,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-const std::string HeaderToFilterStateFilterName =
-    "envoy.filters.http.header_to_filter_state_for_test";
+const char HeaderToFilterStateFilterName[] = "envoy.filters.http.header_to_filter_state_for_test";
 
 // This filter extracts a string header from "header" and
 // save it into FilterState as name "state" as read-only Router::StringAccessor.
