@@ -184,8 +184,9 @@ message Cluster {
   //
   // .. attention::
   //
-  //   **This field is deprecated**. Set the
-  //   :ref:`load_assignment<envoy_api_field_Cluster.load_assignment>` field instead.
+  //   **This field is outdated**. Setting the
+  //   :ref:`load_assignment<envoy_api_field_Cluster.load_assignment>` field is
+  //   preferred.
   //
   repeated core.Address hosts = 7 [deprecated = true];
 
