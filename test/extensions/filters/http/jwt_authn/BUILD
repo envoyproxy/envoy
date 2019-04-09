@@ -34,6 +34,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         "//source/extensions/filters/http/jwt_authn:extractor_lib",
+        "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/test_common:utility_lib",
     ],
 )

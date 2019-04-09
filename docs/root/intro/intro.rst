@@ -12,3 +12,4 @@ Introduction
   comparison
   getting_help
   version_history
+  deprecated
