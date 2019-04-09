@@ -533,16 +533,14 @@ void ConnectionImpl::onWriteReady() {
     }
   }
 
-  // Disable the delayed close timer since data is still being flushed. The timer should only
-  // trigger after a delayedCloseTimeout() period of inactivity.
-  if (delayed_close_timer_ != nullptr) {
-    delayed_close_timer_->disableTimer();
-  }
-
   IoResult result = transport_socket_->doWrite(*write_buffer_, write_end_stream_);
   ASSERT(!result.end_stream_read_); // The interface guarantees that only read operations set this.
   uint64_t new_buffer_size = write_buffer_->length();
   updateWriteBufferStats(result.bytes_processed_, new_buffer_size);
+
+  // NOTE: If the delayed_close_timer_ is set, it must only trigger after a delayed_close_timeout_
+  // period of inactivity from the last write event. Therefore, the timer must be reset to its
+  // original timeout value unless the socket is going to be closed as a result of the doWrite().
 
   if (result.action_ == PostIoAction::Close) {
     // It is possible (though unlikely) for the connection to have already been closed during the

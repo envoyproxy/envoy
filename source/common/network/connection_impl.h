@@ -174,7 +174,17 @@ private:
 
   // States associated with delayed closing of the connection (i.e., when the underlying socket is
   // not immediately close()d as a result of a ConnectionImpl::close()).
-  enum class DelayedCloseState { None, CloseAfterFlush, CloseAfterFlushAndTimeout };
+  enum class DelayedCloseState {
+    None,
+    // The socket will be closed immediately after the buffer is flushed _or_ if a period of
+    // inactivity after the last write event greater than or equal to delayed_close_timeout_ has
+    // elapsed.
+    CloseAfterFlush,
+    // The socket will be closed after a grace period of delayed_close_timeout_ has elapsed after
+    // the socket is flushed _or_ if a period of inactivity after the last write event greater than
+    // or equal to delayed_close_timeout_ has elapsed.
+    CloseAfterFlushAndTimeout
+  };
   DelayedCloseState delayed_close_state_{DelayedCloseState::None};
 
   Event::Dispatcher& dispatcher_;
