@@ -23,7 +23,7 @@ ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& r
     : config_(config), time_system_(time_system), stats_(config_.stats()),
       random_generator_(random_generator), deserializer_(config.createDeserializer()),
       protocol_(config.createProtocol()),
-      decoder_(std::make_unique<Decoder>(*protocol_.get(), *deserializer_.get(), this)) {}
+      decoder_(std::make_unique<Decoder>(*protocol_.get(), *deserializer_.get(), *this)) {}
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(trace, "dubbo: read {} bytes", data.length());

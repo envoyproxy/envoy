@@ -187,7 +187,7 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {
       }));
   EXPECT_CALL(callbacks_, newDecoderEventHandler()).Times(0);
 
-  Decoder decoder(protocol_, deserializer_, &callbacks_);
+  Decoder decoder(protocol_, deserializer_, callbacks_);
 
   Buffer::OwnedImpl buffer;
   bool buffer_underflow;
@@ -211,7 +211,7 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
   EXPECT_CALL(callbacks_.handler_, transferBodyTo(_, _)).Times(0);
   EXPECT_CALL(callbacks_.handler_, transportEnd()).Times(0);
 
-  Decoder decoder(protocol_, deserializer_, &callbacks_);
+  Decoder decoder(protocol_, deserializer_, callbacks_);
 
   Buffer::OwnedImpl buffer;
   bool buffer_underflow;
@@ -242,7 +242,7 @@ TEST_F(DubboDecoderTest, decodeResponseMessage) {
   EXPECT_CALL(callbacks_.handler_, transferBodyTo(_, _)).Times(1);
   EXPECT_CALL(callbacks_.handler_, transportEnd()).Times(1);
 
-  Decoder decoder(protocol_, deserializer_, &callbacks_);
+  Decoder decoder(protocol_, deserializer_, callbacks_);
 
   bool buffer_underflow;
   EXPECT_EQ(decoder.onData(buffer, buffer_underflow), Network::FilterStatus::Continue);

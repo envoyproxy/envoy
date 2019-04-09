@@ -13,7 +13,7 @@ ResponseDecoder::ResponseDecoder(Buffer::Instance& buffer, DubboFilterStats& sta
                                  Network::Connection& connection, Deserializer& deserializer,
                                  Protocol& protocol)
     : response_buffer_(buffer), stats_(stats), response_connection_(connection),
-      decoder_(std::make_unique<Decoder>(protocol, deserializer, this)), complete_(false) {}
+      decoder_(std::make_unique<Decoder>(protocol, deserializer, *this)), complete_(false) {}
 
 bool ResponseDecoder::onData(Buffer::Instance& data) {
   ENVOY_LOG(debug, "dubbo response: the received reply data length is {}", data.length());

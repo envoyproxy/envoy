@@ -127,7 +127,7 @@ ProtocolState DecoderStateMachine::run(Buffer::Instance& buffer) {
 typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
 
 Decoder::Decoder(Protocol& protocol, Deserializer& deserializer,
-                 DecoderCallbacks* decoder_callbacks)
+                 DecoderCallbacks& decoder_callbacks)
     : deserializer_(deserializer), protocol_(protocol), decoder_callbacks_(decoder_callbacks) {}
 
 Network::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
@@ -167,7 +167,7 @@ Network::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_under
 void Decoder::start() {
   metadata_ = std::make_shared<MessageMetadata>();
   state_machine_ = std::make_unique<DecoderStateMachine>(protocol_, deserializer_, metadata_,
-                                                         *decoder_callbacks_);
+                                                         decoder_callbacks_);
   decode_started_ = true;
 }
 

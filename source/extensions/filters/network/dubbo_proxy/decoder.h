@@ -115,7 +115,7 @@ typedef std::unique_ptr<DecoderStateMachine> DecoderStateMachinePtr;
  */
 class Decoder : public Logger::Loggable<Logger::Id::dubbo> {
 public:
-  Decoder(Protocol& protocol, Deserializer& deserializer, DecoderCallbacks* decoder_callbacks);
+  Decoder(Protocol& protocol, Deserializer& deserializer, DecoderCallbacks& decoder_callbacks);
 
   /**
    * Drains data from the given buffer
@@ -129,13 +129,6 @@ public:
   const Protocol& protocol() { return protocol_; }
 
 private:
-  struct ActiveRequest {
-    ActiveRequest(DecoderEventHandler& handler) : handler_(handler) {}
-
-    DecoderEventHandler& handler_;
-  };
-  typedef std::unique_ptr<ActiveRequest> ActiveRequestPtr;
-
   void start();
   void complete();
 
@@ -144,7 +137,7 @@ private:
   Protocol& protocol_;
   DecoderStateMachinePtr state_machine_;
   bool decode_started_ = false;
-  DecoderCallbacks* decoder_callbacks_;
+  DecoderCallbacks& decoder_callbacks_;
 };
 
 typedef std::unique_ptr<Decoder> DecoderPtr;
