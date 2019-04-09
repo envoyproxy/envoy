@@ -31,7 +31,7 @@ For more information on CSRF please refer to the pages below.
 
 * https://www.owasp.org/index.php/Cross-Site_Request_Forgery_%28CSRF%29
 * https://seclab.stanford.edu/websec/csrf/csrf.pdf
-* :ref:`v2 API reference <envoy_api_msg_route.CsrfPolicy>`
+* :ref:`v2 API reference <envoy_api_msg_config.filter.http.csrf.v2.CsrfPolicy>`
 
   .. note::
 
@@ -50,7 +50,7 @@ filter_enabled
 
   To utilize runtime to enabled/disable the CSRF filter set the
   :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>`
-  value of the :ref:`filter_enabled <envoy_api_field_route.CsrfPolicy.filter_enabled>`
+  value of the :ref:`filter_enabled <envoy_api_msg_config.filter.http.csrf.v2.CsrfPolicy>`
   field.
 
 shadow_enabled
@@ -60,7 +60,7 @@ shadow_enabled
 
   To utilize runtime to enabled/disable the CSRF filter's shadow mode set the
   :ref:`runtime_key <envoy_api_msg_core.runtimefractionalpercent>`
-  value of the :ref:`shadow_enabled <envoy_api_field_route.CsrfPolicy.shadow_enabled>`
+  value of the :ref:`shadow_enabled <envoy_api_msg_config.filter.http.csrf.v2.CsrfPolicy>`
   field.
 
 To determine if the filter and/or shadow mode are enabled you can check the runtime
