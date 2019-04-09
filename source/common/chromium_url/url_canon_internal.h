@@ -19,7 +19,7 @@
 #include "common/chromium_url/envoy_shim.h"
 #include "common/chromium_url/url_canon.h"
 
-namespace url {
+namespace chromium_url {
 
 // Character type handling -----------------------------------------------------
 
@@ -241,6 +241,6 @@ inline bool DecodeEscaped(const CHAR* spec, int* begin, int end, unsigned char* 
   return true;
 }
 
-} // namespace url
+} // namespace chromium_url
 
 #endif // URL_URL_CANON_INTERNAL_H_

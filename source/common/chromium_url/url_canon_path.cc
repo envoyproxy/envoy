@@ -11,7 +11,7 @@
 #include "common/chromium_url/url_canon_internal.h"
 #include "common/chromium_url/url_parse_internal.h"
 
-namespace url {
+namespace chromium_url {
 
 namespace {
 
@@ -414,4 +414,4 @@ bool CanonicalizePath(const char* spec, const Component& path, CanonOutput* outp
   return DoPath<char, unsigned char>(spec, path, output, out_path);
 }
 
-} // namespace url
+} // namespace chromium_url
