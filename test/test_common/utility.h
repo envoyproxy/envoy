@@ -528,7 +528,7 @@ ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system
 } // namespace Api
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
-  bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);
+  const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);
   if (!equal) {
     *result_listener << "\n"
                      << "========================Expected header map:========================\n"
@@ -541,7 +541,7 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
 }
 
 MATCHER_P(ProtoEq, expected, "") {
-  bool equal = TestUtility::protoEqual(arg, expected);
+  const bool equal = TestUtility::protoEqual(arg, expected);
   if (!equal) {
     *result_listener << "\n"
                      << "==========================Expected proto:===========================\n"
@@ -554,7 +554,7 @@ MATCHER_P(ProtoEq, expected, "") {
 }
 
 MATCHER_P(RepeatedProtoEq, expected, "") {
-  bool equal = TestUtility::repeatedPtrFieldEqual(arg, expected);
+  const bool equal = TestUtility::repeatedPtrFieldEqual(arg, expected);
   if (!equal) {
     *result_listener << "\n"
                      << "=======================Expected repeated:===========================\n"
