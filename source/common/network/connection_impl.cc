@@ -137,11 +137,15 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       // Validate that a delayed close timer is already enabled unless it was disabled via
       // configuration.
       ASSERT(!delayed_close_timeout_set || delayed_close_timer_ != nullptr);
-      if (type == ConnectionCloseType::FlushWrite || !delayed_close_timeout_set) {
-        delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
-      } else {
-        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndTimeout;
-      }
+      // Validate that the same close type is used when multiple close()s are issued. An edge case
+      // (checked first below) is when the delayed close timeout is disabled; in that case, the
+      // state is set to CloseAterFlush even if the requested type is FluhWriteAndDelay.
+      ASSERT((!delayed_close_timeout_set && type == ConnectionCloseType::FlushWriteAndDelay &&
+              delayed_close_state_ == DelayedCloseState::CloseAfterFlush) ||
+             (type == ConnectionCloseType::FlushWrite &&
+              delayed_close_state_ == DelayedCloseState::CloseAfterFlush) ||
+             (type == ConnectionCloseType::FlushWriteAndDelay &&
+              delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndTimeout));
       return;
     }
 
