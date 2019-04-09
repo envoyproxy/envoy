@@ -48,7 +48,7 @@ public:
 class MockGrpcMuxWatch : public GrpcMuxWatch {
 public:
   MockGrpcMuxWatch();
-  virtual ~MockGrpcMuxWatch();
+  ~MockGrpcMuxWatch();
 
   MOCK_METHOD0(cancel, void());
 };
@@ -56,7 +56,7 @@ public:
 class MockGrpcMux : public GrpcMux {
 public:
   MockGrpcMux();
-  virtual ~MockGrpcMux();
+  ~MockGrpcMux();
 
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
@@ -71,7 +71,7 @@ public:
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
 public:
   MockGrpcMuxCallbacks();
-  virtual ~MockGrpcMuxCallbacks();
+  ~MockGrpcMuxCallbacks();
 
   MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string& version_info));
@@ -82,7 +82,7 @@ public:
 class MockGrpcStreamCallbacks : public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
   MockGrpcStreamCallbacks();
-  virtual ~MockGrpcStreamCallbacks();
+  ~MockGrpcStreamCallbacks();
 
   MOCK_METHOD0(onStreamEstablished, void());
   MOCK_METHOD0(onEstablishmentFailure, void());
