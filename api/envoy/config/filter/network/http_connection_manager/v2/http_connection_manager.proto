@@ -207,7 +207,7 @@ message HttpConnectionManager {
   // is pending a flush of the write buffer. However, any progress made writing data to the socket
   // will restart the timer associated with this timeout. This means that the total grace period for
   // a socket in this state will be
-  // <delayed_close_timeout>+<total_time_waiting_for_write_buffer_flushes>.
+  // <total_time_waiting_for_write_buffer_flushes>+<delayed_close_timeout>.
   //
   // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
