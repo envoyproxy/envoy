@@ -43,6 +43,7 @@ public:
   PassthruRouter(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(conn_pool) {}
 
   ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return conn_pool_; }
+
 private:
   ConnPool::InstanceSharedPtr conn_pool_;
 };
@@ -64,7 +65,8 @@ public:
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}), store_, "redis.foo.", time_system_, false};
+  InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
+                         store_, "redis.foo.", time_system_, false};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -1275,9 +1277,9 @@ public:
     handle_ = splitter_.makeRequest(std::move(request), callbacks_);
   }
 
-
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
-  InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}), store_, "redis.foo.", time_system_, true};
+  InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
+                         store_, "redis.foo.", time_system_, true};
 };
 
 TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {

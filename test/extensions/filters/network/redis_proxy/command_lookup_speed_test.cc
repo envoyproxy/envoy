@@ -33,9 +33,7 @@ public:
 };
 
 class NullRouterImpl : public Router {
-  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override {
-    return nullptr;
-  }
+  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return nullptr; }
 };
 
 class CommandLookUpSpeedTest {

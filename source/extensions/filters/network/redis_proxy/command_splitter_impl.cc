@@ -138,7 +138,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   if (conn_pool) {
     request_ptr->conn_pool_ = conn_pool;
     request_ptr->handle_ = conn_pool->makeRequest(incoming_request->asArray()[1].asString(),
-                                                 *incoming_request, *request_ptr);
+                                                  *incoming_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -150,8 +150,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   return std::move(request_ptr);
 }
 
-SplitRequestPtr EvalRequest::create(Router& router,
-                                    Common::Redis::RespValuePtr&& incoming_request,
+SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool latency_in_micros) {
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
@@ -168,7 +167,8 @@ SplitRequestPtr EvalRequest::create(Router& router,
   auto conn_pool = router.upstreamPool(incoming_request->asArray()[3].asString());
   if (conn_pool) {
     request_ptr->conn_pool_ = conn_pool;
-    request_ptr->handle_ = conn_pool->makeRequest(incoming_request->asArray()[3].asString(), *incoming_request, *request_ptr);
+    request_ptr->handle_ = conn_pool->makeRequest(incoming_request->asArray()[3].asString(),
+                                                  *incoming_request, *request_ptr);
   }
 
   if (!request_ptr->handle_) {
@@ -202,8 +202,7 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
   onChildResponse(Utility::makeError(Response::get().UpstreamFailure), index);
 }
 
-SplitRequestPtr MGETRequest::create(Router& router,
-                                    Common::Redis::RespValuePtr&& incoming_request,
+SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool latency_in_micros) {
   std::unique_ptr<MGETRequest> request_ptr{
@@ -235,7 +234,7 @@ SplitRequestPtr MGETRequest::create(Router& router,
     if (conn_pool) {
       pending_request.conn_pool_ = conn_pool;
       pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(),
-                                                      single_mget, pending_request);
+                                                       single_mget, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -318,8 +317,7 @@ bool MGETRequest::onChildRedirection(const Common::Redis::RespValue& value, uint
   return (this->pending_requests_[index].handle_ != nullptr);
 }
 
-SplitRequestPtr MSETRequest::create(Router& router,
-                                    Common::Redis::RespValuePtr&& incoming_request,
+SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool latency_in_micros) {
   if ((incoming_request->asArray().size() - 1) % 2 != 0) {
@@ -358,7 +356,7 @@ SplitRequestPtr MSETRequest::create(Router& router,
     if (conn_pool) {
       pending_request.conn_pool_ = conn_pool;
       pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(),
-                                                      single_mset, pending_request);
+                                                       single_mset, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -470,7 +468,8 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
     auto conn_pool = router.upstreamPool(incoming_request->asArray()[i].asString());
     if (conn_pool) {
       pending_request.conn_pool_ = conn_pool;
-      pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(), single_fragment, pending_request);
+      pending_request.handle_ = conn_pool->makeRequest(incoming_request->asArray()[i].asString(),
+                                                       single_fragment, pending_request);
     }
 
     if (!pending_request.handle_) {
@@ -534,7 +533,8 @@ void SplitKeysSumResultRequest::recreate(Common::Redis::RespValue& request, uint
 }
 
 bool SplitKeysSumResultRequest::onChildRedirection(const Common::Redis::RespValue& value,
-                                                   uint32_t index, ConnPool::InstanceSharedPtr conn_pool) {
+                                                   uint32_t index,
+                                                   ConnPool::InstanceSharedPtr conn_pool) {
   std::vector<absl::string_view> err;
   bool ask_redirection = false;
   if (redirectionArgsInvalid(incoming_request_.get(), value, err, ask_redirection) || !conn_pool) {
@@ -549,9 +549,8 @@ bool SplitKeysSumResultRequest::onChildRedirection(const Common::Redis::RespValu
   return (this->pending_requests_[index].handle_ != nullptr);
 }
 
-InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope,
-                           const std::string& stat_prefix, TimeSource& time_source,
-                           bool latency_in_micros)
+InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
+                           TimeSource& time_source, bool latency_in_micros)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       split_keys_sum_result_handler_(*router_),

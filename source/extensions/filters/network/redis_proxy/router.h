@@ -21,8 +21,8 @@ public:
   virtual ~Router() = default;
 
   /**
-   * Returns a connection pool that matches a given route. When no match is found, the catch all pool is used. When
-   * remove prefix is set to true, the prefix will be removed from the key.
+   * Returns a connection pool that matches a given route. When no match is found, the catch all
+   * pool is used. When remove prefix is set to true, the prefix will be removed from the key.
    * @param key mutable reference to the key of the current command.
    * @return a handle to the connection pool.
    */
