@@ -170,6 +170,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.removeEnvoyForceTrace();
     request_headers.removeEnvoyIpTags();
     request_headers.removeEnvoyOriginalUrl();
+    request_headers.removeEnvoyHedgeOnPerTryTimeout();
 
     for (const LowerCaseString& header : route_config.internalOnlyHeaders()) {
       request_headers.remove(header);

@@ -180,6 +180,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
 }
 
 FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
+                                                               Http::HeaderMap& request_headers,
                                                                uint64_t random_value) {
   HedgingParams hedgingParams;
   hedgingParams.initial_requests_ = route.hedgePolicy().initialRequests();
@@ -188,6 +189,18 @@ FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry&
   if (ProtobufPercentHelper::evaluateFractionalPercent(
           route.hedgePolicy().additionalRequestChance(), random_value)) {
     hedgingParams.initial_requests_++;
+  }
+
+  Http::HeaderEntry* hedge_on_per_try_timeout_entry = request_headers.EnvoyHedgeOnPerTryTimeout();
+  if (hedge_on_per_try_timeout_entry) {
+    if (hedge_on_per_try_timeout_entry->value() == "true") {
+      hedgingParams.hedge_on_per_try_timeout_ = true;
+    }
+    if (hedge_on_per_try_timeout_entry->value() == "false") {
+      hedgingParams.hedge_on_per_try_timeout_ = false;
+    }
+
+    request_headers.removeEnvoyHedgeOnPerTryTimeout();
   }
 
   return hedgingParams;
@@ -386,7 +399,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
 
-  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, callbacks_->streamId());
+  hedging_params_ =
+      FilterUtility::finalHedgingParams(*route_entry_, headers, callbacks_->streamId());
 
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,

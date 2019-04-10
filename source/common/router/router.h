@@ -102,7 +102,8 @@ public:
    *        initial request should be sent
    * @return HedgingParams the final parameters to use for request hedging
    */
-  static HedgingParams finalHedgingParams(const RouteEntry& route, uint64_t random_value);
+  static HedgingParams finalHedgingParams(const RouteEntry& route, Http::HeaderMap& request_headers,
+                                          uint64_t random_value);
 };
 
 /**
