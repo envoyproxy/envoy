@@ -93,17 +93,21 @@ Note that retries may be disabled depending on the contents of the :ref:`x-envoy
 Request Hedging
 ---------------
 
-Envoy supports request hedging via specifying a :ref:`hedge policy
+Envoy supports request hedging which can be enabled by specifying a :ref:`hedge policy
 <envoy_api_msg_route.HedgePolicy>`. This means that Envoy will race multiple
 simultaneous upstream requests and return the response associated with the
 first acceptable response headers to the downstream. The retry policy is used
 to determine whether a response should be returned or whether more responses
 should be awaited.
 
-Currently hedging can only be applied to retries performed in response to a
-request timeout. The implementation ensures that the same upstream request is
-not retried twice, for instance if it times out and then later receives a 5xx
-response and the retry policy calls for retrying on 5xx.
+Currently hedging can only be performed in response to a request timeout. This
+means that a retry request will be issued without canceling the initial
+timed-out request and a late response will be awaited. The first "good"
+response according to retry policy will be returned downstream.
+
+The implementation ensures that the same upstream request is not retried twice.
+This might otherwise occur if a request times out and then results in a 5xx
+response, creating two retriable events.
 
 .. _arch_overview_http_routing_priority:
 
