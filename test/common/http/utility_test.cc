@@ -767,20 +767,20 @@ TEST(Url, ParsingTest) {
   ValidateUrl("http://www.host.com/", "http", "www.host.com", "/");
 
   // Test url with "?".
-  ValidateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/");
-  ValidateUrl("http://www.host.com/?", "http", "www.host.com", "/");
+  ValidateUrl("http://www.host.com:80/?", "http", "www.host.com:80", "/?");
+  ValidateUrl("http://www.host.com/?", "http", "www.host.com", "/?");
 
   // Test url with "?" but without slash.
-  ValidateUrl("http://www.host.com:80?", "http", "www.host.com:80", "/");
-  ValidateUrl("http://www.host.com?", "http", "www.host.com", "/");
+  ValidateUrl("http://www.host.com:80?", "http", "www.host.com:80", "?");
+  ValidateUrl("http://www.host.com?", "http", "www.host.com", "?");
 
   // Test url with multi-character path
   ValidateUrl("http://www.host.com:80/path", "http", "www.host.com:80", "/path");
   ValidateUrl("http://www.host.com/path", "http", "www.host.com", "/path");
 
   // Test url with multi-character path and ? at the end
-  ValidateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path");
-  ValidateUrl("http://www.host.com/path?", "http", "www.host.com", "/path");
+  ValidateUrl("http://www.host.com:80/path?", "http", "www.host.com:80", "/path?");
+  ValidateUrl("http://www.host.com/path?", "http", "www.host.com", "/path?");
 
   // Test https scheme
   ValidateUrl("https://www.host.com", "https", "www.host.com", "/");
@@ -803,6 +803,11 @@ TEST(Url, ParsingTest) {
               "/path?query=param&query2=param2");
   ValidateUrl("http://www.host.com/path?query=param&query2=param2", "http", "www.host.com",
               "/path?query=param&query2=param2");
+  // Test url with multi-character path, more than one query parameter and fragment
+  ValidateUrl("http://www.host.com:80/path?query=param&query2=param2#fragment", "http",
+              "www.host.com:80", "/path?query=param&query2=param2#fragment");
+  ValidateUrl("http://www.host.com/path?query=param&query2=param2#fragment", "http", "www.host.com",
+              "/path?query=param&query2=param2#fragment");
 }
 
 } // namespace Http
