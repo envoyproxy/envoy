@@ -160,8 +160,9 @@ int HotRestartImpl::bindDomainSocket(uint64_t id) {
   Api::SysCallIntResult result =
       os_sys_calls.bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
   if (result.rc_ != 0) {
-    throw EnvoyException(
-        fmt::format("unable to bind domain socket with id={} (see --base-id option)", id));
+    throw EnvoyException(fmt::format(
+        "unable to bind domain socket with id={}, (see --base-id option), address={}, errno={}: {}",
+        id, result.errno_, strerror(result.errno_)));
   }
 
   return fd;

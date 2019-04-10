@@ -35,6 +35,7 @@ private:
 
   MutexBasicLockable mutex_;
   Api::Api& api_;
+  std::atomic<bool> found_contention_{false};
 };
 
 } // namespace TestUtil
