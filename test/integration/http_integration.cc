@@ -226,10 +226,28 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
+void HttpIntegrationTest::useAccessLog() {
+  access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_));
+}
+
 HttpIntegrationTest::~HttpIntegrationTest() {
   cleanupUpstreamAndDownstream();
   test_server_.reset();
   fake_upstreams_.clear();
+}
+
+std::string HttpIntegrationTest::waitForAccessLog(const std::string& filename) {
+  // Wait a max of 1s for logs to flush to disk.
+  for (int i = 0; i < 1000; ++i) {
+    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
+    if (contents.length() > 0) {
+      return contents;
+    }
+    usleep(1000);
+  }
+  RELEASE_ASSERT(0, "Timed out waiting for access log");
+  return "";
 }
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
