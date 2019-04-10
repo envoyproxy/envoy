@@ -154,4 +154,86 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeout) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
+TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutWithBodyNoBuffer) {
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 512);
+}
+
+TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequest) {
+  config_helper_.setBufferLimits(1024, 1024 * 1024); // Set buffer limits upstream and downstream.
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024);
+}
+
+TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponse) {
+  config_helper_.setBufferLimits(1024 * 1024, 1024); // Set buffer limits upstream and downstream.
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024);
+}
+
+// Sends a request with x-envoy-hedge-on-per-try-timeout, sleeps (with
+// simulated time) for longer than the per try timeout but shorter than the
+// global timeout, asserts that a retry is sent, and then responds with a 200
+// response on the original request and ensures the downstream sees it.
+// Request/response/header size are configurable to test flow control.
+void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTimeout(
+    uint64_t request_size, uint64_t response_size) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-forwarded-for", "10.0.0.1"},
+                                          {"x-envoy-retry-on", "5xx"},
+                                          {"x-envoy-hedge-on-per-try-timeout", "true"},
+                                          {"x-envoy-upstream-rq-timeout-ms", "5000"},
+                                          {"x-envoy-upstream-rq-per-try-timeout-ms", "400"}};
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  codec_client_->sendData(*request_encoder_, request_size, true);
+
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Trigger per try timeout (but not global timeout).
+  timeSystem().sleep(std::chrono::milliseconds(400));
+
+  FakeStreamPtr upstream_request2;
+  // Trigger retry (there's a 25ms backoff before it's issued).
+  timeSystem().sleep(std::chrono::milliseconds(26));
+
+  // Wait for a second request to be sent upstream
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
+  ASSERT_TRUE(upstream_request2->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
+
+  // Encode 200 response headers for the first (timed out) request.
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, response_size == 0);
+
+  response->waitForHeaders();
+
+  // The second request should be reset since we used the response from the first request.
+  ASSERT_TRUE(upstream_request2->waitForReset(std::chrono::milliseconds(0)));
+
+  if (response_size) {
+    upstream_request_->encodeData(response_size, true);
+  }
+
+  response->waitForEndStream();
+
+  codec_client_->close();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
 } // namespace Envoy
