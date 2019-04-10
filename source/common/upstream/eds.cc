@@ -125,9 +125,11 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
     assignment_timeout_.reset();
   }
   // Check if endpoint_stale_after is set.
-  const int64_t stale_after_ms =
+  const uint64_t stale_after_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(cluster_load_assignment.policy(), endpoint_stale_after, 0);
   if (stale_after_ms > 0) {
+    // Stat to track how oftern we receive valid assignment_timeout in response.
+    info_->stats().assignment_timeout_received_.inc();
     assignment_timeout_ = dispatcher_.createTimer([this]() -> void { onAssignmentTimeout(); });
     assignment_timeout_->enableTimer(std::chrono::milliseconds(stale_after_ms));
   }
@@ -138,13 +140,16 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
 
 void EdsClusterImpl::onAssignmentTimeout() {
   // We can no longer use the assignments, remove them.
-  // (TODO) This is not going to work for incremental updates, and we need to
-  // instead change the health status to indicate the assignments are stale.
+  // TODO(vishalpowar) This is not going to work for incremental updates, and we
+  // need to instead change the health status to indicate the assignments are
+  // stale.
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   envoy::api::v2::ClusterLoadAssignment resource;
   resource.set_cluster_name(cluster_name_);
   resources.Add()->PackFrom(resource);
   onConfigUpdate(resources, "");
+  // Stat to track how often we end up with stale assignments.
+  info_->stats().assignment_stale_.inc();
 }
 
 bool EdsClusterImpl::updateHostsPerLocality(
