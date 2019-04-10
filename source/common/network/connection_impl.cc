@@ -112,6 +112,9 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       // The socket is being closed and either there is no more data to write or the data can not be
       // flushed (!transport_socket_->canFlushClose()). Since a delayed close has been requested,
       // start the delayed close timer if it hasn't been done already by a previous close().
+      // NOTE: Even though the delayed_close_state_ is being set to CloseAfterFlushAndTimeout, since
+      // a write event is not being registered for the socket, this logic is simply setting the
+      // timer and waiting for it to trigger to close the socket.
       if (!inDelayedClose()) {
         initializeDelayedCloseTimer();
         delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndTimeout;
