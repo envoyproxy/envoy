@@ -4137,6 +4137,30 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
+TEST_F(RoutePropertyTest, TestBadCorsConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/api"
+    route:
+      cluster: ats
+      cors:
+        enabled: 0
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "Unable to parse JSON as proto "
+      "(INVALID_ARGUMENT:(virtual_hosts[0].routes[0].route.cors.enabled.value): invalid value 0 "
+      "for type TYPE_BOOL): " +
+          Json::Factory::loadFromYamlString(yaml)->asJsonString());
+}
+
 TEST_F(RouteMatcherTest, Decorator) {
   const std::string yaml = R"EOF(
 virtual_hosts:

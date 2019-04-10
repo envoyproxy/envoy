@@ -15,6 +15,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::An;
 using testing::ContainerEq;
 using testing::Return;
 
@@ -187,6 +188,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
 }
 
 // Validated that by default we don't normalize paths
+// unless set build flag path_normalization_by_default=true
 TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -196,9 +198,16 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
   - name: envoy.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
+#ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
+  EXPECT_TRUE(config.shouldNormalizePath());
+#else
   EXPECT_FALSE(config.shouldNormalizePath());
+#endif
 }
 
 // Validated that we normalize paths with runtime override when not specified.
@@ -212,7 +221,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
-              featureEnabled("http_connection_manager.normalize_path", 0))
+              featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .WillOnce(Return(true));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
@@ -231,7 +240,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
-              featureEnabled("http_connection_manager.normalize_path", 0))
+              featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
@@ -250,7 +259,7 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
   )EOF";
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_,
-              featureEnabled("http_connection_manager.normalize_path", 0))
+              featureEnabled("http_connection_manager.normalize_path", An<uint64_t>()))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
