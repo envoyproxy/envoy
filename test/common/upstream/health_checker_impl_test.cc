@@ -2809,7 +2809,7 @@ public:
   }
 
   void respondResponseSpec(size_t index, ResponseSpec&& spec) {
-    const bool trailers_empty = spec.trailers.size() == 0U;
+    const bool trailers_empty = spec.trailers.empty();
     const bool end_stream_on_headers = spec.body_chunks.empty() && trailers_empty;
     auto response_headers = std::make_unique<Http::TestHeaderMapImpl>();
     for (const auto& header : spec.response_headers) {

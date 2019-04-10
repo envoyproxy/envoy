@@ -4,7 +4,6 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
-#include "common/config/filter_json.h"
 #include "common/http/context_impl.h"
 #include "common/http/headers.h"
 
@@ -94,20 +93,6 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Http::ContextImpl http_context_;
 };
-
-TEST_F(HttpRateLimitFilterTest, BadConfig) {
-  const std::string filter_config = R"EOF(
-  {
-    "domain": "foo",
-    "route_key" : "my_route"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(filter_config);
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-  EXPECT_THROW(Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config),
-               Json::Exception);
-}
 
 TEST_F(HttpRateLimitFilterTest, NoRoute) {
   SetUpTest(filter_config_);

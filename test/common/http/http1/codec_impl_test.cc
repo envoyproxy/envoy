@@ -344,7 +344,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderMutateEmbeddedCRLF) {
           absl::StrCat(example_input.substr(0, n), std::string(1, c), example_input.substr(n)));
       try {
         codec_->dispatch(buffer);
-      } catch (CodecProtocolException) {
+      } catch (CodecProtocolException&) {
       }
     }
   }

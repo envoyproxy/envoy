@@ -36,7 +36,7 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
   )EOF";
 
   envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-  MessageUtil::loadFromYaml(yaml, proto_config);
+  MessageUtil::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
@@ -68,12 +68,13 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
 
 TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
   const std::string yaml = R"EOF(
-  domain: test
-  timeout: 20
+  domain: foo
+  route_key: my_route
   )EOF";
 
   envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-  EXPECT_THROW(MessageUtil::loadFromYaml(yaml, proto_config), EnvoyException);
+  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYamlAndValidate(yaml, proto_config), EnvoyException,
+                          "INVALID_ARGUMENT:route_key: Cannot find field");
 }
 
 } // namespace

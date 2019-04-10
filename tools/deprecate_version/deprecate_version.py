@@ -49,7 +49,7 @@ class DeprecateVersionError(Exception):
 
 # Figure out map from version to set of commits.
 def GetHistory():
-  """Obtain mapping from release version to DEPRECATED.md PRs.
+  """Obtain mapping from release version to docs/root/intro/deprecated.rst PRs.
 
   Returns:
     A dictionary mapping from release version to a set of git commit objects.
@@ -57,7 +57,7 @@ def GetHistory():
   repo = Repo(os.getcwd())
   version = None
   history = defaultdict(set)
-  for commit, lines in repo.blame('HEAD', 'DEPRECATED.md'):
+  for commit, lines in repo.blame('HEAD', 'docs/root/intro/deprecated.rst'):
     for line in lines:
       sr = re.match('## Version (.*) \(.*\)', line)
       if sr:
