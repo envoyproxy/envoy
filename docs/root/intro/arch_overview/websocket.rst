@@ -48,7 +48,7 @@ In this case, if a client is for example using WebSocket, we want the Websocket 
 upstream server functionally intact, which means it needs to traverse the HTTP/2 hop.
 
 This is accomplished via
-`extended CONNECT <https://tools.ietf.org/html/draft-mcmanus-httpbis-h2-websockets>`_ support. The
+`extended CONNECT <https://tools.ietf.org/html/rfc8441>`_ support. The
 WebSocket request will be transformed into an HTTP/2 CONNECT stream, with :protocol header
 indicating the original upgrade, traverse the HTTP/2 hop, and be downgraded back into an HTTP/1
 WebSocket Upgrade. This same Upgrade-CONNECT-Upgrade transformation will be performed on any
