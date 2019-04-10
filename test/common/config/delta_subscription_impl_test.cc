@@ -100,8 +100,8 @@ TEST_F(DeltaSubscriptionImplTest, RemoveThenAdd) {
 // resource X before the DeltaDiscoveryRequest is sent causes that request to "unsubscribe" from X.
 // Ideally we would have the request simply not include any mention of X. Oh well. This test is just
 // here to illustrate that this behavior exists, not to enforce that it should be like this. What
-// *is* importat: the server must happily and cleanly ignore "unsubscribe from [resource name I have
-// never before referred to]" requests.
+// *is* important: the server must happily and cleanly ignore "unsubscribe from [resource name I
+// have never before referred to]" requests.
 TEST_F(DeltaSubscriptionImplTest, AddThenRemove) {
   startSubscription({"name1", "name2", "name3"});
   subscription_->pause(); // Pause because we're testing multiple updates in between request sends.
