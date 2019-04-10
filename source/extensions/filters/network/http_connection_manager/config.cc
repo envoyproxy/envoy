@@ -151,13 +151,18 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
-      normalize_path_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, normalize_path,
-                                          // TODO(htuch): we should have a
-                                          // boolean variant of featureEnabled()
-                                          // here.
-                                          context.runtime().snapshot().featureEnabled(
-                                              "http_connection_manager.normalize_path", 0))) {
+      normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, normalize_path,
+          // TODO(htuch): we should have a
+          // boolean variant of featureEnabled()
+          // here.
+          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
+#ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
+                                                      100
+#else
+                                                      0
+#endif
+                                                      ))) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
                                                                    route_config_provider_manager_);
