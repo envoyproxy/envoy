@@ -145,6 +145,19 @@ TEST_F(DeltaSubscriptionImplTest, BothAddAndRemove) {
   subscription_->resume();
 }
 
+// If one update fails to send a request (pausing, rate limit, no stream are all identical for this
+// purpose), and then another update comes along and also fails, when the request is finally sent,
+// both should be present. (A previous version of the code would have had 1->12 generate a diff of
+// 2, then 12->123 generate a diff of 3, which would replace 2).
+TEST_F(DeltaSubscriptionImplTest, CumulativeUpdates) {
+  startSubscription({"name1"});
+  subscription_->pause();
+  subscription_->updateResources({"name1", "name2"});
+  subscription_->updateResources({"name1", "name2", "name3"});
+  expectSendMessage({"name2", "name3"}, {}, Grpc::Status::GrpcStatus::Ok, "");
+  subscription_->resume();
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
