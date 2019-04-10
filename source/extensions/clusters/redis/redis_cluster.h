@@ -50,7 +50,6 @@
 #include "common/upstream/resource_manager_impl.h"
 #include "common/upstream/upstream_impl.h"
 
-#include "server/init_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
@@ -170,10 +169,14 @@ private:
       return parent_.cluster_refresh_timeout_;
     }
     bool enableHashtagging() const override { return false; }
+    bool enableRedirection() const override { return false; }
+
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
+    // Note: Below callback isn't used in topology updates
+    bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) { return true; }
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
