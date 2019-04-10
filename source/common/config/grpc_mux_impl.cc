@@ -22,7 +22,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          const envoy::api::v2::core::GrpcService& grpc_service)
     : GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse, std::string>(
           std::move(async_client), service_method, random, dispatcher, scope, rate_limit_settings),
-      local_info_(local_info), server_type_url_(service_method.service()->full_name()),
+      local_info_(local_info), xds_service_(service_method.service()->full_name()),
       config_tracker_entry_(config_tracker.add(service_method.service()->name(),
                                                [this] { return dumpControlPlaneConfig(); })),
       time_source_(dispatcher.timeSource()) {
@@ -226,8 +226,13 @@ void GrpcMuxImpl::populateControlPlaneInfo(const envoy::api::v2::DiscoveryRespon
     envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo
         config_source_control_plane_info;
     bool config_exists = false;
-    for (auto& config_control_plane :
-         GrpcMuxImpl::per_service_control_plane_info_[server_type_url_]) {
+    // Check if control plane information is already available for the xds service that points to
+    // the grpc_service. If yes, either a new response might have come from the management server it
+    // is already connected to or it is now connected to a different management server instance that
+    // is part of the cluster pointed to by grpc_service. In either case, we should update the
+    // control_plane_identifier in the existing config_source_control_plane_info. Otherwise we
+    // should create a new entry for config_source_control_plane pointing to this grpc_service.
+    for (auto& config_control_plane : GrpcMuxImpl::per_service_control_plane_info_[xds_service_]) {
       if (message_differencer.Compare(grpc_service_, config_control_plane.grpc_service())) {
         config_source_control_plane_info = config_control_plane;
         config_exists = true;
@@ -240,7 +245,7 @@ void GrpcMuxImpl::populateControlPlaneInfo(const envoy::api::v2::DiscoveryRespon
         time_source_.systemTime(), *(config_source_control_plane_info.mutable_last_updated()));
     config_source_control_plane_info.mutable_grpc_service()->MergeFrom(grpc_service_);
     if (!config_exists) {
-      GrpcMuxImpl::per_service_control_plane_info_[server_type_url_].push_back(
+      GrpcMuxImpl::per_service_control_plane_info_[xds_service_].push_back(
           config_source_control_plane_info);
     }
   }
@@ -251,9 +256,8 @@ ProtobufTypes::MessagePtr GrpcMuxImpl::dumpControlPlaneConfig() const {
   for (auto& service_info : GrpcMuxImpl::per_service_control_plane_info_) {
     envoy::admin::v2alpha::ControlPlaneConfigDump::ServiceControlPlaneInfo
         service_control_plane_info;
-    service_control_plane_info.set_server_type_url(service_info.first);
+    service_control_plane_info.set_xds_service(service_info.first);
     for (auto& config_source_control_plane_info : service_info.second) {
-      std::string iden = config_source_control_plane_info.control_plane().identifier();
       service_control_plane_info.add_config_source_control_plane()->MergeFrom(
           config_source_control_plane_info);
     }

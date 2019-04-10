@@ -190,7 +190,7 @@ TEST_F(GrpcMuxImplTest, DumpControlPlaneConfig) {
   const std::string expected_config_dump = R"EOF({
  "service_control_plane_info": [
     {
-     "server_type_url": "envoy.service.discovery.v2.AggregatedDiscoveryService",
+     "xds_service": "envoy.service.discovery.v2.AggregatedDiscoveryService",
      "config_source_control_plane": [
       {
        "grpc_service": {

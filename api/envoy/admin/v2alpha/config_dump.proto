@@ -208,7 +208,7 @@ message ControlPlaneConfigDump {
     // The xDS service this control plane information belongs to. For example
     // envoy.api.v2.EndpointDiscoveryService represents control plane info that Envoy has been
     // configured for EndpointDiscoveryService.
-    string server_type_url = 1;
+    string xds_service = 1;
 
     // The list of control plane information that Envoy has been configured to connect with for this
     // service.
