@@ -34,6 +34,7 @@
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
+#include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
@@ -529,6 +530,14 @@ TEST_F(FileUtilsTest, ReadFileContents) {
   std::string output;
   ReadFileContents(file_path, &output);
   EXPECT_EQ(data, output);
+}
+
+TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
+  QuicStreamBufferAllocator allocator;
+  char* p = allocator.New(1024);
+  EXPECT_NE(nullptr, p);
+  memset(p, 'a', 1024);
+  allocator.Delete(p);
 }
 
 } // namespace

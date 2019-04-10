@@ -155,6 +155,7 @@ cc_library(
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_reference_counted.h",
         "quiche/quic/platform/api/quic_server_stats.h",
+        "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_test_output.h",
         "quiche/quic/platform/api/quic_uint128.h",
@@ -207,6 +208,14 @@ cc_library(
     hdrs = ["quiche/quic/core/quic_time.h"],
     visibility = ["//visibility:public"],
     deps = [":quic_platform"],
+)
+
+cc_library(
+    name = "quic_buffer_allocator_interface_lib",
+    srcs = ["quiche/quic/core/quic_buffer_allocator.cc"],
+    hdrs = ["quiche/quic/core/quic_buffer_allocator.h"],
+    visibility = ["//visibility:public"],
+    deps = [":quic_platform_export"],
 )
 
 envoy_cc_test(

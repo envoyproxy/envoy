@@ -94,6 +94,7 @@ envoy_cc_library(
         "quic_ptr_util_impl.h",
         "quic_server_stats_impl.h",
         "quic_string_piece_impl.h",
+        "quic_stream_buffer_allocator_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
         "quic_expect_bug_impl.h",
@@ -113,7 +114,10 @@ envoy_cc_library(
         "googletest",
     ],
     visibility = ["//visibility:public"],
-    deps = ["@com_googlesource_quiche//:quic_platform_export"] + envoy_select_quiche([
+    deps = [
+        "@com_googlesource_quiche//:quic_platform_export",
+        "@com_googlesource_quiche//:quic_buffer_allocator_interface_lib",
+    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
