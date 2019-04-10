@@ -4150,11 +4150,16 @@ virtual_hosts:
       cluster: ats
       cors:
         enabled: 0
-        allow_credentials: true
 )EOF";
 
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "Unable to parse JSON as proto "
+      "(INVALID_ARGUMENT:(virtual_hosts[0].routes[0].route.cors.enabled.value): invalid value 0 "
+      "for type TYPE_BOOL): "
+      "{\"virtual_hosts\":[{\"routes\":[{\"route\":{\"cors\":{\"enabled\":0},\"cluster\":\"ats\"},"
+      "\"match\":{\"prefix\":\"/api\"}}],\"domains\":[\"*\"],\"name\":\"default\"}]}");
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
