@@ -26,7 +26,6 @@ public:
 
   // Envoy::Config::ConfigProvider
   const Protobuf::Message* getConfigProto() const override { return &config_proto_; }
-  const std::vector<const Protobuf::Message*> getConfigProtos() const override { return {}; }
 
   // Envoy::Config::ConfigProvider
   std::string getConfigVersion() const override { return ""; }
@@ -112,7 +111,6 @@ public:
     }
     return &subscription_->config_proto().value();
   }
-  const std::vector<const Protobuf::Message*> getConfigProtos() const override { return {}; }
 
   // Envoy::Config::ConfigProvider
   std::string getConfigVersion() const override { return ""; }

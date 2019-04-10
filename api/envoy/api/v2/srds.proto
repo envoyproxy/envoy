@@ -27,10 +27,11 @@ option (gogoproto.equal_all) = true;
 // TODO(AndresGuedez): Update :ref:`arch_overview_http_routing` with scoped routing overview and
 // configuration details.
 
-// The `ref:resource_names<envoy_api_field_DiscoveryRequest.resource_names>` field in
-// DiscoveryRequest specifies a set of route configuration scopes. Each scope points to a
-// route_configuration_name which will be used to request a
-// :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>` via the RDS API.
+// The Scoped Routes Discovery Service (SRDS) API distributes
+// :ref:`ScopedRouteConfiguration<envoy_api_msg.ScopedRouteConfiguration>` resources. Each
+// ScopedRouteConfiguration resource represents a "routing scope" containing a mapping that allows
+// the HTTP connection manager to dynamically assign a routing table (specified via
+// a :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>` message) to each HTTP request.
 service ScopedRoutesDiscoveryService {
   rpc StreamScopedRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
@@ -47,33 +48,22 @@ service ScopedRoutesDiscoveryService {
   }
 }
 
-// This configuration represents a set of routing 'scopes', each containing independent routing
-// configuration (see :ref:`routing architecture overview <arch_overview_http_routing>`).
+// Specifies a routing scope, which associates a :ref:`envoy_api_msg_RouteConfiguration` (identified
+// by its resource name) to a :ref:`Key<envoy_api_msg_ScopedRouteConfiguration.Key>`.
 //
-// A ScopedRouteConfigurationsSet is associated with an
-// :ref:`HttpConnectionManager<envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager>`
-// via the
-// :ref:`scoped_rds<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.scoped_rds>`
-// or
-// :ref:`scoped_routes_config<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.scoped_routes_config>`
-// fields. When scoped routing is enabled, the Envoy router will first attempt to determine the
-// routing scope assigned to a request by building a
-// :ref:`Scope.Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` based on request header
-// attributes (such as the value of a header field) defined by the
-// :ref:`ScopeKeyBuilder<envoy_api_msg_ScopedRouteConfigurationsSet.ScopeKeyBuilder>`
-// this message.
+// The HTTP connection manager builds up a table consisting of these Key to RouteConfiguration
+// mappings, and looks up the RouteConfiguration to use per request according to the algorithm
+// specified in the
+// :ref:`scope_key_builder<envoy_api_field_config.filter.network.http_connection_manager.v2.ScopedRoutes.scope_key_builder>`
+// assigned to the HttpConnectionManager.
 //
-// The key will be looked up in a table maintained by the router, containing the
-// :ref:`Scope.Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` to
-// :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>` mappings specified by the
-// :ref:`scopes<envoy_api_field_ScopedRouteConfigurationsSet.scopes>` field in this message. The
-// routing rules specified by the resulting RouteConfiguration will be used to determine the route
-// for the request.
+// For example, with the following configurations (in YAML):
 //
-// For example, with the following YAML configuration:
+// HttpConnectionManager config:
 //
 // .. code::
 //
+//   ...
 //   scope_key_builder:
 //     fragments:
 //       - header_element:
@@ -82,15 +72,26 @@ service ScopedRoutesDiscoveryService {
 //         element:
 //           separator: =
 //           key: vip
-//   scopes:
-//     - route_configuration_name: route-config1
-//       key:
-//          fragments:
-//            - string_key: 172.10.10.20
-//      - route_configuration_name: route-config2
-//        key:
-//          fragments:
-//            - string_key: 172.20.20.30
+//
+// ScopedRouteConfiguration resources (specified statically via
+// HttpConnectionManager.ScopedRoutes.scoped_route_configurations_list or obtained dynamically via
+// SRDS):
+//
+// .. code::
+//
+//  (1)
+//   name: route-scope1
+//   route_configuration_name: route-config1
+//   key:
+//      fragments:
+//        - string_key: 172.10.10.20
+//
+//  (2)
+//   name: route-scope2
+//   route_configuration_name: route-config2
+//   key:
+//     fragments:
+//       - string_key: 172.20.20.30
 //
 // A request from a client such as:
 //
@@ -100,25 +101,18 @@ service ScopedRoutesDiscoveryService {
 //     Host: foo.com
 //     X-Route-Selector: vip=172.10.10.20
 //
-// Would result in the `route-config1` RouteConfiguration being assigned to the request/stream,
-// which Envoy would fetch via RDS.
+// Would result in the routing table defined by the `route-config1` RouteConfiguration being
+// assigned to the HTTP request/stream.
 //
 // [#comment:next free field: 4]
-
-// TODO(AndresGuedez):
-// Specifies a routing scope, which associates a :ref:`envoy_api_msg_RouteConfiguration`
-// (identified by its resource name) to a
-// :ref:`Key<envoy_api_msg_ScopedRouteConfigurationsSet.Scope.Key>` which is matched against each
-// HTTP request.
 message ScopedRouteConfiguration {
-  // TODO(AndresGuedez):
   // The name assigned to the routing scope.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Specifies a key which is matched against the output of the
-  // :ref:`scope_key_builder<envoy_api_field_ScopedRouteConfigurationsSet.scope_key_builder>` to
-  // obtain the route_configuration_name/RouteConfiguration associated with the Scope. The
-  // matching is dependent on the order of the fragments contained in the Key.
+  // :ref:`scope_key_builder<envoy_api_field_config.filter.network.http_connection_manager.v2.ScopedRoutes.scope_key_builder>`
+  // specified in the HttpConnectionManager. The matching is done per HTTP request and is dependent
+  // on the order of the fragments contained in the Key.
   message Key {
     message Fragment {
       oneof type {

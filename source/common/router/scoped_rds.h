@@ -44,7 +44,6 @@ public:
   const std::string& name() const { return name_; }
 
   // Envoy::Config::ConfigProvider
-  const Protobuf::Message* getConfigProto() const override { return nullptr; }
   const Envoy::Config::ConfigProvider::ConfigProtoVector getConfigProtos() const override {
     Envoy::Config::ConfigProvider::ConfigProtoVector out_protos;
     std::for_each(config_protos_.begin(), config_protos_.end(),
@@ -141,7 +140,6 @@ public:
   }
 
   // Envoy::Config::ConfigProvider
-  const Protobuf::Message* getConfigProto() const override { return nullptr; }
   const Envoy::Config::ConfigProvider::ConfigProtoVector getConfigProtos() const override {
     const ScopedConfigManager::ScopedRouteMap& scoped_route_map = subscription_->scopedRouteMap();
     if (scoped_route_map.empty()) {
