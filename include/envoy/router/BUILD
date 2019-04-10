@@ -32,6 +32,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "route_config_update_info_interface",
+    hdrs = ["route_config_update_info.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":router_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],

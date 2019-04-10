@@ -86,7 +86,7 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   Envoy::Router::SubscriptionFactoryFunction factory_function_;
   const std::string context_ = "vhds_test";
-  std::unordered_set<Envoy::Router::RdsRouteConfigProviderImpl*> providers_;
+  std::unordered_set<Envoy::Router::RouteConfigProvider*> providers_;
   Protobuf::util::MessageDifferencer messageDifferencer_;
 };
 

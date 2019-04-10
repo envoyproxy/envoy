@@ -14,6 +14,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
+#include "envoy/router/route_config_update_info.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/filter_config.h"
@@ -25,6 +26,7 @@
 #include "common/config/subscription_factory.h"
 #include "common/init/target_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {
@@ -63,6 +65,7 @@ public:
     return ConfigInfo{route_config_proto_, ""};
   }
   SystemTime lastUpdated() const override { return last_updated_; }
+  void onConfigUpdate() override {}
 
 private:
   ConfigConstSharedPtr config_;
@@ -88,36 +91,9 @@ struct RdsStats {
   ALL_RDS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-// clang-format off
-#define ALL_VHDS_STATS(COUNTER)                                                                     \
-  COUNTER(config_reload)                                                                           \
-  COUNTER(update_empty)
-
-// clang-format on
-
-struct VhdsStats {
-  ALL_VHDS_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-struct LastConfigInfo {
-  uint64_t last_config_hash_;
-  std::string last_config_version_;
-};
-
 class RdsRouteConfigProviderImpl;
-class VhdsSubscription;
-using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;
 
-class ConfigUpdateInfo {
-public:
-  virtual ~ConfigUpdateInfo() = default;
-
-  virtual absl::optional<LastConfigInfo> configInfo() const PURE;
-  virtual envoy::api::v2::RouteConfiguration& routeConfiguration() PURE;
-  virtual SystemTime lastUpdated() const PURE;
-};
-
-class RdsConfigUpdateInfo : public ConfigUpdateInfo {
+class RdsConfigUpdateInfo : public RouteConfigUpdateInfo {
 public:
   RdsConfigUpdateInfo(envoy::api::v2::RouteConfiguration& rc, SystemTime last_updated,
                       absl::optional<LastConfigInfo> config_info)
@@ -134,9 +110,9 @@ private:
   absl::optional<LastConfigInfo> config_info_;
 };
 
-class VhdsConfigUpdateInfo : public ConfigUpdateInfo {
+class VhdsConfigUpdateInfo : public RouteConfigUpdateInfo {
 public:
-  VhdsConfigUpdateInfo(ConfigUpdateInfo& subscription) : subscription_(subscription) {}
+  VhdsConfigUpdateInfo(RouteConfigUpdateInfo& subscription) : subscription_(subscription) {}
 
   absl::optional<LastConfigInfo> configInfo() const override { return subscription_.configInfo(); }
   envoy::api::v2::RouteConfiguration& routeConfiguration() override {
@@ -145,7 +121,7 @@ public:
   SystemTime lastUpdated() const override { return subscription_.lastUpdated(); }
 
 private:
-  ConfigUpdateInfo& subscription_;
+  RouteConfigUpdateInfo& subscription_;
 };
 
 /**
@@ -195,70 +171,15 @@ private:
   SystemTime last_updated_;
   absl::optional<LastConfigInfo> config_info_;
   envoy::api::v2::RouteConfiguration route_config_proto_;
-  std::unordered_set<RdsRouteConfigProviderImpl*> route_config_providers_;
+  std::unordered_set<RouteConfigProvider*> route_config_providers_;
   VhdsSubscriptionPtr vhds_subscription_;
-  std::unique_ptr<ConfigUpdateInfo> config_update_info_;
+  std::unique_ptr<RouteConfigUpdateInfo> config_update_info_;
 
   friend class RouteConfigProviderManagerImpl;
   friend class RdsRouteConfigProviderImpl;
 };
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
-typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFunction)(
-    const envoy::api::v2::core::ConfigSource&, const LocalInfo::LocalInfo&, Event::Dispatcher&,
-    Upstream::ClusterManager&, Envoy::Runtime::RandomGenerator&, Stats::Scope&, const std::string&,
-    const std::string&, absl::string_view, Api::Api&);
-
-class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
-                         Logger::Loggable<Logger::Id::router>,
-                         public ConfigUpdateInfo {
-public:
-  VhdsSubscription(const envoy::api::v2::RouteConfiguration& route_configuration,
-                   Server::Configuration::FactoryContext& factory_context,
-                   const std::string& stat_prefix,
-                   std::unordered_set<RdsRouteConfigProviderImpl*>& route_config_providers,
-                   SubscriptionFactoryFunction factory_function =
-                       Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource);
-  ~VhdsSubscription() override { init_target_.ready(); }
-
-  // Config::SubscriptionCallbacks
-  // TODO(fredlas) deduplicate
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&,
-                      const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
-  void onConfigUpdateFailed(const EnvoyException* e) override;
-  std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
-  }
-
-  void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
-  void initializeVhosts(const envoy::api::v2::RouteConfiguration& route_configuration);
-  void removeVhosts(std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
-                    const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
-  void updateVhosts(std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
-                    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
-  void rebuildRouteConfig(
-      const std::unordered_map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
-      envoy::api::v2::RouteConfiguration& route_config);
-  absl::optional<LastConfigInfo> configInfo() const override { return config_info_; }
-  envoy::api::v2::RouteConfiguration& routeConfiguration() override { return route_config_proto_; }
-  SystemTime lastUpdated() const override { return last_updated_; }
-
-  std::unique_ptr<Envoy::Config::Subscription> subscription_;
-  envoy::api::v2::RouteConfiguration route_config_proto_;
-  const std::string route_config_name_;
-  Init::TargetImpl init_target_;
-  Stats::ScopePtr scope_;
-  VhdsStats stats_;
-  TimeSource& time_source_;
-  SystemTime last_updated_;
-  std::unordered_set<RdsRouteConfigProviderImpl*>& route_config_providers_;
-  std::unordered_map<std::string, envoy::api::v2::route::VirtualHost> virtual_hosts_;
-  absl::optional<LastConfigInfo> config_info_;
-};
 
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using

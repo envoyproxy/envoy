@@ -81,6 +81,7 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
         "//source/common/router:rds_lib",
+        "//source/common/router:vhds_lib",
         "//source/server/http:admin_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/server:server_mocks",
