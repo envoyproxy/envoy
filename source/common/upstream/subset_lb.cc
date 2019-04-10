@@ -281,35 +281,35 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
                                 const HostVector& hosts_removed) {
   updateFallbackSubset(priority, hosts_added, hosts_removed);
 
-  processSubsets(hosts_added, hosts_removed,
-                 [&](LbSubsetEntryPtr entry) {
-                   const bool active_before = entry->active();
-                   entry->priority_subset_->update(priority, hosts_added, hosts_removed);
+  processSubsets(
+      hosts_added, hosts_removed,
+      [&](LbSubsetEntryPtr entry) {
+        const bool active_before = entry->active();
+        entry->priority_subset_->update(priority, hosts_added, hosts_removed);
 
-                   if (active_before && !entry->active()) {
-                     stats_.lb_subsets_active_.dec();
-                     stats_.lb_subsets_removed_.inc();
-                   } else if (!active_before && entry->active()) {
-                     stats_.lb_subsets_active_.inc();
-                     stats_.lb_subsets_created_.inc();
-                   }
-                 },
-                 [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs,
-                     bool adding_host) {
-                   UNREFERENCED_PARAMETER(kvs);
-                   if (adding_host) {
-                     ENVOY_LOG(debug, "subset lb: creating load balancer for {}",
-                               describeMetadata(kvs));
+        if (active_before && !entry->active()) {
+          stats_.lb_subsets_active_.dec();
+          stats_.lb_subsets_removed_.inc();
+        } else if (!active_before && entry->active()) {
+          stats_.lb_subsets_active_.inc();
+          stats_.lb_subsets_created_.inc();
+        }
+      },
+      [&](LbSubsetEntryPtr entry, HostPredicate predicate, const SubsetMetadata& kvs,
+          bool adding_host) {
+        UNREFERENCED_PARAMETER(kvs);
+        if (adding_host) {
+          ENVOY_LOG(debug, "subset lb: creating load balancer for {}", describeMetadata(kvs));
 
-                     // Initialize new entry with hosts and update stats. (An uninitialized entry
-                     // with only removed hosts is a degenerate case and we leave the entry
-                     // uninitialized.)
-                     entry->priority_subset_.reset(new PrioritySubsetImpl(
-                         *this, predicate, locality_weight_aware_, scale_locality_weight_));
-                     stats_.lb_subsets_active_.inc();
-                     stats_.lb_subsets_created_.inc();
-                   }
-                 });
+          // Initialize new entry with hosts and update stats. (An uninitialized entry
+          // with only removed hosts is a degenerate case and we leave the entry
+          // uninitialized.)
+          entry->priority_subset_.reset(new PrioritySubsetImpl(
+              *this, predicate, locality_weight_aware_, scale_locality_weight_));
+          stats_.lb_subsets_active_.inc();
+          stats_.lb_subsets_created_.inc();
+        }
+      });
 }
 
 bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host) {
