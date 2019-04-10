@@ -28,7 +28,7 @@ public:
   ~MockSnapshot() override;
 
   // Provide a default implementation of mocked featureEnabled/2.
-  bool inheritedFeatureEnableStringUint64(const std::string&, uint64_t default_value) {
+  bool featureEnabledDefault(const std::string&, uint64_t default_value) {
     if (default_value == 0) {
       return false;
     } else if (default_value == 100) {
