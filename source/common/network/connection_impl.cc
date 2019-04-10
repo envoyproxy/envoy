@@ -109,9 +109,9 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     }
 
     if (type == ConnectionCloseType::FlushWriteAndDelay && delayed_close_timeout_set) {
-      // The socket is being closed and there is no more data to write. Since a delayed close has
-      // been requested, start the delayed close timer if it hasn't been done already by a previous
-      // close().
+      // The socket is being closed and either there is no more data to write or the data can not be
+      // flushed (!transport_socket_->canFlushClose()). Since a delayed close has been requested,
+      // start the delayed close timer if it hasn't been done already by a previous close().
       if (!inDelayedClose()) {
         initializeDelayedCloseTimer();
         delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndTimeout;
