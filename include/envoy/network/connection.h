@@ -169,7 +169,7 @@ public:
   /**
    * Credentials of the peer of a socket as decided by SO_PEERCRED.
    */
-  struct PeerCredentials {
+  struct UnixDomainSocketPeerCredentials {
     /**
      * The process id of the peer.
      */
@@ -185,10 +185,10 @@ public:
   };
 
   /**
-   * @return The peer credentials of the the remote client. Note that this is only
+   * @return The unix socket peer credentials of the the remote client. Note that this is only
    * supported for unix socket connections.
    */
-  virtual absl::optional<PeerCredentials> peerCredentials() const PURE;
+  virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
 
   /**
    * @return the local address of the connection. For client connections, this is the origin

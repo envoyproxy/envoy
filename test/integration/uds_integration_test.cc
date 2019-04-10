@@ -89,7 +89,7 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest(0);
 
-  auto credentials = codec_client_->connection()->peerCredentials();
+  auto credentials = codec_client_->connection()->unixSocketPeerCredentials();
 #ifndef SO_PEERCRED
   EXPECT_EQ(credentials, absl::nullopt);
 #else

@@ -504,7 +504,8 @@ void ConnectionImpl::onReadReady() {
   }
 }
 
-absl::optional<Connection::PeerCredentials> ConnectionImpl::peerCredentials() const {
+absl::optional<Connection::UnixDomainSocketPeerCredentials>
+ConnectionImpl::unixSocketPeerCredentials() const {
   // TODO(snowp): Support non-linux platforms.
 #ifndef SO_PEERCRED
   return absl::nullopt;
