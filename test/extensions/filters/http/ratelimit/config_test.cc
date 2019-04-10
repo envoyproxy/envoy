@@ -73,7 +73,8 @@ TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
   )EOF";
 
   envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYamlAndValidate(yaml, proto_config), EnvoyException, "INVALID_ARGUMENT:route_key: Cannot find field");
+  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYamlAndValidate(yaml, proto_config), EnvoyException,
+                          "INVALID_ARGUMENT:route_key: Cannot find field");
 }
 
 } // namespace
