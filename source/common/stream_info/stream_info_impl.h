@@ -104,8 +104,8 @@ struct StreamInfoImpl : public StreamInfo {
     return response_code_details_;
   }
 
-  void setResponseCodeDetails(const std::string& rc_details) override {
-    response_code_details_ = rc_details;
+  void setResponseCodeDetails(absl::string_view rc_details) override {
+    response_code_details_.emplace(rc_details);
   }
 
   void addBytesSent(uint64_t bytes_sent) override { bytes_sent_ += bytes_sent; }

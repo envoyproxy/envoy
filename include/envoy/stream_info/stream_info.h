@@ -65,6 +65,14 @@ enum ResponseFlag {
   LastFlag = StreamIdleTimeout
 };
 
+/**
+ * Constants for the response code details field of StreamInfo.
+ *
+ * These provide details about the stream state such as whether the
+ * response is from the upstream or from envoy (in case of a local reply).
+ * Custom extensions can define additional values provided they are appropriately
+ * scoped to avoid collisions.
+ */
 struct ResponseCodeDetailValues {
   const std::string RC_SET_BY_UPSTREAM = "response_code_set_by_upstream";
 };
@@ -125,8 +133,9 @@ public:
 
   /**
    * @param rc_details the response code details string to set for this request.
+   * See ResponseCodeDetailValues above for well-known constants.
    */
-  virtual void setResponseCodeDetails(const std::string& rc_details) PURE;
+  virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 
   /**
    * @param response_flags the response_flags to intersect with.

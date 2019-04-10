@@ -755,8 +755,8 @@ TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
   router_.decodeHeaders(headers, true);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
-  EXPECT_CALL(callbacks_.stream_info_,
-              setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().RC_SET_BY_UPSTREAM));
+  absl::string_view rc_details = StreamInfo::ResponseCodeDetails::get().RC_SET_BY_UPSTREAM;
+  EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details));
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }

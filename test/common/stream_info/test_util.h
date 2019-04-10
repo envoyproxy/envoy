@@ -34,8 +34,8 @@ public:
   const absl::optional<std::string>& responseCodeDetails() const override {
     return response_code_details_;
   }
-  void setResponseCodeDetails(const std::string& rc_details) override {
-    response_code_details_ = rc_details;
+  void setResponseCodeDetails(absl::string_view rc_details) override {
+    response_code_details_.emplace(rc_details);
   }
   void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesSent() const override { return 2; }
