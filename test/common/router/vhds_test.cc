@@ -125,7 +125,7 @@ vhds:
       EnvoyException);
 }
 
-// verify addtion/updating of virtual hosts
+// verify addition/updating of virtual hosts
 TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   const auto route_config = TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(R"EOF(
 name: my_route
@@ -152,7 +152,7 @@ vhds:
       messageDifferencer_.Equals(vhost, subscription.routeConfiguration().virtual_hosts(0)));
 }
 
-// verify addtion/updating of virtual hosts to already existing ones
+// verify addition/updating of virtual hosts to already existing ones
 TEST_F(VhdsTest, VhdsAddsToExistingVirtualHosts) {
   const auto route_config = TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(R"EOF(
 name: my_route
