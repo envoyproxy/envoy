@@ -8,7 +8,7 @@ namespace Thread {
 
 ThreadIdImplWin32::ThreadIdImplWin32(DWORD id) : id_(id) {}
 
-std::string ThreadIdImplWin32::debugString() const { return std::to_string(id_); }
+std::string ThreadIdImplWin32::name() const { return std::to_string(id_); }
 
 bool ThreadIdImplWin32::isCurrentThreadId() const { return id_ == ::GetCurrentThreadId(); }
 

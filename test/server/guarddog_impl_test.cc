@@ -315,8 +315,7 @@ TEST_P(GuardDogTestBase, WatchDogThreadIdTest) {
   NiceMock<Configuration::MockMain> config(100, 90, 1000, 500);
   initGuardDog(stats, config);
   auto watched_dog = guard_dog_->createWatchDog(api_->threadFactory().currentThreadId());
-  EXPECT_EQ(watched_dog->threadId().debugString(),
-            api_->threadFactory().currentThreadId()->debugString());
+  EXPECT_TRUE(watched_dog->threadId().isCurrentThreadId());
   guard_dog_->stopWatching(watched_dog);
 }
 

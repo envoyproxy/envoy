@@ -79,14 +79,14 @@ void GuardDogImpl::step() {
       }
       if (killEnabled() && delta > kill_timeout_) {
         PANIC(fmt::format("GuardDog: one thread ({}) stuck for more than watchdog_kill_timeout",
-                          watched_dog.dog_->threadId().debugString()));
+                          watched_dog.dog_->threadId().name()));
       }
       if (multikillEnabled() && delta > multi_kill_timeout_) {
         if (seen_one_multi_timeout) {
 
           PANIC(fmt::format(
               "GuardDog: multiple threads ({},...) stuck for more than watchdog_multikill_timeout",
-              watched_dog.dog_->threadId().debugString()));
+              watched_dog.dog_->threadId().name()));
         } else {
           seen_one_multi_timeout = true;
         }

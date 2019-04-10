@@ -26,7 +26,7 @@ int64_t getCurrentThreadId() {
 
 ThreadIdImplPosix::ThreadIdImplPosix(int64_t id) : id_(id) {}
 
-std::string ThreadIdImplPosix::debugString() const { return std::to_string(id_); }
+std::string ThreadIdImplPosix::name() const { return std::to_string(id_); }
 
 bool ThreadIdImplPosix::isCurrentThreadId() const { return id_ == getCurrentThreadId(); }
 

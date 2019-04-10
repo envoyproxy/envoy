@@ -14,7 +14,10 @@ class ThreadId {
 public:
   virtual ~ThreadId() {}
 
-  virtual std::string debugString() const PURE;
+  /**
+   * @return human-readable name for this thread id.
+   */
+  virtual std::string name() const PURE;
   virtual bool isCurrentThreadId() const PURE;
 };
 

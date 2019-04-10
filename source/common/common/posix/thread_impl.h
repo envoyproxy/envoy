@@ -14,7 +14,7 @@ public:
   ThreadIdImplPosix(int64_t id);
 
   // Thread::ThreadId
-  std::string debugString() const override;
+  std::string name() const override;
   bool isCurrentThreadId() const override;
 
 private:
