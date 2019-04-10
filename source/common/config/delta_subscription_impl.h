@@ -5,6 +5,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_grpc_context.h"
 
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
@@ -26,12 +27,12 @@ struct ResourceNameDiff {
 
 /**
  * Manages the logic of a (non-aggregated) delta xDS subscription.
- * TODO(fredlas) add aggregation support.
+ * TODO(fredlas) add aggregation support. The plan is for that to happen in XdsGrpcContext,
+ *               which this class will then "have a" rather than "be a".
  */
-class DeltaSubscriptionImpl
-    : public Subscription,
-      public GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
-                        envoy::api::v2::DeltaDiscoveryResponse, ResourceNameDiff> {
+class DeltaSubscriptionImpl : public Subscription,
+                              public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,
+                              public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                         Event::Dispatcher& dispatcher,
@@ -39,9 +40,8 @@ public:
                         absl::string_view type_url, Runtime::RandomGenerator& random,
                         Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                         SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout)
-      : GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse,
-                   ResourceNameDiff>(std::move(async_client), service_method, random, dispatcher,
-                                     scope, rate_limit_settings),
+      : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
+                     rate_limit_settings),
         type_url_(type_url), local_info_(local_info), stats_(stats), dispatcher_(dispatcher),
         init_fetch_timeout_(init_fetch_timeout) {
     request_.set_type_url(type_url_);
@@ -66,8 +66,8 @@ public:
     queueDiscoveryRequest(diff);
   }
 
-  void sendDiscoveryRequest(const ResourceNameDiff& diff) override {
-    if (!grpcStreamAvailable()) {
+  void sendDiscoveryRequest(const ResourceNameDiff& diff) {
+    if (!grpc_stream_.grpcStreamAvailable()) {
       ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url_);
       return; // Drop this request; the reconnect will enqueue a new one.
     }
@@ -85,7 +85,7 @@ public:
               Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_unsubscribe()));
 
     ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request_.DebugString());
-    sendMessage(request_);
+    grpc_stream_.sendMessage(request_);
     request_.clear_error_detail();
     request_.clear_initial_resource_versions();
   }
@@ -113,10 +113,89 @@ public:
 
   envoy::api::v2::DeltaDiscoveryRequest internalRequestStateForTest() const { return request_; }
 
-  // Config::SubscriptionCallbacks
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& version_info) {
+  // Config::GrpcStreamCallbacks
+  void onStreamEstablished() override {
+    // initial_resource_versions "must be populated for first request in a stream", so guarantee
+    // that the initial version'd request we're about to enqueue is what gets sent.
+    clearRequestQueue();
+
+    request_.Clear();
+    for (auto const& resource : resource_versions_) {
+      // Populate initial_resource_versions with the resource versions we currently have. Resources
+      // we are interested in, but are still waiting to get any version of from the server, do not
+      // belong in initial_resource_versions.
+      if (!resource.second.waitingForServer()) {
+        (*request_.mutable_initial_resource_versions())[resource.first] = resource.second.version();
+      }
+    }
+    request_.set_type_url(type_url_);
+    request_.mutable_node()->MergeFrom(local_info_.node());
+    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
+  }
+
+  void onEstablishmentFailure() override {
+    disableInitFetchTimeoutTimer();
+    stats_.update_failure_.inc();
+    ENVOY_LOG(debug, "delta update for {} failed", type_url_);
+    stats_.update_attempt_.inc();
+    callbacks_->onConfigUpdateFailed(nullptr);
+  }
+
+  void
+  onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override {
+    ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
+              message->system_version_info());
+    disableInitFetchTimeoutTimer();
+
+    request_.set_response_nonce(message->nonce());
+
+    try {
+      handleConfigUpdate(message->resources(), message->removed_resources(),
+                         message->system_version_info());
+    } catch (const EnvoyException& e) {
+      stats_.update_rejected_.inc();
+      ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
+      stats_.update_attempt_.inc();
+      callbacks_->onConfigUpdateFailed(&e);
+      ::google::rpc::Status* error_detail = request_.mutable_error_detail();
+      error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
+      error_detail->set_message(e.what());
+    }
+    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
+  }
+
+  void onWriteable() override { drainRequests(); }
+
+  // Config::Subscription
+  void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+
+    if (init_fetch_timeout_.count() > 0) {
+      init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
+        ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
+        callbacks_->onConfigUpdateFailed(nullptr);
+      });
+      init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
+    }
+
+    grpc_stream_.establishNewStream();
+    subscribe(resources);
+    // The attempt stat here is maintained for the purposes of having consistency between ADS and
+    // individual DeltaSubscriptions. Since ADS is push based and muxed, the notion of an
+    // "attempt" for a given xDS API combined by ADS is not really that meaningful.
+    stats_.update_attempt_.inc();
+  }
+
+  void updateResources(const std::vector<std::string>& resources) override {
+    subscribe(resources);
+    stats_.update_attempt_.inc();
+  }
+
+private:
+  void
+  handleConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                     const std::string& version_info) {
     callbacks_->onConfigUpdate(added_resources, removed_resources, version_info);
     for (const auto& resource : added_resources) {
       setResourceVersion(resource.name(), resource.version());
@@ -141,86 +220,21 @@ public:
               added_resources.size(), removed_resources.size());
   }
 
-  void handleResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override {
-    ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
-              message->system_version_info());
-    disableInitFetchTimeoutTimer();
-
-    request_.set_response_nonce(message->nonce());
-
-    try {
-      onConfigUpdate(message->resources(), message->removed_resources(),
-                     message->system_version_info());
-    } catch (const EnvoyException& e) {
-      stats_.update_rejected_.inc();
-      ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
-      stats_.update_attempt_.inc();
-      callbacks_->onConfigUpdateFailed(&e);
-      ::google::rpc::Status* error_detail = request_.mutable_error_detail();
-      error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
-      error_detail->set_message(e.what());
-    }
-    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
-  }
-
-  void handleStreamEstablished() override {
-    // initial_resource_versions "must be populated for first request in a stream", so guarantee
-    // that the initial version'd request we're about to enqueue is what gets sent.
-    clearRequestQueue();
-
-    request_.Clear();
-    for (auto const& resource : resource_versions_) {
-      // Populate initial_resource_versions with the resource versions we currently have. Resources
-      // we are interested in, but are still waiting to get any version of from the server, do not
-      // belong in initial_resource_versions.
-      if (!resource.second.waitingForServer()) {
-        (*request_.mutable_initial_resource_versions())[resource.first] = resource.second.version();
-      }
-    }
-    request_.set_type_url(type_url_);
-    request_.mutable_node()->MergeFrom(local_info_.node());
-    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
-  }
-
-  void handleEstablishmentFailure() override {
-    disableInitFetchTimeoutTimer();
-    stats_.update_failure_.inc();
-    ENVOY_LOG(debug, "delta update for {} failed", type_url_);
-    stats_.update_attempt_.inc();
-    callbacks_->onConfigUpdateFailed(nullptr);
-  }
-
-  // Config::DeltaSubscription
-  void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
-
-    if (init_fetch_timeout_.count() > 0) {
-      init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
-        ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
-        callbacks_->onConfigUpdateFailed(nullptr);
-      });
-      init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
-    }
-
-    establishNewStream();
-    subscribe(resources);
-    // The attempt stat here is maintained for the purposes of having consistency between ADS and
-    // individual DeltaSubscriptions. Since ADS is push based and muxed, the notion of an
-    // "attempt" for a given xDS API combined by ADS is not really that meaningful.
-    stats_.update_attempt_.inc();
-  }
-
-  void updateResources(const std::vector<std::string>& resources) override {
-    subscribe(resources);
-    stats_.update_attempt_.inc();
-  }
-
-private:
   void disableInitFetchTimeoutTimer() {
     if (init_fetch_timeout_timer_) {
       init_fetch_timeout_timer_->disableTimer();
       init_fetch_timeout_timer_.reset();
     }
+  }
+
+  void drainRequests() {
+    ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
+    while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
+      // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
+      sendDiscoveryRequest(request_queue_.front());
+      request_queue_.pop();
+    }
+    grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
   }
 
   class ResourceVersion {
@@ -257,6 +271,26 @@ private:
     resource_versions_.erase(resource_name);
     resource_names_.erase(resource_name);
   }
+
+  void queueDiscoveryRequest(const ResourceNameDiff& queue_item) {
+    request_queue_.push(queue_item);
+    drainRequests();
+  }
+
+  void clearRequestQueue() {
+    grpc_stream_.maybeUpdateQueueSizeStat(0);
+    // TODO(fredlas) when we have C++17: request_queue_ = {};
+    while (!request_queue_.empty()) {
+      request_queue_.pop();
+    }
+  }
+
+  // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
+  // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
+  std::queue<ResourceNameDiff> request_queue_;
+
+  GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
+      grpc_stream_;
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have

@@ -1,66 +1,72 @@
-# DEPRECATED
+.. _deprecated:
+
+Deprecated
+----------
 
 As of release 1.3.0, Envoy will follow a
-[Breaking Change Policy](https://github.com/envoyproxy/envoy/blob/master//CONTRIBUTING.md#breaking-change-policy).
+`Breaking Change Policy <https://github.com/envoyproxy/envoy/blob/master//CONTRIBUTING.md#breaking-change-policy>`_.
 
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 A logged warning is expected for each deprecated item that is in deprecation window.
+Deprecated items below are listed in chronological order.
 
-## Version 1.11.0 (Pending)
+Version 1.11.0 (Pending)
+========================
 
-## Version 1.10.0 (Apr 5, 2019)
-* Use of `use_alpha` in [Ext-Authz Authorization Service](https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/auth/v2/external_auth.proto) is deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
+Version 1.10.0 (Apr 5, 2019)
+============================
+* Use of `use_alpha` in :ref:`Ext-Authz Authorization Service <envoy_api_file_envoy/service/auth/v2/external_auth.proto>` is deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
 * Use of `enabled` in `CorsPolicy`, found in
-  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
+  :ref:`route.proto <envoy_api_file_envoy/api/v2/route/route.proto>`.
   Set the `filter_enabled` field instead.
 * Use of the `type` field in the `FaultDelay` message (found in
-  [fault.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto))
+  :ref:`fault.proto <envoy_api_file_envoy/config/filter/fault/v2/fault.proto>`)
   has been deprecated. It was never used and setting it has no effect. It will be removed in the
   following release.
 
-## Version 1.9.0 (Dec 20, 2018)
-
-* Order of execution of the network write filter chain has been reversed. Prior to this release cycle it was incorrect, see [#4599](https://github.com/envoyproxy/envoy/issues/4599). In the 1.9.0 release cycle we introduced `bugfix_reverse_write_filter_order` in [lds.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/lds.proto) to temporarily support both old and new behaviors. Note this boolean field is deprecated.
-* Order of execution of the HTTP encoder filter chain has been reversed. Prior to this release cycle it was incorrect, see [#4599](https://github.com/envoyproxy/envoy/issues/4599). In the 1.9.0 release cycle we introduced `bugfix_reverse_encode_order` in [http_connection_manager.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto) to temporarily support both old and new behaviors. Note this boolean field is deprecated.
+Version 1.9.0 (Dec 20, 2018)
+============================
+* Order of execution of the network write filter chain has been reversed. Prior to this release cycle it was incorrect, see `#4599 <https://github.com/envoyproxy/envoy/issues/4599>`_. In the 1.9.0 release cycle we introduced `bugfix_reverse_write_filter_order` in `lds.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/lds.proto>`_ to temporarily support both old and new behaviors. Note this boolean field is deprecated.
+* Order of execution of the HTTP encoder filter chain has been reversed. Prior to this release cycle it was incorrect, see `#4599 <https://github.com/envoyproxy/envoy/issues/4599>`_. In the 1.9.0 release cycle we introduced `bugfix_reverse_encode_order` in `http_connection_manager.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto>`_ to temporarily support both old and new behaviors. Note this boolean field is deprecated.
 * Use of the v1 REST_LEGACY ApiConfigSource is deprecated.
 * Use of std::hash in the ring hash load balancer is deprecated.
-* Use of `rate_limit_service` configuration in the [bootstrap configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/bootstrap/v2/bootstrap.proto) is deprecated.
+* Use of `rate_limit_service` configuration in the `bootstrap configuration <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/bootstrap/v2/bootstrap.proto>`_ is deprecated.
 * Use of `runtime_key` in `RequestMirrorPolicy`, found in
-  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
+  `route.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto>`_
   is deprecated. Set the `runtime_fraction` field instead.
-* Use of buffer filter `max_request_time` is deprecated in favor of the request timeout found in [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
+* Use of buffer filter `max_request_time` is deprecated in favor of the request timeout found in `HttpConnectionManager <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto>`_
 
-## Version 1.8.0 (Oct 4, 2018)
-
+Version 1.8.0 (Oct 4, 2018)
+==============================
 * Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.
-  See envoy-announce [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
+  See envoy-announce `email <https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U>`_.
 * Use of the legacy
-  [ratelimit.proto](https://github.com/envoyproxy/envoy/blob/b0a518d064c8255e0e20557a8f909b6ff457558f/source/common/ratelimit/ratelimit.proto)
+  `ratelimit.proto <https://github.com/envoyproxy/envoy/blob/b0a518d064c8255e0e20557a8f909b6ff457558f/source/common/ratelimit/ratelimit.proto>`_
   is deprecated, in favor of the proto defined in
-  [date-plane-api](https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/ratelimit/v2/rls.proto)
+  `date-plane-api <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/ratelimit/v2/rls.proto>`_
   Prior to 1.8.0, Envoy can use either proto to send client requests to a ratelimit server with the use of the
-  `use_data_plane_proto` boolean flag in the [ratelimit configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto).
+  `use_data_plane_proto` boolean flag in the `ratelimit configuration <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto>`_.
   However, when using the deprecated client a warning is logged.
 * Use of the --v2-config-only flag.
 * Use of both `use_websocket` and `websocket_config` in
-  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
+  `route.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto>`_
   is deprecated. Please use the new `upgrade_configs` in the
-  [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
+  `HttpConnectionManager <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto>`_
   instead.
-* Use of the integer `percent` field in [FaultDelay](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto)
-  and in [FaultAbort](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/http/fault/v2/fault.proto) is deprecated in favor
+* Use of the integer `percent` field in `FaultDelay <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto>`_
+  and in `FaultAbort <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/http/fault/v2/fault.proto>`_ is deprecated in favor
   of the new `FractionalPercent` based `percentage` field.
 * Setting hosts via `hosts` field in `Cluster` is deprecated. Use `load_assignment` instead.
 * Use of `response_headers_to_*` and `request_headers_to_add` are deprecated at the `RouteAction`
   level. Please use the configuration options at the `Route` level.
 * Use of `runtime` in `RouteMatch`, found in
-  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
+  `route.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto>`_.
   Set the `runtime_fraction` field instead.
-* Use of the string `user` field in `Authenticated` in [rbac.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2alpha/rbac.proto)
+* Use of the string `user` field in `Authenticated` in `rbac.proto <https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2alpha/rbac.proto>`_
   is deprecated in favor of the new `StringMatcher` based `principal_name` field.
 
-## Version 1.7.0 (Jun 21, 2018)
-
+Version 1.7.0 (Jun 21, 2018)
+===============================
 * Admin mutations should be sent as POSTs rather than GETs. HTTP GETs will result in an error
   status code and will not have their intended effect. Prior to 1.7, GETs can be used for
   admin mutations, but a warning is logged.
@@ -76,8 +82,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
   field where one can specify HeaderMatch objects to match on.
 * The `sni_domains` field in the filter chain match was deprecated/renamed to `server_names`.
 
-## Version 1.6.0 (March 20, 2018)
-
+Version 1.6.0 (March 20, 2018)
+=================================
 * DOWNSTREAM_ADDRESS log formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT
   instead.
 * CLIENT_IP header formatter is deprecated. Use DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT instead.
@@ -86,8 +92,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * `value` and `regex` fields in the `HeaderMatcher` message is deprecated. Use the `exact_match`
   or `regex_match` oneof instead.
 
-## Version 1.5.0 (Dec 4, 2017)
-
+Version 1.5.0 (Dec 4, 2017)
+==============================
 * The outlier detection `ejections_total` stats counter has been deprecated and not replaced. Monitor
   the individual `ejections_detected_*` counters for the detectors of interest, or
   `ejections_enforced_total` for the total number of ejections that actually occurred.
@@ -96,8 +102,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * The outlier detection `ejections_success_rate` stats counter has been deprecated in favour of
   `ejections_detected_success_rate` and `ejections_enforced_success_rate`.
 
-## Version 1.4.0 (Aug 24, 2017)
-
+Version 1.4.0 (Aug 24, 2017)
+============================
 * Config option `statsd_local_udp_port` has been deprecated and has been replaced with
   `statsd_udp_ip_address`.
 * `HttpFilterConfigFactory` filter API has been deprecated in favor of `NamedHttpFilterConfigFactory`.
@@ -105,7 +111,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * The following log macros have been deprecated: `log_trace`, `log_debug`, `conn_log`,
   `conn_log_info`, `conn_log_debug`, `conn_log_trace`, `stream_log`, `stream_log_info`,
   `stream_log_debug`, `stream_log_trace`. For replacements, please see
-  [logger.h](https://github.com/envoyproxy/envoy/blob/master/source/common/common/logger.h).
+  `logger.h <https://github.com/envoyproxy/envoy/blob/master/source/common/common/logger.h>`_.
 * The connectionId() and ssl() callbacks of StreamFilterCallbacks have been deprecated and
   replaced with a more general connection() callback, which, when not returning a nullptr, can be
   used to get the connection id and SSL connection from the returned Connection object pointer.
