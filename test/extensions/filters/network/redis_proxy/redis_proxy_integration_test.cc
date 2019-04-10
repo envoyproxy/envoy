@@ -139,12 +139,10 @@ public:
    * @param target_server a handle to the second server that will respond to the request.
    * @param request supplies client data to transmit to the first upstream server.
    * @param redirection_response supplies the moved or ask redirection error from the first server.
-   * @param received_request suplies data received by the second server from the proxy.
    * @param response supplies data sent by the second server back to the fake Redis client.
    */
   void simpleRedirection(FakeUpstreamPtr& target_server, const std::string& request,
-                         const std::string& redirection_response,
-                         const std::string& received_request, const std::string& response);
+                         const std::string& redirection_response, const std::string& response);
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
@@ -201,8 +199,9 @@ void RedisProxyIntegrationTest::simpleProxyResponse(const std::string& request,
 
 void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
     FakeUpstreamPtr& target_server, const std::string& request,
-    const std::string& redirection_response, const std::string& received_request,
-    const std::string& response) {
+    const std::string& redirection_response, const std::string& response) {
+
+  bool asking = (redirection_response.find("-ASK") != std::string::npos);
   std::string proxy_to_server;
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   redis_client->write(request);
@@ -221,10 +220,20 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
   // The proxy should initiate a new connection to the fake redis server, target_server, in
   // response.
   EXPECT_TRUE(target_server->waitForRawConnection(fake_upstream_connection_2));
-  // The server, target_server, should receive received_request which may or may not be the same as
-  // the original request.
-  EXPECT_TRUE(fake_upstream_connection_2->waitForData(received_request.size(), &proxy_to_server));
-  EXPECT_EQ(received_request, proxy_to_server);
+
+  if (asking) {
+    // The server, target_server, should receive an "asking" command before the original request.
+    std::string asking_request = makeBulkStringArray({"asking"});
+    EXPECT_TRUE(fake_upstream_connection_2->waitForData(asking_request.size() + request.size(),
+                                                        &proxy_to_server));
+    EXPECT_EQ(asking_request + request, proxy_to_server);
+    // Respond with an "OK" to the "asking" command.
+    EXPECT_TRUE(fake_upstream_connection_2->write("+OK\r\n"));
+  } else {
+    // The server, target_server, should receive request unchanged.
+    EXPECT_TRUE(fake_upstream_connection_2->waitForData(request.size(), &proxy_to_server));
+    EXPECT_EQ(request, proxy_to_server);
+  }
 
   // Send response from the second fake Redis server, target_server, to the client.
   EXPECT_TRUE(fake_upstream_connection_2->write(response));
@@ -287,12 +296,11 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToKnownServer) {
   initialize();
   std::stringstream redirection_error;
   redirection_error << "-MOVED 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
-  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), request, "$3\r\nbar\r\n");
+  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
 
   redirection_error.str("");
   redirection_error << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
-  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(),
-                    makeBulkStringArray({"asking", "get", "foo"}), "$3\r\nbar\r\n");
+  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
 }
 
 // This test sends a simple Redis commands to a sequence of fake upstream
@@ -312,12 +320,11 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToUnknownServer) {
 
   std::stringstream redirection_error;
   redirection_error << "-MOVED 1111 " << redisAddressAndPort(target_server) << "\r\n";
-  simpleRedirection(target_server, request, redirection_error.str(), request, "$3\r\nbar\r\n");
+  simpleRedirection(target_server, request, redirection_error.str(), "$3\r\nbar\r\n");
 
   redirection_error.str("");
   redirection_error << "-ASK 1111 " << redisAddressAndPort(target_server) << "\r\n";
-  simpleRedirection(target_server, request, redirection_error.str(),
-                    makeBulkStringArray({"asking", "get", "foo"}), "$3\r\nbar\r\n");
+  simpleRedirection(target_server, request, redirection_error.str(), "$3\r\nbar\r\n");
 }
 
 // This test verifies that various forms of bad MOVED/ASK redirection errors

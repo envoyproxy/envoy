@@ -412,7 +412,7 @@ TEST_F(RedisSingleServerRequestTest, RedirectionFailure) {
 TEST_F(RedisSingleServerRequestTest, AskRedirectionSuccess) {
   InSequence s;
 
-  Common::Redis::Client::MockPoolRequest pool_request2;
+  Common::Redis::Client::MockPoolRequest pool_request2, pool_request3;
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"get", "foo"});
   makeRequest("foo", std::move(request));
@@ -421,12 +421,12 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionSuccess) {
   Common::Redis::RespValue ask_response;
   ask_response.type(Common::Redis::RespType::Error);
   ask_response.asString() = "ASK 1111 10.1.2.3:4000";
-  EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_)))
+  EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, _))
       .WillOnce(
           Invoke([&](const std::string& host_address, const Common::Redis::RespValue& request,
                      Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
-            // Verify that the request has been properly modified in place with an "asking" prefix.
-            std::vector<std::string> commands = {"asking", "get", "foo"};
+            // Verify that the request has been properly prepended with an "asking" command.
+            std::vector<std::string> commands = {"asking"};
             EXPECT_EQ(host_address, "10.1.2.3:4000");
             EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
             EXPECT_EQ(request.asArray().size(), commands.size());
@@ -435,6 +435,20 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionSuccess) {
               EXPECT_EQ(request.asArray()[i].asString(), commands[i]);
             }
             return &pool_request2;
+          }));
+  EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_)))
+      .WillOnce(
+          Invoke([&](const std::string& host_address, const Common::Redis::RespValue& request,
+                     Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+            std::vector<std::string> commands = {"get", "foo"};
+            EXPECT_EQ(host_address, "10.1.2.3:4000");
+            EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+            EXPECT_EQ(request.asArray().size(), commands.size());
+            for (unsigned int i = 0; i < commands.size(); i++) {
+              EXPECT_TRUE(request.asArray()[i].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[i].asString(), commands[i]);
+            }
+            return &pool_request3;
           }));
   EXPECT_TRUE(pool_callbacks_->onRedirection(ask_response));
   respond();
@@ -738,20 +752,30 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithAskRedirection) {
   Common::Redis::RespValue ask_response;
   ask_response.type(Common::Redis::RespType::Error);
   ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // Exact values are not important.
+  Common::Redis::Client::MockPoolRequest dummy_poolrequest;
   for (unsigned int i = 0; i < 2; i++) {
+    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, _))
+        .WillOnce(Invoke(
+            [&](const std::string& host_address, const Common::Redis::RespValue& request,
+                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+              EXPECT_EQ(host_address, "192.168.0.1:5000");
+              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+              EXPECT_EQ(request.asArray().size(), 1);
+              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[0].asString(), "asking");
+              return &dummy_poolrequest;
+            }));
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(
             [&](const std::string& host_address, const Common::Redis::RespValue& request,
                 Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
               EXPECT_EQ(host_address, "192.168.0.1:5000");
               EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 3);
+              EXPECT_EQ(request.asArray().size(), 2);
               EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), "asking");
+              EXPECT_EQ(request.asArray()[0].asString(), "get");
               EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), "get");
-              EXPECT_TRUE(request.asArray()[2].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[2].asString(), std::to_string(i));
+              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
@@ -985,22 +1009,32 @@ TEST_F(RedisMSETCommandHandlerTest, NormalWithAskRedirection) {
   Common::Redis::RespValue ask_response;
   ask_response.type(Common::Redis::RespType::Error);
   ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // Exact values are not important.
+  Common::Redis::Client::MockPoolRequest dummy_poolrequest;
   for (unsigned int i = 0; i < 2; i++) {
+    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, _))
+        .WillOnce(Invoke(
+            [&](const std::string& host_address, const Common::Redis::RespValue& request,
+                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+              EXPECT_EQ(host_address, "192.168.0.1:5000");
+              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+              EXPECT_EQ(request.asArray().size(), 1);
+              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[0].asString(), "asking");
+              return &dummy_poolrequest;
+            }));
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(
             [&](const std::string& host_address, const Common::Redis::RespValue& request,
                 Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
               EXPECT_EQ(host_address, "192.168.0.1:5000");
               EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 4);
+              EXPECT_EQ(request.asArray().size(), 3);
               EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), "asking");
+              EXPECT_EQ(request.asArray()[0].asString(), "set");
               EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), "set");
+              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
               EXPECT_TRUE(request.asArray()[2].type() == Common::Redis::RespType::BulkString);
               EXPECT_EQ(request.asArray()[2].asString(), std::to_string(i));
-              EXPECT_TRUE(request.asArray()[3].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[3].asString(), std::to_string(i));
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
@@ -1209,20 +1243,30 @@ TEST_P(RedisSplitKeysSumResultHandlerTest, NormalWithAskRedirection) {
   Common::Redis::RespValue ask_response;
   ask_response.type(Common::Redis::RespType::Error);
   ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // Exact values are not important.
+  Common::Redis::Client::MockPoolRequest dummy_poolrequest;
   for (unsigned int i = 0; i < 2; i++) {
+    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, _))
+        .WillOnce(Invoke(
+            [&](const std::string& host_address, const Common::Redis::RespValue& request,
+                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+              EXPECT_EQ(host_address, "192.168.0.1:5000");
+              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+              EXPECT_EQ(request.asArray().size(), 1);
+              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[0].asString(), "asking");
+              return &dummy_poolrequest;
+            }));
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(
             [&](const std::string& host_address, const Common::Redis::RespValue& request,
                 Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
               EXPECT_EQ(host_address, "192.168.0.1:5000");
               EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
-              EXPECT_EQ(request.asArray().size(), 3);
+              EXPECT_EQ(request.asArray().size(), 2);
               EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[0].asString(), "asking");
+              EXPECT_EQ(request.asArray()[0].asString(), GetParam());
               EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[1].asString(), GetParam());
-              EXPECT_TRUE(request.asArray()[2].type() == Common::Redis::RespType::BulkString);
-              EXPECT_EQ(request.asArray()[2].asString(), std::to_string(i));
+              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
               EXPECT_NE(&pool_requests_[i], nullptr);
               return &pool_requests_[i];
             }));
