@@ -3,13 +3,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/config_source.pb.validate.h"
+
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
-#include "common/upstream/cds_api_impl.h"
 #include "common/protobuf/utility.h"
-
-#include "envoy/api/v2/core/config_source.pb.validate.h"
+#include "common/upstream/cds_api_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
