@@ -217,6 +217,8 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     // add to the slot
     for (auto i = startField; i <= endField; ++i) {
       slots_[i] = masterAddress->asString();
+      // TODO: Investigate performance of alternative implementations, as this will be O(n)
+      // where n is number of shards.
     }
     new_hosts.emplace_back(
         new RedisHost(parent_.info(), "", std::move(masterAddress), parent_, true));

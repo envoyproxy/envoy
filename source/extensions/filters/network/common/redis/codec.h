@@ -21,7 +21,6 @@ enum class RespType { Null, SimpleString, BulkString, Integer, Error, Array };
 /**
  * A variant implementation of a RESP value optimized for performance. A C++11 union is used for
  * the underlying type so that no unnecessary allocations/constructions are needed.
- * TODO(hyang): make RespValue easier to initialized in subclasses
  */
 class RespValue {
 public:

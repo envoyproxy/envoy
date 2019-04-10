@@ -171,7 +171,6 @@ private:
     bool enableHashtagging() const override { return false; }
     bool enableRedirection() const override { return false; }
 
-
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
