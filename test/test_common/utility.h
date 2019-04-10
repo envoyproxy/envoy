@@ -527,14 +527,44 @@ ApiPtr createApiForTest(Event::TimeSystem& time_system);
 ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system);
 } // namespace Api
 
-MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {
-  *result_listener << *rhs << " is not equal to " << *arg;
-  return TestUtility::headerMapEqualIgnoreOrder(*arg, *rhs);
+MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
+  const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);
+  if (!equal) {
+    *result_listener << "\n"
+                     << "========================Expected header map:========================\n"
+                     << *expected
+                     << "-----------------is not equal to actual header map:-----------------\n"
+                     << *arg
+                     << "====================================================================\n";
+  }
+  return equal;
 }
 
-MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
+MATCHER_P(ProtoEq, expected, "") {
+  const bool equal = TestUtility::protoEqual(arg, expected);
+  if (!equal) {
+    *result_listener << "\n"
+                     << "==========================Expected proto:===========================\n"
+                     << expected.DebugString()
+                     << "------------------is not equal to actual proto:---------------------\n"
+                     << arg.DebugString()
+                     << "====================================================================\n";
+  }
+  return equal;
+}
 
-MATCHER_P(RepeatedProtoEq, rhs, "") { return TestUtility::repeatedPtrFieldEqual(arg, rhs); }
+MATCHER_P(RepeatedProtoEq, expected, "") {
+  const bool equal = TestUtility::repeatedPtrFieldEqual(arg, expected);
+  if (!equal) {
+    *result_listener << "\n"
+                     << "=======================Expected repeated:===========================\n"
+                     << RepeatedPtrUtil::debugString(expected) << "\n"
+                     << "-----------------is not equal to actual repeated:-------------------\n"
+                     << RepeatedPtrUtil::debugString(arg) << "\n"
+                     << "====================================================================\n";
+  }
+  return equal;
+}
 
 MATCHER_P(Percent, rhs, "") {
   envoy::type::FractionalPercent expected;

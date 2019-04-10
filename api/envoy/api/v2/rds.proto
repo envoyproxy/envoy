@@ -46,7 +46,7 @@ service RouteDiscoveryService {
 }
 
 // Virtual Host Discovery Service (VHDS) is used to dynamically update the list of virtual hosts for
-// a given RouteConfiguration. If VHDS is configured a virtual host list update will be triggerred
+// a given RouteConfiguration. If VHDS is configured a virtual host list update will be triggered
 // during the processing of an HTTP request if a route for the request cannot be resolved. The
 // :ref:`resource_names_subscribe <envoy_api_msg_DeltaDiscoveryRequest.resource_names_subscribe>`
 // field contains a list of virtual host names or aliases to track. The contents of an alias would
