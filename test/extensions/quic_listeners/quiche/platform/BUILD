@@ -50,3 +50,13 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "quic_platform_port_utils_test_impl_lib",
+    srcs = ["quic_port_utils_test_impl.cc"],
+    hdrs = ["quic_port_utils_test_impl.h"],
+    deps = [
+        "//source/common/network:utility_lib",
+        "//test/test_common:environment_lib",
+    ],
+)

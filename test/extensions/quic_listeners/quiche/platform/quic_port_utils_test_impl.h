@@ -1,4 +1,3 @@
-
 #pragma once
 
 // NOLINT(namespace-envoy)
@@ -7,4 +6,11 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "test/extensions/quic_listeners/quiche/platform/quic_port_utils_test_impl.h"
+namespace quic {
+
+int QuicPickUnusedPortOrDieImpl();
+inline void QuicRecyclePortImpl(int) {
+  // No-op with current port picking implementation.
+}
+
+} // namespace quic
