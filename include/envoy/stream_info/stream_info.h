@@ -75,6 +75,8 @@ enum ResponseFlag {
  */
 struct ResponseCodeDetailValues {
   const std::string RC_SET_BY_UPSTREAM = "response_code_set_by_upstream";
+
+  // TODO(#6542): add values for sendLocalReply use-cases
 };
 
 typedef ConstSingleton<ResponseCodeDetailValues> ResponseCodeDetails;

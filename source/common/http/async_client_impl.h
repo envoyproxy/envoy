@@ -321,7 +321,7 @@ private:
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
-    // TODO(eziskind): add an extra parameter for setting rc details
+    // TODO(#6542): add an extra parameter for setting rc details
     stream_info_.setResponseCodeDetails("");
     Utility::sendLocalReply(
         is_grpc_request_,
