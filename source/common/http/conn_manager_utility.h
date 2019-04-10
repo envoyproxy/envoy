@@ -59,6 +59,11 @@ public:
   static void mutateResponseHeaders(HeaderMap& response_headers, const HeaderMap* request_headers,
                                     const std::string& via);
 
+  // Sanitize the path in the header map if forced by config.
+  // Side affect: the string view of Path header is invalidated.
+  // Return false if error happens during the sanitization.
+  static bool maybeNormalizePath(HeaderMap& request_headers, const ConnectionManagerConfig& config);
+
 private:
   /**
    * Mutate request headers if request needs to be traced.

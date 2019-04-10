@@ -34,6 +34,20 @@ public:
   virtual Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request,
               Common::Redis::Client::PoolCallbacks& callbacks) PURE;
+
+  /**
+   * Makes a redis request based on IP address and TCP port of the upstream host (e.g., moved/ask
+   * cluster redirection).
+   * @param host_address supplies the IP address and TCP port of the upstream host to receive the
+   * request.
+   * @param request supplies the Redis request to make.
+   * @param callbacks supplies the request completion callbacks.
+   * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+   *         for some reason.
+   */
+  virtual Common::Redis::Client::PoolRequest*
+  makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
+                    Common::Redis::Client::PoolCallbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

@@ -68,7 +68,6 @@ else
 fi
 
 # Not sandboxing, since non-privileged Docker can't do nested namespaces.
-BAZEL_OPTIONS="--package_path %workspace%:${ENVOY_SRCDIR}"
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--strategy=Genrule=standalone --spawn_strategy=standalone \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
@@ -92,7 +91,7 @@ if [ "$1" != "-nofetch" ]; then
   then
     git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   fi
-  
+
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
   (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 6c0625cb4cc9a21df97cef2a1d065463f2ae81ae)
   cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
@@ -101,7 +100,6 @@ fi
 # Also setup some space for building Envoy standalone.
 export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
 mkdir -p "${ENVOY_BUILD_DIR}"
-cp -f "${ENVOY_SRCDIR}"/ci/WORKSPACE "${ENVOY_BUILD_DIR}"
 
 # This is where we copy build deliverables to.
 export ENVOY_DELIVERY_DIR="${ENVOY_BUILD_DIR}"/source/exe
@@ -119,29 +117,17 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
 
-# This is where we build for bazel.release* and bazel.dev.
-export ENVOY_CI_DIR="${ENVOY_SRCDIR}"/ci
-
 function cleanup() {
   # Remove build artifacts. This doesn't mess with incremental builds as these
   # are just symlinks.
   rm -rf "${ENVOY_SRCDIR}"/bazel-*
-  rm -rf "${ENVOY_CI_DIR}"/bazel-*
-  rm -rf "${ENVOY_CI_DIR}"/bazel
-  rm -rf "${ENVOY_CI_DIR}"/tools
-  rm -f "${ENVOY_CI_DIR}"/.bazelrc
 }
 
 cleanup
 trap cleanup EXIT
 
-# Hack due to https://github.com/envoyproxy/envoy/issues/838 and the need to have
-# .bazelrc available for build linkstamping.
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
-mkdir -p "${ENVOY_CI_DIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_CI_DIR}"/bazel/
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
-cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_CI_DIR}"/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
