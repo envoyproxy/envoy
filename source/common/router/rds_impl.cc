@@ -75,8 +75,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
       factory_context.api());
 
-  last_update_details_ =
-      std::make_unique<RdsConfigUpdateDetails>(route_config_proto_, last_updated_, config_info_);
+  config_update_info_ =
+      std::make_unique<RdsConfigUpdateInfo>(route_config_proto_, last_updated_, config_info_);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -118,22 +118,21 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     route_config_proto_ = route_config;
     stats_.config_reload_.inc();
 
-    if (!route_config_proto_.has_vhds()) {
+    if (route_config_proto_.has_vhds()) {
+      vhds_subscription_ = std::make_unique<VhdsSubscription>(
+          route_config_proto_, factory_context_, stat_prefix_, route_config_providers_);
+      vhds_subscription_->registerInitTargetWithInitManager(factory_context_.initManager());
+      config_update_info_ = std::make_unique<VhdsConfigUpdateInfo>(*vhds_subscription_);
+    } else {
       ENVOY_LOG(debug, "rds: loading new configuration: config_name={} hash={}", route_config_name_,
                 new_hash);
 
-      last_update_details_ = std::make_unique<RdsConfigUpdateDetails>(route_config_proto_,
-                                                                      last_updated_, config_info_);
+      config_update_info_ =
+          std::make_unique<RdsConfigUpdateInfo>(route_config_proto_, last_updated_, config_info_);
       for (auto* provider : route_config_providers_) {
         provider->onConfigUpdate();
       }
       vhds_subscription_.release();
-    } else {
-      auto s = new VhdsSubscription(route_config_proto_, factory_context_, stat_prefix_,
-                                    route_config_providers_);
-      s->registerInitTargetWithInitManager(factory_context_.initManager());
-      vhds_subscription_.reset(s);
-      last_update_details_ = std::make_unique<VhdsConfigUpdateDetails>(*vhds_subscription_);
     }
   }
 
@@ -247,9 +246,6 @@ void VhdsSubscription::onConfigUpdate(
 
 void VhdsSubscription::initializeVhosts(
     const envoy::api::v2::RouteConfiguration& route_configuration) {
-  if (route_configuration.virtual_hosts_size() <= 0) {
-    return;
-  }
   for (const auto& vhost : route_configuration.virtual_hosts()) {
     virtual_hosts_.emplace(vhost.name(), vhost);
   }

@@ -108,19 +108,19 @@ class RdsRouteConfigProviderImpl;
 class VhdsSubscription;
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;
 
-class ConfigUpdateDetails {
+class ConfigUpdateInfo {
 public:
-  virtual ~ConfigUpdateDetails() = default;
+  virtual ~ConfigUpdateInfo() = default;
 
   virtual absl::optional<LastConfigInfo> configInfo() const PURE;
   virtual envoy::api::v2::RouteConfiguration& routeConfiguration() PURE;
   virtual SystemTime lastUpdated() const PURE;
 };
 
-class RdsConfigUpdateDetails : public ConfigUpdateDetails {
+class RdsConfigUpdateInfo : public ConfigUpdateInfo {
 public:
-  RdsConfigUpdateDetails(envoy::api::v2::RouteConfiguration& rc, SystemTime last_updated,
-                         absl::optional<LastConfigInfo> config_info)
+  RdsConfigUpdateInfo(envoy::api::v2::RouteConfiguration& rc, SystemTime last_updated,
+                      absl::optional<LastConfigInfo> config_info)
       : route_config_proto_(rc), last_updated_(last_updated), config_info_(std::move(config_info)) {
   }
 
@@ -134,9 +134,9 @@ private:
   absl::optional<LastConfigInfo> config_info_;
 };
 
-class VhdsConfigUpdateDetails : public ConfigUpdateDetails {
+class VhdsConfigUpdateInfo : public ConfigUpdateInfo {
 public:
-  VhdsConfigUpdateDetails(ConfigUpdateDetails& subscription) : subscription_(subscription) {}
+  VhdsConfigUpdateInfo(ConfigUpdateInfo& subscription) : subscription_(subscription) {}
 
   absl::optional<LastConfigInfo> configInfo() const override { return subscription_.configInfo(); }
   envoy::api::v2::RouteConfiguration& routeConfiguration() override {
@@ -145,7 +145,7 @@ public:
   SystemTime lastUpdated() const override { return subscription_.lastUpdated(); }
 
 private:
-  ConfigUpdateDetails& subscription_;
+  ConfigUpdateInfo& subscription_;
 };
 
 /**
@@ -169,11 +169,11 @@ public:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
   }
-  absl::optional<LastConfigInfo> configInfo() const { return last_update_details_->configInfo(); }
+  absl::optional<LastConfigInfo> configInfo() const { return config_update_info_->configInfo(); }
   envoy::api::v2::RouteConfiguration& routeConfiguration() {
-    return last_update_details_->routeConfiguration();
+    return config_update_info_->routeConfiguration();
   }
-  SystemTime lastUpdated() const { return last_update_details_->lastUpdated(); }
+  SystemTime lastUpdated() const { return config_update_info_->lastUpdated(); }
 
 private:
   RdsRouteConfigSubscription(
@@ -197,7 +197,7 @@ private:
   envoy::api::v2::RouteConfiguration route_config_proto_;
   std::unordered_set<RdsRouteConfigProviderImpl*> route_config_providers_;
   VhdsSubscriptionPtr vhds_subscription_;
-  std::unique_ptr<ConfigUpdateDetails> last_update_details_;
+  std::unique_ptr<ConfigUpdateInfo> config_update_info_;
 
   friend class RouteConfigProviderManagerImpl;
   friend class RdsRouteConfigProviderImpl;
@@ -211,7 +211,7 @@ typedef std::unique_ptr<Envoy::Config::Subscription> (*SubscriptionFactoryFuncti
 
 class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
                          Logger::Loggable<Logger::Id::router>,
-                         public ConfigUpdateDetails {
+                         public ConfigUpdateInfo {
 public:
   VhdsSubscription(const envoy::api::v2::RouteConfiguration& route_configuration,
                    Server::Configuration::FactoryContext& factory_context,
@@ -260,11 +260,6 @@ public:
   absl::optional<LastConfigInfo> config_info_;
 };
 
-struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-  ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(std::move(initial_config)) {}
-  ConfigConstSharedPtr config_;
-};
-
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
  * the subscription.
@@ -283,6 +278,11 @@ public:
   SystemTime lastUpdated() const override { return subscription_->lastUpdated(); }
 
 private:
+  struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(std::move(initial_config)) {}
+    ConfigConstSharedPtr config_;
+  };
+
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
                              Server::Configuration::FactoryContext& factory_context);
 
