@@ -45,7 +45,7 @@ public:
     stats_.update_attempt_.inc();
   }
 
-  void updateResources(const std::vector<std::string>& resources) override {
+  void updateResources(std::vector<std::string> resources) override {
     watch_ = grpc_mux_.subscribe(type_url_, resources, *this);
     stats_.update_attempt_.inc();
   }

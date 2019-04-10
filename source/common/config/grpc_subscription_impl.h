@@ -32,7 +32,7 @@ public:
     grpc_mux_.start();
   }
 
-  void updateResources(const std::vector<std::string>& resources) override {
+  void updateResources(std::vector<std::string> resources) override {
     grpc_mux_subscription_.updateResources(resources);
   }
 

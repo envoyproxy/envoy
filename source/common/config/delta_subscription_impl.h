@@ -1,7 +1,5 @@
 #pragma once
 
-#include <queue>
-
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/subscription.h"
@@ -19,11 +17,6 @@
 
 namespace Envoy {
 namespace Config {
-
-struct ResourceNameDiff {
-  std::vector<std::string> added_;
-  std::vector<std::string> removed_;
-};
 
 /**
  * Manages the logic of a (non-aggregated) delta xDS subscription.
@@ -48,51 +41,42 @@ public:
     request_.mutable_node()->MergeFrom(local_info_.node());
   }
 
-  // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
-  // added to the passed 'resources' argument, relative to resource_versions_.
-  void buildAndQueueDiscoveryRequest(const std::vector<std::string>& resources) {
-    ResourceNameDiff diff;
-    std::set_difference(resources.begin(), resources.end(), resource_names_.begin(),
-                        resource_names_.end(), std::inserter(diff.added_, diff.added_.begin()));
-    std::set_difference(resource_names_.begin(), resource_names_.end(), resources.begin(),
-                        resources.end(), std::inserter(diff.removed_, diff.removed_.begin()));
+  void updateResources(std::vector<std::string> resource_names) override {
+    std::vector<std::string> cur_added;
+    std::vector<std::string> cur_removed;
 
-    for (const auto& added : diff.added_) {
-      setResourceWaitingForServer(added);
+    // set_difference expects sorted collections. (resource_names_ is always sorted; it's std::set).
+    std::sort(resource_names.begin(), resource_names.end());
+
+    std::set_difference(resource_names.begin(), resource_names.end(), resource_names_.begin(),
+                        resource_names_.end(), std::inserter(cur_added, cur_added.begin()));
+    std::set_difference(resource_names_.begin(), resource_names_.end(), resource_names.begin(),
+                        resource_names.end(), std::inserter(cur_removed, cur_removed.begin()));
+
+    for (auto a : cur_added) {
+      setResourceWaitingForServer(a);
+      // Removed->added requires us to keep track of it as a "new" addition, since our user may have
+      // forgotten its copy of the resource after instructing us to remove it, and so needs to be
+      // reminded of it.
+      names_removed_.erase(a);
+      names_added_.insert(a);
     }
-    for (const auto& removed : diff.removed_) {
-      lostInterestInResource(removed);
-    }
-    queueDiscoveryRequest(diff);
-  }
-
-  void sendDiscoveryRequest(const ResourceNameDiff& diff) {
-    if (!grpc_stream_.grpcStreamAvailable()) {
-      ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url_);
-      return; // Drop this request; the reconnect will enqueue a new one.
-    }
-    if (paused_) {
-      ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest().", type_url_);
-      pending_ = diff;
-      return; // The unpause will send this request.
+    for (auto r : cur_removed) {
+      lostInterestInResource(r);
+      // Ideally, when a resource is added-then-removed in between requests, we would avoid putting
+      // a superfluous "unsubscribe [resource that was never subscribed]" in the request. However,
+      // the removed-then-added case *does* need to go in the request, and due to how we accomplish
+      // that, it's difficult to distinguish remove-add-remove from add-remove (because "remove-add"
+      // has to be treated as equivalent to just "add").
+      names_added_.erase(r);
+      names_removed_.insert(r);
     }
 
-    request_.clear_resource_names_subscribe();
-    request_.clear_resource_names_unsubscribe();
-    std::copy(diff.added_.begin(), diff.added_.end(),
-              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_subscribe()));
-    std::copy(diff.removed_.begin(), diff.removed_.end(),
-              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_unsubscribe()));
-
-    ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request_.DebugString());
-    grpc_stream_.sendMessage(request_);
-    request_.clear_error_detail();
-    request_.clear_initial_resource_versions();
-  }
-
-  void subscribe(const std::vector<std::string>& resources) {
-    ENVOY_LOG(debug, "delta subscribe for " + type_url_);
-    buildAndQueueDiscoveryRequest(resources);
+    stats_.update_attempt_.inc();
+    // Tell the server about our new interests (but only if there are any).
+    if (names_added_.size() > 0 || names_removed_.size() > 0) {
+      kickOffDiscoveryRequest();
+    }
   }
 
   void pause() {
@@ -105,20 +89,13 @@ public:
     ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url_);
     ASSERT(paused_);
     paused_ = false;
-    if (pending_.has_value()) {
-      queueDiscoveryRequest(pending_.value());
-      pending_.reset();
-    }
+    trySendDiscoveryRequestIfPending();
   }
 
   envoy::api::v2::DeltaDiscoveryRequest internalRequestStateForTest() const { return request_; }
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override {
-    // initial_resource_versions "must be populated for first request in a stream", so guarantee
-    // that the initial version'd request we're about to enqueue is what gets sent.
-    clearRequestQueue();
-
     request_.Clear();
     for (auto const& resource : resource_versions_) {
       // Populate initial_resource_versions with the resource versions we currently have. Resources
@@ -130,13 +107,16 @@ public:
     }
     request_.set_type_url(type_url_);
     request_.mutable_node()->MergeFrom(local_info_.node());
-    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
+    kickOffDiscoveryRequest();
   }
 
   void onEstablishmentFailure() override {
     disableInitFetchTimeoutTimer();
     stats_.update_failure_.inc();
     ENVOY_LOG(debug, "delta update for {} failed", type_url_);
+    // TODO(fredlas) this increment is needed to pass existing tests, but it seems wrong. We already
+    // increment it when updating subscription interest, which attempts a request. Is this supposed
+    // to be the sum of client- and server- initiated update attempts? Seems weird.
     stats_.update_attempt_.inc();
     callbacks_->onConfigUpdateFailed(nullptr);
   }
@@ -155,16 +135,19 @@ public:
     } catch (const EnvoyException& e) {
       stats_.update_rejected_.inc();
       ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
+      // TODO(fredlas) this increment is needed to pass existing tests, but it seems wrong. We
+      // already increment it when updating subscription interest, which attempts a request. Is this
+      // supposed to be the sum of client- and server- initiated update attempts? Seems weird.
       stats_.update_attempt_.inc();
       callbacks_->onConfigUpdateFailed(&e);
       ::google::rpc::Status* error_detail = request_.mutable_error_detail();
       error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
       error_detail->set_message(e.what());
     }
-    queueDiscoveryRequest(ResourceNameDiff()); // no change to subscribed resources
+    kickOffDiscoveryRequest();
   }
 
-  void onWriteable() override { drainRequests(); }
+  void onWriteable() override { trySendDiscoveryRequestIfPending(); }
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
@@ -179,19 +162,26 @@ public:
     }
 
     grpc_stream_.establishNewStream();
-    subscribe(resources);
-    // The attempt stat here is maintained for the purposes of having consistency between ADS and
-    // individual DeltaSubscriptions. Since ADS is push based and muxed, the notion of an
-    // "attempt" for a given xDS API combined by ADS is not really that meaningful.
-    stats_.update_attempt_.inc();
-  }
-
-  void updateResources(const std::vector<std::string>& resources) override {
-    subscribe(resources);
-    stats_.update_attempt_.inc();
+    updateResources(resources);
   }
 
 private:
+  void sendDiscoveryRequest() {
+    request_.clear_resource_names_subscribe();
+    request_.clear_resource_names_unsubscribe();
+    std::copy(names_added_.begin(), names_added_.end(),
+              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_subscribe()));
+    std::copy(names_removed_.begin(), names_removed_.end(),
+              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_unsubscribe()));
+    names_added_.clear();
+    names_removed_.clear();
+
+    ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request_.DebugString());
+    grpc_stream_.sendMessage(request_);
+    request_.clear_error_detail();
+    request_.clear_initial_resource_versions();
+  }
+
   void
   handleConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -214,6 +204,9 @@ private:
       }
     }
     stats_.update_success_.inc();
+    // TODO(fredlas) this increment is needed to pass existing tests, but it seems wrong. We already
+    // increment it when updating subscription interest, which attempts a request. Is this supposed
+    // to be the sum of client- and server- initiated update attempts? Seems weird.
     stats_.update_attempt_.inc();
     stats_.version_.set(HashUtil::xxHash64(version_info));
     ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", type_url_,
@@ -227,14 +220,34 @@ private:
     }
   }
 
-  void drainRequests() {
-    ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-    while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
-      // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-      sendDiscoveryRequest(request_queue_.front());
-      request_queue_.pop();
+  void kickOffDiscoveryRequest() {
+    pending_ = true;
+    trySendDiscoveryRequestIfPending();
+  }
+
+  void trySendDiscoveryRequestIfPending() {
+    if (!pending_) {
+      return;
     }
-    grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
+    bool should_send = true;
+    if (paused_) {
+      ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url_);
+      should_send = false;
+    }
+    if (!grpc_stream_.grpcStreamAvailable()) {
+      ENVOY_LOG(trace, "No stream available to send a DiscoveryRequest for {}.", type_url_);
+      should_send = false;
+    }
+    if (!grpc_stream_.checkRateLimitAllowsDrain()) {
+      ENVOY_LOG(trace, "{} DiscoveryRequest hit rate limit; will try later.", type_url_);
+      should_send = false;
+    }
+
+    if (should_send) {
+      sendDiscoveryRequest();
+      pending_ = false;
+    }
+    grpc_stream_.maybeUpdateQueueSizeStat(pending_ ? 1 : 0);
   }
 
   class ResourceVersion {
@@ -272,23 +285,6 @@ private:
     resource_names_.erase(resource_name);
   }
 
-  void queueDiscoveryRequest(const ResourceNameDiff& queue_item) {
-    request_queue_.push(queue_item);
-    drainRequests();
-  }
-
-  void clearRequestQueue() {
-    grpc_stream_.maybeUpdateQueueSizeStat(0);
-    // TODO(fredlas) when we have C++17: request_queue_ = {};
-    while (!request_queue_.empty()) {
-      request_queue_.pop();
-    }
-  }
-
-  // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
-  // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
-  std::queue<ResourceNameDiff> request_queue_;
-
   GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
       grpc_stream_;
 
@@ -299,15 +295,21 @@ private:
   std::unordered_map<std::string, ResourceVersion> resource_versions_;
   // The keys of resource_versions_. Only tracked separately because std::map does not provide an
   // iterator into just its keys, e.g. for use in std::set_difference.
-  std::unordered_set<std::string> resource_names_;
+  // Must be stored sorted to work with std::set_difference.
+  std::set<std::string> resource_names_;
 
   const std::string type_url_;
   SubscriptionCallbacks* callbacks_{};
   // In-flight or previously sent request.
   envoy::api::v2::DeltaDiscoveryRequest request_;
-  // Paused via pause()?
   bool paused_{};
-  absl::optional<ResourceNameDiff> pending_;
+  bool pending_{};
+
+  // Tracking of the delta in our subscription interest since the previous DeltaDiscoveryRequest was
+  // sent. Can't use unordered_set due to ordering issues in gTest expectation matching. Feel free
+  // to change if you can figure out how to make it work.
+  std::set<std::string> names_added_;
+  std::set<std::string> names_removed_;
 
   const LocalInfo::LocalInfo& local_info_;
   SubscriptionStats stats_;

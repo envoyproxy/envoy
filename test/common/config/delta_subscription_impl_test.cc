@@ -77,14 +77,72 @@ TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
 
   // ...but our own map should remember our interest. In particular, losing interest in all 3 should
   // cause their names to appear in the resource_names_unsubscribe field of a DeltaDiscoveryRequest.
-  subscription_->resume(); // now we do want the request to actually get sendMessage()'d.
-  EXPECT_CALL(async_stream_, sendMessage(_, _)).WillOnce([](const Protobuf::Message& msg, bool) {
-    auto sent_request = static_cast<const envoy::api::v2::DeltaDiscoveryRequest*>(&msg);
-    EXPECT_THAT(sent_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
-    EXPECT_THAT(sent_request->resource_names_unsubscribe(),
-                UnorderedElementsAre("name1", "name2", "name3"));
-  });
-  subscription_->subscribe({"name4"}); // (implies "we no longer care about name1,2,3")
+  subscription_->resume(); // we do want the final subscribe() to do a sendMessage().
+  expectSendMessage({"name4"}, {"name1", "name2", "name3"}, Grpc::Status::GrpcStatus::Ok, "");
+  subscription_->updateResources({"name4"}); // (implies "we no longer care about name1,2,3")
+}
+
+// If Envoy decided it wasn't interested in a resource and then (before a request was sent) decided
+// it was again, for all we know, it dropped that resource in between and needs to retrieve it
+// again. So, we *should* send a request "re-"subscribing. This means that the server needs to
+// interpret the resource_names_subscribe field as "send these resources even if you think Envoy
+// already has them".
+TEST_F(DeltaSubscriptionImplTest, RemoveThenAdd) {
+  startSubscription({"name1", "name2", "name3"});
+  subscription_->pause(); // Pause because we're testing multiple updates in between request sends.
+  subscription_->updateResources({"name1", "name2"});
+  subscription_->updateResources({"name1", "name2", "name3"});
+  expectSendMessage({"name3"}, {}, Grpc::Status::GrpcStatus::Ok, "");
+  subscription_->resume();
+}
+
+// Due to the need for the behavior tested by LoseThenGainSent, gain-then-losing interest in
+// resource X before the DeltaDiscoveryRequest is sent causes that request to "unsubscribe" from X.
+// Ideally we would have the request simply not include no mention of X. Oh well. This test is just
+// here to illustrate that this behavior exists, not to enforce that it should be like this. What
+// *is* importat: the server must happily and cleanly ignore "unsubscribe from [resource name I have
+// never before referred to]" requests.
+TEST_F(DeltaSubscriptionImplTest, AddThenRemove) {
+  startSubscription({"name1", "name2", "name3"});
+  subscription_->pause(); // Pause because we're testing multiple updates in between request sends.
+  subscription_->updateResources({"name1", "name2", "name3", "name4"});
+  subscription_->updateResources({"name1", "name2", "name3"});
+  expectSendMessage({}, {"name4"}, Grpc::Status::GrpcStatus::Ok, "");
+  subscription_->resume();
+}
+
+// add/remove/add == add.
+TEST_F(DeltaSubscriptionImplTest, AddRemoveAdd) {
+  startSubscription({"name1", "name2", "name3"});
+  subscription_->pause();
+  subscription_->updateResources({"name1", "name2", "name3", "name4"});
+  subscription_->updateResources({"name1", "name2", "name3"});
+  subscription_->updateResources({"name1", "name2", "name3", "name4"});
+  expectSendMessage({"name4"}, {}, Grpc::Status::GrpcStatus::Ok, "");
+  subscription_->resume();
+}
+
+// remove/add/remove == remove.
+TEST_F(DeltaSubscriptionImplTest, RemoveAddRemove) {
+  startSubscription({"name1", "name2", "name3"});
+  subscription_->pause();
+  subscription_->updateResources({"name1", "name2"});
+  subscription_->updateResources({"name1", "name2", "name3"});
+  subscription_->updateResources({"name1", "name2"});
+  expectSendMessage({}, {"name3"}, Grpc::Status::GrpcStatus::Ok, "");
+  subscription_->resume();
+}
+
+// Starts with 1,2,3. 4 is added/removed/added. In those same updates, 1,2,3 are
+// removed/added/removed. End result should be 4 added and 1,2,3 removed.
+TEST_F(DeltaSubscriptionImplTest, BothAddAndRemove) {
+  startSubscription({"name1", "name2", "name3"});
+  subscription_->pause();
+  subscription_->updateResources({"name4"});
+  subscription_->updateResources({"name1", "name2", "name3"});
+  subscription_->updateResources({"name4"});
+  expectSendMessage({"name4"}, {"name1", "name2", "name3"}, Grpc::Status::GrpcStatus::Ok, "");
+  subscription_->resume();
 }
 
 } // namespace

@@ -67,7 +67,7 @@ public:
     initialize();
   }
 
-  void updateResources(const std::vector<std::string>& resources) override {
+  void updateResources(std::vector<std::string> resources) override {
     Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(resources.begin(),
                                                                        resources.end());
     request_.mutable_resource_names()->Swap(&resources_vector);

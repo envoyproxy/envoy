@@ -60,8 +60,8 @@ public:
     for (const auto& resource : subscribe) {
       expected_request.add_resource_names_subscribe(resource);
     }
-    for (auto resource = unsubscribe.rbegin(); resource != unsubscribe.rend(); ++resource) {
-      expected_request.add_resource_names_unsubscribe(*resource);
+    for (const auto& resource : unsubscribe) {
+      expected_request.add_resource_names_unsubscribe(resource);
     }
     expected_request.set_response_nonce(last_response_nonce_);
     expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
@@ -71,7 +71,6 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    std::cerr << "EXPECTING DiscoveryRequest: " << expected_request.DebugString() << std::endl;
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
@@ -109,10 +108,16 @@ public:
   }
 
   void updateResources(const std::vector<std::string>& cluster_names) override {
-    std::vector<std::string> cluster_superset = cluster_names;
-    cluster_superset.insert(cluster_superset.end(), last_cluster_names_.begin(),
-                            last_cluster_names_.end());
-    expectSendMessage(cluster_names, last_cluster_names_, Grpc::Status::GrpcStatus::Ok, "");
+    std::vector<std::string> sub;
+    std::vector<std::string> unsub;
+
+    std::set_difference(cluster_names.begin(), cluster_names.end(), last_cluster_names_.begin(),
+                        last_cluster_names_.end(), std::inserter(sub, sub.begin()));
+    std::set_difference(last_cluster_names_.begin(), last_cluster_names_.end(),
+                        cluster_names.begin(), cluster_names.end(),
+                        std::inserter(unsub, unsub.begin()));
+
+    expectSendMessage(sub, unsub, Grpc::Status::GrpcStatus::Ok, "");
     subscription_->updateResources(cluster_names);
     last_cluster_names_ = cluster_names;
   }

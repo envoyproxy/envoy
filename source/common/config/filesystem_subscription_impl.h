@@ -45,7 +45,7 @@ public:
     refresh();
   }
 
-  void updateResources(const std::vector<std::string>& resources) override {
+  void updateResources(std::vector<std::string> resources) override {
     // We report all discovered resources in the watched file.
     UNREFERENCED_PARAMETER(resources);
     // Bump stats for consistence behavior with other xDS.

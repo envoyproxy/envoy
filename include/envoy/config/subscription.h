@@ -80,7 +80,7 @@ public:
    * Update the resources to fetch.
    * @param resources vector of resource names to fetch.
    */
-  virtual void updateResources(const std::vector<std::string>& resources) PURE;
+  virtual void updateResources(std::vector<std::string> resource_names) PURE;
 };
 
 /**

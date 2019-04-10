@@ -42,7 +42,7 @@ class MockSubscription : public Subscription {
 public:
   MOCK_METHOD2_T(start,
                  void(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks));
-  MOCK_METHOD1_T(updateResources, void(const std::vector<std::string>& resources));
+  MOCK_METHOD1_T(updateResources, void(std::vector<std::string> resources));
 };
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {

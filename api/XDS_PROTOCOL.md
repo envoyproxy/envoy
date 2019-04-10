@@ -340,6 +340,9 @@ debugging purposes only.
   3. Spontaneous `DeltaDiscoveryRequest` from the client.
      This can be done to dynamically add or remove elements from the tracked
      `resource_names` set. In this case `response_nonce` must be omitted.
+     The client may include resource names in the `resource_names_subscribe`
+     field that the server believes the client should already have. However,
+     the server must still provide those resources in the response.
 
 In this first example the client connects and receives a first update that it
 ACKs. The second update fails and the client NACKs the update. Later the xDS
@@ -348,7 +351,7 @@ client spontaneously requests the "wc" resource.
 ![Incremental session example](diagrams/incremental.svg)
 
 On reconnect the Incremental xDS client may tell the server of its known
-resources to avoid resending them over the network.
+resources to avoid resending them over the network. Because no state is assumed to be preserved from the previous stream, the reconnecting client must provide the server with all resource names it is interested in.
 
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
 
