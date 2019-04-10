@@ -198,9 +198,11 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
   - name: envoy.router
   )EOF";
 
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, featureEnabled(_, An<uint64_t>()))
+      .WillOnce(Invoke(&context_.runtime_loader_.snapshot_,
+                       &Runtime::MockSnapshot::featureEnabledDefault));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
-
 #ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
   EXPECT_TRUE(config.shouldNormalizePath());
 #else
