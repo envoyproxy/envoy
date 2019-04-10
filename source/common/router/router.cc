@@ -445,7 +445,7 @@ void Filter::sendNoHealthyUpstreamResponse() {
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   bool buffering =
-      (retry_state_ && retry_state_->enabled()) || do_shadowing_ || upstream_requests_.size() > 1;
+      (retry_state_ && retry_state_->enabled()) || do_shadowing_;
   if (buffering && buffer_limit_ > 0 &&
       getLength(callbacks_->decodingBuffer()) + data.length() > buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
