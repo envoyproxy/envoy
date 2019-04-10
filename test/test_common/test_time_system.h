@@ -46,6 +46,14 @@ public:
                                       const D& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
     return waitFor(mutex, condvar, std::chrono::duration_cast<Duration>(duration));
   }
+
+protected:
+  /**
+   * Time should only be advanced (via waitFor() or sleep()) on one thread in
+   * the context of a test. Implementors of those methods should call this
+   * to ensure that's the case.
+   */
+  void checkTimeAdvancementOnOneThread();
 };
 
 // There should only be one instance of any time-system resident in a test

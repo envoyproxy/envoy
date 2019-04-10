@@ -25,6 +25,7 @@
 #include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/utility_core.h"
 
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
@@ -511,14 +512,6 @@ public:
 };
 
 } // namespace Stats
-
-namespace Thread {
-ThreadFactory& threadFactoryForTest();
-} // namespace Thread
-
-namespace Filesystem {
-Instance& fileSystemForTest();
-} // namespace Filesystem
 
 namespace Api {
 ApiPtr createApiForTest();
