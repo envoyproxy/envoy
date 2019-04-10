@@ -70,9 +70,7 @@ envoy_cc_test_library(
     name = "quic_platform_port_utils_impl_lib",
     hdrs = ["quic_port_utils_impl.h"],
     include_prefix = "extensions/quic_listeners/quiche/platform",
-    deps = [
-        "//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_test_impl_lib",
-    ],
+    deps = ["//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_test_impl_lib"],
 )
 
 envoy_cc_library(
