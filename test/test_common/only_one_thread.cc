@@ -3,6 +3,7 @@
 #include "envoy/thread/thread.h"
 
 #include "common/common/lock_guard.h"
+
 #include "test/test_common/utility_core.h"
 
 namespace Envoy {

@@ -11,4 +11,4 @@ namespace Filesystem {
 Instance& fileSystemForTest();
 } // namespace Filesystem
 
-}
+} // namespace Envoy

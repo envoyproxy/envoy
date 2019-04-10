@@ -15,7 +15,7 @@ public:
    */
   void checkOneThread();
 
- private:
+private:
   ThreadFactory& thread_factory_;
   ThreadIdPtr thread_advancing_time_ GUARDED_BY(mutex_);
   mutable MutexBasicLockable mutex_;
