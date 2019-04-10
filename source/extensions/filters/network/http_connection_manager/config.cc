@@ -284,7 +284,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       throw EnvoyException(
           fmt::format("Error: multiple upgrade configs with the same name: '{}'", name));
     }
-    if (upgrade_config.filters().size() > 0) {
+    if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
       for (int32_t i = 0; i < upgrade_config.filters().size(); i++) {
         processFilter(upgrade_config.filters(i), i, name, *factories);
