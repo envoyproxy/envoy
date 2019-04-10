@@ -6,6 +6,9 @@
 namespace Envoy {
 namespace Thread {
 
+// Ensures that an operation is performed on only one thread. The first caller
+// to OnlyOneThread::checkOneThread establishes the thread ID, and subsequent
+// ones will assert-fail if they do not match.
 class OnlyOneThread {
 public:
   OnlyOneThread();
