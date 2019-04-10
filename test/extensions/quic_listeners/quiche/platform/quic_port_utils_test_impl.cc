@@ -28,18 +28,15 @@ int QuicPickUnusedPortOrDieImpl() {
   Envoy::Network::Address::IpVersion ip_version = supported_versions.size() == 1
                                                       ? supported_versions[0]
                                                       : Envoy::Network::Address::IpVersion::v6;
-  // Only try to get a port for limited times.
-  for (size_t i = 0; i < 300; ++i) {
-    auto addr_port = Envoy::Network::Utility::parseInternetAddressAndPort(
-        fmt::format("{}:{}", Envoy::Network::Test::getAnyAddressUrlString(ip_version), /*port*/ 0),
-        /*v6only*/ false);
-    ASSERT(addr_port != nullptr);
-    addr_port = Envoy::Network::Test::findOrCheckFreePort(
-        addr_port, Envoy::Network::Address::SocketType::Datagram);
-    if (addr_port != nullptr && addr_port->ip() != nullptr) {
-      // Find a port.
-      return addr_port->ip()->port();
-    }
+  auto addr_port = Envoy::Network::Utility::parseInternetAddressAndPort(
+      fmt::format("{}:{}", Envoy::Network::Test::getAnyAddressUrlString(ip_version), /*port*/ 0),
+      /*v6only*/ false);
+  ASSERT(addr_port != nullptr);
+  addr_port = Envoy::Network::Test::findOrCheckFreePort(
+      addr_port, Envoy::Network::Address::SocketType::Datagram);
+  if (addr_port != nullptr && addr_port->ip() != nullptr) {
+    // Find a port.
+    return addr_port->ip()->port();
   }
   RELEASE_ASSERT(false, "Failed to pick a port for test.");
 }
