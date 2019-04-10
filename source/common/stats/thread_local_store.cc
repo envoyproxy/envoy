@@ -137,7 +137,14 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<TlsCache>();
   });
-  tls_->runOnAllThreads([this, &tls] { tls.dispatcher().initializeStats(*this); });
+
+  // Initialize stats for each thread's dispatcher. This can't be done in the InitializeCb passed
+  // to `set` above, it has to be done as a separate step here, because initializing stats causes
+  // new TLS slots to be created and SlotImpl::set isn't reentrant.
+  tls_->runOnAllThreads([this, &tls] {
+    auto& dispatcher = tls.dispatcher();
+    dispatcher.initializeStats(*this, &dispatcher == main_thread_dispatcher_);
+  });
 }
 
 void ThreadLocalStoreImpl::shutdownThreading() {

@@ -16,8 +16,9 @@
 
 using testing::_;
 using testing::InSequence;
+using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Event {
@@ -95,13 +96,19 @@ protected:
 };
 
 TEST_F(DispatcherImplTest, InitializeStats) {
-  Stats::MockStore parent_scope;
-  // NiceMock because deliverHistogramToSinks may or may not be called, depending on timing.
-  auto* scope = new NiceMock<Stats::MockStore>();
-  EXPECT_CALL(parent_scope, createScope_(_)).WillOnce(Return(scope));
-  EXPECT_CALL(*scope, histogram("loop_duration_us"));
-  EXPECT_CALL(*scope, histogram("poll_delay_us"));
-  dispatcher_->initializeStats(parent_scope);
+  for (bool main : {false, true}) {
+    Stats::MockStore parent_scope;
+    // NiceMock because deliverHistogramToSinks may or may not be called, depending on timing.
+    auto* scope = new NiceMock<Stats::MockStore>();
+    EXPECT_CALL(parent_scope, createScope_(_))
+        .WillOnce(Invoke([main, scope](const std::string& name) {
+          EXPECT_THAT(name, StartsWith(main ? "dispatcher.main_" : "dispatcher.worker_"));
+          return scope;
+        }));
+    EXPECT_CALL(*scope, histogram("loop_duration_us"));
+    EXPECT_CALL(*scope, histogram("poll_delay_us"));
+    dispatcher_->initializeStats(parent_scope, main);
+  }
 }
 
 TEST_F(DispatcherImplTest, Post) {

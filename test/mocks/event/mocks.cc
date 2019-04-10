@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Event {
 
 MockDispatcher::MockDispatcher() {
-  ON_CALL(*this, initializeStats(_)).WillByDefault(Return());
+  ON_CALL(*this, initializeStats(_, _)).WillByDefault(Return());
   ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
     to_delete_.clear();
   }));

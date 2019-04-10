@@ -81,6 +81,11 @@ void LibeventScheduler::onCheck(evwatch*, const evwatch_check_cb_info*, void* ar
     timeval delta, delay;
     evutil_timersub(&self->check_time_, &self->prepare_time_, &delta);
     evutil_timersub(&delta, &self->timeout_, &delay);
+
+    // Delay can be negative, meaning polling completed early. This happens in normal operation,
+    // either because I/O was ready before we hit the timeout, or just because the kernel was
+    // feeling saucy. Disregard negative delays in stats, since they don't indicate anything
+    // particularly useful.
     if (delay.tv_sec >= 0) {
       self->stats_->poll_delay_us_.recordValue(delay.tv_sec * 1000000 + delay.tv_usec);
     }

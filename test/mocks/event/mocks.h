@@ -84,7 +84,7 @@ public:
   }
 
   // Event::Dispatcher
-  MOCK_METHOD1(initializeStats, void(Stats::Scope&));
+  MOCK_METHOD2(initializeStats, void(Stats::Scope&, bool));
   MOCK_METHOD0(clearDeferredDeleteList, void());
   MOCK_METHOD2(createServerConnection_,
                Network::Connection*(Network::ConnectionSocket* socket,

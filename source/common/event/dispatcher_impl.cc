@@ -41,9 +41,10 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
 
 DispatcherImpl::~DispatcherImpl() {}
 
-void DispatcherImpl::initializeStats(Stats::Scope& parent_scope) {
-  std::string thread_id = api_.threadFactory().currentThreadId()->debugString();
-  scope_ = parent_scope.createScope(fmt::format("dispatcher.{}.", thread_id));
+void DispatcherImpl::initializeStats(Stats::Scope& parent_scope, bool main) {
+  scope_ =
+      parent_scope.createScope(fmt::format("dispatcher.{}_{}.", main ? "main" : "worker",
+                                           api_.threadFactory().currentThreadId()->debugString()));
   stats_ = std::make_unique<DispatcherStats>(
       DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM(*scope_))});
   base_scheduler_.initializeStats(stats_.get());

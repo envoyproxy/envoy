@@ -52,11 +52,11 @@ private:
   static void onCheck(evwatch*, const evwatch_check_cb_info*, void* arg);
 
   Libevent::BasePtr libevent_;
-  DispatcherStats* stats_; // stats owned by the containing DispatcherImpl
-  bool timeout_set_{};     // whether there is a poll timeout in the current event loop iteration
-  timeval timeout_{};      // the poll timeout for the current event loop iteration, if available
-  timeval prepare_time_{}; // timestamp immediately before polling
-  timeval check_time_{};   // timestamp immediately after polling
+  DispatcherStats* stats_{}; // stats owned by the containing DispatcherImpl
+  bool timeout_set_{};       // whether there is a poll timeout in the current event loop iteration
+  timeval timeout_{};        // the poll timeout for the current event loop iteration, if available
+  timeval prepare_time_{};   // timestamp immediately before polling
+  timeval check_time_{};     // timestamp immediately after polling
 };
 
 } // namespace Event
