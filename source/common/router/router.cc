@@ -624,11 +624,14 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
     retry_state_->onHostAttempted(upstream_host);
   }
 
+  // Capture upstream_host since setupRetry() in the following line will clear
+  // upstream_request.
+  const auto upstream_host = upstream_request.upstream_host_;
   const RetryStatus retry_status =
       retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
   if (retry_status == RetryStatus::Yes && setupRetry(true)) {
-    if (upstream_request.upstream_host_) {
-      upstream_request.upstream_host_->stats().rq_error_.inc();
+    if (upstream_host) {
+      upstream_host->stats().rq_error_.inc();
     }
     return true;
   } else if (retry_status == RetryStatus::NoOverflow) {
