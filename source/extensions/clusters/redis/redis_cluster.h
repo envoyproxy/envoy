@@ -175,7 +175,7 @@ private:
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
     // Note: Below callback isn't used in topology updates
-    bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) { return true; }
+    bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) override { return true; }
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
