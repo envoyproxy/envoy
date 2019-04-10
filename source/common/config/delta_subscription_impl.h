@@ -233,12 +233,10 @@ private:
     if (paused_) {
       ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url_);
       should_send = false;
-    }
-    if (!grpc_stream_.grpcStreamAvailable()) {
+    } else if (!grpc_stream_.grpcStreamAvailable()) {
       ENVOY_LOG(trace, "No stream available to send a DiscoveryRequest for {}.", type_url_);
       should_send = false;
-    }
-    if (!grpc_stream_.checkRateLimitAllowsDrain()) {
+    } else if (!grpc_stream_.checkRateLimitAllowsDrain()) {
       ENVOY_LOG(trace, "{} DiscoveryRequest hit rate limit; will try later.", type_url_);
       should_send = false;
     }
