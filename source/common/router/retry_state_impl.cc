@@ -199,7 +199,7 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
   // left. NOTE: this is a bit different than non-hedged per try timeouts which
   // are only retried if the applicable retry policy specifies either
   // RETRY_ON_5XX or RETRY_ON_GATEWAY_ERROR. This is because these types of
-  // retries are associated with a stream reset which is analagous to a gateway
+  // retries are associated with a stream reset which is analogous to a gateway
   // error. When hedging on per try timeout is enabled, however, there is no
   // stream reset.
   return shouldRetry([]() -> bool { return true; }, callback);
