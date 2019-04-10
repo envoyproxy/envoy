@@ -114,8 +114,6 @@ public:
 
   /**
    * Close the connection.
-   * @param type the type of close that is being issued; once a close() is issued on a given
-   * connection, the same type must be used on any subsequent close()s on that connection.
    */
   virtual void close(ConnectionCloseType type) PURE;
 

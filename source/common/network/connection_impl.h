@@ -176,11 +176,6 @@ private:
 
   // States associated with delayed closing of the connection (i.e., when the underlying socket is
   // not immediately close()d as a result of a ConnectionImpl::close()).
-  // The following transitions are allowed:
-  //   1. None -> CloseAfterFlush
-  //   2. None -> CloseAfterFlushAndTimeout
-  // Once a transition has happened, a subsequent close() _must_ maintain consistency with the
-  // initial ConnectionCloseType that was used.
   enum class DelayedCloseState {
     None,
     // The socket will be closed immediately after the buffer is flushed _or_ if a period of
