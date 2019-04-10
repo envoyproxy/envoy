@@ -29,9 +29,7 @@ public:
                    prefix_routes,
                Upstreams&& upstreams);
 
-  Common::Redis::Client::PoolRequest*
-  makeRequest(const std::string& hash_key, const Common::Redis::RespValue& request,
-              Common::Redis::Client::PoolCallbacks& callbacks) override;
+  ConnPool::InstanceSharedPtr upstreamPool(std::string& key) override;
 
 private:
   struct Prefix {
@@ -46,7 +44,7 @@ private:
   const ToLowerTable to_lower_table_;
   const bool case_insensitive_;
   Upstreams upstreams_;
-  absl::optional<ConnPool::InstanceSharedPtr> catch_all_upstream_;
+  ConnPool::InstanceSharedPtr catch_all_upstream_;
 };
 
 } // namespace RedisProxy

@@ -48,10 +48,8 @@ TEST(PrefixRoutesTest, MissingCatchAll) {
 
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams));
 
-  Common::Redis::RespValue value;
-  Common::Redis::Client::MockPoolCallbacks callbacks;
-
-  EXPECT_EQ(nullptr, router.makeRequest("c:bar", value, callbacks));
+  std::string key("c:bar");
+  EXPECT_EQ(nullptr, router.upstreamPool(key));
 }
 
 TEST(PrefixRoutesTest, RoutedToCatchAll) {
@@ -66,13 +64,9 @@ TEST(PrefixRoutesTest, RoutedToCatchAll) {
   prefix_routes.set_catch_all_cluster("fake_clusterC");
 
   PrefixRoutes router(prefix_routes, std::move(upstreams));
-  Common::Redis::Client::MockPoolRequest active_request;
-  Common::Redis::RespValue value;
-  Common::Redis::Client::MockPoolCallbacks callbacks;
 
-  EXPECT_CALL(*upstream_c, makeRequest(Eq("c:bar"), Ref(value), Ref(callbacks)))
-      .WillOnce(Return(&active_request));
-  EXPECT_EQ(&active_request, router.makeRequest("c:bar", value, callbacks));
+  std::string key("c:bar");
+  EXPECT_EQ(upstream_c, router.upstreamPool(key));
 }
 
 TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
@@ -83,13 +77,9 @@ TEST(PrefixRoutesTest, RoutedToLongestPrefix) {
   upstreams.emplace("fake_clusterB", std::make_shared<ConnPool::MockInstance>());
 
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams));
-  Common::Redis::Client::MockPoolRequest active_request;
-  Common::Redis::RespValue value;
-  Common::Redis::Client::MockPoolCallbacks callbacks;
 
-  EXPECT_CALL(*upstream_a, makeRequest(Eq("ab:bar"), Ref(value), Ref(callbacks)))
-      .WillOnce(Return(&active_request));
-  EXPECT_EQ(&active_request, router.makeRequest("ab:bar", value, callbacks));
+  std::string key("ab:bar");
+  EXPECT_EQ(upstream_a, router.upstreamPool(key));
 }
 
 TEST(PrefixRoutesTest, CaseUnsensitivePrefix) {
@@ -102,13 +92,10 @@ TEST(PrefixRoutesTest, CaseUnsensitivePrefix) {
   auto prefix_routes = createPrefixRoutes();
   prefix_routes.set_case_insensitive(true);
 
-  EXPECT_CALL(*upstream_a, makeRequest(Eq("AB:bar"), _, _));
-
   PrefixRoutes router(prefix_routes, std::move(upstreams));
-  Common::Redis::RespValue value;
-  Common::Redis::Client::MockPoolCallbacks callbacks;
 
-  EXPECT_EQ(nullptr, router.makeRequest("AB:bar", value, callbacks));
+  std::string key("AB:bar");
+  EXPECT_EQ(upstream_a, router.upstreamPool(key));
 }
 
 TEST(PrefixRoutesTest, RemovePrefix) {
@@ -127,13 +114,11 @@ TEST(PrefixRoutesTest, RemovePrefix) {
     route->set_remove_prefix(true);
   }
 
-  EXPECT_CALL(*upstream_a, makeRequest(Eq(":bar"), _, _));
-
   PrefixRoutes router(prefix_routes, std::move(upstreams));
-  Common::Redis::RespValue value;
-  Common::Redis::Client::MockPoolCallbacks callbacks;
 
-  EXPECT_EQ(nullptr, router.makeRequest("abc:bar", value, callbacks));
+  std::string key("abc:bar");
+  EXPECT_EQ(upstream_a, router.upstreamPool(key));
+  EXPECT_EQ(":bar", key);
 }
 
 TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
@@ -144,13 +129,10 @@ TEST(PrefixRoutesTest, RoutedToShortestPrefix) {
   upstreams.emplace("fake_clusterB", upstream_b);
 
   PrefixRoutes router(createPrefixRoutes(), std::move(upstreams));
-  Common::Redis::Client::MockPoolRequest active_request;
-  Common::Redis::RespValue value;
-  Common::Redis::Client::MockPoolCallbacks callbacks;
 
-  EXPECT_CALL(*upstream_b, makeRequest(Eq("a:bar"), Ref(value), Ref(callbacks)))
-      .WillOnce(Return(&active_request));
-  EXPECT_EQ(&active_request, router.makeRequest("a:bar", value, callbacks));
+  std::string key("a:bar");
+  EXPECT_EQ(upstream_b, router.upstreamPool(key));
+  EXPECT_EQ("a:bar", key);
 }
 
 TEST(PrefixRoutesTest, DifferentPrefixesSameUpstream) {
@@ -168,15 +150,13 @@ TEST(PrefixRoutesTest, DifferentPrefixesSameUpstream) {
     route->set_cluster("fake_clusterB");
   }
 
-  EXPECT_CALL(*upstream_b, makeRequest(Eq("a:bar"), _, _));
-  EXPECT_CALL(*upstream_b, makeRequest(Eq("also_route_to_b:bar"), _, _));
-
   PrefixRoutes router(prefix_routes, std::move(upstreams));
-  Common::Redis::RespValue value;
-  Common::Redis::Client::MockPoolCallbacks callbacks;
 
-  EXPECT_EQ(nullptr, router.makeRequest("a:bar", value, callbacks));
-  EXPECT_EQ(nullptr, router.makeRequest("also_route_to_b:bar", value, callbacks));
+  std::string key1("a:bar");
+  EXPECT_EQ(upstream_b, router.upstreamPool(key1));
+
+  std::string key2("also_route_to_b:bar");
+  EXPECT_EQ(upstream_b, router.upstreamPool(key2));
 }
 
 TEST(PrefixRoutesTest, DuplicatePrefix) {

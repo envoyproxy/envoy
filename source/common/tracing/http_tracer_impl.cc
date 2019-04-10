@@ -30,7 +30,7 @@ static std::string buildUrl(const Http::HeaderMap& request_headers) {
   std::string path = request_headers.EnvoyOriginalPath()
                          ? request_headers.EnvoyOriginalPath()->value().c_str()
                          : request_headers.Path()->value().c_str();
-  static const size_t max_path_length = 128;
+  static const size_t max_path_length = 256;
   if (path.length() > max_path_length) {
     path = path.substr(0, max_path_length);
   }

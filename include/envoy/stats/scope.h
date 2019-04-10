@@ -43,11 +43,27 @@ public:
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
   /**
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @return a counter within the scope's namespace.
+   */
+  virtual Counter& counterFromStatName(StatName name) PURE;
+
+  /**
+   * TODO(jmarantz): this variant is deprecated: use counterFromStatName.
+   * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
    */
   virtual Counter& counter(const std::string& name) PURE;
 
   /**
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @return a gauge within the scope's namespace.
+   */
+  virtual Gauge& gaugeFromStatName(StatName name) PURE;
+
+  /**
+   * TODO(jmarantz): this variant is deprecated: use gaugeFromStatName.
+   * @param name The name, expressed as a string.
    * @return a gauge within the scope's namespace.
    */
   virtual Gauge& gauge(const std::string& name) PURE;
@@ -58,6 +74,14 @@ public:
   virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
 
   /**
+   * @param name The name of the stat, obtained from the SymbolTable.
+   * @return a histogram within the scope's namespace with a particular value type.
+   */
+  virtual Histogram& histogramFromStatName(StatName name) PURE;
+
+  /**
+   * TODO(jmarantz): this variant is deprecated: use histogramFromStatName.
+   * @param name The name, expressed as a string.
    * @return a histogram within the scope's namespace with a particular value type.
    */
   virtual Histogram& histogram(const std::string& name) PURE;

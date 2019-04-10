@@ -59,10 +59,14 @@ private:
       return parent_.timeout_ * 2;
     }
     bool enableHashtagging() const override { return false; }
+    bool enableRedirection() const override {
+      return true;
+    } // Redirection errors are treated as check successes.
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
+    bool onRedirection(const NetworkFilters::Common::Redis::RespValue& value) override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;

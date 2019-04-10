@@ -22,7 +22,7 @@
 namespace Envoy {
 namespace Runtime {
 
-bool runtimeFeatureEnabled(const std::string& feature) {
+bool runtimeFeatureEnabled(absl::string_view feature) {
   ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->snapshot().runtimeFeatureEnabled(feature);
@@ -174,7 +174,7 @@ bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
   return true;
 }
 
-bool SnapshotImpl::runtimeFeatureEnabled(const std::string& key) const {
+bool SnapshotImpl::runtimeFeatureEnabled(absl::string_view key) const {
   bool enabled = false;
   // If the value is not explicitly set as a runtime boolean, the default value is based on
   // disallowedByDefault.
@@ -257,7 +257,7 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
-bool SnapshotImpl::getBoolean(const std::string& key, bool& value) const {
+bool SnapshotImpl::getBoolean(absl::string_view key, bool& value) const {
   auto entry = values_.find(key);
   if (entry != values_.end() && entry->second.bool_value_.has_value()) {
     value = entry->second.bool_value_.value();

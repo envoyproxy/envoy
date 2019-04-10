@@ -21,6 +21,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -64,7 +65,7 @@ public:
   Filters::Common::ExtAuthz::MockClient* client_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
-  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_{};
+  Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -261,6 +262,242 @@ TEST_F(HttpFilterTest, BadConfig) {
       MessageUtil::downcastAndValidate<const envoy::config::filter::http::ext_authz::v2::ExtAuthz&>(
           proto_config),
       ProtoValidationException);
+}
+
+// Checks that filter does not initiate the authorization request when the buffer reaches the max
+// request bytes.
+TEST_F(HttpFilterTest, RequestDataIsTooLarge) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 10
+  )EOF");
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(1);
+  EXPECT_CALL(connection_, remoteAddress()).Times(0);
+  EXPECT_CALL(connection_, localAddress()).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl buffer1("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer1, false));
+
+  Buffer::OwnedImpl buffer2("foobarbaz");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer2, false));
+}
+
+// Checks that the filter initiates an authorization request when the buffer reaches max
+// request bytes and allow_partial_message is set to true.
+TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 10
+    allow_partial_message: true
+  )EOF");
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  ;
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _)).Times(1);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+
+  data_.add("barfoo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+}
+
+// Checks that the filter initiates the authorization process only when the filter decode trailers
+// is called.
+TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  with_request_body:
+    max_request_bytes: 10
+    allow_partial_message: true
+  )EOF");
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
+  EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _)).Times(1);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  data_.add("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+}
+
+// Checks that the filter buffers the data and initiates the authorization request.
+TEST_F(HttpFilterTest, AuthWithRequestData) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  with_request_body:
+    max_request_bytes: 10
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  data_.add("foo");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  data_.add("bar");
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+}
+
+// Checks that filter does not buffer data on header-only request.
+TEST_F(HttpFilterTest, HeaderOnlyRequest) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  with_request_body:
+    max_request_bytes: 10
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+}
+
+// Checks that filter does not buffer data on upgrade WebSocket request.
+TEST_F(HttpFilterTest, UpgradeWebsocketRequest) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  with_request_body:
+    max_request_bytes: 10
+  )EOF");
+
+  prepareCheck();
+
+  request_headers_.addCopy(Http::Headers::get().Connection,
+                           Http::Headers::get().ConnectionValues.Upgrade);
+  request_headers_.addCopy(Http::Headers::get().Upgrade,
+                           Http::Headers::get().UpgradeValues.WebSocket);
+
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+}
+
+// Checks that filter does not buffer data on upgrade H2 WebSocket request.
+TEST_F(HttpFilterTest, H2UpgradeRequest) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  with_request_body:
+    max_request_bytes: 10
+  )EOF");
+
+  prepareCheck();
+
+  request_headers_.addCopy(Http::Headers::get().Method, Http::Headers::get().MethodValues.Connect);
+  request_headers_.addCopy(Http::Headers::get().Protocol,
+                           Http::Headers::get().ProtocolStrings.Http2String);
+
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+}
+
+// Checks that filter does not buffer data when is not the end of the stream, but header-only
+// request has been received.
+TEST_F(HttpFilterTest, HeaderOnlyRequestWithStream) {
+  InSequence s;
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  with_request_body:
+    max_request_bytes: 10
+  )EOF");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
 }
 
 // -------------------

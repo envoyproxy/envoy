@@ -80,7 +80,7 @@ namespace Envoy {
 */
 #define EXPECT_DEATH_LOG_TO_STDERR(statement, message)                                             \
   do {                                                                                             \
-    Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink());                           \
+    Envoy::Logger::StderrSinkDelegate stderr_sink(Envoy::Logger::Registry::getSink());             \
     EXPECT_DEATH(statement, message);                                                              \
   } while (false)
 
@@ -535,5 +535,12 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {
 MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
 
 MATCHER_P(RepeatedProtoEq, rhs, "") { return TestUtility::repeatedPtrFieldEqual(arg, rhs); }
+
+MATCHER_P(Percent, rhs, "") {
+  envoy::type::FractionalPercent expected;
+  expected.set_numerator(rhs);
+  expected.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  return TestUtility::protoEqual(expected, arg);
+}
 
 } // namespace Envoy

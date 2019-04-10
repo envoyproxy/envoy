@@ -71,6 +71,7 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -264,6 +265,20 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "priority_conn_pool_map_impl_test",
+    srcs = ["priority_conn_pool_map_impl_test.cc"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+        "//source/common/upstream:priority_conn_pool_map_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
