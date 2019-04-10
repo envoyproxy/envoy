@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_quiche",
 )
@@ -178,14 +179,10 @@ envoy_cc_library(
     ]),
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "quic_platform_test_mem_slice_vector_impl_lib",
     hdrs = envoy_select_quiche(["quic_test_mem_slice_vector_impl.h"]),
-    visibility = ["//visibility:public"],
-    deps = envoy_select_quiche([
-        "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
-        "//include/envoy/buffer:buffer_interface",
-    ]),
+    deps = envoy_select_quiche(["//test/extensions/quic_listeners/quiche/platform:quic_platform_test_mem_slice_vector_test_impl_lib"]),
 )
 
 envoy_cc_library(

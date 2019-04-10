@@ -270,6 +270,7 @@ cc_library(
     name = "quic_platform_test_mem_slice_vector_lib",
     hdrs = ["quiche/quic/platform/api/quic_test_mem_slice_vector.h"],
     visibility = ["//visibility:public"],
+    testonly = 1,
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_test_mem_slice_vector_impl_lib"],
 )
 

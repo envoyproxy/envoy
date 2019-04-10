@@ -48,3 +48,12 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "quic_platform_test_mem_slice_vector_test_impl_lib",
+    hdrs = envoy_select_quiche(["quic_test_mem_slice_vector_test_impl.h"]),
+    deps = envoy_select_quiche([
+        "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
+        "//include/envoy/buffer:buffer_interface",
+    ]),
+)
