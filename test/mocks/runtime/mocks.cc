@@ -4,6 +4,8 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::An;
+using testing::Invoke;
 using testing::Return;
 using testing::ReturnArg;
 
@@ -14,7 +16,11 @@ MockRandomGenerator::MockRandomGenerator() { ON_CALL(*this, uuid()).WillByDefaul
 
 MockRandomGenerator::~MockRandomGenerator() {}
 
-MockSnapshot::MockSnapshot() { ON_CALL(*this, getInteger(_, _)).WillByDefault(ReturnArg<1>()); }
+MockSnapshot::MockSnapshot() {
+  ON_CALL(*this, getInteger(_, _)).WillByDefault(ReturnArg<1>());
+  ON_CALL(*this, featureEnabled(_, An<uint64_t>()))
+      .WillByDefault(Invoke(this, &MockSnapshot::inheritedFeatureEnableStringUint64));
+}
 
 MockSnapshot::~MockSnapshot() {}
 
