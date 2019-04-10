@@ -4157,9 +4157,8 @@ virtual_hosts:
       EnvoyException,
       "Unable to parse JSON as proto "
       "(INVALID_ARGUMENT:(virtual_hosts[0].routes[0].route.cors.enabled.value): invalid value 0 "
-      "for type TYPE_BOOL): "
-      "{\"virtual_hosts\":[{\"routes\":[{\"route\":{\"cors\":{\"enabled\":0},\"cluster\":\"ats\"},"
-      "\"match\":{\"prefix\":\"/api\"}}],\"domains\":[\"*\"],\"name\":\"default\"}]}");
+      "for type TYPE_BOOL): " +
+          Json::Factory::loadFromYamlString(yaml)->asJsonString());
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
