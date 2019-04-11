@@ -32,15 +32,15 @@ laid out below, but custom filter chains can only be configured on a per-HttpCon
 | F                     | F                       | F                 |
 +-----------------------+-------------------------+-------------------+
 
-Note that the statistics for upgrades are all bundled together so websocket
+Note that the statistics for upgrades are all bundled together so WebSocket
 :ref:`statistics <config_http_conn_man_stats>` are tracked by stats such as
 downstream_cx_upgrades_total and downstream_cx_upgrades_active
 
 Handling H2 hops
 ^^^^^^^^^^^^^^^^
 
-Envoy currently has an alpha implementation of tunneling websockets over H2 streams for deployments
-that prefer a uniform H2 mesh throughout, for example, for a deployment of the form:
+Envoy supports tunneling WebSockets over H2 streams for deployments that prefer a uniform
+H2 mesh throughout; this enables, for example, a deployment of the form:
 
 [Client] ---- HTTP/1.1 ---- [Front Envoy] ---- HTTP/2 ---- [Sidecar Envoy ---- H1  ---- App]
 
