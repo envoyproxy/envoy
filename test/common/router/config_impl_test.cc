@@ -4154,8 +4154,7 @@ virtual_hosts:
 
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-      EnvoyException,
-      "Unable to parse JSON as proto .*: invalid value 0 for type TYPE_BOOL");
+      EnvoyException, "Unable to parse JSON as proto .*: invalid value 0 for type TYPE_BOOL");
 }
 
 TEST_F(RouteMatcherTest, Decorator) {
