@@ -53,7 +53,7 @@ public:
     std::set_difference(resource_names_.begin(), resource_names_.end(), resource_names.begin(),
                         resource_names.end(), std::inserter(cur_removed, cur_removed.begin()));
 
-    for (auto a : cur_added) {
+    for (const auto& a : cur_added) {
       setResourceWaitingForServer(a);
       // Removed->added requires us to keep track of it as a "new" addition, since our user may have
       // forgotten its copy of the resource after instructing us to remove it, and so needs to be
@@ -61,7 +61,7 @@ public:
       names_removed_.erase(a);
       names_added_.insert(a);
     }
-    for (auto r : cur_removed) {
+    for (const auto& r : cur_removed) {
       lostInterestInResource(r);
       // Ideally, when a resource is added-then-removed in between requests, we would avoid putting
       // a superfluous "unsubscribe [resource that was never subscribed]" in the request. However,
@@ -74,7 +74,7 @@ public:
 
     stats_.update_attempt_.inc();
     // Tell the server about our new interests (but only if there are any).
-    if (names_added_.size() > 0 || names_removed_.size() > 0) {
+    if (!names_added_.empty() || !names_removed_.empty()) {
       kickOffDiscoveryRequest();
     }
   }
@@ -100,11 +100,14 @@ public:
     for (auto const& resource : resource_versions_) {
       // Populate initial_resource_versions with the resource versions we currently have. Resources
       // we are interested in, but are still waiting to get any version of from the server, do not
-      // belong in initial_resource_versions.
+      // belong in initial_resource_versions. (But do belong in new subscriptions!)
       if (!resource.second.waitingForServer()) {
         (*request_.mutable_initial_resource_versions())[resource.first] = resource.second.version();
       }
+      // As mentioned above, fill resource_names_subscribe with everything.
+      names_added_.insert(resource.first);
     }
+    names_removed_.clear();
     request_.set_type_url(type_url_);
     request_.mutable_node()->MergeFrom(local_info_.node());
     kickOffDiscoveryRequest();
@@ -225,23 +228,25 @@ private:
     trySendDiscoveryRequestIfPending();
   }
 
+  bool shouldSendDiscoveryRequest() {
+    if (paused_) {
+      ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url_);
+      return false;
+    } else if (!grpc_stream_.grpcStreamAvailable()) {
+      ENVOY_LOG(trace, "No stream available to send a DiscoveryRequest for {}.", type_url_);
+      return false;
+    } else if (!grpc_stream_.checkRateLimitAllowsDrain()) {
+      ENVOY_LOG(trace, "{} DiscoveryRequest hit rate limit; will try later.", type_url_);
+      return false;
+    }
+    return true;
+  }
+
   void trySendDiscoveryRequestIfPending() {
     if (!pending_) {
       return;
     }
-    bool should_send = true;
-    if (paused_) {
-      ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url_);
-      should_send = false;
-    } else if (!grpc_stream_.grpcStreamAvailable()) {
-      ENVOY_LOG(trace, "No stream available to send a DiscoveryRequest for {}.", type_url_);
-      should_send = false;
-    } else if (!grpc_stream_.checkRateLimitAllowsDrain()) {
-      ENVOY_LOG(trace, "{} DiscoveryRequest hit rate limit; will try later.", type_url_);
-      should_send = false;
-    }
-
-    if (should_send) {
+    if (shouldSendDiscoveryRequest()) {
       sendDiscoveryRequest();
       pending_ = false;
     }

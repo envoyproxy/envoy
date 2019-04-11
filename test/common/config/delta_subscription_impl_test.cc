@@ -96,12 +96,14 @@ TEST_F(DeltaSubscriptionImplTest, RemoveThenAdd) {
   subscription_->resume();
 }
 
-// Due to the need for the behavior tested by LoseThenGainSent, gain-then-losing interest in
-// resource X before the DeltaDiscoveryRequest is sent causes that request to "unsubscribe" from X.
-// Ideally we would have the request simply not include any mention of X. Oh well. This test is just
-// here to illustrate that this behavior exists, not to enforce that it should be like this. What
-// *is* important: the server must happily and cleanly ignore "unsubscribe from [resource name I
-// have never before referred to]" requests.
+// Due to how our implementation provides the required behavior tested in RemoveThenAdd, the
+// add-then-remove case *also* causes the resource to be referred to in the request (as an
+// unsubscribe).
+// Unlike the remove-then-add case, this one really is unnecessary, and ideally we would have
+// the request simply not include any mention of the resource. Oh well.
+// This test is just here to illustrate that this behavior exists, not to enforce that it
+// should be like this. What *is* important: the server must happily and cleanly ignore
+// "unsubscribe from [resource name I have never before referred to]" requests.
 TEST_F(DeltaSubscriptionImplTest, AddThenRemove) {
   startSubscription({"name1", "name2", "name3"});
   subscription_->pause(); // Pause because we're testing multiple updates in between request sends.
