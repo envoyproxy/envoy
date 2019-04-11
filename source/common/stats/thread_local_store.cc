@@ -1,5 +1,6 @@
 #include "common/stats/thread_local_store.h"
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <list>
@@ -141,7 +142,7 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
   // Initialize stats for each thread's dispatcher. This can't be done in the InitializeCb passed
   // to `set` above, it has to be done as a separate step here, because initializing stats causes
   // new TLS slots to be created and SlotImpl::set isn't reentrant.
-  auto worker_id = std::make_shared<uint32_t>(0);
+  auto worker_id = std::make_shared<std::atomic<uint32_t>>(0);
   tls_->runOnAllThreads([this, &tls, worker_id] {
     auto& dispatcher = tls.dispatcher();
     std::string name = (&dispatcher == main_thread_dispatcher_)
