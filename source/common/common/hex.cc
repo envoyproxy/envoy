@@ -27,7 +27,7 @@ std::string Hex::encode(const uint8_t* data, size_t length) {
 }
 
 std::vector<uint8_t> Hex::decode(const std::string& hex_string) {
-  if (hex_string.size() == 0 || hex_string.size() % 2 != 0) {
+  if (hex_string.empty() || hex_string.size() % 2 != 0) {
     return {};
   }
 
