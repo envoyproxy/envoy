@@ -183,6 +183,16 @@ public:
   static std::vector<std::string> listFiles(const std::string& path, bool recursive);
 
   /**
+   * Return a unique temporary filename for use in tests.
+   *
+   * @return a filename based on the process id and current time.
+   */
+
+  static std::string uniqueFilename() {
+    return absl::StrCat(getpid(), "_", std::chrono::system_clock::now().time_since_epoch().count());
+  }
+
+  /**
    * Compare two protos of the same type for equality.
    *
    * @param lhs proto on LHS.
