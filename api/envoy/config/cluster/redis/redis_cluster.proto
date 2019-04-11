@@ -1,5 +1,3 @@
-
-
 syntax = "proto3";
 
 package envoy.config.cluster.redis;
@@ -15,9 +13,29 @@ import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Redis Cluster Configuration]
-// To properly support Redis Cluster it is necessary to store the current topology of the cluster.
-// A random node in the cluster can be queried for the topology using the
-// `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_.
+// This cluster adds support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_. Redis
+// Cluster is an extension of Redis which supports sharding and high availability (where a shard
+// that loses its master fails over to a replica, and designates it as the new master). However, as
+// their is no unified frontend or proxy service in front of Redis Cluster, the client (in this case
+// Envoy) must locally maintain the state of the Redis Cluster, specifically the topology. A random
+// node in the cluster can be queried for the topology using the `CLUSTER SLOTS command
+// <https://redis.io/commands/cluster-slots>`_. This results is then stored locally, and updated at
+// user-configured intervals.
+//
+// The user may be familiar with a system that sounds familiar called `Twemproxy
+// <https://github.com/twitter/twemproxy>`_. Twemproxy is also a proxy that interfaces with Redis.
+// However, it differs in several important ways. First, it does not support Redis Cluster. Second,
+// it acts as service in front of Redis, as opposed to being a sidecar proxy. Finally, it is
+// unmaintained. Why do we need a new system, aside from the last point?
+//
+// Beside the expected benefits of a sidecare proxy such as unified retries and so on, it allows us
+// to essentially build a common client for all services to talk to Redis. This is important because
+// while Redis non-cluster clients are performant and have feature parity across various languages,
+// Redis Cluster clients do not! Notably, support for spreading load across read replicas differs in
+// various client implementations- something very important if wants to scale a Redis fleet to
+// handle a large amount of load coming from services implemented in different languages. Hence,
+// these services can use a Redis non-cluster client and get all the benefits of Redis Cluster
+// without worrying about unexpected behaviors.
 //
 // Example:
 //
@@ -29,7 +47,7 @@ import "gogoproto/gogo.proto";
 //     hosts:
 //     - socket_address:
 //       address: foo.bar.com
-//        port_value: 22120
+//       port_value: 22120
 //     cluster_type:
 //     name: envoy.clusters.redis
 //     typed_config:

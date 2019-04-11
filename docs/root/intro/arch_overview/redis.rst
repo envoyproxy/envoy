@@ -57,9 +57,9 @@ close map to 5xx. All other responses from Redis are counted as a success.
 Redis Cluster Support (Experimental)
 ----------------------------------------
 
-Envoy currently offers experimental support for Redis Cluster. This requires Envoy to track
-the topology of the cluster- which nodes exist, and which are the current masters for each shard,
-and which shards and nodes enter or leave the cluster.
+Envoy currently offers experimental support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
+This requires Envoy to track the topology of the cluster- which nodes exist, and which are the current 
+masters for each shard, and which shards and nodes enter or leave the cluster.
 
 For topology configuration details, see the Redis Cluster
 :ref:`v2 API reference <envoy_api_msg_config.cluster.redis.RedisClusterConfig>`

@@ -27,20 +27,8 @@ RedisCluster::RedisCluster(
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(
           std::make_unique<RedisDiscoverySession>(*this, redis_client_factory)) {
-  switch (cluster.dns_lookup_family()) {
-  case envoy::api::v2::Cluster::V6_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
-    break;
-  case envoy::api::v2::Cluster::V4_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
-    break;
-  case envoy::api::v2::Cluster::AUTO:
-    dns_lookup_family_ = Network::DnsLookupFamily::Auto;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
 
+  dns_lookup_family_ = Upstream::getDnsLookupFamilyFromCluster(cluster);
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -145,13 +133,11 @@ void RedisCluster::RedisDiscoverySession::onEvent(Network::ConnectionEvent event
 
 void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
     const std::list<Envoy::Network::Address::InstanceConstSharedPtr>& address_list) {
-  absl::MutexLock l(&discovery_mutex_);
   discovery_address_list_.insert(discovery_address_list_.end(), address_list.begin(),
                                  address_list.end());
 }
 
 void RedisCluster::RedisDiscoverySession::startResolve() {
-  absl::MutexLock l(&discovery_mutex_);
   parent_.info_->stats().update_attempt_.inc();
   // if a resolution is current in progress, skip
   if (current_request_) {
@@ -181,8 +167,6 @@ void RedisCluster::RedisDiscoverySession::startResolve() {
 
 void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
-  absl::MutexLock l(&discovery_mutex_);
-
   current_request_ = nullptr;
   // TODO(hyang): move to use connection pool for the cluster and avoid closing the connection each
   // time
@@ -249,7 +233,6 @@ void RedisCluster::RedisDiscoverySession::onResponse(
 }
 
 void RedisCluster::RedisDiscoverySession::onFailure() {
-  absl::MutexLock l(&discovery_mutex_);
   current_request_ = nullptr;
   if (client_) {
     client_->close();

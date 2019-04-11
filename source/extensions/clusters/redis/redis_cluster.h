@@ -64,6 +64,28 @@ namespace Extensions {
 namespace Clusters {
 namespace Redis {
 
+/*
+ * This class implements support for the topology part of `Redis Cluster
+ * <https://redis.io/topics/cluster-spec>`_. Specifically, it allows Envoy to maintain an internal
+ * representation of the topology of a Redis Cluster, and how often the topology should be
+ * refreshed.
+ *
+ * The target Redis Cluster is obtained from the yaml config file as usual, and we choose a random
+ * discovery address from DNS if there are no existing hosts (our startup condition). Otherwise, we
+ * choose a random host from our known set of hosts. Then, against this host we make a topology
+ * request.
+ *
+ * Topology requests are handled by RedisDiscoverySession, which handles the initilization of
+ * the `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_, and the responses and
+ * failure cases.
+ *
+ * The topology is stored in cluster_slots_map_. The present implementation uses std::array(), which
+ * is a flexible approach for handling the slot mapping, but it will a decent amount of  memory
+ * (16384 std::string's) and CPU cycles (as seen here in the copying of 16384 strings over all
+ * cluster members) for a map that will generally scale as O(n) where n is the number of cluster
+ * nodes.
+ */
+
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
   RedisCluster(const envoy::api::v2::Cluster& cluster,
@@ -185,7 +207,6 @@ private:
     RedisCluster& parent_;
     Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
-    absl::Mutex discovery_mutex_;
 
     std::list<Network::Address::InstanceConstSharedPtr> discovery_address_list_;
     // the slot to master node map
