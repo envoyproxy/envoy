@@ -33,7 +33,6 @@ genrule(
     name = "example_configs",
     srcs = [
         ":configs",
-        ":v1_upgraded_configs",
         "//examples:configs",
         "//test/config/integration/certs",
     ],
