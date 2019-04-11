@@ -318,7 +318,7 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host
       host_metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
 
   if (filter_it == host_metadata.filter_metadata().end()) {
-    return kvs.size() == 0;
+    return kvs.empty();
   }
 
   const ProtobufWkt::Struct& data_struct = filter_it->second;

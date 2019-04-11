@@ -54,7 +54,7 @@ public:
   }
 
   void setPayload() {
-    if (payload_.fields().size() > 0) {
+    if (!payload_.fields().empty()) {
       callback_->setPayload(payload_);
     }
   }

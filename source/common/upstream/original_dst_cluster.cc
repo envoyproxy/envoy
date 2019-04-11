@@ -175,7 +175,7 @@ void OriginalDstCluster::cleanup() {
     }
   }
 
-  if (to_be_removed.size() > 0) {
+  if (!to_be_removed.empty()) {
     priority_set_.updateHosts(0,
                               HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
                               {}, {}, to_be_removed, absl::nullopt);

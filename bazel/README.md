@@ -366,6 +366,8 @@ The following optional features can be enabled on the Bazel build command-line:
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
   `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
+* Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with 
+  `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.
 
 ## Disabling extensions
 
