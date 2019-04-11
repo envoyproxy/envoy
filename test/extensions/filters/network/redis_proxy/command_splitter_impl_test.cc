@@ -753,6 +753,28 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithMovedRedirection) {
   Common::Redis::RespValue moved_response;
   moved_response.type(Common::Redis::RespType::Error);
   moved_response.asString() = "MOVED 1234 192.168.0.1:5000"; // Exact values are not important.
+
+  // Test with simulated upstream failures. This exercises code in
+  // FragmentedRequest::onChildRedirection() common to MGET, MSET, and SplitKeysSumResult commands.
+  for (unsigned int i = 0; i < 2; i++) {
+    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
+        .WillOnce(Invoke(
+            [&](const std::string& host_address, const Common::Redis::RespValue& request,
+                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+              EXPECT_EQ(host_address, "192.168.0.1:5000");
+              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+              EXPECT_EQ(request.asArray().size(), 2);
+              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[0].asString(), "get");
+              EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
+              EXPECT_NE(&pool_requests_[i], nullptr);
+              return nullptr;
+            }));
+    EXPECT_FALSE(pool_callbacks_[i]->onRedirection(moved_response));
+  }
+
+  // Test "successful" redirection.
   for (unsigned int i = 0; i < 2; i++) {
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
         .WillOnce(Invoke(
@@ -815,6 +837,41 @@ TEST_F(RedisMGETCommandHandlerTest, NormalWithAskRedirection) {
   ask_response.type(Common::Redis::RespType::Error);
   ask_response.asString() = "ASK 1234 192.168.0.1:5000"; // Exact values are not important.
   Common::Redis::Client::MockPoolRequest dummy_poolrequest;
+
+  // Test redirection with simulated upstream failures. This exercises code in
+  // FragmentedRequest::onChildRedirection() common to MGET, MSET, and SplitKeysSumResult commands.
+  for (unsigned int i = 0; i < 2; i++) {
+    EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, _))
+        .WillOnce(Invoke(
+            [&](const std::string& host_address, const Common::Redis::RespValue& request,
+                Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+              EXPECT_EQ(host_address, "192.168.0.1:5000");
+              EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+              EXPECT_EQ(request.asArray().size(), 1);
+              EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[0].asString(), "asking");
+              return (i == 0 ? nullptr : &dummy_poolrequest);
+            }));
+    if (i == 1) {
+      EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_[i])))
+          .WillOnce(Invoke(
+              [&](const std::string& host_address, const Common::Redis::RespValue& request,
+                  Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+                EXPECT_EQ(host_address, "192.168.0.1:5000");
+                EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+                EXPECT_EQ(request.asArray().size(), 2);
+                EXPECT_TRUE(request.asArray()[0].type() == Common::Redis::RespType::BulkString);
+                EXPECT_EQ(request.asArray()[0].asString(), "get");
+                EXPECT_TRUE(request.asArray()[1].type() == Common::Redis::RespType::BulkString);
+                EXPECT_EQ(request.asArray()[1].asString(), std::to_string(i));
+                EXPECT_NE(&pool_requests_[i], nullptr);
+                return (i == 1 ? nullptr : &pool_requests_[i]);
+              }));
+    }
+    EXPECT_FALSE(pool_callbacks_[i]->onRedirection(ask_response));
+  }
+
+  // Test "successful" redirection.
   for (unsigned int i = 0; i < 2; i++) {
     EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, _))
         .WillOnce(Invoke(

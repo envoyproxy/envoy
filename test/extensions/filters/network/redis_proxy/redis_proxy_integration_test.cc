@@ -139,9 +139,9 @@ public:
    * @param target_server a handle to the second server that will respond to the request.
    * @param request supplies client data to transmit to the first upstream server.
    * @param redirection_response supplies the moved or ask redirection error from the first server.
-   * @param asking_response supplies the target_server's response to an "asking" command, if it is
-   * received.
    * @param response supplies data sent by the second server back to the fake Redis client.
+   * @param asking_response supplies the target_server's response to an "asking" command, if
+   * appropriate.
    */
   void simpleRedirection(FakeUpstreamPtr& target_server, const std::string& request,
                          const std::string& redirection_response, const std::string& response,
