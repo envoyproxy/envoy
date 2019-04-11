@@ -6,15 +6,15 @@
 #include "common/filesystem/watcher_impl.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Filesystem {
 
-class WatcherImplTest : public TestBase {
+class WatcherImplTest : public testing::Test {
 protected:
   WatcherImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 
@@ -89,6 +89,25 @@ TEST_F(WatcherImplTest, Create) {
   TestUtility::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
                           TestEnvironment::temporaryPath("envoy_test/watcher_link"));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_F(WatcherImplTest, Modify) {
+  Filesystem::WatcherPtr watcher = dispatcher_->createFilesystemWatcher();
+
+  TestUtility::createDirectory(TestEnvironment::temporaryPath("envoy_test"));
+  std::ofstream file(TestEnvironment::temporaryPath("envoy_test/watcher_target"));
+
+  WatchCallback callback;
+  watcher->addWatch(TestEnvironment::temporaryPath("envoy_test/watcher_target"),
+                    Watcher::Events::Modified, [&](uint32_t events) -> void {
+                      callback.called(events);
+                      dispatcher_->exit();
+                    });
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  file << "text" << std::flush;
+  EXPECT_CALL(callback, called(Watcher::Events::Modified));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
 TEST_F(WatcherImplTest, BadPath) {

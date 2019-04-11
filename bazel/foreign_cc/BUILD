@@ -1,8 +1,43 @@
 licenses(["notice"])  # Apache 2
 
 load("//bazel:envoy_build_system.bzl", "envoy_cmake_external", "envoy_package")
+load("@rules_foreign_cc//tools/build_defs:configure.bzl", "configure_make")
 
 envoy_package()
+
+configure_make(
+    name = "gperftools_build",
+    configure_options = [
+        "--enable-shared=no",
+        "--enable-frame-pointers",
+        "--disable-libunwind",
+    ],
+    lib_source = "@com_github_gperftools_gperftools//:all",
+    linkopts = ["-lpthread"],
+    make_commands = ["make install-libLTLIBRARIES install-perftoolsincludeHEADERS"],
+    static_libraries = select({
+        "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
+        "//conditions:default": ["libtcmalloc_and_profiler.a"],
+    }),
+)
+
+# Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/227
+cc_library(
+    name = "gperftools",
+    deps = [
+        "gperftools_build",
+    ],
+)
+
+configure_make(
+    name = "luajit",
+    configure_command = "build.py",
+    lib_source = "@com_github_luajit_luajit//:all",
+    make_commands = [],
+    static_libraries = [
+        "libluajit-5.1.a",
+    ],
+)
 
 envoy_cmake_external(
     name = "ares",
@@ -25,13 +60,17 @@ envoy_cmake_external(
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",
         "EVENT__DISABLE_REGRESS": "on",
+        "EVENT__LIBRARY_TYPE": "STATIC",
         "CMAKE_BUILD_TYPE": "Release",
     },
     copy_pdb = True,
     lib_source = "@com_github_libevent_libevent//:all",
     static_libraries = select({
         "//bazel:windows_x86_64": ["event.lib"],
-        "//conditions:default": ["libevent.a"],
+        "//conditions:default": [
+            "libevent.a",
+            "libevent_pthreads.a",
+        ],
     }),
 )
 
@@ -45,10 +84,7 @@ envoy_cmake_external(
     },
     cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
     copy_pdb = True,
-    env_vars = select({
-        "//bazel:opt_build": {},
-        "//conditions:default": {"CFLAGS": "-DDEBUGBUILD"},
-    }),
+    debug_cache_entries = {"ENABLE_DEBUG": "on"},
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     pdb_name = "nghttp2_static",
     static_libraries = select({

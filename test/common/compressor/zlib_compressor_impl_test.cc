@@ -3,14 +3,15 @@
 #include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Compressor {
 namespace {
 
-class ZlibCompressorImplTest : public TestBase {
+class ZlibCompressorImplTest : public testing::Test {
 protected:
   void expectValidFlushedBuffer(const Buffer::OwnedImpl& output_buffer) {
     uint64_t num_comp_slices = output_buffer.getRawSlices(nullptr, 0);

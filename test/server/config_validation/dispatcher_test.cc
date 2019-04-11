@@ -19,14 +19,14 @@
 namespace Envoy {
 
 // Define fixture which allocates ValidationDispatcher.
-class ConfigValidation : public TestBaseWithParam<Network::Address::IpVersion> {
+class ConfigValidation : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   ConfigValidation() {
     Event::Libevent::Global::initialize();
 
-    validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000),
-                                                        Thread::threadFactoryForTest(),
-                                                        stats_store_, test_time_.timeSystem());
+    validation_ = std::make_unique<Api::ValidationImpl>(Thread::threadFactoryForTest(),
+                                                        stats_store_, test_time_.timeSystem(),
+                                                        Filesystem::fileSystemForTest());
     dispatcher_ = validation_->allocateDispatcher();
   }
 

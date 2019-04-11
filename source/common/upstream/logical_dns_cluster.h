@@ -9,7 +9,10 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"
+#include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/clusters/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -152,6 +155,18 @@ private:
   Network::ActiveDnsQuery* active_dns_query_{};
   const LocalInfo::LocalInfo& local_info_;
   const envoy::api::v2::ClusterLoadAssignment load_assignment_;
+};
+
+class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
+public:
+  LogicalDnsClusterFactory()
+      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().LogicalDns) {}
+
+private:
+  ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

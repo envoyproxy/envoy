@@ -1,14 +1,14 @@
 #include "extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
-#include "test/test_common/test_base.h"
-
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
+namespace {
 
 class MockMemoryStatsReader : public MemoryStatsReader {
 public:
@@ -51,6 +51,7 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
   EXPECT_EQ(resource.pressure(), 0.7);
 }
 
+} // namespace
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

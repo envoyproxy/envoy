@@ -16,10 +16,10 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -30,6 +30,7 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Upstream {
 namespace Outlier {
+namespace {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
   NiceMock<MockClusterMockPrioritySet> cluster;
@@ -56,7 +57,7 @@ public:
   MOCK_METHOD1(check, void(HostSharedPtr host));
 };
 
-class OutlierDetectorImplTest : public TestBase {
+class OutlierDetectorImplTest : public testing::Test {
 public:
   OutlierDetectorImplTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
@@ -772,7 +773,7 @@ TEST(DetectorHostMonitorNullImplTest, All) {
 
 TEST(OutlierDetectionEventLoggerImplTest, All) {
   AccessLog::MockAccessLogManager log_manager;
-  std::shared_ptr<Filesystem::MockFile> file(new Filesystem::MockFile());
+  std::shared_ptr<AccessLog::MockAccessLogFile> file(new AccessLog::MockAccessLogFile());
   NiceMock<MockClusterInfo> cluster;
   std::shared_ptr<MockHostDescription> host(new NiceMock<MockHostDescription>());
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));
@@ -870,6 +871,7 @@ TEST(DetectorHostMonitorImpl, resultToHttpCode) {
             DetectorHostMonitorImpl::resultToHttpCode(Result::SERVER_FAILURE));
 }
 
+} // namespace
 } // namespace Outlier
 } // namespace Upstream
 } // namespace Envoy

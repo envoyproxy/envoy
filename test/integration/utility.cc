@@ -52,7 +52,9 @@ void BufferingStreamDecoder::onComplete() {
   on_complete_cb_();
 }
 
-void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
+void BufferingStreamDecoder::onResetStream(Http::StreamResetReason, absl::string_view) {
+  ADD_FAILURE();
+}
 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
@@ -62,8 +64,8 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
   Event::GlobalTimeSystem time_system;
-  Api::Impl api(std::chrono::milliseconds(9000), Thread::threadFactoryForTest(), mock_stats_store,
-                time_system);
+  Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
+                Filesystem::fileSystemForTest());
   Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{

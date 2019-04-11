@@ -11,9 +11,11 @@ even when using the other service discovery types. Envoy supports three differen
 checking along with various settings (check interval, failures required before marking a host
 unhealthy, successes required before marking a host healthy, etc.):
 
-* **HTTP**: During HTTP health checking Envoy will send an HTTP request to the upstream host. It
-  expects a 200 response if the host is healthy. The upstream host can return 503 if it wants to
-  immediately notify downstream hosts to no longer forward traffic to it.
+* **HTTP**: During HTTP health checking Envoy will send an HTTP request to the upstream host. By
+  default, it expects a 200 response if the host is healthy. Expected response codes are
+  :ref:`configurable <envoy_api_msg_core.HealthCheck.HttpHealthCheck>`. The
+  upstream host can return 503 if it wants to immediately notify downstream hosts to no longer
+  forward traffic to it.
 * **L3/L4**: During L3/L4 health checking, Envoy will send a configurable byte buffer to the
   upstream host. It expects the byte buffer to be echoed in the response if the host is to be
   considered healthy. Envoy also supports connect only L3/L4 health checking.
@@ -91,9 +93,10 @@ operation:
   Envoy will respond with a 200 or a 503 depending on the current draining state of the server.
 * **No pass through, computed from upstream cluster health**: In this mode, the health checking
   filter will return a 200 or a 503 depending on whether at least a :ref:`specified percentage
-  <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>` of the
-  servers are healthy in one or more upstream clusters. (If the Envoy server is in a draining
-  state, though, it will respond with a 503 regardless of the upstream cluster health.)
+  <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>`
+  of the servers are available (healthy + degraded) in one or more upstream clusters. (If the Envoy
+  server is in a draining state, though, it will respond with a 503 regardless of the upstream
+  cluster health.)
 * **Pass through**: In this mode, Envoy will pass every health check request to the local service.
   The service is expected to return a 200 or a 503 depending on its health state.
 * **Pass through with caching**: In this mode, Envoy will pass health check requests to the local

@@ -15,9 +15,8 @@ namespace Api {
  */
 class ValidationImpl : public Impl {
 public:
-  ValidationImpl(std::chrono::milliseconds file_flush_interval_msec,
-                 Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
-                 Event::TimeSystem& time_system);
+  ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
+                 Event::TimeSystem& time_system, Filesystem::Instance& file_system);
 
   Event::DispatcherPtr allocateDispatcher() override;
   Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;

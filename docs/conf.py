@@ -13,19 +13,46 @@
 # serve to show the default.
 
 from datetime import datetime
+import os
+from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 import sys
-import os
+
+
+# https://stackoverflow.com/questions/44761197/how-to-use-substitution-definitions-with-code-blocks
+class SubstitutionCodeBlock(CodeBlock):
+  """
+  Similar to CodeBlock but replaces placeholders with variables. See "substitutions" below.
+  """
+
+  def run(self):
+    """
+    Replace placeholders with given variables.
+    """
+    app = self.state.document.settings.env.app
+    new_content = []
+    existing_content = self.content
+    for item in existing_content:
+      for pair in app.config.substitutions:
+        original, replacement = pair
+        item = item.replace(original, replacement)
+      new_content.append(item)
+
+    self.content = new_content
+    return list(CodeBlock.run(self))
 
 
 def setup(app):
   app.add_config_value('release_level', '', 'env')
+  app.add_config_value('substitutions', [], 'html')
+  app.add_directive('substitution-code-block', SubstitutionCodeBlock)
 
 
 if not os.environ.get('ENVOY_DOCS_RELEASE_LEVEL'):
   raise Exception("ENVOY_DOCS_RELEASE_LEVEL env var must be defined")
 
 release_level = os.environ['ENVOY_DOCS_RELEASE_LEVEL']
+blob_sha = os.environ['ENVOY_BLOB_SHA']
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -42,9 +69,15 @@ release_level = os.environ['ENVOY_DOCS_RELEASE_LEVEL']
 # ones.
 extensions = ['sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig']
 extlinks = {
-    'repo': ('https://github.com/envoyproxy/envoy/blob/master/%s', ''),
-    'api': ('https://github.com/envoyproxy/envoy/blob/master/api/%s', ''),
+    'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
+    'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), ''),
 }
+
+# Setup global substitutions
+if 'pre-release' in release_level:
+  substitutions = [('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha))]
+else:
+  substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha))]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

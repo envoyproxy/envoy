@@ -9,14 +9,15 @@
 #include "extensions/access_loggers/well_known_names.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace File {
+namespace {
 
 TEST(FileAccessLogConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -155,6 +156,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
   }
 }
 
+} // namespace
 } // namespace File
 } // namespace AccessLoggers
 } // namespace Extensions

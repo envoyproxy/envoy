@@ -13,8 +13,9 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using Envoy::Http::Headers;
 using Envoy::Http::HeaderValueOf;
@@ -25,7 +26,6 @@ using testing::MatchesRegex;
 using testing::Not;
 
 namespace Envoy {
-
 namespace {
 
 std::string normalizeDate(const std::string& s) {
@@ -399,9 +399,9 @@ TEST_P(IntegrationTest, BadPath) {
 TEST_P(IntegrationTest, AbsolutePath) {
   // Configure www.redirect.com to send a redirect, and ensure the redirect is
   // encountered via absolute URL.
-  config_helper_.addRoute("www.redirect.com", "/", "cluster_0", true,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::ALL);
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
 
   initialize();
@@ -415,9 +415,9 @@ TEST_P(IntegrationTest, AbsolutePath) {
 TEST_P(IntegrationTest, AbsolutePathWithPort) {
   // Configure www.namewithport.com:1234 to send a redirect, and ensure the redirect is
   // encountered via absolute URL with a port.
-  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::ALL);
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
+  host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
   std::string response;
@@ -432,9 +432,9 @@ TEST_P(IntegrationTest, AbsolutePathWithoutPort) {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
   // Set a matcher for www.namewithport.com:1234 and verify http://www.namewithport.com does not
   // match
-  config_helper_.addRoute("www.namewithport.com:1234", "/", "cluster_0", true,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::ALL);
+  auto host = config_helper_.createVirtualHost("www.namewithport.com:1234", "/");
+  host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
   config_helper_.addConfigModifier(&setAllowAbsoluteUrl);
   initialize();
   std::string response;
@@ -467,10 +467,6 @@ TEST_P(IntegrationTest, Connect) {
 
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
-
-TEST_P(IntegrationTest, LargeHeadersRejected) { testLargeRequestHeaders(62, 60); }
-
-TEST_P(IntegrationTest, LargeHeadersAccepted) { testLargeRequestHeaders(62, 63); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) {
   initialize();
@@ -751,6 +747,44 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
+}
+
+// Test that if no connection pools are free, Envoy fails to establish an upstream connection.
+TEST_P(IntegrationTest, NoConnectionPoolsFree) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+
+    // Somewhat contrived with 0, but this is the simplest way to test right now.
+    auto* circuit_breakers = cluster->mutable_circuit_breakers();
+    circuit_breakers->add_thresholds()->mutable_max_connection_pools()->set_value(0);
+  });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Request 1.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+
+  // Validate none active.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+
+  response->waitForEndStream();
+
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
+  initialize();
+  EXPECT_STREQ(fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
+               Network::Test::getLoopbackAddressString(GetParam()).c_str());
 }
 
 } // namespace Envoy

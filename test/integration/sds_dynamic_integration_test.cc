@@ -16,16 +16,15 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
-#include "test/mocks/init/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "integration.h"
 #include "utility.h"
 
@@ -45,7 +44,7 @@ class SdsDynamicIntegrationBaseTest : public Grpc::GrpcClientIntegrationParamTes
                                       public HttpIntegrationTest {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
         server_cert_("server_cert"), validation_secret_("validation_secret"),
         client_cert_("client_cert") {}
 

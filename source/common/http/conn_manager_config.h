@@ -109,6 +109,7 @@ struct TracingConnectionManagerConfig {
   uint64_t client_sampling_;
   uint64_t random_sampling_;
   uint64_t overall_sampling_;
+  bool verbose_;
 };
 
 typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
@@ -210,12 +211,6 @@ public:
    *         chain.
    */
   virtual FilterChainFactory& filterFactory() PURE;
-
-  /**
-   * @return whether the connection manager will reverse the order of encoder
-   * filters in the HTTP filter chain.
-   */
-  virtual bool reverseEncodeOrder() PURE;
 
   /**
    * @return whether the connection manager will generate a fresh x-request-id if the request does
@@ -345,6 +340,11 @@ public:
    * @return supplies the http1 settings.
    */
   virtual const Http::Http1Settings& http1Settings() const PURE;
+
+  /**
+   * @return if the HttpConnectionManager should normalize url following RFC3986
+   */
+  virtual bool shouldNormalizePath() const PURE;
 };
 } // namespace Http
 } // namespace Envoy

@@ -12,7 +12,11 @@
 #include "common/common/utility.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_options_impl.h"
+#include "common/stats/store_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Stats {
@@ -22,7 +26,7 @@ namespace Stats {
  */
 template <class Base> class IsolatedStatsCache {
 public:
-  typedef std::function<std::shared_ptr<Base>(const std::string& name)> Allocator;
+  using Allocator = std::function<std::shared_ptr<Base>(const std::string& name)>;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
 
@@ -48,23 +52,22 @@ public:
   }
 
 private:
-  std::unordered_map<std::string, std::shared_ptr<Base>> stats_;
+  absl::flat_hash_map<std::string, std::shared_ptr<Base>> stats_;
   Allocator alloc_;
 };
 
-class IsolatedStoreImpl : public Store {
+class IsolatedStoreImpl : public StoreImpl {
 public:
   IsolatedStoreImpl();
+  explicit IsolatedStoreImpl(SymbolTable& symbol_table);
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
-  Histogram& histogram(const std::string& name) override {
-    Histogram& histogram = histograms_.get(name);
-    return histogram;
-  }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
+  Histogram& histogram(const std::string& name) override { return histograms_.get(name); }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
   // Stats::Store
@@ -75,11 +78,15 @@ public:
   }
 
 private:
+  IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
+
+  std::unique_ptr<SymbolTable> symbol_table_storage_;
   HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
   const StatsOptionsImpl stats_options_;
+  NullGaugeImpl null_gauge_;
 };
 
 } // namespace Stats

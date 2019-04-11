@@ -28,7 +28,7 @@ Format Strings
 --------------
 
 Format strings are plain strings, specified using the ``format`` key. They may contain
-either command operators or other characters interpreted as a plain string. 
+either command operators or other characters interpreted as a plain string.
 The access log formatter does not make any assumptions about a new line separator, so one
 has to specified as part of the format string.
 See the :ref:`default format <config_access_log_default_format>` for an example.
@@ -78,7 +78,7 @@ For example, with the following format provided in the configuration:
       }
     }
   }
-  
+
 The following JSON object would be written to the log file:
 
 .. code-block:: json
@@ -112,7 +112,7 @@ The following command operators are supported:
   TCP
     Downstream connection start time including milliseconds.
 
-  START_TIME can be customized using a `format string <http://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  START_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
   In addition to that, START_TIME also accepts following specifiers:
 
   +------------------------+-------------------------------------------------------------+
@@ -228,6 +228,17 @@ The following command operators are supported:
   Local address of the upstream connection. If the address is an IP address it includes both
   address and port.
 
+.. _config_access_log_format_upstream_transport_failure_reason:
+
+%UPSTREAM_TRANSPORT_FAILURE_REASON%
+  HTTP
+    If upstream connection failed due to transport socket (e.g. TLS handshake), provides the failure
+    reason from the transport socket. The format of this field depends on the configured upstream
+    transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+
+  TCP
+    Not implemented ("-")
+
 %DOWNSTREAM_REMOTE_ADDRESS%
   Remote address of the downstream connection. If the address is an IP address it includes both
   address and port.
@@ -287,7 +298,7 @@ The following command operators are supported:
 %DYNAMIC_METADATA(NAMESPACE:KEY*):Z%
   HTTP
     :ref:`Dynamic Metadata <envoy_api_msg_core.Metadata>` info,
-    where NAMESPACE is the the filter namespace used when setting the metadata, KEY is an optional
+    where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
     lookup up key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
     can be set by filters using the :repo:`StreamInfo <include/envoy/stream_info/stream_info.h>` API:
@@ -311,4 +322,29 @@ The following command operators are supported:
     String value set on ssl connection socket for Server Name Indication (SNI)
   TCP
     String value set on ssl connection socket for Server Name Indication (SNI)
+
+%DOWNSTREAM_LOCAL_URI_SAN%
+  HTTP
+    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
+  TCP
+    The URIs present in the SAN of the local certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_URI_SAN%
+  HTTP
+    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+  TCP
+    The URIs present in the SAN of the peer certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_LOCAL_SUBJECT%
+  HTTP
+    The subject present in the local certificate used to establish the downstream TLS connection.
+  TCP
+    The subject present in the local certificate used to establish the downstream TLS connection.
+
+%DOWNSTREAM_PEER_SUBJECT%
+  HTTP
+    The subject present in the peer certificate used to establish the downstream TLS connection.
+  TCP
+    The subject present in the peer certificate used to establish the downstream TLS connection.
+
 

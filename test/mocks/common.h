@@ -8,11 +8,11 @@
 
 #include "common/common/logger.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/test_time.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 /**
@@ -49,8 +49,8 @@ public:
   // where timer callbacks are triggered by the advancement of time. This implementation
   // matches recent behavior, where real-time timers were created directly in libevent
   // by dispatcher_impl.cc.
-  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& base) override {
-    return real_time_.createScheduler(base);
+  Event::SchedulerPtr createScheduler(Event::Scheduler& base_scheduler) override {
+    return real_time_.createScheduler(base_scheduler);
   }
   void sleep(const Duration& duration) override { real_time_.sleep(duration); }
   Thread::CondVar::WaitStatus
@@ -62,14 +62,6 @@ public:
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 
   Event::TestRealTimeSystem real_time_; // NO_CHECK_FORMAT(real_time)
-};
-
-class MockTokenBucket : public TokenBucket {
-public:
-  MockTokenBucket();
-  ~MockTokenBucket();
-
-  MOCK_METHOD1(consume, bool(uint64_t));
 };
 
 // Captures absl::string_view parameters into temp strings, for use

@@ -76,6 +76,14 @@ following are the command line options that Envoy supports.
   `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to 
   this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
 
+.. option:: --cpuset-threads
+
+   *(optional)* This flag is used to control the number of worker threads if :option:`--concurrency` is
+   not set. If enabled, the assigned cpuset size is used to determine the number of worker threads on
+   Linux-based systems. Otherwise the number of worker threads is set to the number of hardware threads
+   on the machine. You can read more about cpusets in the
+   `kernel documentation <https://www.kernel.org/doc/Documentation/cgroup-v1/cpusets.txt>`_.
+
 .. option:: --log-path <path string>
 
    *(optional)* The output file path where logs should be written. This file will be re-opened
@@ -214,7 +222,7 @@ following are the command line options that Envoy supports.
 
   .. attention::
 
-    This setting affects the output of :option:`--hot-restart-version`. If you started envoy with this
+    This setting affects the output of :option:`--hot-restart-version`. If you started Envoy with this
     option set to a non default value, you should use the same option (and same value) for subsequent hot
     restarts.
 

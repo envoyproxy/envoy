@@ -10,10 +10,10 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::Ref;
@@ -25,7 +25,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-class AutoProtocolTest : public TestBase {
+class AutoProtocolTest : public testing::Test {
 public:
   void resetMetadata() {
     metadata_.setMethodName("-");

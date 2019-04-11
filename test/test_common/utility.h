@@ -21,13 +21,14 @@
 #include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AssertionFailure;
@@ -79,7 +80,7 @@ namespace Envoy {
 */
 #define EXPECT_DEATH_LOG_TO_STDERR(statement, message)                                             \
   do {                                                                                             \
-    Logger::StderrSinkDelegate stderr_sink(Logger::Registry::getSink());                           \
+    Envoy::Logger::StderrSinkDelegate stderr_sink(Envoy::Logger::Registry::getSink());             \
     EXPECT_DEATH(statement, message);                                                              \
   } while (false)
 
@@ -120,7 +121,8 @@ public:
    * Compare 2 buffers.
    * @param lhs supplies buffer 1.
    * @param rhs supplies buffer 2.
-   * @return TRUE if the buffers are equal, false if not.
+   * @return TRUE if the buffers contain equal content
+   *         (i.e., if lhs.toString() == rhs.toString()), false if not.
    */
   static bool buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs);
 
@@ -349,6 +351,16 @@ public:
     matcher.set_regex(str);
     return matcher;
   }
+
+  /**
+   * Checks that passed gauges have a value of 0. Gauges can be omitted from
+   * this check by modifying the regex that matches gauge names in the
+   * implementation.
+   *
+   * @param vector of gauges to check.
+   * @return bool indicating that passed gauges not matching the omitted regex have a value of 0.
+   */
+  static bool gaugesZeroed(const std::vector<Stats::GaugeSharedPtr> gauges);
 };
 
 /**
@@ -389,28 +401,6 @@ private:
   Thread::CondVar cv_;
   Thread::MutexBasicLockable mutex_;
   bool ready_{false};
-};
-
-// TODO(sbelair2) Perform the fd close in the close of the IoHandle-
-// i.e., ScopedIoHandleCloser should incorporate the ScopedFdCloser
-class ScopedIoHandleCloser {
-public:
-  ScopedIoHandleCloser(Network::IoHandlePtr& io_handle);
-  ~ScopedIoHandleCloser();
-
-private:
-  Network::IoHandlePtr& io_handle_;
-};
-
-// TODO(sbelair2) Clean up ScopedFdCloser everywhere IOHandle is used-
-// ScopedFdCloser should no longer be needed.
-class ScopedFdCloser {
-public:
-  ScopedFdCloser(int fd);
-  ~ScopedFdCloser();
-
-private:
-  int fd_;
 };
 
 /**
@@ -496,14 +486,15 @@ public:
     }
   };
 
-  explicit TestAllocator(const StatsOptions& stats_options)
-      : RawStatDataAllocator(mutex_, hash_set_, stats_options),
+  TestAllocator(const StatsOptions& stats_options, SymbolTable& symbol_table)
+      : RawStatDataAllocator(mutex_, hash_set_, stats_options, symbol_table),
         block_memory_(std::make_unique<uint8_t[]>(
             RawStatDataSet::numBytes(block_hash_options_, stats_options))),
         hash_set_(block_hash_options_, true /* init */, block_memory_.get(), stats_options) {}
   ~TestAllocator() { EXPECT_EQ(0, hash_set_.size()); }
 
 private:
+  FakeSymbolTableImpl symbol_table_;
   Thread::MutexBasicLockable mutex_;
   TestBlockMemoryHashSetOptions block_hash_options_;
   std::unique_ptr<uint8_t[]> block_memory_;
@@ -512,7 +503,7 @@ private:
 
 class MockedTestAllocator : public TestAllocator {
 public:
-  MockedTestAllocator(const StatsOptions& stats_options);
+  MockedTestAllocator(const StatsOptions& stats_options, SymbolTable& symbol_table);
   virtual ~MockedTestAllocator();
 
   MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));
@@ -524,6 +515,10 @@ public:
 namespace Thread {
 ThreadFactory& threadFactoryForTest();
 } // namespace Thread
+
+namespace Filesystem {
+Instance& fileSystemForTest();
+} // namespace Filesystem
 
 namespace Api {
 ApiPtr createApiForTest();
@@ -540,5 +535,12 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {
 MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
 
 MATCHER_P(RepeatedProtoEq, rhs, "") { return TestUtility::repeatedPtrFieldEqual(arg, rhs); }
+
+MATCHER_P(Percent, rhs, "") {
+  envoy::type::FractionalPercent expected;
+  expected.set_numerator(rhs);
+  expected.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  return TestUtility::protoEqual(expected, arg);
+}
 
 } // namespace Envoy

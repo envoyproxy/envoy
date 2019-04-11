@@ -12,11 +12,11 @@ public:
   // Api::OsSysCalls
   SysCallIntResult bind(int sockfd, const sockaddr* addr, socklen_t addrlen) override;
   SysCallIntResult ioctl(int sockfd, unsigned long int request, void* argp) override;
-  SysCallIntResult open(const std::string& full_path, int flags, int mode) override;
-  SysCallSizeResult write(int fd, const void* buffer, size_t num_bytes) override;
   SysCallSizeResult writev(int fd, const iovec* iovec, int num_iovec) override;
   SysCallSizeResult readv(int fd, const iovec* iovec, int num_iovec) override;
   SysCallSizeResult recv(int socket, void* buffer, size_t length, int flags) override;
+  SysCallSizeResult recvfrom(int sockfd, void* buffer, size_t length, int flags,
+                             struct sockaddr* addr, socklen_t* addrlen) override;
   SysCallIntResult close(int fd) override;
   SysCallIntResult shmOpen(const char* name, int oflag, mode_t mode) override;
   SysCallIntResult shmUnlink(const char* name) override;

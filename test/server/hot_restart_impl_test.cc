@@ -8,11 +8,11 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -23,8 +23,9 @@ using testing::WithArg;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
-class HotRestartImplTest : public TestBase {
+class HotRestartImplTest : public testing::Test {
 public:
   void setup() {
     EXPECT_CALL(os_sys_calls_, shmUnlink(_));
@@ -40,10 +41,11 @@ public:
     EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_ = std::make_unique<HotRestartImpl>(options_);
+    hot_restart_ = std::make_unique<HotRestartImpl>(options_, symbol_table_);
     hot_restart_->drainParentListeners();
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<MockOptions> options_;
@@ -130,7 +132,7 @@ TEST_F(HotRestartImplTest, crossAlloc) {
   EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _))
       .WillOnce(Return(Api::SysCallPtrResult{buffer_.data(), 0}));
   EXPECT_CALL(os_sys_calls_, bind(_, _, _));
-  HotRestartImpl hot_restart2(options_);
+  HotRestartImpl hot_restart2(options_, symbol_table_);
   Stats::RawStatData* stat1_prime = hot_restart2.statsAllocator().alloc("stat1");
   Stats::RawStatData* stat3_prime = hot_restart2.statsAllocator().alloc("stat3");
   Stats::RawStatData* stat5_prime = hot_restart2.statsAllocator().alloc("stat5");
@@ -247,5 +249,6 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
 INSTANTIATE_TEST_SUITE_P(HotRestartImplAlignmentTest, HotRestartImplAlignmentTest,
                          testing::Range(0UL, alignof(Stats::RawStatData) + 1));
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

@@ -6,6 +6,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/match.h"
+#include "yaml-cpp/yaml.h"
 
 namespace Envoy {
 namespace {
@@ -16,6 +17,21 @@ absl::string_view filenameFromPath(absl::string_view full_path) {
     return full_path;
   }
   return full_path.substr(index + 1, full_path.size());
+}
+
+void blockFormat(YAML::Node node) {
+  node.SetStyle(YAML::EmitterStyle::Block);
+
+  if (node.Type() == YAML::NodeType::Sequence) {
+    for (auto it : node) {
+      blockFormat(it);
+    }
+  }
+  if (node.Type() == YAML::NodeType::Map) {
+    for (auto it : node) {
+      blockFormat(it.second);
+    }
+  }
 }
 
 } // namespace
@@ -31,6 +47,11 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   // Checked by schema.
   ASSERT(percent >= 0.0 && percent <= 100.0);
   return max_value * (percent / 100.0);
+}
+
+bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value) {
+  return random_value % fractionalPercentDenominatorToInt(percent.denominator()) <
+         percent.numerator();
 }
 
 uint64_t fractionalPercentDenominatorToInt(
@@ -74,6 +95,7 @@ void MessageUtil::loadFromJsonEx(const std::string& json, Protobuf::Message& mes
   if (proto_unknown_fields == ProtoUnknownFieldsMode::Allow) {
     options.ignore_unknown_fields = true;
   }
+  options.case_insensitive_enum_parsing = true;
   const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
@@ -144,7 +166,7 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
     if (field->options().deprecated()) {
       std::string err = fmt::format(
           "Using deprecated option '{}' from file {}. This configuration will be removed from "
-          "Envoy soon. Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md "
+          "Envoy soon. Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
           "for details.",
           field->full_name(), filename);
       if (warn_only) {
@@ -171,6 +193,19 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
       }
     }
   }
+}
+
+std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
+                                                  const bool block_print,
+                                                  const bool always_print_primitive_fields) {
+  std::string json = getJsonStringFromMessage(message, false, always_print_primitive_fields);
+  auto node = YAML::Load(json);
+  if (block_print) {
+    blockFormat(node);
+  }
+  YAML::Emitter out;
+  out << node;
+  return out.c_str();
 }
 
 std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message,

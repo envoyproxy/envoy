@@ -1,6 +1,6 @@
 #include "common/common/hash.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 TEST(Hash, xxHash) {
@@ -37,5 +37,13 @@ TEST(Hash, stdhash) {
   EXPECT_EQ(std::hash<std::string>()(std::string("")), MurmurHash::murmurHash2_64(""));
 }
 #endif
+
+TEST(Hash, sharedStringSet) {
+  SharedStringSet set;
+  auto foo = std::make_shared<std::string>("foo");
+  set.insert(foo);
+  auto pos = set.find("foo");
+  EXPECT_EQ(pos->get(), foo.get());
+}
 
 } // namespace Envoy

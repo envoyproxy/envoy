@@ -127,9 +127,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
         config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager)
-    : context_(context), reverse_encode_order_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                             config, bugfix_reverse_encode_order, true)),
-      stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
+    : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
@@ -152,7 +150,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
-      delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)) {
+      delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
+      normalize_path_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, normalize_path,
+                                          // TODO(htuch): we should have a
+                                          // boolean variant of featureEnabled()
+                                          // here.
+                                          context.runtime().snapshot().featureEnabled(
+                                              "http_connection_manager.normalize_path", 0))) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
                                                                    route_config_provider_manager_);
@@ -229,9 +234,10 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     uint64_t overall_sampling{
         PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, overall_sampling, 100, 100)};
 
-    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
-        Http::TracingConnectionManagerConfig{tracing_operation_name, request_headers_for_tags,
-                                             client_sampling, random_sampling, overall_sampling});
+    tracing_config_ =
+        std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
+            tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
+            overall_sampling, tracing_config.verbose()});
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -322,11 +328,11 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1:
-    return Http::ServerConnectionPtr{
-        new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
+    return std::make_unique<Http::Http1::ServerConnectionImpl>(
+        connection, callbacks, http1_settings_, maxRequestHeadersKb());
   case CodecType::HTTP2:
-    return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb())};
+    return std::make_unique<Http::Http2::ServerConnectionImpl>(
+        connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb());
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(connection, data, callbacks,
                                                            context_.scope(), http1_settings_,

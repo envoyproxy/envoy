@@ -5,14 +5,15 @@
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
 namespace LcTrie {
 
-class LcTrieTest : public TestBase {
+class LcTrieTest : public testing::Test {
 public:
   void setup(const std::vector<std::vector<std::string>>& cidr_range_strings,
              bool exclusive = false, double fill_factor = 0, uint32_t root_branch_factor = 0) {

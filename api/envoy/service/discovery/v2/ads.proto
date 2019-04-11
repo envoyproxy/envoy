@@ -32,7 +32,7 @@ service AggregatedDiscoveryService {
       returns (stream envoy.api.v2.DiscoveryResponse) {
   }
 
-  rpc IncrementalAggregatedResources(stream envoy.api.v2.IncrementalDiscoveryRequest)
-      returns (stream envoy.api.v2.IncrementalDiscoveryResponse) {
+  rpc DeltaAggregatedResources(stream envoy.api.v2.DeltaDiscoveryRequest)
+      returns (stream envoy.api.v2.DeltaDiscoveryResponse) {
   }
 }

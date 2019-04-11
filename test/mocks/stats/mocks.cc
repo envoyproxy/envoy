@@ -1,8 +1,11 @@
 #include "mocks.h"
 
-#include "test/test_common/test_base.h"
+#include <memory>
+
+#include "common/stats/fake_symbol_table_impl.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -69,7 +72,7 @@ MockSource::~MockSource() {}
 MockSink::MockSink() {}
 MockSink::~MockSink() {}
 
-MockStore::MockStore() {
+MockStore::MockStore() : StoreImpl(*fake_symbol_table_) {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, histogram(_)).WillByDefault(Invoke([this](const std::string& name) -> Histogram& {
     auto* histogram = new NiceMock<MockHistogram>;
@@ -82,8 +85,12 @@ MockStore::MockStore() {
 }
 MockStore::~MockStore() {}
 
-MockIsolatedStatsStore::MockIsolatedStatsStore() {}
+MockIsolatedStatsStore::MockIsolatedStatsStore()
+    : IsolatedStoreImpl(Test::Global<Stats::FakeSymbolTableImpl>::get()) {}
 MockIsolatedStatsStore::~MockIsolatedStatsStore() {}
+
+MockStatsMatcher::MockStatsMatcher() {}
+MockStatsMatcher::~MockStatsMatcher() {}
 
 } // namespace Stats
 } // namespace Envoy

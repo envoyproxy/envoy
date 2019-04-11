@@ -11,9 +11,9 @@
 #include "test/integration/utility.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "mysql_test_utils.h"
 #include "rapidjson/document.h"
 
@@ -26,16 +26,19 @@ namespace MySQLProxy {
 
 constexpr int SESSIONS = 5;
 
-class MySQLIntegrationTest : public TestBaseWithParam<Network::Address::IpVersion>,
+class MySQLIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                              public MySQLTestUtils,
                              public BaseIntegrationTest {
   std::string mysqlConfig() {
-    return TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-        "test/extensions/filters/network/mysql_proxy/mysql_test_config.yaml"));
+    return fmt::format(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+                           "test/extensions/filters/network/mysql_proxy/mysql_test_config.yaml")),
+                       Network::Test::getLoopbackAddressString(GetParam()),
+                       Network::Test::getLoopbackAddressString(GetParam()),
+                       Network::Test::getAnyAddressString(GetParam()));
   }
 
 public:
-  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), realTime(), mysqlConfig()){};
+  MySQLIntegrationTest() : BaseIntegrationTest(GetParam(), mysqlConfig()){};
 
   // Initializer for an individual integration test.
   void SetUp() override { BaseIntegrationTest::initialize(); }
@@ -46,19 +49,6 @@ public:
     fake_upstreams_.clear();
   }
 };
-
-int mysqlGetCounterValueFromStats(const std::string& msg, const std::string& mysql_stat,
-                                  int& counter) {
-  Json::ObjectSharedPtr stats = Json::Factory::loadFromString(msg);
-  for (const Json::ObjectSharedPtr& stat : stats->getObjectArray("stats")) {
-    std::string entry = stat->getString("name");
-    if (!entry.compare(mysql_stat)) {
-      counter = stat->getInteger("value");
-      return 0;
-    }
-  }
-  return -1;
-}
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MySQLIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
@@ -77,16 +67,7 @@ TEST_P(MySQLIntegrationTest, MySQLStatsNewSessionTest) {
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
 
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
-                                         Http::CodecClient::Type::HTTP1, version_);
-
-  int ret = 0;
-  int counter = 0;
-  std::string mysql_stat = "mysql.mysql_stats.sessions";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, SESSIONS);
+  test_server_->waitForCounterGe("mysql.mysql_stats.sessions", SESSIONS);
 }
 
 /**
@@ -96,7 +77,7 @@ TEST_P(MySQLIntegrationTest, MySQLStatsNewSessionTest) {
  * - correct number of attempts
  * - no failures
  */
-TEST_P(MySQLIntegrationTest, MysqLoginTest) {
+TEST_P(MySQLIntegrationTest, MySQLLoginTest) {
   std::string str;
   std::string rcvd_data;
   std::string user = "user1";
@@ -108,7 +89,9 @@ TEST_P(MySQLIntegrationTest, MysqLoginTest) {
   // greeting
   std::string greeting = encodeServerGreeting(MYSQL_PROTOCOL_10);
   ASSERT_TRUE(fake_upstream_connection->write(greeting));
-  tcp_client->waitForData(str);
+
+  str.append(greeting);
+  tcp_client->waitForData(str, true);
 
   // Client username/password and capabilities
   std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user, CHALLENGE_SEQ_NUM);
@@ -119,25 +102,15 @@ TEST_P(MySQLIntegrationTest, MysqLoginTest) {
   // Server response OK to username/password
   std::string loginok = encodeClientLoginResp(MYSQL_RESP_OK);
   ASSERT_TRUE(fake_upstream_connection->write(loginok));
-  tcp_client->waitForData(str);
+
+  str.append(loginok);
+  tcp_client->waitForData(str, true);
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
-  // Verify counters
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
-                                         Http::CodecClient::Type::HTTP1, version_);
-  int ret = 0;
-  int counter = 0;
-  std::string mysql_stat = "mysql.mysql_stats.login_attempts";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, 1);
-  mysql_stat = "mysql.mysql_stats.login_failures";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, 0);
+  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", 1);
+  EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
 /**
@@ -150,9 +123,9 @@ TEST_P(MySQLIntegrationTest, MysqLoginTest) {
 TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
   int idx;
   std::string rcvd_data;
-  std::string str;
 
   for (idx = 0; idx < CLIENT_NUM; idx++) {
+    std::string str;
     std::string user("user");
     user.append(std::to_string(idx));
 
@@ -163,7 +136,9 @@ TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
     // greeting
     std::string greeting = encodeServerGreeting(MYSQL_PROTOCOL_10);
     ASSERT_TRUE(fake_upstream_connection->write(greeting));
-    tcp_client->waitForData(str);
+
+    str.append(greeting);
+    tcp_client->waitForData(str, true);
 
     // Client username/password and capabilities
     std::string login = encodeClientLogin(MYSQL_CLIENT_CAPAB_41VS320, user, CHALLENGE_SEQ_NUM);
@@ -174,26 +149,18 @@ TEST_P(MySQLIntegrationTest, MySQLUnitTestMultiClientsLoop) {
     // Server response OK to username/password
     std::string loginok = encodeClientLoginResp(MYSQL_RESP_OK);
     ASSERT_TRUE(fake_upstream_connection->write(loginok));
-    tcp_client->waitForData(str);
+
+    str.append(loginok);
+    tcp_client->waitForData(str, true);
 
     tcp_client->close();
     ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   }
 
   // Verify counters: CLIENT_NUM login attempts, no failures
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?format=json", "",
-                                         Http::CodecClient::Type::HTTP1, version_);
-  int ret = 0;
-  int counter = 0;
-  std::string mysql_stat = "mysql.mysql_stats.login_attempts";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, CLIENT_NUM);
-  mysql_stat = "mysql.mysql_stats.login_failures";
-  ret = mysqlGetCounterValueFromStats(response->body(), mysql_stat, counter);
-  EXPECT_EQ(ret, 0);
-  EXPECT_EQ(counter, 0);
+  test_server_->waitForCounterGe("mysql.mysql_stats.login_attempts", CLIENT_NUM);
+  EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_attempts")->value(), CLIENT_NUM);
+  EXPECT_EQ(test_server_->counter("mysql.mysql_stats.login_failures")->value(), 0);
 }
 
 } // namespace MySQLProxy

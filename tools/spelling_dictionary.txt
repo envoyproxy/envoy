@@ -4,6 +4,7 @@
 AAAA
 ACK
 AES
+AFAICT
 ALPN
 ALS
 AMZ
@@ -29,6 +30,7 @@ CPU
 CQ
 CR
 CRC
+CREAT
 CRL
 CRLFs
 CRT
@@ -72,6 +74,7 @@ EQ
 ERANGE
 EV
 EVAL
+EVLOOP
 EVP
 EWOULDBLOCK
 EXPR
@@ -106,6 +109,7 @@ HV
 IAM
 IANA
 IDL
+INADDR
 INET
 IO
 IOS
@@ -133,6 +137,7 @@ LC
 LDS
 LEV
 LHS
+LF
 MB
 MD
 MGET
@@ -143,15 +148,18 @@ MiB
 NACK
 NACKed
 NBF
+NBSP
 NDEBUG
 NGHTTP
 NOLINT
+NOLINTNEXTLINE
 NS
 NUL
 Nilsson
 OCSP
 OK
 OOM
+OOMs
 OS
 OSI
 OSS
@@ -178,6 +186,9 @@ RBAC
 RCU
 RDN
 RDS
+RDWR
+README
+REIMPLEMENT
 REQ
 RFC
 RHS
@@ -245,7 +256,9 @@ UTC
 UTF
 UUID
 UUIDs
+VC
 VH
+VHDS
 VLOG
 WKT
 WRR
@@ -253,6 +266,7 @@ WS
 Welford's
 Werror
 XDS
+xDSes
 XFCC
 XFF
 XM
@@ -266,6 +280,7 @@ abcd
 absl
 accessor
 accessors
+acls
 addr
 agg
 alloc
@@ -307,8 +322,11 @@ broadcasted
 buf
 builtin
 cancellable
+canonicalization
 canonicalize
+canonicalizing
 canonicalized
+canonicalizer
 cardinality
 casted
 chrono
@@ -355,9 +373,12 @@ dedupe
 deduplicate
 deflateInit
 deletable
+deleter
 delim
+deque
 dereference
 dereferences
+dereferencing
 deregistered
 deserialization
 deserialize
@@ -433,6 +454,7 @@ gregs
 gzip
 hacky
 handshaker
+hd
 hdr
 healths
 healthz
@@ -447,6 +469,7 @@ ie
 ifdef
 iff
 impl
+implementors
 impls
 incrementing
 ing
@@ -511,6 +534,7 @@ mem
 memcpy
 midp
 milli
+misconfiguration
 misconfigured
 mixin
 mkdir
@@ -609,6 +633,7 @@ reparse
 reperform
 repicked
 repo
+reservable
 resize
 resized
 resizes
@@ -625,6 +650,7 @@ sanitization
 sanitizer
 scala
 scalability
+sched
 schemas
 serializable
 serializer
@@ -664,6 +690,7 @@ symlinked
 sync
 sys
 sysctl
+sz
 tbl
 tcmalloc
 templated
@@ -675,15 +702,20 @@ th
 thru
 tm
 tmp
+tokenize
+tokenizes
 tokenizing
 traceid
 trie
+tuple
+tuples
 typeid
 ucontext
 uint
 un
 unary
 unconfigurable
+unconfigured
 uncontended
 undef
 undegraded
@@ -691,7 +723,9 @@ undrained
 uneject
 unejected
 unejection
+unescape
 unescaped
+unescaping
 uninsantiated
 uninstantiated
 unix
@@ -704,6 +738,7 @@ unordered
 unowned
 unparented
 unpause
+unpopulated
 unprotect
 unref
 unreferenced
@@ -741,9 +776,13 @@ xDS
 xeon
 xform
 xhtml
+xid
 xxhash
 xxs
+xxxx
+xxxxx
 xyz
 zag
 zig
 zlib
+zxid

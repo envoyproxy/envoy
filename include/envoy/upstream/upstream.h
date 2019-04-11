@@ -296,9 +296,16 @@ public:
   virtual LocalityWeightsConstSharedPtr localityWeights() const PURE;
 
   /**
-   * @return next locality index to route to if performing locality weighted balancing.
+   * @return next locality index to route to if performing locality weighted balancing
+   * against healthy hosts.
    */
-  virtual absl::optional<uint32_t> chooseLocality() PURE;
+  virtual absl::optional<uint32_t> chooseHealthyLocality() PURE;
+
+  /**
+   * @return next locality index to route to if performing locality weighted balancing
+   * against degraded hosts.
+   */
+  virtual absl::optional<uint32_t> chooseDegradedLocality() PURE;
 
   /**
    * @return uint32_t the priority of this host set.
@@ -380,6 +387,51 @@ public:
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;
+
+  /**
+   * Callback provided during batch updates that can be used to update hosts.
+   */
+  class HostUpdateCb {
+  public:
+    virtual ~HostUpdateCb() {}
+    /**
+     * Updates the hosts in a given host set.
+     *
+     * @param priority the priority of the host set to update.
+     * @param update_hosts_param supplies the list of hosts and hosts per locality.
+     * @param locality_weights supplies a map from locality to associated weight.
+     * @param hosts_added supplies the hosts added since the last update.
+     * @param hosts_removed supplies the hosts removed since the last update.
+     * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+     */
+    virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+                             LocalityWeightsConstSharedPtr locality_weights,
+                             const HostVector& hosts_added, const HostVector& hosts_removed,
+                             absl::optional<uint32_t> overprovisioning_factor) PURE;
+  };
+
+  /**
+   * Callback that provides the mechanism for performing batch host updates for a PrioritySet.
+   */
+  class BatchUpdateCb {
+  public:
+    virtual ~BatchUpdateCb() {}
+
+    /**
+     * Performs a batch host update. Implementors should use the provided callback to update hosts
+     * in the PrioritySet.
+     */
+    virtual void batchUpdate(HostUpdateCb& host_update_cb) PURE;
+  };
+
+  /**
+   * Allows updating hosts for multiple priorities at once, deferring the MemberUpdateCb from
+   * triggering until all priorities have been updated. The resulting callback will take into
+   * account hosts moved from one priority to another.
+   *
+   * @param callback callback to use to add hosts.
+   */
+  virtual void batchHostUpdate(BatchUpdateCb& callback) PURE;
 };
 
 /**
@@ -401,6 +453,7 @@ public:
   COUNTER  (lb_subsets_removed)                                                                    \
   COUNTER  (lb_subsets_selected)                                                                   \
   COUNTER  (lb_subsets_fallback)                                                                   \
+  COUNTER  (lb_subsets_fallback_panic)                                                             \
   COUNTER  (original_dst_host_invalid)                                                             \
   COUNTER  (upstream_cx_total)                                                                     \
   GAUGE    (upstream_cx_active)                                                                    \
@@ -475,14 +528,21 @@ public:
 // clang-format on
 
 /**
- * Cluster circuit breakers stats.
+ * Cluster circuit breakers stats. Open circuit breaker stats and remaining resource stats
+ * can be handled differently by passing in different macros.
  */
 // clang-format off
-#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GAUGE)                                                  \
-  GAUGE (cx_open)                                                                                  \
-  GAUGE (rq_pending_open)                                                                          \
-  GAUGE (rq_open)                                                                                  \
-  GAUGE (rq_retry_open)
+#define ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(OPEN_GAUGE, REMAINING_GAUGE)                            \
+  OPEN_GAUGE      (cx_open)                                                                        \
+  OPEN_GAUGE      (rq_pending_open)                                                                \
+  OPEN_GAUGE      (rq_open)                                                                        \
+  OPEN_GAUGE      (rq_retry_open)                                                                  \
+  OPEN_GAUGE      (cx_pool_open)                                                                   \
+  REMAINING_GAUGE (remaining_cx)                                                                   \
+  REMAINING_GAUGE (remaining_pending)                                                              \
+  REMAINING_GAUGE (remaining_rq)                                                                   \
+  REMAINING_GAUGE (remaining_retries)                                                              \
+  REMAINING_GAUGE (remaining_cx_pools)
 // clang-format on
 
 /**
@@ -503,7 +563,7 @@ struct ClusterLoadReportStats {
  * Struct definition for cluster circuit breakers stats. @see stats_macros.h
  */
 struct ClusterCircuitBreakersStats {
-  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT)
+  ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 /**
@@ -701,6 +761,11 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+  /**
+   * @return eds cluster service_name of the cluster.
+   */
+  virtual absl::optional<std::string> eds_service_name() const PURE;
 
 protected:
   /**

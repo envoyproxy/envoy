@@ -35,7 +35,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
                                      Upstream::ResourcePriority priority) {
   RetryStatePtr ret;
 
-  // We short circuit here and do not both with an allocation if there is no chance we will retry.
+  // We short circuit here and do not bother with an allocation if there is no chance we will retry.
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
       route_policy.retryOn()) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, runtime, random,
@@ -57,8 +57,16 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()) {
 
+  retry_on_ = route_policy.retryOn();
+  retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
+  const uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
+  // Cap the max interval to 10 times the base interval to ensure reasonable backoff intervals.
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
+  host_selection_max_attempts_ = route_policy.hostSelectionMaxAttempts();
+
+  // Merge in the headers.
   if (request_headers.EnvoyRetryOn()) {
-    retry_on_ = parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
+    retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
   }
   if (request_headers.EnvoyRetryGrpcOn()) {
     retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().c_str());
@@ -67,6 +75,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     const char* max_retries = request_headers.EnvoyMaxRetries()->value().c_str();
     uint64_t temp;
     if (StringUtil::atoull(max_retries, temp)) {
+      // The max retries header takes precedence if set.
       retries_remaining_ = temp;
     }
   }
@@ -79,14 +88,6 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       }
     }
   }
-
-  // Merge in the route policy.
-  retry_on_ |= route_policy.retryOn();
-  retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
-  const uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
-  // Cap the max interval to 10 times the base interval to ensure reasonable backoff intervals.
-  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
-  host_selection_max_attempts_ = route_policy.hostSelectionMaxAttempts();
 }
 
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }
@@ -147,13 +148,11 @@ void RetryStateImpl::resetRetry() {
   }
 }
 
-RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
-                                        const absl::optional<Http::StreamResetReason>& reset_reason,
-                                        DoRetryCallback callback) {
-
-  ASSERT((response_headers != nullptr) ^ reset_reason.has_value());
-
-  if (callback_ && !wouldRetry(response_headers, reset_reason)) {
+RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callback) {
+  // If a callback is armed from a previous shouldRetry and we don't need to
+  // retry this particular request, we can infer that we did a retry earlier
+  // and it was successful.
+  if (callback_ && !would_retry) {
     cluster_.stats().upstream_rq_retry_success_.inc();
   }
 
@@ -164,7 +163,7 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
   }
 
   retries_remaining_--;
-  if (!wouldRetry(response_headers, reset_reason)) {
+  if (!would_retry) {
     return RetryStatus::No;
   }
 
@@ -185,7 +184,26 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
   return RetryStatus::Yes;
 }
 
+RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::HeaderMap& response_headers,
+                                               DoRetryCallback callback) {
+  return shouldRetry(wouldRetryFromHeaders(response_headers), callback);
+}
+
+RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
+                                             DoRetryCallback callback) {
+  return shouldRetry(wouldRetryFromReset(reset_reason), callback);
+}
+
 bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_headers) {
+  if (response_headers.EnvoyOverloaded() != nullptr) {
+    return false;
+  }
+
+  // We never retry if the request is rate limited.
+  if (response_headers.EnvoyRateLimited() != nullptr) {
+    return false;
+  }
+
   if (retry_on_ & RetryPolicy::RETRY_ON_5XX) {
     if (Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(response_headers))) {
       return true;
@@ -237,7 +255,20 @@ bool RetryStateImpl::wouldRetryFromHeaders(const Http::HeaderMap& response_heade
   return false;
 }
 
-bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason& reset_reason) {
+bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason) {
+  // First check "never retry" conditions so we can short circuit (we never
+  // retry if the reset reason is overflow).
+  if (reset_reason == Http::StreamResetReason::Overflow) {
+    return false;
+  }
+
+  if (retry_on_ & (RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GATEWAY_ERROR)) {
+    // Currently we count an upstream reset as a "5xx" (since it will result in
+    // one). We may eventually split this out into its own type. I.e.,
+    // RETRY_ON_RESET.
+    return true;
+  }
+
   if ((retry_on_ & RetryPolicy::RETRY_ON_REFUSED_STREAM) &&
       reset_reason == Http::StreamResetReason::RemoteRefusedStreamReset) {
     return true;
@@ -249,40 +280,6 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason& reset_re
   }
 
   return false;
-}
-
-bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
-                                const absl::optional<Http::StreamResetReason>& reset_reason) {
-  // First check "never retry" conditions so we can short circuit, then delegate to
-  // helper methods for checks dependent on retry policy.
-
-  // we never retry if the reset reason is overflow.
-  if (reset_reason && reset_reason.value() == Http::StreamResetReason::Overflow) {
-    return false;
-  }
-
-  if (response_headers != nullptr) {
-    // We never retry if the overloaded header is set.
-    if (response_headers->EnvoyOverloaded() != nullptr) {
-      return false;
-    }
-
-    // We never retry if the request is rate limited.
-    if (response_headers->EnvoyRateLimited() != nullptr) {
-      return false;
-    }
-
-    if (wouldRetryFromHeaders(*response_headers)) {
-      return true;
-    }
-  } else if (retry_on_ & (RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GATEWAY_ERROR)) {
-    // wouldRetry() is passed null headers when there was an upstream reset. Currently we count an
-    // upstream reset as a "5xx" (since it will result in one). We may eventually split this out
-    // into its own type. I.e., RETRY_ON_RESET.
-    return true;
-  }
-
-  return reset_reason && wouldRetryFromReset(*reset_reason);
 }
 
 } // namespace Router

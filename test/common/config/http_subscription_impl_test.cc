@@ -1,13 +1,14 @@
 #include <memory>
 
 #include "test/common/config/http_subscription_test_harness.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Config {
 namespace {
 
-class HttpSubscriptionImplTest : public TestBase, public HttpSubscriptionTestHarness {};
+class HttpSubscriptionImplTest : public testing::Test, public HttpSubscriptionTestHarness {};
 
 // Validate that the client can recover from a remote fetch failure.
 TEST_F(HttpSubscriptionImplTest, OnRequestReset) {

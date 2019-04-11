@@ -35,6 +35,7 @@ public:
   void finishSpan() override;
   void setOperation(const std::string& operation) override;
   void setTag(const std::string& name, const std::string& value) override;
+  void log(SystemTime timestamp, const std::string& event) override;
   void injectContext(Http::HeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
@@ -42,6 +43,7 @@ public:
 
 private:
   OpenTracingDriver& driver_;
+  opentracing::FinishSpanOptions finish_options_;
   std::unique_ptr<opentracing::Span> span_;
 };
 

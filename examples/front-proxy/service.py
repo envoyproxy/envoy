@@ -1,9 +1,9 @@
 from flask import Flask
 from flask import request
-import socket
 import os
-import sys
 import requests
+import socket
+import sys
 
 app = Flask(__name__)
 

@@ -79,6 +79,11 @@ public:
   uint64_t id() { return connection_->id(); }
 
   /**
+   * @return the underlying connection error.
+   */
+  absl::string_view connectionFailureReason() { return connection_->transportFailureReason(); }
+
+  /**
    * @return size_t the number of outstanding requests that have not completed or been reset.
    */
   size_t numActiveRequests() { return active_requests_.size(); }
@@ -179,7 +184,9 @@ private:
         : StreamDecoderWrapper(inner), parent_(parent) {}
 
     // StreamCallbacks
-    void onResetStream(StreamResetReason reason) override { parent_.onReset(*this, reason); }
+    void onResetStream(StreamResetReason reason, absl::string_view) override {
+      parent_.onReset(*this, reason);
+    }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 

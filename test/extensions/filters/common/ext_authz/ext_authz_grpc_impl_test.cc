@@ -9,9 +9,9 @@
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -29,7 +29,7 @@ namespace ExtAuthz {
 constexpr char V2[] = "envoy.service.auth.v2.Authorization";
 constexpr char V2Alpha[] = "envoy.service.auth.v2alpha.Authorization";
 
-class ExtAuthzGrpcClientTest : public TestBaseWithParam<bool> {
+class ExtAuthzGrpcClientTest : public testing::TestWithParam<bool> {
 public:
   ExtAuthzGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()), timeout_(10) {}
 

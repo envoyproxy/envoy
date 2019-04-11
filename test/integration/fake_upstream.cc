@@ -120,7 +120,7 @@ void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vect
       [this, &metadata_map_vector]() -> void { encoder_.encodeMetadata(metadata_map_vector); });
 }
 
-void FakeStream::onResetStream(Http::StreamResetReason) {
+void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
   Thread::LockGuard lock(lock_);
   saw_reset_ = true;
   decoder_event_.notifyOne();
@@ -208,18 +208,18 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
 
 FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connection,
                                        Stats::Store& store, Type type,
-                                       Event::TestTimeSystem& time_system)
+                                       Event::TestTimeSystem& time_system,
+                                       uint32_t max_request_headers_kb)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
-    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(shared_connection_.connection(),
-                                                                 *this, Http::Http1Settings());
+    codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
+        shared_connection_.connection(), *this, Http::Http1Settings(), max_request_headers_kb);
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
     settings.allow_metadata_ = true;
     codec_ = std::make_unique<Http::Http2::ServerConnectionImpl>(
-        shared_connection_.connection(), *this, store, settings,
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
+        shared_connection_.connection(), *this, store, settings, max_request_headers_kb);
     ASSERT(type == Type::HTTP2);
   }
 
@@ -344,11 +344,24 @@ FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type
   ENVOY_LOG(info, "starting fake server on unix domain socket {}", uds_path);
 }
 
+static Network::SocketPtr
+makeTcpListenSocket(const Network::Address::InstanceConstSharedPtr& address) {
+  return Network::SocketPtr{new Network::TcpListenSocket(address, nullptr, true)};
+}
+
 static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::IpVersion version) {
-  return Network::SocketPtr{new Network::TcpListenSocket(
-      Network::Utility::parseInternetAddressAndPort(
-          fmt::format("{}:{}", Network::Test::getAnyAddressUrlString(version), port)),
-      nullptr, true)};
+  return makeTcpListenSocket(
+      Network::Utility::parseInternetAddress(Network::Test::getAnyAddressString(version), port));
+}
+
+FakeUpstream::FakeUpstream(const Network::Address::InstanceConstSharedPtr& address,
+                           FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
+                           bool enable_half_close)
+    : FakeUpstream(Network::Test::createRawBufferSocketFactory(), makeTcpListenSocket(address),
+                   type, time_system, enable_half_close) {
+  ENVOY_LOG(info, "starting fake server on socket {}:{}. Address version is {}",
+            address->ip()->addressAsString(), address->ip()->port(),
+            Network::Test::addressVersionAsString(address->ip()->version()));
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
@@ -419,7 +432,8 @@ void FakeUpstream::threadRoutine() {
 
 AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                                     FakeHttpConnectionPtr& connection,
-                                                    milliseconds timeout) {
+                                                    milliseconds timeout,
+                                                    uint32_t max_request_headers_kb) {
   Event::TestTimeSystem& time_system = timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   {
@@ -439,7 +453,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
     connection = std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_,
-                                                      time_system);
+                                                      time_system, max_request_headers_kb);
   }
   VERIFY_ASSERTION(connection->initialize());
   VERIFY_ASSERTION(connection->readDisable(false));
@@ -469,7 +483,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
       } else {
         connection = std::make_unique<FakeHttpConnection>(
             upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_,
-            upstream.timeSystem());
+            upstream.timeSystem(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB);
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));

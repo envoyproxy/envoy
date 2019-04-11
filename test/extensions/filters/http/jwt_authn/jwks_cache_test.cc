@@ -19,7 +19,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-class JwksCacheTest : public TestBase {
+class JwksCacheTest : public testing::Test {
 protected:
   JwksCacheTest() : api_(Api::createApiForTest()) {}
   void SetUp() override {

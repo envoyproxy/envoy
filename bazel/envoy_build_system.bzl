@@ -79,7 +79,7 @@ def envoy_copts(repository, test = False):
                "//conditions:default": [],
            }) + select({
                # TCLAP command line parser needs this to support int64_t/uint64_t
-               "@bazel_tools//tools/osx:darwin": ["-DHAVE_LONG_LONG"],
+               repository + "//bazel:apple": ["-DHAVE_LONG_LONG"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
@@ -97,8 +97,8 @@ def envoy_static_link_libstdcpp_linkopts():
 def envoy_linkopts():
     return select({
                # The macOS system library transitively links common libraries (e.g., pthread).
-               "@bazel_tools//tools/osx:darwin": [
-                   # See note here: http://luajit.org/install.html
+               "@envoy//bazel:apple": [
+                   # See note here: https://luajit.org/install.html
                    "-pagezero_size 10000",
                    "-image_base 100000000",
                ],
@@ -126,7 +126,7 @@ def _envoy_stamped_linkopts():
 
         # macOS doesn't have an official equivalent to the `.note.gnu.build-id`
         # ELF section, so just stuff the raw ID into a new text section.
-        "@bazel_tools//tools/osx:darwin": [
+        "@envoy//bazel:apple": [
             "-sectcreate __TEXT __build_id",
             "$(location @envoy//bazel:raw_build_id.ldscript)",
         ],
@@ -139,7 +139,7 @@ def _envoy_stamped_linkopts():
 
 def _envoy_stamped_deps():
     return select({
-        "@bazel_tools//tools/osx:darwin": [
+        "@envoy//bazel:apple": [
             "@envoy//bazel:raw_build_id.ldscript",
         ],
         "//conditions:default": [
@@ -150,8 +150,8 @@ def _envoy_stamped_deps():
 # Compute the test linkopts based on various options.
 def envoy_test_linkopts():
     return select({
-        "@bazel_tools//tools/osx:darwin": [
-            # See note here: http://luajit.org/install.html
+        "@envoy//bazel:apple": [
+            # See note here: https://luajit.org/install.html
             "-pagezero_size 10000",
             "-image_base 100000000",
         ],
@@ -174,8 +174,7 @@ def envoy_external_dep_path(dep):
 def tcmalloc_external_dep(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": None,
-        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("tcmalloc_debug"),
-        "//conditions:default": envoy_external_dep_path("tcmalloc_and_profiler"),
+        "//conditions:default": envoy_external_dep_path("gperftools"),
     })
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
@@ -184,8 +183,7 @@ def tcmalloc_external_dep(repository):
 def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
-        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("tcmalloc_debug")],
-        "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
+        "//conditions:default": [envoy_external_dep_path("gperftools")],
     })
 
 # Transform the package path (e.g. include/envoy/common) into a path for
@@ -196,11 +194,17 @@ def envoy_include_prefix(path):
         return "/".join(path.split("/")[1:])
     return None
 
+def filter_windows_keys(cache_entries = {}):
+    # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
+    # rules_foreign_cc will figure it out for us
+    return {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
+
 # External CMake C++ library targets should be specified with this function. This defaults
 # to building the dependencies with ninja
 def envoy_cmake_external(
         name,
         cache_entries = {},
+        debug_cache_entries = {},
         cmake_options = ["-GNinja"],
         make_commands = ["ninja", "ninja install"],
         lib_source = "",
@@ -210,9 +214,8 @@ def envoy_cmake_external(
         pdb_name = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
         **kwargs):
-    # On Windows, we don't want to explicitly set CMAKE_BUILD_TYPE,
-    # rules_foreign_cc will figure it out for us
-    cache_entries_no_build_type = {key: cache_entries[key] for key in cache_entries.keys() if key != "CMAKE_BUILD_TYPE"}
+    cache_entries_debug = dict(cache_entries)
+    cache_entries_debug.update(debug_cache_entries)
 
     pf = ""
     if copy_pdb:
@@ -233,8 +236,10 @@ def envoy_cmake_external(
     cmake_external(
         name = name,
         cache_entries = select({
-            "@envoy//bazel:windows_x86_64": cache_entries_no_build_type,
-            "//conditions:default": cache_entries,
+            "@envoy//bazel:windows_opt_build": filter_windows_keys(cache_entries),
+            "@envoy//bazel:windows_x86_64": filter_windows_keys(cache_entries_debug),
+            "@envoy//bazel:opt_build": cache_entries,
+            "//conditions:default": cache_entries_debug,
         }),
         cmake_options = cmake_options,
         generate_crosstool_file = select({
@@ -402,7 +407,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
         data = [corpus_name],
         # No fuzzing on macOS.
         deps = select({
-            "@bazel_tools//tools/osx:darwin": ["//test:dummy_main"],
+            "@envoy//bazel:apple": ["//test:dummy_main"],
             "//conditions:default": [
                 ":" + test_lib_name,
                 "//test/fuzz:main",
@@ -438,7 +443,8 @@ def envoy_cc_test(
         args = [],
         shard_count = None,
         coverage = True,
-        local = False):
+        local = False,
+        size = "medium"):
     test_lib_tags = []
     if coverage:
         test_lib_tags.append("coverage_test_lib")
@@ -467,6 +473,7 @@ def envoy_cc_test(
         tags = tags + ["coverage_test"],
         local = local,
         shard_count = shard_count,
+        size = size,
     )
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
@@ -493,6 +500,7 @@ def envoy_cc_test_infrastructure_library(
         tags = tags,
         alwayslink = 1,
         linkstatic = 1,
+        visibility = ["//visibility:public"],
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -508,7 +516,6 @@ def envoy_cc_test_library(
         tags = []):
     deps = deps + [
         repository + "//test/test_common:printers_includes",
-        repository + "//test/test_common:test_base",
     ]
     envoy_cc_test_infrastructure_library(
         name,
@@ -637,7 +644,7 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
 def envoy_select_hot_restart(xs, repository = ""):
     return select({
         repository + "//bazel:disable_hot_restart": [],
-        "@bazel_tools//tools/osx:darwin": [],
+        repository + "//bazel:apple": [],
         "//conditions:default": xs,
     })
 
@@ -664,7 +671,7 @@ def envoy_select_exported_symbols(xs):
 def envoy_select_force_libcpp(if_libcpp, default = None):
     return select({
         "@envoy//bazel:force_libcpp": if_libcpp,
-        "@bazel_tools//tools/osx:darwin": [],
+        "@envoy//bazel:apple": [],
         "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": default or [],
     })
@@ -675,8 +682,6 @@ def envoy_select_boringssl(if_fips, default = None):
         "//conditions:default": default or [],
     })
 
+# Selects the part of QUICHE that does not yet work with the current CI.
 def envoy_select_quiche(xs, repository = ""):
-    return select({
-        repository + "//bazel:enable_quiche": xs,
-        "//conditions:default": [],
-    })
+    return xs

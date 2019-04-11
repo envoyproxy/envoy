@@ -25,9 +25,9 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/load_balancer_context.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 
@@ -56,7 +56,8 @@ public:
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(degradedHostsPerLocality, const HostsPerLocality&());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
-  MOCK_METHOD0(chooseLocality, absl::optional<uint32_t>());
+  MOCK_METHOD0(chooseHealthyLocality, absl::optional<uint32_t>());
+  MOCK_METHOD0(chooseDegradedLocality, absl::optional<uint32_t>());
   MOCK_CONST_METHOD0(priority, uint32_t());
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
   void setOverprovisioningFactor(const uint32_t overprovisioning_factor) {
@@ -93,6 +94,7 @@ public:
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  absl::optional<uint32_t> overprovisioning_factor));
+  MOCK_METHOD1(batchHostUpdate, void(BatchUpdateCb&));
   MOCK_CONST_METHOD6(updateHosts,
                      void(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                           LocalityWeightsConstSharedPtr locality_weights,
@@ -280,8 +282,9 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
 
   // Upstream::ClusterManager
-  MOCK_METHOD2(addOrUpdateCluster,
-               bool(const envoy::api::v2::Cluster& cluster, const std::string& version_info));
+  MOCK_METHOD3(addOrUpdateCluster,
+               bool(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
+                    ClusterWarmingCallback cluster_warming_cb));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
   MOCK_METHOD0(clusters, ClusterInfoMap());
   MOCK_METHOD1(get, ThreadLocalCluster*(const std::string& cluster));
@@ -307,6 +310,7 @@ public:
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks_,
                ClusterUpdateCallbacksHandle*(ClusterUpdateCallbacks& callbacks));
+  MOCK_CONST_METHOD0(warmingClusterCount, std::size_t());
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

@@ -5,7 +5,6 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/filesystem/filesystem.h"
 
 #include "common/common/logger.h"
 #include "common/common/macros.h"
@@ -31,7 +30,7 @@ public:
   void flush() override;
 
 private:
-  Filesystem::FileSharedPtr log_file_;
+  AccessLog::AccessLogFileSharedPtr log_file_;
 };
 
 } // namespace Logger

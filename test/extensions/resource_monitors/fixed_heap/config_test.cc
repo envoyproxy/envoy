@@ -6,12 +6,14 @@
 #include "extensions/resource_monitors/fixed_heap/config.h"
 
 #include "test/mocks/event/mocks.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
+namespace {
 
 TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   auto factory =
@@ -28,6 +30,7 @@ TEST(FixedHeapMonitorFactoryTest, CreateMonitor) {
   EXPECT_NE(monitor, nullptr);
 }
 
+} // namespace
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

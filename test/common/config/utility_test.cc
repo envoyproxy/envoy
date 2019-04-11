@@ -14,10 +14,10 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -78,6 +78,18 @@ TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
   api_config_source.mutable_request_timeout()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
   EXPECT_EQ(1234, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
+}
+
+TEST(UtilityTest, ConfigSourceDefaultInitFetchTimeout) {
+  envoy::api::v2::core::ConfigSource config_source;
+  EXPECT_EQ(0, Utility::configSourceInitialFetchTimeout(config_source).count());
+}
+
+TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
+  envoy::api::v2::core::ConfigSource config_source;
+  config_source.mutable_initial_fetch_timeout()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(654));
+  EXPECT_EQ(654, Utility::configSourceInitialFetchTimeout(config_source).count());
 }
 
 TEST(UtilityTest, TranslateApiConfigSource) {
@@ -268,7 +280,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified:");
+        "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must have a single gRPC service "
+        "specified:");
   }
 
   {
@@ -279,7 +292,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
+        "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must not have a cluster name "
+        "specified:");
   }
 
   {
@@ -290,7 +304,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
+        "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must not have a cluster name "
+        "specified:");
   }
 
   {
@@ -301,7 +316,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have a gRPC service "
+        "envoy::api::v2::core::ConfigSource, if not a gRPC type, must not have a gRPC service "
         "specified:");
   }
 
@@ -311,7 +326,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_cluster_names("foo");
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
-        EnvoyException, "envoy::api::v2::core::ConfigSource type must be GRPC:");
+        EnvoyException, "envoy::api::v2::core::ConfigSource type must be gRPC:");
   }
 
   {
@@ -388,7 +403,8 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   EXPECT_THROW_WITH_REGEX(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
+      "envoy::api::v2::core::ConfigSource::.DELTA_.GRPC must not have a cluster name "
+      "specified:");
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTypes) {

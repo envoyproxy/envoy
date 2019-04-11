@@ -57,8 +57,9 @@ public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Envoy::Network::TransportSocketCallbacks& callbacks) override;
   std::string protocol() const override;
+  absl::string_view failureReason() const override;
   bool canFlushClose() override { return handshake_complete_; }
-  const Envoy::Ssl::Connection* ssl() const override { return nullptr; }
+  const Envoy::Ssl::ConnectionInfo* ssl() const override { return nullptr; }
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void closeSocket(Network::ConnectionEvent event) override;
   Network::IoResult doRead(Buffer::Instance& buffer) override;

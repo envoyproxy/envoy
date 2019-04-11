@@ -9,18 +9,19 @@
 #include "test/mocks/common.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 using testing::NiceMock;
 
 namespace Envoy {
 namespace Event {
+namespace {
 
-class DispatchedThreadTest : public TestBase {
+class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
       : config_(1000, 1000, 1000, 1000), api_(Api::createApiForTest(fakestats_)), thread_(*api_),
@@ -45,5 +46,6 @@ TEST_F(DispatchedThreadTest, PostCallbackTest) {
   thread_.exit();
 }
 
+} // namespace
 } // namespace Event
 } // namespace Envoy

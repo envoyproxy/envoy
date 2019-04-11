@@ -13,6 +13,7 @@
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
+#include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -30,11 +31,11 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -61,10 +62,10 @@ public:
         .WillByDefault(Invoke([&](const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                   Outlier::EventLoggerSharedPtr outlier_event_logger,
                                   bool added_via_api) -> ClusterSharedPtr {
-          return ClusterImplBase::create(cluster, cm, stats_, tls_, dns_resolver_,
-                                         ssl_context_manager_, runtime_, random_, dispatcher_,
-                                         log_manager_, local_info_, admin_, singleton_manager_,
-                                         outlier_event_logger, added_via_api, *api_);
+          return ClusterFactoryImplBase::create(
+              cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
+              dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
+              outlier_event_logger, added_via_api, *api_);
         }));
   }
 
@@ -132,6 +133,11 @@ public:
                           const HostVector& hosts_removed));
 };
 
+class MockLocalHostsRemoved {
+public:
+  MOCK_METHOD1(post, void(const HostVector&));
+};
+
 // A test version of ClusterManagerImpl that provides a way to get a non-const handle to the
 // clusters, which is necessary in order to call updateHosts on the priority set.
 class TestClusterManagerImpl : public ClusterManagerImpl {
@@ -151,17 +157,16 @@ public:
 // it with the right values at the right times.
 class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
-  MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
-                                  ClusterManagerFactory& factory, Stats::Store& stats,
-                                  ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                                  Runtime::RandomGenerator& random,
-                                  const LocalInfo::LocalInfo& local_info,
-                                  AccessLog::AccessLogManager& log_manager,
-                                  Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                                  Api::Api& api, MockLocalClusterUpdate& local_cluster_update)
+  MockedUpdatedClusterManagerImpl(
+      const envoy::config::bootstrap::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+      Server::Admin& admin, Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
+      MockLocalHostsRemoved& local_hosts_removed, Http::Context& http_context)
       : TestClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info,
-                               log_manager, main_thread_dispatcher, admin, api, http_context_),
-        local_cluster_update_(local_cluster_update) {}
+                               log_manager, main_thread_dispatcher, admin, api, http_context),
+        local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
   void postThreadLocalClusterUpdate(const Cluster&, uint32_t priority,
@@ -169,8 +174,13 @@ protected:
                                     const HostVector& hosts_removed) override {
     local_cluster_update_.post(priority, hosts_added, hosts_removed);
   }
-  Http::ContextImpl http_context_;
+
+  void postThreadLocalHostRemoval(const Cluster&, const HostVector& hosts_removed) override {
+    local_hosts_removed_.post(hosts_removed);
+  }
+
   MockLocalClusterUpdate& local_cluster_update_;
+  MockLocalHostsRemoved& local_hosts_removed_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
@@ -179,7 +189,9 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
   return bootstrap;
 }
 
-class ClusterManagerImplTest : public TestBase {
+const ClusterManager::ClusterWarmingCallback dummyWarmingCb = [](auto, auto) {};
+
+class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest() : api_(Api::createApiForTest()) {}
 
@@ -221,7 +233,7 @@ public:
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, *api_,
-        local_cluster_update_);
+        local_cluster_update_, local_hosts_removed_, http_context_);
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -262,6 +274,7 @@ public:
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
   MockLocalClusterUpdate local_cluster_update_;
+  MockLocalHostsRemoved local_hosts_removed_;
   Http::ContextImpl http_context_;
 };
 
@@ -592,8 +605,7 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
       "name": "redis_cluster",
       "lb_type": "ring_hash",
       "ring_hash_lb_config": {
-        "minimum_ring_size": 125,
-        "use_std_hash": true
+        "minimum_ring_size": 125
       },
       "connect_timeout_ms": 250,
       "type": "static",
@@ -621,8 +633,6 @@ TEST_F(ClusterManagerImplTest, RingHashLoadBalancerV2Initialization) {
       dns_lookup_family: V4_ONLY
       ring_hash_lb_config:
         minimum_ring_size: 125
-        deprecated_v1:
-          use_std_hash: true
   )EOF";
   create(parseBootstrapFromV2Yaml(yaml));
 }
@@ -880,16 +890,19 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster3));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1",
+                                       dummyWarmingCb);
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster4));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize(_));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2",
+                                       dummyWarmingCb);
 
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster5));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"), "version3");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster5"), "version3",
+                                       dummyWarmingCb);
 
   cds->initialized_callback_();
   EXPECT_CALL(*cds, versionInfo()).WillOnce(Return("version3"));
@@ -898,6 +911,7 @@ version_info: version3
 static_clusters:
   - cluster:
       name: "cds_cluster"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -909,6 +923,7 @@ static_clusters:
       nanos: 234000000
   - cluster:
       name: "fake_cluster"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -920,6 +935,7 @@ static_clusters:
       nanos: 234000000
   - cluster:
       name: "fake_cluster2"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -933,6 +949,7 @@ dynamic_active_clusters:
   - version_info: "version1"
     cluster:
       name: "cluster3"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -945,6 +962,7 @@ dynamic_active_clusters:
   - version_info: "version2"
     cluster:
       name: "cluster4"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -957,6 +975,7 @@ dynamic_active_clusters:
   - version_info: "version3"
     cluster:
       name: "cluster5"
+      type: "STATIC"
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -1016,7 +1035,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true)).WillOnce(Return(cluster1));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
-  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"), "");
+  cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster1"), "", dummyWarmingCb);
 
   // Add another update callback on foo so we make sure callbacks keep working.
   ReadyWatcher membership_updated;
@@ -1061,8 +1080,8 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
-  EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1"));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1",
+                                                   dummyWarmingCb));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
   checkConfigDump(R"EOF(
@@ -1070,6 +1089,7 @@ dynamic_warming_clusters:
   - version_info: "version1"
     cluster:
       name: "fake_cluster"
+      type: STATIC
       connect_timeout: 0.25s
       hosts:
       - socket_address:
@@ -1106,20 +1126,35 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  int warming_cb_calls = 0;
+  ClusterManager::ClusterWarmingState last_warming_state =
+      ClusterManager::ClusterWarmingState::Starting;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+      defaultStaticCluster("fake_cluster"), "",
+      [&last_warming_state, &warming_cb_calls](auto, auto state) {
+        warming_cb_calls++;
+        last_warming_state = state;
+      }));
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  EXPECT_EQ(1, cluster_manager_->warmingClusterCount());
   EXPECT_EQ(nullptr, cluster_manager_->get("fake_cluster"));
+  EXPECT_EQ(1, warming_cb_calls);
+  EXPECT_EQ(ClusterManager::ClusterWarmingState::Starting, last_warming_state);
   cluster1->initialize_callback_();
 
   EXPECT_EQ(cluster1->info_, cluster_manager_->get("fake_cluster")->info());
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
+  EXPECT_EQ(0, cluster_manager_->warmingClusterCount());
+  EXPECT_EQ(2, warming_cb_calls);
+  EXPECT_EQ(ClusterManager::ClusterWarmingState::Finished, last_warming_state);
 
   // Now try to update again but with the same hash.
-  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "",
+                                                    dummyWarmingCb));
 
   // Now do it again with a different hash.
   auto update_cluster = defaultStaticCluster("fake_cluster");
@@ -1136,7 +1171,7 @@ TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
         initialize_callback();
       }));
   EXPECT_CALL(*callbacks, onClusterAddOrUpdate(_)).Times(1);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, ""));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(update_cluster, "", dummyWarmingCb));
 
   EXPECT_EQ(cluster2->info_, cluster_manager_->get("fake_cluster")->info());
   EXPECT_EQ(1UL, cluster_manager_->clusters().size());
@@ -1206,7 +1241,8 @@ TEST_F(ClusterManagerImplTest, addOrUpdateClusterStaticExists) {
   EXPECT_CALL(initialized, ready());
   cluster1->initialize_callback_();
 
-  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), ""));
+  EXPECT_FALSE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "",
+                                                    dummyWarmingCb));
 
   // Attempt to remove a static cluster.
   EXPECT_FALSE(cluster_manager_->removeCluster("fake_cluster"));
@@ -1246,7 +1282,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
 
   cluster1->priority_set_.updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      {});
+      100);
 
   auto* tls_cluster = cluster_manager_->get(cluster1->info_->name());
 
@@ -1256,6 +1292,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
   EXPECT_EQ(1, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(host3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
   EXPECT_EQ(3, tls_cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(100, tls_cluster->prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
 
   factory_.tls_.shutdownThread();
 
@@ -1651,7 +1688,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   // drain callbacks, etc.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
-
   factory_.tls_.shutdownThread();
 }
 
@@ -1878,7 +1914,6 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   // drain callbacks, etc.
   dns_timer_->callback_();
   dns_callback(TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.3"}));
-
   factory_.tls_.shutdownThread();
 }
 
@@ -2096,6 +2131,11 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
         EXPECT_EQ(1, hosts_removed.size());
       }));
 
+  EXPECT_CALL(local_hosts_removed_, post(_))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([](const auto& hosts_removed) { EXPECT_EQ(1, hosts_removed.size()); }));
+
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
   HostVectorSharedPtr hosts(
@@ -2290,6 +2330,11 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
         EXPECT_EQ(1, hosts_removed.size());
       }));
 
+  EXPECT_CALL(local_hosts_removed_, post(_)).WillOnce(Invoke([](const auto& hosts_removed) {
+    // 1st removal.
+    EXPECT_EQ(1, hosts_removed.size());
+  }));
+
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
 
   // We can't used the bootstrap cluster, so add one dynamically.
@@ -2305,7 +2350,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   common_lb_config:
     update_merge_window: 3s
   )EOF";
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml), "version1"));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml), "version1",
+                                                   dummyWarmingCb));
 
   Cluster& cluster = cluster_manager_->activeClusters().find("new_cluster")->second;
   HostVectorSharedPtr hosts(
@@ -2357,8 +2403,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
   EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
-  EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2"));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2",
+                                                   dummyWarmingCb));
   EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_modified").value());
   EXPECT_EQ(1, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
@@ -2372,7 +2418,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
 }
 
-class ClusterManagerInitHelperTest : public TestBase {
+class ClusterManagerInitHelperTest : public testing::Test {
 public:
   MOCK_METHOD1(onClusterInit, void(Cluster& cluster));
 
