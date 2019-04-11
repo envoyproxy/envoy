@@ -105,7 +105,7 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
     }
 
     auto b3_parent_id_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID);
-    if (b3_parent_id_entry && b3_parent_id_entry->value().size() > 0) {
+    if (b3_parent_id_entry && !b3_parent_id_entry->value().empty()) {
       const std::string pspid = b3_parent_id_entry->value().c_str();
       if (!StringUtil::atoull(pspid.c_str(), parent_id, 16)) {
         throw ExtractorException(fmt::format("Invalid parent span id {}", pspid.c_str()));

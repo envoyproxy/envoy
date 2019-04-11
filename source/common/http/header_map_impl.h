@@ -80,6 +80,7 @@ public:
   void remove(const LowerCaseString& key) override;
   void removePrefix(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
+  bool empty() const override { return headers_.empty(); }
 
 protected:
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
@@ -177,6 +178,7 @@ protected:
     std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
     size_t size() const { return headers_.size(); }
+    bool empty() const { return headers_.empty(); }
 
   private:
     std::list<HeaderEntryImpl> headers_;
