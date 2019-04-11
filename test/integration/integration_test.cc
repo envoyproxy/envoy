@@ -778,6 +778,8 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_pool_overflow")->value(), 1);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
