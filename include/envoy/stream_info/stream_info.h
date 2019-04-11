@@ -77,7 +77,7 @@ struct ResponseCodeDetailValues {
   const std::string STREAM_IDLE_TIMEOUT = "stream_idle_timeout";
   // The per-stream total request timeout was exceeded
   const std::string REQUEST_OVERALL_TIMEOUT = "request_overall_timeout";
-  // The request was rejected due to the Overload Manager reaching configured resouce limits.
+  // The request was rejected due to the Overload Manager reaching configured resource limits.
   const std::string OVERLOAD = "overload";
   // The HTTP/1.0 or HTTP/0.9 request was rejected due to HTTP/1.0 support not being configured.
   const std::string LOW_VERSION = "low_version";
@@ -99,7 +99,7 @@ struct ResponseCodeDetailValues {
   const std::string DIRECT_RESPONSE = "direct_response";
   // The request was rejected by the router filter because there was no route found.
   const std::string CLUSTER_NOT_FOUND = "cluster_not_found";
-  // The request was rejected by the router filter because the cluster was in maintainence mode.
+  // The request was rejected by the router filter because the cluster was in maintenance mode.
   const std::string MAINTENANCE_MODE = "maintenance_mode";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NO_HEALTHY_UPSTREAM = "no_healthy_upstream";

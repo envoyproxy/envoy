@@ -560,7 +560,7 @@ void Filter::updateOutlierDetection(Http::Code code) {
   }
 }
 
-// FIXME details
+// TODO(alyssawilk) details
 void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags) {
   const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
@@ -664,7 +664,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   // I think in practice if there's a transport failure it takes precedence,
   // otherwise there was an application error. So maybe just converting both
   // transport_failure_reasons and reset_reasons to the snake_case is
-  // sufficient?  But maybe there's cases where we want mulitple levels to add
+  // sufficient?  But maybe there's cases where we want multiple levels to add
   // their information.
   std::string details =
       absl::StrCat("upstream_reset{", reset_reason, ",", transport_failure_reason, "}");

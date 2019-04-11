@@ -1115,7 +1115,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
   }
 }
 
-// TODO(alyssar, eziskind) put this in stream info when merging #6530
+// TODO(alyssawilk) put this in stream info when merging #6530
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(HeaderMap& headers)>& modify_headers, bool is_head_request,
