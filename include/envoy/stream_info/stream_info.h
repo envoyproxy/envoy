@@ -74,7 +74,7 @@ enum ResponseFlag {
  * scoped to avoid collisions.
  */
 struct ResponseCodeDetailValues {
-  const std::string RC_SET_BY_UPSTREAM = "response_code_set_by_upstream";
+  const std::string SET_BY_UPSTREAM = "set_by_upstream";
 
   // TODO(#6542): add values for sendLocalReply use-cases
 };
