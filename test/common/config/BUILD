@@ -79,6 +79,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "grpc_stream_test",
+    srcs = ["grpc_stream_test.cc"],
+    deps = [
+        "//source/common/config:grpc_stream_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "grpc_subscription_impl_test",
     srcs = ["grpc_subscription_impl_test.cc"],
     deps = [

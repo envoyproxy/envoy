@@ -356,14 +356,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (cluster_->maintenanceMode()) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
-    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "maintenance mode",
-                               [this](Http::HeaderMap& headers) {
-                                 if (!config_.suppress_envoy_headers_) {
-                                   headers.insertEnvoyOverloaded().value(
-                                       Http::Headers::get().EnvoyOverloadedValues.True);
-                                 }
-                               },
-                               absl::nullopt);
+    callbacks_->sendLocalReply(
+        Http::Code::ServiceUnavailable, "maintenance mode",
+        [this](Http::HeaderMap& headers) {
+          if (!config_.suppress_envoy_headers_) {
+            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+          }
+        },
+        absl::nullopt);
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -444,8 +444,7 @@ void Filter::sendNoHealthyUpstreamResponse() {
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  bool buffering =
-      (retry_state_ && retry_state_->enabled()) || do_shadowing_;
+  bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
   if (buffering && buffer_limit_ > 0 &&
       getLength(callbacks_->decodingBuffer()) + data.length() > buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
@@ -682,14 +681,14 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
     callbacks_->streamInfo().setResponseFlag(response_flags);
 
-    callbacks_->sendLocalReply(code, body,
-                               [dropped, this](Http::HeaderMap& headers) {
-                                 if (dropped && !config_.suppress_envoy_headers_) {
-                                   headers.insertEnvoyOverloaded().value(
-                                       Http::Headers::get().EnvoyOverloadedValues.True);
-                                 }
-                               },
-                               absl::nullopt);
+    callbacks_->sendLocalReply(
+        code, body,
+        [dropped, this](Http::HeaderMap& headers) {
+          if (dropped && !config_.suppress_envoy_headers_) {
+            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+          }
+        },
+        absl::nullopt);
   }
 }
 

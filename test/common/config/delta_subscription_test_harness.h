@@ -104,7 +104,7 @@ public:
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
       expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config");
     }
-    subscription_->onReceiveMessage(std::move(response));
+    subscription_->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
