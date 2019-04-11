@@ -28,7 +28,7 @@ struct SupportedCommands {
         "srem", "sscan", "strlen", "ttl", "type", "zadd", "zcard", "zcount", "zincrby", "zlexcount",
         "zrange", "zrangebylex", "zrangebyscore", "zrank", "zrem", "zremrangebylex",
         "zremrangebyrank", "zremrangebyscore", "zrevrange", "zrevrangebylex", "zrevrangebyscore",
-        "zrevrank", "zscan", "zscore");
+        "zrevrank", "zscan", "zscore", "zpopmin", "zpopmax");
   }
 
   /**
