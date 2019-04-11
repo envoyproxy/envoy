@@ -116,7 +116,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_googlesource_quiche//:quic_platform_export",
-        "@com_googlesource_quiche//:quic_buffer_allocator_interface_lib",
+        "@com_googlesource_quiche//:quic_buffer_allocator_lib",
     ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         "//include/envoy/thread:thread_interface",

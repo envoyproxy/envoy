@@ -7,6 +7,9 @@
 #include <fstream>
 #include <unordered_set>
 
+#include "common/memory/stats.h"
+
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
@@ -533,11 +536,24 @@ TEST_F(FileUtilsTest, ReadFileContents) {
 }
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
+  bool deterministic_stats = Envoy::Stats::TestUtil::hasDeterministicMallocStats();
+  size_t start_mem;
+  if (deterministic_stats) {
+    start_mem = Envoy::Memory::Stats::totalCurrentlyAllocated();
+    std::cerr << "start mem " << start_mem << "\n";
+  }
   QuicStreamBufferAllocator allocator;
   char* p = allocator.New(1024);
+  if (deterministic_stats) {
+    EXPECT_LT(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
+    std::cerr << "after New " << Envoy::Memory::Stats::totalCurrentlyAllocated() << "\n";
+  }
   EXPECT_NE(nullptr, p);
   memset(p, 'a', 1024);
   allocator.Delete(p);
+  if (deterministic_stats) {
+    EXPECT_EQ(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
+  }
 }
 
 } // namespace

@@ -211,9 +211,15 @@ cc_library(
 )
 
 cc_library(
-    name = "quic_buffer_allocator_interface_lib",
-    srcs = ["quiche/quic/core/quic_buffer_allocator.cc"],
-    hdrs = ["quiche/quic/core/quic_buffer_allocator.h"],
+    name = "quic_buffer_allocator_lib",
+    srcs = [
+        "quiche/quic/core/quic_buffer_allocator.cc",
+        "quiche/quic/core/quic_simple_buffer_allocator.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_buffer_allocator.h",
+        "quiche/quic/core/quic_simple_buffer_allocator.h",
+    ],
     visibility = ["//visibility:public"],
     deps = [":quic_platform_export"],
 )
