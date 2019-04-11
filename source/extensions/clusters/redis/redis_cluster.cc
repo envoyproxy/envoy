@@ -123,7 +123,7 @@ ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
   return std::make_shared<Network::Address::Ipv4Instance>(address, value.asArray()[1].asInteger());
 }
 
-void RedisCluster::RedisDiscoverySession::cancelRequestAndCloseClient() {
+RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
   if (current_request_) {
     current_request_->cancel();
     current_request_ = nullptr;
@@ -134,12 +134,11 @@ void RedisCluster::RedisDiscoverySession::cancelRequestAndCloseClient() {
   }
 }
 
-RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() { cancelRequestAndCloseClient(); }
-
 void RedisCluster::RedisDiscoverySession::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    cancelRequestAndCloseClient();
+    // This should only happen after any active requests have been failed/cancelled.
+    ASSERT(!current_request_);
     parent_.dispatcher_.deferredDelete(std::move(client_));
   }
 }

@@ -162,9 +162,6 @@ private:
     // Start discovery against a random host from existing hosts
     void startResolve();
 
-    // Clean up request and connection
-    void cancelRequestAndCloseClient();
-
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }
     std::chrono::milliseconds opTimeout() const override {
