@@ -28,22 +28,17 @@ Network::FilterFactoryCb DubboProxyFilterConfigFactory::createFilterFactoryFromP
 /**
  * Static registration for the dubbo filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DubboProxyFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(DubboProxyFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 class ProtocolTypeMapper {
 public:
   using ConfigProtocolType = envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType;
-  typedef std::map<ConfigProtocolType, ProtocolType> ProtocolTypeMap;
+  typedef absl::flat_hash_map<ConfigProtocolType, ProtocolType> ProtocolTypeMap;
 
   static ProtocolType lookupProtocolType(ConfigProtocolType config_type) {
     const auto& iter = protocolTypeMap().find(config_type);
-    if (iter == protocolTypeMap().end()) {
-      throw EnvoyException(fmt::format(
-          "unknown protocol {}",
-          envoy::config::filter::network::dubbo_proxy::v2alpha1::ProtocolType_Name(config_type)));
-    }
+    ASSERT(iter != protocolTypeMap().end());
     return iter->second;
   }
 
@@ -59,16 +54,11 @@ class SerializationTypeMapper {
 public:
   using ConfigSerializationType =
       envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType;
-  typedef std::map<ConfigSerializationType, SerializationType> SerializationTypeMap;
+  typedef absl::flat_hash_map<ConfigSerializationType, SerializationType> SerializationTypeMap;
 
   static SerializationType lookupSerializationType(ConfigSerializationType type) {
     const auto& iter = serializationTypeMap().find(type);
-    if (iter == serializationTypeMap().end()) {
-      throw EnvoyException(fmt::format(
-          "unknown deserializer {}",
-          envoy::config::filter::network::dubbo_proxy::v2alpha1::SerializationType_Name(type)));
-    }
-
+    ASSERT(iter != serializationTypeMap().end());
     return iter->second;
   }
 

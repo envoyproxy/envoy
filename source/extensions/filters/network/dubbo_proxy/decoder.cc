@@ -24,7 +24,7 @@ DecoderStateMachine::onTransportBegin(Buffer::Instance& buffer, Protocol::Contex
   } else {
     handler_ = decoder_callbacks_.newDecoderEventHandler();
   }
-  return DecoderStatus(ProtocolState::onTransferHeaderTo, handler_->transportBegin());
+  return DecoderStatus(ProtocolState::OnTransferHeaderTo, handler_->transportBegin());
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::onTransportEnd() {
@@ -36,20 +36,20 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::onTransferHeaderTo(Buffe
                                                                            size_t length) {
   ENVOY_LOG(debug, "dubbo decoder: transfer protocol header, buffer size {}, header size {}",
             buffer.length(), length);
-  return DecoderStatus(ProtocolState::onMessageBegin, handler_->transferHeaderTo(buffer, length));
+  return DecoderStatus(ProtocolState::OnMessageBegin, handler_->transferHeaderTo(buffer, length));
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::onTransferBodyTo(Buffer::Instance& buffer,
                                                                          int32_t length) {
   ENVOY_LOG(debug, "dubbo decoder: transfer protocol body, buffer size {}, body size {}",
             buffer.length(), length);
-  return DecoderStatus(ProtocolState::onTransportEnd, handler_->transferBodyTo(buffer, length));
+  return DecoderStatus(ProtocolState::OnTransportEnd, handler_->transferBodyTo(buffer, length));
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::onMessageBegin() {
   ENVOY_LOG(debug, "dubbo decoder: start deserializing messages, deserializer name {}",
             deserializer_.name());
-  return DecoderStatus(ProtocolState::onMessageEnd,
+  return DecoderStatus(ProtocolState::OnMessageEnd,
                        handler_->messageBegin(metadata_->message_type(), metadata_->request_id(),
                                               metadata_->serialization_type()));
 }
@@ -81,22 +81,22 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::onMessageEnd(Buffer::Ins
   }
 
   ENVOY_LOG(debug, "dubbo decoder: ends the deserialization of the message");
-  return DecoderStatus(ProtocolState::onTransferBodyTo, handler_->messageEnd(metadata_));
+  return DecoderStatus(ProtocolState::OnTransferBodyTo, handler_->messageEnd(metadata_));
 }
 
 DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Instance& buffer) {
   switch (state_) {
-  case ProtocolState::onTransportBegin:
+  case ProtocolState::OnTransportBegin:
     return onTransportBegin(buffer, context_);
-  case ProtocolState::onTransferHeaderTo:
+  case ProtocolState::OnTransferHeaderTo:
     return onTransferHeaderTo(buffer, context_.header_size_);
-  case ProtocolState::onMessageBegin:
+  case ProtocolState::OnMessageBegin:
     return onMessageBegin();
-  case ProtocolState::onMessageEnd:
+  case ProtocolState::OnMessageEnd:
     return onMessageEnd(buffer, context_.body_size_);
-  case ProtocolState::onTransferBodyTo:
+  case ProtocolState::OnTransferBodyTo:
     return onTransferBodyTo(buffer, context_.body_size_);
-  case ProtocolState::onTransportEnd:
+  case ProtocolState::OnTransportEnd:
     return onTransportEnd();
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

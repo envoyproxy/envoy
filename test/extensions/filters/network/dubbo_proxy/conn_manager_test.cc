@@ -350,6 +350,17 @@ TEST_F(ConnectionManagerTest, OnDataHandlesHeartbeatEvent) {
   EXPECT_EQ(1U, store_.counter("test.request_event").value());
 }
 
+TEST_F(ConnectionManagerTest, HandlesHeartbeatWithException) {
+  custom_protocol_ = new NiceMock<MockProtocol>();
+  initializeFilter();
+
+  EXPECT_CALL(*custom_protocol_, encode(_, _, _)).WillOnce(Return(false));
+
+  MessageMetadataSharedPtr meta = std::make_shared<MessageMetadata>();
+  EXPECT_THROW_WITH_MESSAGE(filter_->onHeartbeat(meta), EnvoyException,
+                            "failed to encode heartbeat message");
+}
+
 TEST_F(ConnectionManagerTest, OnDataHandlesMessageSplitAcrossBuffers) {
   initializeFilter();
   writePartialHessianRequestMessage(buffer_, false, false, 0x0F, true);

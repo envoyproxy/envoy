@@ -143,7 +143,7 @@ TEST_F(DubboDecoderStateMachineTest, DeserializeRpcInvocationException) {
 
   Buffer::OwnedImpl buffer;
   EXPECT_THROW_WITH_MESSAGE(dsm.run(buffer), EnvoyException, "mock deserialize exception");
-  EXPECT_EQ(dsm.currentState(), ProtocolState::onMessageEnd);
+  EXPECT_EQ(dsm.currentState(), ProtocolState::OnMessageEnd);
 }
 
 TEST_F(DubboDecoderStateMachineTest, DeserializeRpcResultException) {
@@ -163,7 +163,7 @@ TEST_F(DubboDecoderStateMachineTest, DeserializeRpcResultException) {
 
   Buffer::OwnedImpl buffer;
   EXPECT_THROW_WITH_MESSAGE(dsm.run(buffer), EnvoyException, "mock deserialize exception");
-  EXPECT_EQ(dsm.currentState(), ProtocolState::onMessageEnd);
+  EXPECT_EQ(dsm.currentState(), ProtocolState::OnMessageEnd);
 }
 
 TEST_F(DubboDecoderStateMachineTest, ProtocolDecodeException) {
@@ -177,7 +177,7 @@ TEST_F(DubboDecoderStateMachineTest, ProtocolDecodeException) {
 
   Buffer::OwnedImpl buffer;
   EXPECT_THROW_WITH_MESSAGE(dsm.run(buffer), EnvoyException, "mock deserialize exception");
-  EXPECT_EQ(dsm.currentState(), ProtocolState::onTransportBegin);
+  EXPECT_EQ(dsm.currentState(), ProtocolState::OnTransportBegin);
 }
 
 TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {

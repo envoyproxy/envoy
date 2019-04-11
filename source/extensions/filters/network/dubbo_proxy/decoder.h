@@ -17,12 +17,12 @@ namespace DubboProxy {
 #define ALL_PROTOCOL_STATES(FUNCTION)                                                              \
   FUNCTION(StopIteration)                                                                          \
   FUNCTION(WaitForData)                                                                            \
-  FUNCTION(onTransportBegin)                                                                       \
-  FUNCTION(onTransportEnd)                                                                         \
-  FUNCTION(onMessageBegin)                                                                         \
-  FUNCTION(onMessageEnd)                                                                           \
-  FUNCTION(onTransferHeaderTo)                                                                     \
-  FUNCTION(onTransferBodyTo)                                                                       \
+  FUNCTION(OnTransportBegin)                                                                       \
+  FUNCTION(OnTransportEnd)                                                                         \
+  FUNCTION(OnMessageBegin)                                                                         \
+  FUNCTION(OnMessageEnd)                                                                           \
+  FUNCTION(OnTransferHeaderTo)                                                                     \
+  FUNCTION(OnTransferBodyTo)                                                                       \
   FUNCTION(Done)
 
 /**
@@ -50,7 +50,7 @@ public:
   DecoderStateMachine(Protocol& protocol, Deserializer& deserializer,
                       MessageMetadataSharedPtr& metadata, DecoderCallbacks& decoder_callbacks)
       : protocol_(protocol), deserializer_(deserializer), metadata_(metadata),
-        decoder_callbacks_(decoder_callbacks), state_(ProtocolState::onTransportBegin) {}
+        decoder_callbacks_(decoder_callbacks), state_(ProtocolState::OnTransportBegin) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state

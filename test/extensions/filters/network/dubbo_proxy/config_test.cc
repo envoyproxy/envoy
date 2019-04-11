@@ -138,6 +138,32 @@ TEST_F(DubboFilterConfigTest, DubboProxyWithMultipleFilters) {
   EXPECT_EQ("dubbo.ingress.", factory.config_stat_prefix_);
 }
 
+TEST_F(DubboFilterConfigTest, CreateFilterChain) {
+  const std::string yaml = R"EOF(
+    stat_prefix: ingress
+    route_config:
+      name: local_route
+    dubbo_filters:
+      - name: envoy.filters.dubbo.mock_filter
+        config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            name: test_service
+      - name: envoy.filters.dubbo.router
+    )EOF";
+
+  DubboFilters::MockFilterConfigFactory factory;
+  Registry::InjectFactory<DubboFilters::NamedDubboFilterConfigFactory> registry(factory);
+
+  DubboProxyProto dubbo_config = parseDubboProxyFromV2Yaml(yaml);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  DubboFilters::MockFilterChainFactoryCallbacks callbacks;
+  ConfigImpl config(dubbo_config, context);
+  EXPECT_CALL(callbacks, addDecoderFilter(_)).Times(2);
+  config.createFilterChain(callbacks);
+}
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

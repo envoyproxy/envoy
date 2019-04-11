@@ -16,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-const uint32_t BufferLimit = UINT32_MAX;
+constexpr uint32_t BufferLimit = UINT32_MAX;
 
 ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
                                      TimeSource& time_system)
