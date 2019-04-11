@@ -70,8 +70,8 @@ namespace Envoy {
 // Expect that the statement throws the specified type of exception with a message that does not
 // contain any substring matching the specified regular expression.
 #define EXPECT_THROW_WITHOUT_REGEX(statement, expected_exception, regex_str)                       \
-  EXPECT_THAT_THROWS_MESSAGE(                                                                      \
-      statement, expected_exception, ::testing::Not(::testing::ContainsRegex(regex_str)))
+  EXPECT_THAT_THROWS_MESSAGE(statement, expected_exception,                                        \
+                             ::testing::Not(::testing::ContainsRegex(regex_str)))
 
 #define VERBOSE_EXPECT_NO_THROW(statement)                                                         \
   try {                                                                                            \
