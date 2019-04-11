@@ -569,14 +569,14 @@ template <class Value> struct TrieLookupTable {
    * @param key the key used to add the entry.
    * @param value the value to be associated with the key.
    */
-  void add(const char* key, Value value) {
+  void add(absl::string_view key, Value value) {
     TrieEntry<Value>* current = &root_;
-    while (uint8_t c = *key) {
+    for (auto it = key.begin(); it < key.end(); ++it) {
+      uint8_t c = *it;
       if (!current->entries_[c]) {
         current->entries_[c] = std::make_unique<TrieEntry<Value>>();
       }
       current = current->entries_[c].get();
-      key++;
     }
     current->value_ = value;
   }
@@ -586,13 +586,12 @@ template <class Value> struct TrieLookupTable {
    * @param key the key used to find.
    * @return the value associated with the key.
    */
-  Value find(const char* key) const {
+  Value find(absl::string_view key) const {
     const TrieEntry<Value>* current = &root_;
-    while (uint8_t c = *key) {
+    for (auto it = key.begin(); it < key.end(); ++it) {
+      uint8_t c = *it;
       current = current->entries_[c].get();
-      if (current) {
-        key++;
-      } else {
+      if (current == nullptr) {
         return nullptr;
       }
     }

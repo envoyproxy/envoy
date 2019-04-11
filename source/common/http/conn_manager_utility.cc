@@ -223,7 +223,7 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     return;
   }
 
-  std::string x_request_id = request_headers.RequestId()->value().c_str();
+  std::string x_request_id(request_headers.RequestId()->value().getStringView());
   uint64_t result;
   // Skip if x-request-id is corrupted.
   if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {

@@ -200,7 +200,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
         admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
     EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
 }
 

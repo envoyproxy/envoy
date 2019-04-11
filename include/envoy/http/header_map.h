@@ -119,11 +119,6 @@ public:
   char* buffer() { return buffer_.dynamic_; }
 
   /**
-   * @return a null terminated C string.
-   */
-  const char* c_str() const { return buffer_.ref_; }
-
-  /**
    * @return an absl::string_view.
    */
   absl::string_view getStringView() const {
@@ -144,12 +139,19 @@ public:
   /**
    * @return whether a substring exists in the string.
    */
-  bool find(const char* str) const { return strstr(c_str(), str); }
+  bool find(const char* str) const {
+    return getStringView().find(absl::string_view(str)) != absl::string_view::npos;
+  }
 
   /**
    * Set the value of the string by copying data into it. This overwrites any existing string.
    */
   void setCopy(const char* data, uint32_t size);
+
+  /**
+   * Set the value of the string by copying data into it. This overwrites any existing string.
+   */
+  void setCopy(absl::string_view view);
 
   /**
    * Set the value of the string to an integer. This overwrites any existing string.
@@ -173,8 +175,10 @@ public:
    */
   Type type() const { return type_; }
 
-  bool operator==(const char* rhs) const { return 0 == strcmp(c_str(), rhs); }
-  bool operator!=(const char* rhs) const { return 0 != strcmp(c_str(), rhs); }
+  bool operator==(const char* rhs) const { return getStringView() == absl::string_view(rhs); }
+  bool operator==(absl::string_view rhs) const { return getStringView() == rhs; }
+  bool operator!=(const char* rhs) const { return getStringView() != absl::string_view(rhs); }
+  bool operator!=(absl::string_view rhs) const { return getStringView() != rhs; }
 
 private:
   union Buffer {
@@ -524,8 +528,8 @@ public:
   friend std::ostream& operator<<(std::ostream& os, const HeaderMap& headers) {
     headers.iterate(
         [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-          *static_cast<std::ostream*>(context)
-              << "'" << header.key().c_str() << "', '" << header.value().c_str() << "'\n";
+          *static_cast<std::ostream*>(context) << "'" << header.key().getStringView() << "', '"
+                                               << header.value().getStringView() << "'\n";
           return HeaderMap::Iterate::Continue;
         },
         &os);

@@ -491,7 +491,7 @@ TEST_F(RouterTest, AddCookie) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
-        EXPECT_EQ(std::string{headers.get(Http::Headers::get().SetCookie)->value().c_str()},
+        EXPECT_EQ(std::string{headers.get(Http::Headers::get().SetCookie)->value().getStringView()},
                   "foo=\"" + cookie_value + "\"; Max-Age=1337; HttpOnly");
       }));
   expectResponseTimerCreate();
@@ -538,7 +538,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
 
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
-        EXPECT_STREQ(headers.get(Http::Headers::get().SetCookie)->value().c_str(), "foo=baz");
+        EXPECT_EQ(headers.get(Http::Headers::get().SetCookie)->value().getStringView(), "foo=baz");
       }));
   expectResponseTimerCreate();
 
@@ -592,9 +592,9 @@ TEST_F(RouterTest, AddMultipleCookies) {
 
         headers.iterate(
             [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-              if (header.key().c_str() == Http::Headers::get().SetCookie.get().c_str()) {
+              if (header.key() == Http::Headers::get().SetCookie.get()) {
                 static_cast<MockFunction<void(const std::string&)>*>(context)->Call(
-                    std::string(header.value().c_str()));
+                    std::string(header.value().getStringView()));
               }
               return Http::HeaderMap::Iterate::Continue;
             },
