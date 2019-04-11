@@ -226,7 +226,7 @@ TEST_F(GrpcMuxImplTest, DumpControlPlaneConfig) {
 
   EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1")).Times(0);
   expectSendMessage(type_url, {"x", "y"}, "1");
-  grpc_mux_->onReceiveMessage(std::move(response));
+  grpc_mux_->onDiscoveryResponse(std::move(response));
 
   expectSendMessage(type_url, {}, "1");
 

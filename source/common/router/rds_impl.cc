@@ -234,7 +234,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
     // of this code, locking the weak_ptr will not fail.
     auto subscription = element.second.lock();
     ASSERT(subscription);
-    ASSERT(subscription->route_config_providers_.size() > 0);
+    ASSERT(!subscription->route_config_providers_.empty());
 
     if (subscription->config_info_) {
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
