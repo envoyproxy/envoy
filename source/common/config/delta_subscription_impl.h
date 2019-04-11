@@ -41,17 +41,19 @@ public:
     request_.mutable_node()->MergeFrom(local_info_.node());
   }
 
-  void updateResources(std::vector<std::string> resource_names) override {
+  void updateResources(std::vector<std::string> update_to_these_names) override {
     std::vector<std::string> cur_added;
     std::vector<std::string> cur_removed;
 
     // set_difference expects sorted collections. (resource_names_ is always sorted; it's std::set).
-    std::sort(resource_names.begin(), resource_names.end());
+    std::sort(update_to_these_names.begin(), update_to_these_names.end());
 
-    std::set_difference(resource_names.begin(), resource_names.end(), resource_names_.begin(),
-                        resource_names_.end(), std::inserter(cur_added, cur_added.begin()));
-    std::set_difference(resource_names_.begin(), resource_names_.end(), resource_names.begin(),
-                        resource_names.end(), std::inserter(cur_removed, cur_removed.begin()));
+    std::set_difference(update_to_these_names.begin(), update_to_these_names.end(),
+                        resource_names_.begin(), resource_names_.end(),
+                        std::inserter(cur_added, cur_added.begin()));
+    std::set_difference(resource_names_.begin(), resource_names_.end(),
+                        update_to_these_names.begin(), update_to_these_names.end(),
+                        std::inserter(cur_removed, cur_removed.begin()));
 
     for (const auto& a : cur_added) {
       setResourceWaitingForServer(a);
