@@ -4,12 +4,19 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include <netinet/in.h>
+
 #include <fstream>
 #include <unordered_set>
 
+#include "common/network/utility.h"
+
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -30,6 +37,7 @@
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
+#include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
@@ -39,6 +47,7 @@
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
 
+using testing::_;
 using testing::HasSubstr;
 
 // Basic tests to validate functioning of the QUICHE quic platform
@@ -46,6 +55,8 @@ using testing::HasSubstr;
 // typedef/passthrough to a std:: or absl:: construct, the tests are kept
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
+
+using testing::Return;
 
 namespace quic {
 namespace {
@@ -529,6 +540,36 @@ TEST_F(FileUtilsTest, ReadFileContents) {
   std::string output;
   ReadFileContents(file_path, &output);
   EXPECT_EQ(data, output);
+}
+
+TEST_F(QuicPlatformTest, PickUnsedPort) {
+  int port = QuicPickUnusedPortOrDie();
+  std::vector<Envoy::Network::Address::IpVersion> supported_versions =
+      Envoy::TestEnvironment::getIpVersionsForTest();
+  for (auto ip_version : supported_versions) {
+    Envoy::Network::Address::InstanceConstSharedPtr addr =
+        Envoy::Network::Test::getCanonicalLoopbackAddress(ip_version);
+    Envoy::Network::Address::InstanceConstSharedPtr addr_with_port =
+        Envoy::Network::Utility::getAddressWithPort(*addr, port);
+    Envoy::Network::IoHandlePtr io_handle =
+        addr_with_port->socket(Envoy::Network::Address::SocketType::Datagram);
+    // binding of given port should success.
+    EXPECT_EQ(0, addr_with_port->bind(io_handle->fd()).rc_);
+  }
+}
+
+TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
+  Envoy::Api::MockOsSysCalls os_sys_calls;
+  Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  // Actually create sockets.
+  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillRepeatedly([](int domain, int type, int protocol) {
+    int fd = ::socket(domain, type, protocol);
+    return Envoy::Api::SysCallIntResult{fd, errno};
+  });
+  // Fail bind call's to mimic port exhaustion.
+  EXPECT_CALL(os_sys_calls, bind(_, _, _))
+      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
+  EXPECT_DEATH_LOG_TO_STDERR(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
 }
 
 } // namespace

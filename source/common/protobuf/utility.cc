@@ -157,8 +157,9 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
     // standalone config validation utilities)
-    if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(
-                       absl::StrCat("envoy.deprecated_features.", filename, ":", field->name()))) {
+    if (runtime && field->options().deprecated() &&
+        !runtime->snapshot().deprecatedFeatureEnabled(
+            absl::StrCat("envoy.deprecated_features.", filename, ":", field->name()))) {
       warn_only = false;
     }
 
@@ -166,7 +167,7 @@ void MessageUtil::checkForDeprecation(const Protobuf::Message& message, Runtime:
     if (field->options().deprecated()) {
       std::string err = fmt::format(
           "Using deprecated option '{}' from file {}. This configuration will be removed from "
-          "Envoy soon. Please see https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md "
+          "Envoy soon. Please see https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated "
           "for details.",
           field->full_name(), filename);
       if (warn_only) {

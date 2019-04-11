@@ -1,4 +1,6 @@
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_decoder.h"
+#include "extensions/filters/network/zookeeper_proxy/decoder.h"
+
+#include <string>
 
 namespace Envoy {
 namespace Extensions {
