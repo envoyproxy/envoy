@@ -1310,6 +1310,8 @@ TEST_F(ThriftConnectionManagerTest, transportEndWhenRemoteClose) {
   // Remote closes the connection.
   filter_callbacks_.connection_.state_ = Network::Connection::State::Closed;
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
 } // namespace ThriftProxy
