@@ -185,7 +185,7 @@ private:
     // The socket will be closed after a grace period of delayed_close_timeout_ has elapsed after
     // the socket is flushed _or_ if a period of inactivity after the last write event greater than
     // or equal to delayed_close_timeout_ has elapsed.
-    CloseAfterFlushAndTimeout
+    CloseAfterFlushAndWait
   };
   DelayedCloseState delayed_close_state_{DelayedCloseState::None};
 

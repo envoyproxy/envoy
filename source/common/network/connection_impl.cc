@@ -112,12 +112,12 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       // The socket is being closed and either there is no more data to write or the data can not be
       // flushed (!transport_socket_->canFlushClose()). Since a delayed close has been requested,
       // start the delayed close timer if it hasn't been done already by a previous close().
-      // NOTE: Even though the delayed_close_state_ is being set to CloseAfterFlushAndTimeout, since
+      // NOTE: Even though the delayed_close_state_ is being set to CloseAfterFlushAndWait, since
       // a write event is not being registered for the socket, this logic is simply setting the
       // timer and waiting for it to trigger to close the socket.
       if (!inDelayedClose()) {
         initializeDelayedCloseTimer();
-        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndTimeout;
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
       }
     } else {
       closeSocket(ConnectionEvent::LocalClose);
@@ -143,7 +143,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       if (type == ConnectionCloseType::FlushWrite || !delayed_close_timeout_set) {
         delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
       } else {
-        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndTimeout;
+        delayed_close_state_ = DelayedCloseState::CloseAfterFlushAndWait;
       }
       return;
     }
@@ -158,7 +158,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
       initializeDelayedCloseTimer();
       delayed_close_state_ = (type == ConnectionCloseType::FlushWrite)
                                  ? DelayedCloseState::CloseAfterFlush
-                                 : DelayedCloseState::CloseAfterFlushAndTimeout;
+                                 : DelayedCloseState::CloseAfterFlushAndWait;
     } else {
       delayed_close_state_ = DelayedCloseState::CloseAfterFlush;
     }
@@ -554,7 +554,7 @@ void ConnectionImpl::onWriteReady() {
     closeSocket(ConnectionEvent::RemoteClose);
   } else if ((inDelayedClose() && new_buffer_size == 0) || bothSidesHalfClosed()) {
     ENVOY_CONN_LOG(debug, "write flush complete", *this);
-    if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndTimeout) {
+    if (delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
       ASSERT(delayed_close_timer_ != nullptr);
       delayed_close_timer_->enableTimer(delayedCloseTimeout());
     } else {
