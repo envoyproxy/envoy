@@ -1292,6 +1292,29 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
   EXPECT_EQ(1U, store_.gauge("test.request_active").value());
 }
 
+TEST_F(ThriftConnectionManagerTest, transportEndWhenRemoteClose) {
+  initializeFilter();
+  writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
+
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+
+  // Remote closes the connection.
+  filter_callbacks_.connection_.state_ = Network::Connection::State::Closed;
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
+}
+
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions
