@@ -71,7 +71,8 @@ def main():
   else:
     argv += sys.argv[1:]
 
-  # Enforce LLD if LLD is in argv, by default the latest -fuse-ld will be used
+  # Bazel will add -fuse-ld=gold in some cases, gcc/clang will take the last -fuse-ld argument,
+  # so whenever we see lld once, add it to the end.
   if "-fuse-ld=lld" in argv:
     argv.append("-fuse-ld=lld")
 
