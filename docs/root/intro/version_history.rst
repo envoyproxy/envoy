@@ -57,6 +57,7 @@ Version history
 * outlier_detection: added support for :ref:`outlier detection event protobuf-based logging <arch_overview_outlier_detection_logging>`.
 * mysql: added a MySQL proxy filter that is capable of parsing SQL queries over MySQL wire protocol. Refer to :ref:`MySQL proxy<config_network_filters_mysql_proxy>` for more details.
 * performance: new buffer implementation (disabled by default; to test it, add "--use-libevent-buffers 0" to the command-line arguments when starting Envoy).
+* jwt_authn: added :ref:`filter_state_rules <envoy_api_field_config.filter.http.jwt_authn.v2alpha.JwtAuthentication.filter_state_rules>` to allow specifying requirements from filterState by other filters.
 * ratelimit: removed deprecated rate limit configuration from bootstrap.
 * redis: added :ref:`hashtagging <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_hashtagging>` to guarantee a given key's upstream.
 * redis: added :ref:`latency stats <config_network_filters_redis_proxy_per_command_stats>` for commands.

@@ -138,6 +138,20 @@ cc_library(
 )
 
 cc_library(
+    name = "quic_platform_port_utils",
+    testonly = 1,
+    hdrs = envoy_select_quiche(
+        ["quiche/quic/platform/api/quic_port_utils.h"],
+        "@envoy",
+    ),
+    visibility = ["//visibility:public"],
+    deps = envoy_select_quiche(
+        ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
+        "@envoy",
+    ),
+)
+
+cc_library(
     name = "quic_platform_base",
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",

@@ -75,7 +75,7 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
   cluster_ = cm_.get(zipkin_config.collector_cluster())->info();
 
   std::string collector_endpoint = ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT;
-  if (zipkin_config.collector_endpoint().size() > 0) {
+  if (!zipkin_config.collector_endpoint().empty()) {
     collector_endpoint = zipkin_config.collector_endpoint();
   }
 

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "envoy/access_log/access_log.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -9,7 +13,7 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_decoder.h"
+#include "extensions/filters/network/zookeeper_proxy/decoder.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,7 +52,7 @@ namespace ZooKeeperProxy {
   COUNTER(setwatches_rq)                                                \
   COUNTER(checkwatches_rq)                                              \
   COUNTER(removewatches_rq)                                             \
-  COUNTER(check_rq)                                                     \
+  COUNTER(check_rq)
 // clang-format on
 
 /**
@@ -63,7 +67,8 @@ struct ZooKeeperProxyStats {
  */
 class ZooKeeperFilterConfig {
 public:
-  ZooKeeperFilterConfig(const std::string &stat_prefix, uint32_t max_packet_bytes, Stats::Scope& scope);
+  ZooKeeperFilterConfig(const std::string& stat_prefix, uint32_t max_packet_bytes,
+                        Stats::Scope& scope);
 
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
@@ -74,10 +79,8 @@ public:
   ZooKeeperProxyStats stats_;
 
 private:
-  ZooKeeperProxyStats generateStats(const std::string& prefix,
-                                Stats::Scope& scope) {
-    return ZooKeeperProxyStats{
-        ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  ZooKeeperProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return ZooKeeperProxyStats{ALL_ZOOKEEPER_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 };
 
@@ -86,7 +89,9 @@ using ZooKeeperFilterConfigSharedPtr = std::shared_ptr<ZooKeeperFilterConfig>;
 /**
  * Implementation of ZooKeeper proxy filter.
  */
-class ZooKeeperFilter : public Network::Filter, DecoderCallbacks, Logger::Loggable<Logger::Id::filter> {
+class ZooKeeperFilter : public Network::Filter,
+                        DecoderCallbacks,
+                        Logger::Loggable<Logger::Id::filter> {
 public:
   explicit ZooKeeperFilter(ZooKeeperFilterConfigSharedPtr config);
 
@@ -135,7 +140,7 @@ private:
   std::unique_ptr<Decoder> decoder_;
 };
 
-}  // namespace ZooKeeperProxy
-}  // namespace NetworkFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace ZooKeeperProxy
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

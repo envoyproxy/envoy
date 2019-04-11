@@ -128,6 +128,10 @@ public:
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
 
+  // Set the HTTP access log for the first HCM (if present) to a given file. The default is
+  // /dev/null.
+  bool setAccessLog(const std::string& filename);
+
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);
 
