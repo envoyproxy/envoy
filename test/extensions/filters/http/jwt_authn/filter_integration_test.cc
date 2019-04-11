@@ -149,7 +149,7 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
@@ -269,7 +269,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
 
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
-    EXPECT_EQ(test.expected_status, response->headers().Status()->value().c_str());
+    EXPECT_EQ(test.expected_status, response->headers().Status()->value().getStringView());
   }
 }
 
