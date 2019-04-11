@@ -28,7 +28,6 @@ Version history
 * config: use Envoy cpuset size to set the default number or worker threads if :option:`--cpuset-threads` is enabled.
 * config: added support for :ref:`initial_fetch_timeout <envoy_api_field_core.ConfigSource.initial_fetch_timeout>`. The timeout is disabled by default.
 * cors: added :ref:`filter_enabled & shadow_enabled RuntimeFractionalPercent flags <cors-runtime>` to filter.
-* ext_authz: removed unnecessary assert that crashes Envoy when GrpcStatus::Unknown is received from a gRPC authorization server.
 * ext_authz: added support for buffering request body.
 * ext_authz: migrated from v2alpha to v2 and improved docs.
 * ext_authz: added a configurable option to make the gRPC service cross-compatible with V2Alpha. Note that this feature is already deprecated. It should be used for a short time, and only when transitioning from alpha to V2 release version.
