@@ -9,14 +9,10 @@
 #include <fstream>
 #include <unordered_set>
 
-<<<<<<< HEAD
 #include "common/memory/stats.h"
-
-#include "test/common/stats/stat_test_utility.h"
-=======
 #include "common/network/utility.h"
 
->>>>>>> master
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
@@ -54,15 +50,14 @@
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
 
-using testing::_;
-using testing::HasSubstr;
-
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple
 // typedef/passthrough to a std:: or absl:: construct, the tests are kept
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
+using testing::_;
+using testing::HasSubstr;
 using testing::Return;
 
 namespace quic {
