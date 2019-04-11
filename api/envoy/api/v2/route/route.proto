@@ -39,17 +39,21 @@ message VirtualHost {
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // A list of domains (host/authority header) that will be matched to this
-  // virtual host. Wildcard hosts are supported in the form of ``*.foo.com`` or
-  // ``*-bar.foo.com``.
+  // virtual host. Wildcard hosts are supported in the suffix or prefix form.
+  //
+  // Domain search order:
+  //  1. Exact domain names: ``www.foo.com``.
+  //  2. Suffix domain wildcards: ``*.foo.com`` or ``*-bar.foo.com``.
+  //  3. Prefix domain wildcards: ``foo.*`` or ``foo-*``.
+  //  4. Special wildcard ``*`` matching any domain.
   //
   // .. note::
   //
   //   The wildcard will not match the empty string.
   //   e.g. ``*-bar.foo.com`` will match ``baz-bar.foo.com`` but not ``-bar.foo.com``.
-  //   Additionally, a special entry ``*`` is allowed which will match any
-  //   host/authority header. Only a single virtual host in the entire route
-  //   configuration can match on ``*``. A domain must be unique across all virtual
-  //   hosts or the config will fail to load.
+  //   The longest wildcards match first.
+  //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
+  //   must be unique across all virtual hosts or the config will fail to load.
   repeated string domains = 2 [(validate.rules).repeated .min_items = 1];
 
   // The list of routes that will be matched, in order, for incoming requests.
@@ -117,7 +121,7 @@ message VirtualHost {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 12 [deprecated = true];
+  map<string, google.protobuf.Struct> per_filter_config = 12;
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -190,7 +194,7 @@ message Route {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
+  map<string, google.protobuf.Struct> per_filter_config = 8;
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
@@ -287,7 +291,7 @@ message WeightedCluster {
     // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
-    map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
+    map<string, google.protobuf.Struct> per_filter_config = 8;
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
@@ -570,8 +574,7 @@ message RouteAction {
   // fires, the stream is terminated with a 408 Request Timeout error code if no
   // upstream response header has been received, otherwise a stream reset
   // occurs.
-  google.protobuf.Duration idle_timeout = 24
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration idle_timeout = 24 [(gogoproto.stdduration) = true];
 
   // Indicates that the route has a retry policy. Note that if this is set,
   // it'll take precedence over the virtual host level retry policy entirely
@@ -635,14 +638,9 @@ message RouteAction {
   // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
   core.RoutingPriority priority = 11;
 
-  // [#not-implemented-hide:]
-  repeated core.HeaderValueOption request_headers_to_add = 12 [deprecated = true];
-
-  // [#not-implemented-hide:]
-  repeated core.HeaderValueOption response_headers_to_add = 18 [deprecated = true];
-
-  // [#not-implemented-hide:]
-  repeated string response_headers_to_remove = 19 [deprecated = true];
+  reserved 12;
+  reserved 18;
+  reserved 19;
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
@@ -825,7 +823,7 @@ message RetryPolicy {
   message RetryPriority {
     string name = 1 [(validate.rules).string.min_bytes = 1];
     oneof config_type {
-      google.protobuf.Struct config = 2 [deprecated = true];
+      google.protobuf.Struct config = 2;
 
       google.protobuf.Any typed_config = 3;
     }
@@ -839,7 +837,7 @@ message RetryPolicy {
   message RetryHostPredicate {
     string name = 1 [(validate.rules).string.min_bytes = 1];
     oneof config_type {
-      google.protobuf.Struct config = 2 [deprecated = true];
+      google.protobuf.Struct config = 2;
 
       google.protobuf.Any typed_config = 3;
     }

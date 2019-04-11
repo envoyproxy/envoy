@@ -11,6 +11,23 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "delta_subscription_impl_test",
+    srcs = ["delta_subscription_impl_test.cc"],
+    deps = [
+        ":delta_subscription_test_harness",
+        "//source/common/config:delta_subscription_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:logging_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
     deps = [
@@ -58,6 +75,18 @@ envoy_cc_test(
         "@envoy_api//envoy/api/v2:discovery_cc",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "grpc_stream_test",
+    srcs = ["grpc_stream_test.cc"],
+    deps = [
+        "//source/common/config:grpc_stream_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/upstream:upstream_mocks",
     ],
 )
 

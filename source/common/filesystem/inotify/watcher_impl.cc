@@ -40,7 +40,8 @@ void WatcherImpl::addWatch(const std::string& path, uint32_t events, OnChangedCb
   std::string directory = last_slash != 0 ? path.substr(0, last_slash) : "/";
   std::string file = StringUtil::subspan(path, last_slash + 1, path.size());
 
-  int watch_fd = inotify_add_watch(inotify_fd_, directory.c_str(), IN_ALL_EVENTS);
+  const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
+  int watch_fd = inotify_add_watch(inotify_fd_, directory.c_str(), watch_mask);
   if (watch_fd == -1) {
     throw EnvoyException(
         fmt::format("unable to add filesystem watch for file {}: {}", path, strerror(errno)));
@@ -74,6 +75,9 @@ void WatcherImpl::onInotifyEvent() {
                 file);
 
       uint32_t events = 0;
+      if (file_event->mask & IN_MODIFY) {
+        events |= Events::Modified;
+      }
       if (file_event->mask & IN_MOVED_TO) {
         events |= Events::MovedTo;
       }

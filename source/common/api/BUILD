@@ -16,7 +16,6 @@ envoy_cc_library(
         "//include/envoy/api:api_interface",
         "//source/common/common:thread_lib",
         "//source/common/event:dispatcher_lib",
-        "//source/common/filesystem:filesystem_lib",
     ],
 )
 

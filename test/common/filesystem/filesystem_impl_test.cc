@@ -15,27 +15,54 @@ namespace Filesystem {
 class FileSystemImplTest : public testing::Test {
 protected:
   int getFd(File* file) {
-    auto file_impl = dynamic_cast<FileImpl*>(file);
+#ifdef WIN32
+    auto file_impl = dynamic_cast<FileImplWin32*>(file);
+#else
+    auto file_impl = dynamic_cast<FileImplPosix*>(file);
+#endif
     RELEASE_ASSERT(file_impl != nullptr, "failed to cast File* to FileImpl*");
     return file_impl->fd_;
   }
-
-  InstanceImpl file_system_;
+#ifdef WIN32
+  InstanceImplWin32 file_system_;
+#else
+  Api::SysCallStringResult canonicalPath(const std::string& path) {
+    return file_system_.canonicalPath(path);
+  }
+  InstanceImplPosix file_system_;
+#endif
 };
 
 TEST_F(FileSystemImplTest, fileExists) {
-  EXPECT_TRUE(file_system_.fileExists("/dev/null"));
   EXPECT_FALSE(file_system_.fileExists("/dev/blahblahblah"));
+#ifdef WIN32
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", "x");
+  EXPECT_TRUE(file_system_.fileExists(file_path));
+  EXPECT_TRUE(file_system_.fileExists("c:/windows"));
+#else
+  EXPECT_TRUE(file_system_.fileExists("/dev/null"));
+  EXPECT_TRUE(file_system_.fileExists("/dev"));
+#endif
 }
 
 TEST_F(FileSystemImplTest, directoryExists) {
-  EXPECT_TRUE(file_system_.directoryExists("/dev"));
-  EXPECT_FALSE(file_system_.directoryExists("/dev/null"));
   EXPECT_FALSE(file_system_.directoryExists("/dev/blahblah"));
+#ifdef WIN32
+  const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", "x");
+  EXPECT_FALSE(file_system_.directoryExists(file_path));
+  EXPECT_TRUE(file_system_.directoryExists("c:/windows"));
+#else
+  EXPECT_FALSE(file_system_.directoryExists("/dev/null"));
+  EXPECT_TRUE(file_system_.directoryExists("/dev"));
+#endif
 }
 
 TEST_F(FileSystemImplTest, fileSize) {
+#ifdef WIN32
+  EXPECT_EQ(0, file_system_.fileSize("NUL"));
+#else
   EXPECT_EQ(0, file_system_.fileSize("/dev/null"));
+#endif
   EXPECT_EQ(-1, file_system_.fileSize("/dev/blahblahblah"));
   const std::string data = "test string\ntest";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", data);
@@ -78,18 +105,30 @@ TEST_F(FileSystemImplTest, fileReadToEndBlacklisted) {
   EXPECT_THROW(file_system_.fileReadToEnd("/sys/block/sda/dev"), EnvoyException);
 }
 
-TEST_F(FileSystemImplTest, CanonicalPathSuccess) {
-  EXPECT_EQ("/", file_system_.canonicalPath("//").rc_);
-}
+#ifndef WIN32
+TEST_F(FileSystemImplTest, CanonicalPathSuccess) { EXPECT_EQ("/", canonicalPath("//").rc_); }
+#endif
 
+#ifndef WIN32
 TEST_F(FileSystemImplTest, CanonicalPathFail) {
-  const Api::SysCallStringResult result = file_system_.canonicalPath("/_some_non_existent_file");
+  const Api::SysCallStringResult result = canonicalPath("/_some_non_existent_file");
   EXPECT_TRUE(result.rc_.empty());
   EXPECT_STREQ("No such file or directory", ::strerror(result.errno_));
 }
+#endif
 
 TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_FALSE(file_system_.illegalPath("/"));
+  EXPECT_FALSE(file_system_.illegalPath("//"));
+#ifdef WIN32
+  EXPECT_FALSE(file_system_.illegalPath("/dev"));
+  EXPECT_FALSE(file_system_.illegalPath("/dev/"));
+  EXPECT_FALSE(file_system_.illegalPath("/proc"));
+  EXPECT_FALSE(file_system_.illegalPath("/proc/"));
+  EXPECT_FALSE(file_system_.illegalPath("/sys"));
+  EXPECT_FALSE(file_system_.illegalPath("/sys/"));
+  EXPECT_FALSE(file_system_.illegalPath("/_some_non_existent_file"));
+#else
   EXPECT_TRUE(file_system_.illegalPath("/dev"));
   EXPECT_TRUE(file_system_.illegalPath("/dev/"));
   EXPECT_TRUE(file_system_.illegalPath("/proc"));
@@ -97,6 +136,7 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_TRUE(file_system_.illegalPath("/sys"));
   EXPECT_TRUE(file_system_.illegalPath("/sys/"));
   EXPECT_TRUE(file_system_.illegalPath("/_some_non_existent_file"));
+#endif
 }
 
 TEST_F(FileSystemImplTest, ConstructedFileNotOpen) {
@@ -112,7 +152,7 @@ TEST_F(FileSystemImplTest, Open) {
   ::unlink(new_file_path.c_str());
 
   FilePtr file = file_system_.createFile(new_file_path);
-  const Api::SysCallBoolResult result = file->open();
+  const Api::IoCallBoolResult result = file->open();
   EXPECT_TRUE(result.rc_);
   EXPECT_TRUE(file->isOpen());
 }
@@ -124,21 +164,21 @@ TEST_F(FileSystemImplTest, OpenTwice) {
   FilePtr file = file_system_.createFile(new_file_path);
   EXPECT_EQ(getFd(file.get()), -1);
 
-  Api::SysCallBoolResult result = file->open();
+  const Api::IoCallBoolResult result1 = file->open();
   const int initial_fd = getFd(file.get());
-  EXPECT_TRUE(result.rc_);
+  EXPECT_TRUE(result1.rc_);
   EXPECT_TRUE(file->isOpen());
 
   // check that we don't leak a file descriptor
-  result = file->open();
+  const Api::IoCallBoolResult result2 = file->open();
   EXPECT_EQ(initial_fd, getFd(file.get()));
-  EXPECT_TRUE(result.rc_);
+  EXPECT_TRUE(result2.rc_);
   EXPECT_TRUE(file->isOpen());
 }
 
 TEST_F(FileSystemImplTest, OpenBadFilePath) {
   FilePtr file = file_system_.createFile("");
-  const Api::SysCallBoolResult result = file->open();
+  const Api::IoCallBoolResult result = file->open();
   EXPECT_FALSE(result.rc_);
 }
 
@@ -148,10 +188,10 @@ TEST_F(FileSystemImplTest, ExistingFile) {
 
   {
     FilePtr file = file_system_.createFile(file_path);
-    const Api::SysCallBoolResult open_result = file->open();
+    const Api::IoCallBoolResult open_result = file->open();
     EXPECT_TRUE(open_result.rc_);
     std::string data(" new data");
-    const Api::SysCallSizeResult result = file->write(data);
+    const Api::IoCallSizeResult result = file->write(data);
     EXPECT_EQ(data.length(), result.rc_);
   }
 
@@ -165,10 +205,10 @@ TEST_F(FileSystemImplTest, NonExistingFile) {
 
   {
     FilePtr file = file_system_.createFile(new_file_path);
-    const Api::SysCallBoolResult open_result = file->open();
+    const Api::IoCallBoolResult open_result = file->open();
     EXPECT_TRUE(open_result.rc_);
     std::string data(" new data");
-    const Api::SysCallSizeResult result = file->write(data);
+    const Api::IoCallSizeResult result = file->write(data);
     EXPECT_EQ(data.length(), result.rc_);
   }
 
@@ -181,12 +221,12 @@ TEST_F(FileSystemImplTest, Close) {
   ::unlink(new_file_path.c_str());
 
   FilePtr file = file_system_.createFile(new_file_path);
-  Api::SysCallBoolResult result = file->open();
-  EXPECT_TRUE(result.rc_);
+  const Api::IoCallBoolResult result1 = file->open();
+  EXPECT_TRUE(result1.rc_);
   EXPECT_TRUE(file->isOpen());
 
-  result = file->close();
-  EXPECT_TRUE(result.rc_);
+  const Api::IoCallBoolResult result2 = file->close();
+  EXPECT_TRUE(result2.rc_);
   EXPECT_FALSE(file->isOpen());
 }
 
@@ -195,13 +235,14 @@ TEST_F(FileSystemImplTest, WriteAfterClose) {
   ::unlink(new_file_path.c_str());
 
   FilePtr file = file_system_.createFile(new_file_path);
-  Api::SysCallBoolResult bool_result = file->open();
-  EXPECT_TRUE(bool_result.rc_);
-  bool_result = file->close();
-  EXPECT_TRUE(bool_result.rc_);
-  const Api::SysCallSizeResult result = file->write(" new data");
-  EXPECT_EQ(-1, result.rc_);
-  EXPECT_EQ(EBADF, result.errno_);
+  const Api::IoCallBoolResult bool_result1 = file->open();
+  EXPECT_TRUE(bool_result1.rc_);
+  const Api::IoCallBoolResult bool_result2 = file->close();
+  EXPECT_TRUE(bool_result2.rc_);
+  const Api::IoCallSizeResult size_result = file->write(" new data");
+  EXPECT_EQ(-1, size_result.rc_);
+  EXPECT_EQ(IoFileError::IoErrorCode::UnknownError, size_result.err_->getErrorCode());
+  EXPECT_EQ("Bad file descriptor", size_result.err_->getErrorDetails());
 }
 
 } // namespace Filesystem

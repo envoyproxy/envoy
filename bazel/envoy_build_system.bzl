@@ -83,7 +83,8 @@ def envoy_copts(repository, test = False):
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
-           envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository)
+           envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
+           envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
@@ -443,7 +444,8 @@ def envoy_cc_test(
         args = [],
         shard_count = None,
         coverage = True,
-        local = False):
+        local = False,
+        size = "medium"):
     test_lib_tags = []
     if coverage:
         test_lib_tags.append("coverage_test_lib")
@@ -472,6 +474,7 @@ def envoy_cc_test(
         tags = tags + ["coverage_test"],
         local = local,
         shard_count = shard_count,
+        size = size,
     )
 
 # Envoy C++ related test infrastructure (that want gtest, gmock, but may be
@@ -498,6 +501,7 @@ def envoy_cc_test_infrastructure_library(
         tags = tags,
         alwayslink = 1,
         linkstatic = 1,
+        visibility = ["//visibility:public"],
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified
@@ -645,6 +649,13 @@ def envoy_select_hot_restart(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Select the given values if default path normalization is on in the current build.
+def envoy_select_path_normalization_by_default(xs, repository = ""):
+    return select({
+        repository + "//bazel:enable_path_normalization_by_default": xs,
+        "//conditions:default": [],
+    })
+
 def envoy_select_perf_annotation(xs):
     return select({
         "@envoy//bazel:enable_perf_annotation": xs,
@@ -681,7 +692,4 @@ def envoy_select_boringssl(if_fips, default = None):
 
 # Selects the part of QUICHE that does not yet work with the current CI.
 def envoy_select_quiche(xs, repository = ""):
-    return select({
-        repository + "//bazel:enable_quiche": xs,
-        "//conditions:default": [],
-    })
+    return xs

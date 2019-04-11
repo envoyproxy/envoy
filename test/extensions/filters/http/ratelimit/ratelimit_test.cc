@@ -4,7 +4,6 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
-#include "common/config/filter_json.h"
 #include "common/http/context_impl.h"
 #include "common/http/headers.h"
 
@@ -86,7 +85,7 @@ public:
   Http::TestHeaderMapImpl response_headers_;
   Buffer::OwnedImpl data_;
   Buffer::OwnedImpl response_data_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_;
   NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_;
@@ -94,20 +93,6 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Http::ContextImpl http_context_;
 };
-
-TEST_F(HttpRateLimitFilterTest, BadConfig) {
-  const std::string filter_config = R"EOF(
-  {
-    "domain": "foo",
-    "route_key" : "my_route"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(filter_config);
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
-  EXPECT_THROW(Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config),
-               Json::Exception);
-}
 
 TEST_F(HttpRateLimitFilterTest, NoRoute) {
   SetUpTest(filter_config_);

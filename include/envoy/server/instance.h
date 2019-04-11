@@ -9,7 +9,7 @@
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/context.h"
-#include "envoy/init/init.h"
+#include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/runtime/runtime.h"

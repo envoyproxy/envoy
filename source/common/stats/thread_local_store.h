@@ -12,6 +12,7 @@
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/source_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -139,15 +140,25 @@ public:
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
+  Counter& counterFromStatName(StatName name) override {
+    return default_scope_->counterFromStatName(name);
+  }
   Counter& counter(const std::string& name) override { return default_scope_->counter(name); }
   ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
   }
+  Gauge& gaugeFromStatName(StatName name) override {
+    return default_scope_->gaugeFromStatName(name);
+  }
   Gauge& gauge(const std::string& name) override { return default_scope_->gauge(name); }
-  Histogram& histogram(const std::string& name) override {
-    return default_scope_->histogram(name);
-  };
+  Histogram& histogramFromStatName(StatName name) override {
+    return default_scope_->histogramFromStatName(name);
+  }
+  Histogram& histogram(const std::string& name) override { return default_scope_->histogram(name); }
+  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
+  const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
+  SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
@@ -171,19 +182,28 @@ public:
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
-  template <class Stat> using StatMap = CharStarHashMap<Stat>;
+  template <class Stat> using StatMap = ConstCharStarHashMap<Stat>;
 
   struct TlsCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<TlsHistogramSharedPtr> histograms_;
     StatMap<ParentHistogramSharedPtr> parent_histograms_;
+
+    // We keep a TLS cache of rejected stat names. This costs memory, but
+    // reduces runtime overhead running the matcher. Moreover, once symbol
+    // tables are integrated, rejection will need the fully elaborated string,
+    // and it we need to take a global symbol-table lock to run. We keep
+    // this char* map here in the TLS cache to avoid taking a lock to compute
+    // rejection.
+    SharedStringSet rejected_stats_;
   };
 
   struct CentralCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
+    SharedStringSet rejected_stats_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -197,8 +217,11 @@ private:
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(prefix_ + name);
     }
+    const SymbolTable& symbolTable() const override { return parent_.symbolTable(); }
+    SymbolTable& symbolTable() override { return parent_.symbolTable(); }
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gauge(const std::string& name) override;
+    NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
@@ -221,9 +244,21 @@ private:
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType&
-    safeMakeStat(const std::string& name, StatMap<std::shared_ptr<StatType>>& central_cache_map,
-                 MakeStatFn<StatType> make_stat, StatMap<std::shared_ptr<StatType>>* tls_cache);
+    StatType& safeMakeStat(const std::string& name,
+                           StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                           SharedStringSet& central_rejected_stats_, MakeStatFn<StatType> make_stat,
+                           StatMap<std::shared_ptr<StatType>>* tls_cache,
+                           SharedStringSet* tls_rejected_stats, StatType& null_stat);
+
+    Counter& counterFromStatName(StatName name) override {
+      return counter(symbolTable().toString(name));
+    }
+
+    Gauge& gaugeFromStatName(StatName name) override { return gauge(symbolTable().toString(name)); }
+
+    Histogram& histogramFromStatName(StatName name) override {
+      return histogram(symbolTable().toString(name));
+    }
 
     static std::atomic<uint64_t> next_scope_id_;
 
@@ -254,8 +289,11 @@ private:
   void mergeInternal(PostMergeCb mergeCb);
   absl::string_view truncateStatNameIfNeeded(absl::string_view name);
   bool rejects(const std::string& name) const;
+  bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
+  bool checkAndRememberRejection(const std::string& name, SharedStringSet& central_rejected_stats,
+                                 SharedStringSet* tls_rejected_stats);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
@@ -272,6 +310,7 @@ private:
   Counter& num_last_resort_stats_;
   HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
+  NullGaugeImpl null_gauge_;
 
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats

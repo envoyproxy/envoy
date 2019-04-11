@@ -113,6 +113,85 @@ config:
     nanos: 0
 )EOF";
 
+// TODO(#6327) cleaner approach to testing with static config.
+std::string ConfigHelper::discoveredClustersBootstrap(const std::string& api_type) {
+  return fmt::format(
+      R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+dynamic_resources:
+  cds_config:
+    api_config_source:
+      api_type: {}
+      grpc_services:
+        envoy_grpc:
+          cluster_name: my_cds_cluster
+static_resources:
+  clusters:
+  - name: my_cds_cluster
+    http2_protocol_options: {{}}
+    hosts:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+  listeners:
+    name: http
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: envoy.http_connection_manager
+        config:
+          stat_prefix: config_test
+          http_filters:
+            name: envoy.router
+          codec_type: HTTP2
+          route_config:
+            name: route_config_0
+            validate_clusters: false
+            virtual_hosts:
+              name: integration
+              routes:
+              - route:
+                  cluster: cluster_1
+                match:
+                  prefix: "/cluster1"
+              - route:
+                  cluster: cluster_2
+                match:
+                  prefix: "/cluster2"
+              domains: "*"
+)EOF",
+      api_type);
+}
+
+envoy::api::v2::Cluster ConfigHelper::buildCluster(const std::string& name, int port,
+                                                   const std::string& ip_version) {
+  return TestUtility::parseYaml<envoy::api::v2::Cluster>(fmt::format(R"EOF(
+      name: {}
+      connect_timeout: 5s
+      type: STATIC
+      load_assignment:
+        cluster_name: {}
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: {}
+                  port_value: {}
+      lb_policy: ROUND_ROBIN
+      http2_protocol_options: {{}}
+    )EOF",
+                                                                     name, name, ip_version, port));
+}
+
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
                            const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
@@ -133,9 +212,23 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    if (!cluster->hosts().empty() && cluster->mutable_hosts(0)->has_socket_address()) {
-      auto host_socket_addr = cluster->mutable_hosts(0)->mutable_socket_address();
-      host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+    if (!cluster->hosts().empty()) {
+      for (int j = 0; j < cluster->hosts().size(); j++) {
+        if (cluster->mutable_hosts(j)->has_socket_address()) {
+          auto host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
+          host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
+        }
+      }
+    }
+    for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
+      auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
+      for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
+        auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+        if (lb_endpoint->endpoint().address().has_socket_address()) {
+          lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+              Network::Test::getLoopbackAddressString(version));
+        }
+      }
     }
   }
 }
@@ -337,34 +430,24 @@ void ConfigHelper::setConnectTimeout(std::chrono::milliseconds timeout) {
   connect_timeout_set_ = true;
 }
 
-void ConfigHelper::addRoute(
-    const std::string& domains, const std::string& prefix, const std::string& cluster,
-    bool validate_clusters, envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
-    envoy::api::v2::route::VirtualHost::TlsRequirementType type,
-    envoy::api::v2::route::RetryPolicy retry_policy, bool include_attempt_count_header,
-    const absl::string_view upgrade,
-    envoy::api::v2::route::RouteAction::InternalRedirectAction internal_redirect_action) {
+envoy::api::v2::route::VirtualHost
+ConfigHelper::createVirtualHost(const char* domain, const char* prefix, const char* cluster) {
+  envoy::api::v2::route::VirtualHost virtual_host;
+  virtual_host.set_name(domain);
+  virtual_host.add_domains(domain);
+  virtual_host.add_routes()->mutable_match()->set_prefix(prefix);
+  auto* route = virtual_host.mutable_routes(0)->mutable_route();
+  route->set_cluster(cluster);
+  return virtual_host;
+}
+
+void ConfigHelper::addVirtualHost(const envoy::api::v2::route::VirtualHost& vhost) {
   RELEASE_ASSERT(!finalized_, "");
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
-
-  auto* route_config = hcm_config.mutable_route_config();
-  route_config->mutable_validate_clusters()->set_value(validate_clusters);
+  auto route_config = hcm_config.mutable_route_config();
   auto* virtual_host = route_config->add_virtual_hosts();
-  virtual_host->set_name(domains);
-  virtual_host->set_include_request_attempt_count(include_attempt_count_header);
-  virtual_host->add_domains(domains);
-  virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
-  auto* route = virtual_host->mutable_routes(0)->mutable_route();
-  route->set_cluster(cluster);
-  route->set_cluster_not_found_response_code(code);
-  route->mutable_retry_policy()->Swap(&retry_policy);
-  if (!upgrade.empty()) {
-    route->add_upgrade_configs()->set_upgrade_type(std::string(upgrade));
-  }
-  route->set_internal_redirect_action(internal_redirect_action);
-  virtual_host->set_require_tls(type);
-
+  virtual_host->CopyFrom(vhost);
   storeHttpConnectionManager(hcm_config);
 }
 

@@ -4,6 +4,8 @@
 #include <string>
 #include <unordered_set>
 
+#include "envoy/stats/symbol_table.h"
+
 #include "common/common/hash.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
@@ -53,8 +55,8 @@ private:
  */
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
-  HeapStatDataAllocator();
-  ~HeapStatDataAllocator();
+  HeapStatDataAllocator(SymbolTable& symbol_table) : StatDataAllocatorImpl(symbol_table) {}
+  ~HeapStatDataAllocator() override;
 
   // StatDataAllocatorImpl
   HeapStatData* alloc(absl::string_view name) override;

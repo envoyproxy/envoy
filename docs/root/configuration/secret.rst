@@ -20,8 +20,8 @@ The connection between Envoy proxy and SDS server has to be secure. One option i
 SDS server
 ----------
 
-A SDS server needs to implement the gRPC service `SecretDiscoveryService <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/discovery/v2/sds.proto>`_.
-It follows the same protocol as other `xDS <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_
+A SDS server needs to implement the gRPC service :repo:`SecretDiscoveryService <api/envoy/service/discovery/v2/sds.proto>`.
+It follows the same protocol as other :repo:`xDS <api/XDS_PROTOCOL.md>`.
 
 SDS Configuration
 -----------------

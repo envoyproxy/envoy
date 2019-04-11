@@ -12,13 +12,10 @@
 #include <sstream>
 #include <string>
 
-#include "common/common/assert.h"
 #include "common/common/logger.h"
 
 #include "absl/base/optimization.h"
 #include "absl/synchronization/mutex.h"
-
-// TODO(wub): Add CHECK/DCHECK and variants, which are not explicitly exposed by quic_logging.h.
 
 // If |condition| is true, use |logstream| to stream the log message and send it to spdlog.
 // If |condition| is false, |logstream| will not be instantiated.
@@ -45,6 +42,9 @@
 // TODO(wub): Implement QUIC_LOG_FIRST_N_IMPL.
 #define QUIC_LOG_FIRST_N_IMPL(severity, n) QUIC_LOG_IMPL(severity)
 
+// TODO(wub): Implement QUIC_LOG_EVERY_N_IMPL.
+#define QUIC_LOG_EVERY_N_IMPL(severity, n) QUIC_LOG_IMPL(severity)
+
 // TODO(wub): Implement QUIC_LOG_EVERY_N_SEC_IMPL.
 #define QUIC_LOG_EVERY_N_SEC_IMPL(severity, seconds) QUIC_LOG_IMPL(severity)
 
@@ -56,22 +56,29 @@
 #define QUIC_LOG_WARNING_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::WARNING)
 #define QUIC_LOG_ERROR_IS_ON_IMPL() quic::IsLogLevelEnabled(quic::ERROR)
 
+#define CHECK(condition)                                                                           \
+  QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << "CHECK failed: " #condition "."
+
 #ifdef NDEBUG
 // Release build
+#define DCHECK(condition) QUIC_COMPILED_OUT_LOG()
 #define QUIC_COMPILED_OUT_LOG() QUIC_LOG_IMPL_INTERNAL(false, quic::NullLogStream().stream())
 #define QUIC_DVLOG_IMPL(verbosity) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DLOG_IMPL(severity) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DLOG_INFO_IS_ON_IMPL() 0
+#define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_COMPILED_OUT_LOG()
 #define QUIC_NOTREACHED_IMPL()
 #else
 // Debug build
+#define DCHECK(condition) CHECK(condition)
 #define QUIC_DVLOG_IMPL(verbosity) QUIC_VLOG_IMPL(verbosity)
 #define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_VLOG_IF_IMPL(verbosity, condition)
 #define QUIC_DLOG_IMPL(severity) QUIC_LOG_IMPL(severity)
 #define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_LOG_IF_IMPL(severity, condition)
 #define QUIC_DLOG_INFO_IS_ON_IMPL() QUIC_LOG_INFO_IS_ON_IMPL()
+#define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_LOG_EVERY_N_IMPL(severity, n)
 #define QUIC_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
 #endif
 
@@ -132,6 +139,9 @@ void SetVerbosityLogThreshold(int new_verbosity);
 inline bool IsVerboseLogEnabled(int verbosity) {
   return IsLogLevelEnabled(INFO) && verbosity <= GetVerbosityLogThreshold();
 }
+
+bool IsDFatalExitDisabled();
+void SetDFatalExitDisabled(bool is_disabled);
 
 // QuicLogSink is used to capture logs emitted from the QUIC_LOG... macros.
 class QuicLogSink {

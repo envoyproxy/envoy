@@ -42,10 +42,10 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
 }
 
 void AccessLogFileImpl::open() {
-  const Api::SysCallBoolResult result = file_->open();
+  const Api::IoCallBoolResult result = file_->open();
   if (!result.rc_) {
-    throw EnvoyException(fmt::format("unable to open file '{}': {}", file_->path(),
-                                     file_->errorToString(result.errno_)));
+    throw EnvoyException(
+        fmt::format("unable to open file '{}': {}", file_->path(), result.err_->getErrorDetails()));
   }
 }
 
@@ -68,9 +68,9 @@ AccessLogFileImpl::~AccessLogFileImpl() {
       doWrite(flush_buffer_);
     }
 
-    const Api::SysCallBoolResult result = file_->close();
+    const Api::IoCallBoolResult result = file_->close();
     ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                   file_->errorToString(result.errno_)));
+                                   result.err_->getErrorDetails()));
   }
 }
 
@@ -91,7 +91,7 @@ void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
     Thread::LockGuard lock(file_lock_);
     for (const Buffer::RawSlice& slice : slices) {
       absl::string_view data(static_cast<char*>(slice.mem_), slice.len_);
-      const Api::SysCallSizeResult result = file_->write(data);
+      const Api::IoCallSizeResult result = file_->write(data);
       ASSERT(result.rc_ == static_cast<ssize_t>(slice.len_));
       stats_.write_completed_.inc();
     }
@@ -131,9 +131,9 @@ void AccessLogFileImpl::flushThreadFunc() {
       try {
         if (reopen_file_) {
           reopen_file_ = false;
-          const Api::SysCallBoolResult result = file_->close();
+          const Api::IoCallBoolResult result = file_->close();
           ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                         file_->errorToString(result.errno_)));
+                                         result.err_->getErrorDetails()));
           open();
         }
 
