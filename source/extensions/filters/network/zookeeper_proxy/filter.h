@@ -13,7 +13,7 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_decoder.h"
+#include "extensions/filters/network/zookeeper_proxy/decoder.h"
 
 namespace Envoy {
 namespace Extensions {

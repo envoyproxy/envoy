@@ -14,14 +14,14 @@ envoy_package()
 envoy_cc_library(
     name = "proxy_lib",
     srcs = [
-        "zookeeper_decoder.cc",
-        "zookeeper_filter.cc",
-        "zookeeper_utils.cc",
+        "decoder.cc",
+        "filter.cc",
+        "utils.cc",
     ],
     hdrs = [
-        "zookeeper_decoder.h",
-        "zookeeper_filter.h",
-        "zookeeper_utils.h",
+        "decoder.h",
+        "filter.h",
+        "utils.h",
     ],
     deps = [
         "//include/envoy/network:filter_interface",
@@ -37,8 +37,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "config",
-    srcs = ["zookeeper_config.cc"],
-    hdrs = ["zookeeper_config.h"],
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
     deps = [
         ":proxy_lib",
         "//source/extensions/filters/network:well_known_names",

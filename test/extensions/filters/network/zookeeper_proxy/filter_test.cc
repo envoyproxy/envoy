@@ -1,7 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_decoder.h"
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_filter.h"
+#include "extensions/filters/network/zookeeper_proxy/decoder.h"
+#include "extensions/filters/network/zookeeper_proxy/filter.h"
 
 #include "test/mocks/network/mocks.h"
 

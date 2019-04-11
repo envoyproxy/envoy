@@ -1,4 +1,4 @@
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_config.h"
+#include "extensions/filters/network/zookeeper_proxy/config.h"
 
 #include <string>
 
@@ -8,7 +8,7 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_filter.h"
+#include "extensions/filters/network/zookeeper_proxy/filter.h"
 
 namespace Envoy {
 namespace Extensions {

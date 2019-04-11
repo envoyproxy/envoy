@@ -8,7 +8,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_utils.h"
+#include "extensions/filters/network/zookeeper_proxy/utils.h"
 
 namespace Envoy {
 namespace Extensions {
