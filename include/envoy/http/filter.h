@@ -295,10 +295,14 @@ public:
    * @param modify_headers supplies an optional callback function that can modify the
    *                       response headers.
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+   * @param details a string detailing why this local reply was sent.
    */
+  // TODO(alyssawilk) send an email to envoy-dev for API change, add for all other filters, and
+  // make details required.
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(HeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status) PURE;
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details = "") PURE;
 
   /**
    * Called with 100-Continue headers to be encoded.
