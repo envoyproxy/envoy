@@ -148,6 +148,8 @@ For details on each command's usage see the official
   ZREVRANGEBYLEX, Sorted Set
   ZREVRANGEBYSCORE, Sorted Set
   ZREVRANK, Sorted Set
+  ZPOPMIN, Sorted Set
+  ZPOPMAX, Sorted Set
   ZSCAN, Sorted Set
   ZSCORE, Sorted Set
   APPEND, String
