@@ -1547,16 +1547,16 @@ bool ConnectionManagerImpl::ActiveStream::verbose() const {
 
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
   ++high_watermark_count_;
-  if (watermark_callbacks_) {
-    watermark_callbacks_->onAboveWriteBufferHighWatermark();
+  for (auto watermark_callbacks : watermark_callbacks_) {
+    watermark_callbacks->onAboveWriteBufferHighWatermark();
   }
 }
 
 void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
   ASSERT(high_watermark_count_ > 0);
   --high_watermark_count_;
-  if (watermark_callbacks_) {
-    watermark_callbacks_->onBelowWriteBufferLowWatermark();
+  for (auto watermark_callbacks : watermark_callbacks_) {
+    watermark_callbacks->onBelowWriteBufferLowWatermark();
   }
 }
 
@@ -1891,19 +1891,20 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  // This is called exactly once per stream, by the router filter.
-  // If there's ever a need for another filter to subscribe to watermark callbacks this can be
-  // turned into a vector.
-  ASSERT(parent_.watermark_callbacks_ == nullptr);
-  parent_.watermark_callbacks_ = &watermark_callbacks;
+  // This is called exactly once per upstream-stream, by the router filter. Therefore, we
+  // expect the same callbacks to not be registered twice.
+  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
+                   &watermark_callbacks) == parent_.watermark_callbacks_.end());
+  parent_.watermark_callbacks_.emplace(parent_.watermark_callbacks_.end(), &watermark_callbacks);
   for (uint32_t i = 0; i < parent_.high_watermark_count_; ++i) {
     watermark_callbacks.onAboveWriteBufferHighWatermark();
   }
 }
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  ASSERT(parent_.watermark_callbacks_ == &watermark_callbacks);
-  parent_.watermark_callbacks_ = nullptr;
+  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
+                   &watermark_callbacks) != parent_.watermark_callbacks_.end());
+  parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
 
 bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
