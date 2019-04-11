@@ -30,14 +30,6 @@ filegroup(
 )
 
 genrule(
-    name = "v1_upgraded_configs",
-    srcs = ["google_com_proxy.yaml"],
-    outs = ["google_com_proxy.v2.upgraded.json"],
-    cmd = "$(location //tools:v1_to_bootstrap) $(location google_com_proxy.yaml) > $@",
-    tools = ["//tools:v1_to_bootstrap"],
-)
-
-genrule(
     name = "example_configs",
     srcs = [
         ":configs",
