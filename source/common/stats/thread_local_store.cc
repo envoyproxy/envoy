@@ -141,9 +141,13 @@ void ThreadLocalStoreImpl::initializeThreading(Event::Dispatcher& main_thread_di
   // Initialize stats for each thread's dispatcher. This can't be done in the InitializeCb passed
   // to `set` above, it has to be done as a separate step here, because initializing stats causes
   // new TLS slots to be created and SlotImpl::set isn't reentrant.
-  tls_->runOnAllThreads([this, &tls] {
+  auto worker_id = std::make_shared<uint32_t>(0);
+  tls_->runOnAllThreads([this, &tls, worker_id] {
     auto& dispatcher = tls.dispatcher();
-    dispatcher.initializeStats(*this, &dispatcher == main_thread_dispatcher_);
+    std::string name = (&dispatcher == main_thread_dispatcher_)
+                           ? "main"
+                           : fmt::format("worker_{}", (*worker_id)++);
+    dispatcher.initializeStats(*this, name);
   });
 }
 

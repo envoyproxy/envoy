@@ -61,9 +61,9 @@ public:
    * Start writing stats once thread-local storage is ready to receive them (see
    * ThreadLocalStoreImpl::initializeThreading).
    * @param parent_scope the parent scope for the new per-dispatcher stats scope created here.
-   * @param main true if this is the main thread's dispatcher (used in naming the stats scope).
+   * @param name the name for the new stats scope, identifying this dispatcher.
    */
-  virtual void initializeStats(Stats::Scope& parent_scope, bool main) PURE;
+  virtual void initializeStats(Stats::Scope& parent_scope, absl::string_view name) PURE;
 
   /**
    * Clear any items in the deferred deletion queue.

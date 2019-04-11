@@ -38,7 +38,7 @@ public:
 
   // Event::Dispatcher
   TimeSource& timeSource() override { return api_.timeSource(); }
-  void initializeStats(Stats::Scope& parent_scope, bool main) override;
+  void initializeStats(Stats::Scope& parent_scope, absl::string_view name) override;
   void clearDeferredDeleteList() override;
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
