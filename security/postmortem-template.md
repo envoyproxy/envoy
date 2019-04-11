@@ -3,9 +3,13 @@
 > Engineering.”](https://landing.google.com/sre/book/chapters/postmortem.html),
 > modified from
 > https://raw.githubusercontent.com/dastergon/postmortem-templates/master/templates/postmortem-template-srebook.md.
+
 > Follow the SRE link for examples of how to populate.
 
-# Security postmortem for CVE-YEAR-ABCDEF
+> A PR should be opened with  postmortem placed in security/postmortems/cve-year-abcdef.md. If there
+> are multiple CVEs in the postmortem, populate each alias with the string "See cve-year-abcdef.md".
+
+# Security postmortem for CVE-YEAR-ABCDEF, CVE-YEAR-ABCDEG
 
 ## Date
 
@@ -43,9 +47,10 @@
 
 ## Action Items
 
-> List the followup GH issues:
-> * [ ] [Title of issue](GH issue link)
-...
+> Create action item issues and include in their body "Action item for
+> CVE-YEAR-ABCDEF". Modify the search string below to include in the PR:
+
+https://github.com/envoyproxy/envoy/issues?utf8=%E2%9C%93&q=is%3Aissue+%22Action+item+for+CVE-YEAR-ABCDEF%22
 
 ## Lessons Learned
 
