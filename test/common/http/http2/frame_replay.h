@@ -31,7 +31,9 @@ public:
   Api::ApiPtr api_;
 };
 
-// Some standards HTTP/2 frames for setting up a connection.
+// Some standards HTTP/2 frames for setting up a connection. The contents for these and the seed
+// corpus were captured via logging the hex bytes in codec_impl_test's write() connection mocks in
+// setupDefaultConnectionMocks().
 class WellKnownFrames {
 public:
   static const Frame& clientConnectionPrefaceFrame();
