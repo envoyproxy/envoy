@@ -1,5 +1,6 @@
 #include "test/config/utility.h"
 
+#include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
 #include "envoy/http/codec.h"
@@ -59,6 +60,12 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
           http_filters:
             name: envoy.router
           codec_type: HTTP1
+          access_log:
+            name: envoy.file_access_log
+            filter:
+              not_health_check_filter:  {}
+            config:
+              path: /dev/null
           route_config:
             virtual_hosts:
               name: integration
@@ -484,6 +491,20 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   auto* filter_chain =
       bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
   initializeTls(options, *filter_chain->mutable_tls_context()->mutable_common_tls_context());
+}
+
+bool ConfigHelper::setAccessLog(const std::string& filename) {
+  if (getFilterFromListener("envoy.http_connection_manager") == nullptr) {
+    return false;
+  }
+  // Replace /dev/null with a real path for the file access log.
+  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
+  loadHttpConnectionManager(hcm_config);
+  envoy::config::accesslog::v2::FileAccessLog access_log_config;
+  access_log_config.set_path(filename);
+  MessageUtil::jsonConvert(access_log_config, *hcm_config.mutable_access_log(0)->mutable_config());
+  storeHttpConnectionManager(hcm_config);
+  return true;
 }
 
 void ConfigHelper::initializeTls(const ServerSslOptions& options,

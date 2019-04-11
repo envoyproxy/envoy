@@ -284,6 +284,8 @@ TEST_F(RouterRetryStateImplTest, Policy5xxRemote200RemoteReset) {
   EXPECT_TRUE(state_->enabled());
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(response_headers, callback_));
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(remote_reset_, callback_));
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded, state_->shouldRetryReset(remote_reset_, callback_));
 }
 
@@ -496,8 +498,7 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   retry_timer_->callback_();
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
-            state_->shouldRetryHeaders(response_headers, callback_));
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(response_headers, callback_));
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_success_.value());
@@ -536,6 +537,21 @@ TEST_F(RouterRetryStateImplTest, ZeroMaxRetriesHeader) {
 
   EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
             state_->shouldRetryReset(connect_failure_, callback_));
+}
+
+// Check that if there are 0 remaining retries available but we get
+// non-retriable headers, we return No rather than NoRetryLimitExceeded.
+TEST_F(RouterRetryStateImplTest, NoPreferredOverLimitExceeded) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
+                                          {"x-envoy-max-retries", "1"}};
+  setup(request_headers);
+
+  Http::TestHeaderMapImpl bad_response_headers{{":status", "503"}};
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(bad_response_headers, callback_));
+
+  Http::TestHeaderMapImpl good_response_headers{{":status", "200"}};
+  EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(good_response_headers, callback_));
 }
 
 } // namespace

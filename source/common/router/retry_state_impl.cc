@@ -158,14 +158,15 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
   resetRetry();
 
+  if (!would_retry) {
+    return RetryStatus::No;
+  }
+
   if (retries_remaining_ == 0) {
     return RetryStatus::NoRetryLimitExceeded;
   }
 
   retries_remaining_--;
-  if (!would_retry) {
-    return RetryStatus::No;
-  }
 
   if (!cluster_.resourceManager(priority_).retries().canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();

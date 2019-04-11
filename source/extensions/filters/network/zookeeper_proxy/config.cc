@@ -1,4 +1,4 @@
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_config.h"
+#include "extensions/filters/network/zookeeper_proxy/config.h"
 
 #include <string>
 
@@ -8,7 +8,7 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_filter.h"
+#include "extensions/filters/network/zookeeper_proxy/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,8 +18,7 @@ namespace ZooKeeperProxy {
 /**
  * Config registration for the ZooKeeper proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-Network::FilterFactoryCb
-NetworkFilters::ZooKeeperProxy::ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
+Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::zookeeper_proxy::v1alpha1::ZooKeeperProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 

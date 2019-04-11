@@ -1,5 +1,7 @@
 #pragma once
+
 #include <cstdint>
+#include <string>
 
 #include "envoy/common/platform.h"
 
