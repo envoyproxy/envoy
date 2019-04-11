@@ -385,6 +385,14 @@ TEST_F(RedisSingleServerRequestTest, MovedRedirectionFailure) {
   moved_response.asInteger() = 1;
   EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
 
+  // Test an upstream error preventing the request from being sent.
+  moved_response.type(Common::Redis::RespType::Error);
+  moved_response.asString() = "MOVED 1111 10.1.2.3:4000";
+  std::string host_address;
+  Common::Redis::RespValue request_copy;
+  EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, _)).WillOnce(Return(nullptr));
+  EXPECT_FALSE(pool_callbacks_->onRedirection(moved_response));
+
   respond();
 };
 
@@ -470,6 +478,60 @@ TEST_F(RedisSingleServerRequestTest, AskRedirectionFailure) {
   EXPECT_FALSE(pool_callbacks_->onRedirection(ask_response));
   ask_response.type(Common::Redis::RespType::Integer);
   ask_response.asInteger() = 1;
+  EXPECT_FALSE(pool_callbacks_->onRedirection(ask_response));
+
+  // Test an upstream error from trying to send an "asking" command upstream.
+  ask_response.type(Common::Redis::RespType::Error);
+  ask_response.asString() = "ASK 1111 10.1.2.3:4000";
+  EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, _))
+      .WillOnce(
+          Invoke([&](const std::string& host_address, const Common::Redis::RespValue& request,
+                     Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+            // Verify that the request has been properly prepended with an "asking" command.
+            std::vector<std::string> commands = {"asking"};
+            EXPECT_EQ(host_address, "10.1.2.3:4000");
+            EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+            EXPECT_EQ(request.asArray().size(), commands.size());
+            for (unsigned int i = 0; i < commands.size(); i++) {
+              EXPECT_TRUE(request.asArray()[i].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[i].asString(), commands[i]);
+            }
+            return nullptr;
+          }));
+  EXPECT_FALSE(pool_callbacks_->onRedirection(ask_response));
+
+  // Test an upstream error from trying to send the original request after the "asking" command is
+  // sent successfully.
+  Common::Redis::Client::MockPoolRequest pool_request;
+  EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, _))
+      .WillOnce(
+          Invoke([&](const std::string& host_address, const Common::Redis::RespValue& request,
+                     Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+            // Verify that the request has been properly prepended with an "asking" command.
+            std::vector<std::string> commands = {"asking"};
+            EXPECT_EQ(host_address, "10.1.2.3:4000");
+            EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+            EXPECT_EQ(request.asArray().size(), commands.size());
+            for (unsigned int i = 0; i < commands.size(); i++) {
+              EXPECT_TRUE(request.asArray()[i].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[i].asString(), commands[i]);
+            }
+            return &pool_request;
+          }));
+  EXPECT_CALL(*conn_pool_, makeRequestToHost(_, _, Ref(*pool_callbacks_)))
+      .WillOnce(
+          Invoke([&](const std::string& host_address, const Common::Redis::RespValue& request,
+                     Common::Redis::Client::PoolCallbacks&) -> Common::Redis::Client::PoolRequest* {
+            std::vector<std::string> commands = {"get", "foo"};
+            EXPECT_EQ(host_address, "10.1.2.3:4000");
+            EXPECT_TRUE(request.type() == Common::Redis::RespType::Array);
+            EXPECT_EQ(request.asArray().size(), commands.size());
+            for (unsigned int i = 0; i < commands.size(); i++) {
+              EXPECT_TRUE(request.asArray()[i].type() == Common::Redis::RespType::BulkString);
+              EXPECT_EQ(request.asArray()[i].asString(), commands[i]);
+            }
+            return nullptr;
+          }));
   EXPECT_FALSE(pool_callbacks_->onRedirection(ask_response));
 
   respond();

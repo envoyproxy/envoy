@@ -139,10 +139,13 @@ public:
    * @param target_server a handle to the second server that will respond to the request.
    * @param request supplies client data to transmit to the first upstream server.
    * @param redirection_response supplies the moved or ask redirection error from the first server.
+   * @param asking_response supplies the target_server's response to an "asking" command, if it is
+   * received.
    * @param response supplies data sent by the second server back to the fake Redis client.
    */
   void simpleRedirection(FakeUpstreamPtr& target_server, const std::string& request,
-                         const std::string& redirection_response, const std::string& response);
+                         const std::string& redirection_response, const std::string& response,
+                         const std::string& asking_response = "+OK\r\n");
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
@@ -199,7 +202,8 @@ void RedisProxyIntegrationTest::simpleProxyResponse(const std::string& request,
 
 void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
     FakeUpstreamPtr& target_server, const std::string& request,
-    const std::string& redirection_response, const std::string& response) {
+    const std::string& redirection_response, const std::string& response,
+    const std::string& asking_response) {
 
   bool asking = (redirection_response.find("-ASK") != std::string::npos);
   std::string proxy_to_server;
@@ -227,8 +231,8 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
     EXPECT_TRUE(fake_upstream_connection_2->waitForData(asking_request.size() + request.size(),
                                                         &proxy_to_server));
     EXPECT_EQ(asking_request + request, proxy_to_server);
-    // Respond with an "OK" to the "asking" command.
-    EXPECT_TRUE(fake_upstream_connection_2->write("+OK\r\n"));
+    // Respond to the "asking" command.
+    EXPECT_TRUE(fake_upstream_connection_2->write(asking_response));
   } else {
     // The server, target_server, should receive request unchanged.
     EXPECT_TRUE(fake_upstream_connection_2->waitForData(request.size(), &proxy_to_server));
@@ -378,5 +382,69 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, BadRedirectStrings) {
   }
 }
 
+// This test verifies that an upstream connection failure during ask redirection processing is
+// handled correctly. In this case the "asking" command and original client request have been sent
+// to the target server, and then the connection is closed. The fake Redis client should receive an
+// upstream failure error in response to its request.
+
+TEST_P(RedisProxyWithRedirectionIntegrationTest, ConnectionFailureBeforeAskingResponse) {
+  initialize();
+
+  std::string request = makeBulkStringArray({"get", "foo"});
+  std::stringstream redirection_error;
+  redirection_error << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
+
+  std::string proxy_to_server;
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->write(request);
+
+  FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2;
+
+  // Data from the client should always be routed to fake_upstreams_[0] by the load balancer.
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_1));
+  EXPECT_TRUE(fake_upstream_connection_1->waitForData(request.size(), &proxy_to_server));
+  // The data in request should be received by the first server, fake_upstreams_[0].
+  EXPECT_EQ(request, proxy_to_server);
+  proxy_to_server.clear();
+
+  // Send the redirection_response from the first fake Redis server back to the proxy.
+  EXPECT_TRUE(fake_upstream_connection_1->write(redirection_error.str()));
+  // The proxy should initiate a new connection to the fake redis server, target_server, in
+  // response.
+  EXPECT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
+
+  // The server, fake_upstreams_[1], should receive an "asking" command before the original request.
+  std::string asking_request = makeBulkStringArray({"asking"});
+  EXPECT_TRUE(fake_upstream_connection_2->waitForData(asking_request.size() + request.size(),
+                                                      &proxy_to_server));
+  EXPECT_EQ(asking_request + request, proxy_to_server);
+  // Close the upstream connection before responding to the "asking" command.
+  EXPECT_TRUE(fake_upstream_connection_2->close());
+
+  // The fake Redis client should receive an upstream failure error from the proxy.
+  std::stringstream error_response;
+  error_response << "-" << RedisCmdSplitter::Response::get().UpstreamFailure << "\r\n";
+  redis_client->waitForData(error_response.str());
+  EXPECT_EQ(error_response.str(), redis_client->data());
+
+  redis_client->close();
+  EXPECT_TRUE(fake_upstream_connection_1->close());
+}
+
+// This test verifies that a ASK redirection error as a response to an "asking" command is ignored.
+// This is a negative test scenario that should never happen since a Redis server will reply to an
+// "asking" command with either a "cluster support not enabled" error or "OK".
+
+TEST_P(RedisProxyWithRedirectionIntegrationTest, IgnoreRedirectionForAsking) {
+  initialize();
+  std::string request = makeBulkStringArray({"get", "foo"});
+  std::stringstream redirection_error, asking_response;
+  redirection_error << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[1]) << "\r\n";
+  asking_response << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[0]) << "\r\n";
+  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n",
+                    asking_response.str());
+}
+
 } // namespace
+
 } // namespace Envoy
