@@ -7,11 +7,11 @@ apt-get update
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y wget software-properties-common make cmake git python python-pip python3 python3-pip \
   unzip bc libtool ninja-build automake zip time golang gdb strace wireshark tshark tcpdump lcov
-# clang 7.
+# clang 8.
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main"
+apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-8 main"
 apt-get update
-apt-get install -y clang-7 clang-format-7 clang-tidy-7 lld-7 libc++-7-dev libc++abi-7-dev
+apt-get install -y clang-8 clang-format-8 clang-tidy-8 lld-8 libc++-8-dev libc++abi-8-dev
 # gcc-7
 add-apt-repository -y ppa:ubuntu-toolchain-r/test
 apt update

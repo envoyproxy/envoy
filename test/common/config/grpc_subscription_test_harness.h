@@ -80,12 +80,6 @@ public:
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
     subscription_->start(cluster_names, callbacks_);
-    // These are just there to add coverage to the null implementations of these
-    // callbacks.
-    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{}};
-    subscription_->grpcMux().onReceiveInitialMetadata(std::move(response_headers));
-    Http::TestHeaderMapImpl request_headers;
-    subscription_->grpcMux().onCreateInitialMetadata(request_headers);
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
@@ -115,7 +109,7 @@ public:
       expectSendMessage(last_cluster_names_, version_, Grpc::Status::GrpcStatus::Internal,
                         "bad config");
     }
-    subscription_->grpcMux().onReceiveMessage(std::move(response));
+    subscription_->grpcMux().onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
