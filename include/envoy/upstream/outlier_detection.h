@@ -26,9 +26,9 @@ namespace Outlier {
  * Non-HTTP result of requests/operations.
  */
 enum class Result {
-  SUCCESS,        // Successfully established a connection or completed a request.
-  TIMEOUT,        // Timed out while connecting or executing a request.
-  CONNECT_FAILED, // Remote host rejected the connection.
+  TIMEOUT,         // Timed out while connecting or executing a request.
+  CONNECT_SUCCESS, // Successfully established a connection to upstream host
+  CONNECT_FAILED,  // Remote host rejected the connection.
 
   // The entries below only make sense when Envoy understands requests/responses for the
   // protocol being proxied. They do not make sense for TcpProxy, for example.

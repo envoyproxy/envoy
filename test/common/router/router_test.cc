@@ -866,7 +866,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
   HttpTestUtility::addDefaultHeaders(headers);
   // First connection is successful and reset happens later on.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-              putResult(Upstream::Outlier::Result::SUCCESS, _));
+              putResult(Upstream::Outlier::Result::CONNECT_SUCCESS, _));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::CONNECT_FAILED, _));
   router_.decodeHeaders(headers, true);
@@ -1327,7 +1327,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::SUCCESS, _));
+                    putResult(Upstream::Outlier::Result::CONNECT_SUCCESS, _));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));
@@ -1378,7 +1378,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
                            -> Http::ConnectionPool::Cancellable* {
         response_decoder = &decoder;
         EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
-                    putResult(Upstream::Outlier::Result::SUCCESS, _));
+                    putResult(Upstream::Outlier::Result::CONNECT_SUCCESS, _));
         callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_);
         return nullptr;
       }));

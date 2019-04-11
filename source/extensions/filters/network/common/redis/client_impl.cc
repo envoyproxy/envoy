@@ -83,7 +83,6 @@ void ClientImpl::onConnectOrOpTimeout() {
 void ClientImpl::onData(Buffer::Instance& data) {
   try {
     decoder_->decode(data);
-    putOutlierEvent(Upstream::Outlier::Result::REQUEST_SUCCESS);
   } catch (ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::REQUEST_FAILED);
     host_->cluster().stats().upstream_cx_protocol_error_.inc();

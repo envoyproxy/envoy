@@ -107,7 +107,6 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   Http::Code http_code = Http::Code::InternalServerError;
 
   switch (result) {
-  case Result::SUCCESS:
   case Result::REQUEST_SUCCESS:
     http_code = Http::Code::OK;
     break;
@@ -120,6 +119,9 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   case Result::REQUEST_FAILED:
     http_code = Http::Code::InternalServerError;
     break;
+  case Result::CONNECT_SUCCESS:
+    ASSERT(false); // SUCCESS is used to report connection level success, not transaction
+    break;
   }
 
   return http_code;
@@ -129,7 +131,15 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
 // are not treated differently. All errors are mapped to HTTP codes.
 void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
                                                             absl::optional<uint64_t> code) {
-  putHttpResponseCode(code ? code.value() : enumToInt(resultToHttpCode(result)));
+  switch (result) {
+  case Result::CONNECT_SUCCESS:
+    // SUCCESS means that connection to host was established, but not transaction still can fail.
+    // HTTP server may return 5xx or DB server may indicate error.
+    break;
+  default:
+    putHttpResponseCode(code ? code.value() : enumToInt(resultToHttpCode(result)));
+    break;
+  }
 }
 
 // Method is called by putResult when external and local origin errors
@@ -140,7 +150,7 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
-  case Result::SUCCESS:
+  case Result::CONNECT_SUCCESS:
     return localOriginNoFailure();
   // Connectivity related errors.
   case Result::TIMEOUT:

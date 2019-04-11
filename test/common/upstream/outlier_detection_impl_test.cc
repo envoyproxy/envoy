@@ -197,7 +197,11 @@ TEST_F(OutlierDetectorImplTest, DestroyHostInUse) {
   loadRq(hosts_[0], 5, 500);
 }
 
-TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
+/*
+ Tests scenario when connect errors are reported by Non-http codes and success is reported by
+ http codes. (this happens in http router).
+*/
+TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaHttpCodes) {
   EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
   addHosts({"tcp://127.0.0.1:80"});
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
@@ -208,7 +212,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
   addHosts({"tcp://127.0.0.1:81"});
   cluster_.prioritySet().getMockHostSet(0)->runCallbacks({hosts_[1]}, {});
 
-  // Cause a consecutive 5xx error.
+  // Cause a consecutive 5xx error on host[0] by reporting HTTP codes.
   loadRq(hosts_[0], 1, 500);
   loadRq(hosts_[0], 1, 200);
   hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
@@ -250,6 +254,84 @@ TEST_F(OutlierDetectorImplTest, BasicFlow5xx) {
               logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
                        envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
   loadRq(hosts_[0], 1, 500);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({}, hosts_);
+
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+  EXPECT_EQ(2UL, cluster_.info_->stats_store_.counter("outlier_detection.ejections_total").value());
+  EXPECT_EQ(
+      2UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_consecutive_5xx").value());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_consecutive_gateway_failure")
+                     .value());
+}
+
+TEST_F(OutlierDetectorImplTest, BasicFlow5xxViaNonHttpCodes) {
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  addHosts({"tcp://127.0.0.1:81"});
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({hosts_[1]}, {});
+
+  // Cause a consecutive 5xx error on host[0] by reporting Non-HTTP codes.
+  loadRq(hosts_[0], 1, Result::CONNECT_FAILED);
+  loadRq(hosts_[0], 1, 200);
+  hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
+  loadRq(hosts_[0], 4, Result::CONNECT_FAILED);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE,
+               false));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 1, Result::CONNECT_FAILED);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Interval that doesn't bring the host back in.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(9999));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
+
+  // Interval that does bring the host back in.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(30001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
+
+  // Eject host again to cause an ejection after an unejection has taken place
+  hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
+  loadRq(hosts_[0], 4, Result::CONNECT_FAILED);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(40000));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE,
+               false));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
+  loadRq(hosts_[0], 1, Result::CONNECT_FAILED);
   EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
   EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 
@@ -364,6 +446,59 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
                      .value());
 }
 
+/*
+ * Test passing of optional HTTP code with Result:: TIMEOUT
+ */
+TEST_F(OutlierDetectorImplTest, TimeoutWithHttpCode) {
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({
+      "tcp://127.0.0.1:80",
+      "tcp://127.0.0.1:81",
+      "tcp://127.0.0.1:84",
+  });
+
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // Report several TIMEOUT with optional Http code 500. Host should be ejected.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
+  // Get the configured number of failures and simulate than number of connect failures.
+  uint32_t n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_5xx",
+                                             detector->config().consecutive5xx());
+  while (n--) {
+    hosts_[0]->outlierDetector().putResult(Result::TIMEOUT, absl::optional<uint64_t>(500));
+  }
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Wait until it is unejected
+  time_system_.setMonotonicTime(std::chrono::milliseconds(50001));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Report several TIMEOUT with HTTP code other that 500. Node should not be ejected.
+  EXPECT_CALL(checker_, check(hosts_[0])).Times(0);
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true))
+      .Times(0);
+  // Get the configured number of failures and simulate than number of connect failures.
+  n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_5xx",
+                                    detector->config().consecutive5xx());
+  while (n--) {
+    hosts_[0]->outlierDetector().putResult(Result::TIMEOUT, absl::optional<uint64_t>(200));
+  }
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+}
+
 /**
  * Set of tests to verify ejecting and unejecting nodes when local/connect failures are reported.
  */
@@ -423,7 +558,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowLocalOriginFailure) {
     hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   }
   // now success and few failures
-  hosts_[0]->outlierDetector().putResult(Result::SUCCESS);
+  hosts_[0]->outlierDetector().putResult(Result::CONNECT_SUCCESS);
   hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   hosts_[0]->outlierDetector().putResult(Result::CONNECT_FAILED);
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
@@ -539,6 +674,54 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailureAnd5xx) {
   EXPECT_EQ(1UL, cluster_.info_->stats_store_
                      .counter("outlier_detection.ejections_enforced_consecutive_gateway_failure")
                      .value());
+}
+
+// Test mapping of Non-Http codes to Http. This happens when split between external and local
+// origin errors is turned off.
+TEST_F(OutlierDetectorImplTest, BasicFlowNonHttpCodesExternalOrigin) {
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"});
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_system_, event_logger_));
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  addHosts({"tcp://127.0.0.1:81"});
+  cluster_.prioritySet().getMockHostSet(0)->runCallbacks({hosts_[1]}, {});
+
+  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_consecutive_5xx", 100))
+      .WillByDefault(Return(true));
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("outlier_detection.enforcing_consecutive_gateway_failure", 0))
+      .WillByDefault(Return(false));
+
+  // Make sure that REQUEST_SUCCESS cancels CONNECT_FAILED
+  for (auto i = 0; i < 100; i++) {
+    loadRq(hosts_[0], 1, Result::CONNECT_FAILED);
+    loadRq(hosts_[0], 1, Result::REQUEST_SUCCESS);
+  }
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  // Cause a consecutive 5xx error.
+  loadRq(hosts_[0], 1, Result::CONNECT_FAILED);
+  loadRq(hosts_[0], 1, Result::CONNECT_SUCCESS);
+  hosts_[0]->outlierDetector().putResponseTime(std::chrono::milliseconds(5));
+  loadRq(hosts_[0], 3, Result::CONNECT_FAILED);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  EXPECT_CALL(*event_logger_,
+              logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+                       envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_5XX, true));
+  EXPECT_CALL(
+      *event_logger_,
+      logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]), _,
+               envoy::data::cluster::v2alpha::OutlierEjectionType::CONSECUTIVE_GATEWAY_FAILURE,
+               false));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  loadRq(hosts_[0], 1, Result::CONNECT_FAILED);
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
 }
 
 TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateExternalOrigin) {
@@ -686,7 +869,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
                false))
       .Times(40);
   // Cause a SR error on one host. First have 4 of the hosts have perfect SR.
-  loadRq(hosts_, 200, Result::SUCCESS);
+  loadRq(hosts_, 200, Result::CONNECT_SUCCESS);
   loadRq(hosts_[4], 200, Result::CONNECT_FAILED);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
@@ -746,7 +929,7 @@ TEST_F(OutlierDetectorImplTest, BasicFlowSuccessRateLocalOrigin) {
       .Times(5);
 
   // Give 4 hosts enough request volume but not to the 5th. Should not cause an ejection.
-  loadRq(hosts_, 25, Result::SUCCESS);
+  loadRq(hosts_, 25, Result::REQUEST_SUCCESS);
   loadRq(hosts_[4], 25, Result::CONNECT_FAILED);
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(60001));

@@ -651,7 +651,7 @@ TEST_F(TcpProxyTest, OutlierDetection) {
                                   Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
-              putResult(Upstream::Outlier::Result::SUCCESS, _));
+              putResult(Upstream::Outlier::Result::CONNECT_SUCCESS, _));
   raiseEventUpstreamConnected(2);
 }
 
