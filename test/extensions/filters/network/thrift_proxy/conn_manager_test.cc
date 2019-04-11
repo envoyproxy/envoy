@@ -1239,9 +1239,6 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(0U, store_.gauge("test.request_active").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
-
-  // This might not be true, if we haven't decoded a full request.
-  // EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 }
 
 // Tests a decoder filter that modifies data.
