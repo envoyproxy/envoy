@@ -10,10 +10,10 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -22,11 +22,10 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class SecretManagerImplTest : public TestBase {
+class SecretManagerImplTest : public testing::Test {
 protected:
-  SecretManagerImplTest() : api_(Api::createApiForTest(stats_store_)) {}
+  SecretManagerImplTest() : api_(Api::createApiForTest()) {}
 
-  Stats::MockIsolatedStatsStore stats_store_;
   Api::ApiPtr api_;
 };
 
@@ -180,9 +179,10 @@ tls_certificate:
   private_key:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
 )EOF";
-  Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
-  auto secret_config = secret_resources.Add();
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
+  envoy::api::v2::auth::Secret typed_secret;
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), typed_secret);
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
+  secret_resources.Add()->PackFrom(typed_secret);
   dynamic_cast<TlsCertificateSdsApi&>(*secret_provider).onConfigUpdate(secret_resources, "");
   Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), *api_);
   const std::string cert_pem =

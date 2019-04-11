@@ -30,7 +30,7 @@ void FileAccessLog::log(const Http::HeaderMap* request_headers,
   }
 
   if (filter_) {
-    if (!filter_->evaluate(stream_info, *request_headers)) {
+    if (!filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {
       return;
     }
   }

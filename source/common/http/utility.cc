@@ -57,10 +57,19 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
   // RFC allows the absolute-uri to not end in /, but the absolute path form
   // must start with
   if ((u.field_set & (1 << UF_PATH)) == (1 << UF_PATH) && u.field_data[UF_PATH].len > 0) {
-    path_ = absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off,
-                              u.field_data[UF_PATH].len);
+    uint64_t path_len = u.field_data[UF_PATH].len;
+    if ((u.field_set & (1 << UF_QUERY)) == (1 << UF_QUERY) && u.field_data[UF_QUERY].len > 0) {
+      path_len += 1 + u.field_data[UF_QUERY].len;
+    }
+    path_and_query_params_ =
+        absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off, path_len);
+  } else if ((u.field_set & (1 << UF_QUERY)) == (1 << UF_QUERY) && u.field_data[UF_QUERY].len > 0) {
+    // Http parser skips question mark and starts count from first character after ?
+    // so we need to move left by one
+    path_and_query_params_ = absl::string_view(absolute_url.data() + u.field_data[UF_QUERY].off - 1,
+                                               u.field_data[UF_QUERY].len + 1);
   } else {
-    path_ = absl::string_view(kDefaultPath, 1);
+    path_and_query_params_ = absl::string_view(kDefaultPath, 1);
   }
   return true;
 }
@@ -229,7 +238,7 @@ bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
 uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
-  if (!header || !StringUtil::atoul(headers.Status()->value().c_str(), response_code)) {
+  if (!header || !StringUtil::atoull(headers.Status()->value().c_str(), response_code)) {
     throw CodecClientException(":status must be specified and a valid unsigned long");
   }
   return response_code;
@@ -442,6 +451,27 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
     delim = "&";
   }
   return out;
+}
+
+const std::string Utility::resetReasonToString(const Http::StreamResetReason reset_reason) {
+  switch (reset_reason) {
+  case Http::StreamResetReason::ConnectionFailure:
+    return "connection failure";
+  case Http::StreamResetReason::ConnectionTermination:
+    return "connection termination";
+  case Http::StreamResetReason::LocalReset:
+    return "local reset";
+  case Http::StreamResetReason::LocalRefusedStreamReset:
+    return "local refused stream reset";
+  case Http::StreamResetReason::Overflow:
+    return "overflow";
+  case Http::StreamResetReason::RemoteReset:
+    return "remote reset";
+  case Http::StreamResetReason::RemoteRefusedStreamReset:
+    return "remote refused stream reset";
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {

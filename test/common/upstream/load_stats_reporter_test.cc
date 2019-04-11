@@ -10,10 +10,10 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -25,8 +25,9 @@ using testing::Return;
 // for the happy path for LoadStatsReporter is provided in //test/integration:load_stats_reporter.
 namespace Envoy {
 namespace Upstream {
+namespace {
 
-class LoadStatsReporterTest : public TestBase {
+class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
@@ -115,9 +116,10 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   createLoadStatsReporter();
   time_system_.setMonotonicTime(std::chrono::microseconds(3));
   // Start reporting on foo.
-  NiceMock<MockCluster> foo_cluster;
+  NiceMock<MockClusterMockPrioritySet> foo_cluster;
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
-  NiceMock<MockCluster> bar_cluster;
+  foo_cluster.info_->eds_service_name_ = "bar";
+  NiceMock<MockClusterMockPrioritySet> bar_cluster;
   MockClusterManager::ClusterInfoMap cluster_info{{"foo", foo_cluster}, {"bar", bar_cluster}};
   ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
   deliverLoadStatsResponse({"foo"});
@@ -127,6 +129,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(5);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
@@ -149,6 +152,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(2);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
@@ -197,6 +201,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
+    foo_cluster_stats.set_cluster_service_name("bar");
     foo_cluster_stats.set_total_dropped_requests(1);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(4));
@@ -224,5 +229,6 @@ TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
   retry_timer_cb_();
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

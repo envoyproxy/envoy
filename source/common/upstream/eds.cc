@@ -1,19 +1,8 @@
 #include "common/upstream/eds.h"
 
 #include "envoy/api/v2/eds.pb.validate.h"
-#include "envoy/common/exception.h"
-#include "envoy/stats/scope.h"
 
-#include "common/common/fmt.h"
-#include "common/config/metadata.h"
 #include "common/config/subscription_factory.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/network/address_impl.h"
-#include "common/network/resolver_impl.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -34,16 +23,83 @@ EdsClusterImpl::EdsClusterImpl(
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   Runtime::RandomGenerator& random = factory_context.random();
   Upstream::ClusterManager& cm = factory_context.clusterManager();
-  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::ClusterLoadAssignment>(
+  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints", factory_context.api());
+      "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
+      Grpc::Common::typeUrl(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
+      factory_context.api());
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}, *this); }
 
-void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::string&) {
+void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
+  std::unordered_map<std::string, HostSharedPtr> updated_hosts;
+  PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb);
+  for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
+    const uint32_t priority = locality_lb_endpoint.priority();
+
+    if (priority > 0 && !parent_.cluster_name_.empty() &&
+        parent_.cluster_name_ == parent_.cm_.localClusterName()) {
+      throw EnvoyException(fmt::format("Unexpected non-zero priority for local cluster '{}'.",
+                                       parent_.cluster_name_));
+    }
+    priority_state_manager.initializePriorityFor(locality_lb_endpoint);
+
+    for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      priority_state_manager.registerHostForPriority(
+          "", parent_.resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
+          lb_endpoint);
+    }
+  }
+
+  // Track whether we rebuilt any LB structures.
+  bool cluster_rebuilt = false;
+
+  const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      cluster_load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+
+  // Loop over all priorities that exist in the new configuration.
+  auto& priority_state = priority_state_manager.priorityState();
+  for (size_t i = 0; i < priority_state.size(); ++i) {
+    if (priority_state[i].first != nullptr) {
+      if (parent_.locality_weights_map_.size() <= i) {
+        parent_.locality_weights_map_.resize(i + 1);
+      }
+      cluster_rebuilt |= parent_.updateHostsPerLocality(
+          i, overprovisioning_factor, *priority_state[i].first, parent_.locality_weights_map_[i],
+          priority_state[i].second, priority_state_manager, updated_hosts);
+    }
+  }
+
+  // Loop over all priorities not present in the config that already exists. This will
+  // empty out any remaining priority that the config update did not refer to.
+  for (size_t i = priority_state.size(); i < parent_.priority_set_.hostSetsPerPriority().size();
+       ++i) {
+    const HostVector empty_hosts;
+    LocalityWeightsMap empty_locality_map;
+
+    if (parent_.locality_weights_map_.size() <= i) {
+      parent_.locality_weights_map_.resize(i + 1);
+    }
+    cluster_rebuilt |= parent_.updateHostsPerLocality(
+        i, overprovisioning_factor, empty_hosts, parent_.locality_weights_map_[i],
+        empty_locality_map, priority_state_manager, updated_hosts);
+  }
+
+  parent_.all_hosts_ = std::move(updated_hosts);
+
+  if (!cluster_rebuilt) {
+    parent_.info_->stats().update_no_rebuild_.inc();
+  }
+
+  // If we didn't setup to initialize when our first round of health checking is complete, just
+  // do it now.
+  parent_.onPreInitComplete();
+}
+
+void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                    const std::string&) {
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing ClusterLoadAssignment for {} in onConfigUpdate()", cluster_name_);
     info_->stats().update_empty_.inc();
@@ -53,7 +109,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
-  const auto& cluster_load_assignment = resources[0];
+  auto cluster_load_assignment =
+      MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
   MessageUtil::validate(cluster_load_assignment);
   // TODO(PiotrSikora): Remove this hack once fixed internally.
   if (!(cluster_load_assignment.cluster_name() == cluster_name_)) {
@@ -61,66 +118,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
                                      cluster_load_assignment.cluster_name()));
   }
 
-  std::unordered_map<std::string, HostSharedPtr> updated_hosts;
-  PriorityStateManager priority_state_manager(*this, local_info_);
-  for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
-    const uint32_t priority = locality_lb_endpoint.priority();
-
-    if (priority > 0 && !cluster_name_.empty() && cluster_name_ == cm_.localClusterName()) {
-      throw EnvoyException(
-          fmt::format("Unexpected non-zero priority for local cluster '{}'.", cluster_name_));
-    }
-    priority_state_manager.initializePriorityFor(locality_lb_endpoint);
-
-    for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      priority_state_manager.registerHostForPriority(
-          "", resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
-          lb_endpoint, Host::HealthFlag::FAILED_EDS_HEALTH);
-    }
-  }
-
-  // Track whether we rebuilt any LB structures.
-  bool cluster_rebuilt = false;
-
-  const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
-
-  // Loop over all priorities that exist in the new configuration.
-  auto& priority_state = priority_state_manager.priorityState();
-  for (size_t i = 0; i < priority_state.size(); ++i) {
-    if (priority_state[i].first != nullptr) {
-      if (locality_weights_map_.size() <= i) {
-        locality_weights_map_.resize(i + 1);
-      }
-      cluster_rebuilt |= updateHostsPerLocality(
-          i, overprovisioning_factor, *priority_state[i].first, locality_weights_map_[i],
-          priority_state[i].second, priority_state_manager, updated_hosts);
-    }
-  }
-
-  // Loop over all priorities not present in the config that already exists. This will
-  // empty out any remaining priority that the config update did not refer to.
-  for (size_t i = priority_state.size(); i < priority_set_.hostSetsPerPriority().size(); ++i) {
-    const HostVector empty_hosts;
-    LocalityWeightsMap empty_locality_map;
-
-    if (locality_weights_map_.size() <= i) {
-      locality_weights_map_.resize(i + 1);
-    }
-    cluster_rebuilt |=
-        updateHostsPerLocality(i, overprovisioning_factor, empty_hosts, locality_weights_map_[i],
-                               empty_locality_map, priority_state_manager, updated_hosts);
-  }
-
-  all_hosts_ = std::move(updated_hosts);
-
-  if (!cluster_rebuilt) {
-    info_->stats().update_no_rebuild_.inc();
-  }
-
-  // If we didn't setup to initialize when our first round of health checking is complete, just
-  // do it now.
-  onPreInitComplete();
+  BatchUpdateHelper helper(*this, cluster_load_assignment);
+  priority_set_.batchHostUpdate(helper);
 }
 
 bool EdsClusterImpl::updateHostsPerLocality(
@@ -165,6 +164,23 @@ void EdsClusterImpl::onConfigUpdateFailed(const EnvoyException* e) {
   // We need to allow server startup to continue, even if we have a bad config.
   onPreInitComplete();
 }
+
+ClusterImplBaseSharedPtr EdsClusterFactory::createClusterImpl(
+    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+    Stats::ScopePtr&& stats_scope) {
+  if (!cluster.has_eds_cluster_config()) {
+    throw EnvoyException("cannot create an EDS cluster without an EDS config");
+  }
+
+  return std::make_unique<EdsClusterImpl>(cluster, context.runtime(), socket_factory_context,
+                                          std::move(stats_scope), context.addedViaApi());
+}
+
+/**
+ * Static registration for the strict dns cluster factory. @see RegisterFactory.
+ */
+REGISTER_FACTORY(EdsClusterFactory, ClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

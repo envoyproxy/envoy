@@ -2,8 +2,9 @@
 
 #include "common/common/assert.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -38,7 +39,7 @@ public:
 
 class GrpcClientIntegrationParamTest
     : public BaseGrpcClientIntegrationParamTest,
-      public TestBaseWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
 public:
   ~GrpcClientIntegrationParamTest() override = default;
   static std::string protocolTestParamsToString(

@@ -17,26 +17,28 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
-    Api::SysCallIntResult result = buffer.read(callbacks_->ioHandle().fd(), 16384);
-    ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
+    Api::IoCallUint64Result result = buffer.read(callbacks_->ioHandle(), 16384);
 
-    if (result.rc_ == 0) {
-      // Remote close.
-      end_stream = true;
-      break;
-    } else if (result.rc_ == -1) {
-      // Remote error (might be no data).
-      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(), result.errno_);
-      if (result.errno_ != EAGAIN) {
-        action = PostIoAction::Close;
+    if (result.ok()) {
+      ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
+      if (result.rc_ == 0) {
+        // Remote close.
+        end_stream = true;
+        break;
       }
-      break;
-    } else {
       bytes_read += result.rc_;
       if (callbacks_->shouldDrainReadBuffer()) {
         callbacks_->setReadBufferReady();
         break;
       }
+    } else {
+      // Remote error (might be no data).
+      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(),
+                     result.err_->getErrorDetails());
+      if (result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+        action = PostIoAction::Close;
+      }
+      break;
     }
   } while (true);
 
@@ -58,20 +60,20 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    Api::SysCallIntResult result = buffer.write(callbacks_->ioHandle().fd());
-    ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
+    Api::IoCallUint64Result result = buffer.write(callbacks_->ioHandle());
 
-    if (result.rc_ == -1) {
-      ENVOY_CONN_LOG(trace, "write error: {} ({})", callbacks_->connection(), result.errno_,
-                     strerror(result.errno_));
-      if (result.errno_ == EAGAIN) {
+    if (result.ok()) {
+      ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
+      bytes_written += result.rc_;
+    } else {
+      ENVOY_CONN_LOG(trace, "write error: {}", callbacks_->connection(),
+                     result.err_->getErrorDetails());
+      if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
         action = PostIoAction::KeepOpen;
       } else {
         action = PostIoAction::Close;
       }
       break;
-    } else {
-      bytes_written += result.rc_;
     }
   } while (true);
 
@@ -79,6 +81,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
 }
 
 std::string RawBufferSocket::protocol() const { return EMPTY_STRING; }
+absl::string_view RawBufferSocket::failureReason() const { return EMPTY_STRING; }
 
 void RawBufferSocket::onConnected() { callbacks_->raiseEvent(ConnectionEvent::Connected); }
 

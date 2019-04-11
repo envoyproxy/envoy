@@ -17,6 +17,7 @@ void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
 }
 
 std::string TapSocket::protocol() const { return transport_socket_->protocol(); }
+absl::string_view TapSocket::failureReason() const { return transport_socket_->failureReason(); }
 
 bool TapSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
 
@@ -49,7 +50,7 @@ Network::IoResult TapSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
 
 void TapSocket::onConnected() { transport_socket_->onConnected(); }
 
-const Ssl::Connection* TapSocket::ssl() const { return transport_socket_->ssl(); }
+const Ssl::ConnectionInfo* TapSocket::ssl() const { return transport_socket_->ssl(); }
 
 TapSocketFactory::TapSocketFactory(
     const envoy::config::transport_socket::tap::v2alpha::Tap& proto_config,

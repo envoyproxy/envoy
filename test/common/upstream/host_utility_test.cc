@@ -4,10 +4,12 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 TEST(HostUtilityTest, All) {
   ClusterInfoConstSharedPtr cluster{new MockClusterInfo()};
@@ -30,5 +32,6 @@ TEST(HostUtilityTest, All) {
   EXPECT_EQ("/failed_outlier_check", HostUtility::healthFlagsToString(*host));
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

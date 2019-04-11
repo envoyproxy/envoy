@@ -5,11 +5,12 @@
 #include "envoy/api/api.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/config/subscription.h"
-#include "envoy/init/init.h"
+#include "envoy/init/manager.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
+#include "common/init/target_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,8 +19,7 @@ namespace Server {
  * LDS API implementation that fetches via Subscription.
  */
 class LdsApiImpl : public LdsApi,
-                   public Init::Target,
-                   Config::SubscriptionCallbacks<envoy::api::v2::Listener>,
+                   Config::SubscriptionCallbacks,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
@@ -30,25 +30,26 @@ public:
   // Server::LdsApi
   std::string versionInfo() const override { return version_info_; }
 
-  // Init::Target
-  void initialize(std::function<void()> callback) override;
-
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  // TODO(fredlas) deduplicate
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   void onConfigUpdateFailed(const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
   }
 
 private:
-  void runInitializeCallbackIfAny();
-
-  std::unique_ptr<Config::Subscription<envoy::api::v2::Listener>> subscription_;
+  std::unique_ptr<Config::Subscription> subscription_;
   std::string version_info_;
   ListenerManager& listener_manager_;
   Stats::ScopePtr scope_;
   Upstream::ClusterManager& cm_;
-  std::function<void()> initialize_callback_;
+  Init::TargetImpl init_target_;
 };
 
 } // namespace Server

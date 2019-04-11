@@ -5,6 +5,7 @@
 
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
 #include "common/stats/metric_impl.h"
@@ -29,6 +30,8 @@ namespace Stats {
 // available. This could be resolved with placed new, or another nesting level.
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
+  explicit StatDataAllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+
   // StatDataAllocator
   CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
                                std::vector<Tag>&& tags) override;
@@ -50,6 +53,12 @@ public:
    * @param data the data returned by alloc().
    */
   virtual void free(StatData& data) PURE;
+
+  SymbolTable& symbolTable() override { return symbol_table_; }
+  const SymbolTable& symbolTable() const override { return symbol_table_; }
+
+private:
+  SymbolTable& symbol_table_;
 };
 
 /**
@@ -135,7 +144,7 @@ public:
   }
   virtual void sub(uint64_t amount) override {
     ASSERT(data_.value_ >= amount);
-    ASSERT(used());
+    ASSERT(used() || amount == 0);
     data_.value_ -= amount;
   }
   virtual uint64_t value() const override { return data_.value_; }

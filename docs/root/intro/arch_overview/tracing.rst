@@ -12,14 +12,18 @@ sources of latency. Envoy supports three features related to system wide tracing
 * **Request ID generation**: Envoy will generate UUIDs when needed and populate the
   :ref:`config_http_conn_man_headers_x-request-id` HTTP header. Applications can forward the
   x-request-id header for unified logging as well as tracing.
-* **External trace service integration**: Envoy supports pluggable external trace visualization
-  providers. Currently Envoy supports `LightStep <http://lightstep.com/>`_, `Zipkin <http://zipkin.io/>`_
-  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_), and
-  `Datadog <https://datadoghq.com>`_.
-  However, support for other tracing providers would not be difficult to add.
 * **Client trace ID joining**: The :ref:`config_http_conn_man_headers_x-client-trace-id` header can
   be used to join untrusted request IDs to the trusted internal
   :ref:`config_http_conn_man_headers_x-request-id`.
+* **External trace service integration**: Envoy supports pluggable external trace visualization
+  providers, that are divided into two subgroups:
+
+  - External tracers which are part of the Envoy code base, like `LightStep <https://lightstep.com/>`_,
+    `Zipkin <https://zipkin.io/>`_  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_), and
+    `Datadog <https://datadoghq.com>`_.
+  - External tracers which come as a third party plugin, like `Instana <https://www.instana.com/blog/monitoring-envoy-proxy-microservices/>`_.
+
+Support for other tracing providers would not be difficult to add.
 
 How to initiate a trace
 -----------------------

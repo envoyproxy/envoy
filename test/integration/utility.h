@@ -38,7 +38,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -99,8 +100,8 @@ private:
     Network::ConnectionEvent last_connection_event_;
   };
 
-  Api::ApiPtr api_;
   Stats::IsolatedStoreImpl stats_store_;
+  Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;

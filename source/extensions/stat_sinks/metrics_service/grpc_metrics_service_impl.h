@@ -72,7 +72,7 @@ class MetricsServiceSink : public Stats::Sink {
 public:
   // MetricsService::Sink
   MetricsServiceSink(const GrpcMetricsStreamerSharedPtr& grpc_metrics_streamer,
-                     Event::TimeSystem& time_system);
+                     TimeSource& time_system);
   void flush(Stats::Source& source) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
@@ -83,7 +83,7 @@ public:
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
   envoy::service::metrics::v2::StreamMetricsMessage message_;
-  Event::TimeSystem& time_system_;
+  TimeSource& time_source_;
 };
 
 } // namespace MetricsService

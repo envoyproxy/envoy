@@ -71,7 +71,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
     const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
     if (grpc_status_header) {
       uint64_t grpc_status_code;
-      if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) ||
+      if (!StringUtil::atoull(grpc_status_header->value().c_str(), grpc_status_code) ||
           grpc_status_code != 0) {
         response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
       }

@@ -28,10 +28,10 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -134,7 +134,7 @@ std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
   return dns_config;
 }
 
-class StrictDnsParamTest : public TestBaseWithParam<StrictDnsConfigTuple>,
+class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple>,
                            public UpstreamImplTestBase {};
 
 INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
@@ -176,7 +176,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-class StrictDnsClusterImplTest : public TestBase, public UpstreamImplTestBase {
+class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {
 protected:
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_ =
       std::make_shared<Network::MockDnsResolver>();
@@ -455,6 +455,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
                 port_value: 11001
             health_check_config:
               port_value: 8000
+          health_status: DEGRADED
         - endpoint:
             address:
               socket_address:
@@ -524,6 +525,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
   EXPECT_EQ("localhost1", cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->hostname());
   EXPECT_EQ(100, cluster.prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
+  EXPECT_EQ(Host::Health::Degraded,
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->health());
+  EXPECT_EQ(Host::Health::Degraded,
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[1]->health());
 
   // This is the first time we received an update for localhost1, we expect to rebuild.
   EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
@@ -582,7 +587,8 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
       ContainerEq(hostListToAddresses(cluster.prioritySet().hostSetsPerPriority()[0]->hosts())));
 
-  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
   EXPECT_EQ(1UL,
             cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
@@ -596,7 +602,8 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   EXPECT_THAT(std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002", "10.0.0.1:11002"}),
               ContainerEq(hostListToAddresses(hosts)));
 
-  EXPECT_EQ(3UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(2UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
   EXPECT_EQ(1UL,
             cluster.prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
@@ -779,7 +786,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 }
 
 TEST(HostImplTest, HostCluster) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   EXPECT_EQ(cluster.info_.get(), &host->cluster());
   EXPECT_EQ("", host->hostname());
@@ -788,7 +795,7 @@ TEST(HostImplTest, HostCluster) {
 }
 
 TEST(HostImplTest, Weight) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
 
   EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 0)->weight());
   EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 128)->weight());
@@ -805,7 +812,7 @@ TEST(HostImplTest, Weight) {
 }
 
 TEST(HostImplTest, HostnameCanaryAndLocality) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   envoy::api::v2::core::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                          Config::MetadataEnvoyLbKeys::get().CANARY)
@@ -816,7 +823,8 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 metadata, 1, locality,
-                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 1);
+                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 1,
+                envoy::api::v2::core::HealthStatus::UNKNOWN);
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());
@@ -827,7 +835,7 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
 }
 
 TEST(HostImplTest, HealthFlags) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
 
   // To begin with, no flags are set so we're healthy.
@@ -844,9 +852,38 @@ TEST(HostImplTest, HealthFlags) {
   // If the degraded flag is the only thing set, host is degraded.
   host->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   EXPECT_EQ(Host::Health::Degraded, host->health());
+
+  // If the EDS and active degraded flag is set, host is degraded.
+  host->healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
+  EXPECT_EQ(Host::Health::Degraded, host->health());
+
+  // If only the EDS degraded is set, host is degraded.
+  host->healthFlagClear(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  EXPECT_EQ(Host::Health::Degraded, host->health());
+
+  // If EDS and failed active hc is set, host is unhealthy.
+  host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_EQ(Host::Health::Unhealthy, host->health());
 }
 
-class StaticClusterImplTest : public TestBase, public UpstreamImplTestBase {};
+// Test that it's not possible to do a HostDescriptionImpl with a unix
+// domain socket host and a health check config with non-zero port.
+// This is a regression test for oss-fuzz issue
+// https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=11095
+TEST(HostImplTest, HealthPipeAddress) {
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig config;
+        config.set_port_value(8000);
+        HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("unix://foo"),
+                                  envoy::api::v2::core::Metadata::default_instance(),
+                                  envoy::api::v2::core::Locality().default_instance(), config, 1);
+      },
+      EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
+}
+
+class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 TEST_F(StaticClusterImplTest, InitialHosts) {
   const std::string yaml = R"EOF(
@@ -1038,6 +1075,44 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
   }
   EXPECT_EQ(nullptr, cluster.prioritySet().hostSetsPerPriority()[0]->localityWeights());
   EXPECT_FALSE(cluster.info()->addedViaApi());
+}
+
+// Validates that setting an EDS health value through LoadAssignment is honored for static clusters.
+TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      policy:
+        overprovisioning_factor: 100
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+            health_check_config:
+              port_value: 8000
+          health_status: DEGRADED
+  )EOF";
+
+  NiceMock<MockClusterManager> cm;
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, *api_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
+  EXPECT_EQ(Host::Health::Degraded,
+            cluster.prioritySet().hostSetsPerPriority()[0]->hosts()[0]->health());
 }
 
 TEST_F(StaticClusterImplTest, AltStatName) {
@@ -1371,6 +1446,32 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
       "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
 
+// Test for oss-fuzz issue #11329
+// (https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=11329). If no
+// hosts were specified in endpoints but a priority value > 0 there, a
+// crash would happen.
+TEST_F(StaticClusterImplTest, NoHostsTest) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    load_assignment:
+      cluster_name: foo
+      endpoints:
+      - priority: 1
+  )EOF";
+
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope =
+      stats_.createScope(fmt::format("cluster.{}.", cluster_config.name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, *api_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+}
+
 TEST(ClusterDefinitionTest, BadClusterConfig) {
   const std::string json = R"EOF(
   {
@@ -1446,7 +1547,7 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
   }
 }
 
-class ClusterImplTest : public TestBase, public UpstreamImplTestBase {};
+class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 // Test that the correct feature() is set when close_connections_on_host_health_failure is
 // configured.
@@ -1475,6 +1576,39 @@ TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   EXPECT_TRUE(cluster.info()->features() &
               ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE);
 }
+
+class TestBatchUpdateCb : public PrioritySet::BatchUpdateCb {
+public:
+  TestBatchUpdateCb(HostVectorSharedPtr hosts, HostsPerLocalitySharedPtr hosts_per_locality)
+      : hosts_(hosts), hosts_per_locality_(hosts_per_locality) {}
+
+  void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override {
+    // Add the host from P1 to P0.
+    {
+      HostVector hosts_added{hosts_->front()};
+      HostVector hosts_removed{};
+      host_update_cb.updateHosts(
+          0,
+          HostSetImpl::updateHostsParams(hosts_, hosts_per_locality_, hosts_, hosts_per_locality_),
+          {}, hosts_added, hosts_removed, absl::nullopt);
+    }
+
+    // Remove the host from P1.
+    {
+      HostVectorSharedPtr empty_hosts = std::make_shared<HostVector>();
+      HostVector hosts_added{};
+      HostVector hosts_removed{hosts_->front()};
+      host_update_cb.updateHosts(
+          1,
+          HostSetImpl::updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(), empty_hosts,
+                                         HostsPerLocalityImpl::empty()),
+          {}, hosts_added, hosts_removed, absl::nullopt);
+    }
+  }
+
+  HostVectorSharedPtr hosts_;
+  HostsPerLocalitySharedPtr hosts_per_locality_;
+};
 
 // Test creating and extending a priority set.
 TEST(PrioritySet, Extend) {
@@ -1514,12 +1648,14 @@ TEST(PrioritySet, Extend) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostVector hosts_added{hosts->front()};
-  HostVector hosts_removed{};
+  {
+    HostVector hosts_added{hosts->front()};
+    HostVector hosts_removed{};
 
-  priority_set.hostSetsPerPriority()[1]->updateHosts(
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
-      hosts_added, hosts_removed, absl::nullopt);
+    priority_set.updateHosts(
+        1, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
+        hosts_added, hosts_removed, absl::nullopt);
+  }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
   EXPECT_EQ(last_priority, 1);
@@ -1530,9 +1666,25 @@ TEST(PrioritySet, Extend) {
   for (auto& host_set : priority_set.hostSetsPerPriority()) {
     EXPECT_EQ(host_set.get(), priority_set.hostSetsPerPriority()[i++].get());
   }
+
+  // Test batch host updates. Verify that we can move a host without triggering intermediate host
+  // updates.
+
+  // We're going to do a noop host change, so add a callback to assert that we're not announcing any
+  // host changes.
+  priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) -> void {
+    EXPECT_TRUE(added.empty() && removed.empty());
+  });
+
+  TestBatchUpdateCb batch_update(hosts, hosts_per_locality);
+  priority_set.batchHostUpdate(batch_update);
+
+  // We expect to see two priority changes, but only one membership change.
+  EXPECT_EQ(3, priority_changes);
+  EXPECT_EQ(2, membership_changes);
 }
 
-class ClusterInfoImplTest : public TestBase {
+class ClusterInfoImplTest : public testing::Test {
 public:
   ClusterInfoImplTest() : api_(Api::createApiForTest(stats_)) {}
 
@@ -1615,6 +1767,39 @@ TEST_F(ClusterInfoImplTest, Metadata) {
   EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
 }
 
+// Eds service_name is populated.
+TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: EDS
+    lb_policy: MAGLEV
+    eds_cluster_config:
+      service_name: service_foo
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(cluster->info()->eds_service_name(), "service_foo");
+
+  const std::string unexpected_eds_config_yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    eds_cluster_config:
+      service_name: service_foo
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    common_lb_config:
+      healthy_panic_threshold:
+        value: 0.3
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(unexpected_eds_config_yaml), EnvoyException,
+                            "eds_cluster_config set in a non-EDS cluster");
+}
+
 // Typed metadata loading throws exception.
 TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(
@@ -1687,6 +1872,47 @@ TEST_F(ClusterInfoImplTest, OneofExtensionProtocolOptionsForUnknownFilter) {
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Only one of typed_extension_protocol_options or "
                             "extension_protocol_options can be specified");
+}
+TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 1
+        max_pending_requests: 2
+        max_requests: 3
+        max_retries: 4
+        track_remaining: false
+      - priority: HIGH
+        max_connections: 1
+        max_pending_requests: 2
+        max_requests: 3
+        max_retries: 4
+        track_remaining: true
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  // The value of a remaining resource gauge will always be 0 for the default
+  // priority circuit breaker since track_remaining is false
+  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::Default).retries().inc();
+  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::Default).retries().dec();
+  EXPECT_EQ(0U, stats_.gauge("cluster.name.circuit_breakers.default.remaining_retries").value());
+
+  // This gauge will be correctly set since we have opted in to tracking remaining
+  // resource gauges in the high priority circuit breaker.
+  EXPECT_EQ(4U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::High).retries().inc();
+  EXPECT_EQ(3U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
+  cluster->info()->resourceManager(ResourcePriority::High).retries().dec();
+  EXPECT_EQ(4U, stats_.gauge("cluster.name.circuit_breakers.high.remaining_retries").value());
 }
 
 class TestFilterConfigFactoryBase {
@@ -1927,7 +2153,7 @@ TEST(HostsPerLocalityImpl, Cons) {
     EXPECT_EQ(0, hosts_per_locality.get().size());
   }
 
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
 
@@ -1949,7 +2175,7 @@ TEST(HostsPerLocalityImpl, Cons) {
 }
 
 TEST(HostsPerLocalityImpl, Filter) {
-  MockCluster cluster;
+  MockClusterMockPrioritySet cluster;
   HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
 
@@ -1976,7 +2202,7 @@ TEST(HostsPerLocalityImpl, Filter) {
   }
 }
 
-class HostSetImplLocalityTest : public TestBase {
+class HostSetImplLocalityTest : public testing::Test {
 public:
   LocalityWeightsConstSharedPtr locality_weights_;
   HostSetImpl host_set_{0, kDefaultOverProvisioningFactor};
@@ -1990,7 +2216,7 @@ public:
 // When no locality weights belong to the host set, there's an empty pick.
 TEST_F(HostSetImplLocalityTest, Empty) {
   EXPECT_EQ(nullptr, host_set_.localityWeights());
-  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+  EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When no hosts are healthy we should fail to select a locality
@@ -2001,7 +2227,7 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(HostSetImpl::updateHostsParams(hosts, hosts_per_locality), locality_weights,
                         {}, {}, absl::nullopt);
-  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+  EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When a locality has zero hosts, it should be treated as if it has zero healthy.
@@ -2014,8 +2240,8 @@ TEST_F(HostSetImplLocalityTest, EmptyLocality) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
   // Verify that we are not RRing between localities.
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
 }
 
 // When all locality weights are zero we should fail to select a locality.
@@ -2026,7 +2252,7 @@ TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {});
-  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+  EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When all locality weights are the same we have unweighted RR behavior.
@@ -2038,12 +2264,12 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
 }
 
 // When locality weights differ, we have weighted RR behavior.
@@ -2054,12 +2280,12 @@ TEST_F(HostSetImplLocalityTest, Weighted) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(1, host_set_.chooseLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
 }
 
 // Localities with no weight assignment are never picked.
@@ -2071,12 +2297,12 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality),
       locality_weights, {}, {}, absl::nullopt);
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
-  EXPECT_EQ(0, host_set_.chooseLocality().value());
-  EXPECT_EQ(2, host_set_.chooseLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
 }
 
 // Gentle failover between localities as health diminishes.
@@ -2103,7 +2329,7 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
   const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {
     uint32_t count[2] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
-      const uint32_t locality_index = host_set_.chooseLocality().value();
+      const uint32_t locality_index = host_set_.chooseHealthyLocality().value();
       ASSERT_LT(locality_index, 2);
       ++count[locality_index];
     }
@@ -2147,7 +2373,7 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
                          locality_weights, {}, {}, absl::nullopt);
     uint32_t cnts[] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
-      absl::optional<uint32_t> locality_index = host_set.chooseLocality();
+      absl::optional<uint32_t> locality_index = host_set.chooseHealthyLocality();
       if (!locality_index.has_value()) {
         // It's possible locality scheduler is nullptr (when factor is 0).
         continue;

@@ -1,7 +1,8 @@
 #include "common/common/assert.h"
 
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 

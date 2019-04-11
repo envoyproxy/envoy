@@ -7,6 +7,7 @@
 #include "common/common/assert.h"
 #include "common/common/base64.h"
 #include "common/common/utility.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -85,7 +86,7 @@ OpenTracingSpan::OpenTracingSpan(OpenTracingDriver& driver,
                                  std::unique_ptr<opentracing::Span>&& span)
     : driver_{driver}, span_(std::move(span)) {}
 
-void OpenTracingSpan::finishSpan() { span_->Finish(); }
+void OpenTracingSpan::finishSpan() { span_->FinishWithOptions(finish_options_); }
 
 void OpenTracingSpan::setOperation(const std::string& operation) {
   span_->SetOperationName(operation);
@@ -93,6 +94,11 @@ void OpenTracingSpan::setOperation(const std::string& operation) {
 
 void OpenTracingSpan::setTag(const std::string& name, const std::string& value) {
   span_->SetTag(name, value);
+}
+
+void OpenTracingSpan::log(SystemTime timestamp, const std::string& event) {
+  opentracing::LogRecord record{timestamp, {{Tracing::Logs::get().EventKey, event}}};
+  finish_options_.log_records.emplace_back(std::move(record));
 }
 
 void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {

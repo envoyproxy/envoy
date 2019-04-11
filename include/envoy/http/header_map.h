@@ -12,6 +12,7 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
 #include "common/common/hash.h"
 
 #include "absl/strings/string_view.h"
@@ -19,15 +20,29 @@
 namespace Envoy {
 namespace Http {
 
+// Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
+// never contain embedded NULLs.
+static inline bool validHeaderString(absl::string_view s) {
+  for (const char c : {'\0', '\r', '\n'}) {
+    if (s.find(c) != absl::string_view::npos) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Wrapper for a lower case string used in header operations to generally avoid needless case
  * insensitive compares.
  */
 class LowerCaseString {
 public:
-  LowerCaseString(LowerCaseString&& rhs) : string_(std::move(rhs.string_)) {}
-  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) {}
-  explicit LowerCaseString(const std::string& new_string) : string_(new_string) { lower(); }
+  LowerCaseString(LowerCaseString&& rhs) : string_(std::move(rhs.string_)) { ASSERT(valid()); }
+  LowerCaseString(const LowerCaseString& rhs) : string_(rhs.string_) { ASSERT(valid()); }
+  explicit LowerCaseString(const std::string& new_string) : string_(new_string) {
+    ASSERT(valid());
+    lower();
+  }
 
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
@@ -36,6 +51,7 @@ public:
 
 private:
   void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
+  bool valid() const { return validHeaderString(string_); }
 
   std::string string_;
 };
@@ -176,6 +192,7 @@ private:
   };
 
   void freeDynamic();
+  bool valid() const;
 
   uint32_t string_length_;
   Type type_;

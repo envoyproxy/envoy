@@ -11,10 +11,10 @@
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -25,8 +25,9 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
+namespace {
 
-class DogStatsdConfigLoopbackTest : public TestBaseWithParam<Network::Address::IpVersion> {};
+class DogStatsdConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, DogStatsdConfigLoopbackTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -95,6 +96,7 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
 }
 
+} // namespace
 } // namespace DogStatsd
 } // namespace StatSinks
 } // namespace Extensions

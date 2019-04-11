@@ -13,15 +13,15 @@ If a listener server certificate needs to be fetched by SDS remotely, it will NO
 
 Upstream clusters are handled in a similar way, if a cluster client certificate needs to be fetched by SDS remotely, it will NOT be marked as active and it will not be used before the certificates are fetched. If Envoy fails to fetch the certificates due to connection failures, or bad response data, the cluster will be marked as active, it can be used to handle the requests, but the requests routed to that cluster will be rejected.
 
-If a static cluster is using SDS, and it needs to define a SDS cluster (unless Google gRPC is used which doens't need a cluster), the SDS cluster has to be defined before the static clusters using it.
+If a static cluster is using SDS, and it needs to define a SDS cluster (unless Google gRPC is used which doesn't need a cluster), the SDS cluster has to be defined before the static clusters using it.
 
-The connection bewteeen Envoy proxy and SDS server has to be secure. One option is to run the SDS server on the same host and use Unix Domain Socket for the connection. Otherwise it requires mTLS between the proxy and SDS server. In this case, the client certificates for the SDS connection must be statically configured.
+The connection between Envoy proxy and SDS server has to be secure. One option is to run the SDS server on the same host and use Unix Domain Socket for the connection. Otherwise it requires mTLS between the proxy and SDS server. In this case, the client certificates for the SDS connection must be statically configured.
 
 SDS server
 ----------
 
-A SDS server needs to implement the gRPC service `SecretDiscoveryService <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/discovery/v2/sds.proto>`_.
-It follows the same protocol as other `xDS <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_
+A SDS server needs to implement the gRPC service :repo:`SecretDiscoveryService <api/envoy/service/discovery/v2/sds.proto>`.
+It follows the same protocol as other :repo:`xDS <api/XDS_PROTOCOL.md>`.
 
 SDS Configuration
 -----------------
@@ -59,8 +59,8 @@ This example show how to configure secrets in the static_resource:
             E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD
     clusters:
       - connect_timeout: 0.25s
-        hosts:
-        - name: local_service_tls
+        load_assignment:
+          cluster_name: local_service_tls
           ...
           tls_context:
             common_tls_context:
@@ -89,10 +89,15 @@ This example shows how to configure secrets fetched from remote SDS servers:
     clusters:
       - name: sds_server_mtls
         http2_protocol_options: {}
-        hosts:
-          socket_address:
-            address: 127.0.0.1
-            port_value: 8234
+        load_assignment:
+          cluster_name: sds_server_mtls
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 8234
         tls_context:
           common_tls_context:
           - tls_certificate:
@@ -102,13 +107,18 @@ This example shows how to configure secrets fetched from remote SDS servers:
               filename: certs/sds_key.pem
       - name: sds_server_uds
         http2_protocol_options: {}
-        hosts:
-          - pipe:
-              path: /tmp/uds_path
+        load_assignment:
+          cluster_name: sds_server_uds
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  pipe:
+                    path: /tmp/uds_path
       - name: example_cluster
         connect_timeout: 0.25s
-        hosts:
-        - name: local_service_tls
+        load_assignment:
+          cluster_name: local_service_tls
           ...
           tls_context:
             common_tls_context:

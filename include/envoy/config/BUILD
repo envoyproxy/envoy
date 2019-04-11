@@ -9,32 +9,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "grpc_mux_interface",
-    hdrs = ["grpc_mux.h"],
-    deps = [
-        "//include/envoy/stats:stats_macros",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
-    name = "subscription_interface",
-    hdrs = ["subscription.h"],
-    deps = [
-        "//include/envoy/stats:stats_macros",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
-    name = "typed_metadata_interface",
-    hdrs = ["typed_metadata.h"],
-    deps = [
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "config_provider_interface",
     hdrs = ["config_provider.h"],
     external_deps = ["abseil_optional"],
@@ -50,6 +24,42 @@ envoy_cc_library(
     deps = [
         ":config_provider_interface",
         "//include/envoy/server:filter_config_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "grpc_mux_interface",
+    hdrs = ["grpc_mux.h"],
+    deps = [
+        "//include/envoy/stats:stats_macros",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "subscription_interface",
+    hdrs = ["subscription.h"],
+    deps = [
+        "//include/envoy/stats:stats_macros",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:discovery_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "typed_metadata_interface",
+    hdrs = ["typed_metadata.h"],
+    deps = [
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "xds_grpc_context_interface",
+    hdrs = ["xds_grpc_context.h"],
+    deps = [
+        ":subscription_interface",
         "//source/common/protobuf",
     ],
 )

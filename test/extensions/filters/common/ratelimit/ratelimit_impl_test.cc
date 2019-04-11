@@ -14,10 +14,10 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
@@ -31,6 +31,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace RateLimit {
+namespace {
 
 class MockRequestCallbacks : public RequestCallbacks {
 public:
@@ -41,7 +42,7 @@ public:
   MOCK_METHOD2(complete_, void(LimitStatus status, const Http::HeaderMap* headers));
 };
 
-class RateLimitGrpcClientTest : public TestBase {
+class RateLimitGrpcClientTest : public testing::Test {
 public:
   RateLimitGrpcClientTest()
       : async_client_(new Grpc::MockAsyncClient()),
@@ -132,29 +133,7 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
   client_.cancel();
 }
 
-TEST(RateLimitGrpcFactoryTest, Create) {
-  envoy::config::ratelimit::v2::RateLimitServiceConfig config;
-  config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("foo");
-  Grpc::MockAsyncClientManager async_client_manager;
-  Stats::MockStore scope;
-  EXPECT_CALL(async_client_manager,
-              factoryForGrpcService(ProtoEq(config.grpc_service()), Ref(scope), _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
-        return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
-  GrpcFactoryImpl factory(config, async_client_manager, scope);
-  factory.create(absl::optional<std::chrono::milliseconds>());
-}
-
-TEST(RateLimitNullFactoryTest, Basic) {
-  NullFactoryImpl factory;
-  ClientPtr client = factory.create(absl::optional<std::chrono::milliseconds>());
-  MockRequestCallbacks request_callbacks;
-  EXPECT_CALL(request_callbacks, complete_(LimitStatus::OK, _));
-  client->limit(request_callbacks, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance());
-  client->cancel();
-}
-
+} // namespace
 } // namespace RateLimit
 } // namespace Common
 } // namespace Filters

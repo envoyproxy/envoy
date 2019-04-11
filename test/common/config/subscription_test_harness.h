@@ -3,9 +3,9 @@
 #include "common/config/utility.h"
 
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Config {
@@ -61,6 +61,14 @@ public:
   virtual void verifyControlPlaneStats(uint32_t connected_state) {
     EXPECT_EQ(connected_state, stats_store_.gauge("control_plane.connected_state").value());
   }
+
+  virtual void expectConfigUpdateFailed() PURE;
+
+  virtual void expectEnableInitFetchTimeoutTimer(std::chrono::milliseconds timeout) PURE;
+
+  virtual void expectDisableInitFetchTimeoutTimer() PURE;
+
+  virtual void callInitFetchTimeoutCb() PURE;
 
   Stats::IsolatedStoreImpl stats_store_;
   SubscriptionStats stats_;

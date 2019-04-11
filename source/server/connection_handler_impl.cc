@@ -188,7 +188,8 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       // Hands off connections redirected by iptables to the listener associated with the
       // original destination address. Pass 'hand_off_restored_destination_connections' as false to
       // prevent further redirection.
-      new_listener->onAccept(std::move(socket_), false);
+      new_listener->onAccept(std::move(socket_),
+                             false /* hand_off_restored_destination_connections */);
     } else {
       // Set default transport protocol if none of the listener filters did it.
       if (socket_->detectedTransportProtocol().empty()) {
@@ -238,7 +239,6 @@ void ConnectionHandlerImpl::ActiveListener::newConnection(Network::ConnectionSoc
   Network::ConnectionPtr new_connection =
       parent_.dispatcher_.createServerConnection(std::move(socket), std::move(transport_socket));
   new_connection->setBufferLimits(config_.perConnectionBufferLimitBytes());
-  new_connection->setWriteFilterOrder(config_.reverseWriteFilterOrder());
 
   const bool empty_filter_chain = !config_.filterChainFactory().createNetworkFilterChain(
       *new_connection, filter_chain->networkFilterFactories());
@@ -259,7 +259,7 @@ void ConnectionHandlerImpl::ActiveListener::onNewConnection(
   // If the connection is already closed, we can just let this connection immediately die.
   if (new_connection->state() != Network::Connection::State::Closed) {
     ActiveConnectionPtr active_connection(
-        new ActiveConnection(*this, std::move(new_connection), parent_.dispatcher_.timeSystem()));
+        new ActiveConnection(*this, std::move(new_connection), parent_.dispatcher_.timeSource()));
     active_connection->moveIntoList(std::move(active_connection), connections_);
     parent_.num_connections_++;
   }
@@ -267,9 +267,9 @@ void ConnectionHandlerImpl::ActiveListener::onNewConnection(
 
 ConnectionHandlerImpl::ActiveConnection::ActiveConnection(ActiveListener& listener,
                                                           Network::ConnectionPtr&& new_connection,
-                                                          Event::TimeSystem& time_system)
+                                                          TimeSource& time_source)
     : listener_(listener), connection_(std::move(new_connection)),
-      conn_length_(new Stats::Timespan(listener_.stats_.downstream_cx_length_ms_, time_system)) {
+      conn_length_(new Stats::Timespan(listener_.stats_.downstream_cx_length_ms_, time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);

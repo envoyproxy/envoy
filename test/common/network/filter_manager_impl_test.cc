@@ -20,9 +20,9 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -33,8 +33,9 @@ using testing::WithArgs;
 
 namespace Envoy {
 namespace Network {
+namespace {
 
-class NetworkFilterManagerTest : public TestBase, public BufferSource {
+class NetworkFilterManagerTest : public testing::Test, public BufferSource {
 public:
   StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
   StreamBuffer getWriteBuffer() override { return {write_buffer_, write_end_stream_}; }
@@ -97,57 +98,6 @@ TEST_F(NetworkFilterManagerTest, All) {
   EXPECT_CALL(*filter, onWrite(BufferStringEqual("foobar"), false))
       .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), false))
-      .WillOnce(Return(FilterStatus::Continue));
-  manager.onWrite();
-}
-
-// AllWithInorderedWriteFilters verifies the same case of All, except that the write filters are
-// placed in the same order to the configuration.
-TEST_F(NetworkFilterManagerTest, AllWithInorderedWriteFilters) {
-  InSequence s;
-
-  Upstream::HostDescription* host_description(new NiceMock<Upstream::MockHostDescription>());
-  MockReadFilter* read_filter(new MockReadFilter());
-  MockWriteFilter* write_filter(new MockWriteFilter());
-  MockFilter* filter(new LocalMockFilter());
-
-  NiceMock<MockConnection> connection;
-  connection.setWriteFilterOrder(false);
-  FilterManagerImpl manager(connection, *this);
-  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
-  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
-  manager.addFilter(FilterSharedPtr{filter});
-
-  read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
-  EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
-
-  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
-  EXPECT_EQ(manager.initializeReadFilters(), true);
-
-  EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
-  read_filter->callbacks_->continueReading();
-
-  read_buffer_.add("hello");
-  read_end_stream_ = false;
-  EXPECT_CALL(*read_filter, onData(BufferStringEqual("hello"), false))
-      .WillOnce(Return(FilterStatus::StopIteration));
-  manager.onRead();
-
-  read_buffer_.add("world");
-  EXPECT_CALL(*filter, onData(BufferStringEqual("helloworld"), false))
-      .WillOnce(Return(FilterStatus::Continue));
-  read_filter->callbacks_->continueReading();
-
-  write_buffer_.add("foo");
-  write_end_stream_ = false;
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foo"), false))
-      .WillOnce(Return(FilterStatus::StopIteration));
-  manager.onWrite();
-
-  write_buffer_.add("bar");
-  EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), false))
-      .WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(*filter, onWrite(BufferStringEqual("foobar"), false))
       .WillOnce(Return(FilterStatus::Continue));
   manager.onWrite();
 }
@@ -244,7 +194,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   TcpProxy::ConfigSharedPtr tcp_proxy_config(new TcpProxy::Config(tcp_proxy, factory_context));
   manager.addReadFilter(
       std::make_shared<TcpProxy::Filter>(tcp_proxy_config, factory_context.cluster_manager_,
-                                         factory_context.dispatcher().timeSystem()));
+                                         factory_context.dispatcher().timeSource()));
 
   Extensions::Filters::Common::RateLimit::RequestCallbacks* request_callbacks{};
   EXPECT_CALL(*rl_client, limit(_, "foo",
@@ -273,5 +223,6 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   connection.raiseEvent(ConnectionEvent::RemoteClose);
 }
 
+} // namespace
 } // namespace Network
 } // namespace Envoy

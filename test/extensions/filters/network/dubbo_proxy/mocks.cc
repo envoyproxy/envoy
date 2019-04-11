@@ -4,7 +4,7 @@
 
 #include "common/protobuf/utility.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Invoke;
@@ -28,8 +28,17 @@ MockDecoderEventHandler::MockDecoderEventHandler() {
 MockProtocolCallbacks::MockProtocolCallbacks() {}
 MockProtocolCallbacks::~MockProtocolCallbacks() {}
 
-MockProtocol::MockProtocol() { ON_CALL(*this, name()).WillByDefault(ReturnRef(name_)); }
+MockProtocol::MockProtocol() {
+  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, type()).WillByDefault(Return(type_));
+}
 MockProtocol::~MockProtocol() {}
+
+MockDeserializer::MockDeserializer() {
+  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, type()).WillByDefault(Return(type_));
+}
+MockDeserializer::~MockDeserializer() {}
 
 namespace DubboFilters {
 

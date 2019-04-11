@@ -2,7 +2,7 @@
 
 #include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
-#include "test/test_common/test_base.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,7 +10,7 @@ namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 namespace {
 
-class TranscoderInputStreamTest : public TestBase {
+class TranscoderInputStreamTest : public testing::Test {
 public:
   TranscoderInputStreamTest() {
     Buffer::OwnedImpl buffer{"abcd"};

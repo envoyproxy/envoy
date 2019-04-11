@@ -52,7 +52,9 @@ void BufferingStreamDecoder::onComplete() {
   on_complete_cb_();
 }
 
-void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
+void BufferingStreamDecoder::onResetStream(Http::StreamResetReason, absl::string_view) {
+  ADD_FAILURE();
+}
 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
@@ -61,9 +63,10 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
                                    const std::string& host, const std::string& content_type) {
 
   NiceMock<Stats::MockIsolatedStatsStore> mock_stats_store;
-  Api::Impl api(std::chrono::milliseconds(9000), Thread::threadFactoryForTest(), mock_stats_store);
   Event::GlobalTimeSystem time_system;
-  Event::DispatcherPtr dispatcher(api.allocateDispatcher(*time_system));
+  Api::Impl api(Thread::threadFactoryForTest(), mock_stats_store, time_system,
+                Filesystem::fileSystemForTest());
+  Event::DispatcherPtr dispatcher(api.allocateDispatcher());
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
       Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
@@ -112,7 +115,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
                                          Network::Address::IpVersion version) {
   api_ = Api::createApiForTest(stats_store_);
   Event::GlobalTimeSystem time_system;
-  dispatcher_ = api_->allocateDispatcher(*time_system);
+  dispatcher_ = api_->allocateDispatcher();
   callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(

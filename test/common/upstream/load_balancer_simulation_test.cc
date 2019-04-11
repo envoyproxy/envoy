@@ -11,15 +11,16 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1,
@@ -29,7 +30,8 @@ static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
   return HostSharedPtr{
       new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
                    envoy::api::v2::core::Metadata::default_instance(), weight, locality,
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
+                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
+                   envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 // Simulate weighted LR load balancer.
@@ -41,7 +43,6 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 
   PrioritySetImpl priority_set;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  HostSet& host_set = priority_set.getOrCreateHostSet(0);
   HostVector hosts;
   for (uint64_t i = 0; i < num_hosts; i++) {
     const bool should_weight = i < num_hosts * (weighted_subset_percent / 100.0);
@@ -53,9 +54,10 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   }
   HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
   HostsPerLocalitySharedPtr updated_locality_hosts{new HostsPerLocalityImpl(hosts)};
-  host_set.updateHosts(HostSetImpl::updateHostsParams(updated_hosts, updated_locality_hosts,
-                                                      updated_hosts, updated_locality_hosts),
-                       {}, hosts, {}, absl::nullopt);
+  priority_set.updateHosts(0,
+                           HostSetImpl::updateHostsParams(updated_hosts, updated_locality_hosts,
+                                                          updated_hosts, updated_locality_hosts),
+                           {}, hosts, {}, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterStats stats{ClusterInfoImpl::generateStats(stats_store)};
@@ -90,7 +92,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
 /**
  * This test is for simulation only and should not be run as part of unit tests.
  */
-class DISABLED_SimulationTest : public TestBase {
+class DISABLED_SimulationTest : public testing::Test {
 public:
   DISABLED_SimulationTest() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
     ON_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50U))
@@ -156,7 +158,8 @@ public:
         per_zone_local.push_back(local_per_zone_hosts->get()[zone]);
       }
       auto per_zone_local_shared = makeHostsPerLocality(std::move(per_zone_local));
-      local_priority_set_->getOrCreateHostSet(0).updateHosts(
+      local_priority_set_->updateHosts(
+          0,
           HostSetImpl::updateHostsParams(originating_hosts, per_zone_local_shared,
                                          originating_hosts, per_zone_local_shared),
           {}, empty_vector_, empty_vector_, absl::nullopt);
@@ -259,5 +262,6 @@ TEST_F(DISABLED_SimulationTest, unequalZoneDistribution6) {
   run({3U, 2U, 5U}, {3U, 4U, 5U}, {3U, 4U, 5U});
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

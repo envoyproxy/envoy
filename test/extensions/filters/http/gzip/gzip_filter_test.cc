@@ -9,8 +9,9 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::Return;
 
@@ -19,7 +20,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Gzip {
 
-class GzipFilterTest : public TestBase {
+class GzipFilterTest : public testing::Test {
 protected:
   GzipFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("gzip.filter_enabled", 100))
@@ -92,7 +93,7 @@ protected:
 
   void doResponseCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(StringUtil::atoull(headers.get_("content-length").c_str(), content_length));
     feedBuffer(content_length);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
@@ -105,7 +106,7 @@ protected:
 
   void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(StringUtil::atoull(headers.get_("content-length").c_str(), content_length));
     feedBuffer(content_length);
     Http::TestHeaderMapImpl continue_headers;
     EXPECT_EQ(Http::FilterHeadersStatus::Continue,
@@ -207,7 +208,7 @@ TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
   }
   {
     Http::TestHeaderMapImpl headers = {
-        {"accept-encoding", "\tdeflate\t, gzip\t ; q\t =\t 1.0,\t * ;q=0.5\n"}};
+        {"accept-encoding", "\tdeflate\t, gzip\t ; q\t =\t 1.0,\t * ;q=0.5"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
     EXPECT_EQ(3, stats_.counter("test.gzip.header_gzip").value());
   }
@@ -415,7 +416,7 @@ TEST_F(GzipFilterTest, isContentTypeAllowed) {
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    Http::TestHeaderMapImpl headers = {{"content-type", "\ttext/html\t\n"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "\ttext/html\t"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
 
@@ -587,7 +588,7 @@ TEST_F(GzipFilterTest, isTransferEncodingAllowed) {
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
   {
-    Http::TestHeaderMapImpl headers = {{"transfer-encoding", " gzip\t,  chunked\t\n"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", " gzip\t,  chunked\t"}};
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
 }

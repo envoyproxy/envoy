@@ -66,7 +66,7 @@ message HttpConnectionManager {
     // A route table will be dynamically assigned to each request based on request attributes
     // (e.g., the value of a header). The "routing scopes" (i.e., route tables) and "scope keys" are
     // specified in this message.
-    ScopedRoutes scoped_routes = 30;
+    ScopedRoutes scoped_routes = 31;
   }
 
   // A list of individual HTTP filters that make up the filter chain for
@@ -122,6 +122,10 @@ message HttpConnectionManager {
     // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
     // Default: 100%
     envoy.type.Percent overall_sampling = 5;
+
+    // Whether to annotate spans with additional data. If true, spans will include logs for stream
+    // events.
+    bool verbose = 6;
   }
 
   // Presence of the object defines whether the connection manager
@@ -139,14 +143,13 @@ message HttpConnectionManager {
   // header in responses. If not set, the default is *envoy*.
   string server_name = 10;
 
-  // The maximum request headers size for incoming connections. The default max
-  // is 60K, based on default settings for http codecs. For HTTP1, the current
-  // limit set by http_parser is 80K. for HTTP2, the default allowed header
-  // block in nghttp2 is 64K. The max configurable setting is 64K in order to
-  // stay under both codec limits.
-  // Requests that exceed this size will receive a 431 response.
+  // The maximum request headers size for incoming connections.
+  // If unconfigured, the default max request headers allowed is 60 KiB.
+  // Requests that exceed this limit will receive a 431 response.
+  // The max configurable limit is 96 KiB, based on current implementation
+  // constraints.
   google.protobuf.UInt32Value max_request_headers_kb = 29
-      [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 64];
+      [(validate.rules).uint32.gt = 0, (validate.rules).uint32.lte = 96];
 
   // The idle timeout for connections managed by the connection manager. The
   // idle timeout is defined as the period in which there are no active
@@ -348,6 +351,7 @@ message HttpConnectionManager {
   // :ref:`http_connection_manager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6
   // <config_http_conn_man_runtime_represent_ipv4_remote_address_as_ipv4_mapped_ipv6>` for runtime
   // control.
+  // [#not-implemented-hide:]
   bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6 = 20;
 
   // The configuration for HTTP upgrades.
@@ -380,14 +384,20 @@ message HttpConnectionManager {
   };
   repeated UpgradeConfig upgrade_configs = 23;
 
-  // If true, the order of encoder filters will be reversed to that of filters
-  // configured in the HTTP filter chain. Otherwise, it will keep the existing
-  // order.
-  // Note: this is a bug fix for Envoy, which is designed to have the reversed
-  // order of encode filters to that of decode ones, (see
-  // https://github.com/envoyproxy/envoy/issues/4599 for details). When we remove this field, envoy
-  // will have the same behavior when it sets true.
-  google.protobuf.BoolValue bugfix_reverse_encode_order = 27 [deprecated = true];
+  reserved 27;
+
+  // Should paths be normalized according to RFC 3986 before any processing of
+  // requests by HTTP filters or routing? This affects the upstream *:path* header
+  // as well. For paths that fail this check, Envoy will respond with 400 to
+  // paths that are malformed. This defaults to false currently but will default
+  // true in the future. When not specified, this value may be overridden by the
+  // runtime variable
+  // :ref:`http_connection_manager.normalize_path<config_http_conn_man_runtime_normalize_path>`.
+  // See `Normalization and Comparison <https://tools.ietf.org/html/rfc3986#section-6>`
+  // for details of normalization.
+  // Note that Envoy does not perform
+  // `case normalization <https://tools.ietf.org/html/rfc3986#section-6.2.2.1>`
+  google.protobuf.BoolValue normalize_path = 30;
 }
 
 message Rds {
@@ -518,14 +528,20 @@ message HttpFilter {
   // [#comment:TODO(mattklein123): Auto generate the following list]
   // * :ref:`envoy.buffer <config_http_filters_buffer>`
   // * :ref:`envoy.cors <config_http_filters_cors>`
+  // * :ref:`envoy.ext_authz <config_http_filters_ext_authz>`
   // * :ref:`envoy.fault <config_http_filters_fault_injection>`
+  // * :ref:`envoy.filters.http.header_to_metadata <config_http_filters_header_to_metadata>`
+  // * :ref:`envoy.filters.http.grpc_http1_reverse_bridge \
+  //   <config_http_filters_grpc_http1_reverse_bridge>`
+  // * :ref:`envoy.filters.http.jwt_authn <config_http_filters_jwt_authn>`
+  // * :ref:`envoy.filters.http.rbac <config_http_filters_rbac>`
+  // * :ref:`envoy.filters.http.tap <config_http_filters_tap>`
   // * :ref:`envoy.gzip <config_http_filters_gzip>`
   // * :ref:`envoy.http_dynamo_filter <config_http_filters_dynamo>`
   // * :ref:`envoy.grpc_http1_bridge <config_http_filters_grpc_bridge>`
   // * :ref:`envoy.grpc_json_transcoder <config_http_filters_grpc_json_transcoder>`
   // * :ref:`envoy.grpc_web <config_http_filters_grpc_web>`
   // * :ref:`envoy.health_check <config_http_filters_health_check>`
-  // * :ref:`envoy.header_to_metadata <config_http_filters_header_to_metadata>`
   // * :ref:`envoy.ip_tagging <config_http_filters_ip_tagging>`
   // * :ref:`envoy.lua <config_http_filters_lua>`
   // * :ref:`envoy.rate_limit <config_http_filters_rate_limit>`
@@ -536,7 +552,7 @@ message HttpFilter {
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
+    google.protobuf.Struct config = 2;
 
     google.protobuf.Any typed_config = 4;
   }

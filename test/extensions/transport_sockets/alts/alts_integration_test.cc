@@ -11,7 +11,6 @@
 #include "test/integration/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -19,19 +18,21 @@
 #include "gmock/gmock.h"
 #include "grpcpp/grpcpp.h"
 #include "grpcpp/impl/codegen/service_type.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
+namespace {
 
-class AltsIntegrationTestBase : public HttpIntegrationTest,
-                                public TestBaseWithParam<Network::Address::IpVersion> {
+class AltsIntegrationTestBase : public testing::TestWithParam<Network::Address::IpVersion>,
+                                public HttpIntegrationTest {
 public:
   AltsIntegrationTestBase(const std::string& server_peer_identity,
                           const std::string& client_peer_identity, bool server_connect_handshaker,
                           bool client_connect_handshaker)
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
         server_peer_identity_(server_peer_identity), client_peer_identity_(client_peer_identity),
         server_connect_handshaker_(server_connect_handshaker),
         client_connect_handshaker_(client_connect_handshaker) {}
@@ -242,6 +243,7 @@ TEST_P(AltsIntegrationTestClientWrongHandshaker, ConnectToWrongHandshakerAddress
   EXPECT_FALSE(codec_client_->connected());
 }
 
+} // namespace
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

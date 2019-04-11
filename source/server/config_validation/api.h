@@ -15,10 +15,14 @@ namespace Api {
  */
 class ValidationImpl : public Impl {
 public:
-  ValidationImpl(std::chrono::milliseconds file_flush_interval_msec,
-                 Thread::ThreadFactory& thread_factory, Stats::Store& stats_store);
+  ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
+                 Event::TimeSystem& time_system, Filesystem::Instance& file_system);
 
-  Event::DispatcherPtr allocateDispatcher(Event::TimeSystem&) override;
+  Event::DispatcherPtr allocateDispatcher() override;
+  Event::DispatcherPtr allocateDispatcher(Buffer::WatermarkFactoryPtr&& watermark_factory) override;
+
+private:
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace Api

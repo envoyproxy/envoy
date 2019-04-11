@@ -67,6 +67,9 @@ public:
 
   // Overload action to stop accepting new connections.
   const std::string StopAcceptingConnections = "envoy.overload_actions.stop_accepting_connections";
+
+  // Overload action to try to shrink the heap by releasing free memory.
+  const std::string ShrinkHeap = "envoy.overload_actions.shrink_heap";
 };
 
 typedef ConstSingleton<OverloadActionNameValues> OverloadActionNames;
@@ -93,8 +96,9 @@ public:
    * @param dispatcher Event::Dispatcher& the dispatcher on which callbacks will be posted
    * @param callback OverloadActionCb the callback to post when the overload action
    *        changes state
+   * @returns true if action was registered and false if no such action has been configured
    */
-  virtual void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
+  virtual bool registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                                  OverloadActionCb callback) PURE;
 
   /**

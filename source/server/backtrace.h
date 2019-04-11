@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "common/common/logger.h"
 
 #include "absl/debugging/stacktrace.h"
@@ -66,22 +68,51 @@ public:
   void logTrace() {
     ENVOY_LOG(critical, "Backtrace (use tools/stack_decode.py to get line numbers):");
 
-    for (int i = 0; i < stack_depth_; ++i) {
-      char out[1024];
-      const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
-      if (success) {
-        ENVOY_LOG(critical, "#{}: {} [{}]", i, out, stack_trace_[i]);
+    visitTrace([](int index, const char* symbol, void* address) {
+      if (symbol != nullptr) {
+        ENVOY_LOG(critical, "#{}: {} [{}]", index, symbol, address);
       } else {
-        ENVOY_LOG(critical, "#{}: [{}]", i, stack_trace_[i]);
+        ENVOY_LOG(critical, "#{}: [{}]", index, address);
       }
-    }
+    });
   }
 
   void logFault(const char* signame, const void* addr) {
     ENVOY_LOG(critical, "Caught {}, suspect faulting address {}", signame, addr);
   }
 
+  void printTrace(std::ostream& os) {
+    visitTrace([&](int index, const char* symbol, void* address) {
+      if (symbol != nullptr) {
+        os << "#" << index << " " << symbol << " [" << address << "]\n";
+      } else {
+        os << "#" << index << " [" << address << "]\n";
+      }
+    });
+  }
+
 private:
+  /**
+   * Visit the previously captured stack trace.
+   *
+   * The visitor function is called once per frame, with 3 parameters:
+   * 1. (int) The index of the current frame.
+   * 2. (const char*) The symbol name for the address of the current frame. nullptr means
+   * symbolization failed.
+   * 3. (void*) The address of the current frame.
+   */
+  void visitTrace(const std::function<void(int, const char*, void*)>& visitor) {
+    for (int i = 0; i < stack_depth_; ++i) {
+      char out[1024];
+      const bool success = absl::Symbolize(stack_trace_[i], out, sizeof(out));
+      if (success) {
+        visitor(i, out, stack_trace_[i]);
+      } else {
+        visitor(i, nullptr, stack_trace_[i]);
+      }
+    }
+  }
+
   static constexpr int MaxStackDepth = 64;
   void* stack_trace_[MaxStackDepth];
   int stack_depth_{0};

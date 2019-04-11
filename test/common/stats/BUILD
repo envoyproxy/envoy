@@ -14,6 +14,7 @@ envoy_cc_test(
     name = "heap_stat_data_test",
     srcs = ["heap_stat_data_test.cc"],
     deps = [
+        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:heap_stat_data_lib",
         "//source/common/stats:stats_options_lib",
         "//test/test_common:logging_lib",
@@ -151,6 +152,7 @@ envoy_cc_test_binary(
         "//source/common/stats:thread_local_store_lib",
         "//source/common/thread_local:thread_local_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )

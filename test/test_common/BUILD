@@ -5,6 +5,7 @@ load(
     "envoy_basic_cc_library",
     "envoy_cc_library",
     "envoy_cc_test",
+    "envoy_cc_test_infrastructure_library",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -34,6 +35,7 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
+        "//test/common/runtime:utility_lib",
     ],
 )
 
@@ -90,6 +92,7 @@ envoy_cc_test_library(
         "abseil_strings",
     ],
     deps = [
+        ":test_time_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
@@ -100,13 +103,16 @@ envoy_cc_test_library(
         "//source/common/common:utility_lib",
         "//source/common/config:bootstrap_json_lib",
         "//source/common/filesystem:directory_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_options_lib",
+        "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
@@ -155,16 +161,6 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_library(
-    name = "test_base",
-    srcs = ["test_base.cc"],
-    hdrs = ["test_base.h"],
-    deps = [
-        "//external:googletest",
-        "//test/test_common:global_lib",
-    ],
-)
-
 envoy_cc_test_library(
     name = "test_time_lib",
     srcs = ["test_time.cc"],
@@ -178,6 +174,7 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "test_time_system_interface",
+    srcs = ["test_time_system.cc"],
     hdrs = ["test_time_system.h"],
     deps = [
         ":global_lib",
@@ -192,7 +189,9 @@ envoy_cc_test_library(
     hdrs = ["simulated_time_system.h"],
     deps = [
         ":test_time_system_interface",
+        "//source/common/event:event_impl_base_lib",
         "//source/common/event:real_time_system_lib",
+        "//source/common/event:timer_lib",
     ],
 )
 
@@ -202,6 +201,7 @@ envoy_cc_test(
     deps = [
         ":simulated_time_system_lib",
         ":utility_lib",
+        "//source/common/event:libevent_scheduler_lib",
     ],
 )
 

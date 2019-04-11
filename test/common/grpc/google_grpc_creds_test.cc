@@ -1,9 +1,13 @@
+#include <stdlib.h>
+
 #include "common/grpc/google_grpc_creds_impl.h"
 
 #include "test/common/grpc/utility.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -14,11 +18,10 @@ namespace {
 // of getting at the underlying state, we can at best just make sure we don't
 // crash, compare with nullptr and/or look at vector lengths.
 
-class CredsUtilityTest : public TestBase {
+class CredsUtilityTest : public testing::Test {
 public:
-  CredsUtilityTest() : api_(Api::createApiForTest(stats_store_)) {}
+  CredsUtilityTest() : api_(Api::createApiForTest()) {}
 
-  Stats::MockIsolatedStatsStore stats_store_;
   Api::ApiPtr api_;
 };
 
@@ -31,6 +34,14 @@ TEST_F(CredsUtilityTest, GetChannelCredentials) {
   EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
   creds->mutable_local_credentials();
   EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
+
+  const char var_name[] = "GOOGLE_APPLICATION_CREDENTIALS";
+  EXPECT_EQ(nullptr, ::getenv(var_name));
+  const auto creds_path = TestEnvironment::runfilesPath("test/common/grpc/service_key.json");
+  ::setenv(var_name, creds_path.c_str(), 0);
+  creds->mutable_google_default();
+  EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
+  ::unsetenv(var_name);
 }
 
 TEST_F(CredsUtilityTest, DefaultSslChannelCredentials) {

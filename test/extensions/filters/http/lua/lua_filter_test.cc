@@ -29,6 +29,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
+namespace {
 
 class TestFilter : public Filter {
 public:
@@ -37,7 +38,7 @@ public:
   MOCK_METHOD2(scriptLog, void(spdlog::level::level_enum level, const char* message));
 };
 
-class LuaHttpFilterTest : public TestBase {
+class LuaHttpFilterTest : public testing::Test {
 public:
   LuaHttpFilterTest() {
     // Avoid strict mock failures for the following calls. We want strict for other calls.
@@ -95,7 +96,7 @@ public:
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   envoy::api::v2::core::Metadata metadata_;
-  NiceMock<Envoy::Ssl::MockConnection> ssl_;
+  NiceMock<Envoy::Ssl::MockConnectionInfo> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 
@@ -1576,6 +1577,7 @@ TEST_F(LuaHttpFilterTest, CheckConnection) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+} // namespace
 } // namespace Lua
 } // namespace HttpFilters
 } // namespace Extensions

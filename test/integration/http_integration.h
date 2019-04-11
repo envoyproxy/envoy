@@ -79,8 +79,20 @@ typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
  */
 class HttpIntegrationTest : public BaseIntegrationTest {
 public:
+  // TODO(jmarantz): Remove this once
+  // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
   HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
-                      Network::Address::IpVersion version, TestTimeSystemPtr time_system,
+                      Network::Address::IpVersion version, TestTimeSystemPtr,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : HttpIntegrationTest(downstream_protocol, version, config) {}
+
+  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                      Network::Address::IpVersion version,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+
+  HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
+                      const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();
 
@@ -127,19 +139,20 @@ protected:
   typedef std::function<Network::ClientConnectionPtr()> ConnectionCreationFunction;
   // Sends a simple header-only HTTP request, and waits for a response.
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(ConnectionCreationFunction* create_connection,
-                                                    int upstream_index);
-
-  void testRouterRedirect();
+                                                    int upstream_index,
+                                                    const std::string& path = "/test/long/url");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
-  void testRouterClusterNotFound404();
-  void testRouterClusterNotFound503();
+
   void testRouterRequestAndResponseWithBody(uint64_t request_size, uint64_t response_size,
                                             bool big_header,
                                             ConnectionCreationFunction* creator = nullptr);
   void testRouterHeaderOnlyRequestAndResponse(ConnectionCreationFunction* creator = nullptr,
-                                              int upstream_index = 0);
+                                              int upstream_index = 0,
+                                              const std::string& path = "/test/long/url");
   void testRequestAndResponseShutdownWithActiveConnection();
+
+  // Disconnect tests
   void testRouterUpstreamDisconnectBeforeRequestComplete();
   void
   testRouterUpstreamDisconnectBeforeResponseComplete(ConnectionCreationFunction* creator = nullptr);
@@ -148,36 +161,16 @@ protected:
   void testRouterDownstreamDisconnectBeforeResponseComplete(
       ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamResponseBeforeRequestComplete();
+
   void testTwoRequests(bool force_network_backup = false);
   void testLargeRequestHeaders(uint32_t size, uint32_t max_size = 60);
-  void testIdleTimeoutBasic();
-  void testIdleTimeoutWithTwoRequests();
-  void testIdleTimerDisabled();
-  void testUpstreamDisconnectWithTwoRequests();
-  void testHeadersOnlyFilterEncoding();
-  void testHeadersOnlyFilterDecoding();
-  void testHeadersOnlyFilterEncodingIntermediateFilters();
-  void testHeadersOnlyFilterDecodingIntermediateFilters();
-  void testHeadersOnlyFilterInterleaved();
 
-  // Test that a request returns the same content with both allow_absolute_urls enabled and
-  // allow_absolute_urls disabled
-  void testDefaultHost();
-  void testValidZeroLengthContent();
-  void testInvalidContentLength();
-  void testMultipleContentLengths();
-  void testComputedHealthCheck();
   void testAddEncodedTrailers();
-  void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();
   void testRetryAttemptCountHeader();
-  void testGrpcRouterNotFound();
   void testGrpcRetry();
-  void testRetryPriority();
-  void testRetryHostPredicateFilter();
-  void testHittingDecoderFilterLimit();
-  void testHittingEncoderFilterLimit();
+
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
                                     const std::string& via = "");
   void testEnvoyProxying100Continue(bool continue_before_upstream_complete = false,
@@ -205,5 +198,6 @@ protected:
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 } // namespace Envoy

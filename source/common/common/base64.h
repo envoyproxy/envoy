@@ -28,6 +28,14 @@ public:
   static std::string encode(const char* input, uint64_t length);
 
   /**
+   * Base64 encode an input char buffer with a given length.
+   * @param input char array to encode.
+   * @param length of the input array.
+   * @param whether add padding at the end of the output.
+   */
+  static std::string encode(const char* input, uint64_t length, bool add_padding);
+
+  /**
    * Base64 decode an input string. Padding is required.
    * @param input supplies the input to decode.
    *

@@ -1,7 +1,6 @@
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
 #include "common/http/date_provider_impl.h"
 
 #include "extensions/filters/network/http_connection_manager/config.h"
@@ -11,10 +10,10 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::ContainerEq;
@@ -26,17 +25,6 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
-parseHttpConnectionManagerFromJson(const std::string& json_string) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
-      http_connection_manager;
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  NiceMock<Stats::MockStore> scope;
-  Config::FilterJson::translateHttpConnectionManager(*json_object_ptr, http_connection_manager,
-                                                     scope.statsOptions());
-  return http_connection_manager;
-}
-
-envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
 parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
       http_connection_manager;
@@ -44,10 +32,10 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
   return http_connection_manager;
 }
 
-class HttpConnectionManagerConfigTest : public TestBase {
+class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSystem()};
+  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
 };
@@ -61,70 +49,56 @@ TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
 }
 
 TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
-  const std::string json_string = R"EOF(
-  {
-    "codec_type": "http1",
-    "stat_prefix": "router",
-    "route_config":
-    {
-      "virtual_hosts": [
-        {
-          "name": "service",
-          "domains": [ "*" ],
-          "routes": [
-            {
-              "prefix": "/",
-              "cluster": "cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters": [
-      { "name": "foo", "config": {} }
-    ]
-  }
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config: {}
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromJson(json_string), context_,
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromJson(yaml_string), context_,
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_),
       EnvoyException, "Didn't find a registered implementation for name: 'foo'");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
-  const std::string json_string = R"EOF(
-  {
-    "codec_type": "http1",
-    "server_name": "foo",
-    "stat_prefix": "router",
-    "route_config":
-    {
-      "virtual_hosts": [
-        {
-          "name": "service",
-          "domains": [ "*" ],
-          "routes": [
-            {
-              "prefix": "/",
-              "cluster": "cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "tracing": {
-      "operation_name": "ingress",
-      "request_headers_for_tags": [ "foo" ]
-    },
-    "filters": [
-      { "name": "http_dynamo_filter", "config": {} }
-    ]
-  }
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+tracing:
+  operation_name: ingress
+  request_headers_for_tags:
+  - foo
+http_filters:
+- name: envoy.router
+  config: {}
   )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromJson(json_string), context_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromJson(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
 
@@ -157,7 +131,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
-TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeDefault) {
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbDefault) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   route_config:
@@ -172,7 +146,7 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeDefault) {
   EXPECT_EQ(60, config.maxRequestHeadersKb());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeConfigured) {
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   max_request_headers_kb: 16
@@ -186,6 +160,21 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersSizeConfigured) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
   EXPECT_EQ(16, config.maxRequestHeadersKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  max_request_headers_kb: 96
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(96, config.maxRequestHeadersKb());
 }
 
 // Validated that an explicit zero stream idle timeout disables.
@@ -203,6 +192,77 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
   EXPECT_EQ(0, config.streamIdleTimeout().count());
+}
+
+// Validated that by default we don't normalize paths
+TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_FALSE(config.shouldNormalizePath());
+}
+
+// Validated that we normalize paths with runtime override when not specified.
+TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.normalize_path", 0))
+      .WillOnce(Return(true));
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_TRUE(config.shouldNormalizePath());
+}
+
+// Validated that when configured, we normalize paths, ignoring runtime.
+TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  normalize_path: true
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.normalize_path", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_TRUE(config.shouldNormalizePath());
+}
+
+// Validated that when explicitly set false, we don't normalize, ignoring runtime.
+TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  normalize_path: false
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              featureEnabled("http_connection_manager.normalize_path", 0))
+      .Times(0);
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_FALSE(config.shouldNormalizePath());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, ConfiguredRequestTimeout) {
@@ -253,248 +313,178 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
-  const std::string json_string = R"EOF(
-  {
-    "codec_type": "http1",
-    "stat_prefix": "router",
-    "route_config":
-    {
-      "virtual_hosts": [
-        {
-          "name": "service",
-          "domains": [ "*" ],
-          "routes": [
-            {
-              "prefix": "/",
-              "cluster": "cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters": [
-      { "name": "http_dynamo_filter", "config": {} }
-    ]
-  }
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  config: {}
+
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  auto proto_config = parseHttpConnectionManagerFromV2Yaml(yaml_string);
   HttpConnectionManagerFilterConfigFactory factory;
   // We expect a single slot allocation vs. multiple.
   EXPECT_CALL(context_.thread_local_, allocateSlot());
-  Network::FilterFactoryCb cb1 = factory.createFilterFactory(*json_config, context_);
-  Network::FilterFactoryCb cb2 = factory.createFilterFactory(*json_config, context_);
+  Network::FilterFactoryCb cb1 = factory.createFilterFactoryFromProto(proto_config, context_);
+  Network::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, context_);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadHttpConnectionMangerConfig) {
-  std::string json_string = R"EOF(
-  {
-    "codec_type" : "http1",
-    "stat_prefix" : "my_stat_prefix",
-    "route_config" : {
-      "virtual_hosts" : [
-        {
-          "name" : "default",
-          "domains" : ["*"],
-          "routes" : [
-            {
-              "prefix" : "/",
-              "cluster": "fake_cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filter" : [{}]
-  }
+  std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+filter:
+- {}
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  HttpConnectionManagerFilterConfigFactory factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
+  EXPECT_THROW(parseHttpConnectionManagerFromV2Yaml(yaml_string), EnvoyException);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadAccessLogConfig) {
-  std::string json_string = R"EOF(
-  {
-    "codec_type" : "http1",
-    "stat_prefix" : "my_stat_prefix",
-    "route_config" : {
-      "virtual_hosts" : [
-        {
-          "name" : "default",
-          "domains" : ["*"],
-          "routes" : [
-            {
-              "prefix" : "/",
-              "cluster": "fake_cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters" : [
-      {
-        "type" : "both",
-        "name" : "http_dynamo_filter",
-        "config" : {}
-      }
-    ],
-    "access_log" :[
-      {
-        "path" : "mypath",
-        "filter" : []
-      }
-    ]
-  }
+  std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  config: {}
+access_log:
+- name: envoy.file_access_log
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+    path: "/dev/null"
+  filter: []
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  HttpConnectionManagerFilterConfigFactory factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
+  EXPECT_THROW_WITH_REGEX(parseHttpConnectionManagerFromV2Yaml(yaml_string), EnvoyException,
+                          "filter: Proto field is not repeating, cannot start list.");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadAccessLogType) {
-  std::string json_string = R"EOF(
-  {
-    "codec_type" : "http1",
-    "stat_prefix" : "my_stat_prefix",
-    "route_config" : {
-      "virtual_hosts" : [
-        {
-          "name" : "default",
-          "domains" : ["*"],
-          "routes" : [
-            {
-              "prefix" : "/",
-              "cluster": "fake_cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters" : [
-      {
-        "type" : "both",
-        "name" : "http_dynamo_filter",
-        "config" : {}
-      }
-    ],
-    "access_log" :[
-      {
-        "path" : "mypath",
-        "filter" : {
-          "type" : "bad_type"
-        }
-      }
-    ]
-  }
+  std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  config: {}
+access_log:
+- name: envoy.file_access_log
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+    path: "/dev/null"
+  filter:
+    bad_type: {}
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  HttpConnectionManagerFilterConfigFactory factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
+  EXPECT_THROW_WITH_REGEX(parseHttpConnectionManagerFromV2Yaml(yaml_string), EnvoyException,
+                          "bad_type: Cannot find field");
 }
 
 TEST_F(HttpConnectionManagerConfigTest, BadAccessLogNestedTypes) {
-  std::string json_string = R"EOF(
-  {
-    "codec_type" : "http1",
-    "stat_prefix" : "my_stat_prefix",
-    "route_config" : {
-      "virtual_hosts" : [
-        {
-          "name" : "default",
-          "domains" : ["*"],
-          "routes" : [
-            {
-              "prefix" : "/",
-              "cluster": "fake_cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters" : [
-      {
-        "type" : "both",
-        "name" : "http_dynamo_filter",
-        "config" : {}
-      }
-    ],
-    "access_log" :[
-      {
-        "path": "/dev/null",
-        "filter": {
-          "type": "logical_and",
-          "filters": [
-            {
-              "type": "logical_or",
-              "filters": [
-                {"type": "duration", "op": ">=", "value": 10000},
-                {"type": "bad_type"}
-              ]
-            },
-            {"type": "not_healthcheck"}
-          ]
-        }
-      }
-    ]
-  }
+  std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: my_stat_prefix
+route_config:
+  virtual_hosts:
+  - name: default
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: fake_cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  config: {}
+access_log:
+- name: envoy.file_access_log
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+    path: "/dev/null"
+  filter:
+    and_filter:
+      filters:
+      - or_filter:
+          filters:
+          - duration_filter:
+              op: ">="
+              value: 10000
+          - bad_type: {}
+      - not_health_check_filter: {}
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  HttpConnectionManagerFilterConfigFactory factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
-}
-
-TEST_F(HttpConnectionManagerConfigTest, ReversedEncodeOrderConfig) {
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  route_config:
-    name: local_route
-  http_filters:
-  - name: envoy.router
-  )EOF";
-
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
-                                     scoped_routes_config_provider_manager_);
-  EXPECT_TRUE(config.reverseEncodeOrder());
+  EXPECT_THROW_WITH_REGEX(parseHttpConnectionManagerFromV2Yaml(yaml_string), EnvoyException,
+                          "bad_type: Cannot find field");
 }
 
 class FilterChainTest : public HttpConnectionManagerConfigTest {
 public:
   const std::string basic_config_ = R"EOF(
-  {
-    "codec_type": "http1",
-    "server_name": "foo",
-    "stat_prefix": "router",
-    "route_config":
-    {
-      "virtual_hosts": [
-        {
-          "name": "service",
-          "domains": [ "*" ],
-          "routes": [
-            {
-              "prefix": "/",
-              "cluster": "cluster"
-            }
-          ]
-        }
-      ]
-    },
-    "filters": [
-      { "name": "http_dynamo_filter", "config": {} },
-      { "name": "router", "config": {} }
-    ]
-  }
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: envoy.http_dynamo_filter
+  config: {}
+- name: envoy.router
+  config: {}
+
   )EOF";
 };
 
 TEST_F(FilterChainTest, createFilterChain) {
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromJson(basic_config_), context_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(basic_config_), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
 
@@ -506,7 +496,7 @@ TEST_F(FilterChainTest, createFilterChain) {
 
 // Tests where upgrades are configured on via the HCM.
 TEST_F(FilterChainTest, createUpgradeFilterChain) {
-  auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
+  auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
@@ -552,7 +542,7 @@ TEST_F(FilterChainTest, createUpgradeFilterChain) {
 
 // Tests where upgrades are configured off via the HCM.
 TEST_F(FilterChainTest, createUpgradeFilterChainHCMDisabled) {
-  auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
+  auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
   hcm_config.mutable_upgrade_configs(0)->mutable_enabled()->set_value(false);
 
@@ -590,7 +580,7 @@ TEST_F(FilterChainTest, createUpgradeFilterChainHCMDisabled) {
 }
 
 TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
-  auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
+  auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   auto websocket_config = hcm_config.add_upgrade_configs();
   websocket_config->set_upgrade_type("websocket");
 
@@ -632,7 +622,7 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
 }
 
 TEST_F(FilterChainTest, invalidConfig) {
-  auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
+  auto hcm_config = parseHttpConnectionManagerFromV2Yaml(basic_config_);
   hcm_config.add_upgrade_configs()->set_upgrade_type("WEBSOCKET");
   hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
 

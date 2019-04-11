@@ -22,6 +22,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "debug_recursion_checker_lib",
+    hdrs = ["debug_recursion_checker.h"],
+    deps = [":assert_lib"],
+)
+
+envoy_cc_library(
     name = "backoff_lib",
     srcs = ["backoff_strategy.cc"],
     hdrs = ["backoff_strategy.h"],
@@ -134,7 +140,6 @@ envoy_cc_library(
         ":macros",
         ":minimal_logger_lib",
         "//include/envoy/access_log:access_log_interface",
-        "//include/envoy/filesystem:filesystem_interface",
     ],
 )
 

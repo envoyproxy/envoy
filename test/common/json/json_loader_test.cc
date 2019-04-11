@@ -4,17 +4,18 @@
 #include "common/json/json_loader.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Json {
+namespace {
 
-class JsonLoaderTest : public TestBase {
+class JsonLoaderTest : public testing::Test {
 protected:
-  JsonLoaderTest() : api_(Api::createApiForTest(stats_store_)) {}
+  JsonLoaderTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 
@@ -474,5 +475,6 @@ admin:
                              "Unexpected YAML exception");
 }
 
+} // namespace
 } // namespace Json
 } // namespace Envoy

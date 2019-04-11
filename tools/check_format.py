@@ -39,8 +39,12 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './test/test_common/utility.cc', './test/test_common/utility.h',
                        './test/integration/integration.h')
 
-# Files in these paths can use std::get_time
-GET_TIME_WHITELIST = ('./test/test_common/utility.cc')
+# Files in these paths can use MessageLite::SerializeAsString
+SERIALIZE_AS_STRING_WHITELIST = ('./test/common/protobuf/utility_test.cc',
+                                 './test/common/grpc/codec_test.cc')
+
+# Files in these paths can use Protobuf::util::JsonStringToMessage
+JSON_STRING_TO_MESSAGE_WHITELIST = ('./source/common/protobuf/utility.cc')
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
@@ -219,8 +223,12 @@ def whitelistedForRealTime(file_path):
   return file_path in REAL_TIME_WHITELIST
 
 
-def whitelistedForGetTime(file_path):
-  return file_path in GET_TIME_WHITELIST
+def whitelistedForSerializeAsString(file_path):
+  return file_path in SERIALIZE_AS_STRING_WHITELIST
+
+
+def whitelistedForJsonStringToMessage(file_path):
+  return file_path in JSON_STRING_TO_MESSAGE_WHITELIST
 
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -380,16 +388,29 @@ def checkSourceLine(line, file_path, reportError):
     # legitimately show up in comments, for example this one.
     reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
   if not whitelistedForRealTime(file_path) and not 'NO_CHECK_FORMAT(real_time)' in line:
-    if 'RealTimeSource' in line or 'RealTimeSystem' in line or \
+    if 'RealTimeSource' in line or \
+       ('RealTimeSystem' in line and not 'TestRealTimeSystem' in line) or \
        'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
        'std::this_thread::sleep_for' in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
-  if not whitelistedForGetTime(file_path):
-    if "std::get_time" in line:
-      if "test/" in file_path:
-        reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
-      else:
-        reportError("Don't use std::get_time; use the injectable time system")
+  # Check that we use the absl::Time library
+  if "std::get_time" in line:
+    if "test/" in file_path:
+      reportError("Don't use std::get_time; use TestUtility::parseTime in tests")
+    else:
+      reportError("Don't use std::get_time; use the injectable time system")
+  if "std::put_time" in line:
+    reportError("Don't use std::put_time; use absl::Time equivalent instead")
+  if "gmtime" in line:
+    reportError("Don't use gmtime; use absl::Time equivalent instead")
+  if "mktime" in line:
+    reportError("Don't use mktime; use absl::Time equivalent instead")
+  if "localtime" in line:
+    reportError("Don't use localtime; use absl::Time equivalent instead")
+  if "strftime" in line:
+    reportError("Don't use strftime; use absl::FormatTime instead")
+  if "strptime" in line:
+    reportError("Don't use strptime; use absl::FormatTime instead")
   if 'std::atomic_' in line:
     # The std::atomic_* free functions are functionally equivalent to calling
     # operations on std::atomic<T> objects, so prefer to use that instead.
@@ -411,12 +432,21 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
   if line.startswith('using testing::TestWithParams;'):
     reportError("Don't use 'using testing::Test;, elaborate the type instead")
-  if file_path != './test/test_common/test_base.h' and (' testing::Test ' in line or
-                                                        ' testing::TestWithParam' in line):
-    reportError("Derive test classes from TestBase in test/test_common/test_base.h")
+  if not whitelistedForSerializeAsString(file_path) and 'SerializeAsString' in line:
+    # The MessageLite::SerializeAsString doesn't generate deterministic serialization,
+    # use MessageUtil::hash instead.
+    reportError(
+        "Don't use MessageLite::SerializeAsString for generating deterministic serialization, use MessageUtil::hash instead."
+    )
+  if not whitelistedForJsonStringToMessage(file_path) and 'JsonStringToMessage' in line:
+    # Centralize all usage of JSON parsing so it is easier to make changes in JSON parsing
+    # behavior.
+    reportError("Don't use Protobuf::util::JsonStringToMessage, use MessageUtil::loadFromJson.")
 
 
 def checkBuildLine(line, file_path, reportError):
+  if '@bazel_tools' in line and not (isSkylarkFile(file_path) or file_path.startswith('./bazel/')):
+    reportError('unexpected @bazel_tools reference, please indirect via a definition in //bazel')
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")

@@ -41,6 +41,7 @@ envoy_cc_library(
     deps = [
         ":protobuf",
         "//include/envoy/api:api_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",

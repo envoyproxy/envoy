@@ -23,6 +23,7 @@
 
 #include "common/http/context_impl.h"
 #include "common/secret/secret_manager_impl.h"
+#include "common/stats/fake_symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -39,11 +40,11 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/test_time_system.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -79,6 +80,8 @@ public:
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
+  MOCK_CONST_METHOD0(libeventBufferEnabled, bool());
+  MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
 
   std::string config_path_;
@@ -95,6 +98,7 @@ public:
   bool hot_restart_disabled_{};
   bool signal_handling_enabled_{true};
   bool mutex_tracing_enabled_{};
+  bool cpuset_threads_enabled_{};
 };
 
 class MockConfigTracker : public ConfigTracker {
@@ -206,6 +210,7 @@ public:
   MOCK_METHOD0(statsAllocator, Stats::StatDataAllocator&());
 
 private:
+  Test::Global<Stats::FakeSymbolTableImpl> symbol_table_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
   Stats::HeapStatDataAllocator stats_allocator_;
@@ -259,6 +264,15 @@ public:
   MOCK_METHOD0(stopWorkers, void());
 };
 
+class MockServerLifecycleNotifier : public ServerLifecycleNotifier {
+public:
+  MockServerLifecycleNotifier();
+  ~MockServerLifecycleNotifier();
+
+  MOCK_METHOD2(registerCallback, void(Stage, StageCallback));
+  MOCK_METHOD2(registerCallback, void(Stage, StageCallbackWithCompletion));
+};
+
 class MockWorkerFactory : public WorkerFactory {
 public:
   MockWorkerFactory();
@@ -309,7 +323,7 @@ public:
 
   // OverloadManager
   MOCK_METHOD0(start, void());
-  MOCK_METHOD3(registerForAction, void(const std::string& action, Event::Dispatcher& dispatcher,
+  MOCK_METHOD3(registerForAction, bool(const std::string& action, Event::Dispatcher& dispatcher,
                                        OverloadActionCb callback));
   MOCK_METHOD0(getThreadLocalOverloadState, ThreadLocalOverloadState&());
 
@@ -337,9 +351,10 @@ public:
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());
+  MOCK_METHOD0(lifecycleNotifier, ServerLifecycleNotifier&());
   MOCK_METHOD0(listenerManager, ListenerManager&());
   MOCK_METHOD0(mutexTracer, Envoy::MutexTracer*());
-  MOCK_METHOD0(options, Options&());
+  MOCK_METHOD0(options, const Options&());
   MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
   MOCK_METHOD0(runtime, Runtime::Loader&());
@@ -355,7 +370,7 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
-  Event::TestTimeSystem& timeSystem() override { return time_system_; }
+  TimeSource& timeSource() override { return time_system_; }
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -375,6 +390,7 @@ public:
   testing::NiceMock<MockHotRestart> hot_restart_;
   testing::NiceMock<MockOptions> options_;
   testing::NiceMock<Runtime::MockRandomGenerator> random_;
+  testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
@@ -418,6 +434,7 @@ public:
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(initManager, Init::Manager&());
+  MOCK_METHOD0(lifecycleNotifier, ServerLifecycleNotifier&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(scope, Stats::Scope&());
@@ -439,17 +456,17 @@ public:
   testing::NiceMock<MockDrainManager> drain_manager_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
   testing::NiceMock<Init::MockManager> init_manager_;
+  testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
-  Stats::IsolatedStoreImpl scope_;
+  testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
-  Tracing::HttpNullTracer null_tracer_;
   Http::ContextImpl http_context_;
   testing::NiceMock<Api::MockApi> api_;
 };
@@ -512,7 +529,7 @@ public:
     return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
   }
 
-  testing::NiceMock<Upstream::MockCluster> cluster_;
+  testing::NiceMock<Upstream::MockClusterMockPrioritySet> cluster_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;

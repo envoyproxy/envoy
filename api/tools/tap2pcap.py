@@ -44,7 +44,7 @@ def DumpEvent(direction, timestamp, data):
 
 
 def Tap2Pcap(tap_path, pcap_path):
-  wrapper = wrapper_pb2.BufferedTraceWrapper()
+  wrapper = wrapper_pb2.TraceWrapper()
   if tap_path.endswith('.pb_text'):
     with open(tap_path, 'r') as f:
       text_format.Merge(f.read(), wrapper)
@@ -61,9 +61,9 @@ def Tap2Pcap(tap_path, pcap_path):
   dumps = []
   for event in trace.events:
     if event.HasField('read'):
-      dumps.append(DumpEvent('I', event.timestamp, event.read.data))
+      dumps.append(DumpEvent('I', event.timestamp, event.read.data.as_bytes))
     elif event.HasField('write'):
-      dumps.append(DumpEvent('O', event.timestamp, event.write.data))
+      dumps.append(DumpEvent('O', event.timestamp, event.write.data.as_bytes))
 
   ipv6 = False
   try:

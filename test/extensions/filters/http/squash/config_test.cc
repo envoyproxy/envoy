@@ -3,9 +3,9 @@
 #include "extensions/filters/http/squash/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 
@@ -13,6 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Squash {
+namespace {
 
 TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectJson) {
   std::string json_string = R"EOF(
@@ -34,6 +35,7 @@ TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectJson) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace Squash
 } // namespace HttpFilters
 } // namespace Extensions

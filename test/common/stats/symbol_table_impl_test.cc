@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/common/macros.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/fake_symbol_table_impl.h"
@@ -7,10 +8,10 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/test_common/logging.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/blocking_counter.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Stats {
@@ -28,7 +29,7 @@ enum class SymbolTableType {
   Fake,
 };
 
-class StatNameTest : public TestBaseWithParam<SymbolTableType> {
+class StatNameTest : public testing::TestWithParam<SymbolTableType> {
 protected:
   StatNameTest() {
     switch (GetParam()) {
@@ -39,7 +40,9 @@ protected:
       break;
     }
     case SymbolTableType::Fake:
-      table_ = std::make_unique<FakeSymbolTableImpl>();
+      auto table = std::make_unique<FakeSymbolTableImpl>();
+      fake_symbol_table_ = table.get();
+      table_ = std::move(table);
       break;
     }
   }
@@ -54,7 +57,7 @@ protected:
   }
 
   SymbolVec getSymbols(StatName stat_name) {
-    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+    return SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
   }
   std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
     return real_symbol_table_->decodeSymbolVec(symbol_vec);
@@ -71,6 +74,7 @@ protected:
     return stat_name_storage_.back().statName();
   }
 
+  FakeSymbolTableImpl* fake_symbol_table_{nullptr};
   SymbolTableImpl* real_symbol_table_{nullptr};
   std::unique_ptr<SymbolTable> table_;
 
@@ -268,10 +272,10 @@ TEST_P(StatNameTest, TestShrinkingExpectation) {
 // you don't free all the StatNames you've allocated bytes for. StatNameList
 // provides this capability.
 TEST_P(StatNameTest, List) {
-  std::vector<absl::string_view> names{"hello.world", "goodbye.world"};
+  absl::string_view names[] = {"hello.world", "goodbye.world"};
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
-  name_list.populate(names, *table_);
+  table_->populateList(names, ARRAY_SIZE(names), name_list);
   EXPECT_TRUE(name_list.populated());
 
   // First, decode only the first name.
@@ -367,6 +371,8 @@ TEST_P(StatNameTest, JoinAllEmpty) {
   EXPECT_EQ("", table_->toString(StatName(joined.get())));
 }
 
+// Validates that we don't get tsan or other errors when concurrently creating
+// a large number of stats.
 TEST_P(StatNameTest, RacingSymbolCreation) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   MutexTracerImpl& mutex_tracer = MutexTracerImpl::getOrCreateTracer();
@@ -406,20 +412,8 @@ TEST_P(StatNameTest, RacingSymbolCreation) {
   int64_t create_contentions = mutex_tracer.numContentions();
   ENVOY_LOG_MISC(info, "Number of contentions: {}", create_contentions);
 
-  // But when we access the already-existing symbols, we guarantee that no
-  // further mutex contentions occur.
-  int64_t start_contentions = mutex_tracer.numContentions();
   access.setReady();
   accesses.Wait();
-
-  // With fake symbol tables, there are no contentions as there are is no state
-  // in the symbol table to lock. This is why fake symbol tables are a safe way
-  // to transition the codebase to use the SymbolTable API without impacting
-  // hot-path performance.
-  if (GetParam() == SymbolTableType::Fake) {
-    EXPECT_EQ(create_contentions, mutex_tracer.numContentions());
-    EXPECT_EQ(start_contentions, create_contentions);
-  }
 
   // In a perfect world, we could use reader-locks in the SymbolTable
   // implementation, and there should be zero additional contentions

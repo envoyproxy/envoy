@@ -87,7 +87,7 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x8000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x10000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -155,6 +155,10 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded)) {
     common_access_log.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
   }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout)) {
+    common_access_log.mutable_response_flags()->set_stream_idle_timeout(true);
+  }
 }
 
 void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
@@ -173,7 +177,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   }
 
   if (filter_) {
-    if (!filter_->evaluate(stream_info, *request_headers)) {
+    if (!filter_->evaluate(stream_info, *request_headers, *response_headers, *response_trailers)) {
       return;
     }
   }
@@ -183,7 +187,6 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
 
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
-  // TODO(mattklein123): Populate tls_properties field.
   auto* common_properties = log_entry->mutable_common_properties();
 
   if (stream_info.downstreamRemoteAddress() != nullptr) {
@@ -195,6 +198,28 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     Network::Utility::addressToProtobufAddress(
         *stream_info.downstreamLocalAddress(),
         *common_properties->mutable_downstream_local_address());
+  }
+  if (stream_info.downstreamSslConnection() != nullptr) {
+    auto* tls_properties = common_properties->mutable_tls_properties();
+
+    tls_properties->set_tls_sni_hostname(stream_info.requestedServerName());
+
+    auto* local_properties = tls_properties->mutable_local_certificate_properties();
+    for (const auto& uri_san : stream_info.downstreamSslConnection()->uriSanLocalCertificate()) {
+      auto* local_san = local_properties->add_subject_alt_name();
+      local_san->set_uri(uri_san);
+    }
+    local_properties->set_subject(stream_info.downstreamSslConnection()->subjectLocalCertificate());
+
+    auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
+    for (const auto& uri_san : stream_info.downstreamSslConnection()->uriSanPeerCertificate()) {
+      auto* peer_san = peer_properties->add_subject_alt_name();
+      peer_san->set_uri(uri_san);
+    }
+
+    peer_properties->set_subject(stream_info.downstreamSslConnection()->subjectPeerCertificate());
+
+    // TODO(snowp): Populate remaining tls_properties fields.
   }
   common_properties->mutable_start_time()->MergeFrom(
       Protobuf::util::TimeUtil::NanosecondsToTimestamp(
@@ -255,6 +280,10 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
         *stream_info.upstreamLocalAddress(), *common_properties->mutable_upstream_local_address());
   }
   responseFlagsToAccessLogResponseFlags(*common_properties, stream_info);
+  if (!stream_info.upstreamTransportFailureReason().empty()) {
+    common_properties->set_upstream_transport_failure_reason(
+        stream_info.upstreamTransportFailureReason());
+  }
   if (stream_info.dynamicMetadata().filter_metadata_size() > 0) {
     common_properties->mutable_metadata()->MergeFrom(stream_info.dynamicMetadata());
   }

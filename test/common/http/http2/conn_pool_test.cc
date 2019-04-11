@@ -15,10 +15,9 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
@@ -54,7 +53,7 @@ public:
 
 class ActiveTestRequest;
 
-class Http2ConnPoolImplTest : public TestBase {
+class Http2ConnPoolImplTest : public testing::Test {
 public:
   struct TestCodecClient {
     Http::MockClientConnection* codec_;
@@ -69,10 +68,7 @@ public:
         pool_(dispatcher_, host_, Upstream::ResourcePriority::Default, nullptr) {}
 
   ~Http2ConnPoolImplTest() {
-    // Make sure all gauges are 0.
-    for (const Stats::GaugeSharedPtr& gauge : cluster_->stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
-    }
+    EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 
   // Creates a new test client, expecting a new connection to be created and associated
@@ -83,8 +79,7 @@ public:
     test_client.connection_ = new NiceMock<Network::MockClientConnection>();
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
-    test_client.client_dispatcher_ =
-        std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem(), *api_);
+    test_client.client_dispatcher_ = api_->allocateDispatcher();
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
@@ -116,11 +111,26 @@ public:
   // Asserts that the provided requests receives onPoolFailure.
   void expectStreamReset(ActiveTestRequest& r);
 
+  /**
+   * Closes a test client.
+   */
+  void closeClient(size_t index);
+
+  /**
+   * Completes an active request. Useful when this flow is not part of the main test assertions.
+   */
+  void completeRequest(ActiveTestRequest& r);
+
+  /**
+   * Completes an active request and closes the upstream connection. Useful when this flow is
+   * not part of the main test assertions.
+   */
+  void completeRequestCloseUpstream(size_t index, ActiveTestRequest& r);
+
   MOCK_METHOD0(onClientDestroy, void());
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
@@ -168,6 +178,24 @@ void Http2ConnPoolImplTest::expectClientReset(size_t index, ActiveTestRequest& r
 
 void Http2ConnPoolImplTest::expectStreamReset(ActiveTestRequest& r) {
   EXPECT_CALL(r.callbacks_.pool_failure_, ready());
+}
+
+void Http2ConnPoolImplTest::closeClient(size_t index) {
+  test_clients_[index].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+}
+
+void Http2ConnPoolImplTest::completeRequest(ActiveTestRequest& r) {
+  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
+  r.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
+  r.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
+}
+
+void Http2ConnPoolImplTest::completeRequestCloseUpstream(size_t index, ActiveTestRequest& r) {
+  completeRequest(r);
+  closeClient(index);
 }
 
 /**
@@ -581,7 +609,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
 }
 
 TEST_F(Http2ConnPoolImplTest, MaxGlobalRequests) {
-  cluster_->resetResourceManager(1024, 1024, 1, 1);
+  cluster_->resetResourceManager(1024, 1024, 1, 1, 1);
   InSequence s;
 
   expectClientCreate();
@@ -629,6 +657,72 @@ TEST_F(Http2ConnPoolImplTest, GoAway) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_close_notify_.value());
 }
 
+TEST_F(Http2ConnPoolImplTest, NoActiveConnectionsByDefault) {
+  EXPECT_FALSE(pool_.hasActiveConnections());
+}
+
+// Show that an active request on the primary connection is considered active.
+TEST_F(Http2ConnPoolImplTest, ActiveConnectionsHasActiveRequestsTrue) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+
+  EXPECT_TRUE(pool_.hasActiveConnections());
+
+  completeRequestCloseUpstream(0, r1);
+}
+
+// Show that pending requests are considered active.
+TEST_F(Http2ConnPoolImplTest, PendingRequestsConsideredActive) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+
+  EXPECT_TRUE(pool_.hasActiveConnections());
+
+  expectClientConnect(0, r1);
+  completeRequestCloseUpstream(0, r1);
+}
+
+// Show that even if there is a primary client still, if all of its requests have completed, then it
+// does not have any active connections.
+TEST_F(Http2ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnections) {
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  completeRequest(r1);
+
+  EXPECT_FALSE(pool_.hasActiveConnections());
+
+  closeClient(0);
+}
+
+// Show that if connections are draining, they're still considered active.
+TEST_F(Http2ConnPoolImplTest, DrainingConnectionsConsideredActive) {
+  pool_.max_streams_ = 1;
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  pool_.drainConnections();
+
+  EXPECT_TRUE(pool_.hasActiveConnections());
+
+  completeRequest(r1);
+  closeClient(0);
+}
+
+// Show that once we've drained all connections, there are no longer any active.
+TEST_F(Http2ConnPoolImplTest, DrainedConnectionsNotActive) {
+  pool_.max_streams_ = 1;
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+  pool_.drainConnections();
+  completeRequest(r1);
+
+  EXPECT_FALSE(pool_.hasActiveConnections());
+
+  closeClient(0);
+}
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

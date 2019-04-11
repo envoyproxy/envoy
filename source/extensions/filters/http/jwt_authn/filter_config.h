@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/router/string_accessor.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -8,6 +9,8 @@
 
 #include "extensions/filters/http/jwt_authn/matcher.h"
 #include "extensions/filters/http/jwt_authn/verifier.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -65,7 +68,7 @@ public:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : proto_config_(proto_config), stats_(generateStats(stats_prefix, context.scope())),
         tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
-        time_source_(context.dispatcher().timeSystem()), api_(context.api()) {
+        time_source_(context.dispatcher().timeSource()), api_(context.api()) {
     ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalCache>(proto_config_, time_source_, api_);
@@ -76,6 +79,15 @@ public:
       rule_pairs_.emplace_back(
           Matcher::create(rule),
           Verifier::create(rule.requires(), proto_config_.providers(), *this, getExtractor()));
+    }
+
+    if (proto_config_.has_filter_state_rules()) {
+      filter_state_name_ = proto_config_.filter_state_rules().name();
+      for (const auto& it : proto_config_.filter_state_rules().requires()) {
+        filter_state_verifiers_.emplace(
+            it.first,
+            Verifier::create(it.second, proto_config_.providers(), *this, getExtractor()));
+      }
     }
   }
 
@@ -97,10 +109,20 @@ public:
   const Extractor& getExtractor() const { return *extractor_; }
 
   // Finds the matcher that matched the header
-  virtual const Verifier* findVerifier(const Http::HeaderMap& headers) const {
+  virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
+                                       const StreamInfo::FilterState& filter_state) const {
     for (const auto& pair : rule_pairs_) {
       if (pair.matcher_->matches(headers)) {
         return pair.verifier_.get();
+      }
+    }
+    if (!filter_state_name_.empty() && !filter_state_verifiers_.empty() &&
+        filter_state.hasData<Router::StringAccessor>(filter_state_name_)) {
+      const auto& state = filter_state.getDataReadOnly<Router::StringAccessor>(filter_state_name_);
+      ENVOY_LOG(debug, "use filter state value {} to find verifier.", state.asString());
+      const auto& it = filter_state_verifiers_.find(state.asString());
+      if (it != filter_state_verifiers_.end()) {
+        return it->second.get();
       }
     }
     return nullptr;
@@ -139,6 +161,10 @@ private:
   ExtractorConstPtr extractor_;
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
+  // The filter state name to lookup filter_state_rules.
+  std::string filter_state_name_;
+  // The filter state verifier map from filter_state_rules.
+  absl::flat_hash_map<std::string, VerifierConstPtr> filter_state_verifiers_;
   TimeSource& time_source_;
   Api::Api& api_;
 };

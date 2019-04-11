@@ -4,7 +4,7 @@ Proxy Protocol
 ==============
 
 This listener filter adds support for
-`HAProxy Proxy Protocol <http://www.haproxy.org/download/1.9/doc/proxy-protocol.txt>`_.
+`HAProxy Proxy Protocol <https://www.haproxy.org/download/1.9/doc/proxy-protocol.txt>`_.
 
 In this mode, the upstream connection is assumed to come from a proxy
 which places the original coordinates (IP, PORT) into a connection-string.

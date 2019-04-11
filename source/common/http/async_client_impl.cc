@@ -17,6 +17,7 @@ const std::list<std::regex> AsyncStreamImpl::NullCorsPolicy::allow_origin_regex_
 const absl::optional<bool> AsyncStreamImpl::NullCorsPolicy::allow_credentials_;
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
     AsyncStreamImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
+const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
 const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_policy_;
 const AsyncStreamImpl::NullShadowPolicy AsyncStreamImpl::RouteEntryImpl::shadow_policy_;
@@ -40,7 +41,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Http::Context& http_context)
     : cluster_(cluster),
       config_("http.async-client.", local_info, stats_store, cm, runtime, random,
-              std::move(shadow_writer), true, false, false, dispatcher.timeSystem(), http_context),
+              std::move(shadow_writer), true, false, false, dispatcher.timeSource(), http_context),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -76,7 +77,7 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                                  const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSystem()),
+      router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSource()),
       tracing_config_(Tracing::EgressConfig::get()),
       route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout)),
       send_xff_(options.send_xff) {

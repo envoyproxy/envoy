@@ -82,13 +82,13 @@ public:
   const MatcherSharedPtr& requestHeaderMatchers() const { return request_header_matchers_; }
 
   /**
-   * Returns a list of matchers used for selecting the the authorization response headers that
+   * Returns a list of matchers used for selecting the authorization response headers that
    * should be send back to the client.
    */
   const MatcherSharedPtr& clientHeaderMatchers() const { return client_header_matchers_; }
 
   /**
-   *  Returns a list of matchers used for selecting the the authorization response headers that
+   *  Returns a list of matchers used for selecting the authorization response headers that
    * should be send to an the upstream server.
    */
   const MatcherSharedPtr& upstreamHeaderMatchers() const { return upstream_header_matchers_; }

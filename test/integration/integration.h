@@ -14,6 +14,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
@@ -55,7 +56,8 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // Http::StreamCallbacks
-  void onResetStream(Http::StreamResetReason reason) override;
+  void onResetStream(Http::StreamResetReason reason,
+                     absl::string_view transport_failure_reason) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
@@ -131,21 +133,26 @@ struct ApiFilesystemConfig {
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
+  using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
 
-  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
+  // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
+  // provided IP |version|.
+  BaseIntegrationTest(Network::Address::IpVersion version,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr,
+                      const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : BaseIntegrationTest(version, config) {}
+  // Creates a test fixture with a specified |upstream_address| function that provides the IP and
+  // port to use.
+  BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                      Network::Address::IpVersion version,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
 
   virtual ~BaseIntegrationTest() {}
 
-  /**
-   * Helper function to create a simulated time integration test during construction.
-   */
-  static TestTimeSystemPtr simTime() { return std::make_unique<Event::SimulatedTimeSystem>(); }
-
-  /**
-   * Helper function to create a wall-clock time integration test during construction.
-   */
-  static TestTimeSystemPtr realTime() { return std::make_unique<Event::TestRealTimeSystem>(); }
+  // TODO(jmarantz): Remove this once
+  // https://github.com/envoyproxy/envoy-filter-example/pull/69 is reverted.
+  static TestTimeSystemPtr realTime() { return TestTimeSystemPtr(); }
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
@@ -182,7 +189,7 @@ public:
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names);
 
-  Event::TestTimeSystem& timeSystem() { return *time_system_; }
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
@@ -209,8 +216,31 @@ public:
     xds_stream_->sendGrpcMessage(discovery_response);
   }
 
+  AssertionResult compareDeltaDiscoveryRequest(
+      const std::string& expected_type_url,
+      const std::vector<std::string>& expected_resource_subscriptions,
+      const std::vector<std::string>& expected_resource_unsubscriptions,
+      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const std::string& expected_error_message = "");
+  template <class T>
+  void sendDeltaDiscoveryResponse(const std::vector<T>& added_or_updated,
+                                  const std::vector<std::string>& removed,
+                                  const std::string& version) {
+    envoy::api::v2::DeltaDiscoveryResponse response;
+    response.set_system_version_info("system_version_info_this_is_a_test");
+    for (const auto& message : added_or_updated) {
+      auto* resource = response.add_resources();
+      resource->set_name(message.name());
+      resource->set_version(version);
+      resource->mutable_resource()->PackFrom(message);
+    }
+    *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+    response.set_nonce("noncense");
+    xds_stream_->sendGrpcMessage(response);
+  }
+
 private:
-  TestTimeSystemPtr time_system_;
+  Event::GlobalTimeSystem time_system_;
 
 public:
   Event::DispatcherPtr dispatcher_;
@@ -234,17 +264,21 @@ protected:
   // Will not return until that server is listening.
   virtual IntegrationTestServerPtr
   createIntegrationTestServer(const std::string& bootstrap_path,
-                              std::function<void()> pre_worker_start_steps,
+                              std::function<void()> on_server_init_function,
                               Event::TestTimeSystem& time_system);
 
   bool initialized() const { return initialized_; }
 
   // The IpVersion (IPv4, IPv6) to use.
   Network::Address::IpVersion version_;
+  // IP Address to use when binding sockets on upstreams.
+  InstanceConstSharedPtrFn upstream_address_fn_;
   // The config for envoy start-up.
   ConfigHelper config_helper_;
-  // Steps that should be done prior to the workers starting. E.g., xDS pre-init.
-  std::function<void()> pre_worker_start_test_steps_;
+
+  // Steps that should be done in parallel with the envoy server starting. E.g., xDS
+  // pre-init, control plane synchronization needed for server start.
+  std::function<void()> on_server_init_function_;
 
   std::vector<std::unique_ptr<FakeUpstream>> fake_upstreams_;
   // Target number of upstreams.

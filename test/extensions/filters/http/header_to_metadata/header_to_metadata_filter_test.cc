@@ -4,10 +4,10 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -16,8 +16,9 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
+namespace {
 
-class HeaderToMetadataTest : public TestBase {
+class HeaderToMetadataTest : public testing::Test {
 public:
   const std::string request_config_yaml = R"EOF(
 request_rules:
@@ -273,6 +274,7 @@ request_rules:
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
+} // namespace
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions

@@ -8,16 +8,16 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
-#include "test/test_common/test_base.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::InSequence;
 
 namespace Envoy {
 namespace Event {
+namespace {
 
 class TestDeferredDeletable : public DeferredDeletable {
 public:
@@ -30,42 +30,39 @@ private:
 
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
-  Stats::IsolatedStoreImpl stats_store;
-  Api::ApiPtr api = Api::createApiForTest(stats_store);
-  DangerousDeprecatedTestTime test_time;
-  DispatcherImpl dispatcher(test_time.timeSystem(), *api);
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher());
   ReadyWatcher watcher1;
 
-  dispatcher.deferredDelete(
+  dispatcher->deferredDelete(
       DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void { watcher1.ready(); })});
 
   // The first one will get deleted inline.
   EXPECT_CALL(watcher1, ready());
-  dispatcher.clearDeferredDeleteList();
+  dispatcher->clearDeferredDeleteList();
 
   // This one does a nested deferred delete. We should need two clear calls to actually get
   // rid of it with the vector swapping. We also test that inline clear() call does nothing.
   ReadyWatcher watcher2;
   ReadyWatcher watcher3;
-  dispatcher.deferredDelete(DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void {
+  dispatcher->deferredDelete(DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void {
     watcher2.ready();
-    dispatcher.deferredDelete(
+    dispatcher->deferredDelete(
         DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void { watcher3.ready(); })});
-    dispatcher.clearDeferredDeleteList();
+    dispatcher->clearDeferredDeleteList();
   })});
 
   EXPECT_CALL(watcher2, ready());
-  dispatcher.clearDeferredDeleteList();
+  dispatcher->clearDeferredDeleteList();
 
   EXPECT_CALL(watcher3, ready());
-  dispatcher.clearDeferredDeleteList();
+  dispatcher->clearDeferredDeleteList();
 }
 
-class DispatcherImplTest : public TestBase {
+class DispatcherImplTest : public testing::Test {
 protected:
   DispatcherImplTest()
-      : api_(Api::createApiForTest(stat_store_)),
-        dispatcher_(std::make_unique<DispatcherImpl>(test_time_.timeSystem(), *api_)),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         work_finished_(false) {
     dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
@@ -83,9 +80,6 @@ protected:
     dispatcher_thread_->join();
   }
 
-  DangerousDeprecatedTestTime test_time_;
-
-  Stats::IsolatedStoreImpl stat_store_;
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
@@ -162,6 +156,7 @@ TEST_F(DispatcherImplTest, Timer) {
         }
         cv_.notifyOne();
       });
+      EXPECT_FALSE(timer->enabled());
     }
     cv_.notifyOne();
   });
@@ -177,5 +172,17 @@ TEST_F(DispatcherImplTest, Timer) {
   }
 }
 
+TEST(TimerImplTest, TimerEnabledDisabled) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher());
+  Event::TimerPtr timer = dispatcher->createTimer([] {});
+  EXPECT_FALSE(timer->enabled());
+  timer->enableTimer(std::chrono::milliseconds(0));
+  EXPECT_TRUE(timer->enabled());
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(timer->enabled());
+}
+
+} // namespace
 } // namespace Event
 } // namespace Envoy

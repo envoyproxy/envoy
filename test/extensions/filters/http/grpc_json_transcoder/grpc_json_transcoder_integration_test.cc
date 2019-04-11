@@ -6,10 +6,10 @@
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/proto/bookstore.pb.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 using Envoy::Protobuf::Message;
 using Envoy::Protobuf::TextFormat;
@@ -19,12 +19,14 @@ using Envoy::ProtobufUtil::error::Code;
 using Envoy::ProtobufWkt::Empty;
 
 namespace Envoy {
+namespace {
 
-class GrpcJsonTranscoderIntegrationTest : public HttpIntegrationTest,
-                                          public TestBaseWithParam<Network::Address::IpVersion> {
+class GrpcJsonTranscoderIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
 public:
   GrpcJsonTranscoderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
   /**
    * Global initializer for all integration tests.
    */
@@ -330,4 +332,5 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, InvalidJson) {
       "Expected : between key:value pair.\n", false);
 }
 
+} // namespace
 } // namespace Envoy

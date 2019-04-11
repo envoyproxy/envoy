@@ -15,10 +15,10 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::InSequence;
@@ -55,7 +55,7 @@ TEST(ClientSslAuthConfigTest, BadClientSslAuthConfig) {
                Json::Exception);
 }
 
-class ClientSslAuthFilterTest : public TestBase {
+class ClientSslAuthFilterTest : public testing::Test {
 protected:
   ClientSslAuthFilterTest()
       : request_(&cm_.async_client_), interval_timer_(new Event::MockTimer(&dispatcher_)),
@@ -115,7 +115,7 @@ protected:
   std::unique_ptr<ClientSslAuthFilter> instance_;
   Event::MockTimer* interval_timer_;
   Http::AsyncClient::Callbacks* callbacks_;
-  Ssl::MockConnection ssl_;
+  Ssl::MockConnectionInfo ssl_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   Api::ApiPtr api_;

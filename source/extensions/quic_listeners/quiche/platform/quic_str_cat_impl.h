@@ -2,7 +2,6 @@
 
 #include "absl/strings/str_cat.h"
 #include "fmt/printf.h"
-#include "quiche/quic/platform/api/quic_string.h"
 
 // NOLINT(namespace-envoy)
 
@@ -12,11 +11,11 @@
 
 namespace quic {
 
-template <typename... Args> inline QuicString QuicStrCatImpl(const Args&... args) {
+template <typename... Args> inline std::string QuicStrCatImpl(const Args&... args) {
   return absl::StrCat(args...);
 }
 
-template <typename... Args> inline QuicString QuicStringPrintfImpl(const Args&... args) {
+template <typename... Args> inline std::string QuicStringPrintfImpl(const Args&... args) {
   return fmt::sprintf(std::forward<const Args&>(args)...);
 }
 

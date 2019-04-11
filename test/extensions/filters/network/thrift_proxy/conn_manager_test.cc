@@ -17,9 +17,9 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -70,7 +70,7 @@ public:
   MockProtocol* protocol_{};
 };
 
-class ThriftConnectionManagerTest : public TestBase {
+class ThriftConnectionManagerTest : public testing::Test {
 public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {}
   ~ThriftConnectionManagerTest() override {
@@ -111,7 +111,7 @@ public:
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSystem());
+        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource());
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 

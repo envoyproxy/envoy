@@ -3,21 +3,23 @@
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::google::jwt_verify::Status;
 
 using testing::_;
 using testing::Invoke;
+using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
 class MockMatcher : public Matcher {
 public:
@@ -30,10 +32,11 @@ public:
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : FilterConfig(proto_config, stats_prefix, context) {}
-  MOCK_CONST_METHOD1(findVerifier, const Verifier*(const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD2(findVerifier, const Verifier*(const Http::HeaderMap& headers,
+                                                   const StreamInfo::FilterState& filter_state));
 };
 
-class FilterTest : public TestBase {
+class FilterTest : public testing::Test {
 public:
   void SetUp() override {
     mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);
@@ -44,9 +47,7 @@ public:
   }
 
   void setupMockConfig() {
-    EXPECT_CALL(*mock_config_.get(), findVerifier(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
-      return mock_verifier_.get();
-    }));
+    EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(mock_verifier_.get()));
   }
 
   JwtAuthentication proto_config_;
@@ -174,9 +175,7 @@ TEST_F(FilterTest, OutBoundFailure) {
 
 // Test verifies that if no route matched requirement, then request is allowed.
 TEST_F(FilterTest, TestNoRouteMatched) {
-  EXPECT_CALL(*mock_config_.get(), findVerifier(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
-    return nullptr;
-  }));
+  EXPECT_CALL(*mock_config_.get(), findVerifier(_, _)).WillOnce(Return(nullptr));
 
   auto headers = Http::TestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -187,6 +186,7 @@ TEST_F(FilterTest, TestNoRouteMatched) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

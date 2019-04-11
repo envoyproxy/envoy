@@ -7,6 +7,7 @@
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
@@ -21,8 +22,9 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
+namespace {
 
-class GrpcAccessLogStreamerImplTest : public TestBase {
+class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
   using MockAccessLogStream = Grpc::MockAsyncStream;
   using AccessLogCallbacks =
@@ -112,10 +114,10 @@ public:
                           const std::string& log_name));
 };
 
-class HttpGrpcAccessLogTest : public TestBase {
+class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
-    ON_CALL(*filter_, evaluate(_, _)).WillByDefault(Return(true));
+    ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
     config_.mutable_common_config()->set_log_name("hello_log");
     access_log_ =
         std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, streamer_);
@@ -306,6 +308,7 @@ http_logs:
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
+    stream_info.upstream_transport_failure_reason_ = "TLS error";
 
     Http::TestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -325,6 +328,59 @@ http_logs:
           port_value: 0
       start_time:
         seconds: 3600
+      upstream_transport_failure_reason: "TLS error"
+    request:
+      request_method: "METHOD_UNSPECIFIED"
+    response: {}
+)EOF");
+    access_log_->log(nullptr, nullptr, nullptr, stream_info);
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.host_ = nullptr;
+    stream_info.start_time_ = SystemTime(1h);
+
+    NiceMock<Ssl::MockConnectionInfo> connection_info;
+    const std::vector<std::string> peerSans{"peerSan1", "peerSan2"};
+    ON_CALL(connection_info, uriSanPeerCertificate()).WillByDefault(Return(peerSans));
+    const std::vector<std::string> localSans{"localSan1", "localSan2"};
+    ON_CALL(connection_info, uriSanLocalCertificate()).WillByDefault(Return(localSans));
+    ON_CALL(connection_info, subjectPeerCertificate()).WillByDefault(Return("peerSubject"));
+    ON_CALL(connection_info, subjectLocalCertificate()).WillByDefault(Return("localSubject"));
+    stream_info.setDownstreamSslConnection(&connection_info);
+    stream_info.requested_server_name_ = "sni";
+
+    Http::TestHeaderMapImpl request_headers{
+        {":method", "WHACKADOO"},
+    };
+
+    expectLog(R"EOF(
+http_logs:
+  log_entry:
+    common_properties:
+      downstream_remote_address:
+        socket_address:
+          address: "127.0.0.1"
+          port_value: 0
+      downstream_local_address:
+        socket_address:
+          address: "127.0.0.2"
+          port_value: 0
+      start_time:
+        seconds: 3600
+      tls_properties:
+        tls_sni_hostname: sni
+        local_certificate_properties:
+          subject_alt_name:
+          - uri: localSan1
+          - uri: localSan2
+          subject: localSubject
+        peer_certificate_properties:
+          subject_alt_name:
+          - uri: peerSan1
+          - uri: peerSan2
+          subject: peerSubject
     request:
       request_method: "METHOD_UNSPECIFIED"
     response: {}
@@ -443,10 +499,12 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_rate_limit_service_error(true);
   common_access_log_expected.mutable_response_flags()->set_downstream_connection_termination(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
+  common_access_log_expected.mutable_response_flags()->set_stream_idle_timeout(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
 
+} // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
 } // namespace Extensions

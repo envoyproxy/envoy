@@ -16,6 +16,7 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 void makePortHermetic(Fuzz::PerTestEnvironment& test_env, envoy::api::v2::core::Address& address) {
   if (address.has_socket_address()) {
@@ -78,7 +79,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
         options, test_time.timeSystem(),
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart, stats_store,
         fakelock, component_factory, std::make_unique<Runtime::RandomGeneratorImpl>(),
-        thread_local_instance, Thread::threadFactoryForTest());
+        thread_local_instance, Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
     return;
@@ -89,5 +90,6 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   server->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

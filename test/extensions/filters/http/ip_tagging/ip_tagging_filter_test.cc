@@ -11,10 +11,10 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_base.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::Return;
@@ -24,8 +24,9 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
+namespace {
 
-class IpTaggingFilterTest : public TestBase {
+class IpTaggingFilterTest : public testing::Test {
 public:
   IpTaggingFilterTest() {
     ON_CALL(runtime_.snapshot_, featureEnabled("ip_tagging.http_filter_enabled", 100))
@@ -280,6 +281,7 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
 }
 
+} // namespace
 } // namespace IpTagging
 } // namespace HttpFilters
 } // namespace Extensions

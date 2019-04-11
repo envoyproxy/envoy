@@ -1,9 +1,9 @@
 #include "extensions/tracers/datadog/config.h"
 
 #include "test/mocks/server/mocks.h"
-#include "test/test_common/test_base.h"
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -13,6 +13,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
+namespace {
 
 TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   NiceMock<Server::MockInstance> server;
@@ -37,6 +38,7 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
   EXPECT_NE(nullptr, datadog_tracer);
 }
 
+} // namespace
 } // namespace Datadog
 } // namespace Tracers
 } // namespace Extensions

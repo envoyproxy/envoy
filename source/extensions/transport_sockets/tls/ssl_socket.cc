@@ -21,12 +21,16 @@ namespace TransportSockets {
 namespace Tls {
 
 namespace {
+
+constexpr absl::string_view NotReadyReason{"TLS error: Secret is not supplied by SDS"};
+
 // This SslSocket will be used when SSL secret is not fetched from SDS server.
 class NotReadySslSocket : public Network::TransportSocket {
 public:
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
   std::string protocol() const override { return EMPTY_STRING; }
+  absl::string_view failureReason() const override { return NotReadyReason; }
   bool canFlushClose() override { return true; }
   void closeSocket(Network::ConnectionEvent) override {}
   Network::IoResult doRead(Buffer::Instance&) override { return {PostIoAction::Close, 0, false}; }
@@ -34,7 +38,7 @@ public:
     return {PostIoAction::Close, 0, false};
   }
   void onConnected() override {}
-  const Ssl::Connection* ssl() const override { return nullptr; }
+  const Ssl::ConnectionInfo* ssl() const override { return nullptr; }
 };
 } // namespace
 
@@ -161,10 +165,14 @@ void SslSocket::drainErrorQueue() {
     }
     saw_error = true;
 
-    ENVOY_CONN_LOG(debug, "SSL error: {}:{}:{}:{}", callbacks_->connection(), err,
-                   ERR_lib_error_string(err), ERR_func_error_string(err),
-                   ERR_reason_error_string(err));
+    if (failure_reason_.empty()) {
+      failure_reason_ = "TLS error:";
+    }
+    failure_reason_.append(absl::StrCat(" ", err, ":", ERR_lib_error_string(err), ":",
+                                        ERR_func_error_string(err), ":",
+                                        ERR_reason_error_string(err)));
   }
+  ENVOY_CONN_LOG(debug, "{}", callbacks_->connection(), failure_reason_);
   if (saw_error && !saw_counted_error) {
     ctx_->stats().connection_error_.inc();
   }
@@ -244,15 +252,13 @@ bool SslSocket::peerCertificatePresented() const {
   return cert != nullptr;
 }
 
-std::string SslSocket::uriSanLocalCertificate() const {
+std::vector<std::string> SslSocket::uriSanLocalCertificate() const {
   // The cert object is not owned.
   X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
-    return "";
+    return {};
   }
-  // TODO(PiotrSikora): Figure out if returning only one URI is valid limitation.
-  const std::vector<std::string>& san_uris = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return (san_uris.size() > 0) ? san_uris[0] : "";
+  return Utility::getSubjectAltNames(*cert, GEN_URI);
 }
 
 std::vector<std::string> SslSocket::dnsSansLocalCertificate() const {
@@ -303,14 +309,42 @@ const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   return cached_url_encoded_pem_encoded_peer_certificate_;
 }
 
-std::string SslSocket::uriSanPeerCertificate() const {
+const std::string& SslSocket::urlEncodedPemEncodedPeerCertificateChain() const {
+  if (!cached_url_encoded_pem_encoded_peer_cert_chain_.empty()) {
+    return cached_url_encoded_pem_encoded_peer_cert_chain_;
+  }
+
+  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl_.get());
+  if (cert_chain == nullptr) {
+    ASSERT(cached_url_encoded_pem_encoded_peer_cert_chain_.empty());
+    return cached_url_encoded_pem_encoded_peer_cert_chain_;
+  }
+
+  for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
+    X509* cert = sk_X509_value(cert_chain, i);
+
+    bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+    RELEASE_ASSERT(buf != nullptr, "");
+    RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert) == 1, "");
+    const uint8_t* output;
+    size_t length;
+    RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
+
+    absl::string_view pem(reinterpret_cast<const char*>(output), length);
+    cached_url_encoded_pem_encoded_peer_cert_chain_ = absl::StrCat(
+        cached_url_encoded_pem_encoded_peer_cert_chain_,
+        absl::StrReplaceAll(
+            pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}}));
+  }
+  return cached_url_encoded_pem_encoded_peer_cert_chain_;
+}
+
+std::vector<std::string> SslSocket::uriSanPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
-    return "";
+    return {};
   }
-  // TODO(PiotrSikora): Figure out if returning only one URI is valid limitation.
-  const std::vector<std::string>& san_uris = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return (san_uris.size() > 0) ? san_uris[0] : "";
+  return Utility::getSubjectAltNames(*cert, GEN_URI);
 }
 
 std::vector<std::string> SslSocket::dnsSansPeerCertificate() const {
@@ -337,6 +371,8 @@ std::string SslSocket::protocol() const {
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
 }
 
+absl::string_view SslSocket::failureReason() const { return failure_reason_; }
+
 std::string SslSocket::serialNumberPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
@@ -359,6 +395,22 @@ std::string SslSocket::subjectLocalCertificate() const {
     return "";
   }
   return Utility::getSubjectFromCertificate(*cert);
+}
+
+absl::optional<SystemTime> SslSocket::validFromPeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return absl::nullopt;
+  }
+  return Utility::getValidFrom(*cert);
+}
+
+absl::optional<SystemTime> SslSocket::expirationPeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return absl::nullopt;
+  }
+  return Utility::getExpirationTime(*cert);
 }
 
 namespace {

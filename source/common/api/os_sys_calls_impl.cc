@@ -18,18 +18,8 @@ SysCallIntResult OsSysCallsImpl::ioctl(int sockfd, unsigned long int request, vo
   return {rc, errno};
 }
 
-SysCallIntResult OsSysCallsImpl::open(const std::string& full_path, int flags, int mode) {
-  const int rc = ::open(full_path.c_str(), flags, mode);
-  return {rc, errno};
-}
-
 SysCallIntResult OsSysCallsImpl::close(int fd) {
   const int rc = ::close(fd);
-  return {rc, errno};
-}
-
-SysCallSizeResult OsSysCallsImpl::write(int fd, const void* buffer, size_t num_bytes) {
-  const ssize_t rc = ::write(fd, buffer, num_bytes);
   return {rc, errno};
 }
 
@@ -45,6 +35,12 @@ SysCallSizeResult OsSysCallsImpl::readv(int fd, const iovec* iovec, int num_iove
 
 SysCallSizeResult OsSysCallsImpl::recv(int socket, void* buffer, size_t length, int flags) {
   const ssize_t rc = ::recv(socket, buffer, length, flags);
+  return {rc, errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::recvfrom(int sockfd, void* buffer, size_t length, int flags,
+                                           struct sockaddr* addr, socklen_t* addrlen) {
+  const ssize_t rc = ::recvfrom(sockfd, buffer, length, flags, addr, addrlen);
   return {rc, errno};
 }
 
