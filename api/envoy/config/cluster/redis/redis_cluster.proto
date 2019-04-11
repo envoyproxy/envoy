@@ -26,7 +26,7 @@ import "gogoproto/gogo.proto";
 // <https://github.com/twitter/twemproxy>`_. Twemproxy is also a proxy that interfaces with Redis.
 // However, it differs in several important ways. First, it does not support Redis Cluster. Second,
 // it acts as service in front of Redis, as opposed to being a sidecar proxy. Finally, it is
-// unmaintained. Why do we need a new system, aside from the last point?
+// un-maintained. Why do we need a new system, aside from the last point?
 //
 // Beside the expected benefits of a sidecare proxy such as unified retries and so on, it allows us
 // to essentially build a common client for all services to talk to Redis. This is important because

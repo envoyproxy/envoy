@@ -75,7 +75,7 @@ namespace Redis {
  * choose a random host from our known set of hosts. Then, against this host we make a topology
  * request.
  *
- * Topology requests are handled by RedisDiscoverySession, which handles the initilization of
+ * Topology requests are handled by RedisDiscoverySession, which handles the initialization of
  * the `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_, and the responses and
  * failure cases.
  *
