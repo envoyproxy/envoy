@@ -287,14 +287,15 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                              const bool& is_reset, Code response_code, absl::string_view body_text,
                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                              bool is_head_request) {
-  sendLocalReply(is_grpc,
-                 [&](HeaderMapPtr&& headers, bool end_stream) -> void {
-                   callbacks.encodeHeaders(std::move(headers), end_stream);
-                 },
-                 [&](Buffer::Instance& data, bool end_stream) -> void {
-                   callbacks.encodeData(data, end_stream);
-                 },
-                 is_reset, response_code, body_text, grpc_status, is_head_request);
+  sendLocalReply(
+      is_grpc,
+      [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+        callbacks.encodeHeaders(std::move(headers), end_stream);
+      },
+      [&](Buffer::Instance& data, bool end_stream) -> void {
+        callbacks.encodeData(data, end_stream);
+      },
+      is_reset, response_code, body_text, grpc_status, is_head_request);
 }
 
 void Utility::sendLocalReply(
