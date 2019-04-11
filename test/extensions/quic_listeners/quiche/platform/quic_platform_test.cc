@@ -576,16 +576,12 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
   bool deterministic_stats = Envoy::Stats::TestUtil::hasDeterministicMallocStats();
-  size_t start_mem;
-  if (deterministic_stats) {
-    start_mem = Envoy::Memory::Stats::totalCurrentlyAllocated();
-    std::cerr << "start mem " << start_mem << "\n";
-  }
+  const size_t start_mem =
+      deterministic_stats ? Envoy::Memory::Stats::totalCurrentlyAllocated() : 0;
   QuicStreamBufferAllocator allocator;
   char* p = allocator.New(1024);
   if (deterministic_stats) {
     EXPECT_LT(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
-    std::cerr << "after New " << Envoy::Memory::Stats::totalCurrentlyAllocated() << "\n";
   }
   EXPECT_NE(nullptr, p);
   memset(p, 'a', 1024);
