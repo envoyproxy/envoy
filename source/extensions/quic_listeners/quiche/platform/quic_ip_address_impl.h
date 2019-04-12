@@ -29,6 +29,8 @@ public:
   static QuicIpAddressImpl Any6() { return QuicIpAddressImpl(); }
 
   QuicIpAddressImpl() = default;
+  QuicIpAddressImpl(const in_addr&) {}
+  QuicIpAddressImpl(const in6_addr&) {}
   QuicIpAddressImpl(const QuicIpAddressImpl& other) = default;
   QuicIpAddressImpl& operator=(const QuicIpAddressImpl& other) = default;
   QuicIpAddressImpl& operator=(QuicIpAddressImpl&& other) = default;

@@ -148,6 +148,20 @@ cc_library(
 )
 
 cc_library(
+    name = "quic_platform_port_utils",
+    testonly = 1,
+    hdrs = envoy_select_quiche(
+        ["quiche/quic/platform/api/quic_port_utils.h"],
+        "@envoy",
+    ),
+    visibility = ["//visibility:public"],
+    deps = envoy_select_quiche(
+        ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
+        "@envoy",
+    ),
+)
+
+cc_library(
     name = "quic_platform_base",
     srcs = envoy_select_quiche(
         [
@@ -176,6 +190,7 @@ cc_library(
         "quiche/quic/platform/api/quic_reference_counted.h",
         "quiche/quic/platform/api/quic_server_stats.h",
         "quiche/quic/platform/api/quic_socket_address.h",
+        "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_test_output.h",
         "quiche/quic/platform/api/quic_uint128.h",
@@ -223,6 +238,20 @@ cc_library(
     deps = [":quic_platform"],
 )
 
+cc_library(
+    name = "quic_buffer_allocator_lib",
+    srcs = [
+        "quiche/quic/core/quic_buffer_allocator.cc",
+        "quiche/quic/core/quic_simple_buffer_allocator.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_buffer_allocator.h",
+        "quiche/quic/core/quic_simple_buffer_allocator.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [":quic_platform_export"],
+)
+
 envoy_cc_test(
     name = "http2_platform_test",
     srcs = envoy_select_quiche(
@@ -244,20 +273,6 @@ envoy_cc_test(
 )
 
 cc_library(
-    name = "quic_buffer_allocator_lib",
-    srcs = [
-        "quiche/quic/core/quic_buffer_allocator.cc",
-        "quiche/quic/core/quic_simple_buffer_allocator.cc",
-    ],
-    hdrs = [
-        "quiche/quic/core/quic_buffer_allocator.h",
-        "quiche/quic/core/quic_simple_buffer_allocator.h",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [":quic_platform_export"],
-)
-
-cc_library(
     name = "quic_platform_mem_slice_span_lib",
     hdrs = [
         "quiche/quic/platform/api/quic_mem_slice_span.h",
@@ -268,9 +283,9 @@ cc_library(
 
 cc_library(
     name = "quic_platform_test_mem_slice_vector_lib",
+    testonly = 1,
     hdrs = ["quiche/quic/platform/api/quic_test_mem_slice_vector.h"],
     visibility = ["//visibility:public"],
-    testonly = 1,
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_test_mem_slice_vector_impl_lib"],
 )
 
@@ -381,7 +396,10 @@ cc_library(
     ),
     # Need to use same compiler options as envoy_cc_library uses to enforce compiler version and c++ version.
     # QUIC uses offsetof() to optimize memory usage in frames.
-    copts = envoy_copts("@envoy") + ["-Wno-error=invalid-offsetof"],
+    copts = envoy_copts("@envoy") + [
+        "-Wno-error=invalid-offsetof",
+        "-Wno-error=unused-parameter",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",

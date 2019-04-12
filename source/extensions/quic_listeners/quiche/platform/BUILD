@@ -66,6 +66,13 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
 )
 
+envoy_cc_test_library(
+    name = "quic_platform_port_utils_impl_lib",
+    hdrs = ["quic_port_utils_impl.h"],
+    include_prefix = "extensions/quic_listeners/quiche/platform",
+    deps = ["//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_test_impl_lib"],
+)
+
 envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = ["quic_logging_impl.cc"],
@@ -99,6 +106,7 @@ envoy_cc_library(
         "quic_server_stats_impl.h",
         "quic_socket_address_impl.h",
         "quic_string_piece_impl.h",
+        "quic_stream_buffer_allocator_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
         "quic_expect_bug_impl.h",
@@ -182,6 +190,7 @@ envoy_cc_library(
 envoy_cc_test_library(
     name = "quic_platform_test_mem_slice_vector_impl_lib",
     hdrs = envoy_select_quiche(["quic_test_mem_slice_vector_impl.h"]),
+    include_prefix = "extensions/quic_listeners/quiche/platform",
     deps = envoy_select_quiche(["//test/extensions/quic_listeners/quiche/platform:quic_platform_test_mem_slice_vector_test_impl_lib"]),
 )
 
