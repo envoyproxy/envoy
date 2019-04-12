@@ -130,6 +130,8 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_libevent_libevent = dict(
         sha256 = "217d7282d41faabac8c74d8ea0f215d8fa065691fb4b1f9205cbe16a2a65c1cc",
+        # This SHA is when "prepare" and "check" watchers were added to libevent (see
+        # https://github.com/libevent/libevent/pull/793). Update to v2.2 when it is released.
         strip_prefix = "libevent-2f184f8bbf23377bddc8daa1a2c7b40735ee7e2a",
         urls = ["https://github.com/libevent/libevent/archive/2f184f8bbf23377bddc8daa1a2c7b40735ee7e2a.tar.gz"],
     ),

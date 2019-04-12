@@ -96,13 +96,11 @@ protected:
 };
 
 TEST_F(DispatcherImplTest, InitializeStats) {
-  Stats::MockStore parent_scope;
   // NiceMock because deliverHistogramToSinks may or may not be called, depending on timing.
-  auto* scope = new NiceMock<Stats::MockStore>();
-  EXPECT_CALL(parent_scope, createScope_("dispatcher.test.")).WillOnce(Return(scope));
-  EXPECT_CALL(*scope, histogram("loop_duration_us"));
-  EXPECT_CALL(*scope, histogram("poll_delay_us"));
-  dispatcher_->initializeStats(parent_scope, "test");
+  NiceMock<Stats::MockStore> scope;
+  EXPECT_CALL(scope, histogram("test.dispatcher.loop_duration_us"));
+  EXPECT_CALL(scope, histogram("test.dispatcher.poll_delay_us"));
+  dispatcher_->initializeStats(scope, "test");
 }
 
 TEST_F(DispatcherImplTest, Post) {

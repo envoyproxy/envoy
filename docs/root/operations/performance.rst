@@ -26,8 +26,9 @@ Envoy exposes two statistics to monitor performance of the event loops on all th
 Statistics
 ----------
 
-The event dispatcher for the main thread and each worker thread has a statistics tree rooted at
-*dispatcher.<thread_name>.* with the following statistics:
+The event dispatcher for the main thread has a statistics tree rooted at *server.dispatcher.*, and
+the event dispatcher for each worker thread has a statistics tree rooted at
+*listener_manager.worker_<id>.dispatcher.*, each with the following statistics:
 
 .. csv-table::
   :header: Name, Type, Description

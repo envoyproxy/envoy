@@ -58,12 +58,13 @@ public:
   virtual TimeSource& timeSource() PURE;
 
   /**
-   * Start writing stats once thread-local storage is ready to receive them (see
-   * ThreadLocalStoreImpl::initializeThreading).
-   * @param parent_scope the parent scope for the new per-dispatcher stats scope created here.
-   * @param name the name for the new stats scope, identifying this dispatcher.
+   * Initialize stats for this dispatcher. Note that this can't generally be done at construction
+   * time, since the main and worker thread dispatchers are constructed before
+   * ThreadLocalStoreImpl::initializeThreading.
+   * @param scope the scope to contain the new per-dispatcher stats created here.
+   * @param prefix the stats prefix to identify this dispatcher.
    */
-  virtual void initializeStats(Stats::Scope& parent_scope, absl::string_view name) PURE;
+  virtual void initializeStats(Stats::Scope& scope, const std::string& prefix) PURE;
 
   /**
    * Clear any items in the deferred deletion queue.

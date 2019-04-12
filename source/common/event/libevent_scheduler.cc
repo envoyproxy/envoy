@@ -8,6 +8,12 @@
 namespace Envoy {
 namespace Event {
 
+namespace {
+void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
+  histogram.recordValue(tv.tv_sec * 1000000 + tv.tv_usec);
+}
+} // namespace
+
 LibeventScheduler::LibeventScheduler() : libevent_(event_base_new()) {
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
@@ -65,7 +71,7 @@ void LibeventScheduler::onPrepare(evwatch*, const evwatch_prepare_cb_info* info,
   if (self->check_time_.tv_sec != 0) {
     timeval delta;
     evutil_timersub(&self->prepare_time_, &self->check_time_, &delta);
-    self->stats_->loop_duration_us_.recordValue(delta.tv_sec * 1000000 + delta.tv_usec);
+    recordTimeval(self->stats_->loop_duration_us_, delta);
   }
 }
 
@@ -87,7 +93,7 @@ void LibeventScheduler::onCheck(evwatch*, const evwatch_check_cb_info*, void* ar
     // feeling saucy. Disregard negative delays in stats, since they don't indicate anything
     // particularly useful.
     if (delay.tv_sec >= 0) {
-      self->stats_->poll_delay_us_.recordValue(delay.tv_sec * 1000000 + delay.tv_usec);
+      recordTimeval(self->stats_->poll_delay_us_, delay);
     }
   }
 }

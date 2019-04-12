@@ -38,7 +38,7 @@ public:
 
   // Event::Dispatcher
   TimeSource& timeSource() override { return api_.timeSource(); }
-  void initializeStats(Stats::Scope& parent_scope, absl::string_view name) override;
+  void initializeStats(Stats::Scope& scope, const std::string& prefix) override;
   void clearDeferredDeleteList() override;
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
@@ -75,7 +75,7 @@ private:
   bool isThreadSafe() const { return run_tid_ == nullptr || run_tid_->isCurrentThreadId(); }
 
   Api::Api& api_;
-  Stats::ScopePtr scope_;
+  std::string stats_prefix_;
   std::unique_ptr<DispatcherStats> stats_;
   Thread::ThreadIdPtr run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
