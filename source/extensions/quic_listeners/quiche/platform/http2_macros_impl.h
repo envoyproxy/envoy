@@ -18,7 +18,7 @@
 
 namespace http2 {
 
-template <typename T> T dieIfNull(T&& ptr) {
+template <typename T> inline T dieIfNull(T&& ptr) {
   CHECK((ptr) != nullptr);
   return std::forward<T>(ptr);
 }
