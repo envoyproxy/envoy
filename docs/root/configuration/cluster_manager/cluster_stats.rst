@@ -95,6 +95,8 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   version, Gauge, Hash of the contents from the last successful API fetch
   max_host_weight, Gauge, Maximum weight of any host in the cluster
   bind_errors, Counter, Total errors binding the socket to the configured source address
+  assignment_timeout_received, Counter, Total assignments received with endpoint lease information.
+  assignment_stale, Counter, Number of times the received assignments went stale before new assignments arrived.
 
 Health check statistics
 -----------------------

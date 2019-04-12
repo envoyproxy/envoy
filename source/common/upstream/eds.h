@@ -75,7 +75,6 @@ private:
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
   HostMap all_hosts_;
-  Event::Dispatcher& dispatcher_;
   Event::TimerPtr assignment_timeout_;
 };
 

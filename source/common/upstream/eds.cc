@@ -17,15 +17,15 @@ EdsClusterImpl::EdsClusterImpl(
       cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
-                        : cluster.eds_cluster_config().service_name()),
-      dispatcher_(factory_context.dispatcher()) {
+                        : cluster.eds_cluster_config().service_name()) {
   Config::Utility::checkLocalInfo("eds", local_info_);
-
-  const auto& eds_config = cluster.eds_cluster_config().eds_config();
+  Event::Dispatcher& dispatcher = factory_context.dispatcher();
   Runtime::RandomGenerator& random = factory_context.random();
   Upstream::ClusterManager& cm = factory_context.clusterManager();
+  assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
+  const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
-      eds_config, local_info_, dispatcher_, cm, random, info_->statsScope(),
+      eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
       "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
       Grpc::Common::typeUrl(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
@@ -119,18 +119,16 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
                                      cluster_load_assignment.cluster_name()));
   }
 
-  // Reset assignment timeout (if set) as we have received new assignment.
-  if (assignment_timeout_) {
+  // Disable timer (if enabled) as we have received new assignment.
+  if (assignment_timeout_->enabled()) {
     assignment_timeout_->disableTimer();
-    assignment_timeout_.reset();
   }
   // Check if endpoint_stale_after is set.
   const uint64_t stale_after_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(cluster_load_assignment.policy(), endpoint_stale_after, 0);
   if (stale_after_ms > 0) {
-    // Stat to track how oftern we receive valid assignment_timeout in response.
+    // Stat to track how often we receive valid assignment_timeout in response.
     info_->stats().assignment_timeout_received_.inc();
-    assignment_timeout_ = dispatcher_.createTimer([this]() -> void { onAssignmentTimeout(); });
     assignment_timeout_->enableTimer(std::chrono::milliseconds(stale_after_ms));
   }
 

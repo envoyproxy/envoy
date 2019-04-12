@@ -106,7 +106,6 @@ protected:
   NiceMock<Server::MockAdmin> admin_;
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest().currentThreadId()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Event::MockTimer* interval_timer_;
   Api::ApiPtr api_;
 };
 
@@ -1431,9 +1430,31 @@ TEST_F(EdsTest, MalformedIP) {
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
 }
 
+class EdsAssignmentTimeoutTest : public EdsTest {
+ public:
+  EdsAssignmentTimeoutTest()
+      : EdsTest()
+      , interval_timer_(nullptr) {
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(Invoke([this](Event::TimerCb cb) {
+        timer_cb_ = cb;
+        EXPECT_EQ(nullptr, interval_timer_);
+        interval_timer_ = new Event::MockTimer();
+        return interval_timer_;
+      }))
+      .WillRepeatedly(Invoke([](Event::TimerCb ) {
+        return new Event::MockTimer();
+      }));
+
+    resetCluster();
+  }
+
+  Event::MockTimer* interval_timer_;
+  Event::TimerCb timer_cb_;
+};
+
 // Test that assignment timeout is called and removes all the endpoints.
-TEST_F(EdsTest, AssignmentTimeout) {
-  interval_timer_ = new Event::MockTimer(&dispatcher_);
+TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   cluster_load_assignment.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
@@ -1461,16 +1482,18 @@ TEST_F(EdsTest, AssignmentTimeout) {
 
   // Expect the timer to be enabled once.
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  // Expect the timer to be disabled when stale assignments are removed.
+  EXPECT_CALL(*interval_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enabled())
+      .Times(2);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
   }
-  // Expect the timer to be disabled when stale assignments are removed.
-  EXPECT_CALL(*interval_timer_, disableTimer());
-  // Call the timer callback to indicate timeout, and test that stale endpoints
-  // are removed.
-  interval_timer_->callback_();
+  // Call the timer callback to indicate timeout.
+  timer_cb_();
+  // Test that stale endpoints are removed.
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 0);
