@@ -83,7 +83,7 @@ public:
     EXPECT_EQ(host_stream_->headers().Method()->value().getStringView(), "GET");
     EXPECT_EQ(host_stream_->headers().Host()->value().getStringView(), "anna");
 
-    if (cluster2 != "") {
+    if (!cluster2.empty()) {
       ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
       ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
       ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
