@@ -81,6 +81,7 @@ private:
     bool request_complete_ : 1;
     bool response_started_ : 1;
     bool response_complete_ : 1;
+    bool stream_reset_ : 1;
   };
 
   void cleanup();
