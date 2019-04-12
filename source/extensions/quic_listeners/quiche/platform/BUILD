@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_quiche",
 )
@@ -65,6 +66,13 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
 )
 
+envoy_cc_test_library(
+    name = "quic_platform_port_utils_impl_lib",
+    hdrs = ["quic_port_utils_impl.h"],
+    include_prefix = "extensions/quic_listeners/quiche/platform",
+    deps = ["//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_test_impl_lib"],
+)
+
 envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = ["quic_logging_impl.cc"],
@@ -94,6 +102,7 @@ envoy_cc_library(
         "quic_ptr_util_impl.h",
         "quic_server_stats_impl.h",
         "quic_string_piece_impl.h",
+        "quic_stream_buffer_allocator_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
         "quic_expect_bug_impl.h",
@@ -113,7 +122,10 @@ envoy_cc_library(
         "googletest",
     ],
     visibility = ["//visibility:public"],
-    deps = ["@com_googlesource_quiche//:quic_platform_export"] + envoy_select_quiche([
+    deps = [
+        "@com_googlesource_quiche//:quic_platform_export",
+        "@com_googlesource_quiche//:quic_buffer_allocator_lib",
+    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
