@@ -164,7 +164,7 @@ key:
     - string_key: x-foo-key
 )EOF";
 
-  pre_worker_start_test_steps_ = [this, &scope_route1, &scope_route2]() {
+  on_server_init_function_ = [this, &scope_route1, &scope_route2]() {
     createScopedRdsStream();
     sendScopedRdsResponse({scope_route1, scope_route2}, "1");
   };

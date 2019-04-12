@@ -83,7 +83,7 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
 
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::ScopedRds& scoped_rds,
-    const std::string& manager_identifier, const std::string& name,
+    const uint64_t manager_identifier, const std::string& name,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     ScopedRoutesConfigProviderManager& config_provider_manager)
     : ConfigSubscriptionInstanceBase(
@@ -92,31 +92,39 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}) {
-  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::ScopedRouteConfiguration>(
+  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       scoped_rds.scoped_rds_config_source(), factory_context.localInfo(),
       factory_context.dispatcher(), factory_context.clusterManager(), factory_context.random(),
       *scope_, "envoy.api.v2.ScopedRoutesDiscoveryService.FetchScopedRoutes",
-      "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes", factory_context.api());
+      "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes",
+      Grpc::Common::typeUrl(
+          envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
+      factory_context.api());
 }
 
-void ScopedRdsConfigSubscription::onConfigUpdate(const ResourceVector& resources,
-                                                 const std::string& version_info) {
+void ScopedRdsConfigSubscription::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+    const std::string& version_info) {
   if (resources.empty()) {
     ENVOY_LOG(debug, "Empty resources in scoped RDS onConfigUpdate()");
     stats_.update_empty_.inc();
     ConfigSubscriptionInstanceBase::onConfigUpdateFailed();
     return;
   }
+  std::vector<envoy::api::v2::ScopedRouteConfiguration> scoped_routes;
+  for (const auto& resource_any : resources) {
+    scoped_routes.emplace_back(
+        MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any));
+  }
 
   std::unordered_set<std::string> resource_names;
-  for (const auto& scoped_route : resources) {
+  for (const auto& scoped_route : scoped_routes) {
     if (!resource_names.insert(scoped_route.name()).second) {
       throw EnvoyException(
           fmt::format("duplicate scoped route configuration {} found", scoped_route.name()));
     }
   }
-  for (const auto& scoped_route : resources) {
+  for (const auto& scoped_route : scoped_routes) {
     MessageUtil::validate(scoped_route);
   }
 
@@ -125,7 +133,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(const ResourceVector& resources
   // We need to keep track of which scoped routes we might need to remove.
   ScopedConfigManager::ScopedRouteMap scoped_routes_to_remove =
       scoped_config_manager_.scopedRouteMap();
-  for (auto& scoped_route : resources) {
+  for (auto& scoped_route : scoped_routes) {
     const std::string scoped_route_name = scoped_route.name();
     try {
       scoped_routes_to_remove.erase(scoped_route_name);
@@ -233,7 +241,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
       ConfigProviderManagerImplBase::getSubscription<ScopedRdsConfigSubscription>(
           config_source_proto, factory_context.initManager(),
           [&config_source_proto, &factory_context, &stat_prefix,
-           &optarg](const std::string& manager_identifier,
+           &optarg](const uint64_t manager_identifier,
                     ConfigProviderManagerImplBase& config_provider_manager)
               -> Envoy::Config::ConfigSubscriptionInstanceBaseSharedPtr {
             const auto& scoped_rds_config_source = dynamic_cast<

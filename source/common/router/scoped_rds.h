@@ -78,16 +78,15 @@ struct ScopedRdsStats {
 };
 
 // A scoped RDS subscription to be used with the dynamic scoped RDS ConfigProvider.
-class ScopedRdsConfigSubscription
-    : public Envoy::Config::ConfigSubscriptionInstanceBase,
-      Envoy::Config::SubscriptionCallbacks<envoy::api::v2::ScopedRouteConfiguration> {
+class ScopedRdsConfigSubscription : public Envoy::Config::ConfigSubscriptionInstanceBase,
+                                    Envoy::Config::SubscriptionCallbacks {
 public:
   using ScopedRouteConfigurationMap =
       std::map<std::string, envoy::api::v2::ScopedRouteConfiguration>;
 
   ScopedRdsConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::ScopedRds& scoped_rds,
-      const std::string& manager_identifier, const std::string& name,
+      const uint64_t manager_identifier, const std::string& name,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
       ScopedRoutesConfigProviderManager& config_provider_manager);
 
@@ -99,7 +98,12 @@ public:
   void start() override { subscription_->start({}, *this); }
 
   // Envoy::Config::SubscriptionCallbacks
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override;
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   void onConfigUpdateFailed(const EnvoyException*) override {
     ConfigSubscriptionInstanceBase::onConfigUpdateFailed();
   }
@@ -112,8 +116,7 @@ public:
 
 private:
   const std::string name_;
-  std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::ScopedRouteConfiguration>>
-      subscription_;
+  std::unique_ptr<Envoy::Config::Subscription> subscription_;
   Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
   ScopedConfigManager scoped_config_manager_;

@@ -8,7 +8,6 @@
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_base.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -21,16 +20,16 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-void parseScopedRouteConfigurationFromYaml(
-    envoy::api::v2::ScopedRouteConfiguration& scoped_route_config, const std::string& yaml) {
-  MessageUtil::loadFromYaml(yaml, scoped_route_config);
-}
-
 envoy::api::v2::ScopedRouteConfiguration
 parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
   envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
-  parseScopedRouteConfigurationFromYaml(scoped_route_config, yaml);
+  MessageUtil::loadFromYaml(yaml, scoped_route_config);
   return scoped_route_config;
+}
+
+void parseScopedRouteConfigurationFromYaml(ProtobufWkt::Any& scoped_route_config,
+                                           const std::string& yaml) {
+  scoped_route_config.PackFrom(parseScopedRouteConfigurationFromYaml(yaml));
 }
 
 std::vector<std::unique_ptr<const Protobuf::Message>>
@@ -44,7 +43,7 @@ protosToMessageVec(std::vector<envoy::api::v2::ScopedRouteConfiguration>&& proto
   return messages;
 }
 
-class ScopedRoutesTestBase : public TestBase {
+class ScopedRoutesTestBase : public testing::Test {
 protected:
   ScopedRoutesTestBase() {
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("route_scopes", _));
@@ -77,7 +76,7 @@ api_config_source:
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   Upstream::ClusterManager::ClusterInfoMap cluster_map_;
-  Upstream::MockCluster cluster_;
+  Upstream::MockClusterMockPrioritySet cluster_;
   std::unique_ptr<ScopedRoutesConfigProviderManager> config_provider_manager_;
   Event::SimulatedTimeSystem time_system_;
   envoy::api::v2::core::ConfigSource rds_config_source_;
@@ -142,7 +141,7 @@ key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  Protobuf::RepeatedPtrField<envoy::api::v2::ScopedRouteConfiguration> resources;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   EXPECT_THROW(subscription.onConfigUpdate(resources, "1"), ProtoValidationException);
 
@@ -154,7 +153,7 @@ key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  Protobuf::RepeatedPtrField<envoy::api::v2::ScopedRouteConfiguration> resources2;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources2;
   parseScopedRouteConfigurationFromYaml(*resources2.Add(), config_yaml2);
   EXPECT_THROW(subscription.onConfigUpdate(resources2, "1"), ProtoValidationException);
 
@@ -164,7 +163,7 @@ name: foo_scope
 route_configuration_name: foo_routes
 key:
 )EOF";
-  Protobuf::RepeatedPtrField<envoy::api::v2::ScopedRouteConfiguration> resources3;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources3;
   parseScopedRouteConfigurationFromYaml(*resources3.Add(), config_yaml3);
   EXPECT_THROW(subscription.onConfigUpdate(resources3, "1"), ProtoValidationException);
 }
@@ -173,7 +172,7 @@ key:
 TEST_F(ScopedRdsTest, EmptyResource) {
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::ScopedRouteConfiguration> resources;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   subscription().onConfigUpdate(resources, "1");
   EXPECT_EQ(
       1UL,
@@ -191,7 +190,7 @@ key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  Protobuf::RepeatedPtrField<envoy::api::v2::ScopedRouteConfiguration> resources;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   const std::string config_yaml2 = R"EOF(
 name: foo_scope2
@@ -218,7 +217,7 @@ key:
   fragments:
     - string_key: x-foo-key
 )EOF";
-  Protobuf::RepeatedPtrField<envoy::api::v2::ScopedRouteConfiguration> resources;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml);
   EXPECT_THROW_WITH_MESSAGE(subscription().onConfigUpdate(resources, "1"), EnvoyException,
@@ -359,8 +358,8 @@ scoped_rds_config_source:
           ScopedRoutesConfigProviderManagerOptArg("foo-dynamic-scoped-routes", rds_config_source_,
                                                   scope_key_builder));
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::ScopedRouteConfiguration> resources;
-  resources.Add()->MergeFrom(parseScopedRouteConfigurationFromYaml(R"EOF(
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  resources.Add()->PackFrom(parseScopedRouteConfigurationFromYaml(R"EOF(
 name: dynamic-foo
 route_configuration_name: dynamic-foo-route-config
 key:

@@ -68,7 +68,7 @@ http_filters:
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpConnectionManagerConfig(parseHttpConnectionManagerFromJson(yaml_string), context_,
+      HttpConnectionManagerConfig(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                   date_provider_, route_config_provider_manager_,
                                   scoped_routes_config_provider_manager_),
       EnvoyException, "Didn't find a registered implementation for name: 'foo'");
@@ -98,7 +98,7 @@ http_filters:
   config: {}
   )EOF";
 
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromJson(yaml_string), context_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
 
@@ -173,7 +173,8 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_EQ(96, config.maxRequestHeadersKb());
 }
 
@@ -205,7 +206,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathDefault) {
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_FALSE(config.shouldNormalizePath());
 }
 
@@ -223,7 +225,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathRuntime) {
               featureEnabled("http_connection_manager.normalize_path", 0))
       .WillOnce(Return(true));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_TRUE(config.shouldNormalizePath());
 }
 
@@ -242,7 +245,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathTrue) {
               featureEnabled("http_connection_manager.normalize_path", 0))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_TRUE(config.shouldNormalizePath());
 }
 
@@ -261,7 +265,8 @@ TEST_F(HttpConnectionManagerConfigTest, NormalizePathFalse) {
               featureEnabled("http_connection_manager.normalize_path", 0))
       .Times(0);
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_);
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
   EXPECT_FALSE(config.shouldNormalizePath());
 }
 
