@@ -140,6 +140,7 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   bool disableOutlierEvents() const override { return false; }
   std::chrono::milliseconds opTimeout() const override { return std::chrono::milliseconds(25); }
   bool enableHashtagging() const override { return false; }
+  bool enableRedirection() const override { return false; }
   unsigned int maxBufferSizeBeforeFlush() const override { return 8; }
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return std::chrono::milliseconds(1);

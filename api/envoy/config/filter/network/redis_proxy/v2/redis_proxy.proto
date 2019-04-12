@@ -54,7 +54,8 @@ message RedisProxy {
     // original error is passed downstream unchanged. By default, this support is not enabled.
     bool enable_redirection = 3;
 
-    // Maximum size of buffer before flush is triggered
+    // Maximum size of buffer before flush is triggered. If this is unset, the buffer flushes
+    // whenever it receives data and performs no batching.
     uint32 max_buffer_size_before_flush = 4;
 
     // Buffer is flushed every N milliseconds (unless the buffer is filled before the timer fires)
