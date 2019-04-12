@@ -306,7 +306,7 @@ TcpHealthCheckMatcher::MatchSegments TcpHealthCheckMatcher::loadProtoBytes(
 
   for (const auto& entry : byte_array) {
     const auto decoded = Hex::decode(entry.text());
-    if (decoded.size() == 0) {
+    if (decoded.empty()) {
       throw EnvoyException(fmt::format("invalid hex string '{}'", entry.text()));
     }
     result.push_back(decoded);

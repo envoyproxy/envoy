@@ -10,6 +10,7 @@
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/network/dubbo_proxy/message.h"
+#include "extensions/filters/network/dubbo_proxy/metadata.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +31,6 @@ public:
 
   const DeserializerTypeNameMap deserializerTypeNameMap = {
       {SerializationType::Hessian, "hessian"},
-      {SerializationType::Json, "json"},
   };
 
   const std::string& fromType(SerializationType type) const {
@@ -52,7 +52,7 @@ typedef ConstSingleton<DeserializerNameValues> DeserializerNames;
  */
 class RpcInvocation {
 public:
-  virtual ~RpcInvocation() {}
+  virtual ~RpcInvocation() = default;
   virtual const std::string& getMethodName() const PURE;
   virtual const std::string& getServiceName() const PURE;
   virtual const std::string& getServiceVersion() const PURE;
@@ -67,7 +67,7 @@ typedef std::unique_ptr<RpcInvocation> RpcInvocationPtr;
  */
 class RpcResult {
 public:
-  virtual ~RpcResult() {}
+  virtual ~RpcResult() = default;
   virtual bool hasException() const PURE;
 };
 
@@ -75,7 +75,7 @@ typedef std::unique_ptr<RpcResult> RpcResultPtr;
 
 class Deserializer {
 public:
-  virtual ~Deserializer() {}
+  virtual ~Deserializer() = default;
   /**
    * Return this Deserializer's name
    *
@@ -96,8 +96,8 @@ public:
    * @body_size the complete RpcInvocation size
    * @throws EnvoyException if the data is not valid for this serialization
    */
-  virtual RpcInvocationPtr deserializeRpcInvocation(Buffer::Instance& buffer,
-                                                    size_t body_size) PURE;
+  virtual void deserializeRpcInvocation(Buffer::Instance& buffer, size_t body_size,
+                                        MessageMetadataSharedPtr metadata) PURE;
   /**
    * deserialize result of an rpc call
    * If successful, the RpcResult removed from the buffer
@@ -129,7 +129,7 @@ typedef std::unique_ptr<Deserializer> DeserializerPtr;
  */
 class NamedDeserializerConfigFactory {
 public:
-  virtual ~NamedDeserializerConfigFactory() {}
+  virtual ~NamedDeserializerConfigFactory() = default;
 
   /**
    * Create a particular Dubbo deserializer.

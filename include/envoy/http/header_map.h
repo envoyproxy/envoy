@@ -512,6 +512,11 @@ public:
   virtual size_t size() const PURE;
 
   /**
+   * @return true if the map is empty, false otherwise.
+   */
+  virtual bool empty() const PURE;
+
+  /**
    * Allow easy pretty-printing of the key/value pairs in HeaderMap
    * @param os supplies the ostream to print to.
    * @param headers the headers to print.

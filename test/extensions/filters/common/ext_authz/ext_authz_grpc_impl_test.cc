@@ -135,6 +135,30 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
+// Test the client when a gRPC status code unknown is received from the authorization server.
+TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedGrpcUnknownStatus) {
+  initialize(GetParam());
+
+  auto check_response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
+  auto status = check_response->mutable_status();
+  status->set_code(Grpc::Status::GrpcStatus::Unknown);
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Denied;
+
+  envoy::service::auth::v2::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
+
+  Http::HeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  EXPECT_EQ(nullptr, headers.RequestId());
+  EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_unauthorized"));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzResponseNoAttributes(authz_response))));
+
+  client_->onSuccess(std::move(check_response), span_);
+}
+
 // Test the client when a denied response with additional HTTP attributes is received.
 TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   initialize(GetParam());

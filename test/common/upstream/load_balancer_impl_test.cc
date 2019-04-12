@@ -203,7 +203,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
       // Either we selected one of the healthy hosts or we failed to select anything and defaulted
       // to healthy.
       EXPECT_TRUE(!hs.first.healthyHosts().empty() ||
-                  (hs.first.healthyHosts().size() == 0 && hs.first.degradedHosts().size() == 0));
+                  (hs.first.healthyHosts().empty() && hs.first.degradedHosts().empty()));
       break;
     case LoadBalancerBase::HostAvailability::Degraded:
       EXPECT_FALSE(hs.first.degradedHosts().empty());

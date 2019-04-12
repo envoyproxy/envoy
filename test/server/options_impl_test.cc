@@ -40,9 +40,9 @@ public:
     for (const std::string& s : words) {
       argv.push_back(s.c_str());
     }
-    return std::make_unique<OptionsImpl>(argv.size(), argv.data(),
-                                         [](uint64_t, uint64_t, bool) { return "1"; },
-                                         spdlog::level::warn);
+    return std::make_unique<OptionsImpl>(
+        argv.size(), argv.data(), [](uint64_t, uint64_t, bool) { return "1"; },
+        spdlog::level::warn);
   }
 };
 
