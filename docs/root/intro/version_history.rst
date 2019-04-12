@@ -3,8 +3,8 @@ Version history
 
 1.11.0 (Pending)
 ================
+* redis: add support for zpopmax and zpopmin commands.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
-* redis: add support for zpopmin and zpopmax commands.
 
 1.10.0 (Apr 5, 2019)
 ====================
