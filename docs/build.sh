@@ -105,6 +105,9 @@ PROTO_RST="
   /envoy/config/filter/http/tap/v2alpha/tap/envoy/config/filter/http/tap/v2alpha/tap.proto.rst
   /envoy/config/filter/http/transcoder/v2/transcoder/envoy/config/filter/http/transcoder/v2/transcoder.proto.rst
   /envoy/config/filter/listener/original_src/v2alpha1/original_src/envoy/config/filter/listener/original_src/v2alpha1/original_src.proto.rst
+  /envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy/envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.proto.rst
+  /envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy/envoy/config/filter/network/dubbo_proxy/v2alpha1/route.proto.rst
+  /envoy/config/filter/dubbo/router/v2alpha1/router/envoy/config/filter/dubbo/router/v2alpha1/router.proto.rst
   /envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth/envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.proto.rst
   /envoy/config/filter/network/ext_authz/v2/ext_authz/envoy/config/filter/network/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/network/http_connection_manager/v2/http_connection_manager/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.rst

@@ -37,29 +37,41 @@ using testing::AssertionSuccess;
 using testing::Invoke;
 
 namespace Envoy {
+
+/*
+  Macro to use for validating that a statement throws the specified type of exception, and that
+  the exception's what() method returns a string which is matched by the specified matcher.
+  This allows for expectations such as:
+
+  EXPECT_THAT_THROWS_MESSAGE(
+      bad_function_call(),
+      EnvoyException,
+      AllOf(StartsWith("expected prefix"), HasSubstr("some substring")));
+*/
+#define EXPECT_THAT_THROWS_MESSAGE(statement, expected_exception, matcher)                         \
+  try {                                                                                            \
+    statement;                                                                                     \
+    ADD_FAILURE() << "Exception should take place. It did not.";                                   \
+  } catch (expected_exception & e) {                                                               \
+    EXPECT_THAT(std::string(e.what()), matcher);                                                   \
+  }
+
+// Expect that the statement throws the specified type of exception with exactly the specified
+// message.
 #define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
-  try {                                                                                            \
-    statement;                                                                                     \
-    ADD_FAILURE() << "Exception should take place. It did not.";                                   \
-  } catch (expected_exception & e) {                                                               \
-    EXPECT_EQ(message, std::string(e.what()));                                                     \
-  }
+  EXPECT_THAT_THROWS_MESSAGE(statement, expected_exception, ::testing::Eq(message))
 
+// Expect that the statement throws the specified type of exception with a message containing a
+// substring matching the specified regular expression (i.e. the regex doesn't have to match
+// the entire message).
 #define EXPECT_THROW_WITH_REGEX(statement, expected_exception, regex_str)                          \
-  try {                                                                                            \
-    statement;                                                                                     \
-    ADD_FAILURE() << "Exception should take place. It did not.";                                   \
-  } catch (expected_exception & e) {                                                               \
-    EXPECT_THAT(e.what(), ::testing::ContainsRegex(regex_str));                                    \
-  }
+  EXPECT_THAT_THROWS_MESSAGE(statement, expected_exception, ::testing::ContainsRegex(regex_str))
 
+// Expect that the statement throws the specified type of exception with a message that does not
+// contain any substring matching the specified regular expression.
 #define EXPECT_THROW_WITHOUT_REGEX(statement, expected_exception, regex_str)                       \
-  try {                                                                                            \
-    statement;                                                                                     \
-    ADD_FAILURE() << "Exception should take place. It did not.";                                   \
-  } catch (expected_exception & e) {                                                               \
-    EXPECT_THAT(e.what(), ::testing::Not(::testing::ContainsRegex(regex_str)));                    \
-  }
+  EXPECT_THAT_THROWS_MESSAGE(statement, expected_exception,                                        \
+                             ::testing::Not(::testing::ContainsRegex(regex_str)))
 
 #define VERBOSE_EXPECT_NO_THROW(statement)                                                         \
   try {                                                                                            \
