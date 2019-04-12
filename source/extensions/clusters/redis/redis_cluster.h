@@ -57,8 +57,6 @@
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
 
-#include "absl/synchronization/mutex.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -80,7 +78,7 @@ namespace Redis {
  * failure cases.
  *
  * The topology is stored in cluster_slots_map_. The present implementation uses std::array(), which
- * is a flexible approach for handling the slot mapping, but it will a decent amount of  memory
+ * is a flexible approach for handling the slot mapping, but it will use a decent amount of memory
  * (16384 std::string's) and CPU cycles (as seen here in the copying of 16384 strings over all
  * cluster members) for a map that will generally scale as O(n) where n is the number of cluster
  * nodes.
