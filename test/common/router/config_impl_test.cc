@@ -15,6 +15,7 @@
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "extensions/filters/http/common/empty_http_filter_config.h"
 
@@ -41,6 +42,60 @@ using testing::StrNe;
 
 namespace Envoy {
 namespace Router {
+namespace {
+std::string prefix = "runtime.";
+Stats::MockIsolatedStatsStore store;
+Runtime::RuntimeStats stat{
+    ALL_RUNTIME_STATS(POOL_COUNTER_PREFIX(store, prefix), POOL_GAUGE_PREFIX(store, prefix))};
+
+} // namespace
+class MyMockSnapshot : public Envoy::Runtime::Snapshot {
+public:
+  MyMockSnapshot() = default;
+  ~MyMockSnapshot() override {}
+
+  // Provide a default implementation of mocked featureEnabled/2.
+  bool featureEnabledDefault(const std::string&, uint64_t default_value) {
+    if (default_value == 0) {
+      return false;
+    } else if (default_value == 100) {
+      return true;
+    } else {
+      throw std::invalid_argument("Not implemented yet. You may want to set expectation of mocked "
+                                  "featureEnabled() instead.");
+    }
+  }
+
+  Runtime::RandomGeneratorImpl g;
+  Runtime::SnapshotImpl impl{g, stat, {}};
+  // using Snapshot::featureEnabled;
+
+  virtual bool featureEnabledOverride(const std::string& key,
+                                      const envoy::type::FractionalPercent& default_value) const {
+    if (key == "cors.www.shadow_enabled") {
+      return true;
+    } else {
+      return impl.featureEnabled(key, default_value);
+    }
+  }
+
+  MOCK_CONST_METHOD1(deprecatedFeatureEnabled, bool(const std::string& key));
+  MOCK_CONST_METHOD1(runtimeFeatureEnabled, bool(absl::string_view key));
+  MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key, uint64_t default_value));
+  MOCK_CONST_METHOD3(featureEnabled,
+                     bool(const std::string& key, uint64_t default_value, uint64_t random_value));
+  MOCK_CONST_METHOD4(featureEnabled, bool(const std::string& key, uint64_t default_value,
+                                          uint64_t random_value, uint64_t num_buckets));
+  MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key,
+                                          const envoy::type::FractionalPercent& default_value));
+  MOCK_CONST_METHOD3(featureEnabled, bool(const std::string& key,
+                                          const envoy::type::FractionalPercent& default_value,
+                                          uint64_t random_value));
+  MOCK_CONST_METHOD1(get, const std::string&(const std::string& key));
+  MOCK_CONST_METHOD2(getInteger, uint64_t(const std::string& key, uint64_t default_value));
+  MOCK_CONST_METHOD0(getLayers, const std::vector<OverrideLayerConstPtr>&());
+};
+
 namespace {
 
 // Wrap ConfigImpl, the target of tests to allow us to regenerate the route_fuzz_test
@@ -4045,6 +4100,61 @@ virtual_hosts:
   EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
                                        Matcher<const envoy::type::FractionalPercent&>(_)))
       .WillOnce(Return(true));
+  EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, false);
+
+  const Router::CorsPolicy* cors_policy =
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->corsPolicy();
+
+  EXPECT_EQ(cors_policy->enabled(), false);
+  EXPECT_EQ(cors_policy->shadowEnabled(), true);
+  EXPECT_THAT(cors_policy->allowOrigins(), ElementsAreArray({"test-origin"}));
+  EXPECT_EQ(cors_policy->allowMethods(), "test-methods");
+  EXPECT_EQ(cors_policy->allowHeaders(), "test-headers");
+  EXPECT_EQ(cors_policy->exposeHeaders(), "test-expose-headers");
+  EXPECT_EQ(cors_policy->maxAge(), "test-max-age");
+  EXPECT_EQ(cors_policy->allowCredentials(), true);
+}
+
+TEST_F(RoutePropertyTest, TestRouteCorsDefaultFilterEnableConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "default"
+    domains: ["*"]
+    routes:
+      - match:
+          prefix: "/api"
+        route:
+          cluster: "ats"
+          cors:
+            allow_origin: ["test-origin"]
+            allow_methods: "test-methods"
+            allow_headers: "test-headers"
+            expose_headers: "test-expose-headers"
+            max_age: "test-max-age"
+            allow_credentials: true
+            filter_enabled:
+            shadow_enabled:
+              runtime_key: "cors.www.shadow_enabled"
+              default_value:
+                numerator: 100
+                denominator: "HUNDRED"
+)EOF";
+
+  MyMockSnapshot snapshot;
+
+  // use my overrided version
+  ON_CALL(snapshot, featureEnabled(_, Matcher<const envoy::type::FractionalPercent&>(_)))
+      .WillByDefault(Invoke(&snapshot, &MyMockSnapshot::featureEnabledOverride));
+  /*
+EXPECT_CALL(snapshot,
+featureEnabled(_, Matcher<const envoy::type::FractionalPercent&>(_)))
+.WillOnce(Return(false));
+EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
+Matcher<const envoy::type::FractionalPercent&>(_)))
+.WillOnce(Return(true));
+*/
   EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, false);
