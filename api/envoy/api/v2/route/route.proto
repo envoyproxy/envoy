@@ -574,8 +574,7 @@ message RouteAction {
   // fires, the stream is terminated with a 408 Request Timeout error code if no
   // upstream response header has been received, otherwise a stream reset
   // occurs.
-  google.protobuf.Duration idle_timeout = 24
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration idle_timeout = 24 [(gogoproto.stdduration) = true];
 
   // Indicates that the route has a retry policy. Note that if this is set,
   // it'll take precedence over the virtual host level retry policy entirely

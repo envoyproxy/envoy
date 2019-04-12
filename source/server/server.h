@@ -205,7 +205,8 @@ private:
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb = [] {});
+  void notifyCallbacksForStage(
+      Stage stage, Event::PostCb completion_cb = [] {});
 
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially

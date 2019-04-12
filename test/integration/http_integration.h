@@ -96,7 +96,12 @@ public:
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~HttpIntegrationTest();
 
+  // Waits for the first access log entry.
+  std::string waitForAccessLog(const std::string& filename);
+
 protected:
+  void useAccessLog();
+
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
   IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn);
@@ -199,5 +204,6 @@ protected:
   // The codec type for the client-to-Envoy connection
   Http::CodecClient::Type downstream_protocol_{Http::CodecClient::Type::HTTP1};
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
+  std::string access_log_name_;
 };
 } // namespace Envoy

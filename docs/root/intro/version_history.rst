@@ -7,6 +7,7 @@ Version history
 * server: stats are now preserved across hot restart by being explicitly communicated through the hot
           restart protocol, rather than living in shared memory.
 * server: hot restart version incremented to 11.
+* upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 
 1.10.0 (Apr 5, 2019)
 ====================
@@ -57,9 +58,11 @@ Version history
 * http: added :ref:`max request headers size <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.max_request_headers_kb>`. The default behaviour is unchanged.
 * http: added modifyDecodingBuffer/modifyEncodingBuffer to allow modifying the buffered request/response data.
 * http: added encodeComplete/decodeComplete. These are invoked at the end of the stream, after all data has been encoded/decoded respectively. Default implementation is a no-op.
+* jwt_authn: make filter's parsing of JWT more flexible, allowing syntax like ``jwt=eyJhbGciOiJS...ZFnFIw,extra=7,realm=123``
 * outlier_detection: added support for :ref:`outlier detection event protobuf-based logging <arch_overview_outlier_detection_logging>`.
 * mysql: added a MySQL proxy filter that is capable of parsing SQL queries over MySQL wire protocol. Refer to :ref:`MySQL proxy<config_network_filters_mysql_proxy>` for more details.
 * performance: new buffer implementation (disabled by default; to test it, add "--use-libevent-buffers 0" to the command-line arguments when starting Envoy).
+* jwt_authn: added :ref:`filter_state_rules <envoy_api_field_config.filter.http.jwt_authn.v2alpha.JwtAuthentication.filter_state_rules>` to allow specifying requirements from filterState by other filters.
 * ratelimit: removed deprecated rate limit configuration from bootstrap.
 * redis: added :ref:`hashtagging <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_hashtagging>` to guarantee a given key's upstream.
 * redis: added :ref:`latency stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
@@ -595,7 +598,7 @@ Version history
 * mongo filter: added :ref:`fault injection <config_network_filters_mongo_proxy_fault_injection>`.
 * mongo filter: added :ref:`"drain close" <arch_overview_draining>` support.
 * outlier detection: added :ref:`HTTP gateway failure type <arch_overview_outlier_detection>`.
-  See `DEPRECATED.md <https://github.com/envoyproxy/envoy/blob/master/DEPRECATED.md#version-150>`_
+  See :ref:`deprecated log <deprecated>`
   for outlier detection stats deprecations in this release.
 * redis: the :ref:`redis proxy filter <config_network_filters_redis_proxy>` is now considered
   production ready.
@@ -672,7 +675,7 @@ Version history
 * UDP `statsd_ip_address` option added.
 * Per-cluster DNS resolvers added.
 * :ref:`Fault filter <config_http_filters_fault_injection>` enhancements and fixes.
-* Several features are :repo:`deprecated as of the 1.4.0 release </DEPRECATED.md#version-140>`. They
+* Several features are :ref:`deprecated as of the 1.4.0 release <deprecated>`. They
   will be removed at the beginning of the 1.5.0 release cycle. We explicitly call out that the
   `HttpFilterConfigFactory` filter API has been deprecated in favor of
   `NamedHttpFilterConfigFactory`.

@@ -24,7 +24,7 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& req
   ASSERT(!request->headers().Host()->value().empty());
   // Switch authority to add a shadow postfix. This allows upstream logging to make more sense.
   auto parts = StringUtil::splitToken(request->headers().Host()->value().c_str(), ":");
-  ASSERT(parts.size() > 0 && parts.size() <= 2);
+  ASSERT(!parts.empty() && parts.size() <= 2);
   request->headers().Host()->value(
       parts.size() == 2 ? absl::StrJoin(parts, "-shadow:")
                         : absl::StrCat(request->headers().Host()->value().c_str(), "-shadow"));
