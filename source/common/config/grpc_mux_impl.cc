@@ -175,7 +175,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
       // onConfigUpdate should be called only on watches(clusters/routes) that have
       // updates in the message for EDS/RDS.
-      if (found_resources.size() > 0) {
+      if (!found_resources.empty()) {
         watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
       }
     }

@@ -209,7 +209,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
     formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
   }
 
-  ASSERT(formatters.size() > 0);
+  ASSERT(!formatters.empty());
 
   if (formatters.size() == 1) {
     return std::move(formatters[0]);

@@ -45,7 +45,6 @@ class TestNamedProtocolConfigFactory : public NamedProtocolConfigFactory {
 public:
   TestNamedProtocolConfigFactory(std::function<MockProtocol*()> f) : f_(f) {}
 
-  ProtocolPtr createProtocol(ProtocolCallbacks&) override { return ProtocolPtr{f_()}; }
   ProtocolPtr createProtocol() override { return ProtocolPtr{f_()}; }
   std::string name() override { return ProtocolNames::get().fromType(ProtocolType::Dubbo); }
 

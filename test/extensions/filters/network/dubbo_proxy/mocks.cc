@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
 #include "gtest/gtest.h"
@@ -25,8 +26,9 @@ MockDecoderEventHandler::MockDecoderEventHandler() {
   ON_CALL(*this, transferBodyTo(_, _)).WillByDefault(Return(Network::FilterStatus::Continue));
 }
 
-MockProtocolCallbacks::MockProtocolCallbacks() {}
-MockProtocolCallbacks::~MockProtocolCallbacks() {}
+MockDecoderCallbacks::MockDecoderCallbacks() {
+  ON_CALL(*this, newDecoderEventHandler()).WillByDefault(Return(&handler_));
+}
 
 MockProtocol::MockProtocol() {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
@@ -50,8 +52,16 @@ MockDecoderFilter::MockDecoderFilter() {
   ON_CALL(*this, transportEnd()).WillByDefault(Return(Network::FilterStatus::Continue));
   ON_CALL(*this, messageBegin(_, _, _)).WillByDefault(Return(Network::FilterStatus::Continue));
   ON_CALL(*this, messageEnd(_)).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, transferHeaderTo(_, _)).WillByDefault(Return(Network::FilterStatus::Continue));
-  ON_CALL(*this, transferBodyTo(_, _)).WillByDefault(Return(Network::FilterStatus::Continue));
+  ON_CALL(*this, transferHeaderTo(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& buf, size_t size) -> Network::FilterStatus {
+        buf.drain(size);
+        return Network::FilterStatus::Continue;
+      }));
+  ON_CALL(*this, transferBodyTo(_, _))
+      .WillByDefault(Invoke([&](Buffer::Instance& buf, size_t size) -> Network::FilterStatus {
+        buf.drain(size);
+        return Network::FilterStatus::Continue;
+      }));
 }
 MockDecoderFilter::~MockDecoderFilter() {}
 
@@ -70,7 +80,7 @@ MockDirectResponse::~MockDirectResponse() {}
 
 MockFilterConfigFactory::MockFilterConfigFactory()
     : MockFactoryBase("envoy.filters.dubbo.mock_filter"),
-      mock_filter_(std::make_unique<NiceMock<MockDecoderFilter>>()) {}
+      mock_filter_(std::make_shared<NiceMock<MockDecoderFilter>>()) {}
 
 MockFilterConfigFactory::~MockFilterConfigFactory() {}
 

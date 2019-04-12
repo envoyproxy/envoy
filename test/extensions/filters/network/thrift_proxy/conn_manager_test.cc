@@ -1204,6 +1204,44 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   EXPECT_EQ(1U, store_.counter("test.response_error").value());
 }
 
+// sendLocalReply does nothing, when the remote closed the connection.
+TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedConnection) {
+  auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
+  custom_filter_.reset(filter);
+
+  initializeFilter();
+  writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_));
+
+  NiceMock<MockDirectResponse> direct_response;
+  EXPECT_CALL(direct_response, encode(_, _, _)).Times(0);
+
+  // First filter sends local reply.
+  EXPECT_CALL(*filter, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
+        callbacks->sendLocalReply(direct_response, false);
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, false)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+
+  // Remote closes the connection.
+  filter_callbacks_.connection_.state_ = Network::Connection::State::Closed;
+  EXPECT_EQ(filter_->onData(buffer_, true), Network::FilterStatus::StopIteration);
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
 // Tests a decoder filter that modifies data.
 TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
   auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
@@ -1250,6 +1288,33 @@ TEST_F(ThriftConnectionManagerTest, DecoderFiltersModifyRequests) {
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(1U, store_.gauge("test.request_active").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, transportEndWhenRemoteClose) {
+  initializeFilter();
+  writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0x0F);
+
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+
+  // Remote closes the connection.
+  filter_callbacks_.connection_.state_ = Network::Connection::State::Closed;
+  EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
+  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }
 
 } // namespace ThriftProxy
