@@ -117,7 +117,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
   if (downstream_headers &&
       downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost) != nullptr) {
-    const std::string& request_override_host(
+    const std::string request_override_host(
         downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost)
             ->value()
             .getStringView());
