@@ -46,7 +46,7 @@ SERIALIZE_AS_STRING_WHITELIST = ('./test/common/protobuf/utility_test.cc',
 # Files in these paths can use Protobuf::util::JsonStringToMessage
 JSON_STRING_TO_MESSAGE_WHITELIST = ('./source/common/protobuf/utility.cc')
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-8")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
@@ -120,8 +120,8 @@ def checkTools():
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
-        "    export CLANG_FORMAT=clang-format-7.0.0\n"
-        "    export CLANG_FORMAT=/opt/bin/clang-format-7\n"
+        "    export CLANG_FORMAT=clang-format-8.0.0\n"
+        "    export CLANG_FORMAT=/opt/bin/clang-format-8\n"
         "    export CLANG_FORMAT=/usr/local/opt/llvm@7/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   buildifier_abs_path = lookPath(BUILDIFIER_PATH)

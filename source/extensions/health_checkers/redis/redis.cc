@@ -99,6 +99,14 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
 }
 
+bool RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
+    const NetworkFilters::Common::Redis::RespValue&) {
+  // Treat any redirection error response from a Redis server as success.
+  current_request_ = nullptr;
+  handleSuccess();
+  return true;
+}
+
 void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {
   current_request_->cancel();
   current_request_ = nullptr;

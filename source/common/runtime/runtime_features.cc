@@ -47,6 +47,11 @@ constexpr const char* disallowed_features[] = {
     // Acts as both a test entry for deprecated.proto and a marker for the Envoy
     // deprecation scripts.
     "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal",
+    "envoy.deprecated_features.config_source.proto:UNSUPPORTED_REST_LEGACY",
+    "envoy.deprecated_features.ext_authz.proto:use_alpha",
+    "envoy.deprecated_features.route.proto:enabled",
+    "envoy.deprecated_features.fault.proto:type",
+    "envoy.deprecated_features.route.proto:runtime_key",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

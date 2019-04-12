@@ -1,4 +1,7 @@
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_filter.h"
+#include "extensions/filters/network/zookeeper_proxy/filter.h"
+
+#include <string>
+#include <vector>
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"

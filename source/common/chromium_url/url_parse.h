@@ -8,7 +8,7 @@
 #ifndef URL_PARSE_H_
 #define URL_PARSE_H_
 
-namespace url {
+namespace chromium_url {
 
 // Component ------------------------------------------------------------------
 
@@ -44,6 +44,6 @@ struct Component {
 // points. The ending point is non-inclusive.
 inline Component MakeRange(int begin, int end) { return Component(begin, end - begin); }
 
-} // namespace url
+} // namespace chromium_url
 
 #endif // URL_PARSE_H_

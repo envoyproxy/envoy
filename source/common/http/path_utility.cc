@@ -13,10 +13,11 @@ namespace Http {
 namespace {
 absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
   std::string canonical_path;
-  url::Component in_component(0, original_path.size());
-  url::Component out_component;
-  url::StdStringCanonOutput output(&canonical_path);
-  if (!url::CanonicalizePath(original_path.data(), in_component, &output, &out_component)) {
+  chromium_url::Component in_component(0, original_path.size());
+  chromium_url::Component out_component;
+  chromium_url::StdStringCanonOutput output(&canonical_path);
+  if (!chromium_url::CanonicalizePath(original_path.data(), in_component, &output,
+                                      &out_component)) {
     return absl::nullopt;
   } else {
     output.Complete();
@@ -44,10 +45,10 @@ bool PathUtil::canonicalPath(HeaderEntry& path_header) {
       query_pos == original_path.npos
           ? absl::string_view{}
           : absl::string_view{original_path.data() + query_pos, original_path.size() - query_pos};
-  if (query_suffix.size() > 0) {
+  if (!query_suffix.empty()) {
     normalized_path.insert(normalized_path.end(), query_suffix.begin(), query_suffix.end());
   }
-  path_header.value(std::move(normalized_path));
+  path_header.value(normalized_path);
   return true;
 }
 

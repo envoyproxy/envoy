@@ -254,6 +254,7 @@ public:
 
   /**
    * Set the timeout for delayed connection close()s.
+   * This can only be called prior to issuing a close() on the connection.
    * @param timeout The timeout value in milliseconds
    */
   virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
