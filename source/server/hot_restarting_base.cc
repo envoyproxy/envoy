@@ -88,7 +88,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
       ASSERT(sent == total_size, "an fd passing message was too long for one sendmsg().");
     }
 
-    int rc = sendmsg(my_domain_socket_, &message, 0);
+    const int rc = sendmsg(my_domain_socket_, &message, 0);
     RELEASE_ASSERT(rc == static_cast<int>(cur_chunk_size),
                    fmt::format("hot restart sendmsg() failed: returned {}, errno {}", rc, errno));
   }

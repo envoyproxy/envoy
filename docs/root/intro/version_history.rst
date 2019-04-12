@@ -4,7 +4,6 @@ Version history
 1.11.0 (Pending)
 ================
 * hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC.
-* server: changed protocol that hot restart children/parents use; now protobuf based.
 * server: stats are now preserved across hot restart by being explicitly communicated through the hot
           restart protocol, rather than living in shared memory.
 * server: hot restart version incremented to 11.

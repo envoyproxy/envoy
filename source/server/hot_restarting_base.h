@@ -25,7 +25,7 @@ namespace Server {
  */
 class HotRestartingBase {
 protected:
-  HotRestartingBase(int base_id) : base_id_(base_id) {}
+  HotRestartingBase(uint64_t base_id) : base_id_(base_id) {}
 
   void initDomainSocketAddress(sockaddr_un* address);
   sockaddr_un createDomainSocketAddress(uint64_t id, const std::string& role);
@@ -62,7 +62,7 @@ protected:
 private:
   void getPassedFdIfPresent(envoy::api::v2::core::HotRestartMessage* out, msghdr* message);
 
-  const int base_id_;
+  const uint64_t base_id_;
   int my_domain_socket_{-1};
 
   const uint64_t MaxSendmsgSize = 4096;
