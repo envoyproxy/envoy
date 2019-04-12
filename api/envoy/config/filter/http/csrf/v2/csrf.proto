@@ -29,8 +29,8 @@ message CsrfPolicy {
   envoy.api.v2.core.RuntimeFractionalPercent filter_enabled = 1
       [(validate.rules).message.required = true];
 
-  // Specifies if CSRF policies are evaluated and tracked when filter is off but
-  // does not enforce any policies.
+  // Specifies that CSRF policies will be evaluated and tracked, but not enforced.
+  // This is intended to be used when filter_enabled is off.
   //
   // More information on how this can be controlled via runtime can be found
   // :ref:`here <csrf-runtime>`.

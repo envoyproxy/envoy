@@ -48,8 +48,7 @@ config:
 
 class CsrfFilterIntegrationTest : public HttpProtocolIntegrationTest {
 protected:
-  void testNormalRequest(Http::TestHeaderMapImpl&& request_headers,
-                         const char* expected_response_code) {
+  absl::string_view testNormalRequest(Http::TestHeaderMapImpl&& request_headers) {
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
@@ -57,19 +56,18 @@ protected:
     upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
     response->waitForEndStream();
 
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ(expected_response_code, response->headers().Status()->value().c_str());
+    return response->complete() ? response->headers().Status()->value().getStringView()
+                                : absl::string_view("incomplete");
   }
 
-  void testInvalidRequest(Http::TestHeaderMapImpl&& request_headers,
-                          const char* expected_response_code) {
+  absl::string_view testInvalidRequest(Http::TestHeaderMapImpl&& request_headers) {
     initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
     response->waitForEndStream();
 
-    ASSERT_TRUE(response->complete());
-    EXPECT_STREQ(expected_response_code, response->headers().Status()->value().c_str());
+    return response->complete() ? response->headers().Status()->value().getStringView()
+                                : absl::string_view("incomplete");
   }
 };
 
@@ -79,122 +77,115 @@ INSTANTIATE_TEST_SUITE_P(Protocols, CsrfFilterIntegrationTest,
 
 TEST_P(CsrfFilterIntegrationTest, TestCsrfSuccess) {
   config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
-  testNormalRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "PUT"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {"origin", "localhost"},
-          {"host", "localhost"},
-      },
-      "200");
+  EXPECT_STREQ("200", testNormalRequest(Http::TestHeaderMapImpl{
+                                            {":method", "PUT"},
+                                            {":path", "/"},
+                                            {":scheme", "http"},
+                                            {"origin", "localhost"},
+                                            {"host", "localhost"},
+                                        })
+                          .data());
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestCsrfDisabled) {
   config_helper_.addFilter(CSRF_DISABLED_CONFIG);
-  testNormalRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "PUT"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {"origin", "cross-origin"},
-          {"host", "test-origin"},
-      },
-      "200");
+  EXPECT_STREQ("200", testNormalRequest(Http::TestHeaderMapImpl{
+                                            {":method", "PUT"},
+                                            {":path", "/"},
+                                            {":scheme", "http"},
+                                            {"origin", "cross-origin"},
+                                            {"host", "test-origin"},
+                                        })
+                          .data());
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestNonMutationMethod) {
   config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
-  testNormalRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {"origin", "cross-origin"},
-          {"host", "test-origin"},
-      },
-      "200");
+  EXPECT_STREQ("200", testNormalRequest(Http::TestHeaderMapImpl{
+                                            {":method", "GET"},
+                                            {":path", "/"},
+                                            {":scheme", "http"},
+                                            {"origin", "cross-origin"},
+                                            {"host", "test-origin"},
+                                        })
+                          .data());
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestOriginMismatch) {
   config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
-  testInvalidRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "PUT"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {"origin", "cross-origin"},
-          {"host", "test-origin"},
-      },
-      "403");
+  EXPECT_STREQ("403", testInvalidRequest(Http::TestHeaderMapImpl{
+                                             {":method", "PUT"},
+                                             {":path", "/"},
+                                             {":scheme", "http"},
+                                             {"origin", "cross-origin"},
+                                             {"host", "test-origin"},
+                                         })
+                          .data());
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestEnforcesPost) {
   config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
-  testInvalidRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "POST"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {"origin", "cross-origin"},
-          {"host", "test-origin"},
-      },
-      "403");
+  EXPECT_STREQ("403", testInvalidRequest(Http::TestHeaderMapImpl{
+                                             {":method", "POST"},
+                                             {":path", "/"},
+                                             {":scheme", "http"},
+                                             {"origin", "cross-origin"},
+                                             {"host", "test-origin"},
+                                         })
+                          .data());
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestEnforcesDelete) {
   config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
-  testInvalidRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "DELETE"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {"origin", "cross-origin"},
-          {"host", "test-origin"},
-      },
-      "403");
+  EXPECT_STREQ("403", testInvalidRequest(Http::TestHeaderMapImpl{
+                                             {":method", "DELETE"},
+                                             {":path", "/"},
+                                             {":scheme", "http"},
+                                             {"origin", "cross-origin"},
+                                             {"host", "test-origin"},
+                                         })
+                          .data());
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestRefererFallback) {
   config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
-  testNormalRequest(Http::TestHeaderMapImpl{{":method", "DELETE"},
-                                            {":path", "/"},
-                                            {":scheme", "http"},
-                                            {"referer", "test-origin"},
-                                            {"host", "test-origin"}},
-                    "200");
+  EXPECT_STREQ("200", testNormalRequest(Http::TestHeaderMapImpl{{":method", "DELETE"},
+                                                                {":path", "/"},
+                                                                {":scheme", "http"},
+                                                                {"referer", "test-origin"},
+                                                                {"host", "test-origin"}})
+                          .data());
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestMissingOrigin) {
   config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
-  testInvalidRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "DELETE"}, {":path", "/"}, {":scheme", "http"}, {"host", "test-origin"}},
-      "403");
+  EXPECT_STREQ("403", testInvalidRequest(Http::TestHeaderMapImpl{{":method", "DELETE"},
+                                                                 {":path", "/"},
+                                                                 {":scheme", "http"},
+                                                                 {"host", "test-origin"}})
+                          .data());
 }
 TEST_P(CsrfFilterIntegrationTest, TestShadowOnlyMode) {
   config_helper_.addFilter(CSRF_SHADOW_ENABLED_CONFIG);
-  testNormalRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "PUT"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {"origin", "cross-origin"},
-          {"host", "localhost"},
-      },
-      "200");
+  EXPECT_STREQ("200", testNormalRequest(Http::TestHeaderMapImpl{
+                                            {":method", "PUT"},
+                                            {":path", "/"},
+                                            {":scheme", "http"},
+                                            {"origin", "cross-origin"},
+                                            {"host", "localhost"},
+                                        })
+                          .data());
 }
 TEST_P(CsrfFilterIntegrationTest, TestFilterAndShadowEnabled) {
   config_helper_.addFilter(CSRF_ENABLED_CONFIG);
-  testInvalidRequest(
-      Http::TestHeaderMapImpl{
-          {":method", "PUT"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {"origin", "cross-origin"},
-          {"host", "localhost"},
-      },
-      "403");
+  EXPECT_STREQ("403", testInvalidRequest(Http::TestHeaderMapImpl{
+                                             {":method", "PUT"},
+                                             {":path", "/"},
+                                             {":scheme", "http"},
+                                             {"origin", "cross-origin"},
+                                             {"host", "localhost"},
+                                         })
+                          .data());
 }
 } // namespace
 } // namespace Envoy

@@ -32,20 +32,20 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  bool isValid = true;
-  const auto& sourceOrigin = sourceOriginValue(headers);
-  if (sourceOrigin == EMPTY_STRING) {
-    isValid = false;
+  bool is_valid = true;
+  const absl::string_view& source_origin = sourceOriginValue(headers);
+  if (source_origin == EMPTY_STRING) {
+    is_valid = false;
     config_->stats().missing_source_origin_.inc();
   }
 
-  const auto& targetOrigin = targetOriginValue(headers);
-  if (sourceOrigin != targetOrigin) {
-    isValid = false;
+  const absl::string_view& target_origin = targetOriginValue(headers);
+  if (source_origin != target_origin) {
+    is_valid = false;
     config_->stats().request_invalid_.inc();
   }
 
-  if (isValid == true) {
+  if (is_valid == true) {
     config_->stats().request_valid_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -59,18 +59,18 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bo
 }
 
 bool CsrfFilter::modifyMethod(const Http::HeaderMap& headers) {
-  const auto& method = headers.Method();
+  const Envoy::Http::HeaderEntry* method = headers.Method();
   if (method == nullptr) {
     return false;
   }
-  const auto& method_type = method->value().c_str();
-  return (method_type == Http::Headers::get().MethodValues.Post ||
-          method_type == Http::Headers::get().MethodValues.Put ||
-          method_type == Http::Headers::get().MethodValues.Delete);
+  const absl::string_view& method_type = method->value().getStringView();
+  const auto& method_values = Http::Headers::get().MethodValues;
+  return (method_type == method_values.Post || method_type == method_values.Put ||
+          method_type == method_values.Delete);
 }
 
 absl::string_view CsrfFilter::sourceOriginValue(const Http::HeaderMap& headers) {
-  const auto& origin = hostAndPort(headers.Origin());
+  const absl::string_view& origin = hostAndPort(headers.Origin());
   if (origin != EMPTY_STRING) {
     return origin;
   }
@@ -98,7 +98,7 @@ void CsrfFilter::determinePolicy() {
   // If the route has a policy use that.
   if (callbacks_->route() && callbacks_->route()->routeEntry()) {
     const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Csrf;
-    const auto* route_entry = callbacks_->route()->routeEntry();
+    const Router::RouteEntry* route_entry = callbacks_->route()->routeEntry();
 
     const CsrfPolicy* route_policy = route_entry->perFilterConfigTyped<CsrfPolicy>(name);
     const CsrfPolicy* per_route_policy =

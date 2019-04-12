@@ -39,7 +39,7 @@ public:
              Runtime::Loader& runtime) : policy_(policy), runtime_(runtime) {}
 
   bool enabled() const {
-    const auto& filter_enabled = policy_.filter_enabled();
+    const envoy::api::v2::core::RuntimeFractionalPercent& filter_enabled = policy_.filter_enabled();
     return runtime_.snapshot().featureEnabled(filter_enabled.runtime_key(),
                                               filter_enabled.default_value());
   }
@@ -48,7 +48,7 @@ public:
     if (!policy_.has_shadow_enabled()) {
       return false;
     }
-    const auto& shadow_enabled = policy_.shadow_enabled();
+    const envoy::api::v2::core::RuntimeFractionalPercent& shadow_enabled = policy_.shadow_enabled();
     return runtime_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
                                               shadow_enabled.default_value());
   }

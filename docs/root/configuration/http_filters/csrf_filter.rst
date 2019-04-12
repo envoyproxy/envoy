@@ -4,27 +4,27 @@ CSRF
 ====
 
 This is a filter which prevents Cross-Site Request Forgery based on a route or virtual host settings.
-At it's simplest CSRF is an attack that occurs when a malicious third-party
-exploits a vulnerability that allows them to submit a undesired request on the
+At it's simplest, CSRF is an attack that occurs when a malicious third-party
+exploits a vulnerability that allows them to submit an undesired request on the
 user's behalf.
 
 There are many ways to mitigate CSRF, some of which have been outlined in the
 `OWASP Prevention Cheat Sheet <https://github.com/OWASP/CheatSheetSeries/blob/5a1044e38778b42a19c6adbb4dfef7a0fb071099/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.md>`_.
 This filter employs a stateless mitigation pattern known as origin verification.
 
-For this pattern to work it relies on two pieces of information used in determining if
+This pattern relies on two pieces of information used in determining if
 a request originated from the same host.
 * The origin that the request is coming from (source origin).
 * The origin that the request is going to (target origin).
 
-When the filter is evaluating a request it ensures both pieces of information are present
+When the filter is evaluating a request, it ensures both pieces of information are present
 and compares their values. If the source origin is missing or the origins do not match
 the request is rejected.
 
   .. note::
     Due to differing functionality between browsers this filter will determine
-    a requests source origin from the Host header. If that is not present it will
-    fallback to the host and port value from a requests Referer header.
+    a request's source origin from the Host header. If that is not present it will
+    fall back to the host and port value from the requests Referer header.
 
 
 For more information on CSRF please refer to the pages below.

@@ -28,21 +28,23 @@ class CsrfFilterTest : public testing::Test {
 public:
   CsrfFilterConfigSharedPtr setupConfig() {
     envoy::config::filter::http::csrf::v2::CsrfPolicy policy;
-    policy.mutable_filter_enabled()->mutable_default_value()->set_numerator(100);
-    policy.mutable_filter_enabled()->mutable_default_value()->set_denominator(
+    const auto& filter_enabled = policy.mutable_filter_enabled();
+    filter_enabled->mutable_default_value()->set_numerator(100);
+    filter_enabled->mutable_default_value()->set_denominator(
         envoy::type::FractionalPercent::HUNDRED);
-    policy.mutable_filter_enabled()->set_runtime_key("csrf.enabled");
+    filter_enabled->set_runtime_key("csrf.enabled");
 
-    policy.mutable_shadow_enabled()->mutable_default_value()->set_numerator(0);
-    policy.mutable_shadow_enabled()->mutable_default_value()->set_denominator(
+    const auto& shadow_enabled = policy.mutable_shadow_enabled();
+    shadow_enabled->mutable_default_value()->set_numerator(0);
+    shadow_enabled->mutable_default_value()->set_denominator(
         envoy::type::FractionalPercent::HUNDRED);
-    policy.mutable_shadow_enabled()->set_runtime_key("csrf.shadow_enabled");
+    shadow_enabled->set_runtime_key("csrf.shadow_enabled");
     return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);
   }
 
   CsrfFilterTest() : config_(setupConfig()), filter_(config_) {}
 
-  void SetUp() {
+  void SetUp() override {
     setRoutePolicy(config_->policy());
     setVirtualHostPolicy(config_->policy());
 
@@ -105,9 +107,6 @@ TEST_F(CsrfFilterTest, RequestWithoutOrigin) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
-  // EXPECT_EQ(1, stats_.counter("test.csrf.missing_source_origin").value());
-  // EXPECT_EQ(0, stats_.counter("test.csrf.request_invalid").value());
-  // EXPECT_EQ(0, stats_.counter("test.csrf.request_valid").value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 
