@@ -41,12 +41,9 @@ public:
     request_.mutable_node()->MergeFrom(local_info_.node());
   }
 
-  void updateResources(std::vector<std::string> update_to_these_names) override {
+  void updateResources(const std::set<std::string>& update_to_these_names) override {
     std::vector<std::string> cur_added;
     std::vector<std::string> cur_removed;
-
-    // set_difference expects sorted collections. (resource_names_ is always sorted; it's std::set).
-    std::sort(update_to_these_names.begin(), update_to_these_names.end());
 
     std::set_difference(update_to_these_names.begin(), update_to_these_names.end(),
                         resource_names_.begin(), resource_names_.end(),
@@ -155,7 +152,7 @@ public:
   void onWriteable() override { trySendDiscoveryRequestIfPending(); }
 
   // Config::Subscription
-  void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
+  void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) override {
     callbacks_ = &callbacks;
 
     if (init_fetch_timeout_.count() > 0) {
