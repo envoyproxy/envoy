@@ -446,5 +446,4 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, IgnoreRedirectionForAsking) {
 }
 
 } // namespace
-
 } // namespace Envoy

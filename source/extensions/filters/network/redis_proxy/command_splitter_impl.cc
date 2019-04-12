@@ -111,8 +111,15 @@ bool SingleServerRequest::onRedirection(const Common::Redis::RespValue& value) {
     return false;
   }
 
-  const std::string host_address = std::string(err[2]); // ip:port
-  // Prepend request with asking command if redirected via ASK error.
+  // MOVED and ASK redirection errors have the following substrings: MOVED or ASK (err[0]), hash key
+  // slot (err[1]), and IP address and TCP port separated by a colon (err[2]).
+  const std::string host_address = std::string(err[2]);
+
+  // Prepend request with an asking command if redirected via an ASK error. The returned handle is
+  // not important since there is no point in being able to cancel the request. The use of
+  // nullPoolCallbacks ensures the transparent filtering of the Redis server's response to the
+  // "asking" command; this is fine since the server either responds with an OK or an error message
+  // if cluster support is not enabled (in which case we should not get an ASK redirection error).
   if (ask_redirection &&
       !conn_pool_->makeRequestToHost(host_address, askingRequest(), nullPoolCallbacks)) {
     return false;
@@ -257,7 +264,7 @@ bool FragmentedRequest::onChildRedirection(const Common::Redis::RespValue& value
   // not important since there is no point in being able to cancel the request. The use of
   // nullPoolCallbacks ensures the transparent filtering of the Redis server's response to the
   // "asking" command; this is fine since the server either responds with an OK or an error message
-  // if cluster support is not enabled (in which case, we should not get an ASK redirection error).
+  // if cluster support is not enabled (in which case we should not get an ASK redirection error).
   if (ask_redirection &&
       !conn_pool->makeRequestToHost(host_address, askingRequest(), nullPoolCallbacks)) {
     return false;
