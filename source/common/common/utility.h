@@ -571,8 +571,7 @@ template <class Value> struct TrieLookupTable {
    */
   void add(absl::string_view key, Value value) {
     TrieEntry<Value>* current = &root_;
-    for (auto it = key.begin(); it < key.end(); ++it) {
-      uint8_t c = *it;
+    for (uint8_t c : key) {
       if (!current->entries_[c]) {
         current->entries_[c] = std::make_unique<TrieEntry<Value>>();
       }
@@ -588,8 +587,7 @@ template <class Value> struct TrieLookupTable {
    */
   Value find(absl::string_view key) const {
     const TrieEntry<Value>* current = &root_;
-    for (auto it = key.begin(); it < key.end(); ++it) {
-      uint8_t c = *it;
+    for (uint8_t c : key) {
       current = current->entries_[c].get();
       if (current == nullptr) {
         return nullptr;
