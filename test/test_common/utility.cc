@@ -40,7 +40,6 @@
 
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
-#include "test/test_common/utility_core.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"

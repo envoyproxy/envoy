@@ -92,8 +92,9 @@ envoy_cc_test_library(
         "abseil_strings",
     ],
     deps = [
+        ":file_system_for_test_lib",
         ":test_time_lib",
-        ":utility_core_lib",
+        ":thread_factory_for_test_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
@@ -119,11 +120,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "utility_core_lib",
-    srcs = ["utility_core.cc"],
-    hdrs = ["utility_core.h"],
+    name = "thread_factory_for_test_lib",
+    srcs = ["thread_factory_for_test.cc"],
+    hdrs = ["thread_factory_for_test.h"],
     deps = [
         "//source/common/common:thread_lib",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "file_system_for_test_lib",
+    srcs = ["file_system_for_test.cc"],
+    hdrs = ["file_system_for_test.h"],
+    deps = [
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
@@ -177,7 +187,7 @@ envoy_cc_test_library(
     name = "only_one_thread_lib",
     srcs = ["only_one_thread.cc"],
     hdrs = ["only_one_thread.h"],
-    deps = [":utility_core_lib"],
+    deps = [":thread_factory_for_test_lib"],
 )
 
 envoy_cc_test_library(

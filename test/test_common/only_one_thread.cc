@@ -4,7 +4,7 @@
 
 #include "common/common/lock_guard.h"
 
-#include "test/test_common/utility_core.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 namespace Envoy {
 namespace Thread {
