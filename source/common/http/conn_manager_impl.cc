@@ -1118,23 +1118,23 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
   if (!state_.created_filter_chain_) {
     createFilterChain();
   }
-  Utility::sendLocalReply(is_grpc_request,
-                          [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-                            if (modify_headers != nullptr) {
-                              modify_headers(*headers);
-                            }
-                            response_headers_ = std::move(headers);
-                            // TODO: Start encoding from the last decoder filter that saw the
-                            // request instead.
-                            encodeHeaders(nullptr, *response_headers_, end_stream);
-                          },
-                          [this](Buffer::Instance& data, bool end_stream) -> void {
-                            // TODO: Start encoding from the last decoder filter that saw the
-                            // request instead.
-                            encodeData(nullptr, data, end_stream,
-                                       FilterIterationStartState::CanStartFromCurrent);
-                          },
-                          state_.destroyed_, code, body, grpc_status, is_head_request);
+  Utility::sendLocalReply(
+      is_grpc_request,
+      [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+        if (modify_headers != nullptr) {
+          modify_headers(*headers);
+        }
+        response_headers_ = std::move(headers);
+        // TODO: Start encoding from the last decoder filter that saw the
+        // request instead.
+        encodeHeaders(nullptr, *response_headers_, end_stream);
+      },
+      [this](Buffer::Instance& data, bool end_stream) -> void {
+        // TODO: Start encoding from the last decoder filter that saw the
+        // request instead.
+        encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
+      },
+      state_.destroyed_, code, body, grpc_status, is_head_request);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(

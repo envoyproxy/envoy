@@ -49,6 +49,10 @@ configure and code each application independently. Envoy supports various types 
   clean up; connection pools do not. Note that in order for a connection pool to function it needs
   at least one upstream connection, so this value should likely be no greater than
   :ref:`Cluster maximum connections <arch_overview_circuit_break_cluster_maximum_connections>`.
+  If this circuit breaker overflows the
+  :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` counter for the cluster
+  will increment.
+
 
 Each circuit breaking limit is :ref:`configurable <config_cluster_manager_cluster_circuit_breakers>`
 and tracked on a per upstream cluster and per priority basis. This allows different components of

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
+
 #include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
 #include "extensions/filters/network/dubbo_proxy/filters/factory_base.h"
 #include "extensions/filters/network/dubbo_proxy/filters/filter.h"
@@ -31,10 +34,21 @@ public:
   MOCK_METHOD2(transferBodyTo, Network::FilterStatus(Buffer::Instance&, size_t));
 };
 
+class MockDecoderCallbacks : public DecoderCallbacks {
+public:
+  MockDecoderCallbacks();
+  ~MockDecoderCallbacks() = default;
+
+  MOCK_METHOD0(newDecoderEventHandler, DecoderEventHandler*());
+  MOCK_METHOD1(onHeartbeat, void(MessageMetadataSharedPtr));
+
+  MockDecoderEventHandler handler_;
+};
+
 class MockProtocolCallbacks : public ProtocolCallbacks {
 public:
-  MockProtocolCallbacks();
-  ~MockProtocolCallbacks();
+  MockProtocolCallbacks() = default;
+  ~MockProtocolCallbacks() = default;
 
   void onRequestMessage(RequestMessagePtr&& req) override { onRequestMessageRvr(req.get()); }
   void onResponseMessage(ResponseMessagePtr&& res) override { onResponseMessageRvr(res.get()); }
@@ -67,7 +81,7 @@ public:
   // DubboProxy::Deserializer
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(type, SerializationType());
-  MOCK_METHOD2(deserializeRpcInvocation, RpcInvocationPtr(Buffer::Instance&, size_t));
+  MOCK_METHOD3(deserializeRpcInvocation, void(Buffer::Instance&, size_t, MessageMetadataSharedPtr));
   MOCK_METHOD2(deserializeRpcResult, RpcResultPtr(Buffer::Instance&, size_t));
   MOCK_METHOD3(serializeRpcResult, size_t(Buffer::Instance&, const std::string&, RpcResponseType));
 

@@ -185,7 +185,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         config.tcp_fast_open_queue_length().value()));
   }
 
-  if (config.socket_options().size() > 0) {
+  if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
@@ -673,8 +673,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory)
     : server_(server), factory_(listener_factory),
-      scope_(server.stats().createScope("listener_manager.")),
-      stats_(generateStats(*scope_)),
+      scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {

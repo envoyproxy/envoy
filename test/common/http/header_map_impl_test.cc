@@ -287,8 +287,12 @@ TEST(HeaderStringTest, All) {
 
 TEST(HeaderMapImplTest, InlineInsert) {
   HeaderMapImpl headers;
+  EXPECT_TRUE(headers.empty());
+  EXPECT_EQ(0, headers.size());
   EXPECT_EQ(nullptr, headers.Host());
   headers.insertHost().value(std::string("hello"));
+  EXPECT_FALSE(headers.empty());
+  EXPECT_EQ(1, headers.size());
   EXPECT_STREQ(":authority", headers.Host()->key().c_str());
   EXPECT_STREQ("hello", headers.Host()->value().c_str());
   EXPECT_STREQ("hello", headers.get(Headers::get().Host)->value().c_str());
@@ -323,25 +327,31 @@ TEST(HeaderMapImplTest, Remove) {
   EXPECT_STREQ("value", headers.get(static_key)->value().c_str());
   EXPECT_EQ(HeaderString::Type::Reference, headers.get(static_key)->value().type());
   EXPECT_EQ(1UL, headers.size());
+  EXPECT_FALSE(headers.empty());
   headers.remove(static_key);
   EXPECT_EQ(nullptr, headers.get(static_key));
   EXPECT_EQ(0UL, headers.size());
+  EXPECT_TRUE(headers.empty());
 
   // Add and remove by inline.
   headers.insertContentLength().value(5);
   EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
   EXPECT_EQ(1UL, headers.size());
+  EXPECT_FALSE(headers.empty());
   headers.removeContentLength();
   EXPECT_EQ(nullptr, headers.ContentLength());
   EXPECT_EQ(0UL, headers.size());
+  EXPECT_TRUE(headers.empty());
 
   // Add inline and remove by name.
   headers.insertContentLength().value(5);
   EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
   EXPECT_EQ(1UL, headers.size());
+  EXPECT_FALSE(headers.empty());
   headers.remove(Headers::get().ContentLength);
   EXPECT_EQ(nullptr, headers.ContentLength());
   EXPECT_EQ(0UL, headers.size());
+  EXPECT_TRUE(headers.empty());
 }
 
 TEST(HeaderMapImplTest, RemoveRegex) {
@@ -377,6 +387,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   headers.insertContentLength().value(5);
   EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
   EXPECT_EQ(1UL, headers.size());
+  EXPECT_FALSE(headers.empty());
   headers.removePrefix(LowerCaseString("content"));
   EXPECT_EQ(nullptr, headers.ContentLength());
 }
@@ -735,16 +746,20 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     LowerCaseString foo("hello");
     Http::TestHeaderMapImpl headers{};
     EXPECT_EQ(0UL, headers.size());
+    EXPECT_TRUE(headers.empty());
 
     headers.addReferenceKey(foo, "world");
     EXPECT_EQ(1UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     headers.setReferenceKey(Headers::get().ContentType, "text/html");
     EXPECT_EQ(2UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     // Pseudo header gets inserted before non-pseudo headers
     headers.setReferenceKey(Headers::get().Method, "PUT");
     EXPECT_EQ(3UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     InSequence seq;
     EXPECT_CALL(cb, Call(":method", "PUT"));
@@ -761,6 +776,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     // Removal of the header before which pseudo-headers are inserted
     headers.remove(foo);
     EXPECT_EQ(2UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     EXPECT_CALL(cb, Call(":method", "PUT"));
     EXPECT_CALL(cb, Call("content-type", "text/html"));
@@ -775,6 +791,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     // Next pseudo-header goes after other pseudo-headers, but before normal headers
     headers.setReferenceKey(Headers::get().Path, "/test");
     EXPECT_EQ(3UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     EXPECT_CALL(cb, Call(":method", "PUT"));
     EXPECT_CALL(cb, Call(":path", "/test"));
@@ -790,6 +807,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     // Removing the last normal header
     headers.remove(Headers::get().ContentType);
     EXPECT_EQ(2UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     EXPECT_CALL(cb, Call(":method", "PUT"));
     EXPECT_CALL(cb, Call(":path", "/test"));
@@ -804,6 +822,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     // Adding a new pseudo-header after removing the last normal header
     headers.setReferenceKey(Headers::get().Host, "host");
     EXPECT_EQ(3UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     EXPECT_CALL(cb, Call(":method", "PUT"));
     EXPECT_CALL(cb, Call(":path", "/test"));
@@ -819,6 +838,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     // Adding the first normal header
     headers.setReferenceKey(Headers::get().ContentType, "text/html");
     EXPECT_EQ(4UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     EXPECT_CALL(cb, Call(":method", "PUT"));
     EXPECT_CALL(cb, Call(":path", "/test"));
@@ -837,6 +857,7 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     headers.remove(Headers::get().Method);
     headers.remove(Headers::get().Host);
     EXPECT_EQ(1UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     EXPECT_CALL(cb, Call("content-type", "text/html"));
 
@@ -850,10 +871,12 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
     // Removing all headers
     headers.remove(Headers::get().ContentType);
     EXPECT_EQ(0UL, headers.size());
+    EXPECT_TRUE(headers.empty());
 
     // Adding a lone pseudo-header
     headers.setReferenceKey(Headers::get().Status, "200");
     EXPECT_EQ(1UL, headers.size());
+    EXPECT_FALSE(headers.empty());
 
     EXPECT_CALL(cb, Call(":status", "200"));
 
