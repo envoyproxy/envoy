@@ -110,6 +110,16 @@ public:
    * processed.
    */
   virtual bool enableRedirection() const PURE;
+
+  /**
+   * @return buffer size for batching commands for a single upstream host.
+   */
+  virtual unsigned int maxBufferSizeBeforeFlush() const PURE;
+
+  /**
+   * @return timeout for batching commands for a single upstream host.
+   */
+  virtual std::chrono::milliseconds bufferFlushTimeoutInMs() const PURE;
 };
 
 /**

@@ -53,6 +53,12 @@ message RedisProxy {
     // need to be known to the cluster manager. If the command cannot be redirected, then the
     // original error is passed downstream unchanged. By default, this support is not enabled.
     bool enable_redirection = 3;
+
+    // Maximum size of buffer before flush is triggered
+    uint32 max_buffer_size_before_flush = 4;
+
+    // Buffer is flushed every N milliseconds (unless the buffer is filled before the timer fires)
+    google.protobuf.Duration buffer_flush_timeout = 5 [(gogoproto.stdduration) = true];
   }
 
   // Network settings for the connection pool to the upstream cluster.
