@@ -1,7 +1,6 @@
 #include <ctime>
 #include <regex>
 
-#include "common/config/filter_json.h"
 #include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/upstream/upstream_impl.h"
@@ -34,17 +33,18 @@ namespace {
 
 absl::optional<envoy::config::filter::accesslog::v2::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
-  const std::string json_string = R"EOF(
-  {
-    "path": "/dev/null",
-    "format": "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST% %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
-  }
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
+    %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
+    %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
+  path: "/dev/null"
   )EOF";
 
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-
   envoy::config::filter::accesslog::v2::AccessLog upstream_log;
-  Envoy::Config::FilterJson::translateAccessLog(*json_object_ptr, upstream_log);
+  MessageUtil::loadFromYaml(yaml, upstream_log);
 
   return absl::optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log);
 }
@@ -256,17 +256,17 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
 
 // Test timestamps and durations are emitted.
 TEST_F(RouterUpstreamLogTest, LogTimestampsAndDurations) {
-  const std::string json_string = R"EOF(
-  {
-    "path": "/dev/null",
-    "format": "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %DURATION% %RESPONSE_DURATION% %REQUEST_DURATION%"
-  }
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+typed_config:
+  "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
+  format: "[%START_TIME%] %REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%
+    %DURATION% %RESPONSE_DURATION% %REQUEST_DURATION%"
+  path: "/dev/null"
   )EOF";
 
-  auto json_object_ptr = Json::Factory::loadFromString(json_string);
-
   envoy::config::filter::accesslog::v2::AccessLog upstream_log;
-  Envoy::Config::FilterJson::translateAccessLog(*json_object_ptr, upstream_log);
+  MessageUtil::loadFromYaml(yaml, upstream_log);
 
   init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log));
   run(200, {{"x-envoy-original-path", "/foo"}}, {}, {});

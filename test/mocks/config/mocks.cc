@@ -13,6 +13,9 @@ MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
 MockGrpcMux::MockGrpcMux() {}
 MockGrpcMux::~MockGrpcMux() {}
 
+MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() {}
+MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() {}
+
 GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
                                        const std::vector<std::string>& resources,
                                        GrpcMuxCallbacks& callbacks) {

@@ -1,7 +1,7 @@
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_decoder.h"
-#include "extensions/filters/network/zookeeper_proxy/zookeeper_filter.h"
+#include "extensions/filters/network/zookeeper_proxy/decoder.h"
+#include "extensions/filters/network/zookeeper_proxy/filter.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -16,7 +16,7 @@ namespace NetworkFilters {
 namespace ZooKeeperProxy {
 
 bool protoMapEq(const ProtobufWkt::Struct& obj, const std::map<std::string, std::string>& rhs) {
-  EXPECT_TRUE(rhs.size() > 0);
+  EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
   }
