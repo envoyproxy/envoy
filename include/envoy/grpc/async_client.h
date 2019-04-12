@@ -84,9 +84,7 @@ public:
    *         type for the request.
    * NB: createEmptyResponse will not be called if onSuccessRaw() is overriden.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyResponse() {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  virtual ProtobufTypes::MessagePtr createEmptyResponse() { NOT_REACHED_GCOVR_EXCL_LINE; }
 
   /**
    * Called when the async gRPC request succeeds. No further callbacks will be invoked.
@@ -150,9 +148,7 @@ public:
    *          type for the stream.
    * NB: createEmptyResponse will not be called if onRecieveRawMessage() is overriden.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyResponse() {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  virtual ProtobufTypes::MessagePtr createEmptyResponse() { NOT_REACHED_GCOVR_EXCL_LINE; }
 
   /**
    * Called when populating the headers to send with initial metadata.
