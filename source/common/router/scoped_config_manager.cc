@@ -1,7 +1,8 @@
+#include "common/router/scoped_config_manager.h"
+
 #include "envoy/common/exception.h"
 
 #include "common/common/fmt.h"
-#include "common/router/scoped_config_manager.h"
 
 namespace Envoy {
 namespace Router {

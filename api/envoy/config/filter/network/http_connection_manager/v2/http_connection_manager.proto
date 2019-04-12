@@ -405,11 +405,11 @@ message Rds {
   envoy.api.v2.core.ConfigSource config_source = 1
       [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 
-    // The name of the route configuration. This name will be passed to the RDS
-    // API. This allows an Envoy configuration with multiple HTTP listeners (and
-    // associated HTTP connection manager filters) to use different route
-    // configurations.
-    string route_config_name = 2 [(validate.rules).string.min_bytes = 1];
+  // The name of the route configuration. This name will be passed to the RDS
+  // API. This allows an Envoy configuration with multiple HTTP listeners (and
+  // associated HTTP connection manager filters) to use different route
+  // configurations.
+  string route_config_name = 2 [(validate.rules).string.min_bytes = 1];
 }
 
 // This message is used to work around the limitations with 'oneof' and repeated fields.

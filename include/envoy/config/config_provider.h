@@ -1,6 +1,7 @@
 #pragma once
 
 #include <assert.h>
+
 #include <memory>
 
 #include "envoy/common/time.h"

@@ -36,8 +36,7 @@ service ScopedRoutesDiscoveryService {
   rpc StreamScopedRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
-  rpc DeltaScopedRoutes(stream DeltaDiscoveryRequest)
-      returns (stream DeltaDiscoveryResponse) {
+  rpc DeltaScopedRoutes(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
 
   rpc FetchScopedRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
