@@ -191,7 +191,7 @@ protected:
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
   void onChildFailure(uint32_t index);
   virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                  ConnPool::InstanceSharedPtr conn_pool) PURE;
+                                  const ConnPool::InstanceSharedPtr conn_pool) PURE;
 
   SplitCallbacks& callbacks_;
 
@@ -220,7 +220,7 @@ private:
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
   virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                  ConnPool::InstanceSharedPtr conn_pool) override;
+                                  const ConnPool::InstanceSharedPtr conn_pool) override;
   void recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking);
 };
 
@@ -244,7 +244,7 @@ private:
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
   virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                  ConnPool::InstanceSharedPtr conn_pool) override;
+                                  const ConnPool::InstanceSharedPtr conn_pool) override;
   void recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking);
 
   int64_t total_{0};
@@ -269,7 +269,7 @@ private:
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
   virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                  ConnPool::InstanceSharedPtr conn_pool) override;
+                                  const ConnPool::InstanceSharedPtr conn_pool) override;
   void recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking);
 };
 

@@ -302,7 +302,7 @@ void MGETRequest::recreate(Common::Redis::RespValue& request, uint32_t index, bo
 }
 
 bool MGETRequest::onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                     ConnPool::InstanceSharedPtr conn_pool) {
+                                     const ConnPool::InstanceSharedPtr conn_pool) {
   std::vector<absl::string_view> err;
   bool ask_redirection = false;
   if (redirectionArgsInvalid(incoming_request_.get(), value, err, ask_redirection) || !conn_pool) {
@@ -421,7 +421,7 @@ void MSETRequest::recreate(Common::Redis::RespValue& request, uint32_t index, bo
 }
 
 bool MSETRequest::onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                     ConnPool::InstanceSharedPtr conn_pool) {
+                                     const ConnPool::InstanceSharedPtr conn_pool) {
   std::vector<absl::string_view> err;
   bool ask_redirection = false;
   if (redirectionArgsInvalid(incoming_request_.get(), value, err, ask_redirection) || !conn_pool) {
@@ -534,7 +534,7 @@ void SplitKeysSumResultRequest::recreate(Common::Redis::RespValue& request, uint
 
 bool SplitKeysSumResultRequest::onChildRedirection(const Common::Redis::RespValue& value,
                                                    uint32_t index,
-                                                   ConnPool::InstanceSharedPtr conn_pool) {
+                                                   const ConnPool::InstanceSharedPtr conn_pool) {
   std::vector<absl::string_view> err;
   bool ask_redirection = false;
   if (redirectionArgsInvalid(incoming_request_.get(), value, err, ask_redirection) || !conn_pool) {

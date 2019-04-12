@@ -39,10 +39,10 @@ static_resources:
                   socket_address:
                     address: 127.0.0.1
                     port_value: 0
-            - endpoint: 
+            - endpoint:
                 address:
                   socket_address:
-                    address: 127.0.0.1 
+                    address: 127.0.0.1
                     port_value: 0
   listeners:
     name: listener_0
@@ -56,13 +56,23 @@ static_resources:
         config:
           stat_prefix: redis_stats
           cluster: cluster_0
-          settings: 
+          settings:
             op_timeout: 5s
 )EOF";
 
 // This is a configuration with moved/ask redirection support enabled.
 const std::string CONFIG_WITH_REDIRECTION = CONFIG + R"EOF(
             enable_redirection: true
+)EOF";
+
+const std::string CONFIG_WITH_ROUTES = CONFIG + R"EOF(
+          prefix_routes:
+            routes:
+            - prefix: "foo"
+              cluster: cluster_1
+            - prefix: "bar"
+              cluster: cluster_2
+            catch_all_cluster: cluster_0
 )EOF";
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
@@ -145,6 +155,12 @@ public:
   void simpleRedirection(FakeUpstreamPtr& target_server, const std::string& request,
                          const std::string& redirection_response,
                          const std::string& received_request, const std::string& response);
+};
+
+class RedisProxyWithRoutesIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithRoutesIntegrationTest()
+    : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES, 2) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
@@ -236,6 +252,15 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
   EXPECT_TRUE(fake_upstream_connection_1->close());
   EXPECT_TRUE(fake_upstream_connection_2->close());
 }
+
+// This test sends a simple "get foo" identical to SimpleRequestAndResponse
+// but will hit the catch all upstream when routes are defined.
+TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponse) {
+  initialize();
+  simpleRoutedRequestAndResponse(makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
+// This test sends a simple
 
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
