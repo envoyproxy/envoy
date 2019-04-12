@@ -343,9 +343,9 @@ private:
 class DoNothingPoolCallbacks : public Common::Redis::Client::PoolCallbacks {
 public:
   // Common::Redis::Client::PoolCallbacks
-  void onResponse(Common::Redis::RespValuePtr&&) override{};
-  void onFailure() override{};
-  bool onRedirection(const Common::Redis::RespValue&) override { return false; };
+  void onResponse(Common::Redis::RespValuePtr&&) override {}
+  void onFailure() override {}
+  bool onRedirection(const Common::Redis::RespValue&) override { return false; }
 };
 
 } // namespace CommandSplitter

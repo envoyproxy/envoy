@@ -27,16 +27,23 @@ Common::Redis::RespValuePtr Utility::makeError(const std::string& error) {
 
 namespace {
 
-// nullPoolCallbacks is used for requests that must be filtered and not redirected such as "asking".
-DoNothingPoolCallbacks nullPoolCallbacks;
+// null_pool_callbacks is used for requests that must be filtered and not redirected such as
+// "asking".
+DoNothingPoolCallbacks null_pool_callbacks;
 
 // Create an asking command request.
-Common::Redis::RespValue askingRequest() {
-  Common::Redis::RespValue asking_cmd, request;
-  asking_cmd.type(Common::Redis::RespType::BulkString);
-  asking_cmd.asString() = "asking";
-  request.type(Common::Redis::RespType::Array);
-  request.asArray().push_back(asking_cmd);
+const Common::Redis::RespValue& askingRequest() {
+  static Common::Redis::RespValue request;
+  static bool initialized = false;
+
+  if (!initialized) {
+    Common::Redis::RespValue asking_cmd;
+    asking_cmd.type(Common::Redis::RespType::BulkString);
+    asking_cmd.asString() = "asking";
+    request.type(Common::Redis::RespType::Array);
+    request.asArray().push_back(asking_cmd);
+    initialized = true;
+  }
   return request;
 }
 
@@ -117,11 +124,11 @@ bool SingleServerRequest::onRedirection(const Common::Redis::RespValue& value) {
 
   // Prepend request with an asking command if redirected via an ASK error. The returned handle is
   // not important since there is no point in being able to cancel the request. The use of
-  // nullPoolCallbacks ensures the transparent filtering of the Redis server's response to the
+  // null_pool_callbacks ensures the transparent filtering of the Redis server's response to the
   // "asking" command; this is fine since the server either responds with an OK or an error message
   // if cluster support is not enabled (in which case we should not get an ASK redirection error).
   if (ask_redirection &&
-      !conn_pool_->makeRequestToHost(host_address, askingRequest(), nullPoolCallbacks)) {
+      !conn_pool_->makeRequestToHost(host_address, askingRequest(), null_pool_callbacks)) {
     return false;
   }
   handle_ = conn_pool_->makeRequestToHost(host_address, *incoming_request_, *this);
@@ -262,11 +269,11 @@ bool FragmentedRequest::onChildRedirection(const Common::Redis::RespValue& value
 
   // Prepend request with an asking command if redirected via an ASK error. The returned handle is
   // not important since there is no point in being able to cancel the request. The use of
-  // nullPoolCallbacks ensures the transparent filtering of the Redis server's response to the
+  // null_pool_callbacks ensures the transparent filtering of the Redis server's response to the
   // "asking" command; this is fine since the server either responds with an OK or an error message
   // if cluster support is not enabled (in which case we should not get an ASK redirection error).
   if (ask_redirection &&
-      !conn_pool->makeRequestToHost(host_address, askingRequest(), nullPoolCallbacks)) {
+      !conn_pool->makeRequestToHost(host_address, askingRequest(), null_pool_callbacks)) {
     return false;
   }
 
