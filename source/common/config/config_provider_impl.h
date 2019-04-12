@@ -213,7 +213,7 @@ protected:
   }
 
   /**
-   * TODO(AndresGuedez):
+   * Propagates a config update to all worker threads.
    */
   void
   propagateDeltaConfigUpdate(std::function<void(ConfigProvider::ConfigConstSharedPtr)> updateFn);
@@ -290,9 +290,6 @@ public:
     });
   }
 
-  /**
-   * TODO(AndresGuedez):
-   */
   virtual void initialize(ThreadLocal::Slot::InitializeCb initializeCb) {
     subscription_->bindConfigProvider(this);
     tls_->set(initializeCb);
@@ -311,7 +308,8 @@ public:
   }
 
   /**
-   * TODO(AndresGuedez):
+   * Propagates a delta config update to all workers.
+   * @param updateCb the callback to run on each worker.
    */
   virtual void onDeltaConfigUpdate(Envoy::Event::PostCb updateCb) {
     tls_->runOnAllThreads(updateCb);
