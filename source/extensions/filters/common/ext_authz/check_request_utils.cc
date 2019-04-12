@@ -124,6 +124,7 @@ void CheckRequestUtils::setHttpRequest(
     std::string data(length, 0);
     buffer->copyOut(0, length, &data[0]);
     httpreq.set_body(std::move(data));
+    httpreq.set_partial_body(length != buffer->length());
   }
 }
 
