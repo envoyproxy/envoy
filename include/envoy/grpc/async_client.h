@@ -8,6 +8,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
 
+#include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
@@ -84,7 +85,7 @@ public:
    * NB: createEmptyResponse will not be called if onSuccessRaw() is overriden.
    */
   virtual ProtobufTypes::MessagePtr createEmptyResponse() {
-    throw EnvoyException("AsyncRequestCallbacks::createEmptyResponse must be overriden");
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   /**
@@ -150,7 +151,7 @@ public:
    * NB: createEmptyResponse will not be called if onRecieveRawMessage() is overriden.
    */
   virtual ProtobufTypes::MessagePtr createEmptyResponse() {
-    throw EnvoyException("AsyncStreamCallbacks::createEmptyResponse must be overriden");
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   /**
