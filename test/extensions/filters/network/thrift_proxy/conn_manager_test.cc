@@ -1238,6 +1238,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendLocalReplyRemoteClosedCo
   EXPECT_EQ(1U, store_.counter("test.request").value());
   EXPECT_EQ(1U, store_.counter("test.request_call").value());
   EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 }
 
@@ -1310,6 +1311,8 @@ TEST_F(ThriftConnectionManagerTest, transportEndWhenRemoteClose) {
   // Remote closes the connection.
   filter_callbacks_.connection_.state_ = Network::Connection::State::Closed;
   EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, callbacks->upstreamData(write_buffer_));
+  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 }

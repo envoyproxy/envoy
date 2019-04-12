@@ -209,7 +209,7 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
 
   if (cm.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
     complete_ = true;
-    throw EnvoyException("thrift downstream gone");
+    throw EnvoyException("downstream connection is closed");
   }
 
   Buffer::OwnedImpl buffer;
