@@ -100,7 +100,7 @@ TEST_F(DispatcherImplTest, InitializeStats) {
   NiceMock<Stats::MockStore> scope;
   EXPECT_CALL(scope, histogram("test.dispatcher.loop_duration_us"));
   EXPECT_CALL(scope, histogram("test.dispatcher.poll_delay_us"));
-  dispatcher_->initializeStats(scope, "test");
+  dispatcher_->initializeStats(scope, "test.");
 }
 
 TEST_F(DispatcherImplTest, Post) {
