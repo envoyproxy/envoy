@@ -1165,7 +1165,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
-          {"/readyz", "return 200 if the server state is LIVE, otherwise return 503",
+          {"/readyz", "print server state, return 200 if LIVE, otherwise return 503",
            MAKE_ADMIN_HANDLER(handlerReadyz), false, false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/stats/prometheus", "print server stats in prometheus format",
