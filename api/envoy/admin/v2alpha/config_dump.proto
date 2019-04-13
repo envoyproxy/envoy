@@ -186,7 +186,7 @@ message RoutesConfigDump {
 // dynamically obtained scopes via the SRDS API.
 message ScopedRoutesConfigDump {
   message InlineScopedRouteConfigs {
-    // TODO(AndresGuedez)
+    // The name assigned to the scoped route configurations.
     string name = 1;
 
     // The scoped route configurations.
@@ -197,6 +197,7 @@ message ScopedRoutesConfigDump {
   }
 
   message DynamicScopedRouteConfigs {
+    // The name assigned to the scoped route configurations.
     string name = 1;
 
     // This is the per-resource version information. This version is currently taken from the
