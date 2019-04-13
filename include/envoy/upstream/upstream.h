@@ -20,6 +20,7 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/locality.h"
+#include "envoy/upstream/types.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -191,9 +192,14 @@ public:
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
 
 typedef std::vector<HostSharedPtr> HostVector;
+typedef Phantom<HostVector, Healthy> HealthyHostVector;
+typedef Phantom<HostVector, Degraded> DegradedHostVector;
 typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
+
+typedef std::shared_ptr<const HealthyHostVector> HealthyHostVectorConstSharedPtr;
+typedef std::shared_ptr<const DegradedHostVector> DegradedHostVectorConstSharedPtr;
 
 typedef std::unique_ptr<HostVector> HostListPtr;
 typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
@@ -221,15 +227,6 @@ public:
   virtual const std::vector<HostVector>& get() const PURE;
 
   /**
-   * Clone object with a filter predicate.
-   * @param predicate on Host entries.
-   * @return HostsPerLocalityConstSharedPtr clone of the HostsPerLocality with only
-   *         hosts according to predicate.
-   */
-  virtual std::shared_ptr<const HostsPerLocality>
-  filter(std::function<bool(const Host&)> predicate) const PURE;
-
-  /**
    * Clone object with multiple filter predicates. Returns a vector of clones, each with host that
    * match the provided predicates.
    * @param predicates vector of predicates on Host entries.
@@ -244,7 +241,7 @@ public:
    * @return HostsPerLocalityConstSharedPtr clone of the HostsPerLocality.
    */
   std::shared_ptr<const HostsPerLocality> clone() const {
-    return filter([](const Host&) { return true; });
+    return filter({[](const Host&) { return true; }})[0];
   }
 };
 
@@ -376,8 +373,8 @@ public:
    */
   struct UpdateHostsParams {
     HostVectorConstSharedPtr hosts;
-    HostVectorConstSharedPtr healthy_hosts;
-    HostVectorConstSharedPtr degraded_hosts;
+    HealthyHostVectorConstSharedPtr healthy_hosts;
+    DegradedHostVectorConstSharedPtr degraded_hosts;
     HostsPerLocalityConstSharedPtr hosts_per_locality;
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
