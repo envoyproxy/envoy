@@ -151,6 +151,12 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", ContentType(response));
 
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/readyz", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());

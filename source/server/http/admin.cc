@@ -661,6 +661,28 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
   return Http::Code::OK;
 }
 
+Http::Code AdminImpl::handlerReadyz(absl::string_view, Http::HeaderMap&,
+                                        Buffer::Instance& response, AdminStream&) {
+  envoy::admin::v2alpha::ServerInfo::State state;
+
+  switch (server_.initManager().state()) {
+  case Init::Manager::State::NotInitialized:
+    state = envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING;
+    break;
+  case Init::Manager::State::Initializing:
+    state = envoy::admin::v2alpha::ServerInfo::INITIALIZING;
+    break;
+  default:
+    state = server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
+                                                      : envoy::admin::v2alpha::ServerInfo::LIVE;
+  }
+
+  response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
+  Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE ? Http::Code::OK
+                                                      : Http::Code::ServiceUnavailable;
+  return code;
+}
+
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream& admin_stream) {
   Http::Code rc = Http::Code::OK;
@@ -1143,6 +1165,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(handlerResetCounters), false, true},
           {"/server_info", "print server version/status information",
            MAKE_ADMIN_HANDLER(handlerServerInfo), false, false},
+          {"/readyz", "return 200 if the server state is LIVE, otherwise return 503",
+           MAKE_ADMIN_HANDLER(handlerReadyz), false, false},
           {"/stats", "print server stats", MAKE_ADMIN_HANDLER(handlerStats), false, false},
           {"/stats/prometheus", "print server stats in prometheus format",
            MAKE_ADMIN_HANDLER(handlerPrometheusStats), false, false},
