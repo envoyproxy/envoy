@@ -59,7 +59,7 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bo
 }
 
 bool CsrfFilter::modifyMethod(const Http::HeaderMap& headers) {
-  const Envoy::Http::HeaderEntry* method = headers.Method();
+  const auto& method = headers.Method();
   if (method == nullptr) {
     return false;
   }
