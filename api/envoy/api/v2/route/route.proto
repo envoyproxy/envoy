@@ -429,14 +429,14 @@ message CorsPolicy {
     //   :ref:`filter_enabled<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
     google.protobuf.BoolValue enabled = 7 [deprecated = true];
 
-    // Specifies if CORS is enabled.
+    // Specifies if CORS is enabled. Default is disabled.
     //
     // More information on how this can be controlled via runtime can be found
     // :ref:`here <cors-runtime>`.
     //
     // .. note::
     //
-    //   This field defaults to 100/:ref:`HUNDRED
+    //   This field defaults to 0% where the exact value is  0/:ref:`HUNDRED
     //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
@@ -449,7 +449,7 @@ message CorsPolicy {
   //
   // .. note::
   //
-  //   This field defaults to 100/:ref:`HUNDRED
+  //   This field defaults to 0/:ref:`HUNDRED
   //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
