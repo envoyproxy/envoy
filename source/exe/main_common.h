@@ -106,6 +106,12 @@ public:
   static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
                                        bool hot_restart_enabled);
 
+  /**
+   * @return a pointer to the server instance, or nullptr if initialized into
+   *         validation mode.
+   */
+  Server::Instance* server() { return base_.server(); }
+
 private:
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs;

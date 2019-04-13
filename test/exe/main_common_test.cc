@@ -308,7 +308,7 @@ TEST_P(AdminRequestTest, AdminRequestContentionEnabled) {
   waitForEnvoyRun();
 
   // Induce contention to guarantee a non-zero num_contentions count.
-  Thread::TestUtil::ContentionGenerator contention_generator;
+  Thread::TestUtil::ContentionGenerator contention_generator(main_common_->server()->api());
   contention_generator.generateContention(MutexTracerImpl::getOrCreateTracer());
 
   std::string response = adminRequest("/contention", "GET");
