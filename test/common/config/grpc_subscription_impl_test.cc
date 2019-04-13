@@ -37,12 +37,11 @@ TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
 TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   startSubscription({"cluster0", "cluster1"});
   verifyStats(1, 0, 0, 0, 0);
-  Http::HeaderMapPtr trailers{new Http::TestHeaderMapImpl{}};
-  subscription_->grpcMux().onReceiveTrailingMetadata(std::move(trailers));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(random_, random());
-  subscription_->grpcMux().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
+  subscription_->grpcMux().grpcStreamForTest().onRemoteClose(Grpc::Status::GrpcStatus::Canceled,
+                                                             "");
   verifyStats(2, 0, 0, 1, 0);
   verifyControlPlaneStats(0);
 

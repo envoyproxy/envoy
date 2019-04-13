@@ -114,7 +114,7 @@ TEST(HttpTracerUtilityTest, IsTracing) {
 TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
   const std::string path(300, 'a');
   const std::string path_prefix = "http://";
-  const std::string expected_path(128, 'a');
+  const std::string expected_path(256, 'a');
   NiceMock<MockSpan> span;
 
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "id"},
@@ -142,7 +142,7 @@ TEST(HttpConnManFinalizerImpl, OriginalAndLongPath) {
 TEST(HttpConnManFinalizerImpl, NoGeneratedId) {
   const std::string path(300, 'a');
   const std::string path_prefix = "http://";
-  const std::string expected_path(128, 'a');
+  const std::string expected_path(256, 'a');
   NiceMock<MockSpan> span;
 
   Http::TestHeaderMapImpl request_headers{

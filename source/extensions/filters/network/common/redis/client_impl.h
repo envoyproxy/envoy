@@ -10,6 +10,7 @@
 #include "common/common/hash.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/singleton/const_singleton.h"
 #include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/common/redis/client.h"
@@ -24,6 +25,13 @@ namespace Client {
 // TODO(mattklein123): Circuit breaking
 // TODO(rshriram): Fault injection
 
+struct RedirectionValues {
+  const std::string ASK = "ASK";
+  const std::string MOVED = "MOVED";
+};
+
+typedef ConstSingleton<RedirectionValues> RedirectionResponse;
+
 class ConfigImpl : public Config {
 public:
   ConfigImpl(
@@ -32,10 +40,12 @@ public:
   bool disableOutlierEvents() const override { return false; }
   std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
   bool enableHashtagging() const override { return enable_hashtagging_; }
+  bool enableRedirection() const override { return enable_redirection_; }
 
 private:
   const std::chrono::milliseconds op_timeout_;
   const bool enable_hashtagging_;
+  const bool enable_redirection_;
 };
 
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {

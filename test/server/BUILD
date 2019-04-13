@@ -81,21 +81,12 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "init_manager_impl_test",
-    srcs = ["init_manager_impl_test.cc"],
-    deps = [
-        "//source/server:init_manager_lib",
-        "//test/mocks:common_lib",
-        "//test/mocks/init:init_mocks",
-    ],
-)
-
-envoy_cc_test(
     name = "guarddog_impl_test",
     srcs = ["guarddog_impl_test.cc"],
     deps = [
         "//include/envoy/common:time_interface",
         "//source/common/api:api_lib",
+        "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/server:guarddog_lib",

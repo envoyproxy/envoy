@@ -41,13 +41,45 @@ using testing::Not;
 
 namespace Envoy {
 
+void setDoNotValidateRouteConfig(
+    envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+  auto* route_config = hcm.mutable_route_config();
+  route_config->mutable_validate_clusters()->set_value(false);
+};
+
 // Tests for DownstreamProtocolIntegrationTest will be run with all protocols
 // (H1/H2 downstream) but only H1 upstreams.
 //
 // This is useful for things which will likely not differ based on upstream
 // behavior, for example "how does Envoy handle duplicate content lengths from
 // downstream"?
-typedef HttpProtocolIntegrationTest DownstreamProtocolIntegrationTest;
+class DownstreamProtocolIntegrationTest : public HttpProtocolIntegrationTest {
+protected:
+  void changeHeadersForStopAllTests(Http::TestHeaderMapImpl& headers, bool set_buffer_limit) {
+    headers.addCopy("content_size", std::to_string(count_ * size_));
+    headers.addCopy("added_size", std::to_string(added_decoded_data_size_));
+    headers.addCopy("is_first_trigger", "value");
+    if (set_buffer_limit) {
+      headers.addCopy("buffer_limit", std::to_string(buffer_limit_));
+    }
+  }
+
+  void verifyUpStreamRequestAfterStopAllFilter() {
+    if (downstreamProtocol() == Http::CodecClient::Type::HTTP2) {
+      // decode-headers-return-stop-all-filter calls addDecodedData in decodeData and
+      // decodeTrailers. 2 decoded data were added.
+      EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 2, upstream_request_->bodyLength());
+    } else {
+      EXPECT_EQ(count_ * size_ + added_decoded_data_size_ * 1, upstream_request_->bodyLength());
+    }
+    EXPECT_EQ(true, upstream_request_->complete());
+  }
+
+  const int count_ = 70;
+  const int size_ = 1000;
+  const int added_decoded_data_size_ = 1;
+  const int buffer_limit_ = 100;
+};
 
 // Tests for ProtocolIntegrationTest will be run with the full mesh of H1/H2
 // downstream and H1/H2 upstreams.
@@ -71,9 +103,11 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
 
 // Add a route that uses unknown cluster (expect 404 Not Found).
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
-  config_helper_.addRoute("foo.com", "/unknown", "unknown_cluster", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE);
+  config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
+  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
+  host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
+      envoy::api::v2::route::RouteAction::NOT_FOUND);
+  config_helper_.addVirtualHost(host);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -84,9 +118,11 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
 
 // Add a route that uses unknown cluster (expect 503 Service Unavailable).
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
-  config_helper_.addRoute("foo.com", "/unknown", "unknown_cluster", false,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::NONE);
+  config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
+  auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
+  host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
+      envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE);
+  config_helper_.addVirtualHost(host);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -97,9 +133,9 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
 
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
 TEST_P(ProtocolIntegrationTest, RouterRedirect) {
-  config_helper_.addRoute("www.redirect.com", "/", "cluster_0", true,
-                          envoy::api::v2::route::RouteAction::SERVICE_UNAVAILABLE,
-                          envoy::api::v2::route::VirtualHost::ALL);
+  auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
+  host.set_require_tls(envoy::api::v2::route::VirtualHost::ALL);
+  config_helper_.addVirtualHost(host);
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -230,9 +266,9 @@ TEST_P(ProtocolIntegrationTest, Retry) {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request
 // and updated after the request is retried.
 TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
-  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  host.set_include_request_attempt_count(true);
+  config_helper_.addVirtualHost(host);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response =
@@ -280,13 +316,12 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
 
   Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
 
-  envoy::api::v2::route::RetryPolicy retry_policy;
-  retry_policy.mutable_retry_priority()->set_name(factory.name());
-
   // Add route with custom retry policy
-  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, retry_policy);
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  host.set_include_request_attempt_count(true);
+  auto retry_policy = host.mutable_routes(0)->mutable_route()->mutable_retry_policy();
+  retry_policy->mutable_retry_priority()->set_name(factory.name());
+  config_helper_.addVirtualHost(host);
 
   // Use load assignments instead of static hosts. Necessary in order to use priorities.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -356,13 +391,12 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   TestHostPredicateFactory predicate_factory;
   Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
 
-  envoy::api::v2::route::RetryPolicy retry_policy;
-  retry_policy.add_retry_host_predicate()->set_name(predicate_factory.name());
-
   // Add route with custom retry policy
-  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, retry_policy);
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  host.set_include_request_attempt_count(true);
+  auto retry_policy = host.mutable_routes(0)->mutable_route()->mutable_retry_policy();
+  retry_policy->add_retry_host_predicate()->set_name(predicate_factory.name());
+  config_helper_.addVirtualHost(host);
 
   // We want to work with a cluster with two hosts.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -745,6 +779,230 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersRejected) {
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
   testLargeRequestHeaders(95, 96);
+}
+
+// Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
+// once after iteration is resumed.
+TEST_P(DownstreamProtocolIntegrationTest, testDecodeHeadersReturnsStopAll) {
+  config_helper_.addFilter(R"EOF(
+name: call-decodedata-once-filter
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: decode-headers-return-stop-all-filter
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: passthrough-filter
+)EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a request with headers and data.
+  changeHeadersForStopAllTests(default_request_headers_, false);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  for (int i = 0; i < count_ - 1; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
+  }
+  // Sleeps for 1s in order to be consistent with testDecodeHeadersReturnsStopAllWatermark.
+  sleep(1);
+  codec_client_->sendData(*request_encoder_, size_, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, upstream_request_->bodyLength());
+  EXPECT_EQ(true, upstream_request_->complete());
+
+  // Sends a request with headers, data, and trailers.
+  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_2.first;
+  response = std::move(encoder_decoder_2.second);
+  for (int i = 0; i < count_; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
+  }
+  Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  verifyUpStreamRequestAfterStopAllFilter();
+}
+
+// Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
+// limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
+TEST_P(DownstreamProtocolIntegrationTest, testDecodeHeadersReturnsStopAllWatermark) {
+  config_helper_.addFilter(R"EOF(
+name: decode-headers-return-stop-all-filter
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: passthrough-filter
+)EOF");
+
+  // Sets initial stream window to min value to make the client sensitive to a low watermark.
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
+            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a request with headers and data.
+  changeHeadersForStopAllTests(default_request_headers_, true);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  for (int i = 0; i < count_ - 1; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
+  }
+  // Gives buffer 1s to react to buffer limit.
+  sleep(1);
+  codec_client_->sendData(*request_encoder_, size_, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, upstream_request_->bodyLength());
+  EXPECT_EQ(true, upstream_request_->complete());
+
+  // Sends a request with headers, data, and trailers.
+  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_2.first;
+  response = std::move(encoder_decoder_2.second);
+  for (int i = 0; i < count_ - 1; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
+  }
+  // Gives buffer 1s to react to buffer limit.
+  sleep(1);
+  codec_client_->sendData(*request_encoder_, size_, false);
+  Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  verifyUpStreamRequestAfterStopAllFilter();
+}
+
+// Test two filters that return StopAllIterationAndBuffer back-to-back.
+TEST_P(DownstreamProtocolIntegrationTest, testTwoFiltersDecodeHeadersReturnsStopAll) {
+  config_helper_.addFilter(R"EOF(
+name: decode-headers-return-stop-all-filter
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: decode-headers-return-stop-all-filter
+)EOF");
+  config_helper_.addFilter(R"EOF(
+name: passthrough-filter
+)EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a request with headers and data.
+  changeHeadersForStopAllTests(default_request_headers_, false);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  for (int i = 0; i < count_ - 1; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
+  }
+  codec_client_->sendData(*request_encoder_, size_, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, upstream_request_->bodyLength());
+  EXPECT_EQ(true, upstream_request_->complete());
+
+  // Sends a request with headers, data, and trailers.
+  auto encoder_decoder_2 = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder_2.first;
+  response = std::move(encoder_decoder_2.second);
+  for (int i = 0; i < count_; i++) {
+    codec_client_->sendData(*request_encoder_, size_, false);
+  }
+  Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  verifyUpStreamRequestAfterStopAllFilter();
+}
+
+// Tests encodeHeaders() returns StopAllIterationAndBuffer.
+TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAll) {
+  config_helper_.addFilter(R"EOF(
+name: encode-headers-return-stop-all-filter
+)EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Upstream responds with headers, data and trailers.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  waitForNextUpstreamRequest();
+
+  changeHeadersForStopAllTests(default_response_headers_, false);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  for (int i = 0; i < count_ - 1; i++) {
+    upstream_request_->encodeData(size_, false);
+  }
+  // Sleeps for 1s in order to be consistent with testEncodeHeadersReturnsStopAllWatermark.
+  sleep(1);
+  upstream_request_->encodeData(size_, false);
+  Http::TestHeaderMapImpl response_trailers{{"response", "trailer"}};
+  upstream_request_->encodeTrailers(response_trailers);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
+}
+
+// Tests encodeHeaders() returns StopAllIterationAndWatermark.
+TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAllWatermark) {
+  config_helper_.addFilter(R"EOF(
+name: encode-headers-return-stop-all-filter
+)EOF");
+
+  // Sets initial stream window to min value to make the upstream sensitive to a low watermark.
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
+            Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Upstream responds with headers, data and trailers.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  waitForNextUpstreamRequest();
+
+  changeHeadersForStopAllTests(default_response_headers_, true);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  for (int i = 0; i < count_ - 1; i++) {
+    upstream_request_->encodeData(size_, false);
+  }
+  // Gives buffer 1s to react to buffer limit.
+  sleep(1);
+  upstream_request_->encodeData(size_, false);
+  Http::TestHeaderMapImpl response_trailers{{"response", "trailer"}};
+  upstream_request_->encodeTrailers(response_trailers);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(count_ * size_ + added_decoded_data_size_, response->body().size());
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

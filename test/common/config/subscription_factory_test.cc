@@ -32,12 +32,13 @@ public:
   SubscriptionFactoryTest()
       : http_request_(&cm_.async_client_), api_(Api::createApiForTest(stats_store_)) {}
 
-  std::unique_ptr<Subscription<envoy::api::v2::ClusterLoadAssignment>>
+  std::unique_ptr<Subscription>
   subscriptionFromConfigSource(const envoy::api::v2::core::ConfigSource& config) {
-    return SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::ClusterLoadAssignment>(
+    return SubscriptionFactory::subscriptionFromConfigSource(
         config, local_info_, dispatcher_, cm_, random_, stats_store_,
         "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
-        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints", *api_);
+        "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints",
+        Config::TypeUrl::get().ClusterLoadAssignment, *api_);
   }
 
   Upstream::MockClusterManager cm_;

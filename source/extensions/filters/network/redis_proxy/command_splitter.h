@@ -50,14 +50,14 @@ public:
   virtual ~Instance() {}
 
   /**
-   * Make a split redis request.
-   * @param request supplies the split request to make.
+   * Make a split redis request capable of being retried/redirected.
+   * @param request supplies the split request to make (ownership transferred to call).
    * @param callbacks supplies the split request completion callbacks.
    * @return SplitRequestPtr a handle to the active request or nullptr if the request has already
    *         been satisfied (via onResponse() being called). The splitter ALWAYS calls
    *         onResponse() for a given request.
    */
-  virtual SplitRequestPtr makeRequest(const Common::Redis::RespValue& request,
+  virtual SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                                       SplitCallbacks& callbacks) PURE;
 };
 

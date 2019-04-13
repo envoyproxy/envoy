@@ -206,13 +206,13 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version,
                                          const std::string& config)
-    : HttpIntegrationTest::HttpIntegrationTest(downstream_protocol,
-                                               [version](int) {
-                                                 return Network::Utility::parseInternetAddress(
-                                                     Network::Test::getAnyAddressString(version),
-                                                     0);
-                                               },
-                                               version, config) {}
+    : HttpIntegrationTest::HttpIntegrationTest(
+          downstream_protocol,
+          [version](int) {
+            return Network::Utility::parseInternetAddress(
+                Network::Test::getAnyAddressString(version), 0);
+          },
+          version, config) {}
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          const InstanceConstSharedPtrFn& upstream_address_fn,
@@ -226,10 +226,28 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
+void HttpIntegrationTest::useAccessLog() {
+  access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_));
+}
+
 HttpIntegrationTest::~HttpIntegrationTest() {
   cleanupUpstreamAndDownstream();
   test_server_.reset();
   fake_upstreams_.clear();
+}
+
+std::string HttpIntegrationTest::waitForAccessLog(const std::string& filename) {
+  // Wait a max of 1s for logs to flush to disk.
+  for (int i = 0; i < 1000; ++i) {
+    std::string contents = TestEnvironment::readFileToStringForTest(filename, false);
+    if (contents.length() > 0) {
+      return contents;
+    }
+    usleep(1000);
+  }
+  RELEASE_ASSERT(0, "Timed out waiting for access log");
+  return "";
 }
 
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
@@ -579,9 +597,10 @@ void HttpIntegrationTest::testRetry() {
 // Tests that the x-envoy-attempt-count header is properly set on the upstream request
 // and updated after the request is retried.
 void HttpIntegrationTest::testRetryAttemptCountHeader() {
-  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
-                          envoy::api::v2::route::RouteAction::NOT_FOUND,
-                          envoy::api::v2::route::VirtualHost::NONE, {}, true);
+  auto host = config_helper_.createVirtualHost("host", "/test_retry");
+  host.set_include_request_attempt_count(true);
+  config_helper_.addVirtualHost(host);
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response =

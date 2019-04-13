@@ -487,6 +487,7 @@ public:
   COUNTER  (upstream_cx_protocol_error)                                                            \
   COUNTER  (upstream_cx_max_requests)                                                              \
   COUNTER  (upstream_cx_none_healthy)                                                              \
+  COUNTER  (upstream_cx_pool_overflow)                                                             \
   COUNTER  (upstream_rq_total)                                                                     \
   GAUGE    (upstream_rq_active)                                                                    \
   COUNTER  (upstream_rq_completed)                                                                 \
@@ -544,10 +545,12 @@ public:
   OPEN_GAUGE      (rq_pending_open)                                                                \
   OPEN_GAUGE      (rq_open)                                                                        \
   OPEN_GAUGE      (rq_retry_open)                                                                  \
+  OPEN_GAUGE      (cx_pool_open)                                                                   \
   REMAINING_GAUGE (remaining_cx)                                                                   \
   REMAINING_GAUGE (remaining_pending)                                                              \
   REMAINING_GAUGE (remaining_rq)                                                                   \
-  REMAINING_GAUGE (remaining_retries)
+  REMAINING_GAUGE (remaining_retries)                                                              \
+  REMAINING_GAUGE (remaining_cx_pools)
 // clang-format on
 
 /**

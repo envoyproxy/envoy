@@ -16,15 +16,19 @@ then
     exit 1
   fi
   # Check the version_history.rst contains current release version.
-  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst
+  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst \
+    || (echo "Git tag not found in version_history.rst" && exit 1)
+
   # Now that we now there is a match, we can use the tag.
   export ENVOY_DOCS_VERSION_STRING="tag-$CIRCLE_TAG"
   export ENVOY_DOCS_RELEASE_LEVEL=tagged
+  export ENVOY_BLOB_SHA="$CIRCLE_TAG"
 else
   BUILD_SHA=$(git rev-parse HEAD)
   VERSION_NUM=$(cat VERSION)
   export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-"${BUILD_SHA:0:6}"
   export ENVOY_DOCS_RELEASE_LEVEL=pre-release
+  export ENVOY_BLOB_SHA="$BUILD_SHA"
 fi
 
 SCRIPT_DIR=$(dirname "$0")
@@ -42,7 +46,8 @@ source_venv "$BUILD_DIR"
 pip install -r "${SCRIPT_DIR}"/requirements.txt
 
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
-  tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED  --spawn_strategy=standalone
+  tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED \
+  --action_env=ENVOY_BLOB_SHA --spawn_strategy=standalone
 
 # These are the protos we want to put in docs, this list will grow.
 # TODO(htuch): Factor this out of this script.
@@ -100,6 +105,9 @@ PROTO_RST="
   /envoy/config/filter/http/tap/v2alpha/tap/envoy/config/filter/http/tap/v2alpha/tap.proto.rst
   /envoy/config/filter/http/transcoder/v2/transcoder/envoy/config/filter/http/transcoder/v2/transcoder.proto.rst
   /envoy/config/filter/listener/original_src/v2alpha1/original_src/envoy/config/filter/listener/original_src/v2alpha1/original_src.proto.rst
+  /envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy/envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.proto.rst
+  /envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy/envoy/config/filter/network/dubbo_proxy/v2alpha1/route.proto.rst
+  /envoy/config/filter/dubbo/router/v2alpha1/router/envoy/config/filter/dubbo/router/v2alpha1/router.proto.rst
   /envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth/envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.proto.rst
   /envoy/config/filter/network/ext_authz/v2/ext_authz/envoy/config/filter/network/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/network/http_connection_manager/v2/http_connection_manager/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.rst

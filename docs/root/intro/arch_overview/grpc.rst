@@ -40,9 +40,9 @@ Envoy supports two gRPC bridges:
 gRPC services
 -------------
 
-In addition to proxying gRPC on the data plane, Envoy make use of gRPC for its
+In addition to proxying gRPC on the data plane, Envoy makes use of gRPC for its
 control plane, where it :ref:`fetches configuration from management server(s)
-<config_overview_v2>` and also in filters, for example for :ref:`rate limiting
+<config_overview_v2>` and in filters, such as for :ref:`rate limiting
 <config_http_filters_rate_limit>` or authorization checks. We refer to these as
 *gRPC services*.
 
