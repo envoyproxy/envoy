@@ -119,6 +119,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:mutex_tracer_lib",
         "//test/test_common:contention_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
