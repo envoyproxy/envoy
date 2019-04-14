@@ -521,7 +521,7 @@ TEST_F(HttpFilterTest, ClearCache) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_CALL(filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
@@ -560,7 +560,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_CALL(filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
@@ -598,7 +598,7 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_CALL(filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
@@ -705,7 +705,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"}};
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
-  EXPECT_CALL(*client_, check(_, _, _))
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>()))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             callbacks.onComplete(std::move(response_ptr));
@@ -785,7 +785,7 @@ TEST_F(HttpFilterTestParam, DisabledOnRoute) {
 
   // baseline: make sure that when not disabled, check is called
   test_disable(false);
-  EXPECT_CALL(*client_, check(_, _, _)).Times(1);
+  EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>())).Times(1);
   // Engage the filter.
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
