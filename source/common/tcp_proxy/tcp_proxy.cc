@@ -475,7 +475,7 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
       if (upstream_conn_data_ != nullptr) {
         if (upstream_conn_data_->connection().state() != Network::Connection::State::Closed) {
           config_->drainManager().add(config_->sharedConfig(), std::move(upstream_conn_data_),
-                                      std::move(upstream_callbacks_), std::move(idle_timer_),
+                                      upstream_callbacks_, std::move(idle_timer_),
                                       read_callbacks_->upstreamHost());
         } else {
           upstream_conn_data_.reset();

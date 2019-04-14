@@ -11,7 +11,7 @@ bool SpanBuffer::addSpan(const Span& span) {
     // Buffer full
     return false;
   }
-  span_buffer_.push_back(std::move(span));
+  span_buffer_.push_back(span);
 
   return true;
 }

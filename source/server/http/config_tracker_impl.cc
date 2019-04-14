@@ -5,9 +5,8 @@ namespace Server {
 
 ConfigTracker::EntryOwnerPtr ConfigTrackerImpl::add(const std::string& key, Cb cb) {
   auto insert_result = map_->emplace(key, std::move(cb));
-  return insert_result.second
-             ? std::make_unique<ConfigTrackerImpl::EntryOwnerImpl>(map_, std::move(key))
-             : nullptr;
+  return insert_result.second ? std::make_unique<ConfigTrackerImpl::EntryOwnerImpl>(map_, key)
+                              : nullptr;
 }
 
 const ConfigTracker::CbsMap& ConfigTrackerImpl::getCallbacksMap() const { return *map_; }
