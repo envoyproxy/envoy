@@ -30,6 +30,7 @@ envoy_cc_test_library(
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
+        "@envoy_api//envoy/config/accesslog/v2:file_cc",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
         "@envoy_api//envoy/config/transport_socket/tap/v2alpha:tap_cc",
     ],

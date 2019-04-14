@@ -480,6 +480,7 @@ public:
   COUNTER  (upstream_cx_protocol_error)                                                            \
   COUNTER  (upstream_cx_max_requests)                                                              \
   COUNTER  (upstream_cx_none_healthy)                                                              \
+  COUNTER  (upstream_cx_pool_overflow)                                                             \
   COUNTER  (upstream_rq_total)                                                                     \
   GAUGE    (upstream_rq_active)                                                                    \
   COUNTER  (upstream_rq_completed)                                                                 \
