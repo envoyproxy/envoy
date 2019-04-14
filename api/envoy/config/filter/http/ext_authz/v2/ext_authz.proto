@@ -11,6 +11,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 import "envoy/api/v2/core/http_uri.proto";
 
+import "envoy/type/http_status.proto";
 import "envoy/type/matcher/string.proto";
 
 import "validate/validate.proto";
@@ -53,6 +54,10 @@ message ExtAuthz {
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   BufferSettings with_request_body = 5;
+
+  // Sets the HTTP status that is returned to the client when a network error compromises the comunication between the filter and 
+  // the authorization server. The default status is HTTP 403 Forbidden.
+  envoy.type.HttpStatus status_on_error = 7;
 }
 
 // Configuration for buffering the request data.

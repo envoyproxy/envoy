@@ -152,13 +152,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   ENVOY_STREAM_LOG(trace, "ext_authz filter received status code {}", *callbacks_,
                    enumToInt(response->status_code));
 
+  const bool is_error = response->status == CheckStatus::Error;
+
   // We fail open/fail close based of filter config
   // if there is an error contacting the service.
-  if (response->status == CheckStatus::Denied ||
-      (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
+  if (response->status == CheckStatus::Denied || (is_error && !config_->failureModeAllow())) {
     ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request", *callbacks_);
     callbacks_->sendLocalReply(
-        response->status_code, response->body,
+        is_error ? config_->statusOnError() : response->status_code, response->body,
         [& headers = response->headers_to_add,
          &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,

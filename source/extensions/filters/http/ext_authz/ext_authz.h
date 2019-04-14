@@ -12,6 +12,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "envoy/type/http_status.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
@@ -41,7 +43,8 @@ public:
                Runtime::Loader& runtime, Http::Context& http_context)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
-        max_request_bytes_(config.with_request_body().max_request_bytes()), local_info_(local_info),
+        max_request_bytes_(config.with_request_body().max_request_bytes()), 
+        status_on_error_(toErrorCode(config.status_on_error())), local_info_(local_info), 
         scope_(scope), runtime_(runtime), http_context_(http_context) {}
 
   bool allowPartialMessage() const { return allow_partial_message_; }
@@ -49,6 +52,8 @@ public:
   bool withRequestBody() const { return max_request_bytes_ > 0; }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
+
+  Http::Code statusOnError() const { return status_on_error_; }
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
@@ -61,9 +66,17 @@ public:
   Http::Context& httpContext() { return http_context_; }
 
 private:
+  Http::Code toOnError(const envoy::type::HttpStatus status) const {
+    if (status.code() != 0) {
+      return static_cast<Http::Code>(status.code());   
+    }
+    return Http::Code::Forbidden;
+  }
+
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
   const uint32_t max_request_bytes_;
+  const Http::Code status_on_error_;
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
