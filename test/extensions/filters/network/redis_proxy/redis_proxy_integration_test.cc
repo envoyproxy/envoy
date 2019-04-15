@@ -207,7 +207,8 @@ public:
    * @param request supplies Redis client data to transmit to the Redis server.
    * @param response supplies Redis server data to transmit to the client.
    */
-  void simpleRoundtripToUpstream(FakeUpstreamPtr& upstream, const std::string& request, const std::string& response);
+  void simpleRoundtripToUpstream(FakeUpstreamPtr& upstream, const std::string& request,
+                                 const std::string& response);
 
   /**
    * Simple bi-directional test between a fake Redis client and proxy server.
@@ -242,8 +243,7 @@ public:
 
 class RedisProxyWithRoutesIntegrationTest : public RedisProxyIntegrationTest {
 public:
-  RedisProxyWithRoutesIntegrationTest()
-    : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES, 6) {}
+  RedisProxyWithRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES, 6) {}
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
@@ -271,8 +271,9 @@ void RedisProxyIntegrationTest::initialize() {
   ON_CALL(*mock_rng_, random()).WillByDefault(Return(0));
 }
 
-void RedisProxyIntegrationTest::simpleRoundtripToUpstream(FakeUpstreamPtr& upstream, const std::string& request,
-                                                         const std::string& response) {
+void RedisProxyIntegrationTest::simpleRoundtripToUpstream(FakeUpstreamPtr& upstream,
+                                                          const std::string& request,
+                                                          const std::string& response) {
   std::string proxy_to_server;
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   redis_client->write(request);
@@ -480,13 +481,16 @@ TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPref
   initialize();
 
   // roundtrip to cluster_0 (catch_all route)
-  simpleRoundtripToUpstream(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n");
+  simpleRoundtripToUpstream(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}),
+                            "$3\r\nbar\r\n");
 
   // roundtrip to cluster_1 (prefix "foo:" route)
-  simpleRoundtripToUpstream(fake_upstreams_[2], makeBulkStringArray({"get", "foo:123"}), "$3\r\nbar\r\n");
+  simpleRoundtripToUpstream(fake_upstreams_[2], makeBulkStringArray({"get", "foo:123"}),
+                            "$3\r\nbar\r\n");
 
   // roundtrip to cluster_2 (prefix "baz:" route)
-  simpleRoundtripToUpstream(fake_upstreams_[4], makeBulkStringArray({"get", "baz:123"}), "$3\r\nbar\r\n");
+  simpleRoundtripToUpstream(fake_upstreams_[4], makeBulkStringArray({"get", "baz:123"}),
+                            "$3\r\nbar\r\n");
 }
 
 } // namespace
