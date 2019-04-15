@@ -1,6 +1,5 @@
 #include "common/stats/thread_local_store.h"
 
-#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <list>

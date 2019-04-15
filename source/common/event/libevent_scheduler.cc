@@ -51,6 +51,7 @@ void LibeventScheduler::loopExit() { event_base_loopexit(libevent_.get(), nullpt
 
 void LibeventScheduler::initializeStats(DispatcherStats* stats) {
   stats_ = stats;
+  // These are thread safe.
   evwatch_prepare_new(libevent_.get(), &onPrepare, this);
   evwatch_check_new(libevent_.get(), &onCheck, this);
 }
@@ -64,7 +65,7 @@ void LibeventScheduler::onPrepare(evwatch*, const evwatch_prepare_cb_info* info,
   // between the prepare time and the check time immediately after polling. These are compared in
   // onCheck to compute the poll_delay stat.
   self->timeout_set_ = evwatch_prepare_get_timeout(info, &self->timeout_);
-  evutil_gettimeofday(&self->prepare_time_, NULL);
+  evutil_gettimeofday(&self->prepare_time_, nullptr);
 
   // If we have a check time available from a previous iteration of the event loop (that is, all but
   // the first), compute the loop_duration stat.
@@ -82,7 +83,7 @@ void LibeventScheduler::onCheck(evwatch*, const evwatch_check_cb_info*, void* ar
   // Record check time for this iteration of the event loop. Use this together with prepare time
   // from above to compute the actual polling duration, and store it for the next iteration of the
   // event loop to compute the loop duration.
-  evutil_gettimeofday(&self->check_time_, NULL);
+  evutil_gettimeofday(&self->check_time_, nullptr);
   if (self->timeout_set_) {
     timeval delta, delay;
     evutil_timersub(&self->check_time_, &self->prepare_time_, &delta);
