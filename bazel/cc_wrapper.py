@@ -71,6 +71,11 @@ def main():
   else:
     argv += sys.argv[1:]
 
+  # Bazel will add -fuse-ld=gold in some cases, gcc/clang will take the last -fuse-ld argument,
+  # so whenever we see lld once, add it to the end.
+  if "-fuse-ld=lld" in argv:
+    argv.append("-fuse-ld=lld")
+
   # Add compiler-specific options
   if "clang" in compiler:
     # This ensures that STL symbols are included.

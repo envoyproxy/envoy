@@ -35,8 +35,7 @@ ConnPoolMap<KEY_TYPE, POOL_TYPE>::getPool(KEY_TYPE key, const PoolFactory& facto
   if (!connPoolResource.canCreate()) {
     // We're full. Try to free up a pool. If we can't, bail out.
     if (!freeOnePool()) {
-      // TODO(klarose): Add some explicit counters for failure cases here, similar to the other
-      // circuit breakers.
+      host_->cluster().stats().upstream_cx_pool_overflow_.inc();
       return absl::nullopt;
     }
 
