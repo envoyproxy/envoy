@@ -26,7 +26,6 @@ namespace {
 
 // TODO(jmarantz): switch this to simulated-time after debugging flakes.
 class HdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                           public Event::TestUsingSimulatedTime,
                            public HttpIntegrationTest {
 public:
   HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
