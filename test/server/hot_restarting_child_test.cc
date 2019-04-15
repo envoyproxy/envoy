@@ -24,9 +24,6 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
-using SimpleMetric = envoy::admin::v2alpha::SimpleMetric;
-
 class HotRestartingChildTest : public testing::Test {
 public:
   HotRestartingChildTest() : os_calls_injector_(InitOsCalls()), hot_restarting_child_(123, 456) {
@@ -39,19 +36,17 @@ public:
     return &os_sys_calls_;
   }
 
-  void addGaugeProto(HotRestartMessage::Reply::Stats& stats, const std::string& name,
+  void addGaugeProto(envoy::HotRestartMessage::Reply::Stats& stats, const std::string& name,
                      uint64_t value) {
     auto* gauge_proto = stats.mutable_gauges()->Add();
     gauge_proto->set_name(name);
-    gauge_proto->set_type(SimpleMetric::GAUGE);
     gauge_proto->set_value(value);
   }
 
-  void addCounterProto(HotRestartMessage::Reply::Stats& stats, const std::string& name,
+  void addCounterProto(envoy::HotRestartMessage::Reply::Stats& stats, const std::string& name,
                        uint64_t value) {
     auto* counter_proto = stats.mutable_counters()->Add();
     counter_proto->set_name(name);
-    counter_proto->set_type(SimpleMetric::COUNTER);
     counter_proto->set_value(value);
   }
 
@@ -62,7 +57,7 @@ public:
 };
 
 TEST_F(HotRestartingChildTest, basicDefaultAccumulationImport) {
-  HotRestartMessage::Reply::Stats stats;
+  envoy::HotRestartMessage::Reply::Stats stats;
   addGaugeProto(stats, "whywassixafraidofseven", 111);
   addCounterProto(stats, "draculaer", 3);
 
@@ -73,7 +68,7 @@ TEST_F(HotRestartingChildTest, basicDefaultAccumulationImport) {
 }
 
 TEST_F(HotRestartingChildTest, multipleImportsWithAccumulationLogic) {
-  HotRestartMessage::Reply::Stats stats1;
+  envoy::HotRestartMessage::Reply::Stats stats1;
   addGaugeProto(stats1, "whywassixafraidofseven", 100);
   addCounterProto(stats1, "draculaer", 2);
   hot_restarting_child_.mergeParentStats(store_, stats1);
@@ -82,7 +77,7 @@ TEST_F(HotRestartingChildTest, multipleImportsWithAccumulationLogic) {
   EXPECT_EQ(3, store_.counter("draculaer").value());
 
   // The parent's gauge drops by 1, and its counter increases by 1.
-  HotRestartMessage::Reply::Stats stats2;
+  envoy::HotRestartMessage::Reply::Stats stats2;
   addGaugeProto(stats2, "whywassixafraidofseven", 99);
   addCounterProto(stats2, "draculaer", 3);
   hot_restarting_child_.mergeParentStats(store_, stats2);
@@ -101,7 +96,7 @@ TEST_F(HotRestartingChildTest, multipleImportsWithAccumulationLogic) {
   // Our counter and the parent's counter both increase by 1, total increase of 2.
   store_.gauge("whywassixafraidofseven").sub(5);
   store_.counter("draculaer").add(1);
-  HotRestartMessage::Reply::Stats stats3;
+  envoy::HotRestartMessage::Reply::Stats stats3;
   addGaugeProto(stats3, "whywassixafraidofseven", 104);
   addCounterProto(stats3, "draculaer", 4);
   hot_restarting_child_.mergeParentStats(store_, stats3);
@@ -114,7 +109,7 @@ TEST_F(HotRestartingChildTest, multipleImportsWithAccumulationLogic) {
 TEST_F(HotRestartingChildTest, exclusionsNotImported) {
   store_.gauge("some.sort.of.version").set(12345);
 
-  HotRestartMessage::Reply::Stats stats;
+  envoy::HotRestartMessage::Reply::Stats stats;
   addGaugeProto(stats, "some.sort.of.version", 67890);
   addGaugeProto(stats, "child.doesnt.have.this.version", 111);
 
@@ -139,7 +134,7 @@ TEST_F(HotRestartingChildTest, exclusionsNotImported) {
 
 // The OnlyImportWhenUnused logic should overwrite an undefined gauge, but not a defined one.
 TEST_F(HotRestartingChildTest, onlyImportWhenUnused) {
-  HotRestartMessage::Reply::Stats stats;
+  envoy::HotRestartMessage::Reply::Stats stats;
   addGaugeProto(stats, "cluster_manager.active_clusters", 33);
   addGaugeProto(stats, "cluster_manager.warming_clusters", 33);
   addGaugeProto(stats, "cluster.rds.membership_total", 33);
@@ -195,10 +190,10 @@ TEST_F(HotRestartingChildTest, booleanOr) {
   store_.gauge("some.connected_state").set(0);
   store_.gauge("server.live").set(0);
 
-  HotRestartMessage::Reply::Stats stats_with_value0;
+  envoy::HotRestartMessage::Reply::Stats stats_with_value0;
   addGaugeProto(stats_with_value0, "some.connected_state", 0);
   addGaugeProto(stats_with_value0, "server.live", 0);
-  HotRestartMessage::Reply::Stats stats_with_value1;
+  envoy::HotRestartMessage::Reply::Stats stats_with_value1;
   addGaugeProto(stats_with_value1, "some.connected_state", 1);
   addGaugeProto(stats_with_value1, "server.live", 1);
 

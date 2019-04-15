@@ -1,12 +1,10 @@
 syntax = "proto3";
 
-package envoy.api.v2.core;
+package envoy;
 
 option java_outer_classname = "HotRestartProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2.core";
-
-import "envoy/admin/v2alpha/metrics.proto";
+option java_package = "io.envoyproxy.envoy";
 
 message HotRestartMessage {
   // Child->parent requests
@@ -44,9 +42,14 @@ message HotRestartMessage {
       uint64 memory_allocated = 1;
       uint64 num_connections = 2;
 
+      message NamedValue {
+        string name = 1;
+        uint64 value = 2;
+      }
+
       // The parent's current values for various stats in its stats store.
-      repeated envoy.admin.v2alpha.SimpleMetric counters = 3;
-      repeated envoy.admin.v2alpha.SimpleMetric gauges = 4;
+      repeated NamedValue counters = 3;
+      repeated NamedValue gauges = 4;
     }
     oneof reply {
       // When this oneof is of the PassListenSocketReply type, there is a special

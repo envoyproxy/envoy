@@ -102,13 +102,12 @@ public:
   // Server::HotRestart
   void drainParentListeners() override;
   int duplicateParentListenSocket(const std::string& address) override;
-  std::unique_ptr<envoy::api::v2::core::HotRestartMessage> getParentStats() override;
+  std::unique_ptr<envoy::HotRestartMessage> getParentStats() override;
   void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) override;
   void shutdownParentAdmin(ShutdownParentAdminInfo& info) override;
   void terminateParent() override;
-  void mergeParentStats(
-      Stats::StoreRoot& stats_store,
-      const envoy::api::v2::core::HotRestartMessage::Reply::Stats& stats_proto) override;
+  void mergeParentStats(Stats::StoreRoot& stats_store,
+                        const envoy::HotRestartMessage::Reply::Stats& stats_proto) override;
   void shutdown() override;
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }

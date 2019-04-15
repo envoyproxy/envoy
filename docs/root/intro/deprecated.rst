@@ -12,6 +12,7 @@ Deprecated items below are listed in chronological order.
 
 Version 1.11.0 (Pending)
 ========================
+* The --max-stats flag no longer has any effect.
 
 Version 1.10.0 (Apr 5, 2019)
 ============================

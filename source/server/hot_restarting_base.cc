@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Server {
 
-using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
+using HotRestartMessage = envoy::HotRestartMessage;
 
 void HotRestartingBase::initDomainSocketAddress(sockaddr_un* address) {
   memset(address, 0, sizeof(*address));

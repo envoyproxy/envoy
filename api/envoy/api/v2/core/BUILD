@@ -119,12 +119,6 @@ api_go_proto_library(
 )
 
 api_proto_library_internal(
-    name = "hot_restart",
-    srcs = ["hot_restart.proto"],
-    deps = ["//envoy/admin/v2alpha:metrics"],
-)
-
-api_proto_library_internal(
     name = "protocol",
     srcs = ["protocol.proto"],
     visibility = [

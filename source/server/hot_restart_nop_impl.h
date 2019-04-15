@@ -20,14 +20,12 @@ public:
   // Server::HotRestart
   void drainParentListeners() override {}
   int duplicateParentListenSocket(const std::string&) override { return -1; }
-  std::unique_ptr<envoy::api::v2::core::HotRestartMessage> getParentStats() override {
-    return nullptr;
-  }
+  std::unique_ptr<envoy::HotRestartMessage> getParentStats() override { return nullptr; }
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
   void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
   void terminateParent() override {}
-  void mergeParentStats(Stats::StoreRoot&,
-                        const envoy::api::v2::core::HotRestartMessage::Reply::Stats&) override {}
+  void mergeParentStats(Stats::StoreRoot&, const envoy::HotRestartMessage::Reply::Stats&) override {
+  }
   void shutdown() override {}
   std::string version() override { return "disabled"; }
   Thread::BasicLockable& logLock() override { return log_lock_; }

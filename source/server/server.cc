@@ -47,8 +47,6 @@
 namespace Envoy {
 namespace Server {
 
-using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
-
 InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
                            Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                            HotRestart& restarter, Stats::StoreRoot& store,
@@ -152,7 +150,7 @@ void InstanceImpl::flushStats() {
   stats_store_.mergeHistograms([this]() -> void {
     uint64_t parent_memory_allocated = 0;
     uint64_t parent_connections = 0;
-    std::unique_ptr<HotRestartMessage> wrapper_msg = restarter_.getParentStats();
+    std::unique_ptr<envoy::HotRestartMessage> wrapper_msg = restarter_.getParentStats();
     // getParentStats() will happily and cleanly return nullptr if we have no parent.
     if (wrapper_msg) {
       restarter_.mergeParentStats(stats_store_, wrapper_msg->reply().stats());

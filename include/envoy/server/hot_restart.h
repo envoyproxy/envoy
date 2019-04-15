@@ -3,12 +3,13 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/hot_restart.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
+
+#include "source/server/hot_restart.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -46,7 +47,7 @@ public:
    * Retrieve stats from our parent process.
    * @param info will be filled with information from our parent if it can be retrieved.
    */
-  virtual std::unique_ptr<envoy::api::v2::core::HotRestartMessage> getParentStats() PURE;
+  virtual std::unique_ptr<envoy::HotRestartMessage> getParentStats() PURE;
 
   /**
    * Initialize the parent logic of our restarter. Meant to be called after initialization of a
@@ -73,9 +74,8 @@ public:
    * @param stats_store the store whose stats will be updated.
    * @param stats_proto the stats values we are updating with.
    */
-  virtual void
-  mergeParentStats(Stats::StoreRoot& stats_store,
-                   const envoy::api::v2::core::HotRestartMessage::Reply::Stats& stats_proto) PURE;
+  virtual void mergeParentStats(Stats::StoreRoot& stats_store,
+                                const envoy::HotRestartMessage::Reply::Stats& stats_proto) PURE;
 
   /**
    * Shutdown the half of our hot restarter that acts as a parent.

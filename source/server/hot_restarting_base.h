@@ -45,8 +45,7 @@ protected:
   //
   // There is no mechanism to explicitly pair responses to requests. However, the child initiates
   // all exchanges, and blocks until a reply is received, so there is implicit pairing.
-  void sendHotRestartMessage(sockaddr_un& address,
-                             const envoy::api::v2::core::HotRestartMessage& proto);
+  void sendHotRestartMessage(sockaddr_un& address, const envoy::HotRestartMessage& proto);
 
   enum class Blocking { Yes, No };
   // Receive data, possibly enough to build one of our protocol messages.
@@ -54,13 +53,13 @@ protected:
   // If block is false, returns nullptr if we run out of data to receive before a full protocol
   // message is available. In either case, the HotRestartingBase may end up buffering some data for
   // the next protocol message, even if the function returns a protobuf.
-  std::unique_ptr<envoy::api::v2::core::HotRestartMessage> receiveHotRestartMessage(Blocking block);
+  std::unique_ptr<envoy::HotRestartMessage> receiveHotRestartMessage(Blocking block);
 
-  bool replyIsExpectedType(const envoy::api::v2::core::HotRestartMessage* proto,
-                           envoy::api::v2::core::HotRestartMessage::Reply::ReplyCase oneof_type);
+  bool replyIsExpectedType(const envoy::HotRestartMessage* proto,
+                           envoy::HotRestartMessage::Reply::ReplyCase oneof_type);
 
 private:
-  void getPassedFdIfPresent(envoy::api::v2::core::HotRestartMessage* out, msghdr* message);
+  void getPassedFdIfPresent(envoy::HotRestartMessage* out, msghdr* message);
 
   const uint64_t base_id_;
   int my_domain_socket_{-1};

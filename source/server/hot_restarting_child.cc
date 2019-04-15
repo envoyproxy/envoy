@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Server {
 
-using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
+using HotRestartMessage = envoy::HotRestartMessage;
 
 HotRestartingChild::HotRestartingChild(int base_id, int restart_epoch)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {

@@ -8,8 +8,7 @@
 namespace Envoy {
 namespace Server {
 
-using HotRestartMessage = envoy::api::v2::core::HotRestartMessage;
-using SimpleMetric = envoy::admin::v2alpha::SimpleMetric;
+using HotRestartMessage = envoy::HotRestartMessage;
 
 HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch)
     : HotRestartingBase(base_id), restart_epoch_(restart_epoch) {
@@ -96,13 +95,11 @@ void HotRestartingParent::exportStatsToChild(HotRestartMessage::Reply::Stats* st
   for (const auto& gauge : server_->stats().gauges()) {
     auto* gauge_proto = stats->mutable_gauges()->Add();
     gauge_proto->set_name(gauge->name());
-    gauge_proto->set_type(SimpleMetric::GAUGE);
     gauge_proto->set_value(gauge->value());
   }
   for (const auto& counter : server_->stats().counters()) {
     auto* counter_proto = stats->mutable_counters()->Add();
     counter_proto->set_name(counter->name());
-    counter_proto->set_type(SimpleMetric::COUNTER);
     counter_proto->set_value(counter->value());
   }
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());

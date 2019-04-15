@@ -197,13 +197,12 @@ public:
   // Server::HotRestart
   MOCK_METHOD0(drainParentListeners, void());
   MOCK_METHOD1(duplicateParentListenSocket, int(const std::string& address));
-  MOCK_METHOD0(getParentStats, std::unique_ptr<envoy::api::v2::core::HotRestartMessage>());
+  MOCK_METHOD0(getParentStats, std::unique_ptr<envoy::HotRestartMessage>());
   MOCK_METHOD2(initialize, void(Event::Dispatcher& dispatcher, Server::Instance& server));
   MOCK_METHOD1(shutdownParentAdmin, void(ShutdownParentAdminInfo& info));
   MOCK_METHOD0(terminateParent, void());
-  MOCK_METHOD2(mergeParentStats,
-               void(Stats::StoreRoot& stats_store,
-                    const envoy::api::v2::core::HotRestartMessage::Reply::Stats& stats_proto));
+  MOCK_METHOD2(mergeParentStats, void(Stats::StoreRoot& stats_store,
+                                      const envoy::HotRestartMessage::Reply::Stats& stats_proto));
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
@@ -348,7 +347,7 @@ public:
   MOCK_METHOD0(drainManager, DrainManager&());
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD1(failHealthcheck, void(bool fail));
-  MOCK_METHOD1(exportStatsToChild, void(envoy::api::v2::core::HotRestartMessage::Reply::Stats*));
+  MOCK_METHOD1(exportStatsToChild, void(envoy::HotRestartMessage::Reply::Stats*));
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());

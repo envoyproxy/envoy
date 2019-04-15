@@ -13,7 +13,7 @@ public:
   HotRestartingChild(int base_id, int restart_epoch);
 
   int duplicateParentListenSocket(const std::string& address);
-  std::unique_ptr<envoy::api::v2::core::HotRestartMessage> getParentStats();
+  std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
   void shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo& info);
   void terminateParent();
@@ -21,7 +21,7 @@ public:
   // addition, while gauges default to addition but have exceptions.
   // Exceptions are listed in a map at the top of this function's body.
   void mergeParentStats(Stats::Store& stats_store,
-                        const envoy::api::v2::core::HotRestartMessage::Reply::Stats& stats_proto);
+                        const envoy::HotRestartMessage::Reply::Stats& stats_proto);
 
 private:
   const int restart_epoch_;
