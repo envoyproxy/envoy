@@ -74,14 +74,12 @@ public:
 
   SslStats& stats() { return stats_; }
 
-  Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr getPrivateKeyOperationsProvider() {
-    return private_key_provider_;
-  }
-
   // Ssl::Context
   size_t daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
+
+  std::vector<Ssl::PrivateKeyOperationsProviderSharedPtr> getPrivateKeyMethodProviders();
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -139,11 +137,15 @@ protected:
     bssl::UniquePtr<X509> cert_chain_;
     std::string cert_chain_file_path_;
     bool is_ecdsa_{};
+    Ssl::PrivateKeyOperationsProviderSharedPtr private_key_provider_{};
 
     std::string getCertChainFileName() const { return cert_chain_file_path_; };
     void addClientValidationContext(const Envoy::Ssl::CertificateValidationContextConfig& config,
                                     bool require_client_cert);
     bool isCipherEnabled(uint16_t cipher_id, uint16_t client_version);
+    Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr getPrivateKeyOperationsProvider() {
+      return private_key_provider_;
+    }
   };
 
   // This is always non-empty, with the first context used for all new SSL
@@ -164,7 +166,6 @@ protected:
   std::string cert_chain_file_path_;
   TimeSource& time_source_;
   const unsigned tls_max_version_;
-  Ssl::PrivateKeyOperationsProviderSharedPtr private_key_provider_;
 };
 
 typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;

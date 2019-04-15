@@ -13,7 +13,7 @@ class PrivateKeyOperationsProviderInstanceFactory {
 public:
   virtual ~PrivateKeyOperationsProviderInstanceFactory() {}
   virtual PrivateKeyOperationsProviderSharedPtr createPrivateKeyOperationsProviderInstance(
-      const envoy::api::v2::auth::PrivateKeyOperations& message,
+      const envoy::api::v2::auth::PrivateKeyMethod& message,
       Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) PURE;
   virtual std::string name() const PURE;
 };

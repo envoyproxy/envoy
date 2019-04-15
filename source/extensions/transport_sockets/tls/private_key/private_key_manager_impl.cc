@@ -9,7 +9,7 @@ namespace Tls {
 
 Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr
 PrivateKeyOperationsManagerImpl::createPrivateKeyOperationsProvider(
-    const envoy::api::v2::auth::PrivateKeyOperations& message,
+    const envoy::api::v2::auth::PrivateKeyMethod& message,
     Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) {
 
   Ssl::PrivateKeyOperationsProviderInstanceFactory* factory =

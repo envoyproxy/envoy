@@ -60,14 +60,15 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
 
-  provider_ = ctx_->getPrivateKeyOperationsProvider();
-  if (provider_) {
-    ops_ = provider_->getPrivateKeyOperations(*this, callbacks_->connection().dispatcher());
-    if (ops_) {
-      Ssl::PrivateKeyMethodSharedPtr private_key_methods = ops_->getPrivateKeyMethods(ssl_.get());
-      if (private_key_methods) {
-        SSL_set_private_key_method(ssl_.get(), private_key_methods.get());
-      }
+  // Associate this SSL connection with all the certificates (with their potentially different
+  // private key methods).
+  std::vector<Ssl::PrivateKeyOperationsProviderSharedPtr> providers =
+      ctx_->getPrivateKeyMethodProviders();
+  for (auto const& provider : providers) {
+    Ssl::PrivateKeyOperationsPtr op =
+        provider->getPrivateKeyOperations(ssl_.get(), *this, callbacks_->connection().dispatcher());
+    if (op && op->associateWithSsl(ssl_.get())) {
+      ops_.emplace_back(std::move(op));
     }
   }
 

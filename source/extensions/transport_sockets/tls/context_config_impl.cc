@@ -26,7 +26,9 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
   if (!config.tls_certificates().empty()) {
     std::vector<Secret::TlsCertificateConfigProviderSharedPtr> providers;
     for (const auto& tls_certificate : config.tls_certificates()) {
-      if (!tls_certificate.has_certificate_chain() && !tls_certificate.has_private_key()) {
+      Ssl::PrivateKeyOperationsProviderSharedPtr private_key_ops_provider = nullptr;
+      if (!tls_certificate.has_private_key_method() && !tls_certificate.has_certificate_chain() &&
+          !tls_certificate.has_private_key()) {
         continue;
       }
       providers.push_back(
@@ -104,20 +106,6 @@ getCertificateValidationContextConfigProvider(
   }
 }
 
-Ssl::PrivateKeyOperationsProviderSharedPtr getPrivateKeyOperationsProvider(
-    const envoy::api::v2::auth::CommonTlsContext& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
-
-  if (config.has_private_key_operations()) {
-    const auto private_key_operations_config = config.private_key_operations();
-
-    return factory_context.sslContextManager()
-        .privateKeyOperationsManager()
-        .createPrivateKeyOperationsProvider(private_key_operations_config, factory_context);
-  }
-  return nullptr;
-}
-
 } // namespace
 
 ContextConfigImpl::ContextConfigImpl(
@@ -134,7 +122,6 @@ ContextConfigImpl::ContextConfigImpl(
       tls_certificate_providers_(getTlsCertificateConfigProviders(config, factory_context)),
       certificate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context, &default_cvc_)),
-      private_key_provider_(getPrivateKeyOperationsProvider(config, factory_context)),
       min_protocol_version_(tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(),
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
@@ -159,7 +146,7 @@ ContextConfigImpl::ContextConfigImpl(
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
-        tls_certificate_configs_.emplace_back(*provider->secret(), api_);
+        tls_certificate_configs_.emplace_back(*provider->secret(), factory_context, api_);
       }
     }
   }
@@ -185,14 +172,14 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<void()> callback) 
     }
     // Once tls_certificate_config_ receives new secret, this callback updates
     // ContextConfigImpl::tls_certificate_config_ with new secret.
-    tc_update_callback_handle_ =
-        tls_certificate_providers_[0]->addUpdateCallback([this, callback]() {
-          // This breaks multiple certificate support, but today SDS is only single cert.
-          // TODO(htuch): Fix this when SDS goes multi-cert.
-          tls_certificate_configs_.clear();
-          tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), api_);
-          callback();
-        });
+    tc_update_callback_handle_ = tls_certificate_providers_[0]->addUpdateCallback([this,
+                                                                                   callback]() {
+      // This breaks multiple certificate support, but today SDS is only single cert.
+      // TODO(htuch): Fix this when SDS goes multi-cert.
+      tls_certificate_configs_.clear();
+      tls_certificate_configs_.emplace_back(*tls_certificate_providers_[0]->secret(), api_, false);
+      callback();
+    });
   }
   if (certificate_validation_context_provider_) {
     if (cvc_update_callback_handle_) {

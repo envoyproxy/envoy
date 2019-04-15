@@ -8,7 +8,6 @@
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
-#include "envoy/ssl/private_key/private_key.h"
 
 #include "common/common/empty_string.h"
 #include "common/json/json_loader.h"
@@ -41,10 +40,6 @@ public:
   const Envoy::Ssl::CertificateValidationContextConfig*
   certificateValidationContext() const override {
     return validation_context_config_.get();
-  }
-  const Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr
-  privateKeyOperationsProvider() const override {
-    return private_key_provider_;
   }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
@@ -92,7 +87,6 @@ private:
   Common::CallbackHandle* tc_update_callback_handle_{};
   Secret::CertificateValidationContextConfigProviderSharedPtr
       certificate_validation_context_provider_;
-  Ssl::PrivateKeyOperationsProviderSharedPtr private_key_provider_;
   // Handle for certificate validation context dynamic secret callback.
   Common::CallbackHandle* cvc_update_callback_handle_{};
   Common::CallbackHandle* cvc_validation_callback_handle_{};

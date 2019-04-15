@@ -13,7 +13,7 @@ class PrivateKeyOperationsManagerImpl : public virtual Ssl::PrivateKeyOperations
 public:
   // Ssl::PrivateKeyOperationsManager
   Ssl::PrivateKeyOperationsProviderSharedPtr createPrivateKeyOperationsProvider(
-      const envoy::api::v2::auth::PrivateKeyOperations& message,
+      const envoy::api::v2::auth::PrivateKeyMethod& message,
       Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) override;
 };
 

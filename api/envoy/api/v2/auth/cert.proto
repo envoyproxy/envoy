@@ -11,6 +11,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/config_source.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
@@ -103,6 +104,19 @@ message TlsParameters {
   repeated string ecdh_curves = 4;
 }
 
+message PrivateKeyMethod {
+  // Private key operations provider name. The name must match a
+  // supported private key operations provider type.
+  string provider_name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Private key operations provider specific configuration.
+  oneof config_type {
+    google.protobuf.Struct config = 2;
+
+    google.protobuf.Any typed_config = 4;
+  }
+}
+
 message TlsCertificate {
   // The TLS certificate chain.
   core.DataSource certificate_chain = 1;
@@ -119,6 +133,10 @@ message TlsCertificate {
 
   // [#not-implemented-hide:]
   repeated core.DataSource signed_certificate_timestamp = 5;
+
+  // BoringSSL private key operations. This is an alternative to private_key field. This can't be
+  // marked as "oneof" due to API compatibility reasons.
+  PrivateKeyMethod private_key_method = 6;
 }
 
 message TlsSessionTicketKeys {
@@ -146,15 +164,6 @@ message TlsSessionTicketKeys {
   //   * Rotate session ticket keys at least daily, and preferably hourly
   //   * Always generate keys using a cryptographically-secure random data source
   repeated core.DataSource keys = 1 [(validate.rules).repeated .min_items = 1];
-}
-
-message PrivateKeyOperations {
-  // Private key operations provider name. The name must match a
-  // supported private key operations provider type.
-  string provider_name = 1 [(validate.rules).string.min_bytes = 1];
-
-  // Private key operations provider specific configuration.
-  google.protobuf.Any typed_config = 2;
 }
 
 message CertificateValidationContext {
@@ -325,8 +334,6 @@ message CommonTlsContext {
   repeated string alpn_protocols = 4;
 
   reserved 5;
-
-  PrivateKeyOperations private_key_operations = 9;
 }
 
 message UpstreamTlsContext {

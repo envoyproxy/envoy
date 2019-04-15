@@ -61,7 +61,6 @@ envoy_cc_library(
         "//include/envoy/secret:secret_provider_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:context_config_interface",
-        "//include/envoy/ssl/private_key:private_key_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
