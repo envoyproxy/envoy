@@ -82,81 +82,15 @@ void HotRestartingChild::terminateParent() {
   parent_terminated_ = true;
   // Once setting parent_terminated_ == true, we can send no more hot restart RPCs, and therefore
   // receive no more responses, including stats. So, now safe to forget our stat transferral state.
-  parent_counter_values_.clear();
-  parent_gauge_values_.clear();
+  stat_merger_.reset();
 }
 
 void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
                                           const HotRestartMessage::Reply::Stats& stats_proto) {
-  // Map from stat name *substrings* to special logic to use for combining stat values.
-  const std::unordered_map<std::string, CombineLogic> combine_logic_exceptions{
-      {".version", CombineLogic::NoImport},
-      {".connected_state", CombineLogic::BooleanOr},
-      {"server.live", CombineLogic::BooleanOr},
-      {"runtime.admin_overrides_active", CombineLogic::NoImport},
-      {"runtime.num_keys", CombineLogic::NoImport},
-      {"cluster_manager.active_clusters", CombineLogic::OnlyImportWhenUnused},
-      {"cluster_manager.warming_clusters", CombineLogic::OnlyImportWhenUnused},
-      {".membership_total", CombineLogic::OnlyImportWhenUnused},
-      {".membership_healthy", CombineLogic::OnlyImportWhenUnused},
-      {".membership_degraded", CombineLogic::OnlyImportWhenUnused},
-      {".max_host_weight", CombineLogic::OnlyImportWhenUnused},
-      {".total_principals", CombineLogic::OnlyImportWhenUnused},
-      {"listener_manager.total_listeners_draining", CombineLogic::NoImport},
-      {"listener_manager.total_listeners_warming", CombineLogic::OnlyImportWhenUnused},
-      {"listener_manager.total_listeners_active", CombineLogic::OnlyImportWhenUnused},
-      {"pressure", CombineLogic::OnlyImportWhenUnused},
-      {"server.concurrency", CombineLogic::OnlyImportWhenUnused},
-      {"server.hot_restart_epoch", CombineLogic::NoImport},
-  };
-  for (const auto& counter_proto : stats_proto.counters()) {
-    uint64_t new_parent_value = counter_proto.value();
-    auto found_value = parent_counter_values_.find(counter_proto.name());
-    uint64_t old_parent_value =
-        found_value == parent_counter_values_.end() ? 0 : found_value->second;
-    parent_counter_values_[counter_proto.name()] = new_parent_value;
-    stats_store.counter(counter_proto.name()).add(new_parent_value - old_parent_value);
+  if (!stat_merger_) {
+    stat_merger_ = std::make_unique<Stats::StatMerger>(stats_store);
   }
-
-  for (const auto& gauge_proto : stats_proto.gauges()) {
-    uint64_t new_parent_value = gauge_proto.value();
-    auto found_value = parent_gauge_values_.find(gauge_proto.name());
-    uint64_t old_parent_value = found_value == parent_gauge_values_.end() ? 0 : found_value->second;
-    parent_gauge_values_[gauge_proto.name()] = new_parent_value;
-    CombineLogic combine_logic = CombineLogic::Accumulate;
-    for (auto exception : combine_logic_exceptions) {
-      if (gauge_proto.name().find(exception.first) != std::string::npos) {
-        combine_logic = exception.second;
-        break;
-      }
-    }
-    if (combine_logic == CombineLogic::NoImport) {
-      continue;
-    }
-    auto& gauge_ref = stats_store.gauge(gauge_proto.name());
-    // If undefined, take parent's value unless explicitly told NoImport.
-    if (!gauge_ref.used()) {
-      gauge_ref.set(new_parent_value);
-      continue;
-    }
-    switch (combine_logic) {
-    case CombineLogic::OnlyImportWhenUnused:
-      // Already set above; nothing left to do.
-      break;
-    case CombineLogic::NoImport:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    case CombineLogic::Accumulate:
-      if (new_parent_value > old_parent_value) {
-        gauge_ref.add(new_parent_value - old_parent_value);
-      } else {
-        gauge_ref.sub(old_parent_value - new_parent_value);
-      }
-      break;
-    case CombineLogic::BooleanOr:
-      gauge_ref.set(gauge_ref.value() != 0 || new_parent_value != 0 ? 1 : 0);
-      break;
-    }
-  }
+  stat_merger_->mergeStats(stats_proto.counters(), stats_proto.gauges());
 }
 
 } // namespace Server

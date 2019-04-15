@@ -10,6 +10,7 @@ filters.
 .. toctree::
   :maxdepth: 2
 
+  dubbo_proxy_filter
   client_ssl_auth_filter
   echo_filter
   ext_authz_filter

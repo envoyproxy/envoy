@@ -121,6 +121,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "stat_merger_lib",
+    srcs = ["stat_merger.cc"],
+    hdrs = ["stat_merger.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "stats_lib",
     deps = [
         ":histogram_lib",
