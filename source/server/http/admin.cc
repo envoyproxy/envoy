@@ -586,7 +586,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
-  if (query_params.size() > 0 && !changeLogLevel(query_params)) {
+  if (!query_params.empty() && !changeLogLevel(query_params)) {
     response.add("usage: /logging?<name>=<level> (change single level)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");
@@ -820,7 +820,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
 
     response.add(fmt::format("{0}_bucket{{{1}le=\"+Inf\"}} {2}\n", metric_name, hist_tags,
                              stats.sampleCount()));
-    response.add(fmt::format("{0}_sum{{{1}}} {2}\n", metric_name, tags, stats.sampleSum()));
+    response.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", metric_name, tags, stats.sampleSum()));
     response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
   }
 
@@ -1197,8 +1197,8 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
         if (method != Http::Headers::get().MethodValues.Post) {
           ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
-          code = Http::Code::BadRequest;
-          response.add("Invalid request; POST required");
+          code = Http::Code::MethodNotAllowed;
+          response.add(fmt::format("Method {} not allowed, POST required.", method));
           break;
         }
       }

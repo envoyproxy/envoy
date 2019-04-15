@@ -56,11 +56,13 @@ bool Utility::Url::initialize(absl::string_view absolute_url) {
 
   // RFC allows the absolute-uri to not end in /, but the absolute path form
   // must start with
-  if ((u.field_set & (1 << UF_PATH)) == (1 << UF_PATH) && u.field_data[UF_PATH].len > 0) {
-    path_ = absl::string_view(absolute_url.data() + u.field_data[UF_PATH].off,
-                              u.field_data[UF_PATH].len);
+  uint64_t path_len =
+      absolute_url.length() - (u.field_data[UF_HOST].off + host_and_port().length());
+  if (path_len > 0) {
+    uint64_t path_beginning = u.field_data[UF_HOST].off + host_and_port().length();
+    path_and_query_params_ = absl::string_view(absolute_url.data() + path_beginning, path_len);
   } else {
-    path_ = absl::string_view(kDefaultPath, 1);
+    path_and_query_params_ = absl::string_view(kDefaultPath, 1);
   }
   return true;
 }
@@ -285,14 +287,15 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                              const bool& is_reset, Code response_code, absl::string_view body_text,
                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                              bool is_head_request) {
-  sendLocalReply(is_grpc,
-                 [&](HeaderMapPtr&& headers, bool end_stream) -> void {
-                   callbacks.encodeHeaders(std::move(headers), end_stream);
-                 },
-                 [&](Buffer::Instance& data, bool end_stream) -> void {
-                   callbacks.encodeData(data, end_stream);
-                 },
-                 is_reset, response_code, body_text, grpc_status, is_head_request);
+  sendLocalReply(
+      is_grpc,
+      [&](HeaderMapPtr&& headers, bool end_stream) -> void {
+        callbacks.encodeHeaders(std::move(headers), end_stream);
+      },
+      [&](Buffer::Instance& data, bool end_stream) -> void {
+        callbacks.encodeData(data, end_stream);
+      },
+      is_reset, response_code, body_text, grpc_status, is_head_request);
 }
 
 void Utility::sendLocalReply(

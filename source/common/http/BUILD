@@ -141,6 +141,7 @@ envoy_cc_library(
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
+        ":path_utility_lib",
         ":user_agent_lib",
         ":utility_lib",
         "//include/envoy/access_log:access_log_interface",
@@ -312,5 +313,17 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/route:route_cc",
         "@envoy_api//envoy/type:range_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "path_utility_lib",
+    srcs = ["path_utility.cc"],
+    hdrs = ["path_utility.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/http:header_map_interface",
+        "//source/common/chromium_url",
+        "//source/common/common:logger_lib",
     ],
 )

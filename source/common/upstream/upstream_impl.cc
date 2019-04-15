@@ -102,7 +102,7 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   // Cluster socket_options trump cluster manager wide.
   if (bind_config.socket_options().size() + config.upstream_bind_config().socket_options().size() >
       0) {
-    auto socket_options = config.upstream_bind_config().socket_options().size() > 0
+    auto socket_options = !config.upstream_bind_config().socket_options().empty()
                               ? config.upstream_bind_config().socket_options()
                               : bind_config.socket_options();
     Network::Socket::appendOptions(
@@ -203,8 +203,11 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
   HostVector net_hosts;
   net_hosts.reserve(hosts.size());
 
-  std::set_difference(hosts.begin(), hosts.end(), excluded_hosts.begin(), excluded_hosts.end(),
-                      std::inserter(net_hosts, net_hosts.begin()));
+  for (const auto& host : hosts) {
+    if (excluded_hosts.find(host) == excluded_hosts.end()) {
+      net_hosts.emplace_back(host);
+    }
+  }
 
   return net_hosts;
 }
@@ -1144,6 +1147,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       // Did the priority change?
       if (host->priority() != existing_host->second->priority()) {
         existing_host->second->priority(host->priority());
+        hosts_added_to_current_priority.emplace_back(existing_host->second);
       }
 
       existing_host->second->weight(host->weight());

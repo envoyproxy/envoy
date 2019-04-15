@@ -8,7 +8,6 @@
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
-#include "extensions/filters/network/redis_proxy/router.h"
 
 #include "test/test_common/printers.h"
 
@@ -18,17 +17,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
-
-class MockRouter : public Router {
-public:
-  MockRouter();
-  ~MockRouter();
-
-  MOCK_METHOD3(makeRequest,
-               Common::Redis::Client::PoolRequest*(
-                   const std::string& hash_key, const Common::Redis::RespValue& request,
-                   Common::Redis::Client::PoolCallbacks& callbacks));
-};
 
 namespace ConnPool {
 
@@ -40,6 +28,10 @@ public:
   MOCK_METHOD3(makeRequest,
                Common::Redis::Client::PoolRequest*(
                    const std::string& hash_key, const Common::Redis::RespValue& request,
+                   Common::Redis::Client::PoolCallbacks& callbacks));
+  MOCK_METHOD3(makeRequestToHost,
+               Common::Redis::Client::PoolRequest*(
+                   const std::string& host_address, const Common::Redis::RespValue& request,
                    Common::Redis::Client::PoolCallbacks& callbacks));
 };
 
@@ -70,9 +62,9 @@ public:
   MockInstance();
   ~MockInstance();
 
-  SplitRequestPtr makeRequest(const Common::Redis::RespValue& request,
+  SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
                               SplitCallbacks& callbacks) override {
-    return SplitRequestPtr{makeRequest_(request, callbacks)};
+    return SplitRequestPtr{makeRequest_(*request, callbacks)};
   }
 
   MOCK_METHOD2(makeRequest_,

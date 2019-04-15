@@ -20,6 +20,7 @@ public:
 
   struct Events {
     static const uint32_t MovedTo = 0x1;
+    static const uint32_t Modified = 0x2;
   };
 
   virtual ~Watcher() {}

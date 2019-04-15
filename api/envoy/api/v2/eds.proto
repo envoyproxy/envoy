@@ -43,9 +43,10 @@ service EndpointDiscoveryService {
 //
 // With EDS, each cluster is treated independently from a LB perspective, with
 // LB taking place between the Localities within a cluster and at a finer
-// granularity between the hosts within a locality. For a given cluster, the
-// effective weight of a host is its load_balancing_weight multiplied by the
-// load_balancing_weight of its Locality.
+// granularity between the hosts within a locality. The percentage of traffic
+// for each endpoint is determined by both its load_balancing_weight, and the
+// load_balancing_weight of its locality. First, a locality will be selected,
+// then an endpoint within that locality will be chose based on its weight.
 message ClusterLoadAssignment {
   // Name of the cluster. This will be the :ref:`service_name
   // <envoy_api_field_Cluster.EdsClusterConfig.service_name>` value if specified

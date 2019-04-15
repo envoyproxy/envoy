@@ -38,9 +38,8 @@ private:
   test::common::config::DummyConfig config_proto_;
 };
 
-class DummyConfigSubscription
-    : public ConfigSubscriptionInstanceBase,
-      Envoy::Config::SubscriptionCallbacks<test::common::config::DummyConfig> {
+class DummyConfigSubscription : public ConfigSubscriptionInstanceBase,
+                                Envoy::Config::SubscriptionCallbacks {
 public:
   DummyConfigSubscription(const uint64_t manager_identifier,
                           Server::Configuration::FactoryContext& factory_context,
@@ -53,8 +52,9 @@ public:
 
   // Envoy::Config::SubscriptionCallbacks
   // TODO(fredlas) deduplicate
-  void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override {
-    const auto& config = resources[0];
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                      const std::string& version_info) override {
+    auto config = MessageUtil::anyConvert<test::common::config::DummyConfig>(resources[0]);
     if (checkAndApplyConfig(config, "dummy_config", version_info)) {
       config_proto_ = config;
     }
@@ -246,12 +246,12 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   // No config protos have been received via the subscription yet.
   EXPECT_FALSE(provider1->configProtoInfo<test::common::config::DummyConfig>().has_value());
 
-  Protobuf::RepeatedPtrField<test::common::config::DummyConfig> dummy_configs;
-  dummy_configs.Add()->MergeFrom(parseDummyConfigFromYaml("a: a dummy config"));
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> untyped_dummy_configs;
+  untyped_dummy_configs.Add()->PackFrom(parseDummyConfigFromYaml("a: a dummy config"));
 
   DummyConfigSubscription& subscription =
       dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription();
-  subscription.onConfigUpdate(dummy_configs, "1");
+  subscription.onConfigUpdate(untyped_dummy_configs, "1");
 
   // Check that a newly created provider with the same config source will share
   // the subscription, config proto and resulting ConfigProvider::Config.
@@ -278,7 +278,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
 
   dynamic_cast<DummyDynamicConfigProvider&>(*provider3)
       .subscription()
-      .onConfigUpdate(dummy_configs, "provider3");
+      .onConfigUpdate(untyped_dummy_configs, "provider3");
 
   EXPECT_EQ(2UL, static_cast<test::common::config::DummyConfigsDump*>(
                      provider_manager_->dumpConfigs().get())
@@ -346,13 +346,13 @@ dynamic_dummy_configs:
       config_source_proto, factory_context_, "dummy_prefix");
 
   // Static + dynamic config dump.
-  Protobuf::RepeatedPtrField<test::common::config::DummyConfig> dummy_configs;
-  dummy_configs.Add()->MergeFrom(parseDummyConfigFromYaml("a: a dynamic dummy config"));
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> untyped_dummy_configs;
+  untyped_dummy_configs.Add()->PackFrom(parseDummyConfigFromYaml("a: a dynamic dummy config"));
 
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891567));
   DummyConfigSubscription& subscription =
       dynamic_cast<DummyDynamicConfigProvider&>(*dynamic_provider).subscription();
-  subscription.onConfigUpdate(dummy_configs, "v1");
+  subscription.onConfigUpdate(untyped_dummy_configs, "v1");
 
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["dummy"]();
   const auto& dummy_config_dump3 =

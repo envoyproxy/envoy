@@ -28,8 +28,6 @@ using testing::Return;
 namespace Envoy {
 namespace Config {
 
-typedef GrpcSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> GrpcEdsSubscriptionImpl;
-
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   GrpcSubscriptionTestHarness() : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
@@ -44,12 +42,13 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_ = std::make_unique<GrpcEdsSubscriptionImpl>(
+    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, stats_, stats_store_, rate_limit_settings_, init_fetch_timeout);
+        *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, stats_, stats_store_,
+        rate_limit_settings_, init_fetch_timeout);
   }
 
-  ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
+  ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {
@@ -81,12 +80,6 @@ public:
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
     subscription_->start(cluster_names, callbacks_);
-    // These are just there to add coverage to the null implementations of these
-    // callbacks.
-    Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{}};
-    subscription_->grpcMux().onReceiveInitialMetadata(std::move(response_headers));
-    Http::TestHeaderMapImpl request_headers;
-    subscription_->grpcMux().onCreateInitialMetadata(request_headers);
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
@@ -106,7 +99,7 @@ public:
         response->add_resources()->PackFrom(*load_assignment);
       }
     }
-    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(typed_resources), version))
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response->resources()), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       expectSendMessage(last_cluster_names_, version);
@@ -116,7 +109,7 @@ public:
       expectSendMessage(last_cluster_names_, version_, Grpc::Status::GrpcStatus::Internal,
                         "bad config");
     }
-    subscription_->grpcMux().onReceiveMessage(std::move(response));
+    subscription_->grpcMux().onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -156,7 +149,7 @@ public:
   envoy::api::v2::core::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   Grpc::MockAsyncStream async_stream_;
-  std::unique_ptr<GrpcEdsSubscriptionImpl> subscription_;
+  std::unique_ptr<GrpcSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::vector<std::string> last_cluster_names_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;

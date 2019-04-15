@@ -3,6 +3,7 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_grpc_context.h"
 
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
@@ -12,8 +13,7 @@
 namespace Envoy {
 namespace Config {
 
-template <class ResourceType>
-class MockSubscriptionCallbacks : public SubscriptionCallbacks<ResourceType> {
+template <class ResourceType> class MockSubscriptionCallbacks : public SubscriptionCallbacks {
 public:
   MockSubscriptionCallbacks() {
     ON_CALL(*this, resourceName(testing::_))
@@ -21,15 +21,15 @@ public:
           return resourceName_(MessageUtil::anyConvert<ResourceType>(resource));
         }));
   }
+  ~MockSubscriptionCallbacks() override {}
   static std::string resourceName_(const envoy::api::v2::ClusterLoadAssignment& resource) {
     return resource.cluster_name();
   }
   template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
 
   // TODO(fredlas) deduplicate
-  MOCK_METHOD2_T(onConfigUpdate,
-                 void(const typename SubscriptionCallbacks<ResourceType>::ResourceVector& resources,
-                      const std::string& version_info));
+  MOCK_METHOD2_T(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                      const std::string& version_info));
   MOCK_METHOD3_T(onConfigUpdate,
                  void(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -38,17 +38,17 @@ public:
   MOCK_METHOD1_T(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
-template <class ResourceType> class MockSubscription : public Subscription<ResourceType> {
+class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD2_T(start, void(const std::vector<std::string>& resources,
-                             SubscriptionCallbacks<ResourceType>& callbacks));
+  MOCK_METHOD2_T(start,
+                 void(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks));
   MOCK_METHOD1_T(updateResources, void(const std::vector<std::string>& resources));
 };
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {
 public:
   MockGrpcMuxWatch();
-  virtual ~MockGrpcMuxWatch();
+  ~MockGrpcMuxWatch();
 
   MOCK_METHOD0(cancel, void());
 };
@@ -56,7 +56,7 @@ public:
 class MockGrpcMux : public GrpcMux {
 public:
   MockGrpcMux();
-  virtual ~MockGrpcMux();
+  ~MockGrpcMux();
 
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
@@ -71,12 +71,24 @@ public:
 class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
 public:
   MockGrpcMuxCallbacks();
-  virtual ~MockGrpcMuxCallbacks();
+  ~MockGrpcMuxCallbacks();
 
   MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string& version_info));
   MOCK_METHOD1(onConfigUpdateFailed, void(const EnvoyException* e));
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
+};
+
+class MockGrpcStreamCallbacks : public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
+public:
+  MockGrpcStreamCallbacks();
+  ~MockGrpcStreamCallbacks();
+
+  MOCK_METHOD0(onStreamEstablished, void());
+  MOCK_METHOD0(onEstablishmentFailure, void());
+  MOCK_METHOD1(onDiscoveryResponse,
+               void(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message));
+  MOCK_METHOD0(onWriteable, void());
 };
 
 } // namespace Config
