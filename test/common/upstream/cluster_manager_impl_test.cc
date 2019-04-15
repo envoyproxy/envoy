@@ -1107,6 +1107,34 @@ dynamic_warming_clusters:
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
+// Verify that shutting down the cluster manager destroys warming clusters.
+TEST_F(ClusterManagerImplTest, ShutdownWithWarming) {
+  const std::string json = R"EOF(
+  {
+    "clusters": []
+  }
+  )EOF";
+
+  create(parseBootstrapFromJson(json));
+
+  InSequence s;
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+  EXPECT_CALL(*cluster1, initializePhase()).Times(0);
+  EXPECT_CALL(*cluster1, initialize(_));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(defaultStaticCluster("fake_cluster"), "version1",
+                                                   dummyWarmingCb));
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 1 /*warming*/);
+  cluster_manager_->shutdown();
+  checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 0 /*warming*/);
+
+  EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
+}
+
 TEST_F(ClusterManagerImplTest, DynamicAddRemove) {
   const std::string json = R"EOF(
   {
