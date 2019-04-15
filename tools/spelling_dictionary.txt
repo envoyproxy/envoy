@@ -39,7 +39,9 @@ CSV
 CTX
 CTXs
 CVC
+CVE
 CX
+CloseAterFlush
 DCHECK
 DER
 DESC
@@ -428,6 +430,7 @@ favicon
 fd
 fds
 fileno
+fixup
 fld
 fmt
 fmtlib
@@ -728,6 +731,7 @@ unejection
 unescape
 unescaped
 unescaping
+unindexed
 uninsantiated
 uninstantiated
 unix

@@ -970,11 +970,11 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
           throw EnvoyException(fmt::format("Only a single wildcard domain is permitted"));
         }
         default_virtual_host_ = virtual_host;
-      } else if (domain.size() > 0 && '*' == domain[0]) {
+      } else if (!domain.empty() && '*' == domain[0]) {
         duplicate_found = !wildcard_virtual_host_suffixes_[domain.size() - 1]
                                .emplace(domain.substr(1), virtual_host)
                                .second;
-      } else if (domain.size() > 0 && '*' == domain[domain.size() - 1]) {
+      } else if (!domain.empty() && '*' == domain[domain.size() - 1]) {
         duplicate_found = !wildcard_virtual_host_prefixes_[domain.size() - 1]
                                .emplace(domain.substr(0, domain.size() - 1), virtual_host)
                                .second;
@@ -1076,7 +1076,7 @@ VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const
     }
   }
 
-  if (virtual_clusters_.size() > 0) {
+  if (!virtual_clusters_.empty()) {
     return &VIRTUAL_CLUSTER_CATCH_ALL;
   }
 

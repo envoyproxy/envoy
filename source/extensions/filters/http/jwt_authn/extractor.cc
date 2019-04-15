@@ -102,6 +102,10 @@ private:
   // ctor helper for a jwt provider config
   void addProvider(const JwtProvider& provider);
 
+  // @return what should be the 3-part base64url-encoded substring; see RFC-7519
+  absl::string_view extractJWT(absl::string_view value_str,
+                               absl::string_view::size_type after) const;
+
   // HeaderMap value type to store prefix and issuers that specified this
   // header.
   struct HeaderLocationSpec {
@@ -181,11 +185,12 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
     if (entry) {
       auto value_str = entry->value().getStringView();
       if (!location_spec->value_prefix_.empty()) {
-        if (!absl::StartsWith(value_str, location_spec->value_prefix_)) {
-          // prefix doesn't match, skip it.
+        const auto pos = value_str.find(location_spec->value_prefix_);
+        if (pos == absl::string_view::npos) {
+          // value_prefix not found anywhere in value_str, so skip
           continue;
         }
-        value_str = value_str.substr(location_spec->value_prefix_.size());
+        value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
       }
       tokens.push_back(std::make_unique<const JwtHeaderLocation>(
           std::string(value_str), location_spec->specified_issuers_, location_spec->header_));
@@ -209,6 +214,36 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
     }
   }
   return tokens;
+}
+
+// as specified in RFC-4648 § 5, plus dot (period, 0x2e), of which two are required in the JWT
+constexpr absl::string_view ConstantBase64UrlEncodingCharsPlusDot =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+
+// Returns a token, not a URL: skips non-Base64Url-legal (or dot) characters, collects following
+// Base64Url+dot string until first non-Base64Url char.
+//
+// The input parameters:
+//    "value_str" - the header value string, perhaps "Bearer string....", and
+//    "after" - the offset into that string after which to begin looking for JWT-legal characters
+//
+// For backwards compatibility, if it finds no suitable string, it returns value_str as-is.
+//
+// It is forgiving w.r.t. dots/periods, as the exact syntax will be verified after extraction.
+//
+// See RFC-7519 § 2, RFC-7515 § 2, and RFC-4648 "Base-N Encodings" § 5.
+absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
+                                            absl::string_view::size_type after) const {
+  const auto starting = value_str.find_first_of(ConstantBase64UrlEncodingCharsPlusDot, after);
+  if (starting == value_str.npos) {
+    return value_str;
+  }
+  // There should be two dots (periods; 0x2e) inside the string, but we don't verify that here
+  auto ending = value_str.find_first_not_of(ConstantBase64UrlEncodingCharsPlusDot, starting);
+  if (ending == value_str.npos) { // Base64Url-encoded string occupies the rest of the line
+    return value_str.substr(starting);
+  }
+  return value_str.substr(starting, ending - starting);
 }
 
 void ExtractorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {

@@ -291,6 +291,7 @@ TEST_P(IntegrationTest, Http10DisabledWithUpgrade) {
 
 // Turn HTTP/1.0 support on and verify 09 style requests work.
 TEST_P(IntegrationTest, Http09Enabled) {
+  useAccessLog();
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
   initialize();
@@ -304,6 +305,8 @@ TEST_P(IntegrationTest, Http09Enabled) {
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_TRUE(upstream_headers != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
+
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("HTTP/1.0"));
 }
 
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
@@ -775,6 +778,8 @@ TEST_P(IntegrationTest, NoConnectionPoolsFree) {
 
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_503", 1);
+
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_pool_overflow")->value(), 1);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
