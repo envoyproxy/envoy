@@ -16,6 +16,7 @@
 #include "opencensus/trace/exporter/span_data.h"
 #include "opencensus/trace/exporter/span_exporter.h"
 #include "opencensus/trace/span_id.h"
+#include "opencensus/trace/span.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -40,6 +41,7 @@ namespace OpenCensus {
 
 using ::opencensus::trace::exporter::SpanData;
 using ::opencensus::trace::exporter::SpanExporter;
+using envoy::config::trace::v2::OpenCensusConfig;
 
 namespace {
 
@@ -92,7 +94,7 @@ void registerSpanCatcher() {
 // the produced SpanData.
 TEST(OpenCensusTracerTest, Span) {
   registerSpanCatcher();
-  envoy::config::trace::v2::OpenCensusConfig oc_config;
+  OpenCensusConfig oc_config;
   std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
 
   NiceMock<Tracing::MockConfig> config;
@@ -135,7 +137,6 @@ TEST(OpenCensusTracerTest, Span) {
 
 // Test that trace context propagation works.
 TEST(OpenCensusTracerTest, PropagateTraceContext) {
-  using OpenCensusConfig = envoy::config::trace::v2::OpenCensusConfig;
   registerSpanCatcher();
   OpenCensusConfig oc_config;
   oc_config.add_incoming_trace_context(OpenCensusConfig::trace_context);
@@ -148,7 +149,7 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
       {"x-request-id", "foo"},
       {"traceparent", "00-404142434445464748494a4b4c4d4e4f-6162636465666768-01"},
   };
-  const std::string operation_name{"my_operation_1"};
+  const std::string operation_name{"my_operation_2"};
   SystemTime start_time;
 
   {
@@ -169,6 +170,33 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
   EXPECT_EQ("404142434445464748494a4b4c4d4e4f", sd.context().trace_id().ToHex());
   EXPECT_TRUE(sd.context().trace_options().IsSampled())
       << "parent was sampled, child should be also";
+}
+
+// Test constant_sampler that's always on.
+TEST(OpenCensusTracerTest, ConstantSamplerAlwaysOn) {
+  registerSpanCatcher();
+  OpenCensusConfig oc_config;
+  oc_config.mutable_trace_config()->mutable_constant_sampler()->set_decision( ::opencensus::proto::trace::v1::ConstantSampler::ALWAYS_ON);
+  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
+  auto span = ::opencensus::trace::Span::StartSpan("span_on");
+  span.End();
+  // Retrieve SpanData from the OpenCensus trace exporter.
+  std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
+  ASSERT_EQ(1, spans.size());
+  EXPECT_TRUE(spans[0].context().trace_options().IsSampled());
+}
+
+// Test constant_sampler that's always off.
+TEST(OpenCensusTracerTest, ConstantSamplerAlwaysOff) {
+  registerSpanCatcher();
+  OpenCensusConfig oc_config;
+  oc_config.mutable_trace_config()->mutable_constant_sampler()->set_decision( ::opencensus::proto::trace::v1::ConstantSampler::ALWAYS_OFF);
+  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
+  auto span = ::opencensus::trace::Span::StartSpan("span_off");
+  span.End();
+  // Retrieve SpanData from the OpenCensus trace exporter.
+  std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
+  EXPECT_EQ(0, spans.size());
 }
 
 } // namespace OpenCensus

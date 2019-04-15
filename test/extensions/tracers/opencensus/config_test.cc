@@ -38,13 +38,18 @@ TEST(OpenCensusTracerConfigTest, OpenCensusHttpTracerWithTypedConfig) {
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2.OpenCensusConfig
       trace_config:
-        constant_sampler:
-          decision: ALWAYS_ON
+        rate_limiting_sampler:
+          qps: 123
         max_number_of_attributes: 12
         max_number_of_annotations: 34
         max_number_of_message_events: 56
         max_number_of_links: 78
       stdout_exporter_enabled: true
+      stackdriver_exporter_enabled: true
+      stackdriver_project_id: test_project_id
+      zipkin_exporter_enabled: true
+      zipkin_url: http://127.0.0.1:9411/api/v2/spans
+      zipkin_service_name: test_service
       incoming_trace_context: trace_context
       incoming_trace_context: grpc_trace_bin
       incoming_trace_context: cloud_trace_context
