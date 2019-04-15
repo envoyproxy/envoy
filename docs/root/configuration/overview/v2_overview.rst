@@ -528,7 +528,7 @@ in :repo:`this
 <api/XDS_PROTOCOL.md#aggregated-discovery-services-ads>`
 document. The gRPC endpoint is:
 
-.. http:post:: /envoy.api.v2.AggregatedDiscoveryService/StreamAggregatedResources
+.. http:post:: /envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources
 
 See :repo:`discovery.proto
 <api/envoy/api/v2/discovery.proto>`
