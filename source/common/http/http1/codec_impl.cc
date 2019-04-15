@@ -677,13 +677,11 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   if (resetStreamCalled()) {
     throw CodecClientException("cannot create new streams after calling reset");
   }
-  // Streams are responsible for unwinding any outstanding readDisable(true)
-  // calls done on the underlying connection as they are destroyed. As this is
-  // the only place a HTTP/1 stream is destroyed where the Network::Connection is
-  // reused, unwind any outstanding readDisable() calls here.
-  while (!connection_.readEnabled()) {
-    connection_.readDisable(false);
-  }
+
+  // If reads were disabled due to flow control, we expect reads to always be enabled again before
+  // reusing this connection. This is done when the final pipeline response is received.
+  ASSERT(connection_.readEnabled());
+
   request_encoder_ = std::make_unique<RequestStreamEncoderImpl>(*this);
   pending_responses_.emplace_back(&response_decoder);
   return *request_encoder_;
@@ -740,6 +738,18 @@ void ClientConnectionImpl::onMessageComplete() {
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
     PendingResponse response = pending_responses_.front();
     pending_responses_.pop_front();
+
+    // Streams are responsible for unwinding any outstanding readDisable(true)
+    // calls done on the underlying connection as they are destroyed. As this is
+    // the only place a HTTP/1 stream is destroyed where the Network::Connection is
+    // reused, unwind any outstanding readDisable() calls here. Only do this if there are no
+    // pipelined responses remaining. Also do this before we dispatch end_stream in case the caller
+    // immediately reuses the connection.
+    if (pending_responses_.empty()) {
+      while (!connection_.readEnabled()) {
+        connection_.readDisable(false);
+      }
+    }
 
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(std::move(deferred_end_stream_headers_), true);
