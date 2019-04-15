@@ -80,6 +80,7 @@ public:
   const Address::InstanceConstSharedPtr& localAddress() const override {
     return socket_->localAddress();
   }
+  absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   void setConnectionStats(const ConnectionStats& stats) override;
   const Ssl::ConnectionInfo* ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
