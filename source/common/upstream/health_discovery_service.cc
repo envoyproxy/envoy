@@ -166,12 +166,15 @@ void HdsDelegate::onReceiveMessage(
   hds_clusters_.clear();
 
   // Set response
-  server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
+  auto server_response_ms = PROTOBUF_GET_MS_REQUIRED(*message, interval);
 
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
 
-  setHdsStreamResponseTimer();
+  if (server_response_ms_ != server_response_ms) {
+    server_response_ms_ = server_response_ms;
+    setHdsStreamResponseTimer();
+  }
 }
 
 void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
@@ -182,6 +185,7 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
   ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
   hds_stream_response_timer_->disableTimer();
   stream_ = nullptr;
+  server_response_ms_ = 0;
   handleFailure();
 }
 
@@ -204,11 +208,12 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                                           dispatcher, random, singleton_manager, tls, api});
 
   for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(new HostImpl(
-        info_, "", Network::Address::resolveProtoAddress(host),
-        envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality().default_instance(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0));
+    initial_hosts_->emplace_back(
+        new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
+                     envoy::api::v2::core::Metadata::default_instance(), 1,
+                     envoy::api::v2::core::Locality().default_instance(),
+                     envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0,
+                     envoy::api::v2::core::HealthStatus::UNKNOWN));
   }
   initialize([] {});
 }
@@ -251,10 +256,8 @@ void HdsCluster::initialize(std::function<void()> callback) {
     host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
 
-  auto& first_host_set = priority_set_.getOrCreateHostSet(0);
-
-  first_host_set.updateHosts(
-      HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
+  priority_set_.updateHosts(
+      0, HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
       *initial_hosts_, {}, absl::nullopt);
 }
 

@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.api.v2.listener;
+
+option java_outer_classname = "ListenerProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.listener";
 option go_package = "listener";
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
@@ -38,7 +41,7 @@ message Filter {
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
+    google.protobuf.Struct config = 2;
 
     google.protobuf.Any typed_config = 4;
   }
@@ -207,7 +210,7 @@ message ListenerFilter {
   // Filter specific configuration which depends on the filter being instantiated.
   // See the supported filters for further documentation.
   oneof config_type {
-    google.protobuf.Struct config = 2 [deprecated = true];
+    google.protobuf.Struct config = 2;
 
     google.protobuf.Any typed_config = 3;
   }

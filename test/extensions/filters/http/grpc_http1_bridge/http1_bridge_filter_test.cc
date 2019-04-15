@@ -21,10 +21,11 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
+namespace {
 
 class GrpcHttp1BridgeFilterTest : public testing::Test {
 public:
-  GrpcHttp1BridgeFilterTest() : filter_() {
+  GrpcHttp1BridgeFilterTest() {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(decoder_callbacks_.stream_info_, protocol()).WillByDefault(ReturnPointee(&protocol_));
@@ -214,6 +215,7 @@ TEST_F(GrpcHttp1BridgeFilterTest, HandlingBadGrpcStatus) {
   EXPECT_EQ("foo", response_headers.get_("grpc-message"));
 }
 
+} // namespace
 } // namespace GrpcHttp1Bridge
 } // namespace HttpFilters
 } // namespace Extensions

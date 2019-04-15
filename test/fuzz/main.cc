@@ -14,7 +14,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"
@@ -28,11 +27,10 @@ namespace {
 // List of paths for files in the test corpus.
 std::vector<std::string> test_corpus_;
 
-class FuzzerCorpusTest : public ::testing::TestWithParam<std::string> {
+class FuzzerCorpusTest : public testing::TestWithParam<std::string> {
 protected:
-  FuzzerCorpusTest() : api_(Api::createApiForTest(stats_store_)) {}
+  FuzzerCorpusTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 
@@ -53,26 +51,29 @@ int main(int argc, char** argv) {
   RELEASE_ASSERT(argc >= 2, "");
   // Consider any file after the test path which doesn't have a - prefix to be a corpus entry.
   uint32_t input_args = 0;
-  Envoy::Stats::IsolatedStoreImpl stats_store;
-  Envoy::Api::ApiPtr api = Envoy::Api::createApiForTest(stats_store);
-  for (int i = 1; i < argc; ++i) {
-    const std::string arg{argv[i]};
-    if (arg.empty() || arg[0] == '-') {
-      break;
-    }
-    ++input_args;
-    // Outputs from envoy_directory_genrule might be directories or we might
-    // have artisanal files.
-    if (api->fileSystem().directoryExists(arg)) {
-      const auto paths = Envoy::TestUtility::listFiles(arg, true);
-      Envoy::test_corpus_.insert(Envoy::test_corpus_.begin(), paths.begin(), paths.end());
-    } else {
-      Envoy::test_corpus_.emplace_back(arg);
+  // Ensure we cleanup API resources before we jump into the tests, the test API creates a singleton
+  // time system that we don't want to leak into gtest.
+  {
+    Envoy::Api::ApiPtr api = Envoy::Api::createApiForTest();
+    for (int i = 1; i < argc; ++i) {
+      const std::string arg{argv[i]};
+      if (arg.empty() || arg[0] == '-') {
+        break;
+      }
+      ++input_args;
+      // Outputs from envoy_directory_genrule might be directories or we might
+      // have artisanal files.
+      if (api->fileSystem().directoryExists(arg)) {
+        const auto paths = Envoy::TestUtility::listFiles(arg, true);
+        Envoy::test_corpus_.insert(Envoy::test_corpus_.begin(), paths.begin(), paths.end());
+      } else {
+        Envoy::test_corpus_.emplace_back(arg);
+      }
     }
   }
   argc -= input_args;
-  for (size_t i = 0; i < Envoy::test_corpus_.size(); ++i) {
-    argv[i + 1] = argv[i + 1 + input_args];
+  for (ssize_t i = 1; i < argc; ++i) {
+    argv[i] = argv[i + input_args];
   }
 
   testing::InitGoogleTest(&argc, argv);

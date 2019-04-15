@@ -19,10 +19,10 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-class JwksCacheTest : public ::testing::Test {
+class JwksCacheTest : public testing::Test {
 protected:
-  JwksCacheTest() : api_(Api::createApiForTest(stats_)) {}
-  void SetUp() {
+  JwksCacheTest() : api_(Api::createApiForTest()) {}
+  void SetUp() override {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
     cache_ = JwksCache::create(config_, time_system_, *api_);
     jwks_ = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
@@ -32,7 +32,6 @@ protected:
   JwtAuthentication config_;
   JwksCachePtr cache_;
   google::jwt_verify::JwksPtr jwks_;
-  Stats::IsolatedStoreImpl stats_;
   Api::ApiPtr api_;
 };
 

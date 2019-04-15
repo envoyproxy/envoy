@@ -10,7 +10,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::TestWithParam;
 using testing::Values;
 
 namespace Envoy {
@@ -998,7 +997,7 @@ TEST_F(CompactProtocolTest, ReadBinary) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-class CompactProtocolFieldTypeTest : public TestWithParam<uint8_t> {};
+class CompactProtocolFieldTypeTest : public testing::TestWithParam<uint8_t> {};
 
 TEST_P(CompactProtocolFieldTypeTest, ConvertsToFieldType) {
   uint8_t compact_field_type = GetParam();

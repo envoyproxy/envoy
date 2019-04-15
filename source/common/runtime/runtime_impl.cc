@@ -14,11 +14,23 @@
 #include "common/common/utility.h"
 #include "common/filesystem/directory.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_features.h"
 
+#include "absl/strings/match.h"
 #include "openssl/rand.h"
 
 namespace Envoy {
 namespace Runtime {
+
+bool runtimeFeatureEnabled(absl::string_view feature) {
+  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  if (Runtime::LoaderSingleton::getExisting()) {
+    return Runtime::LoaderSingleton::getExisting()->snapshot().runtimeFeatureEnabled(feature);
+  }
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::runtime), warn,
+                      "Unable to use runtime singleton for feature {}", feature);
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature);
+}
 
 const size_t RandomGeneratorImpl::UUID_LENGTH = 36;
 
@@ -144,6 +156,35 @@ std::string RandomGeneratorImpl::uuid() {
   return std::string(uuid, UUID_LENGTH);
 }
 
+bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
+  bool allowed = false;
+  // If the value is not explicitly set as a runtime boolean, the default value is based on
+  // disallowedByDefault.
+  if (!getBoolean(key, allowed)) {
+    allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
+  }
+
+  if (!allowed) {
+    // If either disallowed by default or configured off, the feature is not enabled.
+    return false;
+  }
+  // The feature is allowed. It is assumed this check is called when the feature
+  // is about to be used, so increment the feature use stat.
+  stats_.deprecated_feature_use_.inc();
+  return true;
+}
+
+bool SnapshotImpl::runtimeFeatureEnabled(absl::string_view key) const {
+  bool enabled = false;
+  // If the value is not explicitly set as a runtime boolean, the default value is based on
+  // disallowedByDefault.
+  if (!getBoolean(key, enabled)) {
+    enabled = RuntimeFeaturesDefaults::get().enabledByDefault(key);
+  }
+
+  return enabled;
+}
+
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
                                   uint64_t random_value, uint64_t num_buckets) const {
   return random_value % num_buckets < std::min(getInteger(key, default_value), num_buckets);
@@ -184,23 +225,27 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
                                   const envoy::type::FractionalPercent& default_value,
                                   uint64_t random_value) const {
   const auto& entry = values_.find(key);
-  uint64_t numerator, denominator;
+  envoy::type::FractionalPercent percent;
   if (entry != values_.end() && entry->second.fractional_percent_value_.has_value()) {
-    numerator = entry->second.fractional_percent_value_->numerator();
-    denominator = ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-        entry->second.fractional_percent_value_->denominator());
+    percent = entry->second.fractional_percent_value_.value();
   } else if (entry != values_.end() && entry->second.uint_value_.has_value()) {
-    // The runtime value must have been specified as an integer rather than a fractional percent
-    // proto. To preserve legacy semantics, we'll assume this represents a percentage.
-    numerator = entry->second.uint_value_.value();
-    denominator = 100;
+    // Check for > 100 because the runtime value is assumed to be specified as
+    // an integer, and it also ensures that truncating the uint64_t runtime
+    // value into a uint32_t percent numerator later is safe
+    if (entry->second.uint_value_.value() > 100) {
+      return true;
+    }
+
+    // The runtime value was specified as an integer rather than a fractional
+    // percent proto. To preserve legacy semantics, we treat it as a percentage
+    // (i.e. denominator of 100).
+    percent.set_numerator(entry->second.uint_value_.value());
+    percent.set_denominator(envoy::type::FractionalPercent::HUNDRED);
   } else {
-    numerator = default_value.numerator();
-    denominator =
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(default_value.denominator());
+    percent = default_value;
   }
 
-  return random_value % denominator < numerator;
+  return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
 }
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
@@ -212,13 +257,22 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
   }
 }
 
+bool SnapshotImpl::getBoolean(absl::string_view key, bool& value) const {
+  auto entry = values_.find(key);
+  if (entry != values_.end() && entry->second.bool_value_.has_value()) {
+    value = entry->second.bool_value_.value();
+    return true;
+  }
+  return false;
+}
+
 const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() const {
   return layers_;
 }
 
 SnapshotImpl::SnapshotImpl(RandomGenerator& generator, RuntimeStats& stats,
                            std::vector<OverrideLayerConstPtr>&& layers)
-    : layers_{std::move(layers)}, generator_{generator} {
+    : layers_{std::move(layers)}, generator_{generator}, stats_{stats} {
   for (const auto& layer : layers_) {
     for (const auto& kv : layer->values()) {
       values_.erase(kv.first);
@@ -239,9 +293,23 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const std::string& value) {
   return entry;
 }
 
+bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
+  absl::string_view stripped = entry.raw_string_value_;
+  stripped = absl::StripAsciiWhitespace(stripped);
+
+  if (absl::EqualsIgnoreCase(stripped, "true")) {
+    entry.bool_value_ = true;
+    return true;
+  } else if (absl::EqualsIgnoreCase(stripped, "false")) {
+    entry.bool_value_ = false;
+    return true;
+  }
+  return false;
+}
+
 bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
   uint64_t converted_uint64;
-  if (StringUtil::atoul(entry.raw_string_value_.c_str(), converted_uint64)) {
+  if (StringUtil::atoull(entry.raw_string_value_.c_str(), converted_uint64)) {
     entry.uint_value_ = converted_uint64;
     return true;
   }
@@ -283,7 +351,7 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
                               Api::Api& api) {
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throw EnvoyException(fmt::format("Walk recursion depth exceded {}", MaxWalkDepth));
+    throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {

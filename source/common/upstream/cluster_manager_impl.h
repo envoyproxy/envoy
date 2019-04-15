@@ -23,6 +23,7 @@
 #include "common/config/grpc_mux_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
+#include "common/upstream/priority_conn_pool_map.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -172,11 +173,12 @@ public:
                      Http::Context& http_context);
 
   // Upstream::ClusterManager
-  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
-                          const std::string& version_info) override;
+  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
+                          ClusterWarmingCallback cluster_warming_cb) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
   }
+
   ClusterInfoMap clusters() override {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
     ClusterInfoMap clusters_map;
@@ -218,7 +220,10 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
+  std::size_t warmingClusterCount() const override { return warming_clusters_.size(); }
+
 protected:
+  virtual void postThreadLocalHostRemoval(const Cluster& cluster, const HostVector& hosts_removed);
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
                                             const HostVector& hosts_added,
                                             const HostVector& hosts_removed);
@@ -231,9 +236,14 @@ private:
    */
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
-      typedef std::map<std::vector<uint8_t>, Http::ConnectionPool::InstancePtr> ConnPools;
+      ConnPoolsContainer(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host)
+          : pools_{std::make_shared<ConnPools>(dispatcher, host)} {}
 
-      ConnPools pools_;
+      typedef PriorityConnPoolMap<std::vector<uint8_t>, Http::ConnectionPool::Instance> ConnPools;
+
+      // This is a shared_ptr so we can keep it alive while cleaning up.
+      std::shared_ptr<ConnPools> pools_;
+      bool ready_to_drain_{false};
       uint64_t drains_remaining_{};
     };
 
@@ -307,14 +317,21 @@ private:
     ~ThreadLocalClusterManagerImpl();
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
+    void clearContainer(HostSharedPtr old_host, ConnPoolsContainer& container);
     void drainTcpConnPools(HostSharedPtr old_host, TcpConnPoolsContainer& container);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
+    static void removeHosts(const std::string& name, const HostVector& hosts_removed,
+                            ThreadLocal::Slot& tls);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
-                                        HostSet::UpdateHostsParams&& update_hosts_params,
+                                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
-                                        const HostVector& hosts_removed, ThreadLocal::Slot& tls);
+                                        const HostVector& hosts_removed, ThreadLocal::Slot& tls,
+                                        uint64_t overprovisioning_factor);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
+
+    ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
+                                                  bool allocate = false);
 
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
@@ -423,7 +440,11 @@ private:
   Stats::Store& stats_;
   ThreadLocal::SlotPtr tls_;
   Runtime::RandomGenerator& random_;
+
+protected:
   ClusterMap active_clusters_;
+
+private:
   ClusterMap warming_clusters_;
   envoy::api::v2::core::BindConfig bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;

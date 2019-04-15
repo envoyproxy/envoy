@@ -36,7 +36,8 @@ public:
   static ServerConnectionPtr
   autoCreateCodec(Network::Connection& connection, const Buffer::Instance& data,
                   ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
-                  const Http1Settings& http1_settings, const Http2Settings& http2_settings);
+                  const Http1Settings& http1_settings, const Http2Settings& http2_settings,
+                  const uint32_t max_request_headers_kb);
 
   /**
    * Mutates request headers in various ways. This functionality is broken out because of its
@@ -57,6 +58,11 @@ public:
 
   static void mutateResponseHeaders(HeaderMap& response_headers, const HeaderMap* request_headers,
                                     const std::string& via);
+
+  // Sanitize the path in the header map if forced by config.
+  // Side affect: the string view of Path header is invalidated.
+  // Return false if error happens during the sanitization.
+  static bool maybeNormalizePath(HeaderMap& request_headers, const ConnectionManagerConfig& config);
 
 private:
   /**

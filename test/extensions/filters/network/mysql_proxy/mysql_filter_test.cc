@@ -17,7 +17,7 @@ namespace MySQLProxy {
 
 constexpr int SESSIONS = 5;
 
-class MySQLFilterTest : public MySQLTestUtils, public testing::Test {
+class MySQLFilterTest : public testing::Test, public MySQLTestUtils {
 public:
   MySQLFilterTest() { ENVOY_LOG_MISC(info, "test"); }
 

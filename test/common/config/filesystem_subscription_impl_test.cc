@@ -12,8 +12,8 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class FilesystemSubscriptionImplTest : public FilesystemSubscriptionTestHarness,
-                                       public testing::Test {};
+class FilesystemSubscriptionImplTest : public testing::Test,
+                                       public FilesystemSubscriptionTestHarness {};
 
 // Validate that the client can recover from bad JSON responses.
 TEST_F(FilesystemSubscriptionImplTest, BadJsonRecovery) {
@@ -42,7 +42,7 @@ TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(_, _, _)).WillOnce(Throw(EnvoyException("bad path")));
-  EXPECT_THROW_WITH_MESSAGE(FilesystemEdsSubscriptionImpl(dispatcher, "##!@/dev/null", stats, *api),
+  EXPECT_THROW_WITH_MESSAGE(FilesystemSubscriptionImpl(dispatcher, "##!@/dev/null", stats, *api),
                             EnvoyException, "bad path");
 }
 

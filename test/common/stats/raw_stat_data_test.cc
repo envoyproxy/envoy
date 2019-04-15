@@ -10,12 +10,14 @@
 
 namespace Envoy {
 namespace Stats {
+namespace {
 
 class RawStatDataTest : public testing::Test {
 public:
-  RawStatDataTest() : allocator_(stats_options_) {}
+  RawStatDataTest() : allocator_(stats_options_, symbol_table_) {}
 
   StatsOptionsImpl stats_options_;
+  FakeSymbolTableImpl symbol_table_;
   TestAllocator allocator_; // This is RawStatDataAllocator with some size settings.
 };
 
@@ -50,5 +52,6 @@ TEST_F(RawStatDataTest, RawAlloc) {
   allocator_.free(*stat_3);
 }
 
+} // namespace
 } // namespace Stats
 } // namespace Envoy

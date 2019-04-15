@@ -5,7 +5,7 @@
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Network {

@@ -39,16 +39,19 @@ HeaderString::HeaderString() : type_(Type::Inline) {
   clear();
   static_assert(sizeof(inline_buffer_) >= MaxIntegerLength, "");
   static_assert(MinDynamicCapacity >= MaxIntegerLength, "");
+  ASSERT(valid());
 }
 
 HeaderString::HeaderString(const LowerCaseString& ref_value) : type_(Type::Reference) {
   buffer_.ref_ = ref_value.get().c_str();
   string_length_ = ref_value.get().size();
+  ASSERT(valid());
 }
 
 HeaderString::HeaderString(const std::string& ref_value) : type_(Type::Reference) {
   buffer_.ref_ = ref_value.c_str();
   string_length_ = ref_value.size();
+  ASSERT(valid());
 }
 
 HeaderString::HeaderString(HeaderString&& move_value) {
@@ -76,6 +79,7 @@ HeaderString::HeaderString(HeaderString&& move_value) {
     break;
   }
   }
+  ASSERT(valid());
 }
 
 HeaderString::~HeaderString() { freeDynamic(); }
@@ -85,6 +89,8 @@ void HeaderString::freeDynamic() {
     free(buffer_.dynamic_);
   }
 }
+
+bool HeaderString::valid() const { return validHeaderString(getStringView()); }
 
 void HeaderString::append(const char* data, uint32_t size) {
   switch (type_) {
@@ -143,6 +149,7 @@ void HeaderString::append(const char* data, uint32_t size) {
   memcpy(buffer_.dynamic_ + string_length_, data, size);
   string_length_ += size;
   buffer_.dynamic_[string_length_] = 0;
+  ASSERT(valid());
 }
 
 void HeaderString::clear() {
@@ -203,6 +210,7 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
   memcpy(buffer_.dynamic_, data, size);
   buffer_.dynamic_[size] = 0;
   string_length_ = size;
+  ASSERT(valid());
 }
 
 void HeaderString::setInteger(uint64_t value) {
@@ -235,6 +243,7 @@ void HeaderString::setReference(const std::string& ref_value) {
   type_ = Type::Reference;
   buffer_.ref_ = ref_value.c_str();
   string_length_ = ref_value.size();
+  ASSERT(valid());
 }
 
 // Specialization needed for HeaderMapImpl::HeaderList::insert() when key is LowerCaseString.
@@ -339,6 +348,8 @@ bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {
 
   return true;
 }
+
+bool HeaderMapImpl::operator!=(const HeaderMapImpl& rhs) const { return !operator==(rhs); }
 
 void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
   EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.c_str());

@@ -18,6 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
 class MockMatcher : public Matcher {
 public:
@@ -33,9 +34,9 @@ public:
   MOCK_CONST_METHOD1(findVerifier, const Verifier*(const Http::HeaderMap& headers));
 };
 
-class FilterTest : public ::testing::Test {
+class FilterTest : public testing::Test {
 public:
-  void SetUp() {
+  void SetUp() override {
     mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);
 
     mock_verifier_ = std::make_unique<MockVerifier>();
@@ -189,6 +190,7 @@ TEST_F(FilterTest, TestNoRouteMatched) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

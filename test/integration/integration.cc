@@ -132,7 +132,7 @@ void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_ma
   }
 }
 
-void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason) {
+void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, absl::string_view) {
   saw_reset_ = true;
   reset_reason_ = reason;
   if (waiting_for_reset_) {
@@ -227,13 +227,14 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
   }
 }
 
-BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
-                                         TestTimeSystemPtr time_system, const std::string& config)
+BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstream_address_fn,
+                                         Network::Address::IpVersion version,
+                                         const std::string& config)
     : api_(Api::createApiForTest(stats_store_)),
-      mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
-      dispatcher_(new Event::DispatcherImpl(
-          *time_system_, Buffer::WatermarkFactoryPtr{mock_buffer_factory_}, *api_)),
-      version_(version), config_helper_(version, *api_, config),
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
+      dispatcher_(api_->allocateDispatcher(Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
+      version_(version), upstream_address_fn_(upstream_address_fn),
+      config_helper_(version, *api_, config),
       default_log_level_(TestEnvironment::getOptions().logLevel()) {
   // This is a hack, but there are situations where we disconnect fake upstream connections and
   // then we expect the server connection pool to get the disconnect before the next test starts.
@@ -241,7 +242,7 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
   // notification and clear the pool connection if necessary. A real fix would require adding fairly
   // complex test hooks to the server and/or spin waiting on stats, neither of which I think are
   // necessary right now.
-  time_system_->sleep(std::chrono::milliseconds(10));
+  timeSystem().sleep(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, create_(_, _))
       .WillByDefault(Invoke([](std::function<void()> below_low,
                                std::function<void()> above_high) -> Buffer::Instance* {
@@ -249,6 +250,15 @@ BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
       }));
   ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
 }
+
+BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
+                                         const std::string& config)
+    : BaseIntegrationTest(
+          [version](int) {
+            return Network::Utility::parseInternetAddress(
+                Network::Test::getAnyAddressString(version), 0);
+          },
+          version, config) {}
 
 Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t port) {
   Network::ClientConnectionPtr connection(dispatcher_->createClientConnection(
@@ -272,12 +282,13 @@ void BaseIntegrationTest::initialize() {
 
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+    auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
       fake_upstreams_.emplace_back(
-          new AutonomousUpstream(0, upstream_protocol_, version_, *time_system_));
+          new AutonomousUpstream(endpoint, upstream_protocol_, *time_system_));
     } else {
       fake_upstreams_.emplace_back(
-          new FakeUpstream(0, upstream_protocol_, version_, *time_system_, enable_half_close_));
+          new FakeUpstream(endpoint, upstream_protocol_, *time_system_, enable_half_close_));
     }
   }
 }
@@ -294,8 +305,8 @@ void BaseIntegrationTest::createEnvoy() {
   // config, you will need to do so *after* initialize() (which calls this function) is done.
   config_helper_.finalize(ports);
 
-  ENVOY_LOG_MISC(debug, "Running Envoy with configuration {}",
-                 config_helper_.bootstrap().DebugString());
+  ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}",
+                 MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
       "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
@@ -368,9 +379,9 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_,
-                                               pre_worker_start_test_steps_, deterministic_,
-                                               *time_system_, *api_, defer_listener_finalization_);
+  test_server_ = IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function_,
+                                               deterministic_, timeSystem(), *api_,
+                                               defer_listener_finalization_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
@@ -401,7 +412,7 @@ void BaseIntegrationTest::createTestServer(const std::string& json_path,
                                            const std::vector<std::string>& port_names) {
   test_server_ = createIntegrationTestServer(
       TestEnvironment::temporaryFileSubstitute(json_path, port_map_, version_), nullptr,
-      *time_system_);
+      timeSystem());
   registerTestServerPorts(port_names);
 }
 
@@ -424,9 +435,9 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
 
 IntegrationTestServerPtr
 BaseIntegrationTest::createIntegrationTestServer(const std::string& bootstrap_path,
-                                                 std::function<void()> pre_worker_start_test_steps,
+                                                 std::function<void()> on_server_init_function,
                                                  Event::TestTimeSystem& time_system) {
-  return IntegrationTestServer::create(bootstrap_path, version_, pre_worker_start_test_steps,
+  return IntegrationTestServer::create(bootstrap_path, version_, on_server_init_function,
                                        deterministic_, time_system, *api_,
                                        defer_listener_finalization_);
 }
@@ -514,4 +525,51 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
   }
   return AssertionSuccess();
 }
+
+AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
+    const std::string& expected_type_url,
+    const std::vector<std::string>& expected_resource_subscriptions,
+    const std::vector<std::string>& expected_resource_unsubscriptions,
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_message) {
+  envoy::api::v2::DeltaDiscoveryRequest request;
+  VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, request));
+
+  EXPECT_TRUE(request.has_node());
+  EXPECT_FALSE(request.node().id().empty());
+  EXPECT_FALSE(request.node().cluster().empty());
+
+  // TODO(PiotrSikora): Remove this hack once fixed internally.
+  if (!(expected_type_url == request.type_url())) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}",
+                                             request.type_url(), expected_type_url);
+  }
+  if (!(expected_error_code == request.error_detail().code())) {
+    return AssertionFailure() << fmt::format("error_code {} does not match expected {}",
+                                             request.error_detail().code(), expected_error_code);
+  }
+  EXPECT_TRUE(IsSubstring("", "", expected_error_message, request.error_detail().message()));
+
+  const std::vector<std::string> resource_subscriptions(request.resource_names_subscribe().cbegin(),
+                                                        request.resource_names_subscribe().cend());
+  if (expected_resource_subscriptions != resource_subscriptions) {
+    return AssertionFailure() << fmt::format(
+               "newly subscribed resources {} do not match expected {} in {}",
+               fmt::join(resource_subscriptions.begin(), resource_subscriptions.end(), ","),
+               fmt::join(expected_resource_subscriptions.begin(),
+                         expected_resource_subscriptions.end(), ","),
+               request.DebugString());
+  }
+  const std::vector<std::string> resource_unsubscriptions(
+      request.resource_names_unsubscribe().cbegin(), request.resource_names_unsubscribe().cend());
+  if (expected_resource_unsubscriptions != resource_unsubscriptions) {
+    return AssertionFailure() << fmt::format(
+               "newly UNsubscribed resources {} do not match expected {} in {}",
+               fmt::join(resource_unsubscriptions.begin(), resource_unsubscriptions.end(), ","),
+               fmt::join(expected_resource_unsubscriptions.begin(),
+                         expected_resource_unsubscriptions.end(), ","),
+               request.DebugString());
+  }
+  return AssertionSuccess();
+}
+
 } // namespace Envoy

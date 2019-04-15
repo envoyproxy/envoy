@@ -79,6 +79,7 @@ A log of outlier ejection events can optionally be produced by Envoy. This is ex
 during daily operations since global stats do not provide enough information on which hosts are
 being ejected and for what reasons. The log is structured as protobuf-based dumps of
 :ref:`OutlierDetectionEvent messages <envoy_api_msg_data.cluster.v2alpha.OutlierDetectionEvent>`.
+Ejection event logging is configured in the Cluster manager :ref:`outlier detection configuration <envoy_api_field_config.bootstrap.v2.ClusterManager.outlier_detection>`.
 
 Configuration reference
 -----------------------

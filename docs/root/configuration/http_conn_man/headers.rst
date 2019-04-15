@@ -131,7 +131,7 @@ should be replaced by backslash-double-quote (\").
 The following keys are supported:
 
 1. ``By`` The Subject Alternative Name (URI type) of the current proxy's certificate.
-2. ``Hash`` The SHA 256 diguest of the current client certificate.
+2. ``Hash`` The SHA 256 digest of the current client certificate.
 3. ``Cert`` The entire client certificate in URL encoded PEM format.
 4. ``Subject`` The Subject field of the current client certificate. The value is always double-quoted.
 5. ``URI`` The URI type Subject Alternative Name field of the current client certificate.
@@ -325,12 +325,6 @@ A few very important notes about XFF:
      Envoy will not consider it internal. This is a known "bug" due to the simplification of how
      XFF is parsed to determine if a request is internal. In this scenario, do not forward XFF and
      allow Envoy to generate a new one with a single internal origin IP.
-3. Testing IPv6 in a large multi-hop system can be difficult from a change management perspective.
-   For testing IPv6 compatibility of upstream services which parse XFF header values,
-   :ref:`represent_ipv4_remote_address_as_ipv4_mapped_ipv6 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.represent_ipv4_remote_address_as_ipv4_mapped_ipv6>`
-   can be enabled in the v2 API. Envoy will append an IPv4 address in mapped IPv6 format, e.g.
-   ::FFFF:50.0.0.1. This change will also apply to
-   :ref:`config_http_conn_man_headers_x-envoy-external-address`.
 
 .. _config_http_conn_man_headers_x-forwarded-proto:
 

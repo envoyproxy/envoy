@@ -1,11 +1,15 @@
 syntax = "proto3";
 
 package envoy.api.v2.route;
+
+option java_outer_classname = "RouteProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v2.route";
 option go_package = "route";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/percent.proto";
 import "envoy/type/range.proto";
 
 import "google/protobuf/any.proto";
@@ -17,6 +21,7 @@ import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 option (gogoproto.equal_all) = true;
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: HTTP route]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -34,17 +39,21 @@ message VirtualHost {
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // A list of domains (host/authority header) that will be matched to this
-  // virtual host. Wildcard hosts are supported in the form of ``*.foo.com`` or
-  // ``*-bar.foo.com``.
+  // virtual host. Wildcard hosts are supported in the suffix or prefix form.
+  //
+  // Domain search order:
+  //  1. Exact domain names: ``www.foo.com``.
+  //  2. Suffix domain wildcards: ``*.foo.com`` or ``*-bar.foo.com``.
+  //  3. Prefix domain wildcards: ``foo.*`` or ``foo-*``.
+  //  4. Special wildcard ``*`` matching any domain.
   //
   // .. note::
   //
   //   The wildcard will not match the empty string.
   //   e.g. ``*-bar.foo.com`` will match ``baz-bar.foo.com`` but not ``-bar.foo.com``.
-  //   Additionally, a special entry ``*`` is allowed which will match any
-  //   host/authority header. Only a single virtual host in the entire route
-  //   configuration can match on ``*``. A domain must be unique across all virtual
-  //   hosts or the config will fail to load.
+  //   The longest wildcards match first.
+  //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
+  //   must be unique across all virtual hosts or the config will fail to load.
   repeated string domains = 2 [(validate.rules).repeated .min_items = 1];
 
   // The list of routes that will be matched, in order, for incoming requests.
@@ -112,7 +121,7 @@ message VirtualHost {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 12 [deprecated = true];
+  map<string, google.protobuf.Struct> per_filter_config = 12;
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -135,6 +144,12 @@ message VirtualHost {
   // route level entry will take precedence over this config and it'll be treated
   // independently (e.g.: values are not inherited).
   RetryPolicy retry_policy = 16;
+
+  // Indicates the hedge policy for all routes in this virtual host. Note that setting a
+  // route level entry will take precedence over this config and it'll be treated
+  // independently (e.g.: values are not inherited).
+  // [#not-implemented-hide:]
+  HedgePolicy hedge_policy = 17;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
@@ -179,7 +194,7 @@ message Route {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
+  map<string, google.protobuf.Struct> per_filter_config = 8;
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
@@ -276,7 +291,7 @@ message WeightedCluster {
     // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
-    map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
+    map<string, google.protobuf.Struct> per_filter_config = 8;
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
@@ -320,7 +335,7 @@ message RouteMatch {
     // regex must match the *:path* header once the query string is removed. The entire path
     // (without the query string) must match the regex. The rule will not match if only a
     // subsequence of the *:path* header matches the regex. The regex grammar is defined `here
-    // <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+    // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
     //
     // Examples:
     //
@@ -559,8 +574,7 @@ message RouteAction {
   // fires, the stream is terminated with a 408 Request Timeout error code if no
   // upstream response header has been received, otherwise a stream reset
   // occurs.
-  google.protobuf.Duration idle_timeout = 24
-      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+  google.protobuf.Duration idle_timeout = 24 [(gogoproto.stdduration) = true];
 
   // Indicates that the route has a retry policy. Note that if this is set,
   // it'll take precedence over the virtual host level retry policy entirely
@@ -624,14 +638,9 @@ message RouteAction {
   // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
   core.RoutingPriority priority = 11;
 
-  // [#not-implemented-hide:]
-  repeated core.HeaderValueOption request_headers_to_add = 12 [deprecated = true];
-
-  // [#not-implemented-hide:]
-  repeated core.HeaderValueOption response_headers_to_add = 18 [deprecated = true];
-
-  // [#not-implemented-hide:]
-  repeated string response_headers_to_remove = 19 [deprecated = true];
+  reserved 12;
+  reserved 18;
+  reserved 19;
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
@@ -778,6 +787,12 @@ message RouteAction {
     HANDLE_INTERNAL_REDIRECT = 1;
   }
   InternalRedirectAction internal_redirect_action = 26;
+
+  // Indicates that the route has a hedge policy. Note that if this is set,
+  // it'll take precedence over the virtual host level hedge policy entirely
+  // (e.g.: policies are not merged, most internal one becomes the enforced policy).
+  // [#not-implemented-hide:]
+  HedgePolicy hedge_policy = 27;
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
@@ -808,7 +823,7 @@ message RetryPolicy {
   message RetryPriority {
     string name = 1 [(validate.rules).string.min_bytes = 1];
     oneof config_type {
-      google.protobuf.Struct config = 2 [deprecated = true];
+      google.protobuf.Struct config = 2;
 
       google.protobuf.Any typed_config = 3;
     }
@@ -822,7 +837,7 @@ message RetryPolicy {
   message RetryHostPredicate {
     string name = 1 [(validate.rules).string.min_bytes = 1];
     oneof config_type {
-      google.protobuf.Struct config = 2 [deprecated = true];
+      google.protobuf.Struct config = 2;
 
       google.protobuf.Any typed_config = 3;
     }
@@ -841,6 +856,25 @@ message RetryPolicy {
 
   // HTTP status codes that should trigger a retry in addition to those specified by retry_on.
   repeated uint32 retriable_status_codes = 7;
+}
+
+// HTTP request hedging TODO(mpuncel) docs
+// [#not-implemented-hide:]
+message HedgePolicy {
+  // Specifies the number of initial requests that should be sent upstream.
+  // Must be at least 1.
+  // Defaults to 1.
+  google.protobuf.UInt32Value initial_requests = 1 [(validate.rules).uint32.gte = 1];
+
+  // Specifies a probability that an additional upstream request should be sent
+  // on top of what is specified by initial_requests.
+  // Defaults to 0.
+  envoy.type.FractionalPercent additional_request_chance = 2;
+
+  // Indicates that a hedged request should be sent when the per-try timeout
+  // is hit. This will only occur if the retry policy also indicates that a
+  // timed out request should be retried. Defaults to false.
+  bool hedge_on_per_try_timeout = 3;
 }
 
 message RedirectAction {
@@ -948,7 +982,7 @@ message Decorator {
 message VirtualCluster {
   // Specifies a regex pattern to use for matching requests. The entire path of the request
   // must match the regex. The regex grammar used is defined `here
-  // <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+  // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
   //
   // Examples:
   //
@@ -1144,7 +1178,7 @@ message HeaderMatcher {
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
     // request header value matches the regex. The regex grammar used in the value field is defined
-    // `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+    // `here <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
     //
     // Examples:
     //
@@ -1166,7 +1200,7 @@ message HeaderMatcher {
     //   "-1somestring"
     envoy.type.Int64Range range_match = 6;
 
-    // If specified, header match will be be performed based on whether the header is in the
+    // If specified, header match will be performed based on whether the header is in the
     // request.
     bool present_match = 7;
 

@@ -22,28 +22,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, Http2IntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(Http2IntegrationTest, RouterNotFound) { testRouterNotFound(); }
-
-TEST_P(Http2IntegrationTest, RouterNotFoundBodyNoBuffer) { testRouterNotFoundWithBody(); }
-
-TEST_P(Http2IntegrationTest, RouterClusterNotFound404) { testRouterClusterNotFound404(); }
-
-TEST_P(Http2IntegrationTest, RouterClusterNotFound503) { testRouterClusterNotFound503(); }
-
-TEST_P(Http2IntegrationTest, RouterRedirect) { testRouterRedirect(); }
-
-TEST_P(Http2IntegrationTest, ValidZeroLengthContent) { testValidZeroLengthContent(); }
-
-TEST_P(Http2IntegrationTest, InvalidContentLength) { testInvalidContentLength(); }
-
-TEST_P(Http2IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); }
-
-TEST_P(Http2IntegrationTest, ComputedHealthCheck) { testComputedHealthCheck(); }
-
-TEST_P(Http2IntegrationTest, AddEncodedTrailers) { testAddEncodedTrailers(); }
-
-TEST_P(Http2IntegrationTest, DrainClose) { testDrainClose(); }
-
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
@@ -59,10 +37,6 @@ TEST_P(Http2IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
 
 TEST_P(Http2IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, true);
-}
-
-TEST_P(Http2IntegrationTest, ShutdownWithActiveConnPoolConnections) {
-  testRequestAndResponseShutdownWithActiveConnection();
 }
 
 TEST_P(Http2IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
@@ -85,28 +59,14 @@ TEST_P(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(); }
-
-TEST_P(Http2IntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
-
 TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2IntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
-
-TEST_P(Http2IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
 static std::string response_metadata_filter = R"EOF(
 name: response-metadata-filter
 config: {}
 )EOF";
-
-void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string> keys) {
-  for (const auto key : keys) {
-    // keys are the same as their corresponding values.
-    EXPECT_EQ(metadata_map.find(key)->second, key);
-  }
-  EXPECT_EQ(metadata_map.size(), keys.size());
-}
 
 // Verifies metadata can be sent at different locations of the responses.
 TEST_P(Http2MetadataIntegrationTest, ProxyMetadataInResponse) {
@@ -296,6 +256,14 @@ TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
   EXPECT_EQ(response->metadata_map().size(), 0);
 }
 
+void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string> keys) {
+  for (const auto key : keys) {
+    // keys are the same as their corresponding values.
+    EXPECT_EQ(metadata_map.find(key)->second, key);
+  }
+  EXPECT_EQ(metadata_map.size(), keys.size());
+}
+
 TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   addFilters({response_metadata_filter});
   config_helper_.addConfigModifier(
@@ -421,7 +389,28 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
 }
 
 TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadataReachSizeLimit) {
-  testEnvoyMultipleMetadataReachSizeLimit();
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends a request.
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 10);
+  waitForNextUpstreamRequest();
+
+  // Sends multiple metadata after response header until max size limit is reached.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  const int size = 200;
+  std::vector<Http::MetadataMapVector> multiple_vecs(size);
+  for (int i = 0; i < size; i++) {
+    Http::MetadataMap metadata_map = {{"key", std::string(10000, 'a')}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    multiple_vecs[i].push_back(std::move(metadata_map_ptr));
+    upstream_request_->encodeMetadata(multiple_vecs[i]);
+  }
+  upstream_request_->encodeData(12, true);
+
+  // Verifies reset is received.
+  response->waitForReset();
+  ASSERT_FALSE(response->complete());
 }
 
 // Verifies small metadata can be sent at different locations of a request.
@@ -654,41 +643,21 @@ TEST_P(Http2MetadataIntegrationTest, DecodeHeaderOnlyRequestWithRequestMetadata)
   EXPECT_EQ(true, upstream_request_->complete());
 }
 
-TEST_P(Http2IntegrationTest, EnvoyHandlingDuplicate100Continue) {
-  testEnvoyHandling100Continue(true);
+TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {
+  config_helper_.setDefaultHostAndRoute("foo.com", "/found");
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "POST", "/service/notfound", "", downstream_protocol_, version_, "host",
+      Http::Headers::get().ContentTypeValues.Grpc);
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
+            response->headers().ContentType()->value().c_str());
+  EXPECT_STREQ("12", response->headers().GrpcStatus()->value().c_str());
 }
-
-TEST_P(Http2IntegrationTest, EnvoyProxyingEarly100Continue) { testEnvoyProxying100Continue(true); }
-
-TEST_P(Http2IntegrationTest, EnvoyProxyingLate100Continue) { testEnvoyProxying100Continue(false); }
-
-TEST_P(Http2IntegrationTest, RetryHittingBufferLimit) { testRetryHittingBufferLimit(); }
-
-TEST_P(Http2IntegrationTest, HittingDecoderFilterLimit) { testHittingDecoderFilterLimit(); }
-
-TEST_P(Http2IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
-
-TEST_P(Http2IntegrationTest, GrpcRouterNotFound) { testGrpcRouterNotFound(); }
-
-TEST_P(Http2IntegrationTest, RetryHostPredicateFilter) { testRetryHostPredicateFilter(); }
-
-TEST_P(Http2IntegrationTest, RetryPriority) { testRetryPriority(); }
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
-
-TEST_P(Http2IntegrationTest, LargeHeadersInvokeResetStream) { testLargeRequestHeaders(62, 60); }
-
-TEST_P(Http2IntegrationTest, LargeHeadersAcceptedIfConfigured) { testLargeRequestHeaders(62, 63); }
-
-TEST_P(Http2IntegrationTest, EncodingHeaderOnlyResponse) { testHeadersOnlyFilterEncoding(); }
-
-TEST_P(Http2IntegrationTest, DecodingHeaderOnlyResponse) { testHeadersOnlyFilterDecoding(); }
-
-TEST_P(Http2IntegrationTest, DecodingHeaderOnlyInterleaved) { testHeadersOnlyFilterInterleaved(); }
-
-TEST_P(Http2IntegrationTest, DownstreamResetBeforeResponseComplete) {
-  testDownstreamResetBeforeResponseComplete();
-}
 
 TEST_P(Http2IntegrationTest, BadMagic) {
   initialize();
@@ -776,14 +745,6 @@ TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
   EXPECT_STREQ("14", response->headers().GrpcStatus()->value().c_str()); // Service Unavailable
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.upstream_rq_timeout")->value());
 }
-
-// Tests idle timeout behaviour with single request and validates that idle timer kicks in
-// after given timeout.
-TEST_P(Http2IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
-
-// Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
-// after both the requests are done.
-TEST_P(Http2IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
 
 // Interleave two requests and responses and make sure that idle timeout is handled correctly.
 TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {

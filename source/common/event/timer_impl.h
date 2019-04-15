@@ -5,6 +5,7 @@
 #include "envoy/event/timer.h"
 
 #include "common/event/event_impl_base.h"
+#include "common/event/libevent.h"
 
 namespace Envoy {
 namespace Event {
@@ -19,6 +20,7 @@ public:
   // Timer
   void disableTimer() override;
   void enableTimer(const std::chrono::milliseconds& d) override;
+  bool enabled() override;
 
 private:
   TimerCb cb_;

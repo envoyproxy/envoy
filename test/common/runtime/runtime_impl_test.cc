@@ -21,6 +21,7 @@ using testing::ReturnNew;
 
 namespace Envoy {
 namespace Runtime {
+namespace {
 
 TEST(Random, DISABLED_benchmarkRandom) {
   Runtime::RandomGeneratorImpl random;
@@ -106,6 +107,29 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_EQ(2UL, loader->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file4", 1));
 
+  // Boolean getting.
+  bool value;
+  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader->snapshot());
+
+  EXPECT_EQ(true, snapshot->getBoolean("file11", value));
+  EXPECT_EQ(true, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file12", value));
+  EXPECT_EQ(false, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file13", value));
+  EXPECT_EQ(true, value);
+  // File1 is not a boolean.
+  EXPECT_EQ(false, snapshot->getBoolean("file1", value));
+
+  // Feature defaults.
+  // test_feature_true is explicitly set true in runtime_features.cc
+  EXPECT_EQ(true, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+  // test_feature_false is not in runtime_features.cc and so is false by default.
+  EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+
+  // Feature defaults via helper function.
+  EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+
   // Files with comments.
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
   EXPECT_EQ("/home#about-us", loader->snapshot().get("file6"));
@@ -190,6 +214,48 @@ TEST_F(DiskBackedLoaderImplTest, OverrideFolderDoesNotExist) {
   EXPECT_EQ("hello", loader->snapshot().get("file1"));
 }
 
+TEST_F(DiskBackedLoaderImplTest, PercentHandling) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  envoy::type::FractionalPercent default_value;
+
+  // Smoke test integer value of 0, should be interpreted as 0%
+  {
+    loader->mergeValues({{"foo", "0"}});
+
+    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 5));
+  }
+
+  // Smoke test integer value of 5, should be interpreted as 5%
+  {
+    loader->mergeValues({{"foo", "5"}});
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 4));
+    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 5));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 100));
+  }
+
+  // Verify uint64 -> uint32 conversion by using a runtime value with all 0s in
+  // the bottom 32 bits. If it were to be naively treated as a uint32_t then it
+  // would appear as 0%, but it should be 100% because we assume the
+  // denominator is 100
+  {
+    // NOTE: high_value has to have the property that the lowest 32 bits % 100
+    // is less than 100. If it's greater than 100 the test will pass whether or
+    // not the uint32 conversion is handled properly.
+    uint64_t high_value = 1UL << 60;
+    std::string high_value_str = std::to_string(high_value);
+    loader->mergeValues({{"foo", high_value_str}});
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 50));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 100));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 12389));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 23859235));
+  }
+}
+
 void testNewOverrides(Loader& loader, Stats::Store& store) {
   // New string
   loader.mergeValues({{"foo", "bar"}});
@@ -262,9 +328,8 @@ TEST(LoaderImplTest, All) {
 
 class DiskLayerTest : public testing::Test {
 protected:
-  DiskLayerTest() : api_(Api::createApiForTest(store_)) {}
+  DiskLayerTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl store_;
   Api::ApiPtr api_;
 };
 
@@ -282,8 +347,18 @@ TEST_F(DiskLayerTest, Loop) {
   EXPECT_THROW_WITH_MESSAGE(
       DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
                 *api_),
-      EnvoyException, "Walk recursion depth exceded 16");
+      EnvoyException, "Walk recursion depth exceeded 16");
 }
 
+TEST(NoRuntime, FeatureEnabled) {
+  // Make sure the registry is not set up.
+  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
+
+  // Feature defaults should still work.
+  EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+}
+
+} // namespace
 } // namespace Runtime
 } // namespace Envoy

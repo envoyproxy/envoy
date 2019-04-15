@@ -24,46 +24,26 @@ using MatcherPtr = std::unique_ptr<Matcher>;
  * - In order to make this computationally efficient, the matching tree is kept in a vector, with
  *   all references to other matchers implemented using an index into the vector. The vector is
  *   effectively a preorder traversal flattened N-ary tree.
- * - The previous point allows the creation of a per-stream/request vector of booleans of the same
- *   size as the matcher vector. Then, when match status is updated given new information, the
- *   vector of booleans can be easily updated using the same indexes as in the constant match
- *   configuration.
+ * - The previous point allows the creation of a per-stream/request vector of match statuses of
+ *   the same size as the matcher vector. Then, when match status is updated given new
+ *   information, the vector of match statuses can be easily updated using the same indexes as in
+ *   the constant match configuration.
  * - Finally, a matches() function can be trivially implemented by looking in the status vector at
  *   the index position that the current matcher is located in.
  */
 class Matcher {
 public:
-  virtual ~Matcher() = default;
+  struct MatchStatus {
+    bool operator==(const MatchStatus& rhs) const {
+      return matches_ == rhs.matches_ && might_change_status_ == rhs.might_change_status_;
+    }
 
-  /**
-   * @return the matcher's index in the match tree vector (see above).
-   */
-  size_t index() { return my_index_; }
+    bool matches_{false};            // Does the matcher currently match?
+    bool might_change_status_{true}; // Is it possible for matches_ to change in subsequent updates?
+  };
 
-  /**
-   * Update match status given new information.
-   * @param request_headers supplies the request headers, if available.
-   * @param response_headers supplies the response headers, if available.
-   * @param statuses supplies the per-stream-request match status vector which must be the same
-   *                 size as the match tree vector (see above).
-   *
-   * TODO(mattklein123): Currently, this performs a recursive updateMatchStatus() call on any
-   * child match nodes. It's possible that we can short circuit this in certain cases but this
-   * needs more thinking (e.g., if an OR matcher already has one match and it's not possible for
-   * a matcher to flip from true to false).
-   */
-  virtual bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                                 const Http::HeaderMap* response_headers,
-                                 std::vector<bool>& statuses) const PURE;
+  using MatchStatusVector = std::vector<MatchStatus>;
 
-  /**
-   * @return whether given currently available information, the matcher matches.
-   * @param statuses supplies the per-stream-request match status vector which must be the same
-   *                 size as the match tree vector (see above).
-   */
-  bool matches(const std::vector<bool>& statuses) const { return statuses[my_index_]; }
-
-protected:
   /**
    * Base class constructor for a matcher.
    * @param matchers supplies the match tree vector being built.
@@ -74,6 +54,63 @@ protected:
       // tap_matcher.cc.
       : my_index_(matchers.size() - 1) {}
 
+  virtual ~Matcher() = default;
+
+  /**
+   * @return the matcher's index in the match tree vector (see above).
+   */
+  size_t index() { return my_index_; }
+
+  /**
+   * Update match status when a stream is created. This might be an HTTP stream, a TCP connection,
+   * etc. This allows any matchers to flip to an initial state of true if applicable.
+   */
+  virtual void onNewStream(MatchStatusVector& statuses) const PURE;
+
+  /**
+   * Update match status given HTTP request headers.
+   * @param request_headers supplies the request headers.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  virtual void onHttpRequestHeaders(const Http::HeaderMap& request_headers,
+                                    MatchStatusVector& statuses) const PURE;
+
+  /**
+   * Update match status given HTTP request trailers.
+   * @param request_trailers supplies the request trailers.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  virtual void onHttpRequestTrailers(const Http::HeaderMap& request_trailers,
+                                     MatchStatusVector& statuses) const PURE;
+
+  /**
+   * Update match status given HTTP response headers.
+   * @param response_headers supplies the response headers.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  virtual void onHttpResponseHeaders(const Http::HeaderMap& response_headers,
+                                     MatchStatusVector& statuses) const PURE;
+
+  /**
+   * Update match status given HTTP response trailers.
+   * @param response_headers supplies the response trailers.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  virtual void onHttpResponseTrailers(const Http::HeaderMap& response_trailers,
+                                      MatchStatusVector& statuses) const PURE;
+
+  /**
+   * @return whether given currently available information, the matcher matches.
+   * @param statuses supplies the per-stream-request match status vector which must be the same
+   *                 size as the match tree vector (see above).
+   */
+  MatchStatus matchStatus(const MatchStatusVector& statuses) const { return statuses[my_index_]; }
+
+protected:
   const size_t my_index_;
 };
 
@@ -86,21 +123,61 @@ void buildMatcher(const envoy::service::tap::v2alpha::MatchPredicate& match_conf
                   std::vector<MatcherPtr>& matchers);
 
 /**
+ * Base class for logic matchers that need to forward update calls to child matchers.
+ */
+class LogicMatcherBase : public Matcher {
+public:
+  using Matcher::Matcher;
+
+  // Extensions::Common::Tap::Matcher
+  void onNewStream(MatchStatusVector& statuses) const override {
+    updateLocalStatus(statuses,
+                      [](Matcher& m, MatchStatusVector& statuses) { m.onNewStream(statuses); });
+  }
+  void onHttpRequestHeaders(const Http::HeaderMap& request_headers,
+                            MatchStatusVector& statuses) const override {
+    updateLocalStatus(statuses, [&request_headers](Matcher& m, MatchStatusVector& statuses) {
+      m.onHttpRequestHeaders(request_headers, statuses);
+    });
+  }
+  void onHttpRequestTrailers(const Http::HeaderMap& request_trailers,
+                             MatchStatusVector& statuses) const override {
+    updateLocalStatus(statuses, [&request_trailers](Matcher& m, MatchStatusVector& statuses) {
+      m.onHttpRequestTrailers(request_trailers, statuses);
+    });
+  }
+  void onHttpResponseHeaders(const Http::HeaderMap& response_headers,
+                             MatchStatusVector& statuses) const override {
+    updateLocalStatus(statuses, [&response_headers](Matcher& m, MatchStatusVector& statuses) {
+      m.onHttpResponseHeaders(response_headers, statuses);
+    });
+  }
+  void onHttpResponseTrailers(const Http::HeaderMap& response_trailers,
+                              MatchStatusVector& statuses) const override {
+    updateLocalStatus(statuses, [&response_trailers](Matcher& m, MatchStatusVector& statuses) {
+      m.onHttpResponseTrailers(response_trailers, statuses);
+    });
+  }
+
+protected:
+  using UpdateFunctor = std::function<void(Matcher&, MatchStatusVector&)>;
+  virtual void updateLocalStatus(MatchStatusVector& statuses,
+                                 const UpdateFunctor& functor) const PURE;
+};
+
+/**
  * Matcher for implementing set logic.
  */
-class SetLogicMatcher : public Matcher {
+class SetLogicMatcher : public LogicMatcherBase {
 public:
   enum class Type { And, Or };
 
   SetLogicMatcher(const envoy::service::tap::v2alpha::MatchPredicate::MatchSet& configs,
                   std::vector<MatcherPtr>& matchers, Type type);
 
-  // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                         const Http::HeaderMap* response_headers,
-                         std::vector<bool>& statuses) const override;
-
 private:
+  void updateLocalStatus(MatchStatusVector& statuses, const UpdateFunctor& functor) const override;
+
   std::vector<MatcherPtr>& matchers_;
   std::vector<size_t> indexes_;
   const Type type_;
@@ -109,68 +186,116 @@ private:
 /**
  * Not matcher.
  */
-class NotMatcher : public Matcher {
+class NotMatcher : public LogicMatcherBase {
 public:
   NotMatcher(const envoy::service::tap::v2alpha::MatchPredicate& config,
              std::vector<MatcherPtr>& matchers);
 
-  // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                         const Http::HeaderMap* response_headers,
-                         std::vector<bool>& statuses) const override;
-
 private:
+  void updateLocalStatus(MatchStatusVector& statuses, const UpdateFunctor& functor) const override;
+
   std::vector<MatcherPtr>& matchers_;
   const size_t not_index_;
 };
 
 /**
- * Any matcher (always matches).
+ * A base class for a matcher that generally wants to return default values, but might override
+ * a single update function.
  */
-class AnyMatcher : public Matcher {
+class SimpleMatcher : public Matcher {
 public:
-  AnyMatcher(std::vector<MatcherPtr>& matchers) : Matcher(matchers) {}
+  using Matcher::Matcher;
 
   // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap*, const Http::HeaderMap*,
-                         std::vector<bool>& statuses) const override {
-    statuses[my_index_] = true;
-    return true;
+  void onNewStream(MatchStatusVector&) const override {}
+  void onHttpRequestHeaders(const Http::HeaderMap&, MatchStatusVector&) const override {}
+  void onHttpRequestTrailers(const Http::HeaderMap&, MatchStatusVector&) const override {}
+  void onHttpResponseHeaders(const Http::HeaderMap&, MatchStatusVector&) const override {}
+  void onHttpResponseTrailers(const Http::HeaderMap&, MatchStatusVector&) const override {}
+};
+
+/**
+ * Any matcher (always matches).
+ */
+class AnyMatcher : public SimpleMatcher {
+public:
+  using SimpleMatcher::SimpleMatcher;
+
+  // Extensions::Common::Tap::Matcher
+  void onNewStream(MatchStatusVector& statuses) const override {
+    statuses[my_index_].matches_ = true;
+    statuses[my_index_].might_change_status_ = false;
   }
 };
 
 /**
- * HTTP request matcher.
+ * Base class for the various HTTP header matchers.
  */
-class HttpRequestMatcher : public Matcher {
+class HttpHeaderMatcherBase : public SimpleMatcher {
 public:
-  HttpRequestMatcher(const envoy::service::tap::v2alpha::HttpRequestMatch& config,
-                     const std::vector<MatcherPtr>& matchers);
+  HttpHeaderMatcherBase(const envoy::service::tap::v2alpha::HttpHeadersMatch& config,
+                        const std::vector<MatcherPtr>& matchers);
 
-  // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                         const Http::HeaderMap* response_headers,
-                         std::vector<bool>& statuses) const override;
+protected:
+  void matchHeaders(const Http::HeaderMap& headers, MatchStatusVector& statuses) const;
 
-private:
   std::vector<Http::HeaderUtility::HeaderData> headers_to_match_;
 };
 
 /**
- * HTTP response matcher.
+ * HTTP request headers matcher.
  */
-class HttpResponseMatcher : public Matcher {
+class HttpRequestHeadersMatcher : public HttpHeaderMatcherBase {
 public:
-  HttpResponseMatcher(const envoy::service::tap::v2alpha::HttpResponseMatch& config,
-                      const std::vector<MatcherPtr>& matchers);
+  using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
 
   // Extensions::Common::Tap::Matcher
-  bool updateMatchStatus(const Http::HeaderMap* request_headers,
-                         const Http::HeaderMap* response_headers,
-                         std::vector<bool>& statuses) const override;
+  void onHttpRequestHeaders(const Http::HeaderMap& request_headers,
+                            MatchStatusVector& statuses) const override {
+    matchHeaders(request_headers, statuses);
+  }
+};
 
-private:
-  std::vector<Http::HeaderUtility::HeaderData> headers_to_match_;
+/**
+ * HTTP request trailers matcher.
+ */
+class HttpRequestTrailersMatcher : public HttpHeaderMatcherBase {
+public:
+  using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
+
+  // Extensions::Common::Tap::Matcher
+  void onHttpRequestTrailers(const Http::HeaderMap& request_trailers,
+                             MatchStatusVector& statuses) const override {
+    matchHeaders(request_trailers, statuses);
+  }
+};
+
+/**
+ * HTTP response headers matcher.
+ */
+class HttpResponseHeadersMatcher : public HttpHeaderMatcherBase {
+public:
+  using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
+
+  // Extensions::Common::Tap::Matcher
+  void onHttpResponseHeaders(const Http::HeaderMap& response_headers,
+                             MatchStatusVector& statuses) const override {
+    matchHeaders(response_headers, statuses);
+  }
+};
+
+/**
+ * HTTP response trailers matcher.
+ */
+class HttpResponseTrailersMatcher : public HttpHeaderMatcherBase {
+public:
+  using HttpHeaderMatcherBase::HttpHeaderMatcherBase;
+
+  // Extensions::Common::Tap::Matcher
+  void onHttpResponseTrailers(const Http::HeaderMap& response_trailers,
+                              MatchStatusVector& statuses) const override {
+    matchHeaders(response_trailers, statuses);
+  }
 };
 
 } // namespace Tap

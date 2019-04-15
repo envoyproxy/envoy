@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
 #include "envoy/service/tap/v2alpha/common.pb.h"
@@ -25,16 +26,35 @@ public:
   virtual void onRequestHeaders(const Http::HeaderMap& headers) PURE;
 
   /**
+   * Called when request body is received.
+   */
+  virtual void onRequestBody(const Buffer::Instance& data) PURE;
+
+  /**
+   * Called when request trailers are received.
+   */
+  virtual void onRequestTrailers(const Http::HeaderMap& trailers) PURE;
+
+  /**
    * Called when response headers are received.
    */
   virtual void onResponseHeaders(const Http::HeaderMap& headers) PURE;
 
   /**
+   * Called when response body is received.
+   */
+  virtual void onResponseBody(const Buffer::Instance& data) PURE;
+
+  /**
+   * Called when response trailers are received.
+   */
+  virtual void onResponseTrailers(const Http::HeaderMap& headers) PURE;
+
+  /**
    * Called when the request is being destroyed and is being logged.
    * @return whether the request was tapped or not.
    */
-  virtual bool onDestroyLog(const Http::HeaderMap* request_headers,
-                            const Http::HeaderMap* response_headers) PURE;
+  virtual bool onDestroyLog() PURE;
 };
 
 using HttpPerRequestTapperPtr = std::unique_ptr<HttpPerRequestTapper>;
@@ -42,35 +62,16 @@ using HttpPerRequestTapperPtr = std::unique_ptr<HttpPerRequestTapper>;
 /**
  * Abstract HTTP tap configuration.
  */
-class HttpTapConfig {
+class HttpTapConfig : public virtual Extensions::Common::Tap::TapConfig {
 public:
-  virtual ~HttpTapConfig() = default;
-
   /**
    * @return a new per-request HTTP tapper which is used to handle tapping of a discrete request.
+   * @param stream_id supplies the owning HTTP stream ID.
    */
-  virtual HttpPerRequestTapperPtr createPerRequestTapper() PURE;
+  virtual HttpPerRequestTapperPtr createPerRequestTapper(uint64_t stream_id) PURE;
 };
 
 using HttpTapConfigSharedPtr = std::shared_ptr<HttpTapConfig>;
-
-/**
- * Configuration factory for the HTTP tap filter.
- */
-class HttpTapConfigFactory {
-public:
-  virtual ~HttpTapConfigFactory() = default;
-
-  /**
-   * @return a new configuration given a raw tap service config proto. See
-   * Extensions::Common::Tap::ExtensionConfig::newTapConfig() for param info.
-   */
-  virtual HttpTapConfigSharedPtr
-  createHttpConfigFromProto(envoy::service::tap::v2alpha::TapConfig&& proto_config,
-                            Extensions::Common::Tap::Sink* admin_streamer) PURE;
-};
-
-using HttpTapConfigFactoryPtr = std::unique_ptr<HttpTapConfigFactory>;
 
 } // namespace TapFilter
 } // namespace HttpFilters

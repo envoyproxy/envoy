@@ -15,6 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
+namespace {
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
   std::string yaml = R"EOF(
@@ -76,6 +77,8 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
     path_prefix: /extauth
     
   failure_mode_allow: true
+  with_request_body:
+    max_request_bytes: 100
   )EOF";
 
   ExtAuthzFilterConfig factory;
@@ -92,6 +95,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
   cb(filter_callback);
 }
 
+} // namespace
 } // namespace ExtAuthz
 } // namespace HttpFilters
 } // namespace Extensions

@@ -29,7 +29,6 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::TestWithParam;
 using testing::Values;
 
 namespace Envoy {
@@ -37,7 +36,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
-
 namespace {
 
 class TestNamedTransportConfigFactory : public NamedTransportConfigFactory {
@@ -329,11 +327,12 @@ public:
   NiceMock<Network::MockClientConnection> upstream_connection_;
 };
 
-class ThriftRouterTest : public ThriftRouterTestBase, public testing::Test {
+class ThriftRouterTest : public testing::Test, public ThriftRouterTestBase {
 public:
 };
 
-class ThriftRouterFieldTypeTest : public ThriftRouterTestBase, public TestWithParam<FieldType> {
+class ThriftRouterFieldTypeTest : public testing::TestWithParam<FieldType>,
+                                  public ThriftRouterTestBase {
 public:
 };
 
@@ -342,7 +341,8 @@ INSTANTIATE_TEST_SUITE_P(PrimitiveFieldTypes, ThriftRouterFieldTypeTest,
                                 FieldType::I64, FieldType::Double, FieldType::String),
                          fieldTypeParamToString);
 
-class ThriftRouterContainerTest : public ThriftRouterTestBase, public TestWithParam<FieldType> {
+class ThriftRouterContainerTest : public testing::TestWithParam<FieldType>,
+                                  public ThriftRouterTestBase {
 public:
 };
 

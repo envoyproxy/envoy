@@ -11,6 +11,23 @@ load(
 
 envoy_package()
 
+envoy_cc_test_library(
+    name = "listener_impl_test_base_lib",
+    hdrs = ["listener_impl_test_base.h"],
+    deps = [
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:listener_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "address_impl_test",
     srcs = ["address_impl_test.cc"],
@@ -64,6 +81,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_time_lib",
     ],
 )
 
@@ -85,7 +103,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
-        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -151,11 +168,11 @@ envoy_cc_test(
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+        "//test/common/network:listener_impl_test_base_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
-        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -169,6 +186,7 @@ envoy_cc_test(
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+        "//test/common/network:listener_impl_test_base_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
@@ -259,5 +277,13 @@ envoy_cc_binary(
     deps = [
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "io_socket_handle_impl_test",
+    srcs = ["io_socket_handle_impl_test.cc"],
+    deps = [
+        "//source/common/network:io_socket_handle_lib",
     ],
 )

@@ -16,7 +16,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/integration/ssl_utility.h"
-#include "test/mocks/init/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/network_utility.h"
@@ -41,11 +40,11 @@ const envoy::service::discovery::v2::SdsDummy _sds_dummy;
 // Sds integration base class with following support:
 // * functions to create sds upstream, and send sds response
 // * functions to create secret protobuf.
-class SdsDynamicIntegrationBaseTest : public HttpIntegrationTest,
-                                      public Grpc::GrpcClientIntegrationParamTest {
+class SdsDynamicIntegrationBaseTest : public Grpc::GrpcClientIntegrationParamTest,
+                                      public HttpIntegrationTest {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
         server_cert_("server_cert"), validation_secret_("validation_secret"),
         client_cert_("client_cert") {}
 
@@ -199,7 +198,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamIntegrationTe
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getServerSecret());
   };
@@ -215,7 +214,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
 // The first ssl request should fail at connecting.
 // then SDS send a good server secret,  the second request should be OK.
 TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getWrongSecret(server_cert_));
   };
@@ -296,7 +295,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamCertValidatio
 // A test that SDS server send a good certificate validation context for a static listener.
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getCvcSecret());
   };
@@ -313,7 +312,7 @@ TEST_P(SdsDynamicDownstreamCertValidationContextTest, BasicSuccess) {
 // The first ssl request should be OK.
 TEST_P(SdsDynamicDownstreamCertValidationContextTest, CombinedCertValidationContextSuccess) {
   enableCombinedValidationContext(true);
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getCvcSecretWithOnlyTrustedCa());
   };
@@ -375,7 +374,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicUpstreamIntegrationTest,
 // To test a static cluster with sds. SDS send a good client secret first.
 // The first request should work.
 TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getClientSecret());
   };
@@ -400,7 +399,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
 // The first request should fail with 503,  then SDS sends a good client secret,
 // the second request should work.
 TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
-  pre_worker_start_test_steps_ = [this]() {
+  on_server_init_function_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
     sendSdsResponse(getWrongSecret(client_cert_));
   };

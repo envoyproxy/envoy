@@ -106,6 +106,12 @@ public:
   virtual std::string protocol() const PURE;
 
   /**
+   * @return std::string the last failure reason occurred on the transport socket. If no failure
+   *         has been occurred the empty string is returned.
+   */
+  virtual absl::string_view failureReason() const PURE;
+
+  /**
    * @return bool whether the socket can be flushed and closed.
    */
   virtual bool canFlushClose() PURE;
@@ -117,7 +123,6 @@ public:
   virtual void closeSocket(Network::ConnectionEvent event) PURE;
 
   /**
-   *
    * @param buffer supplies the buffer to read to.
    * @return IoResult the result of the read action.
    */
@@ -139,7 +144,7 @@ public:
   /**
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual const Ssl::Connection* ssl() const PURE;
+  virtual const Ssl::ConnectionInfo* ssl() const PURE;
 };
 
 typedef std::unique_ptr<TransportSocket> TransportSocketPtr;

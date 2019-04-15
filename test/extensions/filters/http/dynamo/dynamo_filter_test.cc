@@ -25,6 +25,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Dynamo {
+namespace {
 
 class DynamoFilterTest : public testing::Test {
 public:
@@ -34,7 +35,7 @@ public:
     EXPECT_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100));
 
     filter_ = std::make_unique<DynamoFilter>(loader_, stat_prefix_, stats_,
-                                             decoder_callbacks_.dispatcher().timeSystem());
+                                             decoder_callbacks_.dispatcher().timeSource());
 
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -795,6 +796,7 @@ TEST_F(DynamoFilterTest, PartitionIdStatsForSingleTableBatchOperation) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
 }
 
+} // namespace
 } // namespace Dynamo
 } // namespace HttpFilters
 } // namespace Extensions

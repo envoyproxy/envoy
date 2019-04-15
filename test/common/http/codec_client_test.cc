@@ -18,7 +18,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -37,6 +36,7 @@ using testing::Throw;
 
 namespace Envoy {
 namespace Http {
+namespace {
 
 class CodecClientTest : public testing::Test {
 public:
@@ -60,7 +60,6 @@ public:
 
   ~CodecClientTest() { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
-  DangerousDeprecatedTestTime test_time_;
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
@@ -127,7 +126,7 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
 
   // When we get a remote close with an active request we should try to send zero bytes through
   // the codec.
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
   EXPECT_CALL(*codec_, dispatch(_));
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
   connection_cb_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -181,7 +180,7 @@ TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
 
   // When we get a remote close with an active request validate idleTimer is reset after client
   // close
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
   EXPECT_CALL(*codec_, dispatch(_));
   EXPECT_NE(client_->numActiveRequests(), 0);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
@@ -204,7 +203,7 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
   request_encoder.getStream().addCallbacks(callbacks);
 
   // When we get a local close with an active request validate idleTimer is reset after client close
-  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination));
+  EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectionTermination, _));
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
   // TODO(ramaraochavali): Use default connection mock handlers for raising events.
   client_->close();
@@ -261,8 +260,8 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  CodecNetworkTest() : api_(Api::createApiForTest(stats_store_)) {
-    dispatcher_ = std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem(), *api_);
+  CodecNetworkTest() : api_(Api::createApiForTest()) {
+    dispatcher_ = api_->allocateDispatcher();
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
@@ -328,9 +327,7 @@ public:
   }
 
 protected:
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;
   Network::MockListenerCallbacks listener_callbacks_;
@@ -388,7 +385,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
   // would not be finished.
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
     for (auto callbacks : inner_encoder_.stream_.callbacks_) {
-      callbacks->onResetStream(StreamResetReason::RemoteReset);
+      callbacks->onResetStream(StreamResetReason::RemoteReset, absl::string_view());
     }
     dispatcher_->exit();
   }));
@@ -417,7 +414,7 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
       .WillOnce(Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ("", data.toString()); }));
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
     for (auto callbacks : inner_encoder_.stream_.callbacks_) {
-      callbacks->onResetStream(StreamResetReason::RemoteReset);
+      callbacks->onResetStream(StreamResetReason::RemoteReset, absl::string_view());
     }
     dispatcher_->exit();
   }));
@@ -428,5 +425,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, CodecNetworkTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+} // namespace
 } // namespace Http
 } // namespace Envoy

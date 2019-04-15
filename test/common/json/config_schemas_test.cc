@@ -16,6 +16,7 @@ using testing::_;
 
 namespace Envoy {
 namespace Json {
+namespace {
 
 std::vector<std::string> generateTestInputs() {
   TestEnvironment::exec({TestEnvironment::runfilesPath(
@@ -27,11 +28,10 @@ std::vector<std::string> generateTestInputs() {
   return file_list;
 }
 
-class ConfigSchemasTest : public ::testing::TestWithParam<std::string> {
+class ConfigSchemasTest : public testing::TestWithParam<std::string> {
 protected:
-  ConfigSchemasTest() : api_(Api::createApiForTest(stats_store_)) {}
+  ConfigSchemasTest() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
 };
 
@@ -70,5 +70,7 @@ TEST_P(ConfigSchemasTest, CheckValidationExpectation) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Default, ConfigSchemasTest, testing::ValuesIn(generateTestInputs()));
+
+} // namespace
 } // namespace Json
 } // namespace Envoy

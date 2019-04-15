@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.data.core.v2alpha;
+
+option java_outer_classname = "HealthCheckEventProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.core.v2alpha";
 
 import "envoy/api/v2/core/address.proto";

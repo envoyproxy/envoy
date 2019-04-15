@@ -16,11 +16,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
+namespace {
 
 class HeaderToMetadataTest : public testing::Test {
 public:
-  HeaderToMetadataTest() {}
-
   const std::string request_config_yaml = R"EOF(
 request_rules:
   - header: x-version
@@ -277,6 +276,7 @@ request_rules:
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
 }
 
+} // namespace
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters
 } // namespace Extensions

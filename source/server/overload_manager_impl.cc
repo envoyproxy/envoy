@@ -34,14 +34,14 @@ private:
 };
 
 std::string StatsName(const std::string& a, const std::string& b) {
-  return absl::StrCat("overload.", a, b);
+  return absl::StrCat("overload.", a, ".", b);
 }
 
 } // namespace
 
 OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config,
                                Stats::Scope& stats_scope)
-    : active_gauge_(stats_scope.gauge(StatsName(config.name(), ".active"))) {
+    : active_gauge_(stats_scope.gauge(StatsName(config.name(), "active"))) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
 
@@ -162,18 +162,19 @@ void OverloadManagerImpl::stop() {
   resources_.clear();
 }
 
-void OverloadManagerImpl::registerForAction(const std::string& action,
+bool OverloadManagerImpl::registerForAction(const std::string& action,
                                             Event::Dispatcher& dispatcher,
                                             OverloadActionCb callback) {
   ASSERT(!started_);
 
   if (actions_.find(action) == actions_.end()) {
-    ENVOY_LOG(debug, "No overload action configured for {}.", action);
-    return;
+    ENVOY_LOG(debug, "No overload action is configured for {}.", action);
+    return false;
   }
 
   action_to_callbacks_.emplace(std::piecewise_construct, std::forward_as_tuple(action),
                                std::forward_as_tuple(dispatcher, callback));
+  return true;
 }
 
 ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {
@@ -191,7 +192,7 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
                     const bool is_active = action_it->second.isActive();
                     const auto state =
                         is_active ? OverloadActionState::Active : OverloadActionState::Inactive;
-                    ENVOY_LOG(info, "Overload action {} has become {}", action,
+                    ENVOY_LOG(info, "Overload action {} became {}", action,
                               is_active ? "active" : "inactive");
                     tls_->runOnAllThreads([this, action, state] {
                       tls_->getTyped<ThreadLocalOverloadState>().setState(action, state);
@@ -209,9 +210,9 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
 OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
                                         OverloadManagerImpl& manager, Stats::Scope& stats_scope)
     : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false),
-      pressure_gauge_(stats_scope.gauge(StatsName(name, ".pressure"))),
-      failed_updates_counter_(stats_scope.counter(StatsName(name, ".failed_updates"))),
-      skipped_updates_counter_(stats_scope.counter(StatsName(name, ".skipped_updates"))) {}
+      pressure_gauge_(stats_scope.gauge(StatsName(name, "pressure"))),
+      failed_updates_counter_(stats_scope.counter(StatsName(name, "failed_updates"))),
+      skipped_updates_counter_(stats_scope.counter(StatsName(name, "skipped_updates"))) {}
 
 void OverloadManagerImpl::Resource::update() {
   if (!pending_update_) {

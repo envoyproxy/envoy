@@ -116,7 +116,7 @@ private:
                             public Event::DeferredDeletable,
                             public Network::ConnectionCallbacks {
     ActiveConnection(ActiveListener& listener, Network::ConnectionPtr&& new_connection,
-                     Event::TimeSystem& time_system);
+                     TimeSource& time_system);
     ~ActiveConnection();
 
     // Network::ConnectionCallbacks

@@ -31,7 +31,8 @@
   {%endif %}
     filters:
     - name: envoy.http_connection_manager
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
         codec_type: AUTO
         stat_prefix: router
         {% if proxy_proto -%}
@@ -42,20 +43,26 @@
           {{ router_file_content(router_file='envoy_router_v2.template.yaml')|indent(10) }}
         http_filters:
         - name: envoy.health_check
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
             pass_through_mode: false
             headers:
               - name: ":path"
                 exact_match: "/healthcheck"
         - name: envoy.buffer
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
             max_request_bytes: 5242880
         - name: envoy.rate_limit
           config:
             domain: envoy_front
             request_type: external
+            rate_limit_service:
+              grpc_service:
+                envoy_grpc:
+                  cluster_name: ratelimit
         - name: envoy.router
-          config: {}
+          typed_config: {}
         add_user_agent: true
         tracing:
           operation_name: INGRESS
@@ -78,7 +85,8 @@
                         default_value: 1000
                         runtime_key: access_log.access_error.duration
                 - traceable_filter: {}
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog      
             path: "/var/log/envoy/access_error.log"
             format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
 {% endmacro -%}
@@ -96,45 +104,57 @@ static_resources:
     type: STRICT_DNS
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-       protocol: TCP
-       address: disccovery.yourcompany.net
-       port_value: 80
+    load_assignment:
+      cluster_name: sds
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: discovery.yourcompany.net
+                port_value: 80
+                protocol: TCP
   - name: statsd
     type: STATIC
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: 127.0.0.1
-        port_value: 8125
+    load_assignment:
+      cluster_name: statsd
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8125
+                protocol: TCP
   - name: lightstep_saas
     type: LOGICAL_DNS
     connect_timeout: 1s
     lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        protocol: TCP
-        address: collector-grpc.lightstep.com
-        port_value: 443
+    load_assignment:
+      cluster_name: lightstep_saas
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: collector-grpc.lightstep.com
+                port_value: 443
+                protocol: TCP
     http2_protocol_options: {}
-  {% for service, options in clusters.iteritems() -%}
+  {% for service, options in clusters.items() -%}
   - {{ helper.internal_cluster_definition(service, options)|indent(2) }}
   {% endfor %}
 cluster_manager:
   outlier_detection:
     event_log_path: /var/log/envoy/outlier_events.log
 flags_path: /etc/envoy/flags
-rate_limit_service:
- grpc_service:
-   envoy_grpc:
-     cluster_name: ratelimit
 tracing:
   http:
     name: envoy.lightstep
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.LightstepConfig
       collector_cluster: lightstep_saas
       access_token_file: "/etc/envoy/lightstep_access_token"
 runtime:

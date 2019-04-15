@@ -65,7 +65,7 @@ public:
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : proto_config_(proto_config), stats_(generateStats(stats_prefix, context.scope())),
         tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
-        time_source_(context.dispatcher().timeSystem()), api_(context.api()) {
+        time_source_(context.dispatcher().timeSource()), api_(context.api()) {
     ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalCache>(proto_config_, time_source_, api_);

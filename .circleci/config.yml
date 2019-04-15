@@ -4,13 +4,15 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:111781fa2823535762e9c514db0c5c41a119b4b1
+      - image: envoyproxy/envoy-build:698009170e362f9ca0594f2b1927fbbee199bf98
     resource_class: xlarge
     working_directory: /source
 
 jobs:
    release:
      executor: ubuntu-build
+     environment:
+       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -18,11 +20,26 @@ jobs:
            command:
              ci/do_circle_ci.sh bazel.release
            no_output_timeout: 60m
+       - persist_to_workspace:
+           root: .
+           paths:
+             - build_release
+             - build_release_stripped
+       - store_artifacts:
+           path: /build/envoy/generated
+           destination: /
+   docker:
+     docker:
+       - image: docker
+     steps:
+       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+       - checkout
+       - attach_workspace:
+           at: .
        - setup_remote_docker
+       - run: ci/docker_build.sh
        - run: ci/docker_push.sh
        - run: ci/docker_tag.sh
-       - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
    asan:
      executor: ubuntu-build
      steps:
@@ -33,7 +50,8 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.asan
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    tsan:
      executor: ubuntu-build
      steps:
@@ -41,7 +59,9 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.tsan
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
+
    compile_time_options:
      executor: ubuntu-build
      steps:
@@ -49,7 +69,8 @@ jobs:
        - checkout
        - run: ci/do_circle_ci.sh bazel.compile_time_options
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    api:
      executor: ubuntu-build
      steps:
@@ -61,7 +82,8 @@ jobs:
              - "fb:f3:fe:be:1c:b2:ec:b6:25:f9:7b:a6:87:54:02:8c"
        - run: ci/api_mirror.sh
        - store_artifacts:
-           path: /build/envoy/generated/failed-testlogs
+           path: /build/envoy/generated
+           destination: /
    filter_example_mirror:
      executor: ubuntu-build
      steps:
@@ -105,7 +127,8 @@ jobs:
            no_output_timeout: 60m
        - run: ci/coverage_publish.sh
        - store_artifacts:
-           path: /build/envoy/generated/coverage
+           path: /build/envoy/generated
+           destination: /
 
    clang_tidy:
      executor: ubuntu-build
@@ -127,6 +150,7 @@ jobs:
        - run: ci/do_circle_ci.sh check_format
        - run: ci/do_circle_ci.sh check_repositories
        - run: ci/do_circle_ci.sh check_spelling
+       - run: ci/do_circle_ci.sh check_spelling_pedantic
    build_image:
      docker:
        - image: circleci/python:3.7
@@ -154,6 +178,8 @@ jobs:
    mac:
      macos:
        xcode: "9.3.0"
+     environment:
+       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: sudo ntpdate -vu time.apple.com
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
@@ -166,6 +192,11 @@ workflows:
   all:
     jobs:
       - release:
+          filters:
+            tags:
+              only: /^v.*/
+      - docker:
+          requires: [release]
           filters:
             tags:
               only: /^v.*/
@@ -184,3 +215,10 @@ workflows:
             tags:
               only: /^v.*/
       - mac
+
+# Instructions from https://docs.opsgenie.com/docs/circleci-integration
+# Configuration at https://app.opsgenie.com/integration#/edit/CircleCi/d9585dd7-b9c5-4723-abee-647a623639e4
+# Deletion possible via https://app.opsgenie.com/integration#/configured-integrations
+notify:
+  webhooks:
+     -url: https://api.opsgenie.com/v1/json/circleci?apiKey=f45d58a7-15a4-4800-8d2c-f460ec02cf71

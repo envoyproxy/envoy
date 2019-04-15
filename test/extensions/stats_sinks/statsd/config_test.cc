@@ -26,6 +26,7 @@ namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Statsd {
+namespace {
 
 TEST(StatsConfigTest, ValidTcpStatsd) {
   const std::string name = StatsSinkNames::get().Statsd;
@@ -201,6 +202,7 @@ TEST(StatsdConfigTest, ValidateFail) {
       ProtoValidationException);
 }
 
+} // namespace
 } // namespace Statsd
 } // namespace StatSinks
 } // namespace Extensions

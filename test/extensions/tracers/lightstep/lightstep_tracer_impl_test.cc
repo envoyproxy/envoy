@@ -38,6 +38,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Lightstep {
+namespace {
 
 class LightStepDriverTest : public testing::Test {
 public:
@@ -482,6 +483,7 @@ TEST_F(LightStepDriverTest, SpawnChild) {
   EXPECT_FALSE(base2_context.empty());
 }
 
+} // namespace
 } // namespace Lightstep
 } // namespace Tracers
 } // namespace Extensions

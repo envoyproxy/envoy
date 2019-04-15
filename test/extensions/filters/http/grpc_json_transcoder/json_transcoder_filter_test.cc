@@ -41,12 +41,12 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
+namespace {
 
 class GrpcJsonTranscoderFilterTestBase {
 protected:
-  GrpcJsonTranscoderFilterTestBase() : api_(Api::createApiForTest(stats_)) {}
+  GrpcJsonTranscoderFilterTestBase() : api_(Api::createApiForTest()) {}
 
-  Stats::IsolatedStoreImpl stats_;
   Api::ApiPtr api_;
 };
 
@@ -788,6 +788,7 @@ INSTANTIATE_TEST_SUITE_P(
     })",
             R"({"id":"101","gender":"MALE","last_name":"Shakespeare"})"}));
 
+} // namespace
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters
 } // namespace Extensions

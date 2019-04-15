@@ -6,7 +6,6 @@
 #include "extensions/resource_monitors/injected_resource/injected_resource_monitor.h"
 
 #include "test/test_common/environment.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -18,6 +17,7 @@ namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace InjectedResourceMonitor {
+namespace {
 
 class TestableInjectedResourceMonitor : public InjectedResourceMonitor {
 public:
@@ -46,13 +46,13 @@ public:
 class InjectedResourceMonitorTest : public testing::Test {
 protected:
   InjectedResourceMonitorTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(resource_filename_), monitor_(createMonitor()) {}
 
   void updateResource(const std::string& contents) {
     file_updater_.update(contents);
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
     monitor_->updateResourceUsage(cb_);
   }
 
@@ -61,14 +61,12 @@ protected:
   std::unique_ptr<InjectedResourceMonitor> createMonitor() {
     envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
     config.set_filename(resource_filename_);
-    Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher_, *api_);
+    Server::Configuration::ResourceMonitorFactoryContextImpl context(*dispatcher_, *api_);
     return std::make_unique<TestableInjectedResourceMonitor>(config, context);
   }
 
-  Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
-  Event::DispatcherImpl dispatcher_;
+  Event::DispatcherPtr dispatcher_;
   const std::string resource_filename_;
   AtomicFileUpdater file_updater_;
   MockedCallbacks cb_;
@@ -99,10 +97,11 @@ TEST_F(InjectedResourceMonitorTest, ReportsErrorForOutOfRangePressure) {
 }
 
 TEST_F(InjectedResourceMonitorTest, ReportsErrorOnFileRead) {
-  EXPECT_CALL(cb_, onFailure(ExceptionContains("unable to read file")));
+  EXPECT_CALL(cb_, onFailure(ExceptionContains("Invalid path")));
   monitor_->updateResourceUsage(cb_);
 }
 
+} // namespace
 } // namespace InjectedResourceMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

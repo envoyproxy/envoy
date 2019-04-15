@@ -73,7 +73,7 @@ public:
 class ThriftConnectionManagerTest : public testing::Test {
 public:
   ThriftConnectionManagerTest() : stats_(ThriftFilterStats::generateStats("test.", store_)) {}
-  ~ThriftConnectionManagerTest() {
+  ~ThriftConnectionManagerTest() override {
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
@@ -111,7 +111,7 @@ public:
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSystem());
+        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource());
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 

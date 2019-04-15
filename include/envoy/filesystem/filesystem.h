@@ -4,9 +4,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/io_error.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/thread/thread.h"
 
 #include "absl/strings/string_view.h"
 
@@ -14,58 +14,59 @@ namespace Envoy {
 namespace Filesystem {
 
 /**
- * Abstraction for a file on disk.
+ * Abstraction for a basic file on disk.
  */
 class File {
 public:
   virtual ~File() {}
 
   /**
-   * Write data to the file.
+   * Open the file with O_RDWR | O_APPEND | O_CREAT
+   * The file will be closed when this object is destructed
+   *
+   * @return bool whether the open succeeded
    */
-  virtual void write(absl::string_view) PURE;
+  virtual Api::IoCallBoolResult open() PURE;
 
   /**
-   * Reopen the file.
+   * Write the buffer to the file. The file must be explicitly opened before writing.
+   *
+   * @return ssize_t number of bytes written, or -1 for failure
    */
-  virtual void reopen() PURE;
+  virtual Api::IoCallSizeResult write(absl::string_view buffer) PURE;
 
   /**
-   * Synchronously flush all pending data to disk.
+   * Close the file.
+   *
+   * @return bool whether the close succeeded
    */
-  virtual void flush() PURE;
+  virtual Api::IoCallBoolResult close() PURE;
+
+  /**
+   * @return bool is the file open
+   */
+  virtual bool isOpen() const PURE;
+
+  /**
+   * @return string the file path
+   */
+  virtual std::string path() const PURE;
 };
 
-typedef std::shared_ptr<File> FileSharedPtr;
+using FilePtr = std::unique_ptr<File>;
 
 /**
- * Captures state, properties, and stats of a file-system.
+ * Abstraction for some basic filesystem operations
  */
 class Instance {
 public:
   virtual ~Instance() {}
 
   /**
-   * Creates a file, overriding the flush-interval set in the class.
-   *
-   * @param path The path of the file to open.
-   * @param dispatcher The dispatcher used for set up timers to run flush().
-   * @param lock The lock.
-   * @param file_flush_interval_msec Number of milliseconds to delay before flushing.
+   *  @param path The path of the File
+   *  @return a FilePtr. The file is not opened.
    */
-  virtual FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                   Thread::BasicLockable& lock,
-                                   std::chrono::milliseconds file_flush_interval_msec) PURE;
-
-  /**
-   * Creates a file, using the default flush-interval for the class.
-   *
-   * @param path The path of the file to open.
-   * @param dispatcher The dispatcher used for set up timers to run flush().
-   * @param lock The lock.
-   */
-  virtual FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
-                                   Thread::BasicLockable& lock) PURE;
+  virtual FilePtr createFile(const std::string& path) PURE;
 
   /**
    * @return bool whether a file exists on disk and can be opened for read.
@@ -92,12 +93,6 @@ public:
   virtual std::string fileReadToEnd(const std::string& path) PURE;
 
   /**
-   * @param path some filesystem path.
-   * @return SysCallStringResult containing the canonical path (see realpath(3)).
-   */
-  virtual Api::SysCallStringResult canonicalPath(const std::string& path) PURE;
-
-  /**
    * Determine if the path is on a list of paths Envoy will refuse to access. This
    * is a basic sanity check for users, blacklisting some clearly bad paths. Paths
    * may still be problematic (e.g. indirectly leading to /dev/mem) even if this
@@ -108,8 +103,6 @@ public:
    */
   virtual bool illegalPath(const std::string& path) PURE;
 };
-
-typedef std::unique_ptr<Watcher> WatcherPtr;
 
 enum class FileType { Regular, Directory, Other };
 

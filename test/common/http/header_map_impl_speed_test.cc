@@ -1,6 +1,6 @@
 #include "common/http/header_map_impl.h"
 
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
 
 namespace Envoy {
 namespace Http {

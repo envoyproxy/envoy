@@ -316,9 +316,11 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
   return *table;
 }
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
+                               uint32_t max_headers_kb)
     : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                                              [&]() -> void { this->onAboveHighWatermark(); }) {
+                                              [&]() -> void { this->onAboveHighWatermark(); }),
+      max_headers_kb_(max_headers_kb) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -416,9 +418,24 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     // Ignore trailers.
     return;
   }
+  // http-parser should filter for this
+  // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
+  // have an invariant that they must not contain embedded zero characters
+  // (NUL, ASCII 0x0).
+  if (absl::string_view(data, length).find('\0') != absl::string_view::npos) {
+    throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
+  }
 
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
+
+  const uint32_t total =
+      current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
+  if (total > (max_headers_kb_ * 1024)) {
+    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
+    sendProtocolError();
+    throw CodecProtocolException("headers size exceeds limit");
+  }
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
@@ -471,8 +488,9 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            ServerConnectionCallbacks& callbacks,
-                                           Http1Settings settings)
-    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks), codec_settings_(settings) {}
+                                           Http1Settings settings, uint32_t max_request_headers_kb)
+    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb), callbacks_(callbacks),
+      codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -522,7 +540,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   // forward the received Host field-value.
   headers.insertHost().value(std::string(absolute_url.host_and_port()));
 
-  headers.insertPath().value(std::string(absolute_url.path()));
+  headers.insertPath().value(std::string(absolute_url.path_and_query_params()));
   active_request_->request_url_.clear();
 }
 
@@ -643,7 +661,7 @@ void ServerConnectionImpl::onBelowLowWatermark() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
-    : ConnectionImpl(connection, HTTP_RESPONSE) {}
+    : ConnectionImpl(connection, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||

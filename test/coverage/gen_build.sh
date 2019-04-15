@@ -26,6 +26,10 @@ set -e
 rm -f "${BUILD_PATH}"
 
 TARGETS=$("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${REPOSITORY}//test/...)" | grep "^//")
+
+# Run the QUICHE platform api tests for coverage.
+TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', '@com_googlesource_quiche//:all')" | grep "^@com_googlesource_quiche")"
+
 if [ -n "${EXTRA_QUERY_PATHS}" ]; then
   TARGETS="$TARGETS $("${BAZEL_BIN}" query ${BAZEL_QUERY_OPTIONS} "attr('tags', 'coverage_test_lib', ${EXTRA_QUERY_PATHS})" | grep "^//")"
 fi
@@ -68,4 +72,5 @@ EOF
 
 ) > "${BUILD_PATH}"
 
+echo "Generated coverage BUILD file at: ${BUILD_PATH}"
 "${BUILDIFIER_BIN}" "${BUILD_PATH}"

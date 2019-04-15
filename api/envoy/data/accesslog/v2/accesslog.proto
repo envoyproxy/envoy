@@ -1,6 +1,9 @@
 syntax = "proto3";
 
 package envoy.data.accesslog.v2;
+
+option java_outer_classname = "AccesslogProto";
+option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.data.accesslog.v2";
 
 import "envoy/api/v2/core/address.proto";
@@ -11,6 +14,8 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 import "gogoproto/gogo.proto";
 import "validate/validate.proto";
+
+option (gogoproto.stable_marshaler_all) = true;
 
 // [#protodoc-title: gRPC access logs]
 // Envoy access logs describe incoming interaction with Envoy over a fixed
@@ -64,7 +69,6 @@ message AccessLogCommon {
   // This field is the local/destination address on which the request from the user was received.
   envoy.api.v2.core.Address downstream_local_address = 3;
 
-  // [#not-implemented-hide:]
   // If the connection is secure,S this field will contain TLS properties.
   TLSProperties tls_properties = 4;
 
@@ -132,6 +136,12 @@ message AccessLogCommon {
   // that ID in this field and cross reference later. It can also be used to
   // determine if a canary endpoint was used or not.
   envoy.api.v2.core.Metadata metadata = 17;
+
+  // If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
+  // failure reason from the transport socket. The format of this field depends on the configured
+  // upstream transport socket. Common TLS failures are in
+  // :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  string upstream_transport_failure_reason = 18;
 }
 
 // Flags indicating occurrences during request/response processing.
@@ -194,11 +204,14 @@ message ResponseFlags {
 
   // Indicates that the upstream retry limit was exceeded, resulting in a downstream error.
   bool upstream_retry_limit_exceeded = 16;
+
+  // Indicates that the stream idle timeout was hit, resulting in a downstream 408.
+  bool stream_idle_timeout = 17;
 }
 
-// [#not-implemented-hide:]
 // Properties of a negotiated TLS connection.
 message TLSProperties {
+  // [#not-implemented-hide:]
   enum TLSVersion {
     VERSION_UNSPECIFIED = 0;
     TLSv1 = 1;
@@ -206,9 +219,11 @@ message TLSProperties {
     TLSv1_2 = 3;
     TLSv1_3 = 4;
   }
+  // [#not-implemented-hide:]
   // Version of TLS that was negotiated.
   TLSVersion tls_version = 1;
 
+  // [#not-implemented-hide:]
   // TLS cipher suite negotiated during handshake. The value is a
   // four-digit hex code defined by the IANA TLS Cipher Suite Registry
   // (e.g. ``009C`` for ``TLS_RSA_WITH_AES_128_GCM_SHA256``).
@@ -218,6 +233,28 @@ message TLSProperties {
 
   // SNI hostname from handshake.
   string tls_sni_hostname = 3;
+
+  message CertificateProperties {
+    message SubjectAltName {
+      oneof san {
+        string uri = 1;
+        // [#not-implemented-hide:]
+        string dns = 2;
+      }
+    }
+
+    // SANs present in the certificate.
+    repeated SubjectAltName subject_alt_name = 1;
+
+    // The subject field of the certificate.
+    string subject = 2;
+  }
+
+  // Properties of the local certificate used to negotiate TLS.
+  CertificateProperties local_certificate_properties = 4;
+
+  // Properties of the peer certificate used to negotiate TLS.
+  CertificateProperties peer_certificate_properties = 5;
 }
 
 message HTTPRequestProperties {

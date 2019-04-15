@@ -17,8 +17,8 @@ public:
           const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // Event::TimeSystem
-  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& libevent) override {
-    return real_time_system_.createScheduler(libevent);
+  Event::SchedulerPtr createScheduler(Scheduler& base_scheduler) override {
+    return real_time_system_.createScheduler(base_scheduler);
   }
 
   // TimeSource
@@ -31,13 +31,7 @@ private:
 
 class GlobalTimeSystem : public DelegatingTestTimeSystemBase<TestTimeSystem> {
 public:
-  TestTimeSystem& timeSystem() override {
-    if (singleton_->timeSystem() == nullptr) {
-      // TODO(#4160): Switch default to SimulatedTimeSystem.
-      singleton_->set(new TestRealTimeSystem);
-    }
-    return *singleton_->timeSystem();
-  }
+  TestTimeSystem& timeSystem() override;
 
 private:
   Test::Global<SingletonTimeSystemHelper> singleton_;

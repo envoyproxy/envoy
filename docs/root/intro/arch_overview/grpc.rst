@@ -3,7 +3,7 @@
 gRPC
 ====
 
-`gRPC <http://www.grpc.io/>`_ is an RPC framework from Google. It uses protocol buffers as the
+`gRPC <https://www.grpc.io/>`_ is an RPC framework from Google. It uses protocol buffers as the
 underlying serialization/IDL format. At the transport layer it uses HTTP/2 for request/response
 multiplexing. Envoy has first class support for gRPC both at the transport layer as well as at the
 application layer:
@@ -31,8 +31,8 @@ Envoy supports two gRPC bridges:
 * :ref:`grpc_http1_bridge filter <config_http_filters_grpc_bridge>` which allows gRPC requests to be sent to Envoy over
   HTTP/1.1. Envoy then translates the requests to HTTP/2 for transport to the target server. The response is translated back to HTTP/1.1.
   When installed, the bridge filter gathers per RPC statistics in addition to the standard array of global HTTP statistics.
-* :ref:`grpc_http1_reverse_bridge filter <config_http_filters_grpc_reverse_bridge>` which allows gRPC requests to be sent to Envoy and
-  then translated to HTTP/1.1 when sent to the upstream. The response is then converted back into gRPC when sent to the downstream.
+* :ref:`grpc_http1_reverse_bridge filter <config_http_filters_grpc_http1_reverse_bridge>` which allows gRPC requests to be sent to Envoy
+  and then translated to HTTP/1.1 when sent to the upstream. The response is then converted back into gRPC when sent to the downstream.
   This filter can also optionally manage the gRPC frame header, allowing the upstream to not have to be gRPC aware at all.
 
 .. _arch_overview_grpc_services:
@@ -40,9 +40,9 @@ Envoy supports two gRPC bridges:
 gRPC services
 -------------
 
-In addition to proxying gRPC on the data plane, Envoy make use of gRPC for its
+In addition to proxying gRPC on the data plane, Envoy makes use of gRPC for its
 control plane, where it :ref:`fetches configuration from management server(s)
-<config_overview_v2>` and also in filters, for example for :ref:`rate limiting
+<config_overview_v2>` and in filters, such as for :ref:`rate limiting
 <config_http_filters_rate_limit>` or authorization checks. We refer to these as
 *gRPC services*.
 

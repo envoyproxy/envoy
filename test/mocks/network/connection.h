@@ -67,7 +67,7 @@ public:
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
@@ -80,12 +80,7 @@ public:
   MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
-
-  void setWriteFilterOrder(bool reversed) override { reversed_write_filter_order_ = reversed; }
-  bool reverseWriteFilterOrder() const override { return reversed_write_filter_order_; }
-
-private:
-  bool reversed_write_filter_order_{true};
+  MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
 };
 
 /**
@@ -116,7 +111,7 @@ public:
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+  MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
@@ -129,8 +124,7 @@ public:
   MOCK_CONST_METHOD0(streamInfo, const StreamInfo::StreamInfo&());
   MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
-  MOCK_METHOD1(setWriteFilterOrder, void(bool reversed));
-  bool reverseWriteFilterOrder() const override { return true; }
+  MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());

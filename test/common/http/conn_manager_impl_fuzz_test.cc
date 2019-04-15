@@ -89,9 +89,8 @@ public:
   DateProvider& dateProvider() override { return date_provider_; }
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
-  bool reverseEncodeOrder() override { return true; }
   bool generateRequestId() override { return true; }
-  uint32_t maxRequestHeadersSizeKb() const override { return max_request_headers_size_kb_; }
+  uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -117,6 +116,7 @@ public:
   ConnectionManagerListenerStats& listenerStats() override { return listener_stats_; }
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
+  bool shouldNormalizePath() const override { return false; }
 
   const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager config_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
@@ -132,7 +132,7 @@ public:
   ConnectionManagerStats stats_;
   ConnectionManagerTracingStats tracing_stats_;
   ConnectionManagerListenerStats listener_stats_;
-  uint32_t max_request_headers_size_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_SIZE_KB};
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
@@ -143,9 +143,10 @@ public:
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   absl::optional<std::string> user_agent_;
   TracingConnectionManagerConfigPtr tracing_config_;
-  bool proxy_100_continue_ = true;
+  bool proxy_100_continue_{true};
   Http::Http1Settings http1_settings_;
   Http::DefaultInternalAddressConfig internal_address_config_;
+  bool normalize_path_{true};
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
@@ -385,12 +386,13 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   FuzzConfig config;
   NiceMock<Network::MockDrainDecision> drain_close;
   NiceMock<Runtime::MockRandomGenerator> random;
+  Stats::FakeSymbolTableImpl symbol_table;
   Http::ContextImpl http_context;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
-  std::unique_ptr<Ssl::MockConnection> ssl_connection;
+  std::unique_ptr<Ssl::MockConnectionInfo> ssl_connection;
   bool connection_alive = true;
 
   ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection.get()));

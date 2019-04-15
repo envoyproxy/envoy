@@ -12,7 +12,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace TcpProxy {
 
-class RouteIpListConfigTest : public ::testing::TestWithParam<std::string> {};
+class RouteIpListConfigTest : public testing::TestWithParam<std::string> {};
 
 INSTANTIATE_TEST_SUITE_P(IpList, RouteIpListConfigTest,
                          ::testing::Values(R"EOF("destination_ip_list": [

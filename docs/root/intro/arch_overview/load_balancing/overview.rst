@@ -16,7 +16,7 @@ load balancing and distributed load balancing.
 Distributed Load Balancing
 --------------------------
 
-Distributed load balancing refers to having Envoy itself deteremine how load should be distributed
+Distributed load balancing refers to having Envoy itself determine how load should be distributed
 to the endpoints based on knowing the location of the upstream hosts.
 
 Examples

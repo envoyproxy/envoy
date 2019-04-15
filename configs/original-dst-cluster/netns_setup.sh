@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #
 # Example setup network namespace for testing Envoy original_dst cluster
 # Clean up with the cleanup script with the same arguments.

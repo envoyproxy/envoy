@@ -33,7 +33,7 @@ void adjustContentLength(Http::HeaderMap& headers,
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {
     uint64_t length;
-    if (StringUtil::atoul(length_header->value().c_str(), length)) {
+    if (StringUtil::atoull(length_header->value().c_str(), length)) {
       length_header->value(adjustment(length));
     }
   }

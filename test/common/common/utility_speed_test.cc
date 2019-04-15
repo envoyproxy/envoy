@@ -7,7 +7,9 @@
 #include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
+
+namespace Envoy {
 
 static const char TextToTrim[] = "\t  the quick brown fox jumps over the lazy dog\n\r\n";
 static size_t TextToTrimLength = sizeof(TextToTrim) - 1;
@@ -250,6 +252,7 @@ static void BM_IntervalSet50ToVector(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_IntervalSet50ToVector);
+} // namespace Envoy
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {

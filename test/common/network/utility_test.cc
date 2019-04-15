@@ -17,6 +17,7 @@
 
 namespace Envoy {
 namespace Network {
+namespace {
 
 TEST(NetworkUtility, Url) {
   EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
@@ -459,5 +460,6 @@ TEST(AbslUint128, TestByteOrder) {
   }
 }
 
+} // namespace
 } // namespace Network
 } // namespace Envoy

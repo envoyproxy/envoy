@@ -28,10 +28,10 @@ x-envoy-max-retries
 ^^^^^^^^^^^^^^^^^^^
 If a :ref:`route config retry policy <envoy_api_field_route.RouteAction.retry_policy>` or a
 :ref:`virtual host retry policy <envoy_api_field_route.VirtualHost.retry_policy>` is in place, Envoy will default to retrying
-one time unless explicitly specified. The number of retries can be explicitly set in either the virtual host retry config,
-or the route retry config, or by using this header. If a retry policy is not configured and
-:ref:`config_http_filters_router_x-envoy-retry-on` or :ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers
-are not specified, Envoy will not retry a failed request.
+one time unless explicitly specified. The number of retries can be explicitly set in the virtual host retry config,
+the route retry config, or by using this header. If this header is used, its value takes precedence over the number of
+retries set in either retry policy. If a retry policy is not configured and :ref:`config_http_filters_router_x-envoy-retry-on`
+or :ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers are not specified, Envoy will not retry a failed request.
 
 A few notes on how Envoy does retries:
 
@@ -330,6 +330,7 @@ owning HTTP connection manager.
   rq_redirect, Counter, Total requests that resulted in a redirect response
   rq_direct_response, Counter, Total requests that resulted in a direct response
   rq_total, Counter, Total routed requests
+  rq_reset_after_downstream_response_started, Counter, Total requests that were reset after downstream response had started.
 
 Virtual cluster statistics are output in the
 *vhost.<virtual host name>.vcluster.<virtual cluster name>.* namespace and include the following

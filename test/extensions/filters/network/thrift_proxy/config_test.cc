@@ -16,7 +16,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-
 namespace {
 
 std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType>
@@ -67,20 +66,20 @@ public:
   ThriftProxyFilterConfigFactory factory_;
 };
 
-class ThriftFilterConfigTest : public ThriftFilterConfigTestBase, public testing::Test {};
+class ThriftFilterConfigTest : public testing::Test, public ThriftFilterConfigTestBase {};
 
 class ThriftFilterTransportConfigTest
-    : public ThriftFilterConfigTestBase,
-      public testing::TestWithParam<
-          envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType> {};
+    : public testing::TestWithParam<
+          envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType>,
+      public ThriftFilterConfigTestBase {};
 
 INSTANTIATE_TEST_SUITE_P(TransportTypes, ThriftFilterTransportConfigTest,
                          testing::ValuesIn(getTransportTypes()));
 
 class ThriftFilterProtocolConfigTest
-    : public ThriftFilterConfigTestBase,
-      public testing::TestWithParam<
-          envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType> {};
+    : public testing::TestWithParam<
+          envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType>,
+      public ThriftFilterConfigTestBase {};
 
 INSTANTIATE_TEST_SUITE_P(ProtocolTypes, ThriftFilterProtocolConfigTest,
                          testing::ValuesIn(getProtocolTypes()));

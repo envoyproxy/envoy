@@ -27,49 +27,56 @@ up-to-date with the latest security patches. See
 for how to update or override dependencies.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
-On Ubuntu, run the following command:
-```
-sudo apt-get install \
-   libtool \
-   cmake \
-   realpath \
-   clang-format-7 \
-   automake \
-   ninja-build \
-   curl \
-   unzip
-```
+1. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
+    On Ubuntu, run the following command:
+    ```
+    sudo apt-get install \
+       libtool \
+       cmake \
+       clang-format-7 \
+       automake \
+       autoconf \
+       make \
+       ninja-build \
+       curl \
+       unzip \
+       virtualenv
+    ```
 
-On Fedora (maybe also other red hat distros), run the following:
-```
-dnf install cmake libtool libstdc++ ninja-build lld patch
-```
+    On Fedora (maybe also other red hat distros), run the following:
+    ```
+    dnf install cmake libtool libstdc++ ninja-build lld patch
+    ```
 
-On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
-```
-brew install coreutils wget cmake libtool go bazel automake ninja llvm@7
-```
-_notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
+    On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
+    ```
+    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7 autoconf
+    ```
+    _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
 
-Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
-Apple LLVM version 9.1.0 (clang-902.0.30).
+    Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
+    Apple LLVM version 9.1.0 (clang-902.0.30).
 
-In order for bazel to be aware of the tools installed by brew, the PATH
-variable must be set for bazel builds. This can be accomplished by setting
-this in your `$HOME/.bazelrc` file:
+    In order for bazel to be aware of the tools installed by brew, the PATH
+    variable must be set for bazel builds. This can be accomplished by setting
+    this in your `$HOME/.bazelrc` file:
 
-```
-build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
-```
+    ```
+    build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
+    ```
 
-Alternatively, you can pass `--action_env` on the command line when running
-`bazel build`/`bazel test`.
+    Alternatively, you can pass `--action_env` on the command line when running
+    `bazel build`/`bazel test`.
 
-3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
-and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
-4. `go get github.com/bazelbuild/buildtools/buildifier` to install buildifier
-5. `bazel build //source/exe:envoy-static` from the Envoy source directory.
+    Having the binutils keg installed in Brew is known to cause issues due to putting an incompatible
+    version of `ar` on the PATH, so if you run into issues building third party code like luajit
+    consider uninstalling binutils.
+
+1. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
+   and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
+1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
+   in your shell for buildifier to work.
+1. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image
 
@@ -91,8 +98,8 @@ export CXX=clang++
 bazel build --config=libc++ //source/exe:envoy-static
 ```
 Note: this assumes that both: clang compiler and libc++ library are installed in the system,
-and that `clang` and `clang++` are available in `$PATH`. On some systems, exports might need
-to be changed to versioned binaries, e.g. `CC=clang-7` and `CXX=clang++-7`.
+and that `clang` and `clang++` are available in `$PATH`. On some systems, you might need to
+include them in the search path, e.g. `export PATH=/usr/lib/llvm-7/bin:$PATH`.
 
 You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
 might look like `sudo apt-get install libc++abi-7-dev libc++-7-dev`.
@@ -190,17 +197,21 @@ Envoy can produce backtraces on demand and from assertions and other fatal
 actions like segfaults. Where supported, stack traces will contain resolved
 symbols, though not include line numbers. On systems where absl::Symbolization is
 not supported, the stack traces written in the log or to stderr contain addresses rather
-than resolved symbols. The `tools/stack_decode.py` script exists to process the output
-and do symbol resolution including line numbers, to make the stack traces useful.
-Any log lines not relevant to the backtrace capability
-are passed through the script unchanged (it acts like a filter).
+than resolved symbols. If the symbols were resolved, the address is also included at
+the end of the line.
 
-The script runs in one of two modes. If passed no arguments it anticipates
-Envoy (or test) output on stdin. You can postprocess a log or pipe the output of
-an Envoy process. If passed some arguments it runs the arguments as a child
-process. This enables you to run a test with backtrace post processing. Bazel
-sandboxing must be disabled by specifying standalone execution. Example
-command line:
+The `tools/stack_decode.py` script exists to process the output and do additional symbol
+resolution including file names and line numbers. It requires the `addr2line` program be
+installed and in your path. Any log lines not relevant to the backtrace capability are
+passed through the script unchanged (it acts like a filter). File and line information
+is appended to the stack trace lines.
+
+The script runs in one of two modes. To process log input from stdin, pass `-s` as the first
+argument, followed by the executable file path. You can postprocess a log or pipe the output
+of an Envoy process. If you do not specify the `-s` argument it runs the arguments as a child
+process. This enables you to run a test with backtrace post processing. Bazel sandboxing must
+be disabled by specifying standalone execution. Example command line with
+`run_under`:
 
 ```
 bazel test -c dbg //test/server:backtrace_test
@@ -208,8 +219,14 @@ bazel test -c dbg //test/server:backtrace_test
 --cache_test_results=no --test_output=all
 ```
 
-You will need to use either a `dbg` build type or the `opt` build type to get symbol
-information in the binaries.
+Example using input on stdin:
+
+```
+bazel test -c dbg //test/server:backtrace_test --cache_test_results=no --test_output=streamed |& tools/stack_decode.py -s bazel-bin/test/server/backtrace_test
+```
+
+You will need to use either a `dbg` build type or the `opt` build type to get file and line
+symbol information in the binaries.
 
 By default main.cc will install signal handlers to print backtraces at the
 location where a fatal signal occurred. The signal handler will re-raise the
@@ -251,8 +268,8 @@ Use `RUN_REMOTE=yes` when you don't want to run against your local docker instan
 will need to override a few environment variables to set up the remote docker. The list of variables
 can be found in the [Documentation](https://docs.docker.com/engine/reference/commandline/cli/).
 
-Use `LOCAL_MOUNT=yes` when you are not building with the envoy build container. This will ensure
-that the libraries against which the tests dynmically link will be available and of the correct
+Use `LOCAL_MOUNT=yes` when you are not building with the Envoy build container. This will ensure
+that the libraries against which the tests dynamically link will be available and of the correct
 version.
 
 ## Examples
@@ -314,6 +331,12 @@ Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wi
 bazel test -c dbg --config=clang-tsan //test/...
 ```
 
+To run the sanitizers on OS X, prefix `macos-` to the config option, e.g.:
+
+```
+bazel test -c dbg --config=macos-asan //test/...
+```
+
 ## Log Verbosity
 
 Log verbosity is controlled at runtime in all builds.
@@ -342,7 +365,7 @@ The following optional features can be enabled on the Bazel build command-line:
   `--define log_debug_assert_in_release=enabled`. The default behavior is to compile debug assertions out of
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
-  `--define tcmalloc=debug`.
+  `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
 
 ## Disabling extensions
 
@@ -512,7 +535,7 @@ to run clang-format scripts on your workstation directly:
  * Type-ahead doesn't always work when waiting running a command through docker
 To run the tools directly, you must install the correct version of clang. This
 may change over time but as of January 2019,
-[clang+llvm-7.0.0](http://releases.llvm.org/download.html) works well. You must
+[clang+llvm-7.0.0](https://releases.llvm.org/download.html) works well. You must
 also have 'buildifier' installed from the bazel distribution.
 
 Edit the paths shown here to reflect the installation locations on your system:
@@ -535,28 +558,6 @@ Once this is set up, you can run clang-tidy without docker:
 
 Setting up an HTTP cache for Bazel output helps optimize Bazel performance and resource usage when
 using multiple compilation modes or multiple trees.
-
-## Setup common `envoy_deps`
-
-This step sets up the common `envoy_deps` allowing HTTP or disk cache (described below) to work
-across working trees in different paths. Also it allows new working trees to skip dependency
-compilation. The drawback is that the cached dependencies won't be updated automatically, so make
-sure all your working trees have same (or compatible) dependencies, and run this step periodically
-to update them.
-
-Make sure you don't have `--override_repository` in your `.bazelrc` when you run this step.
-
-```
-bazel fetch //test/...
-cp -LR $(bazel info output_base)/external/envoy_deps ${HOME}/envoy_deps_cache
-```
-
-Adding the following parameter to Bazel everytime or persist them in `.bazelrc`, note you will need to expand
-the environment variables for `.bazelrc`.
-
-```
---override_repository=envoy_deps=${HOME}/envoy_deps_cache
-```
 
 ## Setup local cache
 

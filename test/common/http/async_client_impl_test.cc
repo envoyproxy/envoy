@@ -62,6 +62,7 @@ public:
   }
 
   MessagePtr message_{new RequestMessageImpl()};
+  Stats::MockIsolatedStatsStore stats_store_;
   MockAsyncClientCallbacks callbacks_;
   MockAsyncClientStreamCallbacks stream_callbacks_;
   NiceMock<Upstream::MockClusterManager> cm_;
@@ -71,7 +72,6 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
-  Stats::IsolatedStoreImpl stats_store_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Http::ContextImpl http_context_;
   AsyncClientImpl client_;
@@ -671,7 +671,8 @@ TEST_F(AsyncClientImplTest, PoolFailure) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
                            ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
-        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
+                                nullptr);
         return nullptr;
       }));
 
@@ -687,7 +688,8 @@ TEST_F(AsyncClientImplTest, PoolFailureWithBody) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,
                            ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
-        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
+        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, absl::string_view(),
+                                nullptr);
         return nullptr;
       }));
 

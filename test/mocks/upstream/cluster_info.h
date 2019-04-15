@@ -36,6 +36,7 @@ public:
   MOCK_CONST_METHOD0(subsetKeys, const std::vector<std::set<std::string>>&());
   MOCK_CONST_METHOD0(localityWeightAware, bool());
   MOCK_CONST_METHOD0(scaleLocalityWeight, bool());
+  MOCK_CONST_METHOD0(panicModeAny, bool());
 
   std::vector<std::set<std::string>> subset_keys_;
 };
@@ -45,9 +46,10 @@ public:
   MockClusterInfo();
   ~MockClusterInfo();
 
-  void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry) {
-    resource_manager_ = std::make_unique<ResourceManagerImpl>(runtime_, name_, cx, rq_pending, rq,
-                                                              rq_retry, circuit_breakers_stats_);
+  void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
+                            uint64_t conn_pool) {
+    resource_manager_ = std::make_unique<ResourceManagerImpl>(
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_);
   }
 
   // Upstream::ClusterInfo
@@ -82,8 +84,10 @@ public:
   MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
+  MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
 
   std::string name_{"fake_cluster"};
+  absl::optional<std::string> eds_service_name_;
   Http::Http2Settings http2_settings_{};
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
   uint64_t max_requests_per_connection_{};

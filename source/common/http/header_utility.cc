@@ -96,7 +96,7 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
     break;
   case HeaderMatchType::Range: {
     int64_t header_value = 0;
-    match = StringUtil::atol(header->value().c_str(), header_value, 10) &&
+    match = StringUtil::atoll(header->value().c_str(), header_value, 10) &&
             header_value >= header_data.range_.start() && header_value < header_data.range_.end();
     break;
   }

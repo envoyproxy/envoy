@@ -13,7 +13,7 @@ envoy_cc_library(
     name = "backtrace_lib",
     hdrs = ["backtrace.h"],
     external_deps = [
-        "backward",
+        "abseil_stacktrace",
         "abseil_symbolize",
     ],
     tags = ["backtrace"],
@@ -43,7 +43,6 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/extensions/filters/common/ratelimit:ratelimit_registration_lib",
         "@envoy_api//envoy/api/v2:lds_cc",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
@@ -139,24 +138,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "init_manager_lib",
-    srcs = ["init_manager_impl.cc"],
-    hdrs = ["init_manager_impl.h"],
-    deps = [
-        "//include/envoy/init:init_interface",
-        "//source/common/common:assert_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "options_lib",
-    srcs = ["options_impl.cc"],
-    hdrs = ["options_impl.h"],
+    srcs = ["options_impl.cc"] + select({
+        "//bazel:linux_x86_64": ["options_impl_platform_linux.cc"],
+        "//bazel:linux_aarch64": ["options_impl_platform_linux.cc"],
+        "//conditions:default": ["options_impl_platform_default.cc"],
+    }),
+    hdrs = [
+        "options_impl.h",
+        "options_impl_platform.h",
+    ] + select({
+        "//bazel:linux_x86_64": ["options_impl_platform_linux.h"],
+        "//bazel:linux_aarch64": ["options_impl_platform_linux.h"],
+        "//conditions:default": [],
+    }),
     external_deps = ["tclap"],
     deps = [
         "//include/envoy/network:address_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:logger_lib",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
         "//source/common/protobuf:utility_lib",
@@ -185,12 +187,13 @@ envoy_cc_library(
     hdrs = ["lds_api.h"],
     deps = [
         "//include/envoy/config:subscription_interface",
-        "//include/envoy/init:init_interface",
+        "//include/envoy/init:manager_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/common:cleanup_lib",
         "//source/common/config:resources_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
+        "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:lds_cc",
     ],
@@ -203,7 +206,6 @@ envoy_cc_library(
     deps = [
         ":configuration_lib",
         ":drain_manager_lib",
-        ":init_manager_lib",
         ":lds_api_lib",
         ":transport_socket_config_lib",
         "//include/envoy/server:filter_config_interface",
@@ -213,6 +215,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
+        "//source/common/init:manager_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
         "//source/common/network:listen_socket_lib",
@@ -266,7 +269,6 @@ envoy_cc_library(
         ":configuration_lib",
         ":connection_handler_lib",
         ":guarddog_lib",
-        ":init_manager_lib",
         ":listener_manager_lib",
         ":test_hooks_lib",
         ":worker_lib",
@@ -283,6 +285,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/api:api_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
@@ -292,7 +295,9 @@ envoy_cc_library(
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:context_lib",
+        "//source/common/init:manager_lib",
         "//source/common/local_info:local_info_lib",
+        "//source/common/memory:heap_shrinker_lib",
         "//source/common/memory:stats_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:rds_lib",

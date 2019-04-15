@@ -8,9 +8,9 @@
 from __future__ import print_function
 
 import argparse
+import logging
 import os
 import shutil
-import logging
 import subprocess
 import sys
 
@@ -195,6 +195,7 @@ if __name__ == "__main__":
   errors += checkUnfixableError("std_get_time.cc", "std::get_time")
   errors += checkUnfixableError("no_namespace_envoy.cc",
                                 "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
+  errors += checkUnfixableError("bazel_tools.BUILD", "unexpected @bazel_tools reference")
   errors += checkUnfixableError("proto.BUILD", "unexpected direct external dependency on protobuf")
   errors += checkUnfixableError("proto_deps.cc", "unexpected direct dependency on google.protobuf")
   errors += checkUnfixableError("attribute_packed.cc", "Don't use __attribute__((packed))")
@@ -202,6 +203,9 @@ if __name__ == "__main__":
   errors += checkUnfixableError("elvis_operator.cc", "Don't use the '?:' operator")
   errors += checkUnfixableError("testing_test.cc",
                                 "Don't use 'using testing::Test;, elaborate the type instead")
+  errors += checkUnfixableError(
+      "serialize_as_string.cc",
+      "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
   errors += checkUnfixableError(
       "version_history.rst",
       "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "

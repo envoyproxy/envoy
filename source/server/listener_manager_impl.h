@@ -12,10 +12,10 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
+#include "common/init/manager_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
 
-#include "server/init_manager_impl.h"
 #include "server/lds_api.h"
 
 namespace Envoy {
@@ -104,7 +104,7 @@ struct ListenerManagerStats {
 class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
-                      WorkerFactory& worker_factory, TimeSource& time_source);
+                      WorkerFactory& worker_factory);
 
   void onListenerWarmed(ListenerImpl& listener);
 
@@ -124,7 +124,6 @@ public:
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;
-  TimeSource& time_source_;
   ListenerComponentFactory& factory_;
 
 private:
@@ -258,7 +257,6 @@ public:
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  bool reverseWriteFilterOrder() const override { return reverse_write_filter_order_; }
 
   // Server::Configuration::ListenerFactoryContext
   AccessLog::AccessLogManager& accessLogManager() override {
@@ -282,7 +280,7 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
-  TimeSource& timeSource() override { return parent_.time_source_; }
+  TimeSource& timeSource() override { return api().timeSource(); }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =
@@ -299,6 +297,9 @@ public:
   }
   const Network::ListenerConfig& listenerConfig() const override { return *this; }
   Api::Api& api() override { return parent_.server_.api(); }
+  ServerLifecycleNotifier& lifecycleNotifier() override {
+    return parent_.server_.lifecycleNotifier();
+  }
 
   // Network::DrainDecision
   bool drainClose() const override;
@@ -399,12 +400,17 @@ private:
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
   const std::string name_;
-  const bool reverse_write_filter_order_;
   const bool modifiable_;
   const bool workers_started_;
   const uint64_t hash_;
-  InitManagerImpl dynamic_init_manager_;
-  bool initialize_canceled_{};
+
+  // This init manager is populated with targets from the filter chain factories, namely
+  // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
+  Init::ManagerImpl dynamic_init_manager_;
+
+  // This init watcher, if available, notifies the "parent" listener manager when listener
+  // initialization is complete. It may be reset to cancel interest.
+  std::unique_ptr<Init::WatcherImpl> init_watcher_;
   std::vector<Network::ListenerFilterFactoryCb> listener_filter_factories_;
   DrainManagerPtr local_drain_manager_;
   bool saw_listener_create_failure_{};

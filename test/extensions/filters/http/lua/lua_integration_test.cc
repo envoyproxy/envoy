@@ -8,11 +8,10 @@
 namespace Envoy {
 namespace {
 
-class LuaIntegrationTest : public HttpIntegrationTest,
-                           public testing::TestWithParam<Network::Address::IpVersion> {
+class LuaIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                           public HttpIntegrationTest {
 public:
-  LuaIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  LuaIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();

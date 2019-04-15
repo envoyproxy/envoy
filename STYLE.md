@@ -83,10 +83,10 @@
   annotations](https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h),
   such as `GUARDED_BY`, should be used for shared state guarded by
   locks/mutexes.
-* Functions intended to be local to a cc file should be declared in an anonymonus namespace,
+* Functions intended to be local to a cc file should be declared in an anonymous namespace,
   rather than using the 'static' keyword. Note that the
   [Google C++ style guide](https://google.github.io/styleguide/cppguide.html#Unnamed_Namespaces_and_Static_Variables)
-   allows either, but in Envoy we prefer annonymous namespaces.
+   allows either, but in Envoy we prefer anonymous namespaces.
 * Braces are required for all control statements include single line if, while, etc. statements.
 
 # Error handling

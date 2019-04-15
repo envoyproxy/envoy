@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "tap_interface",
     hdrs = ["tap.h"],
     deps = [
+        ":tap_matcher",
         "//include/envoy/http:header_map_interface",
         "@envoy_api//envoy/data/tap/v2alpha:wrapper_cc",
         "@envoy_api//envoy/service/tap/v2alpha:common_cc",
@@ -49,5 +50,16 @@ envoy_cc_library(
         "//include/envoy/singleton:manager_interface",
         "//source/common/buffer:buffer_lib",
         "@envoy_api//envoy/admin/v2alpha:tap_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "extension_config_base",
+    srcs = ["extension_config_base.cc"],
+    hdrs = ["extension_config_base.h"],
+    deps = [
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/extensions/common/tap:admin",
+        "@envoy_api//envoy/config/common/tap/v2alpha:common_cc",
     ],
 )
