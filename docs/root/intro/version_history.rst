@@ -8,7 +8,7 @@ Version history
 * redis: add support for zpopmax and zpopmin commands.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 * ext_authz: added a new bool field set when there is a partial body sent in the request message:
-  :ref:`partial_body <envoy_api_field_service.auth.v2.AttributeContext.partial_body>`
+  :ref:`partial_body <envoy_api_field_service.auth.v2.AttributeContext.HttpRequest.partial_body>`
 
 1.10.0 (Apr 5, 2019)
 ====================
