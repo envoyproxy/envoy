@@ -771,7 +771,7 @@ dynamic_draining_listeners:
 
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_, _));
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _, _));
   manager_->startWorkers(guard_dog_);
   worker_->callAddCompletion(true);
 
@@ -954,7 +954,7 @@ dynamic_draining_listeners:
 TEST_F(ListenerManagerImplTest, AddDrainingListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _, _));
   manager_->startWorkers(guard_dog_);
 
   // Add foo listener directly into active.
@@ -1003,7 +1003,7 @@ TEST_F(ListenerManagerImplTest, AddDrainingListener) {
 TEST_F(ListenerManagerImplTest, CantBindSocket) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _, _));
   manager_->startWorkers(guard_dog_);
 
   const std::string listener_foo_json = R"EOF(
@@ -1025,7 +1025,7 @@ TEST_F(ListenerManagerImplTest, CantBindSocket) {
 TEST_F(ListenerManagerImplTest, ListenerDraining) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _, _));
   manager_->startWorkers(guard_dog_);
 
   const std::string listener_foo_json = R"EOF(
@@ -1073,7 +1073,7 @@ TEST_F(ListenerManagerImplTest, ListenerDraining) {
 TEST_F(ListenerManagerImplTest, RemoveListener) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _, _));
   manager_->startWorkers(guard_dog_);
 
   // Remove an unknown listener.
@@ -1149,7 +1149,7 @@ TEST_F(ListenerManagerImplTest, RemoveListener) {
 TEST_F(ListenerManagerImplTest, AddListenerFailure) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _, _));
   manager_->startWorkers(guard_dog_);
 
   // Add foo listener into active.
@@ -1197,7 +1197,7 @@ TEST_F(ListenerManagerImplTest, StatsNameValidCharacterTest) {
 TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
   InSequence s;
 
-  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, start(_, _, _));
   manager_->startWorkers(guard_dog_);
 
   // Add foo listener into warming.
@@ -1250,7 +1250,7 @@ TEST_F(ListenerManagerImplTest, DuplicateAddressDontBind) {
 TEST_F(ListenerManagerImplTest, EarlyShutdown) {
   // If stopWorkers is called before the workers are started, it should be a no-op: they should be
   // neither started nor stopped.
-  EXPECT_CALL(*worker_, start(_)).Times(0);
+  EXPECT_CALL(*worker_, start(_, _, _)).Times(0);
   EXPECT_CALL(*worker_, stop()).Times(0);
   manager_->stopWorkers();
 }
