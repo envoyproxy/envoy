@@ -18,8 +18,7 @@ namespace {
 absl::flat_hash_map<std::string, Flag*> MakeFlagMap() {
   absl::flat_hash_map<std::string, Flag*> flags;
 
-#define QUICHE_FLAG(type, flag, value, help)                                                       \
-  flags.emplace(FLAGS_##flag->name(), FLAGS_##flag);
+#define QUICHE_FLAG(type, flag, value, help) flags.emplace(FLAGS_##flag->name(), FLAGS_##flag);
 #include "extensions/quic_listeners/quiche/platform/flags_list.h"
 #undef QUICHE_FLAG
 
