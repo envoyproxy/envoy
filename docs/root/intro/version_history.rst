@@ -7,6 +7,8 @@ Version history
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
 * redis: add support for zpopmax and zpopmin commands.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
+* ext_authz: added a new bool field set when there is a partial body sent in the request message:
+  :ref:`partial_body <envoy_api_field_service.auth.v2.AttributeContext.partial_body>`
 
 1.10.0 (Apr 5, 2019)
 ====================
