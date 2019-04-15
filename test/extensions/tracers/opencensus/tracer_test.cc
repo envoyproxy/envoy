@@ -167,7 +167,9 @@ TEST(OpenCensusTracerTest, PropagateTraceContext) {
     oc_config.add_incoming_trace_context(OpenCensusConfig::cloud_trace_context);
     oc_config.add_outgoing_trace_context(OpenCensusConfig::trace_context);
     // TODO: Add test for (binary) grpc-trace-bin header.
-    // oc_config.add_outgoing_trace_context(OpenCensusConfig::grpc_trace_bin);
+    if (0) {
+      oc_config.add_outgoing_trace_context(OpenCensusConfig::grpc_trace_bin);
+    }
     oc_config.add_outgoing_trace_context(OpenCensusConfig::cloud_trace_context);
     std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
     NiceMock<Tracing::MockConfig> config;
