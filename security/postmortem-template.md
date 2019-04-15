@@ -11,9 +11,9 @@
 
 # Security postmortem for CVE-YEAR-ABCDEF, CVE-YEAR-ABCDEG
 
-## Date
+## Incident date(s)
 
-> YYYY-MM-DD
+> YYYY-MM-DD (as a date range if over a period of time)
 
 ## Authors
 
