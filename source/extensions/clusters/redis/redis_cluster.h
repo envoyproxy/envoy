@@ -237,6 +237,8 @@ public:
       : ConfigurableClusterFactoryBase(Extensions::Clusters::ClusterTypes::get().Redis) {}
 
 private:
+  friend class RedisClusterTest;
+
   Upstream::ClusterImplBaseSharedPtr createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster,
       const envoy::config::cluster::redis::RedisClusterConfig& proto_config,

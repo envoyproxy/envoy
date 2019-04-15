@@ -99,19 +99,19 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
       client_factory_(client_factory) {}
 
 namespace {
-  Network::Address::InstanceConstSharedPtr
-  ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
-    ASSERT(value.type() == NetworkFilters::Common::Redis::RespType::Array);
-    ASSERT(value.asArray().size() >= 2);
-    std::string address = value.asArray()[0].asString();
-    bool ipv6 = (address.find(":") != std::string::npos);
-    if (ipv6) {
-      return std::make_shared<Network::Address::Ipv6Instance>(address,
-                                                              value.asArray()[1].asInteger());
-    }
-    return std::make_shared<Network::Address::Ipv4Instance>(address, value.asArray()[1].asInteger());
+Network::Address::InstanceConstSharedPtr
+ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
+  ASSERT(value.type() == NetworkFilters::Common::Redis::RespType::Array);
+  ASSERT(value.asArray().size() >= 2);
+  std::string address = value.asArray()[0].asString();
+  bool ipv6 = (address.find(":") != std::string::npos);
+  if (ipv6) {
+    return std::make_shared<Network::Address::Ipv6Instance>(address,
+                                                            value.asArray()[1].asInteger());
   }
+  return std::make_shared<Network::Address::Ipv4Instance>(address, value.asArray()[1].asInteger());
 }
+} // namespace
 
 RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
   if (current_request_) {
@@ -195,7 +195,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
 
     // Field 2: Master address for slot range
     // TODO(hyang): For now we're only adding the master node for each slot. When we're ready to
-    //  send requests to replica nodes, we need to add subsequent address in the response as 
+    //  send requests to replica nodes, we need to add subsequent address in the response as
     //  replica nodes.
     auto master_address = ProcessCluster(slot_range[2]);
     // Add to the slot
@@ -205,7 +205,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
       // where n is number of shards.
     }
     new_hosts.emplace_back(
-        new RedisHost(parent_.info(), "", std::move(masterAddress), parent_, true));
+        new RedisHost(parent_.info(), "", std::move(master_address), parent_, true));
   }
 
   std::unordered_map<std::string, Upstream::HostSharedPtr> updated_hosts;
@@ -224,9 +224,9 @@ void RedisCluster::RedisDiscoverySession::onResponse(
   all_hosts_ = std::move(updated_hosts);
   cluster_slots_map_.swap(slots_);
 
-  // TODO(hyang): If there is an initialize callback, fire it now. Note that if the 
-  // cluster refers to multiple DNS names, this will return initialized after a single 
-  // DNS resolution completes. This is not perfect but is easier to code and it is unclear 
+  // TODO(hyang): If there is an initialize callback, fire it now. Note that if the
+  // cluster refers to multiple DNS names, this will return initialized after a single
+  // DNS resolution completes. This is not perfect but is easier to code and it is unclear
   // if the extra complexity is needed so will start with this.
   parent_.onPreInitComplete();
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
