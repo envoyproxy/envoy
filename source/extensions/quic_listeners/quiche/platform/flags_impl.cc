@@ -20,19 +20,16 @@ FlagRegistry& FlagRegistry::GetInstance() {
 }
 
 void FlagRegistry::RegisterFlag(const char* name, Flag* flag) {
-  absl::MutexLock lock(&mutex_);
   flags_.emplace(std::string(name), flag);
 }
 
 void FlagRegistry::ResetFlags() const {
-  absl::MutexLock lock(&mutex_);
   for (auto& kv : flags_) {
     kv.second->ResetValue();
   }
 }
 
 Flag* FlagRegistry::FindFlag(const std::string& name) const {
-  absl::MutexLock lock(&mutex_);
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;
 }

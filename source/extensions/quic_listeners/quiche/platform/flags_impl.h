@@ -36,8 +36,18 @@ public:
 private:
   FlagRegistry() = default;
 
-  mutable absl::Mutex mutex_;
-  absl::flat_hash_map<std::string, Flag*> flags_ GUARDED_BY(mutex_);
+  // TODO(mpwarres): add absl::Mutex to guard flags_ once Abseil dependency has
+  // been updated to a version that supports absl::Mutex(absl::kConstInit)--see
+  // https://github.com/abseil/abseil-cpp/commit/389ec3f906f018661a5308458d623d01f96d7b23
+  // "Add a constructor to allow for global absl::Mutex instances."
+  //
+  // Alternatively, use std::mutex, which would require an exemption in
+  // tools/check_format.py.
+  //
+  // From a practical perspective this doesn't matter much, since flags_ is only
+  // mutated (via RegisterFlag) during static initialization, and read (via
+  // ResetFlags/FindFlag) at runtime.
+  absl::flat_hash_map<std::string, Flag*> flags_;
 };
 
 // Abstract class for QUICHE protocol and feature flags.
