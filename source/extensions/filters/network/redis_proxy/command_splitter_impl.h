@@ -114,8 +114,6 @@ protected:
                       TimeSource& time_source, bool latency_in_micros)
       : SplitRequestBase(command_stats, time_source, latency_in_micros), callbacks_(callbacks) {}
 
-  void recreate(Common::Redis::RespValue& request, bool prepend_asking);
-
   SplitCallbacks& callbacks_;
   ConnPool::InstanceSharedPtr conn_pool_;
   Common::Redis::Client::PoolRequest* handle_{};
@@ -190,8 +188,9 @@ protected:
 
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
   void onChildFailure(uint32_t index);
-  virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                  const ConnPool::InstanceSharedPtr conn_pool) PURE;
+  bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
+                          const ConnPool::InstanceSharedPtr conn_pool);
+  virtual void recreate(Common::Redis::RespValue& request, uint32_t index) PURE;
 
   SplitCallbacks& callbacks_;
 
@@ -219,9 +218,7 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                  const ConnPool::InstanceSharedPtr conn_pool) override;
-  void recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking);
+  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 };
 
 /**
@@ -243,9 +240,7 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                  const ConnPool::InstanceSharedPtr conn_pool) override;
-  void recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking);
+  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 
   int64_t total_{0};
 };
@@ -268,9 +263,7 @@ private:
 
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
-  virtual bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                  const ConnPool::InstanceSharedPtr conn_pool) override;
-  void recreate(Common::Redis::RespValue& request, uint32_t index, bool prepend_asking);
+  void recreate(Common::Redis::RespValue& request, uint32_t index) override;
 };
 
 /**
@@ -337,6 +330,18 @@ private:
   const ToLowerTable to_lower_table_;
   const bool latency_in_micros_;
   TimeSource& time_source_;
+};
+
+/**
+ * DoNothingPoolCallbacks is used for internally generated commands whose response is
+ * transparently filtered, and redirection never occurs (e.g., "asking", etc.).
+ */
+class DoNothingPoolCallbacks : public Common::Redis::Client::PoolCallbacks {
+public:
+  // Common::Redis::Client::PoolCallbacks
+  void onResponse(Common::Redis::RespValuePtr&&) override {}
+  void onFailure() override {}
+  bool onRedirection(const Common::Redis::RespValue&) override { return false; }
 };
 
 } // namespace CommandSplitter

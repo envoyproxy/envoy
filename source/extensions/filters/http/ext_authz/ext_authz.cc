@@ -81,8 +81,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   initiateCall(headers);
-  return filter_return_ == FilterReturn::StopDecoding ? Http::FilterHeadersStatus::StopIteration
-                                                      : Http::FilterHeadersStatus::Continue;
+  return filter_return_ == FilterReturn::StopDecoding
+             ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
+             : Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
@@ -90,24 +91,28 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
     if (end_stream || isBufferFull()) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
       initiateCall(*request_headers_);
+      return filter_return_ == FilterReturn::StopDecoding
+                 ? Http::FilterDataStatus::StopIterationAndWatermark
+                 : Http::FilterDataStatus::Continue;
     } else {
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
   }
 
-  return filter_return_ == FilterReturn::StopDecoding
-             ? Http::FilterDataStatus::StopIterationAndWatermark
-             : Http::FilterDataStatus::Continue;
+  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
-  if (buffer_data_ && filter_return_ != FilterReturn::StopDecoding) {
-    ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
-    initiateCall(*request_headers_);
+  if (buffer_data_) {
+    if (filter_return_ != FilterReturn::StopDecoding) {
+      ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
+      initiateCall(*request_headers_);
+    }
+    return filter_return_ == FilterReturn::StopDecoding ? Http::FilterTrailersStatus::StopIteration
+                                                        : Http::FilterTrailersStatus::Continue;
   }
 
-  return filter_return_ == FilterReturn::StopDecoding ? Http::FilterTrailersStatus::StopIteration
-                                                      : Http::FilterTrailersStatus::Continue;
+  return Http::FilterTrailersStatus::Continue;
 }
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
