@@ -662,7 +662,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // when the allow_absolute_url flag is enabled on the HCM.
   // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
   // :path because CONNECT does not have a path, and we don't support that currently.
-  if (!request_headers_->Path() || request_headers_->Path()->value().getStringView()[0] != '/') {
+  if (!request_headers_->Path() || request_headers_->Path()->value().getStringView().empty() ||
+      request_headers_->Path()->value().getStringView()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    is_head_request_, absl::nullopt);

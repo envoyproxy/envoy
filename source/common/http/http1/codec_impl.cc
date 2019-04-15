@@ -511,8 +511,9 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   bool is_connect = (method == HTTP_CONNECT);
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
-  if (active_request_->request_url_.getStringView()[0] == '/' ||
-      ((method == HTTP_OPTIONS) && active_request_->request_url_.getStringView()[0] == '*')) {
+  if (!active_request_->request_url_.getStringView().empty() &&
+      (active_request_->request_url_.getStringView()[0] == '/' ||
+       ((method == HTTP_OPTIONS) && active_request_->request_url_.getStringView()[0] == '*'))) {
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }

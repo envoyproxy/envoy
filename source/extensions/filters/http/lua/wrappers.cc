@@ -25,10 +25,10 @@ int HeaderMapIterator::luaPairsIterator(lua_State* state) {
     parent_.iterator_.reset();
     return 0;
   } else {
-    const std::string key_string(entries_[current_]->key().getStringView());
-    lua_pushstring(state, key_string.c_str());
-    const std::string value_string(entries_[current_]->value().getStringView());
-    lua_pushstring(state, value_string.c_str());
+    const absl::string_view key_view(entries_[current_]->key().getStringView());
+    lua_pushlstring(state, key_view.data(), key_view.length());
+    const absl::string_view value_view(entries_[current_]->value().getStringView());
+    lua_pushlstring(state, value_view.data(), value_view.length());
     current_++;
     return 2;
   }
@@ -47,8 +47,8 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   const char* key = luaL_checkstring(state, 2);
   const Http::HeaderEntry* entry = headers_.get(Http::LowerCaseString(key));
   if (entry != nullptr) {
-    const std::string entry_string(entry->value().getStringView());
-    lua_pushstring(state, entry_string.c_str());
+    lua_pushlstring(state, entry->value().getStringView().data(),
+                    entry->value().getStringView().length());
     return 1;
   } else {
     return 0;

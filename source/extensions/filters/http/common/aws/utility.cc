@@ -21,7 +21,7 @@ std::map<std::string, std::string> Utility::canonicalizeHeaders(const Http::Head
           return Http::HeaderMap::Iterate::Continue;
         }
         // Pseudo-headers should not be canonicalized
-        if (entry.key().getStringView()[0] == ':') {
+        if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
           return Http::HeaderMap::Iterate::Continue;
         }
         std::string value(entry.value().getStringView());

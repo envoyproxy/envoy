@@ -139,7 +139,7 @@ protected:
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
-      return key.getStringView()[0] == ':';
+      return !key.getStringView().empty() && key.getStringView()[0] == ':';
     }
 
     template <class Key, class... Value>

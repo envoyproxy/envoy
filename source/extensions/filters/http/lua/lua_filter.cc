@@ -212,10 +212,10 @@ void StreamHandleWrapper::onSuccess(Http::MessagePtr&& response) {
   response->headers().iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         lua_State* state = static_cast<lua_State*>(context);
-        std::string header_key_string(header.key().getStringView());
-        lua_pushstring(state, header_key_string.c_str());
-        std::string header_value_string(header.value().getStringView());
-        lua_pushstring(state, header_value_string.c_str());
+        lua_pushlstring(state, header.key().getStringView().data(),
+                        header.key().getStringView().length());
+        lua_pushlstring(state, header.value().getStringView().data(),
+                        header.value().getStringView().length());
         lua_settable(state, -3);
         return Http::HeaderMap::Iterate::Continue;
       },
