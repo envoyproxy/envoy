@@ -340,8 +340,7 @@ void MGETRequest::recreate(Common::Redis::RespValue& request, uint32_t index) {
   request.asArray().swap(values);
 }
 
-SplitRequestPtr MSETRequest::create(Router& router,
-                                    Common::Redis::RespValuePtr&& incoming_request,
+SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
                                     TimeSource& time_source, bool latency_in_micros) {
   if ((incoming_request->asArray().size() - 1) % 2 != 0) {
@@ -533,10 +532,8 @@ void SplitKeysSumResultRequest::recreate(Common::Redis::RespValue& request, uint
   request.asArray().swap(values);
 }
 
-
-InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope,
-                           const std::string& stat_prefix, TimeSource& time_source,
-                           bool latency_in_micros)
+InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
+                           TimeSource& time_source, bool latency_in_micros)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       split_keys_sum_result_handler_(*router_),
