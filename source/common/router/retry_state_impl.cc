@@ -72,7 +72,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView());
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
-    std::string max_retries(request_headers.EnvoyMaxRetries()->value().getStringView());
+    // TODO(dnoe): Migrate to pure string_view (#6580)
+    const std::string max_retries(request_headers.EnvoyMaxRetries()->value().getStringView());
     uint64_t temp;
     if (StringUtil::atoull(max_retries.c_str(), temp)) {
       // The max retries header takes precedence if set.

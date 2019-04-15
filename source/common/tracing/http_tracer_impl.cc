@@ -64,7 +64,6 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
     return {Reason::NotTraceableRequestId, false};
   }
 
-  // TODO PERF: Avoid copy.
   UuidTraceStatus trace_status =
       UuidUtils::isTraceableUuid(request_headers.RequestId()->value().getStringView());
 

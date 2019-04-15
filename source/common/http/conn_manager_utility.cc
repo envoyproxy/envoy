@@ -223,6 +223,7 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     return;
   }
 
+  // TODO(dnoe): Migrate uuidModBy and others below to take string_view (#6580)
   std::string x_request_id(request_headers.RequestId()->value().getStringView());
   uint64_t result;
   // Skip if x-request-id is corrupted.

@@ -118,6 +118,7 @@ bool RuntimeFilter::evaluate(const StreamInfo::StreamInfo&, const Http::HeaderMa
                              const Http::HeaderMap&, const Http::HeaderMap&) {
   const Http::HeaderEntry* uuid = request_header.RequestId();
   uint64_t random_value;
+  // TODO(dnoe): Migrate uuidModBy to take string_view (#6580)
   if (use_independent_randomness_ || uuid == nullptr ||
       !UuidUtils::uuidModBy(
           std::string(uuid->value().getStringView()), random_value,

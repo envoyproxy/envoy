@@ -87,7 +87,7 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   }
 
   bool match;
-  absl::string_view header_view = header->value().getStringView();
+  const absl::string_view header_view = header->value().getStringView();
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
     match = header_data.value_.empty() || header_view == header_data.value_;
@@ -97,7 +97,8 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
     break;
   case HeaderMatchType::Range: {
     int64_t header_value = 0;
-    std::string header_string(header_view);
+    // TODO(dnoe): Migrate to pure string_view to eliminate std:string instance (#6580)
+    const std::string header_string(header_view);
     match = StringUtil::atoll(header_string.c_str(), header_value, 10) &&
             header_value >= header_data.range_.start() && header_value < header_data.range_.end();
     break;

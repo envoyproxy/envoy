@@ -780,6 +780,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     // should be used to override the active span's operation.
     if (req_operation_override) {
       if (!req_operation_override->value().empty()) {
+        // TODO(dnoe): Migrate setOperation to take string_view (#6580)
         active_span_->setOperation(std::string(req_operation_override->value().getStringView()));
 
         // Clear the decorated operation so won't be used in the response header, as

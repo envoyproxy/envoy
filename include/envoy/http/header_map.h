@@ -138,6 +138,9 @@ public:
 
   /**
    * @return whether a substring exists in the string.
+   *
+   * TODO(dnoe): Eliminate this by migrating callers to use string_view find
+   * directly (#6580)
    */
   bool find(const char* str) const {
     return getStringView().find(absl::string_view(str)) != absl::string_view::npos;

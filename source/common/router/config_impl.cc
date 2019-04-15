@@ -831,7 +831,7 @@ void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
 
   const absl::string_view path_view = path.getStringView();
   ASSERT(std::regex_match(path_view.begin(), path_view.begin() + path_string_length, regex_));
-  std::string matched_path(path_view.begin(), path_view.begin() + path_string_length);
+  const std::string matched_path(path_view.begin(), path_view.begin() + path_string_length);
 
   finalizePathHeader(headers, matched_path, insert_envoy_original_path);
 }
