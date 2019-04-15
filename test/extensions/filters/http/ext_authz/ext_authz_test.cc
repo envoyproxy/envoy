@@ -174,7 +174,7 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
 
@@ -204,7 +204,7 @@ TEST_F(HttpFilterTest, ErrorOpen) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
@@ -408,10 +408,9 @@ TEST_F(HttpFilterTest, HeaderOnlyRequest) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, true));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  // decodeData() and decodeTrailers() will not be called since request is header only.
 }
 
 // Checks that filter does not buffer data on upgrade WebSocket request.
@@ -438,10 +437,9 @@ TEST_F(HttpFilterTest, UpgradeWebsocketRequest) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  // decodeData() and decodeTrailers() will not be called until continueDecoding() is called.
 }
 
 // Checks that filter does not buffer data on upgrade H2 WebSocket request.
@@ -467,10 +465,9 @@ TEST_F(HttpFilterTest, H2UpgradeRequest) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  // decodeData() and decodeTrailers() will not be called until continueDecoding() is called.
 }
 
 // Checks that filter does not buffer data when is not the end of the stream, but header-only
@@ -570,7 +567,7 @@ TEST_F(HttpFilterTestParam, DisabledOnRoute) {
   test_disable(false);
   EXPECT_CALL(*client_, check(_, _, _)).Times(1);
   // Engage the filter.
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
   // test that disabling works
@@ -608,10 +605,8 @@ TEST_F(HttpFilterTestParam, OkResponse) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
@@ -621,6 +616,10 @@ TEST_F(HttpFilterTestParam, OkResponse) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.ok").value());
+
+  // decodeData() and decodeTrailers() are called after continueDecoding().
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 }
 
 // Test that an synchronous OK response from the authorization service, on the call stack, results
@@ -666,11 +665,11 @@ TEST_F(HttpFilterTestParam, ImmediateDeniedResponseWithHttpAttributes) {
             callbacks.onComplete(std::move(response_ptr));
           })));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  // When request is denied, no call to continueDecoding(). As a result, decodeData() and
+  // decodeTrailer() will not be called.
 }
 
 // Test that an synchronous ok response from the authorization service passing additional HTTP
@@ -728,11 +727,11 @@ TEST_F(HttpFilterTestParam, ImmediateDeniedResponse) {
             callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
           })));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  // When request is denied, no call to continueDecoding(). As a result, decodeData() and
+  // decodeTrailer() will not be called.
 }
 
 // Test that a denied response results in the connection closing with a 401 response to the client.
@@ -745,7 +744,7 @@ TEST_F(HttpFilterTestParam, DeniedResponseWith401) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestHeaderMapImpl response_headers{{":status", "401"}};
@@ -772,7 +771,7 @@ TEST_F(HttpFilterTestParam, DeniedResponseWith403) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestHeaderMapImpl response_headers{{":status", "403"}};
@@ -809,7 +808,7 @@ TEST_F(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestHeaderMapImpl response_headers{{":status", "403"},
@@ -854,7 +853,7 @@ TEST_F(HttpFilterTestParam, OverrideEncodingHeaders) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
   Http::TestHeaderMapImpl response_headers{{":status", "403"},
@@ -896,7 +895,7 @@ TEST_F(HttpFilterTestParam, ResetDuringCall) {
           WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(*client_, cancel());
   filter_->onDestroy();
