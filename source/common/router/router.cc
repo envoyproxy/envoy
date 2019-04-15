@@ -792,6 +792,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
     onUpstreamComplete();
   }
 
+  callbacks_->streamInfo().setResponseCodeDetails(
+      StreamInfo::ResponseCodeDetails::get().ViaUpstream);
   callbacks_->encodeHeaders(std::move(headers), end_stream);
 }
 
