@@ -16,8 +16,7 @@
 
 namespace quic {
 
-// Wrap a Buffer::Instance and deliver its data to quic stream through as less
-// copy as possible.
+// Wraps a Buffer::Instance and deliver its data with mininum number of copies.
 class QuicMemSliceSpanImpl {
 public:
   /**

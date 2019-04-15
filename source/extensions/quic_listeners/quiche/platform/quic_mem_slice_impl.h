@@ -22,9 +22,8 @@ public:
   // Constructs an empty QuicMemSliceImpl.
   QuicMemSliceImpl() = default;
 
-  // A helper function to construct a buffer fragment and the buffer of given length the fragment
-  // points to with the guarantee that buffer and fragment are both aligned according to
-  // max_align_t.
+  // Constructs a buffer fragment and the buffer of given length the fragment points to with the
+  // guarantee that buffer and fragment are both aligned according to max_align_t.
   static Envoy::Buffer::BufferFragmentImpl*
   allocateBufferAndFragment(QuicBufferAllocator* allocator, size_t length);
 
