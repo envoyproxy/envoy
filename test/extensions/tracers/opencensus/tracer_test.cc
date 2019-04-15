@@ -106,33 +106,52 @@ TEST(OpenCensusTracerTest, Span) {
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, true});
-    span->setOperation("my_operation_2");
+    span->setOperation("wut"); // my_operation_2");
     span->setTag("my_key", "my_value");
     span->log(start_time, "my annotation");
-    // TODO: injectContext.
-    // TODO: spawnChild.
+    // injectContext is tested in another unit test.
+    Tracing::SpanPtr child = span->spawnChild(config, "child_span", start_time);
+    child->finishSpan();
     span->setSampled(false); // Abandon tracer.
     span->finishSpan();
   }
 
   // Retrieve SpanData from the OpenCensus trace exporter.
   std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
-  ASSERT_EQ(1, spans.size());
-  const auto& sd = spans[0];
-  ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
+  ASSERT_EQ(2, spans.size());
+  ::opencensus::trace::SpanId parent_span_id;
 
-  EXPECT_EQ("my_operation_1", sd.name());
-  EXPECT_TRUE(sd.context().IsValid());
-  EXPECT_TRUE(sd.context().trace_options().IsSampled());
-  ::opencensus::trace::SpanId zeros;
-  EXPECT_EQ(zeros, sd.parent_span_id());
+  // Check contents of parent span.
+  {
+    const auto& sd = (spans[0].name() == operation_name) ? spans[0] : spans[1];
+    ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
 
-  ASSERT_EQ(3, sd.annotations().events().size());
-  EXPECT_EQ("setOperation", sd.annotations().events()[0].event().description());
-  EXPECT_EQ("my annotation", sd.annotations().events()[1].event().description());
-  EXPECT_EQ("setSampled", sd.annotations().events()[2].event().description());
+    EXPECT_EQ("my_operation_1", sd.name());
+    EXPECT_TRUE(sd.context().IsValid());
+    EXPECT_TRUE(sd.context().trace_options().IsSampled());
+    ::opencensus::trace::SpanId zeros;
+    EXPECT_EQ(zeros, sd.parent_span_id());
+    parent_span_id = sd.context().span_id();
 
-  EXPECT_TRUE(sd.has_ended());
+    ASSERT_EQ(4, sd.annotations().events().size());
+    EXPECT_EQ("setOperation", sd.annotations().events()[0].event().description());
+    EXPECT_EQ("my annotation", sd.annotations().events()[1].event().description());
+    EXPECT_EQ("spawnChild", sd.annotations().events()[2].event().description());
+    EXPECT_EQ("setSampled", sd.annotations().events()[3].event().description());
+    EXPECT_TRUE(sd.has_ended());
+  }
+
+  // And child span.
+  {
+    const auto& sd = (spans[0].name() == "child_span") ? spans[0] : spans[1];
+    ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
+
+    EXPECT_EQ("child_span", sd.name());
+    EXPECT_TRUE(sd.context().IsValid());
+    EXPECT_TRUE(sd.context().trace_options().IsSampled());
+    EXPECT_EQ(parent_span_id, sd.parent_span_id());
+    EXPECT_TRUE(sd.has_ended());
+  }
 }
 
 // Test that trace context propagation works.
