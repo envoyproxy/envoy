@@ -12,6 +12,8 @@
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -21,7 +23,6 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
-#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
