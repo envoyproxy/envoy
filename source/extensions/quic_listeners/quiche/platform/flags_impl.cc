@@ -13,15 +13,28 @@
 
 namespace quiche {
 
+namespace {
+
+absl::flat_hash_map<std::string, Flag*> MakeFlagMap() {
+  absl::flat_hash_map<std::string, Flag*> flags;
+
+#define QUICHE_FLAG(type, flag, value, help)                                                       \
+  flags.emplace(FLAGS_##flag->name(), FLAGS_##flag);
+#include "extensions/quic_listeners/quiche/platform/flags_list.h"
+#undef QUICHE_FLAG
+
+  return flags;
+}
+
+} // namespace
+
 // static
 FlagRegistry& FlagRegistry::GetInstance() {
   static auto* instance = new FlagRegistry();
   return *instance;
 }
 
-void FlagRegistry::RegisterFlag(const char* name, Flag* flag) {
-  flags_.emplace(std::string(name), flag);
-}
+FlagRegistry::FlagRegistry() : flags_(MakeFlagMap()) {}
 
 void FlagRegistry::ResetFlags() const {
   for (auto& kv : flags_) {
