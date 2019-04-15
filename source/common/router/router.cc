@@ -1246,7 +1246,7 @@ void Filter::UpstreamRequest::clearRequestEncoder() {
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.request_encoder_);
-  ASSERT(parent_.upstream_requests_.size() == 1);
+  ASSERT(parent_.parent_.upstream_requests_.size() == 1);
   // The downstream connection is overrun. Pause reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(true);
@@ -1254,7 +1254,7 @@ void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHigh
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
   ASSERT(parent_.request_encoder_);
-  ASSERT(parent_.upstream_requests_.size() == 1);
+  ASSERT(parent_.parent_.upstream_requests_.size() == 1);
   // The downstream connection has buffer available. Resume reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(false);
