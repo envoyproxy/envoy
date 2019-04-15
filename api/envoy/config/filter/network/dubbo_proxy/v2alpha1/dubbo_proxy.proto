@@ -15,7 +15,9 @@ import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Dubbo Proxy]
-// Dubbo Proxy filter configuration.
+// Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
+
+// [#comment:next free field: 6]
 message DubboProxy {
   // The human readable prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
@@ -36,10 +38,12 @@ message DubboProxy {
   repeated DubboFilter dubbo_filters = 5;
 }
 
+// Dubbo Protocol types supported by Envoy.
 enum ProtocolType {
   Dubbo = 0; // the default protocol.
 }
 
+// Dubbo Serialization types supported by Envoy.
 enum SerializationType {
   Hessian2 = 0; // the default serialization protocol.
 }

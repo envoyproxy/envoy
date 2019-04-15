@@ -19,10 +19,12 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/upstream:cds_api_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:config_source_cc",
     ],
 )
 

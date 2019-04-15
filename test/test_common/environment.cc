@@ -226,11 +226,14 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   return temporaryFileSubstitute(path, ParamMap(), port_map, version);
 }
 
-std::string TestEnvironment::readFileToStringForTest(const std::string& filename) {
+std::string TestEnvironment::readFileToStringForTest(const std::string& filename,
+                                                     bool require_existence) {
   std::ifstream file(filename);
   if (file.fail()) {
-    std::cerr << "failed to open: " << filename << std::endl;
-    RELEASE_ASSERT(false, "");
+    if (!require_existence) {
+      return "";
+    }
+    RELEASE_ASSERT(false, absl::StrCat("failed to open: ", filename));
   }
 
   std::stringstream file_string_stream;
