@@ -15,6 +15,9 @@
 #include "gtest/gtest.h"
 #include "opencensus/trace/exporter/span_data.h"
 #include "opencensus/trace/exporter/span_exporter.h"
+#include "opencensus/trace/propagation/cloud_trace_context.h"
+#include "opencensus/trace/propagation/grpc_trace_bin.h"
+#include "opencensus/trace/propagation/trace_context.h"
 #include "opencensus/trace/span.h"
 #include "opencensus/trace/span_id.h"
 
@@ -106,7 +109,7 @@ TEST(OpenCensusTracerTest, Span) {
   {
     Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
                                               {Tracing::Reason::Sampling, true});
-    span->setOperation("wut"); // my_operation_2");
+    span->setOperation("different_name");
     span->setTag("my_key", "my_value");
     span->log(start_time, "my annotation");
     // injectContext is tested in another unit test.
@@ -157,38 +160,65 @@ TEST(OpenCensusTracerTest, Span) {
 // Test that trace context propagation works.
 TEST(OpenCensusTracerTest, PropagateTraceContext) {
   registerSpanCatcher();
-  OpenCensusConfig oc_config;
-  oc_config.add_incoming_trace_context(OpenCensusConfig::trace_context);
-  std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
+  auto helper = [](const std::string& header, const std::string& value) {
+    OpenCensusConfig oc_config;
+    oc_config.add_incoming_trace_context(OpenCensusConfig::trace_context);
+    oc_config.add_incoming_trace_context(OpenCensusConfig::grpc_trace_bin);
+    oc_config.add_incoming_trace_context(OpenCensusConfig::cloud_trace_context);
+    oc_config.add_outgoing_trace_context(OpenCensusConfig::trace_context);
+    // TODO: Add test for (binary) grpc-trace-bin header.
+    // oc_config.add_outgoing_trace_context(OpenCensusConfig::grpc_trace_bin);
+    oc_config.add_outgoing_trace_context(OpenCensusConfig::cloud_trace_context);
+    std::unique_ptr<Tracing::Driver> driver(new OpenCensus::Driver(oc_config));
+    NiceMock<Tracing::MockConfig> config;
+    Http::TestHeaderMapImpl request_headers{
+        {":path", "/"},
+        {":method", "GET"},
+        {"x-request-id", "foo"},
+        {header, value},
+    };
+    const std::string operation_name{"my_operation_2"};
+    SystemTime start_time;
+    Http::TestHeaderMapImpl injected_headers;
+    {
+      Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
+                                                {Tracing::Reason::Sampling, false});
+      span->injectContext(injected_headers);
+      span->finishSpan();
+    }
 
-  NiceMock<Tracing::MockConfig> config;
-  Http::TestHeaderMapImpl request_headers{
-      {":path", "/"},
-      {":method", "GET"},
-      {"x-request-id", "foo"},
-      {"traceparent", "00-404142434445464748494a4b4c4d4e4f-6162636465666768-01"},
+    // Retrieve SpanData from the OpenCensus trace exporter.
+    std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
+    ASSERT_EQ(1, spans.size());
+    const auto& sd = spans[0];
+    ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
+
+    // Check contents.
+    EXPECT_TRUE(sd.has_remote_parent());
+    EXPECT_EQ("6162636465666768", sd.parent_span_id().ToHex());
+    EXPECT_EQ("404142434445464748494a4b4c4d4e4f", sd.context().trace_id().ToHex());
+    EXPECT_TRUE(sd.context().trace_options().IsSampled())
+        << "parent was sampled, child should be also";
+
+    // Check injectContext.
+    using Envoy::Http::LowerCaseString;
+    {
+      auto val = injected_headers.get(LowerCaseString("traceparent"));
+      ASSERT_NE(nullptr, val);
+      EXPECT_EQ(::opencensus::trace::propagation::ToTraceParentHeader(sd.context()),
+                val->value().getStringView());
+    }
+    // TODO: Add grpc-trace-bin.
+    {
+      auto val = injected_headers.get(LowerCaseString("x-cloud-trace-context"));
+      ASSERT_NE(nullptr, val);
+      EXPECT_EQ(::opencensus::trace::propagation::ToCloudTraceContextHeader(sd.context()),
+                val->value().getStringView());
+    }
   };
-  const std::string operation_name{"my_operation_2"};
-  SystemTime start_time;
 
-  {
-    Tracing::SpanPtr span = driver->startSpan(config, request_headers, operation_name, start_time,
-                                              {Tracing::Reason::Sampling, false});
-    span->finishSpan();
-  }
-
-  // Retrieve SpanData from the OpenCensus trace exporter.
-  std::vector<SpanData> spans = getSpanCatcher()->catchSpans();
-  ASSERT_EQ(1, spans.size());
-  const auto& sd = spans[0];
-  ENVOY_LOG_MISC(debug, "{}", sd.DebugString());
-
-  // Check contents.
-  EXPECT_TRUE(sd.has_remote_parent());
-  EXPECT_EQ("6162636465666768", sd.parent_span_id().ToHex());
-  EXPECT_EQ("404142434445464748494a4b4c4d4e4f", sd.context().trace_id().ToHex());
-  EXPECT_TRUE(sd.context().trace_options().IsSampled())
-      << "parent was sampled, child should be also";
+  helper("traceparent", "00-404142434445464748494a4b4c4d4e4f-6162636465666768-01");
+  helper("x-cloud-trace-context", "404142434445464748494a4b4c4d4e4f/7017280452245743464;o=1");
 }
 
 // Test constant_sampler that's always on.
