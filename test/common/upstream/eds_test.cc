@@ -1458,7 +1458,7 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
 
   auto health_checker = std::make_shared<MockHealthChecker>();
   EXPECT_CALL(*health_checker, start());
-  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(AtLeast(1));
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
   cluster_->setHealthChecker(health_checker);
 
   auto* socket_address = endpoints->add_lb_endpoints()
@@ -1472,10 +1472,9 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
   cluster_load_assignment_lease.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(1));
 
-  // Expect the timer to be enabled once.
-  EXPECT_CALL(*interval_timer_, enableTimer(_)).Times(AtLeast(1));
-  EXPECT_CALL(*interval_timer_, disableTimer()).Times(AtLeast(1));
-  EXPECT_CALL(*interval_timer_, enabled()).Times(AtLeast(1));
+  EXPECT_CALL(*interval_timer_, enableTimer(_)).Times(2); // Timer enabled twice.
+  EXPECT_CALL(*interval_timer_, disableTimer()).Times(1); // Timer disabled once.
+  EXPECT_CALL(*interval_timer_, enabled()).Times(6);      // Includes calls by test.
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_lease);
   // Check that the timer is enabled.
   EXPECT_EQ(interval_timer_->enabled(), true);
