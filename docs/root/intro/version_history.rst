@@ -5,6 +5,7 @@ Version history
 ================
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
+* redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
 * redis: add support for zpopmax and zpopmin commands.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 
@@ -65,7 +66,6 @@ Version history
 * ratelimit: removed deprecated rate limit configuration from bootstrap.
 * redis: added :ref:`hashtagging <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.enable_hashtagging>` to guarantee a given key's upstream.
 * redis: added :ref:`latency stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
-* redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
 * redis: added :ref:`success and error stats <config_network_filters_redis_proxy_per_command_stats>` for commands.
 * redis: migrate hash function for host selection to `MurmurHash2 <https://sites.google.com/site/murmurhash>`_ from std::hash. MurmurHash2 is compatible with std::hash in GNU libstdc++ 3.4.20 or above. This is typically the case when compiled on Linux and not macOS.
 * redis: added :ref:`latency_in_micros <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.latency_in_micros>` to specify the redis commands stats time unit in microseconds.

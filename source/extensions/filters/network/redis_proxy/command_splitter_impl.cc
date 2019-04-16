@@ -264,7 +264,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
 }
 
 bool FragmentedRequest::onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                                           const ConnPool::InstanceSharedPtr conn_pool) {
+                                           const ConnPool::InstanceSharedPtr& conn_pool) {
   std::vector<absl::string_view> err;
   bool ask_redirection = false;
   if (redirectionArgsInvalid(incoming_request_.get(), value, err, ask_redirection) || !conn_pool) {

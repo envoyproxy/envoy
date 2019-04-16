@@ -354,8 +354,6 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
   EXPECT_TRUE(fake_upstream_connection_2->close());
 }
 
-// This test sends a simple
-
 // This test sends a simple "get foo" command from a fake
 // downstream client through the proxy to a fake upstream
 // Redis server. The fake server sends a valid response

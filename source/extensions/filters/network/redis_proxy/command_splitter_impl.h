@@ -189,7 +189,7 @@ protected:
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
   void onChildFailure(uint32_t index);
   bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                          const ConnPool::InstanceSharedPtr conn_pool);
+                          const ConnPool::InstanceSharedPtr& conn_pool);
   virtual void recreate(Common::Redis::RespValue& request, uint32_t index) PURE;
 
   SplitCallbacks& callbacks_;
