@@ -82,9 +82,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "a5342629fe1b689eceb3be4d4f167b04c70a84b9d61cf8b555e968bc500bdb5a",
-        strip_prefix = "grpc-1.16.1",
-        urls = ["https://github.com/grpc/grpc/archive/v1.16.1.tar.gz"],
+        sha256 = "01c5e617d098a33672ddb640d0e50831fb7c613999435e5dcf115021abde6b9a",
+        strip_prefix = "grpc-1.20.0",
+        urls = ["https://github.com/grpc/grpc/archive/v1.20.0.tar.gz"],
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
@@ -225,7 +225,7 @@ REPOSITORY_LOCATIONS = dict(
     rules_foreign_cc = dict(
         sha256 = "136470a38dcd00c7890230402b43004dc947bf1e3dd0289dd1bd2bfb1e0a3484",
         strip_prefix = "rules_foreign_cc-e3f4b5e0bc9dac9cf036616c13de25e6cd5051a2",
-        # 2019-02-14
+        # 2019-04-04
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/e3f4b5e0bc9dac9cf036616c13de25e6cd5051a2.tar.gz"],
     ),
     six_archive = dict(

@@ -82,10 +82,17 @@ createTransportSocketFactoryHelper(const Protobuf::Message& message, bool is_ups
     }
     const char* target_name = is_upstream ? "" : nullptr;
     tsi_handshaker* handshaker = nullptr;
+    // TODO(cmluciano): Implement grpc_alts_shared_resource_dedicated_init(), and
+    // grpc_alts_shared_resource_dedicated_shutdown() to properly include interested parties
+    //
+    // grpc_pollset_set adds pollsets of interested parties & automatically adds their registered
+    // fd's hard-coding this to nullptr results in creation of a dedicated tsi_thread
+    grpc_pollset_set* interested_parties = nullptr;
     // Specifying target name as empty since TSI won't take care of validating peer identity
     // in this use case. The validation will be performed by TsiSocket with the validator.
-    tsi_result status = alts_tsi_handshaker_create(
-        options.get(), target_name, handshaker_service.c_str(), is_upstream, &handshaker);
+    tsi_result status =
+        alts_tsi_handshaker_create(options.get(), target_name, handshaker_service.c_str(),
+                                   is_upstream, interested_parties, &handshaker);
     CHandshakerPtr handshaker_ptr{handshaker};
 
     if (status != TSI_OK) {
