@@ -175,7 +175,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
   EXPECT_TRUE(upstream_request2->complete());
   EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
   EXPECT_TRUE(response2->complete());
-  EXPECT_STREQ("200", response2->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response2->headers().Status()->value().getStringView());
   EXPECT_EQ(response2_bytes, response2->body().size());
 
   // Respond to request 1
@@ -185,7 +185,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
   EXPECT_TRUE(upstream_request1->complete());
   EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
   EXPECT_TRUE(response1->complete());
-  EXPECT_STREQ("200", response1->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response1->headers().Status()->value().getStringView());
   EXPECT_EQ(response1_bytes, response1->body().size());
 }
 
@@ -230,11 +230,11 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
     responses[i]->waitForEndStream();
     if (i % 2 != 0) {
       EXPECT_TRUE(responses[i]->complete());
-      EXPECT_STREQ("200", responses[i]->headers().Status()->value().c_str());
+      EXPECT_EQ("200", responses[i]->headers().Status()->value().getStringView());
       EXPECT_EQ(response_bytes[i], responses[i]->body().length());
     } else {
       // Upstream stream reset.
-      EXPECT_STREQ("503", responses[i]->headers().Status()->value().c_str());
+      EXPECT_EQ("503", responses[i]->headers().Status()->value().getStringView());
     }
   }
 }

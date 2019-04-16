@@ -34,8 +34,9 @@ uint32_t getLength(const Buffer::Instance* instance) { return instance ? instanc
 
 bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
                   const Network::Connection& connection) {
-  if (downstream_headers.ForwardedProto() && downstream_headers.ForwardedProto()->value().c_str() ==
-                                                 Http::Headers::get().SchemeValues.Http) {
+  if (downstream_headers.ForwardedProto() &&
+      downstream_headers.ForwardedProto()->value().getStringView() ==
+          Http::Headers::get().SchemeValues.Http) {
     return true;
   }
   if (!connection.ssl()) {
@@ -138,7 +139,9 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;
   if (header_timeout_entry) {
-    if (StringUtil::atoull(header_timeout_entry->value().c_str(), header_timeout)) {
+    // TODO(dnoe): Migrate to pure string_view (#6580)
+    if (StringUtil::atoull(std::string(header_timeout_entry->value().getStringView()).c_str(),
+                           header_timeout)) {
       timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestTimeoutMs();
@@ -147,7 +150,9 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
   Http::HeaderEntry* per_try_timeout_entry = request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
   if (per_try_timeout_entry) {
-    if (StringUtil::atoull(per_try_timeout_entry->value().c_str(), header_timeout)) {
+    // TODO(dnoe): Migrate to pure string_view (#6580)
+    if (StringUtil::atoull(std::string(per_try_timeout_entry->value().getStringView()).c_str(),
+                           header_timeout)) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -274,7 +279,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   if (!route_) {
     config_.stats_.no_route_.inc();
     ENVOY_STREAM_LOG(debug, "no cluster match for URL '{}'", *callbacks_,
-                     headers.Path()->value().c_str());
+                     headers.Path()->value().getStringView());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt);
@@ -317,11 +322,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
-                   route_entry_->clusterName(), headers.Path()->value().c_str());
+                   route_entry_->clusterName(), headers.Path()->value().getStringView());
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
-    alt_stat_prefix_ = std::string(request_alt_name->value().c_str()) + ".";
+    alt_stat_prefix_ = std::string(request_alt_name->value().getStringView()) + ".";
     headers.removeEnvoyUpstreamAltStatName();
   }
 

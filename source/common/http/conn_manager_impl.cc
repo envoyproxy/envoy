@@ -573,7 +573,8 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 // e.g. many early returns do not currently handle connection: close properly.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   request_headers_ = std::move(headers);
-  if (Http::Headers::get().MethodValues.Head == request_headers_->Method()->value().c_str()) {
+  if (Http::Headers::get().MethodValues.Head ==
+      request_headers_->Method()->value().getStringView()) {
     is_head_request_ = true;
   }
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
@@ -661,7 +662,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // when the allow_absolute_url flag is enabled on the HCM.
   // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
   // :path because CONNECT does not have a path, and we don't support that currently.
-  if (!request_headers_->Path() || request_headers_->Path()->value().c_str()[0] != '/') {
+  if (!request_headers_->Path() || request_headers_->Path()->value().getStringView().empty() ||
+      request_headers_->Path()->value().getStringView()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    is_head_request_, absl::nullopt);
@@ -779,7 +781,8 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     // should be used to override the active span's operation.
     if (req_operation_override) {
       if (!req_operation_override->value().empty()) {
-        active_span_->setOperation(req_operation_override->value().c_str());
+        // TODO(dnoe): Migrate setOperation to take string_view (#6580)
+        active_span_->setOperation(std::string(req_operation_override->value().getStringView()));
 
         // Clear the decorated operation so won't be used in the response header, as
         // it has been overridden by the inbound decorator operation request header.
@@ -1289,7 +1292,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       // should be used to override the active span's operation.
       if (resp_operation_override) {
         if (!resp_operation_override->value().empty() && active_span_) {
-          active_span_->setOperation(resp_operation_override->value().c_str());
+          active_span_->setOperation(std::string(resp_operation_override->value().getStringView()));
         }
         // Remove header so not propagated to service.
         headers.removeEnvoyDecoratorOperation();
@@ -1588,7 +1591,7 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
     }
 
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
-            upgrade->value().c_str(), upgrade_map, *this)) {
+            upgrade->value().getStringView(), upgrade_map, *this)) {
       state_.successful_upgrade_ = true;
       connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
       connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
