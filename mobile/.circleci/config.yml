@@ -1,0 +1,29 @@
+version: 2.1
+
+executors:
+  ubuntu-build:
+    description: "A regular build executor based on ubuntu image"
+    docker:
+      - image: envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
+    # TODO(mattklein123): Get xlarge class enabled
+    resource_class: medium
+    working_directory: /source
+
+jobs:
+  docs:
+    executor: ubuntu-build
+    steps:
+      - checkout
+      - run: git submodule update --init
+      - run: docs/build.sh
+      - store_artifacts:
+          path: generated/docs
+
+workflows:
+  version: 2
+  all:
+    jobs:
+      - docs:
+          filters:
+            tags:
+              only: /^v.*/
