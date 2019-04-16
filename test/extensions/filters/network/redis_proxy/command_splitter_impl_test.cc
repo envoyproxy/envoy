@@ -38,6 +38,16 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
 
+class PassthruRouter : public Router {
+public:
+  PassthruRouter(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(conn_pool) {}
+
+  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return conn_pool_; }
+
+private:
+  ConnPool::InstanceSharedPtr conn_pool_;
+};
+
 class RedisCommandSplitterImplTest : public testing::Test {
 public:
   void makeBulkStringArray(Common::Redis::RespValue& value,
@@ -55,8 +65,8 @@ public:
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_,
-                         false};
+  InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
+                         store_, "redis.foo.", time_system_, false};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
 };
@@ -226,6 +236,7 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {GetParam(), "hello"});
   EXPECT_CALL(*conn_pool_, makeRequest("hello", Ref(*request), _)).WillOnce(Return(nullptr));
+
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
   response.asString() = Response::get().NoUpstreamHost;
@@ -328,6 +339,7 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"eval", "return {ARGV[1]}", "1", "key", "arg"});
   EXPECT_CALL(*conn_pool_, makeRequest("key", Ref(*request), _)).WillOnce(Return(nullptr));
+
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
   response.asString() = Response::get().NoUpstreamHost;
@@ -1429,8 +1441,8 @@ public:
   }
 
   ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
-  InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.", time_system_,
-                         true};
+  InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
+                         store_, "redis.foo.", time_system_, true};
 };
 
 TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {

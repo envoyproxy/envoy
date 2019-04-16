@@ -18,6 +18,7 @@ public:
 
   // StreamInfo::StreamInfo
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
+  MOCK_METHOD1(setResponseCodeDetails, void(absl::string_view));
   MOCK_CONST_METHOD1(intersectResponseFlags, bool(uint64_t));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
@@ -44,6 +45,7 @@ public:
   MOCK_CONST_METHOD0(protocol, absl::optional<Http::Protocol>());
   MOCK_METHOD1(protocol, void(Http::Protocol protocol));
   MOCK_CONST_METHOD0(responseCode, absl::optional<uint32_t>());
+  MOCK_CONST_METHOD0(responseCodeDetails, const absl::optional<std::string>&());
   MOCK_METHOD1(addBytesSent, void(uint64_t));
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
   MOCK_CONST_METHOD1(hasResponseFlag, bool(ResponseFlag));
@@ -90,6 +92,7 @@ public:
   absl::optional<std::chrono::nanoseconds> end_time_;
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
+  absl::optional<std::string> response_code_details_;
   envoy::api::v2::core::Metadata metadata_;
   FilterStateImpl filter_state_;
   uint64_t bytes_received_{};
