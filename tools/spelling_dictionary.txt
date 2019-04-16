@@ -285,6 +285,7 @@ accessors
 acls
 addr
 agg
+alignof
 alloc
 alloca
 allocator
