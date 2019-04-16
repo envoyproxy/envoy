@@ -149,11 +149,6 @@ public:
   void setCopy(absl::string_view view);
 
   /**
-   * Set the value of the string by copying data into it. This overwrites any existing string.
-   */
-  void setCopy(absl::string_view view);
-
-  /**
    * Set the value of the string to an integer. This overwrites any existing string.
    */
   void setInteger(uint64_t value);
