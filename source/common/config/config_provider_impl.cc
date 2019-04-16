@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Config {
 
-ImmutableConfigProviderImplBase::ImmutableConfigProviderImplBase(
+ImmutableConfigProviderBase::ImmutableConfigProviderBase(
     Server::Configuration::FactoryContext& factory_context,
     ConfigProviderManagerImplBase& config_provider_manager,
     ConfigProviderInstanceType instance_type, ApiType api_type)
@@ -13,18 +13,35 @@ ImmutableConfigProviderImplBase::ImmutableConfigProviderImplBase(
   config_provider_manager_.bindImmutableConfigProvider(this);
 }
 
-ImmutableConfigProviderImplBase::~ImmutableConfigProviderImplBase() {
+ImmutableConfigProviderBase::~ImmutableConfigProviderBase() {
   config_provider_manager_.unbindImmutableConfigProvider(this);
 }
 
-ConfigSubscriptionInstanceBase::~ConfigSubscriptionInstanceBase() {
+ConfigSubscriptionCommonBase::~ConfigSubscriptionCommonBase() {
   init_target_.ready();
   config_provider_manager_.unbindSubscription(manager_identifier_);
 }
 
-bool ConfigSubscriptionInstanceBase::checkAndApplyConfig(const Protobuf::Message& config_proto,
-                                                         const std::string& config_name,
-                                                         const std::string& version_info) {
+void ConfigSubscriptionCommonBase::bindConfigProvider(MutableConfigProviderCommonBase* provider) {
+  // All config providers bound to a ConfigSubscriptionCommonBase must be of the same concrete
+  // type; this is assumed by ConfigSubscriptionInstance::checkAndApplyConfigUpdate() and is
+  // verified by the assertion below. NOTE: an inlined statement ASSERT() triggers a potentially
+  // evaluated expression warning from clang due to `typeid(**mutable_config_providers_.begin())`.
+  // To avoid this, we use a lambda to separate the first mutable provider dereference from the
+  // typeid() statement.
+  ASSERT([&]() {
+    if (!mutable_config_providers_.empty()) {
+      const auto& first_provider = **mutable_config_providers_.begin();
+      return typeid(*provider) == typeid(first_provider);
+    }
+    return true;
+  }());
+  mutable_config_providers_.insert(provider);
+}
+
+bool ConfigSubscriptionInstance::checkAndApplyConfigUpdate(const Protobuf::Message& config_proto,
+                                                           const std::string& config_name,
+                                                           const std::string& version_info) {
   const uint64_t new_hash = MessageUtil::hash(config_proto);
   if (config_info_) {
     ASSERT(config_info_.value().last_config_hash_.has_value());
@@ -44,39 +61,25 @@ bool ConfigSubscriptionInstanceBase::checkAndApplyConfig(const Protobuf::Message
     // bindConfigProvider()).
     // This makes it safe to call any of the provider's onConfigProtoUpdate() to get a new config
     // impl, which can then be passed to all providers.
+    auto* typed_provider = static_cast<MutableConfigProviderBase*>(provider);
     if (new_config == nullptr) {
-      if ((new_config = provider->onConfigProtoUpdate(config_proto)) == nullptr) {
+      if ((new_config = typed_provider->onConfigProtoUpdate(config_proto)) == nullptr) {
         return false;
       }
     }
-    provider->onConfigUpdate(new_config);
+    typed_provider->onConfigUpdate(new_config);
   }
 
   return true;
 }
 
-void ConfigSubscriptionInstanceBase::propagateDeltaConfigUpdate(
+void DeltaConfigSubscriptionInstance::applyConfigUpdate(
     std::function<void(ConfigProvider::ConfigConstSharedPtr)> updateFn) {
   for (auto* provider : mutable_config_providers_) {
-    ConfigProvider::ConfigConstSharedPtr config = provider->getConfig();
-    provider->onDeltaConfigUpdate([config, updateFn]() { updateFn(config); });
+    auto* typed_provider = static_cast<DeltaMutableConfigProviderBase*>(provider);
+    ConfigProvider::ConfigConstSharedPtr config = typed_provider->getConfig();
+    typed_provider->onConfigUpdate([config, updateFn]() { updateFn(config); });
   }
-}
-
-void ConfigSubscriptionInstanceBase::bindConfigProvider(MutableConfigProviderImplBase* provider) {
-  // All config providers bound to a ConfigSubscriptionInstanceBase must be of the same concrete
-  // type; this is assumed by checkAndApplyConfig() and is verified by the assertion below.
-  // NOTE: an inlined statement ASSERT() triggers a potentially evaluated expression warning from
-  // clang due to `typeid(**mutable_config_providers_.begin())`. To avoid this, we use a lambda to
-  // separate the first mutable provider dereference from the typeid() statement.
-  ASSERT([&]() {
-    if (!mutable_config_providers_.empty()) {
-      const auto& first_provider = **mutable_config_providers_.begin();
-      return typeid(*provider) == typeid(first_provider);
-    }
-    return true;
-  }());
-  mutable_config_providers_.insert(provider);
 }
 
 ConfigProviderManagerImplBase::ConfigProviderManagerImplBase(Server::Admin& admin,
@@ -100,7 +103,7 @@ ConfigProviderManagerImplBase::immutableConfigProviders(ConfigProviderInstanceTy
 }
 
 void ConfigProviderManagerImplBase::bindImmutableConfigProvider(
-    ImmutableConfigProviderImplBase* provider) {
+    ImmutableConfigProviderBase* provider) {
   ASSERT(provider->instanceType() == ConfigProviderInstanceType::Static ||
          provider->instanceType() == ConfigProviderInstanceType::Inline);
   ConfigProviderMap::iterator it;
@@ -115,7 +118,7 @@ void ConfigProviderManagerImplBase::bindImmutableConfigProvider(
 }
 
 void ConfigProviderManagerImplBase::unbindImmutableConfigProvider(
-    ImmutableConfigProviderImplBase* provider) {
+    ImmutableConfigProviderBase* provider) {
   ASSERT(provider->instanceType() == ConfigProviderInstanceType::Static ||
          provider->instanceType() == ConfigProviderInstanceType::Inline);
   auto it = immutable_config_providers_map_.find(provider->instanceType());

@@ -29,7 +29,7 @@ public:
 class ScopedRoutesConfigProviderManager;
 
 // A ConfigProvider for inline scoped routing configuration.
-class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderImplBase {
+class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderBase {
 public:
   InlineScopedRoutesConfigProvider(
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
@@ -78,7 +78,7 @@ struct ScopedRdsStats {
 };
 
 // A scoped RDS subscription to be used with the dynamic scoped RDS ConfigProvider.
-class ScopedRdsConfigSubscription : public Envoy::Config::ConfigSubscriptionInstanceBase,
+class ScopedRdsConfigSubscription : public Envoy::Config::DeltaConfigSubscriptionInstance,
                                     Envoy::Config::SubscriptionCallbacks {
 public:
   using ScopedRouteConfigurationMap =
@@ -94,7 +94,7 @@ public:
 
   const std::string& name() const { return name_; }
 
-  // Envoy::Config::ConfigSubscriptionInstanceBase
+  // Envoy::Config::ConfigSubscriptionCommonBase
   void start() override { subscription_->start({}, *this); }
 
   // Envoy::Config::SubscriptionCallbacks
@@ -105,7 +105,7 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void onConfigUpdateFailed(const EnvoyException*) override {
-    ConfigSubscriptionInstanceBase::onConfigUpdateFailed();
+    ConfigSubscriptionCommonBase::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
@@ -126,7 +126,7 @@ using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubs
 
 // A ConfigProvider for scoped RDS that dynamically fetches scoped routing configuration via a
 // subscription.
-class ScopedRdsConfigProvider : public Envoy::Config::MutableConfigProviderImplBase {
+class ScopedRdsConfigProvider : public Envoy::Config::DeltaMutableConfigProviderBase {
 public:
   ScopedRdsConfigProvider(ScopedRdsConfigSubscriptionSharedPtr&& subscription,
                           Server::Configuration::FactoryContext& factory_context,
@@ -136,35 +136,9 @@ public:
 
   ScopedRdsConfigSubscription& subscription() { return *subscription_; }
 
-  // Envoy::Config::MutableConfigProviderImplBase
-  Envoy::Config::ConfigProvider::ConfigConstSharedPtr
-  onConfigProtoUpdate(const Protobuf::Message&) override {
-    return nullptr;
-  }
-
   // Envoy::Config::ConfigProvider
-  const Envoy::Config::ConfigProvider::ConfigProtoVector getConfigProtos() const override {
-    const ScopedConfigManager::ScopedRouteMap& scoped_route_map = subscription_->scopedRouteMap();
-    if (scoped_route_map.empty()) {
-      return {};
-    }
-
-    Envoy::Config::ConfigProvider::ConfigProtoVector config_protos(scoped_route_map.size());
-    for (ScopedConfigManager::ScopedRouteMap::const_iterator it = scoped_route_map.begin();
-         it != scoped_route_map.end(); ++it) {
-      config_protos.push_back(&it->second->config_proto_);
-    }
-    return config_protos;
-  }
-  std::string getConfigVersion() const override {
-    if (subscription_->configInfo().has_value()) {
-      return subscription_->configInfo().value().last_config_version_;
-    }
-
-    return "";
-  }
   ConfigConstSharedPtr getConfig() const override {
-    return std::dynamic_pointer_cast<const Envoy::Config::ConfigProvider::Config>(tls()->get());
+    return std::dynamic_pointer_cast<const Envoy::Config::ConfigProvider::Config>(tls_->get());
   }
 
 private:
@@ -193,10 +167,10 @@ public:
   Envoy::Config::ConfigProviderPtr
   createStaticConfigProvider(const Protobuf::Message&, Server::Configuration::FactoryContext&,
                              const Envoy::Config::ConfigProviderManager::OptionalArg&) override {
-    ASSERT(false ||
+    ASSERT(false,
            "SRDS supports delta updates and requires the use of the createStaticConfigProvider() "
            "overload that accepts a config proto set as an argument.");
-    return nullptr;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   Envoy::Config::ConfigProviderPtr createStaticConfigProvider(
       std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,

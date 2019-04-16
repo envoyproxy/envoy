@@ -16,7 +16,7 @@ namespace {
 
 class DummyConfigProviderManager;
 
-class StaticDummyConfigProvider : public ImmutableConfigProviderImplBase {
+class StaticDummyConfigProvider : public ImmutableConfigProviderBase {
 public:
   StaticDummyConfigProvider(const test::common::config::DummyConfig& config_proto,
                             Server::Configuration::FactoryContext& factory_context,
@@ -38,7 +38,7 @@ private:
   test::common::config::DummyConfig config_proto_;
 };
 
-class DummyConfigSubscription : public ConfigSubscriptionInstanceBase,
+class DummyConfigSubscription : public ConfigSubscriptionInstance,
                                 Envoy::Config::SubscriptionCallbacks {
 public:
   DummyConfigSubscription(const uint64_t manager_identifier,
@@ -47,7 +47,7 @@ public:
 
   ~DummyConfigSubscription() override = default;
 
-  // Envoy::Config::ConfigSubscriptionInstanceBase
+  // Envoy::Config::ConfigSubscriptionCommonBase
   void start() override {}
 
   // Envoy::Config::SubscriptionCallbacks
@@ -55,11 +55,11 @@ public:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override {
     auto config = MessageUtil::anyConvert<test::common::config::DummyConfig>(resources[0]);
-    if (checkAndApplyConfig(config, "dummy_config", version_info)) {
+    if (checkAndApplyConfigUpdate(config, "dummy_config", version_info)) {
       config_proto_ = config;
     }
 
-    ConfigSubscriptionInstanceBase::onConfigUpdate();
+    ConfigSubscriptionCommonBase::onConfigUpdate();
   }
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
@@ -87,14 +87,14 @@ public:
   DummyConfig(const test::common::config::DummyConfig&) {}
 };
 
-class DummyDynamicConfigProvider : public MutableConfigProviderImplBase {
+class DummyDynamicConfigProvider : public MutableConfigProviderBase {
 public:
   DummyDynamicConfigProvider(DummyConfigSubscriptionSharedPtr&& subscription,
                              ConfigConstSharedPtr initial_config,
                              Server::Configuration::FactoryContext& factory_context)
-      : MutableConfigProviderImplBase(std::move(subscription), factory_context, ApiType::Full),
+      : MutableConfigProviderBase(std::move(subscription), factory_context, ApiType::Full),
         subscription_(static_cast<DummyConfigSubscription*>(
-            MutableConfigProviderImplBase::subscription().get())) {
+            MutableConfigProviderCommonBase::subscription_.get())) {
     initialize(initial_config);
   }
 
@@ -102,7 +102,7 @@ public:
 
   DummyConfigSubscription& subscription() { return *subscription_; }
 
-  // Envoy::Config::MutableConfigProviderImplBase
+  // Envoy::Config::MutableConfigProviderBase
   ConfigProvider::ConfigConstSharedPtr
   onConfigProtoUpdate(const Protobuf::Message& config) override {
     return std::make_shared<DummyConfig>(
@@ -116,8 +116,6 @@ public:
     }
     return &subscription_->config_proto().value();
   }
-
-  // Envoy::Config::ConfigProvider
   std::string getConfigVersion() const override { return ""; }
 
 private:
@@ -171,15 +169,15 @@ public:
         config_source_proto, factory_context.initManager(),
         [&factory_context](const uint64_t manager_identifier,
                            ConfigProviderManagerImplBase& config_provider_manager)
-            -> ConfigSubscriptionInstanceBaseSharedPtr {
+            -> ConfigSubscriptionCommonBaseSharedPtr {
           return std::make_shared<DummyConfigSubscription>(
               manager_identifier, factory_context,
               static_cast<DummyConfigProviderManager&>(config_provider_manager));
         });
 
     ConfigProvider::ConfigConstSharedPtr initial_config;
-    const MutableConfigProviderImplBase* provider =
-        subscription->getAnyBoundMutableConfigProvider();
+    const auto* provider = static_cast<const MutableConfigProviderBase*>(
+        subscription->getAnyBoundMutableConfigProvider());
     if (provider) {
       initial_config = provider->getConfig();
     }
@@ -208,14 +206,14 @@ StaticDummyConfigProvider::StaticDummyConfigProvider(
     const test::common::config::DummyConfig& config_proto,
     Server::Configuration::FactoryContext& factory_context,
     DummyConfigProviderManager& config_provider_manager)
-    : ImmutableConfigProviderImplBase(factory_context, config_provider_manager,
-                                      ConfigProviderInstanceType::Static, ApiType::Full),
+    : ImmutableConfigProviderBase(factory_context, config_provider_manager,
+                                  ConfigProviderInstanceType::Static, ApiType::Full),
       config_(std::make_shared<DummyConfig>(config_proto)), config_proto_(config_proto) {}
 
 DummyConfigSubscription::DummyConfigSubscription(
     const uint64_t manager_identifier, Server::Configuration::FactoryContext& factory_context,
     DummyConfigProviderManager& config_provider_manager)
-    : ConfigSubscriptionInstanceBase(
+    : ConfigSubscriptionInstance(
           "DummyDS", manager_identifier, config_provider_manager, factory_context.timeSource(),
           factory_context.timeSource().systemTime(), factory_context.localInfo()) {}
 

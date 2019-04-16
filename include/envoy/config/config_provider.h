@@ -1,11 +1,10 @@
 #pragma once
 
-#include <assert.h>
-
 #include <memory>
 
 #include "envoy/common/time.h"
 
+#include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
@@ -140,26 +139,20 @@ protected:
    * @return Protobuf::Message* the config proto corresponding to the Config instantiated by the
    *         provider.
    */
-  virtual const Protobuf::Message* getConfigProto() const {
-    assert("not implemented" && false);
-    return nullptr;
-  }
+  virtual const Protobuf::Message* getConfigProto() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   /**
    * Returns the config protos associated with the provider.
    * @return const ConfigProtoVector the config protos corresponding to the Config instantiated by
    *         the provider.
    */
-  virtual const ConfigProtoVector getConfigProtos() const {
-    assert("not implemented" && false);
-    return {};
-  }
+  virtual const ConfigProtoVector getConfigProtos() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   /**
    * Returns the config version associated with the provider.
    * @return std::string the config version.
    */
-  virtual std::string getConfigVersion() const PURE;
+  virtual std::string getConfigVersion() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   /**
    * Returns the config implementation associated with the provider.
