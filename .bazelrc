@@ -24,6 +24,15 @@ build:asan --copt -D__SANITIZE_ADDRESS__
 build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true
 build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
 build:asan --test_env=ASAN_SYMBOLIZER_PATH
+# TODO(htuch): these are temporary workarounds, remove when
+# https://github.com/bazelbuild/rules_foreign_cc/issues/154#issuecomment-466504751 is resolved.
+build:asan --action_env=CC
+build:asan --action_env=CXX
+build:asan --action_env=CFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
+build:asan --action_env=CXXFLAGS="-fsanitize=address,undefined -fno-sanitize=vptr"
+# This is needed for host protoc. TODO(htuch): Figure out why..
+build:asan --action_env=LSAN_OPTIONS=verbosity=1:log_threads=1
+build:asan --test_env=LSAN_OPTIONS=verbosity=1:log_threads=1
 
 # Clang ASAN/UBSAN
 build:clang-asan --config=asan
@@ -37,8 +46,16 @@ build:macos-asan --copt -D_FORTIFY_SOURCE=0
 # Clang TSAN
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
+# This is needed because of https://github.com/libevent/libevent/issues/777
+build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --define tcmalloc=disabled
+# TODO(htuch): these are temporary workarounds, remove when
+# https://github.com/bazelbuild/rules_foreign_cc/issues/154#issuecomment-466504751 is resolved.
+build:clang-tsan --action_env=CC
+build:clang-tsan --action_env=CXX
+build:clang-tsan --action_env=CFLAGS="-fsanitize=thread -DEVENT__DISABLE_DEBUG_MODE"
+build:clang-tsan --action_env=CXXFLAGS="-fsanitize=thread"
 
 # Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
 # support (see https://github.com/envoyproxy/envoy/issues/443).
