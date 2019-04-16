@@ -550,7 +550,7 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
     *result_listener << "\n"
                      << "========================Expected header map:========================\n"
                      << *expected
-                     << "-----------------is not equal to actual header map:-----------------\n"
+                     << "-------------------------actual header map:-------------------------\n"
                      << *arg
                      << "====================================================================\n";
   }
@@ -563,7 +563,7 @@ MATCHER_P(ProtoEq, expected, "") {
     *result_listener << "\n"
                      << "==========================Expected proto:===========================\n"
                      << expected.DebugString()
-                     << "------------------is not equal to actual proto:---------------------\n"
+                     << "---------------------------actual proto:----------------------------\n"
                      << arg.DebugString()
                      << "====================================================================\n";
   }
@@ -576,7 +576,7 @@ MATCHER_P(RepeatedProtoEq, expected, "") {
     *result_listener << "\n"
                      << "=======================Expected repeated:===========================\n"
                      << RepeatedPtrUtil::debugString(expected) << "\n"
-                     << "-----------------is not equal to actual repeated:-------------------\n"
+                     << "------------------------actual repeated:----------------------------\n"
                      << RepeatedPtrUtil::debugString(arg) << "\n"
                      << "====================================================================\n";
   }
