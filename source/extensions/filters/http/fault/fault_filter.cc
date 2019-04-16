@@ -106,7 +106,8 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   }
 
   if (headers.EnvoyDownstreamServiceCluster()) {
-    downstream_cluster_ = headers.EnvoyDownstreamServiceCluster()->value().c_str();
+    downstream_cluster_ =
+        std::string(headers.EnvoyDownstreamServiceCluster()->value().getStringView());
 
     downstream_cluster_delay_percent_key_ =
         fmt::format("fault.http.{}.delay.fixed_delay_percent", downstream_cluster_);
@@ -361,7 +362,8 @@ bool FaultFilter::matchesDownstreamNodes(const Http::HeaderMap& headers) {
     return false;
   }
 
-  const std::string downstream_node = headers.EnvoyDownstreamServiceNode()->value().c_str();
+  const absl::string_view downstream_node =
+      headers.EnvoyDownstreamServiceNode()->value().getStringView();
   return fault_settings_->downstreamNodes().find(downstream_node) !=
          fault_settings_->downstreamNodes().end();
 }

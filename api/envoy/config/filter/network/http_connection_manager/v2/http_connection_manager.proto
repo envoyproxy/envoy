@@ -200,8 +200,14 @@ message HttpConnectionManager {
 
   // The delayed close timeout is for downstream connections managed by the HTTP connection manager.
   // It is defined as a grace period after connection close processing has been locally initiated
-  // during which Envoy will flush the write buffers for the connection and await the peer to close
-  // (i.e., a TCP FIN/RST is received by Envoy from the downstream connection).
+  // during which Envoy will wait for the peer to close (i.e., a TCP FIN/RST is received by Envoy
+  // from the downstream connection) prior to Envoy closing the socket associated with that
+  // connection.
+  // NOTE: This timeout is enforced even when the socket associated with the downstream connection
+  // is pending a flush of the write buffer. However, any progress made writing data to the socket
+  // will restart the timer associated with this timeout. This means that the total grace period for
+  // a socket in this state will be
+  // <total_time_waiting_for_write_buffer_flushes>+<delayed_close_timeout>.
   //
   // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
@@ -213,8 +219,15 @@ message HttpConnectionManager {
   //
   // The default timeout is 1000 ms if this option is not specified.
   //
-  // A value of 0 will completely disable delayed close processing, and the downstream connection's
-  // socket will be closed immediately after the write flush is completed.
+  // .. NOTE::
+  //    To be useful in avoiding the race condition described above, this timeout must be set
+  //    to *at least* <max round trip time expected between clients and Envoy>+<100ms to account for
+  //    a reasonsable "worst" case processing time for a full iteration of Envoy's event loop>.
+  //
+  // .. WARNING::
+  //    A value of 0 will completely disable delayed close processing. When disabled, the downstream
+  //    connection's socket will be closed immediately after the write flush is completed or will
+  //    never close if the write flush does not complete.
   google.protobuf.Duration delayed_close_timeout = 26 [(gogoproto.stdduration) = true];
 
   // Configuration for :ref:`HTTP access logs <arch_overview_access_logs>`

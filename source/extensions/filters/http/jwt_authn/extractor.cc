@@ -203,7 +203,7 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
   }
 
   // Check query parameter locations.
-  const auto& params = Http::Utility::parseQueryString(headers.Path()->value().c_str());
+  const auto& params = Http::Utility::parseQueryString(headers.Path()->value().getStringView());
   for (const auto& location_it : param_locations_) {
     const auto& param_key = location_it.first;
     const auto& location_spec = location_it.second;
