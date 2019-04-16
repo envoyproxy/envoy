@@ -7,11 +7,20 @@ StatMerger::StatMerger(Stats::Store& target_store) : target_store_(target_store)
 
 void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters,
                             const Protobuf::Map<std::string, uint64_t>& gauges) {
-  // Map from stat name *substrings* to special logic to use for combining stat values.
-  const std::unordered_map<std::string, CombineLogic> combine_logic_exceptions{
+  for (const auto& counter : counters) {
+    uint64_t new_parent_value = counter.second;
+    auto found_value = parent_counter_values_.find(counter.first);
+    uint64_t old_parent_value =
+        found_value == parent_counter_values_.end() ? 0 : found_value->second;
+    parent_counter_values_[counter.first] = new_parent_value;
+    target_store_.counter(counter.first).add(new_parent_value - old_parent_value);
+  }
+
+  // Gauge name *substrings*, and special logic to use for combining those gauges' values.
+  static const std::vector<std::pair<std::string, CombineLogic>> combine_logic_exceptions{
       {".version", CombineLogic::NoImport},
       {".connected_state", CombineLogic::BooleanOr},
-      {"server.live", CombineLogic::BooleanOr},
+      {"server.live", CombineLogic::NoImport},
       {"runtime.admin_overrides_active", CombineLogic::NoImport},
       {"runtime.num_keys", CombineLogic::NoImport},
       {"cluster_manager.active_clusters", CombineLogic::OnlyImportWhenUnused},
@@ -28,16 +37,9 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
       {"server.concurrency", CombineLogic::OnlyImportWhenUnused},
       {"server.hot_restart_epoch", CombineLogic::NoImport},
   };
-  for (const auto& counter : counters) {
-    uint64_t new_parent_value = counter.second;
-    auto found_value = parent_counter_values_.find(counter.first);
-    uint64_t old_parent_value =
-        found_value == parent_counter_values_.end() ? 0 : found_value->second;
-    parent_counter_values_[counter.first] = new_parent_value;
-    target_store_.counter(counter.first).add(new_parent_value - old_parent_value);
-  }
-
+  std::cerr << "MERGING GAUGES:" << std::endl;
   for (const auto& gauge : gauges) {
+    std::cerr << gauge.first << std::endl;
     uint64_t new_parent_value = gauge.second;
     auto found_value = parent_gauge_values_.find(gauge.first);
     uint64_t old_parent_value = found_value == parent_gauge_values_.end() ? 0 : found_value->second;

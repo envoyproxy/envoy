@@ -43,11 +43,10 @@ public:
     EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_ = std::make_unique<HotRestartImpl>(options_, symbol_table_);
+    hot_restart_ = std::make_unique<HotRestartImpl>(options_);
     hot_restart_->drainParentListeners();
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<MockOptions> options_;

@@ -203,17 +203,6 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   }
 }
 
-absl::string_view ThreadLocalStoreImpl::truncateStatNameIfNeeded(absl::string_view name) {
-  // If the main allocator requires stat name truncation, do so now, though any
-  // warnings will be printed only if the truncated stat requires a new
-  // allocation.
-  if (alloc_.requiresBoundedStatNameSize()) {
-    const uint64_t max_length = stats_options_.maxNameLength();
-    name = name.substr(0, max_length);
-  }
-  return name;
-}
-
 std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
@@ -259,13 +248,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     return null_stat;
   }
 
-  std::unique_ptr<std::string> truncation_buffer;
-  absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
-  if (truncated_name.size() < name.size()) {
-    truncation_buffer = std::make_unique<std::string>(std::string(truncated_name));
-    stat_key = truncation_buffer->c_str(); // must be nul-terminated.
-  }
-
   // If we have a valid cache entry, return it.
   if (tls_cache) {
     auto pos = tls_cache->find(stat_key);
@@ -285,27 +267,19 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     // Note that again we do the name-rejection lookup on the untruncated name.
     return null_stat;
   } else {
-    // If we had to truncate, warn now that we've missed all caches.
-    if (truncation_buffer != nullptr) {
-      ENVOY_LOG_MISC(
-          warn,
-          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
-          name, name.size(), truncation_buffer->size());
-    }
-
     std::vector<Tag> tags;
 
     // Tag extraction occurs on the original, untruncated name so the extraction
     // can complete properly, even if the tag values are partially truncated.
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
     std::shared_ptr<StatType> stat =
-        make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name), std::move(tags));
+        make_stat(parent_.alloc_, name, std::move(tag_extracted_name), std::move(tags));
     if (stat == nullptr) {
       // TODO(jmarantz): If make_stat fails, the actual move does not actually occur
       // for tag_extracted_name and tags, so there is no use-after-move problem.
       // In order to increase the readability of the code, refactoring is done here.
       parent_.num_last_resort_stats_.inc();
-      stat = make_stat(parent_.heap_allocator_, truncated_name,
+      stat = make_stat(parent_.heap_allocator_, name,
                        std::move(tag_extracted_name), // NOLINT(bugprone-use-after-move)
                        std::move(tags));              // NOLINT(bugprone-use-after-move)
       ASSERT(stat != nullptr);

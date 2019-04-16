@@ -122,16 +122,37 @@ void HotRestartingBase::getPassedFdIfPresent(HotRestartMessage* out, msghdr* mes
   }
 }
 
+// While in use, recv_buf_ is always >= MaxSendmsgSize. In between messages, it is kept empty, to be
+// grown back to MaxSendmsgSize at the start of the next message.
+void HotRestartingBase::initRecvBufIfNewMessage() {
+  if (recv_buf_.empty()) {
+    ASSERT(cur_msg_recvd_bytes_ == 0);
+    ASSERT(!expected_proto_length_.has_value());
+    recv_buf_.resize(MaxSendmsgSize);
+  }
+}
+
+// Must only be called when recv_buf_ contains a full proto. Returns that proto, and resets all of
+// our receive-buffering state back to empty, to await a new message.
+std::unique_ptr<HotRestartMessage> HotRestartingBase::parseProtoAndResetState() {
+  auto ret = std::make_unique<HotRestartMessage>();
+  RELEASE_ASSERT(
+      ret->ParseFromArray(recv_buf_.data() + sizeof(uint64_t), expected_proto_length_.value()),
+      "failed to parse a HotRestartMessage.");
+  recv_buf_.resize(0);
+  cur_msg_recvd_bytes_ = 0;
+  expected_proto_length_.reset();
+  return ret;
+}
+
 std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(Blocking block) {
   // By default the domain socket is non blocking. If we need to block, make it blocking first.
   if (block == Blocking::Yes) {
     RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, 0) != -1,
                    fmt::format("Set domain socket blocking failed, errno = {}", errno));
   }
-  if (recv_buf_.size() < MaxSendmsgSize) {
-    recv_buf_.resize(MaxSendmsgSize);
-    cur_msg_recvd_bytes_ = 0;
-  }
+
+  initRecvBufIfNewMessage();
 
   iovec iov[1];
   msghdr message;
@@ -175,13 +196,7 @@ std::unique_ptr<HotRestartMessage> HotRestartingBase::receiveHotRestartMessage(B
                    "received a length+protobuf message not aligned to start of sendmsg().");
 
     if (cur_msg_recvd_bytes_ == sizeof(uint64_t) + expected_proto_length_.value()) {
-      ret = std::make_unique<HotRestartMessage>();
-      RELEASE_ASSERT(
-          ret->ParseFromArray(recv_buf_.data() + sizeof(uint64_t), expected_proto_length_.value()),
-          "failed to parse a HotRestartMessage.");
-      recv_buf_.resize(0);
-      cur_msg_recvd_bytes_ = 0;
-      expected_proto_length_.reset();
+      ret = parseProtoAndResetState();
     }
   }
 

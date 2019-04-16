@@ -60,6 +60,8 @@ protected:
 
 private:
   void getPassedFdIfPresent(envoy::HotRestartMessage* out, msghdr* message);
+  std::unique_ptr<envoy::HotRestartMessage> parseProtoAndResetState();
+  void initRecvBufIfNewMessage();
 
   const uint64_t base_id_;
   int my_domain_socket_{-1};
@@ -69,14 +71,16 @@ private:
   // State for the receiving half of the protocol.
   //
   // When filled, the size in bytes that the in-flight HotRestartMessage should be.
-  // When empty, we're ready to start receiving a new message (starting with a uint64_t 'length').
+  // When empty, we're ready to start receiving a new message (starting with a uint64 'length').
   absl::optional<uint64_t> expected_proto_length_;
-  // How much of the current in-flight message (uint64_t 'length', plus 'length' bytes of
-  // HotRestartMessage) we have received. Once this equals
-  // expected_message_length_ - sizeof(uint64_t), we're ready to parse the HotRestartMessage.
+  // How much of the current in-flight message (including both the uint64 'length', plus the proto
+  // itself) we have received. Once this equals expected_proto_length_ + sizeof(uint64_t), we're
+  // ready to parse the HotRestartMessage. Should be set to 0 in between messages, to indicate
+  // readiness for a new message.
   uint64_t cur_msg_recvd_bytes_{};
-  // When not empty, the first 8 bytes will always be the raw bytes of the current value of
-  // expected_message_length_. The protobuf partial data starts at byte 8.
+  // The first 8 bytes will always be the raw net-order bytes of the current value of
+  // expected_proto_length_. The protobuf partial data starts at byte 8.
+  // Should be resized to 0 in between messages, to indicate readiness for a new message.
   std::vector<uint8_t> recv_buf_;
 };
 

@@ -48,7 +48,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                Thread::ThreadFactory& thread_factory,
                                Filesystem::Instance& file_system)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
-      file_system_(file_system) {
+      file_system_(file_system), stats_allocator_(symbol_table_) {
   Thread::ThreadFactorySingleton::set(&thread_factory_);
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
@@ -60,11 +60,11 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
   case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
     if (!options.hotRestartDisabled()) {
-      restarter_ = std::make_unique<Server::HotRestartImpl>(options_, symbol_table_);
+      restarter_ = std::make_unique<Server::HotRestartImpl>(options_);
     }
 #endif
     if (restarter_ == nullptr) {
-      restarter_ = std::make_unique<Server::HotRestartNopImpl>(symbol_table_);
+      restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     }
 
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
@@ -80,8 +80,8 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     // block or not.
     std::set_new_handler([]() { PANIC("out of memory"); });
 
-    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
-                                                                 restarter_->statsAllocator());
+    stats_store_ =
+        std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(), stats_allocator_);
 
     server_ = std::make_unique<Server::InstanceImpl>(
         options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
@@ -91,7 +91,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     break;
   }
   case Server::Mode::Validate:
-    restarter_ = std::make_unique<Server::HotRestartNopImpl>(symbol_table_);
+    restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                                          restarter_->logLock());
     break;

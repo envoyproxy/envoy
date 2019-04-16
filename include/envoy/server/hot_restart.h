@@ -97,11 +97,6 @@ public:
    * @return Thread::BasicLockable& a lock for access logs.
    */
   virtual Thread::BasicLockable& accessLogLock() PURE;
-
-  /**
-   * @returns an allocator for stats.
-   */
-  virtual Stats::StatDataAllocator& statsAllocator() PURE;
 };
 
 } // namespace Server

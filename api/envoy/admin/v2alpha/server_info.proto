@@ -114,7 +114,6 @@ message CommandLineOptions {
   // See :option:`--mode` for details.
   Mode mode = 19;
 
-  // See :option:`--max-stats` for details.
   uint64 max_stats = 20 [deprecated = true];
 
   // See :option:`--max-obj-name-len` for details.

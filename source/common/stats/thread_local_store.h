@@ -287,7 +287,6 @@ private:
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
-  absl::string_view truncateStatNameIfNeeded(absl::string_view name);
   bool rejects(const std::string& name) const;
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>

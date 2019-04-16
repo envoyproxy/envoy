@@ -109,6 +109,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   (*stats.mutable_gauges())["runtime.num_keys"] = 111;
   (*stats.mutable_gauges())["listener_manager.total_listeners_draining"] = 111;
   (*stats.mutable_gauges())["server.hot_restart_epoch"] = 111;
+  (*stats.mutable_gauges())["server.live"] = 1;
 
   hot_restarting_child_.mergeParentStats(store_, stats);
   EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version").used());
@@ -116,6 +117,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   EXPECT_FALSE(store_.gauge("runtime.num_keys").used());
   EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_draining").used());
   EXPECT_FALSE(store_.gauge("server.hot_restart_epoch").used());
+  EXPECT_FALSE(store_.gauge("server.live").used());
 }
 
 // The OnlyImportWhenUnused logic should overwrite an undefined gauge, but not a defined one.
@@ -174,34 +176,27 @@ TEST_F(StatMergerTest, onlyImportWhenUnused) {
 // Tests that the substrings "connected_state" and "server.live" get OR'd.
 TEST_F(StatMergerTest, booleanOr) {
   store_.gauge("some.connected_state").set(0);
-  store_.gauge("server.live").set(0);
 
   envoy::HotRestartMessage::Reply::Stats stats_with_value0;
   (*stats_with_value0.mutable_gauges())["some.connected_state"] = 0;
-  (*stats_with_value0.mutable_gauges())["server.live"] = 0;
   envoy::HotRestartMessage::Reply::Stats stats_with_value1;
   (*stats_with_value1.mutable_gauges())["some.connected_state"] = 1;
-  (*stats_with_value1.mutable_gauges())["server.live"] = 1;
 
   // 0 || 0 == 0
   hot_restarting_child_.mergeParentStats(store_, stats_with_value0);
   EXPECT_EQ(0, store_.gauge("some.connected_state").value());
-  EXPECT_EQ(0, store_.gauge("server.live").value());
 
   // 0 || 1 == 1
   hot_restarting_child_.mergeParentStats(store_, stats_with_value1);
   EXPECT_EQ(1, store_.gauge("some.connected_state").value());
-  EXPECT_EQ(1, store_.gauge("server.live").value());
 
   // 1 || 0 == 1
   hot_restarting_child_.mergeParentStats(store_, stats_with_value0);
   EXPECT_EQ(1, store_.gauge("some.connected_state").value());
-  EXPECT_EQ(1, store_.gauge("server.live").value());
 
   // 1 || 1 == 1
   hot_restarting_child_.mergeParentStats(store_, stats_with_value1);
   EXPECT_EQ(1, store_.gauge("some.connected_state").value());
-  EXPECT_EQ(1, store_.gauge("server.live").value());
 }
 
 } // namespace

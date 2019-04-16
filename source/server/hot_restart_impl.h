@@ -97,7 +97,7 @@ private:
  */
 class HotRestartImpl : public HotRestart {
 public:
-  HotRestartImpl(const Options& options, Stats::SymbolTable& symbol_table);
+  HotRestartImpl(const Options& options);
 
   // Server::HotRestart
   void drainParentListeners() override;
@@ -112,7 +112,6 @@ public:
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::HeapStatDataAllocator& statsAllocator() override { return stats_allocator_; }
 
   /**
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string
@@ -127,7 +126,6 @@ private:
   // It will automatically be unmapped when the process terminates.
   SharedMemory* shmem_;
   const Options& options_;
-  Stats::HeapStatDataAllocator stats_allocator_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
 };

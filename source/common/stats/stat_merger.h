@@ -22,10 +22,10 @@ public:
 
 private:
   enum class CombineLogic {
-    Accumulate, // the default
-    OnlyImportWhenUnused,
-    NoImport,
-    BooleanOr,
+    Accumulate,           // the default; the merged result is old+new.
+    OnlyImportWhenUnused, // import parent value only if child stat is undefined. (So, just once.)
+    NoImport,  // ignore parent entirely; child stat is undefined until it sets its own value.
+    BooleanOr, // the merged result is old || new.
   };
   std::unordered_map<std::string, uint64_t> parent_counter_values_;
   std::unordered_map<std::string, uint64_t> parent_gauge_values_;
