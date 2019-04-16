@@ -65,7 +65,8 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       remote_end_stream_(false), data_deferred_(false),
       waiting_for_non_informational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
-      pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false) {
+      pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
+      decoder_destroyed_(false) {
   if (buffer_limit > 0) {
     setWriteBufferWatermarks(buffer_limit / 2, buffer_limit);
   }
@@ -344,6 +345,11 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
+  if (decoder_destroyed_) {
+    // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Avoid referring to
+    // decoder_.
+    return;
+  }
   decoder_->decodeMetadata(std::move(metadata_map_ptr));
 }
 
@@ -615,6 +621,9 @@ int ConnectionImpl::onMetadataReceived(int32_t stream_id, const uint8_t* data, s
   }
 
   bool success = stream->getMetadataDecoder().receiveMetadata(data, len);
+  if (!success) {
+    stream->decoder_destroyed_ = true;
+  }
   return success ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
@@ -626,6 +635,9 @@ int ConnectionImpl::onMetadataFrameComplete(int32_t stream_id, bool end_metadata
   ASSERT(stream != nullptr);
 
   bool result = stream->getMetadataDecoder().onMetadataFrameComplete(end_metadata);
+  if (!result) {
+    stream->decoder_destroyed_ = true;
+  }
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 

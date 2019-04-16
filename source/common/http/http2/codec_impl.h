@@ -230,6 +230,9 @@ protected:
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
+    // When nghttp2 returns processing error, ConnectionManager will call resetAllStreams() to
+    // destroy ActiveStream (decoder_). We should avoid referring to decoder_ when it happens.
+    bool decoder_destroyed_ : 1;
   };
 
   typedef std::unique_ptr<StreamImpl> StreamImplPtr;
