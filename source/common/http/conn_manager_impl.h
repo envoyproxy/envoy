@@ -503,7 +503,7 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
-    DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
+    std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};
