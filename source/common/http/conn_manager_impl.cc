@@ -1064,14 +1064,20 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metada
 
 void ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilter* filter,
                                                          MetadataMap& metadata_map) {
-  std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
-  if (!filter) {
-    entry = decoder_filters_.begin();
-  } else {
-    entry = std::next(filter->entry());
-  }
+  // Filter iteration may start at the current filter.
+  std::list<ActiveStreamDecoderFilterPtr>::iterator entry =
+      commonDecodePrefix(filter, FilterIterationStartState::CanStartFromCurrent);
 
   for (; entry != decoder_filters_.end(); entry++) {
+    // If the filter pointed by entry has stopped for all frame type, stores metadata and return.
+    if ((*entry)->stoppedAll()) {
+      Http::MetadataMap metadata;
+      metadata.insert(metadata_map.begin(), metadata_map.end());
+      Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata);
+      saved_request_metadata_when_stopall_.emplace_back(std::move(metadata_map_ptr));
+      return;
+    }
+
     FilterMetadataStatus status = (*entry)->handle_->decodeMetadata(metadata_map);
     ENVOY_STREAM_LOG(trace, "decode metadata called: filter={} status={}, metadata: {}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status),
@@ -1697,6 +1703,10 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(complete() && !bufferedData() && !trailers());
+  }
+
+  if (!saved_metadata().empty()) {
+    doMetadata();
   }
 
   // TODO(mattklein123): If a filter returns StopIterationNoBuffer and then does a continue, we

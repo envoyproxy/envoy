@@ -125,6 +125,8 @@ private:
     virtual void doData(bool end_stream) PURE;
     virtual void doTrailers() PURE;
     virtual const HeaderMapPtr& trailers() PURE;
+    virtual void doMetadata() PURE;
+    virtual MetadataMapVector& saved_metadata() PURE;
 
     // Http::StreamFilterCallbacks
     const Network::Connection* connection() override;
@@ -201,6 +203,21 @@ private:
     void doData(bool end_stream) override {
       parent_.decodeData(this, *parent_.buffered_request_data_, end_stream,
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
+    }
+    void doMetadata() override {
+      // A filter down the chain may return StopAllIteration, and additional metadata may be added
+      // to saved_request_metadata_when_stopall_. Only parse and remove the metadata existing before
+      // calls to decodeMetadata().
+      size_t size = parent_.saved_request_metadata_when_stopall_.size();
+      MetadataMapVector::iterator begin = parent_.saved_request_metadata_when_stopall_.begin();
+      size_t i = 0;
+      for (auto it = begin; i < size; it++, i++) {
+        parent_.decodeMetadata(this, **it);
+      }
+      parent_.saved_request_metadata_when_stopall_.erase(begin, begin + size - 1);
+    }
+    MetadataMapVector& saved_metadata() override {
+      return parent_.saved_request_metadata_when_stopall_;
     }
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
@@ -288,6 +305,21 @@ private:
     void doData(bool end_stream) override {
       parent_.encodeData(this, *parent_.buffered_response_data_, end_stream,
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
+    }
+    void doMetadata() override {
+      // A filter down the chain may return StopAllIteration, and additional metadata may be added
+      // to saved_response_metadata_when_stopall_. Only parse and remove the metadata existing
+      // before calls to decodeMetadata().
+      size_t size = parent_.saved_response_metadata_when_stopall_.size();
+      MetadataMapVector::iterator begin = parent_.saved_response_metadata_when_stopall_.begin();
+      size_t i = 0;
+      for (auto it = begin; i < size; it++, i++) {
+        parent_.encodeMetadata(this, std::move(*it));
+      }
+      parent_.saved_response_metadata_when_stopall_.erase(begin, begin + size - 1);
+    }
+    MetadataMapVector& saved_metadata() override {
+      return parent_.saved_response_metadata_when_stopall_;
     }
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
@@ -512,6 +544,9 @@ private:
     // Stores metadata added in the decoding filter that is being processed. Will be cleared before
     // processing the next filter.
     MetadataMapVector request_metadata_map_vector_;
+    // Saves metadata if a filter has returned StopAllIteration.
+    MetadataMapVector saved_request_metadata_when_stopall_;
+    MetadataMapVector saved_response_metadata_when_stopall_;
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};
