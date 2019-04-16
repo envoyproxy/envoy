@@ -124,7 +124,9 @@ void CheckRequestUtils::setHttpRequest(
     std::string data(length, 0);
     buffer->copyOut(0, length, &data[0]);
     httpreq.set_body(std::move(data));
-    httpreq.set_partial_body(length != buffer->length());
+
+    // Add in a header to detect when a partial body is used.
+    (*mutable_headers)[Http::Headers::get().EnvoyAuthPartialBody.get()] = length != buffer->length() ? "1" : "0";
   }
 }
 

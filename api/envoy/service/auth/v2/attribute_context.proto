@@ -116,15 +116,6 @@ message AttributeContext {
 
     // The HTTP request body.
     string body = 11;
-
-    // Specifies whether the body contains partial data to fit within the specified
-    // :ref:`max_request_bytes
-    // <envoy_api_field_config.filter.http.ext_authz.v2.BufferSettings.max_request_bytes>`
-    // setting when
-    // :ref:`allow_partial_message
-    // <envoy_api_field_config.filter.http.ext_authz.v2.BufferSettings.allow_partial_message>`
-    // is true.
-    bool partial_body = 12;
   }
 
   // The source of a network activity, such as starting a TCP connection.
