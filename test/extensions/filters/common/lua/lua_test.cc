@@ -19,7 +19,7 @@ namespace Common {
 namespace Lua {
 namespace {
 
-class TestObject : public BaseLuaObject<TestObject> {
+class alignas(32) TestObject : public BaseLuaObject<TestObject> {
 public:
   ~TestObject() { onDestroy(); }
 
