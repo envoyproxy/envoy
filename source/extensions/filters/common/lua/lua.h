@@ -65,6 +65,8 @@ namespace Lua {
  * Calculate the maximum space needed to be aligned.
  */
 template <typename T> constexpr size_t maximumSpaceNeededToAlign() {
+  // The allocated memory can be misaligned up to `alignof(T) - 1` bytes. Adding it to the size to
+  // allocate.
   return sizeof(T) + alignof(T) - 1;
 }
 
@@ -77,8 +79,7 @@ template <typename T> inline T* alignAndCast(void* mem) {
  * Create a new user data and assign its metatable.
  */
 template <typename T> inline T* allocateLuaUserData(lua_State* state) {
-  size_t space = maximumSpaceNeededToAlign<T>();
-  void* mem = lua_newuserdata(state, space);
+  void* mem = lua_newuserdata(state, maximumSpaceNeededToAlign<T>());
   luaL_getmetatable(state, typeid(T).name());
   ASSERT(lua_istable(state, -1));
   lua_setmetatable(state, -2);
