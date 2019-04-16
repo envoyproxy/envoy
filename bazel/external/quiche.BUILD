@@ -89,6 +89,7 @@ cc_library(
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
         "quiche/spdy/platform/api/spdy_string_piece.h",
+        "quiche/spdy/platform/api/spdy_unsafe_arena.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/spdy/platform/api/spdy_flags.h",
     ] + envoy_select_quiche(
@@ -101,6 +102,21 @@ cc_library(
     ),
     visibility = ["//visibility:public"],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib"],
+)
+
+cc_library(
+    name = "spdy_simple_arena_lib",
+    srcs = ["quiche/spdy/core/spdy_simple_arena.cc"],
+    hdrs = ["quiche/spdy/core/spdy_simple_arena.h"],
+    visibility = ["//visibility:public"],
+    deps = [":spdy_platform"],
+)
+
+cc_library(
+    name = "spdy_platform_unsafe_arena_lib",
+    hdrs = ["quiche/spdy/platform/api/spdy_unsafe_arena.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_unsafe_arena_impl_lib"],
 )
 
 cc_library(
