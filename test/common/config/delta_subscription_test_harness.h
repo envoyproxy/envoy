@@ -13,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::InSequence;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;

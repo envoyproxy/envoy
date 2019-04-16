@@ -1,6 +1,7 @@
 #include "test/common/config/delta_subscription_test_harness.h"
 
 using testing::AnyNumber;
+using testing::InSequence;
 using testing::UnorderedElementsAre;
 
 namespace Envoy {
@@ -82,6 +83,11 @@ TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   subscription_->updateResources({"name4"}); // (implies "we no longer care about name1,2,3")
 }
 
+// Delta xDS reliably queues up and sends all discovery requests, even in situations where it isn't
+// strictly necessary. E.g.: if you subscribe but then unsubscribe to a given resource, all before a
+// request was able to be sent, two requests will be sent. The following tests test various cases of
+// this reliability. TODO TODO REMOVE PROBABLY
+//
 // If Envoy decided it wasn't interested in a resource and then (before a request was sent) decided
 // it was again, for all we know, it dropped that resource in between and needs to retrieve it
 // again. So, we *should* send a request "re-"subscribing. This means that the server needs to
@@ -92,7 +98,9 @@ TEST_F(DeltaSubscriptionImplTest, RemoveThenAdd) {
   subscription_->pause(); // Pause because we're testing multiple updates in between request sends.
   subscription_->updateResources({"name1", "name2"});
   subscription_->updateResources({"name1", "name2", "name3"});
+  InSequence s;
   expectSendMessage({"name3"}, {}, Grpc::Status::GrpcStatus::Ok, "");
+  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, ""); // no-op due to the second update
   subscription_->resume();
 }
 
@@ -109,7 +117,9 @@ TEST_F(DeltaSubscriptionImplTest, AddThenRemove) {
   subscription_->pause(); // Pause because we're testing multiple updates in between request sends.
   subscription_->updateResources({"name1", "name2", "name3", "name4"});
   subscription_->updateResources({"name1", "name2", "name3"});
+  InSequence s;
   expectSendMessage({}, {"name4"}, Grpc::Status::GrpcStatus::Ok, "");
+  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, ""); // no-op due to the second update
   subscription_->resume();
 }
 
@@ -120,7 +130,10 @@ TEST_F(DeltaSubscriptionImplTest, AddRemoveAdd) {
   subscription_->updateResources({"name1", "name2", "name3", "name4"});
   subscription_->updateResources({"name1", "name2", "name3"});
   subscription_->updateResources({"name1", "name2", "name3", "name4"});
+  InSequence s;
   expectSendMessage({"name4"}, {}, Grpc::Status::GrpcStatus::Ok, "");
+  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, ""); // no-op due to the second update
+  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, ""); // no-op due to the third update
   subscription_->resume();
 }
 
@@ -131,7 +144,10 @@ TEST_F(DeltaSubscriptionImplTest, RemoveAddRemove) {
   subscription_->updateResources({"name1", "name2"});
   subscription_->updateResources({"name1", "name2", "name3"});
   subscription_->updateResources({"name1", "name2"});
+  InSequence s;
   expectSendMessage({}, {"name3"}, Grpc::Status::GrpcStatus::Ok, "");
+  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, ""); // no-op due to the second update
+  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, ""); // no-op due to the third update
   subscription_->resume();
 }
 
@@ -143,20 +159,21 @@ TEST_F(DeltaSubscriptionImplTest, BothAddAndRemove) {
   subscription_->updateResources({"name4"});
   subscription_->updateResources({"name1", "name2", "name3"});
   subscription_->updateResources({"name4"});
+  InSequence s;
   expectSendMessage({"name4"}, {"name1", "name2", "name3"}, Grpc::Status::GrpcStatus::Ok, "");
+  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, ""); // no-op due to the second update
+  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, ""); // no-op due to the third update
   subscription_->resume();
 }
 
-// If one update fails to send a request (pausing, rate limit, no stream are all identical for this
-// purpose), and then another update comes along and also fails, when the request is finally sent,
-// both should be present. (A previous version of the code would have had 1->12 generate a diff of
-// 2, then 12->123 generate a diff of 3, which would replace 2).
 TEST_F(DeltaSubscriptionImplTest, CumulativeUpdates) {
   startSubscription({"name1"});
   subscription_->pause();
   subscription_->updateResources({"name1", "name2"});
   subscription_->updateResources({"name1", "name2", "name3"});
+  InSequence s;
   expectSendMessage({"name2", "name3"}, {}, Grpc::Status::GrpcStatus::Ok, "");
+  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, ""); // no-op due to the second update
   subscription_->resume();
 }
 

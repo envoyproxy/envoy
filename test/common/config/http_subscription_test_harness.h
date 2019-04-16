@@ -76,8 +76,16 @@ public:
           }
           expected_request += "\"node\":{\"id\":\"fo0\"},";
           if (!cluster_names.empty()) {
-            expected_request +=
-                "\"resource_names\":[\"" + StringUtil::join(cluster_names, "\",\"") + "\"]";
+            std::string joined_cluster_names;
+            {
+              std::string delimiter = "\",\"";
+              std::ostringstream buf;
+              std::copy(cluster_names.begin(), cluster_names.end(),
+                        std::ostream_iterator<std::string>(buf, delimiter.c_str()));
+              std::string with_comma = buf.str();
+              joined_cluster_names = with_comma.substr(0, with_comma.length() - delimiter.length());
+            }
+            expected_request += "\"resource_names\":[\"" + joined_cluster_names + "\"]";
           }
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());

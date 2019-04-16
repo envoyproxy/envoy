@@ -1,5 +1,7 @@
 #pragma once
 
+#include <queue>
+
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/subscription.h"
@@ -17,6 +19,12 @@
 
 namespace Envoy {
 namespace Config {
+
+struct UpdateAck {
+  UpdateAck(absl::string_view nonce) : nonce_(nonce) {}
+  std::string nonce_;
+  ::google::rpc::Status error_detail_;
+};
 
 /**
  * Manages the logic of a (non-aggregated) delta xDS subscription.
@@ -88,7 +96,7 @@ public:
     ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url_);
     ASSERT(paused_);
     paused_ = false;
-    trySendDiscoveryRequestIfPending();
+    trySendDiscoveryRequests();
   }
 
   envoy::api::v2::DeltaDiscoveryRequest internalRequestStateForTest() const { return request_; }
@@ -129,8 +137,7 @@ public:
               message->system_version_info());
     disableInitFetchTimeoutTimer();
 
-    request_.set_response_nonce(message->nonce());
-
+    UpdateAck ack(message->nonce());
     try {
       handleConfigUpdate(message->resources(), message->removed_resources(),
                          message->system_version_info());
@@ -142,14 +149,13 @@ public:
       // supposed to be the sum of client- and server- initiated update attempts? Seems weird.
       stats_.update_attempt_.inc();
       callbacks_->onConfigUpdateFailed(&e);
-      ::google::rpc::Status* error_detail = request_.mutable_error_detail();
-      error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
-      error_detail->set_message(e.what());
+      ack.error_detail_.set_code(Grpc::Status::GrpcStatus::Internal);
+      ack.error_detail_.set_message(e.what());
     }
-    kickOffDiscoveryRequest();
+    kickOffDiscoveryRequestWithAck(ack);
   }
 
-  void onWriteable() override { trySendDiscoveryRequestIfPending(); }
+  void onWriteable() override { trySendDiscoveryRequests(); }
 
   // Config::Subscription
   void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) override {
@@ -168,7 +174,12 @@ public:
   }
 
 private:
-  void sendDiscoveryRequest() {
+  void sendDiscoveryRequest(absl::optional<UpdateAck> maybe_ack) {
+    if (maybe_ack.has_value()) {
+      const UpdateAck& ack = maybe_ack.value();
+      request_.set_response_nonce(ack.nonce_);
+      *request_.mutable_error_detail() = ack.error_detail_;
+    }
     request_.clear_resource_names_subscribe();
     request_.clear_resource_names_unsubscribe();
     std::copy(names_added_.begin(), names_added_.end(),
@@ -222,9 +233,11 @@ private:
     }
   }
 
-  void kickOffDiscoveryRequest() {
-    pending_ = true;
-    trySendDiscoveryRequestIfPending();
+  void kickOffDiscoveryRequest() { kickOffDiscoveryRequestWithAck(absl::nullopt); }
+
+  void kickOffDiscoveryRequestWithAck(absl::optional<UpdateAck> ack) {
+    ack_queue_.push(ack);
+    trySendDiscoveryRequests();
   }
 
   bool shouldSendDiscoveryRequest() {
@@ -241,15 +254,16 @@ private:
     return true;
   }
 
-  void trySendDiscoveryRequestIfPending() {
-    if (!pending_) {
-      return;
+  void trySendDiscoveryRequests() {
+    while (!ack_queue_.empty()) {
+      if (shouldSendDiscoveryRequest()) {
+        sendDiscoveryRequest(ack_queue_.front());
+        ack_queue_.pop();
+      } else {
+        break;
+      }
     }
-    if (shouldSendDiscoveryRequest()) {
-      sendDiscoveryRequest();
-      pending_ = false;
-    }
-    grpc_stream_.maybeUpdateQueueSizeStat(pending_ ? 1 : 0);
+    grpc_stream_.maybeUpdateQueueSizeStat(ack_queue_.size());
   }
 
   class ResourceVersion {
@@ -302,10 +316,13 @@ private:
 
   const std::string type_url_;
   SubscriptionCallbacks* callbacks_{};
-  // In-flight or previously sent request.
+  // The request being built for the next send.
   envoy::api::v2::DeltaDiscoveryRequest request_;
   bool paused_{};
-  bool pending_{};
+
+  // An item in the queue represents a DeltaDiscoveryRequest that must be sent. If an item is not
+  // empty, it is the ACK (nonce + error_detail) to set.
+  std::queue<absl::optional<UpdateAck>> ack_queue_;
 
   // Tracking of the delta in our subscription interest since the previous DeltaDiscoveryRequest was
   // sent. Can't use unordered_set due to ordering issues in gTest expectation matching. Feel free
