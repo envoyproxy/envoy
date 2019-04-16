@@ -89,7 +89,6 @@ cc_library(
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
         "quiche/spdy/platform/api/spdy_string_piece.h",
-        "quiche/spdy/platform/api/spdy_unsafe_arena.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/spdy/platform/api/spdy_flags.h",
     ] + envoy_select_quiche(
