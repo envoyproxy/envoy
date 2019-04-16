@@ -532,13 +532,12 @@ void Filter::onResponseTimeout() {
 
   ASSERT(upstream_requests_.size() <= 1);
   if (upstream_requests_.size() == 1) {
-    UpstreamRequest* upstream_request = upstream_requests_.front().get();
-    if (upstream_request->upstream_host_) {
-      upstream_request->upstream_host_->stats().rq_timeout_.inc();
+    if (upstream_requests_.front()->upstream_host_) {
+      upstream_requests_.front()->upstream_host_->stats().rq_timeout_.inc();
     }
 
-    updateOutlierDetection(timeout_response_code_, *upstream_request);
-    upstream_request->resetStream();
+    updateOutlierDetection(timeout_response_code_, *upstream_requests_.front().get());
+    upstream_requests_.front()->resetStream();
   }
 
   onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
