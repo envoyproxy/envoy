@@ -192,7 +192,6 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
   HeaderEntryImpl* getExistingInline(absl::string_view key);
-  HeaderEntryImpl* getExistingInline(const char* key);
 
   void removeInline(HeaderEntryImpl** entry);
 

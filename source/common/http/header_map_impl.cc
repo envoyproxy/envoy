@@ -408,7 +408,7 @@ void HeaderMapImpl::addReferenceKey(const LowerCaseString& key, const std::strin
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
-  auto* entry = getExistingInline(key.get().c_str());
+  auto* entry = getExistingInline(key.get());
   if (entry != nullptr) {
     char buf[32];
     StringUtil::itoa(buf, sizeof(buf), value);
@@ -425,7 +425,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
 }
 
 void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value) {
-  auto* entry = getExistingInline(key.get().c_str());
+  auto* entry = getExistingInline(key.get());
   if (entry != nullptr) {
     appendToHeader(entry->value(), value);
     return;
@@ -591,10 +591,6 @@ HeaderMapImpl::HeaderEntryImpl* HeaderMapImpl::getExistingInline(absl::string_vi
     return *ref_lookup_response.entry_;
   }
   return nullptr;
-}
-
-HeaderMapImpl::HeaderEntryImpl* HeaderMapImpl::getExistingInline(const char* key) {
-  return this->getExistingInline(absl::string_view(key));
 }
 
 void HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
