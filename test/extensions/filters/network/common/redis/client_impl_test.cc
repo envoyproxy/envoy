@@ -66,8 +66,8 @@ public:
     conn_info.connection_ = upstream_connection_;
 
     // Create timers in order they are created in client_impl.cc
-    connect_or_op_timer_ = {new Event::MockTimer(&dispatcher_)};
-    flush_timer_ = {new Event::MockTimer(&dispatcher_)};
+    connect_or_op_timer_ = new Event::MockTimer(&dispatcher_);
+    flush_timer_ = new Event::MockTimer(&dispatcher_);
 
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
     EXPECT_CALL(*host_, createConnection_(_, _)).WillOnce(Return(conn_info));
@@ -163,9 +163,12 @@ TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
-  // Pretend the the flush timer fires
+  // Pretend the the flush timer fires.
+  // The timer callback is the general-purpose flush function, also used when
+  // the buffer is filled. If the buffer fills before the timer fires, we need
+  // to check if the timer is active and cancel it. However, if the timer fires
+  // the callback, this internal check returns false as the timer is finished.
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ; // timer is disabled, as it has already fired
   flush_timer_->invokeCallback();
 
   // Process the dummy request
@@ -243,7 +246,6 @@ TEST_F(RedisClientImplTest, Basic) {
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -253,7 +255,6 @@ TEST_F(RedisClientImplTest, Basic) {
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
@@ -293,7 +294,6 @@ TEST_F(RedisClientImplTest, Cancel) {
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -303,7 +303,6 @@ TEST_F(RedisClientImplTest, Cancel) {
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
@@ -346,7 +345,6 @@ TEST_F(RedisClientImplTest, FailAll) {
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -374,7 +372,6 @@ TEST_F(RedisClientImplTest, FailAllWithCancel) {
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -400,7 +397,6 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -429,7 +425,6 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -462,7 +457,6 @@ TEST_F(RedisClientImplTest, OutlierDisabled) {
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -484,7 +478,6 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -507,7 +500,6 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
-  ;
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 

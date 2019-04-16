@@ -41,7 +41,7 @@ public:
   std::chrono::milliseconds opTimeout() const override { return op_timeout_; }
   bool enableHashtagging() const override { return enable_hashtagging_; }
   bool enableRedirection() const override { return enable_redirection_; }
-  unsigned int maxBufferSizeBeforeFlush() const override { return max_buffer_size_before_flush_; }
+  uint32_t maxBufferSizeBeforeFlush() const override { return max_buffer_size_before_flush_; }
   std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
     return buffer_flush_timeout_;
   }
@@ -50,7 +50,7 @@ private:
   const std::chrono::milliseconds op_timeout_;
   const bool enable_hashtagging_;
   const bool enable_redirection_;
-  const unsigned int max_buffer_size_before_flush_;
+  const uint32_t max_buffer_size_before_flush_;
   const std::chrono::milliseconds buffer_flush_timeout_;
 };
 

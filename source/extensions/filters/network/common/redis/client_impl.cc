@@ -14,7 +14,11 @@ ConfigImpl::ConfigImpl(
       enable_redirection_(config.enable_redirection()),
       max_buffer_size_before_flush_(
           config.max_buffer_size_before_flush()), // This is a scalar, so default is zero.
-      buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_timeout, 3)) {}
+      buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, buffer_flush_timeout,
+          3)) // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
+              // as the buffer is flushed on each request immediately.
+{}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
@@ -62,16 +66,17 @@ void ClientImpl::flushBufferAndResetTimer() {
 PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
-  bool empty_buffer = encoder_buffer_.length() == 0;
+  const bool empty_buffer = encoder_buffer_.length() == 0;
 
   pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
 
+  // If buffer is full, flush. If the the buffer is empty, start the timer.
   if (encoder_buffer_.length() > config_.maxBufferSizeBeforeFlush()) {
     flushBufferAndResetTimer();
   } else if (empty_buffer) {
     flush_timer_->enableTimer(std::chrono::milliseconds(config_.bufferFlushTimeoutInMs()));
-  } // else keep adding to buffer
+  }
 
   // Only boost the op timeout if:
   // - We are not already connected. Otherwise, we are governed by the connect timeout and the timer
