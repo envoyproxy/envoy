@@ -8,7 +8,9 @@ In this mode, the goals of Envoy are to maintain availability and partition tole
 over consistency. This is the key point when comparing Envoy to `Redis Cluster
 <https://redis.io/topics/cluster-spec>`_. Envoy is designed as a best-effort cache,
 meaning that it will not try to reconcile inconsistent data or keep a globally consistent
-view of cluster membership.
+view of cluster membership. It also supports routing commands from different workload to
+different to different upstream clusters based on their access patterns, eviction, or isolation
+requirements.
 
 The Redis project offers a thorough reference on partitioning as it relates to Redis. See
 "`Partitioning: how to split data among multiple Redis instances
@@ -22,6 +24,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Detailed command statistics.
 * Active and passive healthchecking.
 * Hash tagging.
+* Prefix routing.
 
 **Planned future enhancements**:
 

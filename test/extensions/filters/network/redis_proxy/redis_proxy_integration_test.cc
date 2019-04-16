@@ -39,10 +39,10 @@ static_resources:
                   socket_address:
                     address: 127.0.0.1
                     port_value: 0
-            - endpoint: 
+            - endpoint:
                 address:
                   socket_address:
-                    address: 127.0.0.1 
+                    address: 127.0.0.1
                     port_value: 0
   listeners:
     name: listener_0
@@ -56,13 +56,95 @@ static_resources:
         config:
           stat_prefix: redis_stats
           cluster: cluster_0
-          settings: 
+          settings:
             op_timeout: 5s
 )EOF";
 
 // This is a configuration with moved/ask redirection support enabled.
 const std::string CONFIG_WITH_REDIRECTION = CONFIG + R"EOF(
             enable_redirection: true
+)EOF";
+
+const std::string CONFIG_WITH_ROUTES = R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+    - name: cluster_0
+      type: STATIC
+      lb_policy: RANDOM
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+    - name: cluster_1
+      type: STATIC
+      lb_policy: RANDOM
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 1
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 1
+    - name: cluster_2
+      type: STATIC
+      lb_policy: RANDOM
+      load_assignment:
+        cluster_name: cluster_2
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 2
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 2
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: envoy.redis_proxy
+        config:
+          stat_prefix: redis_stats
+          settings:
+            op_timeout: 5s
+          prefix_routes:
+            catch_all_cluster: cluster_0
+            routes:
+            - prefix: "foo:"
+              cluster: cluster_1
+            - prefix: "baz:"
+              cluster: cluster_2
 )EOF";
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
@@ -115,7 +197,19 @@ public:
    * @param request supplies Redis client data to transmit to the Redis server.
    * @param response supplies Redis server data to transmit to the client.
    */
-  void simpleRequestAndResponse(const std::string& request, const std::string& response);
+  void simpleRequestAndResponse(const std::string& request, const std::string& response) {
+    return simpleRoundtripToUpstream(fake_upstreams_[0], request, response);
+  }
+
+  /**
+   * Simple bi-direction test between a fake redis client and a specific redis server.
+   * @param upstream a handle to the server that will respond to the request.
+   * @param request supplies Redis client data to transmit to the Redis server.
+   * @param response supplies Redis server data to transmit to the client.
+   */
+  void simpleRoundtripToUpstream(FakeUpstreamPtr& upstream, const std::string& request,
+                                 const std::string& response);
+
   /**
    * Simple bi-directional test between a fake Redis client and proxy server.
    * @param request supplies Redis client data to transmit to the proxy.
@@ -148,11 +242,20 @@ public:
                          const std::string& asking_response = "+OK\r\n");
 };
 
+class RedisProxyWithRoutesIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES, 6) {}
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -169,14 +272,15 @@ void RedisProxyIntegrationTest::initialize() {
   ON_CALL(*mock_rng_, random()).WillByDefault(Return(0));
 }
 
-void RedisProxyIntegrationTest::simpleRequestAndResponse(const std::string& request,
-                                                         const std::string& response) {
+void RedisProxyIntegrationTest::simpleRoundtripToUpstream(FakeUpstreamPtr& upstream,
+                                                          const std::string& request,
+                                                          const std::string& response) {
   std::string proxy_to_server;
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   redis_client->write(request);
 
   FakeRawConnectionPtr fake_upstream_connection;
-  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  EXPECT_TRUE(upstream->waitForRawConnection(fake_upstream_connection));
   EXPECT_TRUE(fake_upstream_connection->waitForData(request.size(), &proxy_to_server));
   // The original request should be the same as the data received by the server.
   EXPECT_EQ(request, proxy_to_server);
@@ -443,6 +547,24 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, IgnoreRedirectionForAsking) {
   asking_response << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[0]) << "\r\n";
   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n",
                     asking_response.str());
+}
+
+// This test verifies that it's possible to route keys to 3 different upstream pools.
+
+TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPrefix) {
+  initialize();
+
+  // roundtrip to cluster_0 (catch_all route)
+  simpleRoundtripToUpstream(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}),
+                            "$3\r\nbar\r\n");
+
+  // roundtrip to cluster_1 (prefix "foo:" route)
+  simpleRoundtripToUpstream(fake_upstreams_[2], makeBulkStringArray({"get", "foo:123"}),
+                            "$3\r\nbar\r\n");
+
+  // roundtrip to cluster_2 (prefix "baz:" route)
+  simpleRoundtripToUpstream(fake_upstreams_[4], makeBulkStringArray({"get", "baz:123"}),
+                            "$3\r\nbar\r\n");
 }
 
 } // namespace
