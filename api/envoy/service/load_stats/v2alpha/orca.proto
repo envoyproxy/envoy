@@ -36,13 +36,6 @@ message OrcaLoadReport {
   // during the request.
   double mem_utilization = 2 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
 
-  // NIC inbound/outbound utilization expressed as a fraction of available NIC
-  // bandwidth. The request in/out bytes can be inferred by Envoy, but not the
-  // NIC availability at the endpoint, hence reporting
-  double nic_in_utilization = 3 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
-
-  double nic_out_utilization = 4 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
-
   // Application specific requests costs. Values may be absolute costs (e.g.
   // 3487 bytes of storage) associated with the cost or utilization,
   // expressed as a fraction of total resources available. Utilization
