@@ -2968,6 +2968,12 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWith
     MockDownstreamWatermarkCallbacks callbacks;
     EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
     decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+
+    // Ensures that when new callbacks are registered they get invoked immediately
+    // and the already-registered callbacks do not.
+    MockDownstreamWatermarkCallbacks callbacks2;
+    EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
+    decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks2);
   }
 }
 
@@ -3086,10 +3092,13 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
 
   MockDownstreamWatermarkCallbacks callbacks;
   decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+  MockDownstreamWatermarkCallbacks callbacks2;
+  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks2);
 
   // Now overload the buffer with response data. The downstream watermark
   // callbacks should be called.
   EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(callbacks2, onAboveWriteBufferHighWatermark());
   Buffer::OwnedImpl fake_response("A long enough string to go over watermarks");
   EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
@@ -3098,6 +3107,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
   // Change the limit so the buffered data is below the new watermark.
   buffer_len = encoder_filters_[1]->callbacks_->encodingBuffer()->length();
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark());
   encoder_filters_[1]->callbacks_->setEncoderBufferLimit((buffer_len + 1) * 2);
 }
 
