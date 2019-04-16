@@ -4152,13 +4152,9 @@ virtual_hosts:
         enabled: 0
 )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
-      EnvoyException,
-      "Unable to parse JSON as proto "
-      "(INVALID_ARGUMENT:(virtual_hosts[0].routes[0].route.cors.enabled.value): invalid value 0 "
-      "for type TYPE_BOOL): " +
-          Json::Factory::loadFromYamlString(yaml)->asJsonString());
+      EnvoyException, "Unable to parse JSON as proto .*: invalid value 0 for type TYPE_BOOL");
 }
 
 TEST_F(RouteMatcherTest, Decorator) {

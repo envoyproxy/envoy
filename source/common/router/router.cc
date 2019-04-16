@@ -444,6 +444,7 @@ void Filter::sendNoHealthyUpstreamResponse() {
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
+  ASSERT(upstream_requests_.size() == 1);
   bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
   if (buffering && buffer_limit_ > 0 &&
       getLength(callbacks_->decodingBuffer()) + data.length() > buffer_limit_) {
@@ -507,7 +508,9 @@ void Filter::cleanup() {
     if (upstream_request.get() == final_upstream_request_) {
       callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
     }
-    upstream_request->resetStream(); // Idempotent.
+    if ((upstream_request.get() != final_upstream_request_) || !attempting_internal_redirect_with_complete_stream_) {
+      upstream_request->resetStream(); // Idempotent.
+    }
   }
   retry_state_.reset();
   if (response_timeout_) {
@@ -921,6 +924,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
   }
 
   if (final_upstream_request_ == &upstream_request) {
+    callbacks_->streamInfo().setResponseCodeDetails(
+        StreamInfo::ResponseCodeDetails::get().ViaUpstream);
     callbacks_->encodeHeaders(std::move(headers), end_stream);
   }
 }
@@ -1025,6 +1030,7 @@ bool Filter::setupRetry() {
     return false;
   }
 
+  ASSERT(upstream_requests_.size() == 1);
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
 
   return true;
@@ -1053,6 +1059,8 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
       convertRequestHeadersForInternalRedirect(*downstream_headers_, *location,
                                                *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
+    final_upstream_request_ = &upstream_request;
+    resetOtherUpstreams(upstream_request);
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;
   }
@@ -1388,6 +1396,7 @@ void Filter::UpstreamRequest::clearRequestEncoder() {
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.request_encoder_);
+  ASSERT(parent_.parent_.upstream_requests_.size() == 1);
   // The downstream connection is overrun. Pause reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(true);
@@ -1395,6 +1404,7 @@ void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHigh
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
   ASSERT(parent_.request_encoder_);
+  ASSERT(parent_.parent_.upstream_requests_.size() == 1);
   // The downstream connection has buffer available. Resume reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(false);
