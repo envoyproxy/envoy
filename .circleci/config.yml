@@ -150,7 +150,6 @@ jobs:
        - run: ci/do_circle_ci.sh check_format
        - run: ci/do_circle_ci.sh check_repositories
        - run: ci/do_circle_ci.sh check_spelling
-       - run: ci/do_circle_ci.sh check_spelling_pedantic
    build_image:
      docker:
        - image: circleci/python:3.7
