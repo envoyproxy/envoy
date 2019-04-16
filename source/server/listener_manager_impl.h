@@ -177,6 +177,7 @@ private:
   std::list<DrainingListener> draining_listeners_;
   std::list<WorkerPtr> workers_;
   bool workers_started_{};
+  Stats::ScopePtr scope_;
   ListenerManagerStats stats_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   LdsApiPtr lds_api_;

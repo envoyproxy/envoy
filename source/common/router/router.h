@@ -21,6 +21,7 @@
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
+#include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
@@ -268,7 +269,8 @@ protected:
 private:
   struct UpstreamRequest : public Http::StreamDecoder,
                            public Http::StreamCallbacks,
-                           public Http::ConnectionPool::Callbacks {
+                           public Http::ConnectionPool::Callbacks,
+                           public LinkedObject<UpstreamRequest> {
     UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool);
     ~UpstreamRequest();
 
@@ -301,10 +303,12 @@ private:
     void onBelowWriteBufferLowWatermark() override { enableDataFromDownstream(); }
 
     void disableDataFromDownstream() {
+      ASSERT(parent_.upstream_requests_.size() == 1);
       parent_.cluster_->stats().upstream_flow_control_backed_up_total_.inc();
       parent_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     }
     void enableDataFromDownstream() {
+      ASSERT(parent_.upstream_requests_.size() == 1);
       parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
       parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
     }
@@ -371,8 +375,8 @@ private:
                                          Upstream::ResourcePriority priority) PURE;
   Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
-  bool maybeRetryReset(Http::StreamResetReason reset_reason);
-  void onPerTryTimeout();
+  bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
+  void onPerTryTimeout(UpstreamRequest& upstream_request);
   void onRequestComplete();
   void onResponseTimeout();
   void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
@@ -383,20 +387,23 @@ private:
   // downstream if appropriate.
   void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
                        absl::string_view body, bool dropped);
-  void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers, bool end_stream);
-  void onUpstreamData(Buffer::Instance& data, bool end_stream);
-  void onUpstreamTrailers(Http::HeaderMapPtr&& trailers);
+  void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
+                         UpstreamRequest& upstream_request, bool end_stream);
+  void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request, bool end_stream);
+  void onUpstreamTrailers(Http::HeaderMapPtr&& trailers, UpstreamRequest& upstream_request);
   void onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map);
-  void onUpstreamComplete();
-  void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure);
+  void onUpstreamComplete(UpstreamRequest& upstream_request);
+  void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
+                       UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
   bool setupRetry(bool end_stream);
-  bool setupRedirect(const Http::HeaderMap& headers);
-  void updateOutlierDetection(Http::Code code);
+  bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request);
+  void updateOutlierDetection(Http::Code code, UpstreamRequest& upstream_request);
   void doRetry();
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
-  void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
+  void handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
+                                   UpstreamRequest& upstream_request, bool end_stream);
   TimeSource& timeSource() { return config_.timeSource(); }
   Http::Context& httpContext() { return config_.http_context_; }
 
@@ -410,7 +417,7 @@ private:
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
-  UpstreamRequestPtr upstream_request_;
+  std::list<UpstreamRequestPtr> upstream_requests_;
   bool grpc_request_{};
   Http::HeaderMap* downstream_headers_{};
   Http::HeaderMap* downstream_trailers_{};
