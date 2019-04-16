@@ -3119,6 +3119,9 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimits) {
   EXPECT_CALL(*encoder_filters_[1], encodeComplete());
   Buffer::OwnedImpl data("A longer string");
   decoder_filters_[0]->callbacks_->addDecodedData(data, false);
+  const auto rc_details = encoder_filters_[1]->callbacks_->streamInfo().responseCodeDetails();
+  EXPECT_TRUE(rc_details.has_value());
+  EXPECT_EQ("", rc_details.value());
 }
 
 // Return 413 from an intermediate filter and make sure we don't continue the filter chain.

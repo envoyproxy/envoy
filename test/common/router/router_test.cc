@@ -738,6 +738,29 @@ TEST_F(RouterTestSuppressEnvoyHeaders, MaintenanceMode) {
   router_.decodeHeaders(headers, true);
 }
 
+TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  absl::string_view rc_details = StreamInfo::ResponseCodeDetails::get().ViaUpstream;
+  EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
 // Validate that x-envoy-upstream-service-time is added on a regular
 // request/response path.
 TEST_F(RouterTest, EnvoyUpstreamServiceTime) {

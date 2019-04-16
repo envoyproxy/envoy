@@ -129,9 +129,11 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "53d4bb49b837944893b7caf9ae8eb43e94690ee5babea6469cc4a928722f99b1",
-        strip_prefix = "libevent-c4fbae3ae6166dddfa126734edd63213afa14dce",
-        urls = ["https://github.com/libevent/libevent/archive/c4fbae3ae6166dddfa126734edd63213afa14dce.tar.gz"],
+        sha256 = "217d7282d41faabac8c74d8ea0f215d8fa065691fb4b1f9205cbe16a2a65c1cc",
+        # This SHA is when "prepare" and "check" watchers were added to libevent (see
+        # https://github.com/libevent/libevent/pull/793). Update to v2.2 when it is released.
+        strip_prefix = "libevent-2f184f8bbf23377bddc8daa1a2c7b40735ee7e2a",
+        urls = ["https://github.com/libevent/libevent/archive/2f184f8bbf23377bddc8daa1a2c7b40735ee7e2a.tar.gz"],
     ),
     com_github_madler_zlib = dict(
         sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
@@ -236,8 +238,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4fbea5de9afdf30611b27afd54c45a596944f9c2.tar.gz
-        sha256 = "2cf9f5ea62a03ca0d8773fe4f56949b72c28ac5b1bcf43d850a571f4e32add2a",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/4fbea5de9afdf30611b27afd54c45a596944f9c2.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/ba6354aa1b39f3d9788ead909ad3e678ac863938.tar.gz
+        sha256 = "4598537810c3d343c32333c5367fcb652638018118f7f4e844e080405d9e73bb",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/ba6354aa1b39f3d9788ead909ad3e678ac863938.tar.gz"],
     ),
 )
