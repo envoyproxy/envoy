@@ -19,7 +19,7 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
   // Gauge name *substrings*, and special logic to use for combining those gauges' values.
   static const std::vector<std::pair<std::string, CombineLogic>> combine_logic_exceptions{
       {".version", CombineLogic::NoImport},
-      {".connected_state", CombineLogic::BooleanOr},
+      {".connected_state", CombineLogic::NoImport},
       {"server.live", CombineLogic::NoImport},
       {"runtime.admin_overrides_active", CombineLogic::NoImport},
       {"runtime.num_keys", CombineLogic::NoImport},
@@ -37,9 +37,7 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
       {"server.concurrency", CombineLogic::OnlyImportWhenUnused},
       {"server.hot_restart_epoch", CombineLogic::NoImport},
   };
-  std::cerr << "MERGING GAUGES:" << std::endl;
   for (const auto& gauge : gauges) {
-    std::cerr << gauge.first << std::endl;
     uint64_t new_parent_value = gauge.second;
     auto found_value = parent_gauge_values_.find(gauge.first);
     uint64_t old_parent_value = found_value == parent_gauge_values_.end() ? 0 : found_value->second;
@@ -72,9 +70,6 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
       } else {
         gauge_ref.sub(old_parent_value - new_parent_value);
       }
-      break;
-    case CombineLogic::BooleanOr:
-      gauge_ref.set(gauge_ref.value() != 0 || new_parent_value != 0 ? 1 : 0);
       break;
     }
   }

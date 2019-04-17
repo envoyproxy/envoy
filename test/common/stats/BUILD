@@ -53,13 +53,8 @@ envoy_cc_test(
     name = "stat_merger_test",
     srcs = ["stat_merger_test.cc"],
     deps = [
-        "//source/common/api:os_sys_calls_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stat_merger_lib",
-        "//source/common/stats:stats_lib",
-        "//source/server:hot_restart_lib",
-        "//test/mocks/server:server_mocks",
-        "//test/test_common:logging_lib",
-        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 

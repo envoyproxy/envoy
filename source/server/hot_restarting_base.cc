@@ -51,7 +51,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
   std::vector<uint8_t> send_buf;
   send_buf.resize(total_size);
   *reinterpret_cast<uint64_t*>(send_buf.data()) = htobe64(serialized_size);
-  RELEASE_ASSERT(proto.SerializeToArray(send_buf.data() + sizeof(uint64_t), serialized_size),
+  RELEASE_ASSERT(proto.SerializeWithCachedSizesToArray(send_buf.data() + sizeof(uint64_t)),
                  "failed to serialize a HotRestartMessage");
 
   RELEASE_ASSERT(fcntl(my_domain_socket_, F_SETFL, 0) != -1,

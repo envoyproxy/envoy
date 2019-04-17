@@ -1,72 +1,53 @@
 #include <memory>
 
-#include "common/api/os_sys_calls_impl.h"
+#include "common/stats/isolated_store_impl.h"
+#include "common/stats/stat_merger.h"
 
-#include "server/hot_restarting_child.h"
-
-#include "test/mocks/server/mocks.h"
-#include "test/test_common/logging.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
-
-#include "absl/strings/match.h"
-#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::AnyNumber;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
-using testing::Return;
-using testing::ReturnRef;
-using testing::WithArg;
-
 namespace Envoy {
-namespace Server {
+namespace Stats {
 namespace {
 
 class StatMergerTest : public testing::Test {
 public:
-  StatMergerTest() : os_calls_injector_(InitOsCalls()), hot_restarting_child_(123, 456) {
+  StatMergerTest() : stat_merger_(store_) {
     store_.counter("draculaer").inc();
     store_.gauge("whywassixafraidofseven").set(678);
   }
 
-  Api::MockOsSysCalls* InitOsCalls() {
-    EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(AnyNumber());
-    return &os_sys_calls_;
-  }
-
   Stats::IsolatedStoreImpl store_;
-  Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_injector_;
-  HotRestartingChild hot_restarting_child_;
+  StatMerger stat_merger_;
 };
 
 TEST_F(StatMergerTest, basicDefaultAccumulationImport) {
-  envoy::HotRestartMessage::Reply::Stats stats;
-  (*stats.mutable_gauges())["whywassixafraidofseven"] = 111;
-  (*stats.mutable_counters())["draculaer"] = 3;
+  Protobuf::Map<std::string, uint64_t> counters;
+  Protobuf::Map<std::string, uint64_t> gauges;
+  gauges["whywassixafraidofseven"] = 111;
+  counters["draculaer"] = 3;
 
-  hot_restarting_child_.mergeParentStats(store_, stats);
+  stat_merger_.mergeStats(counters, gauges);
 
   EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
   EXPECT_EQ(4, store_.counter("draculaer").value());
 }
 
 TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
-  envoy::HotRestartMessage::Reply::Stats stats1;
-  (*stats1.mutable_gauges())["whywassixafraidofseven"] = 100;
-  (*stats1.mutable_counters())["draculaer"] = 2;
-  hot_restarting_child_.mergeParentStats(store_, stats1);
+  Protobuf::Map<std::string, uint64_t> counters1;
+  Protobuf::Map<std::string, uint64_t> gauges1;
+  gauges1["whywassixafraidofseven"] = 100;
+  counters1["draculaer"] = 2;
+  stat_merger_.mergeStats(counters1, gauges1);
   // Initial combined values: 678+100 and 1+2.
   EXPECT_EQ(778, store_.gauge("whywassixafraidofseven").value());
   EXPECT_EQ(3, store_.counter("draculaer").value());
 
   // The parent's gauge drops by 1, and its counter increases by 1.
-  envoy::HotRestartMessage::Reply::Stats stats2;
-  (*stats2.mutable_gauges())["whywassixafraidofseven"] = 99;
-  (*stats2.mutable_counters())["draculaer"] = 3;
-  hot_restarting_child_.mergeParentStats(store_, stats2);
+  Protobuf::Map<std::string, uint64_t> counters2;
+  Protobuf::Map<std::string, uint64_t> gauges2;
+  gauges2["whywassixafraidofseven"] = 99;
+  counters2["draculaer"] = 3;
+  stat_merger_.mergeStats(counters2, gauges2);
   EXPECT_EQ(777, store_.gauge("whywassixafraidofseven").value());
   EXPECT_EQ(4, store_.counter("draculaer").value());
 
@@ -74,7 +55,7 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
   // Our own counter increases by 4, while the parent's stays constant. Total increase of 4.
   store_.gauge("whywassixafraidofseven").add(12);
   store_.counter("draculaer").add(4);
-  hot_restarting_child_.mergeParentStats(store_, stats2);
+  stat_merger_.mergeStats(counters2, gauges2);
   EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
   EXPECT_EQ(8, store_.counter("draculaer").value());
 
@@ -82,10 +63,11 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
   // Our counter and the parent's counter both increase by 1, total increase of 2.
   store_.gauge("whywassixafraidofseven").sub(5);
   store_.counter("draculaer").add(1);
-  envoy::HotRestartMessage::Reply::Stats stats3;
-  (*stats3.mutable_gauges())["whywassixafraidofseven"] = 104;
-  (*stats3.mutable_counters())["draculaer"] = 4;
-  hot_restarting_child_.mergeParentStats(store_, stats3);
+  Protobuf::Map<std::string, uint64_t> counters3;
+  Protobuf::Map<std::string, uint64_t> gauges3;
+  gauges3["whywassixafraidofseven"] = 104;
+  counters3["draculaer"] = 4;
+  stat_merger_.mergeStats(counters3, gauges3);
   EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
   EXPECT_EQ(10, store_.counter("draculaer").value());
 }
@@ -95,47 +77,51 @@ TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
 TEST_F(StatMergerTest, exclusionsNotImported) {
   store_.gauge("some.sort.of.version").set(12345);
 
-  envoy::HotRestartMessage::Reply::Stats stats;
-  (*stats.mutable_gauges())["some.sort.of.version"] = 67890;
-  (*stats.mutable_gauges())["child.doesnt.have.this.version"] = 111;
+  Protobuf::Map<std::string, uint64_t> counters;
+  Protobuf::Map<std::string, uint64_t> gauges;
+  gauges["some.sort.of.version"] = 67890;
+  gauges["child.doesnt.have.this.version"] = 111;
 
   // Check defined values are not changed, and undefined remain undefined.
-  hot_restarting_child_.mergeParentStats(store_, stats);
+  stat_merger_.mergeStats(counters, gauges);
   EXPECT_EQ(12345, store_.gauge("some.sort.of.version").value());
   EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version").used());
 
   // Check the "undefined remains undefined" behavior for a bunch of other names.
-  (*stats.mutable_gauges())["runtime.admin_overrides_active"] = 111;
-  (*stats.mutable_gauges())["runtime.num_keys"] = 111;
-  (*stats.mutable_gauges())["listener_manager.total_listeners_draining"] = 111;
-  (*stats.mutable_gauges())["server.hot_restart_epoch"] = 111;
-  (*stats.mutable_gauges())["server.live"] = 1;
+  gauges["runtime.admin_overrides_active"] = 111;
+  gauges["runtime.num_keys"] = 111;
+  gauges["listener_manager.total_listeners_draining"] = 111;
+  gauges["server.hot_restart_epoch"] = 111;
+  gauges["server.live"] = 1;
+  gauges["some.connected_state"] = 1;
 
-  hot_restarting_child_.mergeParentStats(store_, stats);
+  stat_merger_.mergeStats(counters, gauges);
   EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version").used());
   EXPECT_FALSE(store_.gauge("runtime.admin_overrides_active").used());
   EXPECT_FALSE(store_.gauge("runtime.num_keys").used());
   EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_draining").used());
   EXPECT_FALSE(store_.gauge("server.hot_restart_epoch").used());
   EXPECT_FALSE(store_.gauge("server.live").used());
+  EXPECT_FALSE(store_.gauge("some.connected_state").used());
 }
 
 // The OnlyImportWhenUnused logic should overwrite an undefined gauge, but not a defined one.
 TEST_F(StatMergerTest, onlyImportWhenUnused) {
-  envoy::HotRestartMessage::Reply::Stats stats;
-  (*stats.mutable_gauges())["cluster_manager.active_clusters"] = 33;
-  (*stats.mutable_gauges())["cluster_manager.warming_clusters"] = 33;
-  (*stats.mutable_gauges())["cluster.rds.membership_total"] = 33;
-  (*stats.mutable_gauges())["cluster.rds.membership_healthy"] = 33;
-  (*stats.mutable_gauges())["cluster.rds.membership_degraded"] = 33;
-  (*stats.mutable_gauges())["cluster.rds.max_host_weight"] = 33;
-  (*stats.mutable_gauges())["anything.total_principals"] = 33;
-  (*stats.mutable_gauges())["listener_manager.total_listeners_warming"] = 33;
-  (*stats.mutable_gauges())["listener_manager.total_listeners_active"] = 33;
-  (*stats.mutable_gauges())["some_sort_of_pressure"] = 33;
-  (*stats.mutable_gauges())["server.concurrency"] = 33;
+  Protobuf::Map<std::string, uint64_t> counters;
+  Protobuf::Map<std::string, uint64_t> gauges;
+  gauges["cluster_manager.active_clusters"] = 33;
+  gauges["cluster_manager.warming_clusters"] = 33;
+  gauges["cluster.rds.membership_total"] = 33;
+  gauges["cluster.rds.membership_healthy"] = 33;
+  gauges["cluster.rds.membership_degraded"] = 33;
+  gauges["cluster.rds.max_host_weight"] = 33;
+  gauges["anything.total_principals"] = 33;
+  gauges["listener_manager.total_listeners_warming"] = 33;
+  gauges["listener_manager.total_listeners_active"] = 33;
+  gauges["some_sort_of_pressure"] = 33;
+  gauges["server.concurrency"] = 33;
   // 33 is stored into the child's until-now-undefined gauges
-  hot_restarting_child_.mergeParentStats(store_, stats);
+  stat_merger_.mergeStats(counters, gauges);
   EXPECT_EQ(33, store_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(33, store_.gauge("cluster_manager.warming_clusters").value());
   EXPECT_EQ(33, store_.gauge("cluster.rds.membership_total").value());
@@ -159,7 +145,7 @@ TEST_F(StatMergerTest, onlyImportWhenUnused) {
   store_.gauge("some_sort_of_pressure").set(88);
   store_.gauge("server.concurrency").set(88);
   // Now that the child's gauges have been set to 88, merging the "33" values will make no change.
-  hot_restarting_child_.mergeParentStats(store_, stats);
+  stat_merger_.mergeStats(counters, gauges);
   EXPECT_EQ(88, store_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(88, store_.gauge("cluster_manager.warming_clusters").value());
   EXPECT_EQ(88, store_.gauge("cluster.rds.membership_total").value());
@@ -173,32 +159,6 @@ TEST_F(StatMergerTest, onlyImportWhenUnused) {
   EXPECT_EQ(88, store_.gauge("server.concurrency").value());
 }
 
-// Tests that the substrings "connected_state" and "server.live" get OR'd.
-TEST_F(StatMergerTest, booleanOr) {
-  store_.gauge("some.connected_state").set(0);
-
-  envoy::HotRestartMessage::Reply::Stats stats_with_value0;
-  (*stats_with_value0.mutable_gauges())["some.connected_state"] = 0;
-  envoy::HotRestartMessage::Reply::Stats stats_with_value1;
-  (*stats_with_value1.mutable_gauges())["some.connected_state"] = 1;
-
-  // 0 || 0 == 0
-  hot_restarting_child_.mergeParentStats(store_, stats_with_value0);
-  EXPECT_EQ(0, store_.gauge("some.connected_state").value());
-
-  // 0 || 1 == 1
-  hot_restarting_child_.mergeParentStats(store_, stats_with_value1);
-  EXPECT_EQ(1, store_.gauge("some.connected_state").value());
-
-  // 1 || 0 == 1
-  hot_restarting_child_.mergeParentStats(store_, stats_with_value0);
-  EXPECT_EQ(1, store_.gauge("some.connected_state").value());
-
-  // 1 || 1 == 1
-  hot_restarting_child_.mergeParentStats(store_, stats_with_value1);
-  EXPECT_EQ(1, store_.gauge("some.connected_state").value());
-}
-
 } // namespace
-} // namespace Server
+} // namespace Stats
 } // namespace Envoy
