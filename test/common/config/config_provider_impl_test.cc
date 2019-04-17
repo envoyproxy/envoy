@@ -90,7 +90,7 @@ public:
 class DummyDynamicConfigProvider : public MutableConfigProviderBase {
 public:
   DummyDynamicConfigProvider(DummyConfigSubscriptionSharedPtr&& subscription,
-                             ConfigConstSharedPtr initial_config,
+                             const ConfigConstSharedPtr& initial_config,
                              Server::Configuration::FactoryContext& factory_context)
       : MutableConfigProviderBase(std::move(subscription), factory_context, ApiType::Full),
         subscription_(static_cast<DummyConfigSubscription*>(

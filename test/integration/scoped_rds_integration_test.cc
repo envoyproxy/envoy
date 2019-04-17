@@ -23,7 +23,7 @@ protected:
   ScopedRdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
 
-  ~ScopedRdsIntegrationTest() {
+  ~ScopedRdsIntegrationTest() override {
     resetConnections();
     cleanupUpstreamAndDownstream();
   }

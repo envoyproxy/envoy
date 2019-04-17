@@ -403,7 +403,7 @@ public:
    * Propagates a delta config update to all workers.
    * @param updateCb the callback to run on each worker.
    */
-  void onConfigUpdate(Envoy::Event::PostCb updateCb) { tls_->runOnAllThreads(updateCb); }
+  void onConfigUpdate(Envoy::Event::PostCb updateCb) { tls_->runOnAllThreads(std::move(updateCb)); }
 
 protected:
   DeltaMutableConfigProviderBase(ConfigSubscriptionCommonBaseSharedPtr&& subscription,

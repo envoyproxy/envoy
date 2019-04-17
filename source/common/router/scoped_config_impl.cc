@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Router {
 
-void ThreadLocalScopedConfigImpl::addOrUpdateRoutingScope(ScopedRouteInfoConstSharedPtr) {}
+void ThreadLocalScopedConfigImpl::addOrUpdateRoutingScope(ScopedRouteInfoConstSharedPtr&) {}
 
 void ThreadLocalScopedConfigImpl::removeRoutingScope(const std::string&) {}
 
