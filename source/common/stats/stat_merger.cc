@@ -1,5 +1,7 @@
 #include "common/stats/stat_merger.h"
 
+#include <regex>
+
 namespace Envoy {
 namespace Stats {
 
@@ -17,25 +19,25 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
   }
 
   // Gauge name *substrings*, and special logic to use for combining those gauges' values.
-  static const std::vector<std::pair<std::string, CombineLogic>> combine_logic_exceptions{
-      {".version", CombineLogic::NoImport},
-      {".connected_state", CombineLogic::NoImport},
-      {"server.live", CombineLogic::NoImport},
-      {"runtime.admin_overrides_active", CombineLogic::NoImport},
-      {"runtime.num_keys", CombineLogic::NoImport},
-      {"cluster_manager.active_clusters", CombineLogic::OnlyImportWhenUnused},
-      {"cluster_manager.warming_clusters", CombineLogic::OnlyImportWhenUnused},
-      {".membership_total", CombineLogic::OnlyImportWhenUnused},
-      {".membership_healthy", CombineLogic::OnlyImportWhenUnused},
-      {".membership_degraded", CombineLogic::OnlyImportWhenUnused},
-      {".max_host_weight", CombineLogic::OnlyImportWhenUnused},
-      {".total_principals", CombineLogic::OnlyImportWhenUnused},
-      {"listener_manager.total_listeners_draining", CombineLogic::NoImport},
-      {"listener_manager.total_listeners_warming", CombineLogic::OnlyImportWhenUnused},
-      {"listener_manager.total_listeners_active", CombineLogic::OnlyImportWhenUnused},
-      {"pressure", CombineLogic::OnlyImportWhenUnused},
-      {"server.concurrency", CombineLogic::OnlyImportWhenUnused},
-      {"server.hot_restart_epoch", CombineLogic::NoImport},
+  static const std::vector<std::pair<std::regex, CombineLogic>> combine_logic_exceptions{
+      {std::regex(".*\\.version$"), CombineLogic::NoImport},
+      {std::regex(".*\\.control_plane.connected_state$"), CombineLogic::NoImport},
+      {std::regex("^server.live$"), CombineLogic::NoImport},
+      {std::regex("^runtime.admin_overrides_active$"), CombineLogic::NoImport},
+      {std::regex("^runtime.num_keys$"), CombineLogic::NoImport},
+      {std::regex("^cluster_manager.active_clusters$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^cluster_manager.warming_clusters$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^cluster\\..*\\.membership_total$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^cluster\\..*\\.membership_healthy$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^cluster\\..*\\.membership_degraded$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^cluster\\..*\\.max_host_weight$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex(".*\\.total_principals$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^listener_manager.total_listeners_draining$"), CombineLogic::NoImport},
+      {std::regex("^listener_manager.total_listeners_warming$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^listener_manager.total_listeners_active$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^overload\\..*\\.pressure$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^server.concurrency$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^server.hot_restart_epoch$"), CombineLogic::NoImport},
   };
   for (const auto& gauge : gauges) {
     uint64_t new_parent_value = gauge.second;
@@ -44,7 +46,8 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
     parent_gauge_values_[gauge.first] = new_parent_value;
     CombineLogic combine_logic = CombineLogic::Accumulate;
     for (auto exception : combine_logic_exceptions) {
-      if (gauge.first.find(exception.first) != std::string::npos) {
+      std::smatch match;
+      if(std::regex_match(gauge.first, match, exception.first)) {
         combine_logic = exception.second;
         break;
       }
