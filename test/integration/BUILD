@@ -172,6 +172,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_timeout_integration_test",
+    srcs = [
+        "http_timeout_integration_test.cc",
+        "http_timeout_integration_test.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "protocol_integration_test",
     srcs = [
         "protocol_integration_test.cc",
