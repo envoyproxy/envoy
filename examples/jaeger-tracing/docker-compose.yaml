@@ -1,4 +1,4 @@
-version: '2'
+version: '3.7'
 services:
 
   front-envoy:
@@ -6,7 +6,7 @@ services:
       context: ../
       dockerfile: front-proxy/Dockerfile-frontenvoy
     volumes:
-      - ./front-envoy-zipkin.yaml:/etc/front-envoy.yaml
+      - ./front-envoy-jaeger.yaml:/etc/front-envoy.yaml
     networks:
       - envoymesh
     expose:
@@ -21,7 +21,7 @@ services:
       context: ../front-proxy
       dockerfile: Dockerfile-service
     volumes:
-      - ./service1-envoy-zipkin.yaml:/etc/service-envoy.yaml
+      - ./service1-envoy-jaeger.yaml:/etc/service-envoy.yaml
     networks:
       envoymesh:
         aliases:
@@ -36,7 +36,7 @@ services:
       context: ../front-proxy
       dockerfile: Dockerfile-service
     volumes:
-      - ./service2-envoy-zipkin.yaml:/etc/service-envoy.yaml
+      - ./service2-envoy-jaeger.yaml:/etc/service-envoy.yaml
     networks:
       envoymesh:
         aliases:
@@ -46,16 +46,20 @@ services:
     expose:
       - "80"
 
-  zipkin:
-    image: openzipkin/zipkin
+  jaeger:
+    image: jaegertracing/all-in-one
+    environment:
+      - COLLECTOR_ZIPKIN_HTTP_PORT=9411
     networks:
       envoymesh:
         aliases:
-          - zipkin
+          - jaeger
     expose:
       - "9411"
+      - "16686"
     ports:
       - "9411:9411"
+      - "16686:16686"
 
 networks:
   envoymesh: {}
