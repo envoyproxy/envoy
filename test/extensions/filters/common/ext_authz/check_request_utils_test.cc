@@ -86,7 +86,9 @@ TEST_F(CheckRequestUtilsTest, BasicHttp) {
                                      request_, size);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
-  EXPECT_EQ(request_.attributes().request().http().headers().end(), request_.attributes().request().http().headers().find(Http::Headers::get().EnvoyAuthPartialBody.get()));
+  EXPECT_EQ(request_.attributes().request().http().headers().end(),
+            request_.attributes().request().http().headers().find(
+                Http::Headers::get().EnvoyAuthPartialBody.get()));
 }
 
 // Verify that check request object has only a portion of the request data.
@@ -101,7 +103,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithPartialBody) {
                                      request_, size);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, size), request_.attributes().request().http().body());
-  EXPECT_EQ("1", request_.attributes().request().http().headers().at(Http::Headers::get().EnvoyAuthPartialBody.get()));
+  EXPECT_EQ("1", request_.attributes().request().http().headers().at(
+                     Http::Headers::get().EnvoyAuthPartialBody.get()));
 }
 
 // Verify that check request object has all the request data.
@@ -116,7 +119,8 @@ TEST_F(CheckRequestUtilsTest, BasicHttpWithFullBody) {
   ASSERT_EQ(buffer_->length(), request_.attributes().request().http().body().size());
   EXPECT_EQ(buffer_->toString().substr(0, buffer_->length()),
             request_.attributes().request().http().body());
-  EXPECT_EQ("0", request_.attributes().request().http().headers().at(Http::Headers::get().EnvoyAuthPartialBody.get()));
+  EXPECT_EQ("0", request_.attributes().request().http().headers().at(
+                     Http::Headers::get().EnvoyAuthPartialBody.get()));
 }
 
 // Verify that createHttpCheck extract the proper attributes from the http request into CheckRequest
