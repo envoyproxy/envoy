@@ -2399,7 +2399,8 @@ virtual_hosts:
                 .retryOn());
 }
 
-TEST_F(RouteMatcherTest, RetryBackoffIntervals) {
+// Test route-specific retry back-off intervals.
+TEST_F(RouteMatcherTest, RetryBackOffIntervals) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -2486,7 +2487,8 @@ virtual_hosts:
                                .maxInterval());
 }
 
-TEST_F(RouteMatcherTest, InvalidRetryBackoff) {
+// Test invalid route-specific retry back-off configs.
+TEST_F(RouteMatcherTest, InvalidRetryBackOff) {
   const std::string invalid_max = R"EOF(
 virtual_hosts:
   - name: backoff

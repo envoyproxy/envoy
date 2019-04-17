@@ -505,7 +505,8 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   EXPECT_EQ(0UL, cluster_.circuit_breakers_stats_.rq_retry_open_.value());
 }
 
-TEST_F(RouterRetryStateImplTest, CustomBackoffInterval) {
+// Test customized retry back-off intervals.
+TEST_F(RouterRetryStateImplTest, CustomBackOffInterval) {
   policy_.num_retries_ = 10;
   policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
   policy_.base_interval_ = std::chrono::milliseconds(100);
@@ -540,7 +541,8 @@ TEST_F(RouterRetryStateImplTest, CustomBackoffInterval) {
   retry_timer_->callback_();
 }
 
-TEST_F(RouterRetryStateImplTest, CustomBackoffIntervalDefaultMax) {
+// Test the default maximum retry back-off interval.
+TEST_F(RouterRetryStateImplTest, CustomBackOffIntervalDefaultMax) {
   policy_.num_retries_ = 10;
   policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
   policy_.base_interval_ = std::chrono::milliseconds(100);
