@@ -9,7 +9,7 @@ option go_package = "v1";
 
 import "validate/validate.proto";
 
-// See section `ORCA lad report format` of the design document in
+// See section `ORCA load report format` of the design document in
 // :ref:`https://github.com/envoyproxy/envoy/issues/6614`.
 
 message OrcaLoadReport {
