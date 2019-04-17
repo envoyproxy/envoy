@@ -155,8 +155,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
   }
-  const ProtobufTypes::String method = headers.Method()->value().c_str();
-  ProtobufTypes::String path = headers.Path()->value().c_str();
+  const ProtobufTypes::String method(headers.Method()->value().getStringView());
+  ProtobufTypes::String path(headers.Path()->value().getStringView());
   ProtobufTypes::String args;
 
   const size_t pos = path.find('?');

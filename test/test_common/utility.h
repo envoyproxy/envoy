@@ -466,7 +466,8 @@ public:
     p.iterate(
         [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
           std::ostream* local_os = static_cast<std::ostream*>(context);
-          *local_os << header.key().c_str() << " " << header.value().c_str() << std::endl;
+          *local_os << header.key().getStringView() << " " << header.value().getStringView()
+                    << std::endl;
           return HeaderMap::Iterate::Continue;
         },
         &os);
