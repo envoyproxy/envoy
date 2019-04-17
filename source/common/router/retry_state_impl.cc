@@ -66,15 +66,16 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
 
   // Merge in the headers.
   if (request_headers.EnvoyRetryOn()) {
-    retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
+    retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().getStringView());
   }
   if (request_headers.EnvoyRetryGrpcOn()) {
-    retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().c_str());
+    retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView());
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
-    const char* max_retries = request_headers.EnvoyMaxRetries()->value().c_str();
+    // TODO(dnoe): Migrate to pure string_view (#6580)
+    const std::string max_retries(request_headers.EnvoyMaxRetries()->value().getStringView());
     uint64_t temp;
-    if (StringUtil::atoull(max_retries, temp)) {
+    if (StringUtil::atoull(max_retries.c_str(), temp)) {
       // The max retries header takes precedence if set.
       retries_remaining_ = temp;
     }

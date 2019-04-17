@@ -467,12 +467,12 @@ TEST(HttpUtility, SendLocalGrpcReply) {
 
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ(headers.Status()->value().c_str(), "200");
+        EXPECT_EQ(headers.Status()->value().getStringView(), "200");
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
+        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unknown)));
         EXPECT_NE(headers.GrpcMessage(), nullptr);
-        EXPECT_STREQ(headers.GrpcMessage()->value().c_str(), "large");
+        EXPECT_EQ(headers.GrpcMessage()->value().getStringView(), "large");
       }));
   Utility::sendLocalReply(true, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt, false);
@@ -484,7 +484,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
+        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::Unavailable)));
       }));
   Utility::sendLocalReply(true, callbacks, false, Http::Code::TooManyRequests, "", absl::nullopt,
@@ -493,7 +493,7 @@ TEST(HttpUtility, RateLimitedGrpcStatus) {
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(headers.GrpcStatus(), nullptr);
-        EXPECT_EQ(headers.GrpcStatus()->value().c_str(),
+        EXPECT_EQ(headers.GrpcStatus()->value().getStringView(),
                   std::to_string(enumToInt(Grpc::Status::GrpcStatus::ResourceExhausted)));
       }));
   Utility::sendLocalReply(
@@ -519,8 +519,8 @@ TEST(HttpUtility, SendLocalReplyHeadRequest) {
   bool is_reset = false;
   EXPECT_CALL(callbacks, encodeHeaders_(_, true))
       .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
-        EXPECT_STREQ(headers.ContentLength()->value().c_str(),
-                     fmt::format("{}", strlen("large")).c_str());
+        EXPECT_EQ(headers.ContentLength()->value().getStringView(),
+                  fmt::format("{}", strlen("large")));
       }));
   Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large",
                           absl::nullopt, true);
@@ -569,8 +569,8 @@ TEST(HttpUtility, TestPrepareHeaders) {
 
   Http::MessagePtr message = Utility::prepareHeaders(http_uri);
 
-  EXPECT_STREQ("/x/y/z", message->headers().Path()->value().c_str());
-  EXPECT_STREQ("dns.name", message->headers().Host()->value().c_str());
+  EXPECT_EQ("/x/y/z", message->headers().Path()->value().getStringView());
+  EXPECT_EQ("dns.name", message->headers().Host()->value().getStringView());
 }
 
 TEST(HttpUtility, QueryParamsToString) {

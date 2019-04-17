@@ -117,9 +117,9 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   Http::HeaderMapPtr headers = buildHeadersFromTable(state, 2);
 
   uint64_t status;
-  if (headers->Status() == nullptr ||
-      !StringUtil::atoull(headers->Status()->value().c_str(), status) || status < 200 ||
-      status >= 600) {
+  const std::string status_string(headers->Status()->value().getStringView());
+  if (headers->Status() == nullptr || !StringUtil::atoull(status_string.c_str(), status) ||
+      status < 200 || status >= 600) {
     luaL_error(state, ":status must be between 200-599");
   }
 
@@ -212,8 +212,10 @@ void StreamHandleWrapper::onSuccess(Http::MessagePtr&& response) {
   response->headers().iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         lua_State* state = static_cast<lua_State*>(context);
-        lua_pushstring(state, header.key().c_str());
-        lua_pushstring(state, header.value().c_str());
+        lua_pushlstring(state, header.key().getStringView().data(),
+                        header.key().getStringView().length());
+        lua_pushlstring(state, header.value().getStringView().data(),
+                        header.value().getStringView().length());
         lua_settable(state, -3);
         return Http::HeaderMap::Iterate::Continue;
       },

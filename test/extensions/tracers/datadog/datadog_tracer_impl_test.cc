@@ -133,8 +133,9 @@ TEST_F(DatadogDriverTest, FlushSpansTimer) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
-            EXPECT_STREQ("application/msgpack", message->headers().ContentType()->value().c_str());
+            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
+            EXPECT_EQ("application/msgpack",
+                      message->headers().ContentType()->value().getStringView());
 
             return &request;
           }));
