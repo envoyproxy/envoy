@@ -30,7 +30,7 @@ public:
 
   ~ThreadLocalScopedConfigImpl() override = default;
 
-  void addOrUpdateRoutingScope(ScopedRouteInfoConstSharedPtr& scoped_route_info);
+  void addOrUpdateRoutingScope(const ScopedRouteInfoConstSharedPtr& scoped_route_info);
   void removeRoutingScope(const std::string& scope_name);
 
   // Envoy::Router::ScopedConfig
