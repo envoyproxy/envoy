@@ -27,6 +27,11 @@ public:
   RespValue() : type_(RespType::Null) {}
   ~RespValue() { cleanup(); }
 
+  RespValue(const RespValue& other);             // copy constructor
+  RespValue& operator=(const RespValue& other);  // copy assignment
+  bool operator==(const RespValue& other) const; // test for equality, unit tests
+  bool operator!=(const RespValue& other) const { return !(*this == other); }
+
   /**
    * Convert a RESP value to a string for debugging purposes.
    */

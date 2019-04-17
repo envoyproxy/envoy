@@ -150,7 +150,19 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
-      delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)) {
+      delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
+      normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, normalize_path,
+          // TODO(htuch): we should have a
+          // boolean variant of featureEnabled()
+          // here.
+          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
+#ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
+                                                      100
+#else
+                                                      0
+#endif
+                                                      ))) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
                                                                    route_config_provider_manager_);
@@ -272,7 +284,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       throw EnvoyException(
           fmt::format("Error: multiple upgrade configs with the same name: '{}'", name));
     }
-    if (upgrade_config.filters().size() > 0) {
+    if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
       for (int32_t i = 0; i < upgrade_config.filters().size(); i++) {
         processFilter(upgrade_config.filters(i), i, name, *factories);

@@ -38,7 +38,8 @@ struct SuccessResponse {
           // UpstreamHeaderMatcher
           if (context->matchers_->matches(header.key().getStringView())) {
             context->response_->headers_to_add.emplace_back(
-                Http::LowerCaseString{header.key().c_str()}, header.value().c_str());
+                Http::LowerCaseString{std::string(header.key().getStringView())},
+                header.value().getStringView());
           }
           return Http::HeaderMap::Iterate::Continue;
         },
@@ -215,7 +216,9 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
   // Set an error status if parsing status code fails. A Forbidden response is sent to the client
   // if the filter has not been configured with failure_mode_allow.
   uint64_t status_code{};
-  if (!StringUtil::atoull(message->headers().Status()->value().c_str(), status_code)) {
+  // TODO(dnoe): Migrate to pure string_view to eliminate std:string instance (#6580)
+  const std::string status_string(message->headers().Status()->value().getStringView());
+  if (!StringUtil::atoull(status_string.c_str(), status_code)) {
     ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
     return std::make_unique<Response>(errorResponse());
   }

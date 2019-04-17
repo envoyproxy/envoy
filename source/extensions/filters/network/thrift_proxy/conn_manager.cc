@@ -87,8 +87,11 @@ void ConnectionManager::dispatch() {
 
 void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                                        bool end_stream) {
-  Buffer::OwnedImpl buffer;
+  if (read_callbacks_->connection().state() == Network::Connection::State::Closed) {
+    return;
+  }
 
+  Buffer::OwnedImpl buffer;
   const DirectResponse::ResponseType result = response.encode(metadata, *protocol_, buffer);
 
   Buffer::OwnedImpl response_buffer;
@@ -203,6 +206,11 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   ASSERT(metadata_ != nullptr);
 
   ConnectionManager& cm = parent_.parent_;
+
+  if (cm.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
+    complete_ = true;
+    throw EnvoyException("downstream connection is closed");
+  }
 
   Buffer::OwnedImpl buffer;
 

@@ -4137,6 +4137,26 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
+TEST_F(RoutePropertyTest, TestBadCorsConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/api"
+    route:
+      cluster: ats
+      cors:
+        enabled: 0
+)EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Unable to parse JSON as proto .*: invalid value 0 for type TYPE_BOOL");
+}
+
 TEST_F(RouteMatcherTest, Decorator) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -5036,8 +5056,10 @@ virtual_hosts:
           idle_timeout: 0s
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeout), EnvoyException,
-                          "value must be greater than \" \"0s");
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeout), factory_context_, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(0, route_entry->idleTimeout().value().count());
 }
 
 TEST_F(RouteConfigurationV2, ExplicitIdleTimeout) {

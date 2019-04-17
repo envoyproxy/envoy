@@ -15,9 +15,9 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "zookeeper_filter_test",
+    name = "filter_test",
     srcs = [
-        "zookeeper_filter_test.cc",
+        "filter_test.cc",
     ],
     extension_name = "envoy.filters.network.zookeeper_proxy",
     deps = [

@@ -76,11 +76,11 @@ public:
     while (!(known_counter_exists && known_gauge_exists && known_histogram_exists)) {
       envoy::service::metrics::v2::StreamMetricsMessage request_msg;
       VERIFY_ASSERTION(metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg));
-      EXPECT_STREQ("POST", metrics_service_request_->headers().Method()->value().c_str());
-      EXPECT_STREQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
-                   metrics_service_request_->headers().Path()->value().c_str());
-      EXPECT_STREQ("application/grpc",
-                   metrics_service_request_->headers().ContentType()->value().c_str());
+      EXPECT_EQ("POST", metrics_service_request_->headers().Method()->value().getStringView());
+      EXPECT_EQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
+                metrics_service_request_->headers().Path()->value().getStringView());
+      EXPECT_EQ("application/grpc",
+                metrics_service_request_->headers().ContentType()->value().getStringView());
       EXPECT_TRUE(request_msg.envoy_metrics_size() > 0);
       const Protobuf::RepeatedPtrField<::io::prometheus::client::MetricFamily>& envoy_metrics =
           request_msg.envoy_metrics();

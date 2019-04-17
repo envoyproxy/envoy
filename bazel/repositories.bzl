@@ -1,6 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":genrule_repository.bzl", "genrule_repository")
-load("//api/bazel:envoy_http_archive.bzl", "envoy_http_archive")
+load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(
     "@bazel_tools//tools/cpp:windows_cc_configure.bzl",
@@ -8,6 +8,7 @@ load(
     "setup_vc_env_vars",
 )
 load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
+load("@envoy_api//bazel:repositories.bzl", "api_dependencies")
 
 # dict of {build recipe name: longform extension name,}
 PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
@@ -35,27 +36,6 @@ _default_envoy_build_config = repository_rule(
     implementation = _default_envoy_build_config_impl,
     attrs = {
         "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
-    },
-)
-
-def _default_envoy_api_impl(ctx):
-    ctx.file("WORKSPACE", "")
-    ctx.file("BUILD.bazel", "")
-    api_dirs = [
-        "bazel",
-        "docs",
-        "envoy",
-        "examples",
-        "test",
-        "tools",
-    ]
-    for d in api_dirs:
-        ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
-
-_default_envoy_api = repository_rule(
-    implementation = _default_envoy_api_impl,
-    attrs = {
-        "api": attr.label(default = "@envoy//api:BUILD"),
     },
 )
 
@@ -94,6 +74,14 @@ def _python_deps():
         name = "com_github_twitter_common_finagle_thrift",
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
+    _repository_impl(
+        name = "six_archive",
+        build_file = "@com_google_protobuf//:six.BUILD",
+    )
+    native.bind(
+        name = "six",
+        actual = "@six_archive//:six",
+    )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
@@ -126,29 +114,6 @@ def _go_deps(skip_targets):
         )
         _repository_impl("io_bazel_rules_go")
         _repository_impl("bazel_gazelle")
-
-def _envoy_api_deps():
-    # Treat the data plane API as an external repo, this simplifies exporting the API to
-    # https://github.com/envoyproxy/data-plane-api.
-    if "envoy_api" not in native.existing_rules().keys():
-        _default_envoy_api(name = "envoy_api")
-
-    native.bind(
-        name = "api_httpbody_protos",
-        actual = "@googleapis//:api_httpbody_protos",
-    )
-    native.bind(
-        name = "http_api_protos",
-        actual = "@googleapis//:http_api_protos",
-    )
-    _repository_impl(
-        name = "six_archive",
-        build_file = "@com_google_protobuf//:six.BUILD",
-    )
-    native.bind(
-        name = "six",
-        actual = "@six_archive//:six",
-    )
 
 def envoy_dependencies(skip_targets = []):
     # Treat Envoy's overall build config as an external repo, so projects that
@@ -207,7 +172,7 @@ def envoy_dependencies(skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
-    _envoy_api_deps()
+    api_dependencies()
 
 def _boringssl():
     _repository_impl("boringssl")
