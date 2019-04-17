@@ -149,7 +149,7 @@ private:
       return retriable_status_codes_;
     }
 
-    const std::vector<uint32_t> retriable_status_codes_;
+    const std::vector<uint32_t> retriable_status_codes_{};
   };
 
   struct NullShadowPolicy : public Router::ShadowPolicy {

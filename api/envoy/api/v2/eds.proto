@@ -17,6 +17,7 @@ import "google/api/annotations.proto";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 import "google/protobuf/wrappers.proto";
+import "google/protobuf/duration.proto";
 
 option (gogoproto.equal_all) = true;
 option (gogoproto.stable_marshaler_all) = true;
@@ -107,6 +108,12 @@ message ClusterLoadAssignment {
     // Read more at :ref:`priority levels <arch_overview_load_balancing_priority_levels>` and
     // :ref:`localities <arch_overview_load_balancing_locality_weighted_lb>`.
     google.protobuf.UInt32Value overprovisioning_factor = 3 [(validate.rules).uint32.gt = 0];
+
+    // The max time until which the endpoints from this assignment can be used.
+    // If no new assignments are received before this time expires the endpoints
+    // are considered stale and should be marked unhealthy.
+    // Defaults to 0 which means endpoints never go stale.
+    google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration.gt.seconds = 0];
   }
 
   // Load balancing policy settings.

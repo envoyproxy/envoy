@@ -555,7 +555,8 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
   local_priority_set_->updateHosts(
       0,
-      HostSetImpl::updateHostsParams(hosts, HostsPerLocalityImpl::empty(), hosts,
+      HostSetImpl::updateHostsParams(hosts, HostsPerLocalityImpl::empty(),
+                                     std::make_shared<const HealthyHostVector>(*hosts),
                                      HostsPerLocalityImpl::empty()),
       {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
@@ -825,8 +826,11 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
   init(true);
   local_priority_set_->updateHosts(
-      0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
-      empty_host_vector_, empty_host_vector_, absl::nullopt);
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 0))
       .WillRepeatedly(Return(50));
@@ -850,8 +854,11 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
       .WillRepeatedly(Return(1));
   // Trigger reload.
   local_priority_set_->updateHosts(
-      0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
-      empty_host_vector_, empty_host_vector_, absl::nullopt);
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
 }
 
@@ -876,10 +883,12 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
   common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
   common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
   init(true);
-  local_priority_set_->updateHosts(0,
-                                   HostSetImpl::updateHostsParams(hosts, local_hosts_per_locality,
-                                                                  hosts, local_hosts_per_locality),
-                                   {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(hosts, local_hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     local_hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 100))
       .WillRepeatedly(Return(50));
@@ -916,8 +925,11 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
   local_priority_set_->updateHosts(
-      0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
-      empty_host_vector_, empty_host_vector_, absl::nullopt);
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
@@ -966,7 +978,8 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
   init(true);
   local_priority_set_->updateHosts(
       0,
-      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality, local_hosts,
+      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*local_hosts),
                                      local_hosts_per_locality),
       {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
@@ -1039,7 +1052,8 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   auto local_hosts_per_locality_shared = makeHostsPerLocality(std::move(local_hosts_per_locality));
   local_priority_set_->updateHosts(
       0,
-      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality_shared, local_hosts,
+      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality_shared,
+                                     std::make_shared<const HealthyHostVector>(*local_hosts),
                                      local_hosts_per_locality_shared),
       {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
@@ -1062,8 +1076,11 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
   local_priority_set_->updateHosts(
-      0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
-      empty_host_vector_, empty_host_vector_, absl::nullopt);
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
 
@@ -1078,8 +1095,11 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
   local_priority_set_->updateHosts(
-      0, HostSetImpl::updateHostsParams(hosts, hosts_per_locality, hosts, hosts_per_locality), {},
-      empty_host_vector_, empty_host_vector_, absl::nullopt);
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // local zone has no healthy hosts, take from the all healthy hosts.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -1111,7 +1131,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   init(true);
   local_priority_set_->updateHosts(
       0,
-      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality, local_hosts,
+      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*local_hosts),
                                      local_hosts_per_locality),
       {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
@@ -1142,7 +1163,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   init(true);
   local_priority_set_->updateHosts(
       0,
-      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality, local_hosts,
+      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*local_hosts),
                                      local_hosts_per_locality),
       {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 

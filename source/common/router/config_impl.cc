@@ -178,7 +178,7 @@ public:
 
     const Http::HeaderEntry* header = headers.get(header_name_);
     if (header) {
-      hash = HashUtil::xxHash64(header->value().c_str());
+      hash = HashUtil::xxHash64(header->value().getStringView());
     }
     return hash;
   }
@@ -436,7 +436,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
   if (!config_query_parameters_.empty()) {
     Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseQueryString(headers.Path()->value().c_str());
+        Http::Utility::parseQueryString(headers.Path()->value().getStringView());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
   }
 
@@ -494,7 +494,7 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
     return;
   }
 
-  std::string path = std::string(headers.Path()->value().c_str(), headers.Path()->value().size());
+  std::string path(headers.Path()->value().getStringView());
   if (insert_envoy_original_path) {
     headers.insertEnvoyOriginalPath().value(*headers.Path());
   }
@@ -542,7 +542,7 @@ absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& 
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   ASSERT(isDirectResponse());
 
-  const char* final_scheme;
+  absl::string_view final_scheme;
   absl::string_view final_host;
   absl::string_view final_port;
   absl::string_view final_path;
@@ -550,10 +550,10 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
   if (!scheme_redirect_.empty()) {
     final_scheme = scheme_redirect_.c_str();
   } else if (https_redirect_) {
-    final_scheme = Http::Headers::get().SchemeValues.Https.c_str();
+    final_scheme = Http::Headers::get().SchemeValues.Https;
   } else {
     ASSERT(headers.ForwardedProto());
-    final_scheme = headers.ForwardedProto()->value().c_str();
+    final_scheme = headers.ForwardedProto()->value().getStringView();
   }
 
   if (!port_redirect_.empty()) {
@@ -573,7 +573,7 @@ std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {
     final_path = path_redirect_.c_str();
   } else {
     ASSERT(headers.Path());
-    final_path = absl::string_view(headers.Path()->value().c_str(), headers.Path()->value().size());
+    final_path = headers.Path()->value().getStringView();
     if (strip_query_) {
       size_t path_end = final_path.find("?");
       if (path_end != absl::string_view::npos) {
@@ -677,7 +677,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
       const Http::HeaderEntry* entry = headers.get(cluster_header_name_);
       std::string final_cluster_name;
       if (entry) {
-        final_cluster_name = entry->value().c_str();
+        final_cluster_name = std::string(entry->value().getStringView());
       }
 
       // NOTE: Though we return a shared_ptr here, the current ownership model assumes that
@@ -790,17 +790,17 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
     const Http::HeaderString& path = headers.Path()->value();
-    const char* query_string_start = Http::Utility::findQueryStringStart(path);
+    absl::string_view query_string = Http::Utility::findQueryStringStart(path);
     size_t compare_length = path.size();
-    if (query_string_start != nullptr) {
-      compare_length = query_string_start - path.c_str();
+    if (query_string.length() > 0) {
+      compare_length = compare_length - query_string.length();
     }
 
     if (compare_length != path_.size()) {
       return nullptr;
     }
 
-    absl::string_view path_section(path.c_str(), compare_length);
+    const absl::string_view path_section = path.getStringView().substr(0, compare_length);
     if (case_sensitive_) {
       if (absl::string_view(path_) == path_section) {
         return clusterEntry(headers, random_value);
@@ -824,11 +824,14 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(const VirtualHostImpl& vhost,
 void RegexRouteEntryImpl::rewritePathHeader(Http::HeaderMap& headers,
                                             bool insert_envoy_original_path) const {
   const Http::HeaderString& path = headers.Path()->value();
-  const char* query_string_start = Http::Utility::findQueryStringStart(path);
+  const absl::string_view query_string = Http::Utility::findQueryStringStart(path);
+  const size_t path_string_length = path.size() - query_string.length();
   // TODO(yuval-k): This ASSERT can happen if the path was changed by a filter without clearing the
   // route cache. We should consider if ASSERT-ing is the desired behavior in this case.
-  ASSERT(std::regex_match(path.c_str(), query_string_start, regex_));
-  std::string matched_path(path.c_str(), query_string_start);
+
+  const absl::string_view path_view = path.getStringView();
+  ASSERT(std::regex_match(path_view.begin(), path_view.begin() + path_string_length, regex_));
+  const std::string matched_path(path_view.begin(), path_view.begin() + path_string_length);
 
   finalizePathHeader(headers, matched_path, insert_envoy_original_path);
 }
@@ -837,8 +840,10 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::HeaderMap& headers,
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, random_value)) {
     const Http::HeaderString& path = headers.Path()->value();
-    const char* query_string_start = Http::Utility::findQueryStringStart(path);
-    if (std::regex_match(path.c_str(), query_string_start, regex_)) {
+    const absl::string_view query_string = Http::Utility::findQueryStringStart(path);
+    if (std::regex_match(path.getStringView().begin(),
+                         path.getStringView().begin() + (path.size() - query_string.length()),
+                         regex_)) {
       return clusterEntry(headers, random_value);
     }
   }
@@ -1026,7 +1031,8 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
 
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
-  const std::string host = Http::LowerCaseString(headers.Host()->value().c_str()).get();
+  const std::string host =
+      Http::LowerCaseString(std::string(headers.Host()->value().getStringView())).get();
   const auto& iter = virtual_hosts_.find(host);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
@@ -1069,9 +1075,10 @@ const VirtualCluster*
 VirtualHostImpl::virtualClusterFromEntries(const Http::HeaderMap& headers) const {
   for (const VirtualClusterEntry& entry : virtual_clusters_) {
     bool method_matches =
-        !entry.method_ || headers.Method()->value().c_str() == entry.method_.value();
+        !entry.method_ || headers.Method()->value().getStringView() == entry.method_.value();
 
-    if (method_matches && std::regex_match(headers.Path()->value().c_str(), entry.pattern_)) {
+    absl::string_view path_view = headers.Path()->value().getStringView();
+    if (method_matches && std::regex_match(path_view.begin(), path_view.end(), entry.pattern_)) {
       return &entry;
     }
   }

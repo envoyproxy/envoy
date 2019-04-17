@@ -82,8 +82,8 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         State* state = static_cast<State*>(context);
         const Http::HeaderEntry* entry =
-            state->lhs.get(Http::LowerCaseString(std::string(header.key().c_str())));
-        if (entry == nullptr || (entry->value() != header.value().c_str())) {
+            state->lhs.get(Http::LowerCaseString(std::string(header.key().getStringView())));
+        if (entry == nullptr || (entry->value() != header.value().getStringView())) {
           state->equal = false;
           return Http::HeaderMap::Iterate::Break;
         }
@@ -371,7 +371,7 @@ std::string TestHeaderMapImpl::get_(const LowerCaseString& key) {
   if (!header) {
     return EMPTY_STRING;
   } else {
-    return header->value().c_str();
+    return std::string(header->value().getStringView());
   }
 }
 

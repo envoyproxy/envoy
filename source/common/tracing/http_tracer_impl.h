@@ -117,7 +117,7 @@ public:
   bool verbose() const override { return false; }
 
 private:
-  const std::vector<Http::LowerCaseString> request_headers_for_tags_;
+  const std::vector<Http::LowerCaseString> request_headers_for_tags_{};
 };
 
 typedef ConstSingleton<EgressConfigImpl> EgressConfig;

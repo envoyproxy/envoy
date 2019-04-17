@@ -285,6 +285,7 @@ accessors
 acls
 addr
 agg
+alignof
 alloc
 alloca
 allocator
@@ -423,6 +424,7 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
+evwatch
 exe
 execlp
 facto
