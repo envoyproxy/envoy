@@ -28,7 +28,7 @@ public:
   QuicMemSliceSpanImpl(const QuicMemSliceSpanImpl& other) = default;
   QuicMemSliceSpanImpl& operator=(const QuicMemSliceSpanImpl& other) = default;
 
-  QuicMemSliceSpanImpl(QuicMemSliceSpanImpl&& other) : buffer_(other.buffer_) noexcept {
+  QuicMemSliceSpanImpl(QuicMemSliceSpanImpl&& other) noexcept : buffer_(other.buffer_) {
     other.buffer_ = nullptr;
   }
 
@@ -75,7 +75,7 @@ public:
   bool empty() const { return buffer_->length() == 0; }
 
 private:
-  Envoy::Buffer::Instance* buffer_;
+  Envoy::Buffer::Instance* buffer_{nullptr};
 };
 
 } // namespace quic
