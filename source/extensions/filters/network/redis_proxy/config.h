@@ -13,11 +13,25 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
+class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
+public:
+  ProtocolOptionsConfigImpl(
+      const envoy::config::filter::network::redis_proxy::v2::RedisProtocolOptions& proto_config)
+      : auth_password_(proto_config.auth_password()) {}
+
+  const std::string& auth_password() const { return auth_password_; }
+
+private:
+  const std::string auth_password_;
+};
+
 /**
  * Config registration for the redis proxy filter. @see NamedNetworkFilterConfigFactory.
  */
 class RedisProxyFilterConfigFactory
-    : public Common::FactoryBase<envoy::config::filter::network::redis_proxy::v2::RedisProxy> {
+    : public Common::FactoryBase<
+          envoy::config::filter::network::redis_proxy::v2::RedisProxy,
+          envoy::config::filter::network::redis_proxy::v2::RedisProtocolOptions> {
 public:
   RedisProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().RedisProxy) {}
 
@@ -30,6 +44,12 @@ private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
+
+  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
+      const envoy::config::filter::network::redis_proxy::v2::RedisProtocolOptions& proto_config)
+      override {
+    return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
+  }
 };
 
 } // namespace RedisProxy

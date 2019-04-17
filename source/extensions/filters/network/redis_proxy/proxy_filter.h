@@ -59,6 +59,8 @@ public:
   const std::string stat_prefix_;
   const std::string redis_drain_close_runtime_key_{"redis.drain_close_enabled"};
   ProxyStats stats_;
+  bool auth_required_;
+  const std::string downstream_auth_password_;
 
 private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -91,12 +93,16 @@ public:
   // Common::Redis::DecoderCallbacks
   void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
+  bool connectionAllowed() { return connection_allowed_; }
+
 private:
   struct PendingRequest : public CommandSplitter::SplitCallbacks {
     PendingRequest(ProxyFilter& parent);
     ~PendingRequest();
 
     // RedisProxy::CommandSplitter::SplitCallbacks
+    bool connectionAllowed() override { return parent_.connectionAllowed(); }
+    void onAuth(const std::string& password) override { parent_.onAuth(*this, password); }
     void onResponse(Common::Redis::RespValuePtr&& value) override {
       parent_.onResponse(*this, std::move(value));
     }
@@ -106,6 +112,7 @@ private:
     CommandSplitter::SplitRequestPtr request_handle_;
   };
 
+  void onAuth(PendingRequest& request, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
 
   Common::Redis::DecoderPtr decoder_;
@@ -115,6 +122,7 @@ private:
   Buffer::OwnedImpl encoder_buffer_;
   Network::ReadFilterCallbacks* callbacks_{};
   std::list<PendingRequest> pending_requests_;
+  bool connection_allowed_;
 };
 
 } // namespace RedisProxy

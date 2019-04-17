@@ -49,10 +49,21 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
+    std::string auth_password;
+    Upstream::ThreadLocalCluster* cluster_ptr = context.clusterManager().get(cluster);
+
+    if (cluster_ptr) {
+      auto options = cluster_ptr->info()->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+          NetworkFilterNames::get().RedisProxy);
+      if (options) {
+        auth_password = options->auth_password();
+      }
+    }
+
     upstreams.emplace(cluster, std::make_shared<ConnPool::InstanceImpl>(
                                    cluster, context.clusterManager(),
                                    Common::Redis::Client::ClientFactoryImpl::instance_,
-                                   context.threadLocal(), proto_config.settings()));
+                                   context.threadLocal(), proto_config.settings(), auth_password));
   }
 
   auto router = std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams));

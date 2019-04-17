@@ -238,6 +238,10 @@ void FilterJson::translateRedisProxy(
 
   auto* conn_pool = proto_config.mutable_settings();
   JSON_UTIL_SET_DURATION(*json_conn_pool, *conn_pool, op_timeout);
+
+  if (json_config.hasObject("downstream_auth_password")) {
+    proto_config.set_downstream_auth_password(json_config.getString("downstream_auth_password"));
+  }
 }
 
 void FilterJson::translateMongoProxy(

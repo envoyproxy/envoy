@@ -13,11 +13,30 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace ConnPool {
 
+namespace {
+
+Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
+
+Common::Redis::RespValue makeAuthCommand(const std::string& password) {
+  Common::Redis::RespValue auth_command, value;
+  auth_command.type(Common::Redis::RespType::Array);
+  value.type(Common::Redis::RespType::BulkString);
+  value.asString() = "auth";
+  auth_command.asArray().push_back(value);
+  value.asString() = password;
+  auth_command.asArray().push_back(value);
+  return auth_command;
+}
+
+} // namespace
+
 InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
-    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config) {
+    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
+    const std::string& auth_password)
+    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
+      auth_password_(auth_password) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -136,6 +155,11 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     client->host_ = host;
     client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
     client->redis_client_->addConnectionCallbacks(*client);
+    if (!parent_.auth_password_.empty()) {
+      // Send an AUTH command to the upstream server.
+      client->redis_client_->makeRequest(makeAuthCommand(parent_.auth_password_),
+                                         null_pool_callbacks);
+    }
   }
 
   // Keep host_address_map_ in sync with client_map_.
@@ -218,6 +242,11 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     client->redis_client_ =
         parent_.client_factory_.create(it->second, dispatcher_, parent_.config_);
     client->redis_client_->addConnectionCallbacks(*client);
+    if (!parent_.auth_password_.empty()) {
+      // Send an AUTH command to the upstream server.
+      client->redis_client_->makeRequest(makeAuthCommand(parent_.auth_password_),
+                                         null_pool_callbacks);
+    }
   }
 
   return client->redis_client_->makeRequest(request, callbacks);

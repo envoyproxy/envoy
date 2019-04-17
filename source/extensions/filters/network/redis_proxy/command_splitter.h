@@ -35,6 +35,18 @@ public:
   virtual ~SplitCallbacks() {}
 
   /**
+   * Called to verify that commands should be processed.
+   * @return bool true if commands from this client connection can be processed, false if not.
+   */
+  virtual bool connectionAllowed() PURE;
+
+  /**
+   * Called when an authentication command has been received.
+   * @param password supplies the AUTH password provided by the downstream client.
+   */
+  virtual void onAuth(const std::string& password) PURE;
+
+  /**
    * Called when the response is ready.
    * @param value supplies the response which is now owned by the callee.
    */
