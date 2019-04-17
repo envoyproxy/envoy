@@ -522,6 +522,8 @@ public:
   COUNTER  (update_failure)                                                                        \
   COUNTER  (update_empty)                                                                          \
   COUNTER  (update_no_rebuild)                                                                     \
+  COUNTER  (assignment_timeout_received)                                                           \
+  COUNTER  (assignment_stale)                                                                      \
   GAUGE    (version)
 // clang-format on
 
