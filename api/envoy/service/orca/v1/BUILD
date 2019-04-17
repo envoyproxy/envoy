@@ -6,9 +6,15 @@ api_proto_library_internal(
     name = "orca",
     srcs = ["orca.proto"],
     has_services = 1,
+    deps = [
+        "//envoy/data/orca/v1:orca_load_report",
+    ],
 )
 
 api_go_grpc_library(
     name = "orca",
     proto = ":orca",
+    deps = [
+        "//envoy/data/orca/v1:orca_load_report",
+    ],
 )

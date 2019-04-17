@@ -1,11 +1,13 @@
 syntax = "proto3";
 
-package envoy.service.load_stats.v2alpha;
+package envoy.service.orca.v1;
 
 option java_outer_classname = "OpenRcaProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.service.load_stats.v2alpha";
-option go_package = "v2alpha";
+option java_package = "io.envoyproxy.envoy.service.orca.v1";
+option go_package = "v1";
+
+import "envoy/data/orca/v1/orca_load_report.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -20,7 +22,7 @@ import "validate/validate.proto";
 // streaming service, client needs to terminate current RPC and initiate
 // a new call to change backend reporting frequency.
 service OpenRcaService {
-  rpc StreamCoreMetrics(OrcaLoadReportRequest) returns (stream OrcaLoadReport);
+  rpc StreamCoreMetrics (OrcaLoadReportRequest) returns (stream envoy.data.orca.v1.OrcaLoadReport);
 }
 
 message OrcaLoadReportRequest {
@@ -30,22 +32,4 @@ message OrcaLoadReportRequest {
   // the load reporting agent will be returned. This provides an opportunity for
   // the client to selectively obtain a subset of tracked costs.
   repeated string request_cost_names = 2;
-}
-
-message OrcaLoadReport {
-  // CPU utilization expressed as a fraction of available CPU resources. This
-  // should be derived from a sample or measurement taken during the request.
-  double cpu_utilization = 1 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
-
-  // Memory utilization expressed as a fraction of available memory
-  // resources. This should be derived from a sample or measurement taken
-  // during the request.
-  double mem_utilization = 2 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
-
-  // Application specific requests costs. Values may be absolute costs (e.g.
-  // 3487 bytes of storage) associated with the cost or utilization,
-  // expressed as a fraction of total resources available. Utilization
-  // metrics should be derived from a sample or measurement taken
-  // during the request.
-  map<string, double> request_cost_or_utilization = 5;
 }
