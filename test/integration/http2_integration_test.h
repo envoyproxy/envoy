@@ -53,5 +53,7 @@ public:
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
+
+  void testRequestMetadataWithStopAllFilter();
 };
 } // namespace Envoy

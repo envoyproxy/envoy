@@ -165,6 +165,9 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
+        "//test/integration/filters:metadata_stop_all_filter_config_lib",
+        "//test/integration/filters:request_metadata_filter_config_lib",
+        "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -258,8 +261,6 @@ envoy_cc_test_library(
         "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
-        "//test/integration/filters:request_metadata_filter_config_lib",
-        "//test/integration/filters:response_metadata_filter_config_lib",
         "//test/test_common:registry_lib",
     ],
 )

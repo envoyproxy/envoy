@@ -603,6 +603,7 @@ TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   expected_metadata_keys.insert("metadata1");
   expected_metadata_keys.insert("metadata2");
   expected_metadata_keys.insert("trailers");
+  verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
   EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 6);
 }
 
@@ -641,6 +642,49 @@ TEST_P(Http2MetadataIntegrationTest, DecodeHeaderOnlyRequestWithRequestMetadata)
   EXPECT_EQ(true, upstream_request_->receivedData());
   EXPECT_EQ(0, upstream_request_->bodyLength());
   EXPECT_EQ(true, upstream_request_->complete());
+}
+
+void Http2MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Sends multiple metadata.
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  Http::MetadataMap metadata_map = {{"metadata1", "metadata1"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  codec_client_->sendData(*request_encoder_, 10, false);
+  metadata_map = {{"metadata2", "metadata2"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  metadata_map = {{"consume", "consume"}};
+  codec_client_->sendMetadata(*request_encoder_, metadata_map);
+  Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  std::set<std::string> expected_metadata_keys = {"headers",   "data",    "metadata", "metadata1",
+                                                  "metadata2", "replace", "trailers"};
+  verifyExpectedMetadata(upstream_request_->metadata_map(), expected_metadata_keys);
+  EXPECT_EQ(upstream_request_->duplicated_metadata_key_count().find("metadata")->second, 6);
+}
+
+static std::string metadata_stop_all_filter = R"EOF(
+name: metadata-stop-all-filter
+config: {}
+)EOF";
+
+TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
+  addFilters({request_metadata_filter, metadata_stop_all_filter});
+  testRequestMetadataWithStopAllFilter();
+}
+
+TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterAfterMetadataFilter) {
+  addFilters({metadata_stop_all_filter, request_metadata_filter});
+  testRequestMetadataWithStopAllFilter();
 }
 
 TEST_P(Http2IntegrationTest, GrpcRouterNotFound) {

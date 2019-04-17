@@ -97,7 +97,7 @@ private:
     ActiveStreamFilterBase(ActiveStream& parent, bool dual_filter)
         : iteration_state_(IterationState::Continue), iterate_from_current_filter_(false),
           parent_(parent), headers_continued_(false), continue_headers_continued_(false),
-          end_stream_(false), dual_filter_(dual_filter) {}
+          end_stream_(false), dual_filter_(dual_filter), decode_headers_called_(false) {}
 
     // Functions in the following block are called after the filter finishes processing
     // corresponding data. Those functions handle state updates and data storage (if needed)
@@ -127,6 +127,8 @@ private:
     virtual const HeaderMapPtr& trailers() PURE;
     virtual void doMetadata() PURE;
     virtual MetadataMapVector& saved_metadata() PURE;
+    // TODO(soya3129): make this pure when adding impl to encodefilter.
+    virtual void handleMetadataAfterHeadersCallback() {}
 
     // Http::StreamFilterCallbacks
     const Network::Connection* connection() override;
@@ -150,7 +152,12 @@ private:
       ASSERT(iteration_state_ != IterationState::Continue);
       iteration_state_ = IterationState::Continue;
     }
-
+    // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
+    // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
+    // [de|en]codeHeaders() adds new metadata to [de|en]code, but we don't know
+    // [de|en]codeHeaders()'s return value yet.
+    MetadataMapVector saved_request_metadata_;
+    MetadataMapVector saved_response_metadata_;
     // The state of iteration.
     enum class IterationState {
       Continue,            // Iteration has not stopped for any frame type.
@@ -172,6 +179,7 @@ private:
     // If true, end_stream is called for this filter.
     bool end_stream_ : 1;
     const bool dual_filter_ : 1;
+    bool decode_headers_called_ : 1;
   };
 
   /**
@@ -204,23 +212,19 @@ private:
       parent_.decodeData(this, *parent_.buffered_request_data_, end_stream,
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
-    void doMetadata() override {
-      // A filter down the chain may return StopAllIteration, and additional metadata may be added
-      // to saved_request_metadata_when_stopall_. Only parse and remove the metadata existing before
-      // calls to decodeMetadata().
-      size_t size = parent_.saved_request_metadata_when_stopall_.size();
-      MetadataMapVector::iterator begin = parent_.saved_request_metadata_when_stopall_.begin();
-      size_t i = 0;
-      for (auto it = begin; i < size; it++, i++) {
-        parent_.decodeMetadata(this, **it);
-      }
-      parent_.saved_request_metadata_when_stopall_.erase(begin, begin + size - 1);
-    }
-    MetadataMapVector& saved_metadata() override {
-      return parent_.saved_request_metadata_when_stopall_;
-    }
+    void doMetadata() override { drainSavedRequestMetadata(); }
+    MetadataMapVector& saved_metadata() override { return saved_request_metadata_; }
     void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
+
+    void drainSavedRequestMetadata() {
+      for (auto& metadata_map : saved_request_metadata_) {
+        parent_.decodeMetadata(this, *metadata_map);
+      }
+      saved_request_metadata_.clear();
+    }
+    // Calls this function after the filter calls decodeHeaders() to drain accumulated metadata.
+    void handleMetadataAfterHeadersCallback() override;
 
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
@@ -306,21 +310,15 @@ private:
       parent_.encodeData(this, *parent_.buffered_response_data_, end_stream,
                          ActiveStream::FilterIterationStartState::CanStartFromCurrent);
     }
-    void doMetadata() override {
-      // A filter down the chain may return StopAllIteration, and additional metadata may be added
-      // to saved_response_metadata_when_stopall_. Only parse and remove the metadata existing
-      // before calls to decodeMetadata().
-      size_t size = parent_.saved_response_metadata_when_stopall_.size();
-      MetadataMapVector::iterator begin = parent_.saved_response_metadata_when_stopall_.begin();
-      size_t i = 0;
-      for (auto it = begin; i < size; it++, i++) {
-        parent_.encodeMetadata(this, std::move(*it));
+    void drainSavedResponseMetadata() {
+      for (auto& metadata_map : saved_response_metadata_) {
+        parent_.encodeMetadata(this, std::move(metadata_map));
       }
-      parent_.saved_response_metadata_when_stopall_.erase(begin, begin + size - 1);
+      saved_response_metadata_.clear();
     }
-    MetadataMapVector& saved_metadata() override {
-      return parent_.saved_response_metadata_when_stopall_;
-    }
+
+    void doMetadata() override { drainSavedResponseMetadata(); }
+    MetadataMapVector& saved_metadata() override { return saved_response_metadata_; }
     void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
 

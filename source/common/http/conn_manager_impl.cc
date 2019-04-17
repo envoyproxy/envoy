@@ -823,6 +823,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
       empty_data_end_stream_sent_ = true;
     }
 
+    (*entry)->decode_headers_called_ = true;
     if (!(*entry)->commonHandleAfterHeadersCallback(status, decoding_headers_only_) &&
         std::next(entry) != decoder_filters_.end()) {
       // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
@@ -1070,11 +1071,13 @@ void ConnectionManagerImpl::ActiveStream::decodeMetadata(ActiveStreamDecoderFilt
 
   for (; entry != decoder_filters_.end(); entry++) {
     // If the filter pointed by entry has stopped for all frame type, stores metadata and return.
-    if ((*entry)->stoppedAll()) {
+    // If the filter pointed by entry hasn't returned from decodeHeaders, stores newly added
+    // metadata in case decodeHeaders returns StopAllIteration.
+    if (!(*entry)->decode_headers_called_ || (*entry)->stoppedAll()) {
       Http::MetadataMap metadata;
       metadata.insert(metadata_map.begin(), metadata_map.end());
       Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata);
-      saved_request_metadata_when_stopall_.emplace_back(std::move(metadata_map_ptr));
+      (*entry)->saved_request_metadata_.emplace_back(std::move(metadata_map_ptr));
       return;
     }
 
@@ -1745,22 +1748,25 @@ bool ConnectionManagerImpl::ActiveStreamFilterBase::commonHandleAfterHeadersCall
 
   if (status == FilterHeadersStatus::StopIteration) {
     iteration_state_ = IterationState::StopSingleIteration;
-    return false;
   } else if (status == FilterHeadersStatus::StopAllIterationAndBuffer) {
     iteration_state_ = IterationState::StopAllBuffer;
-    return false;
   } else if (status == FilterHeadersStatus::StopAllIterationAndWatermark) {
     iteration_state_ = IterationState::StopAllWatermark;
-    return false;
   } else if (status == FilterHeadersStatus::ContinueAndEndStream) {
     // Set headers_only to true so we know to end early if necessary,
     // but continue filter iteration so we actually write the headers/run the cleanup code.
     headers_only = true;
     ENVOY_STREAM_LOG(debug, "converting to headers only", parent_);
-    return true;
   } else {
     ASSERT(status == FilterHeadersStatus::Continue);
     headers_continued_ = true;
+  }
+
+  handleMetadataAfterHeadersCallback();
+
+  if (stoppedAll() || status == FilterHeadersStatus::StopIteration) {
+    return false;
+  } else {
     return true;
   }
 }
@@ -1874,6 +1880,19 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::cre
                                                 [this]() -> void { this->requestDataTooLarge(); });
   buffer->setWatermarks(parent_.buffer_limit_);
   return buffer;
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::handleMetadataAfterHeadersCallback() {
+  // If we drain acumulated metadata, the iteration must start with the current filter.
+  bool saved_state = iterate_from_current_filter_;
+  iterate_from_current_filter_ = true;
+  // If decodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
+  // for doMetadata() to drain the metadata after iteration continues.
+  if (!stoppedAll() && !saved_request_metadata_.empty()) {
+    drainSavedRequestMetadata();
+  }
+  // Restores the originial value of iterate_from_current_filter_.
+  iterate_from_current_filter_ = saved_state;
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedTrailers() {
