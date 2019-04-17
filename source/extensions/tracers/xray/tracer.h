@@ -34,7 +34,7 @@ public:
   virtual void reportSpan(const Span& span) PURE;
 };
 
-typedef std::unique_ptr<Reporter> ReporterPtr;
+using ReporterPtr = std::unique_ptr<Reporter>;
 
 /**
  * This class implements the XRay tracer.
@@ -110,8 +110,8 @@ public:
   std::string generateTraceId();
 
 private:
-  static const std::string VERSION_;
-  static const std::string DELIMITER_;
+  const char* version_ = "1";
+  const char* delimiter_ = "-";
   const char* hex_digits = "0123456789abcdef";
 
   const std::string segment_name_;
@@ -121,7 +121,7 @@ private:
   TimeSource& time_source_;
 };
 
-typedef std::unique_ptr<Tracer> TracerPtr;
+using TracerPtr = std::unique_ptr<Tracer>;
 } // namespace XRay
 } // namespace Tracers
 } // namespace Extensions

@@ -1,7 +1,5 @@
 #include "extensions/tracers/xray/tracer.h"
 
-#include <chrono>
-#include <ctime>
 #include <random>
 
 #include "common/common/utility.h"
@@ -14,12 +12,12 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace XRay {
-const std::string Tracer::VERSION_ = "1";
-const std::string Tracer::DELIMITER_ = "-";
 
 std::string Tracer::generateRandom96BitString() {
   char values[25] = {'\0'};
-  auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+  uint64_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                      time_source_.systemTime().time_since_epoch())
+                      .count();
   std::mt19937 mt_rand(seed);
 
   for (int i = 0; i < 24; i++) {
@@ -29,13 +27,13 @@ std::string Tracer::generateRandom96BitString() {
 }
 
 std::string Tracer::generateTraceId() {
-  time_t epoch = time(nullptr);
+  uint64_t epoch_time =
+      std::chrono::duration_cast<std::chrono::seconds>(time_source_.systemTime().time_since_epoch())
+          .count();
   std::stringstream stream;
-  stream << std::hex << epoch;
+  stream << std::hex << epoch_time;
   std::string result(stream.str());
-  std::stringstream trace_id;
-  trace_id << VERSION_ << DELIMITER_ << result << DELIMITER_ << generateRandom96BitString();
-  return trace_id.str();
+  return absl::StrCat(version_, delimiter_, result, delimiter_, generateRandom96BitString());
 }
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
