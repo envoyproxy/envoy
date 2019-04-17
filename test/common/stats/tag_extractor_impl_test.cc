@@ -327,6 +327,17 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("http.fault_connection_manager.fault.fault_cluster.aborts_injected",
                          "http.fault.aborts_injected",
                          {fault_connection_manager, fault_downstream_cluster});
+
+  Tag rds_hcm;
+  rds_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  rds_hcm.value_ = "rds_connection_manager";
+
+  Tag rds_route_config;
+  rds_route_config.name_ = tag_names.RDS_ROUTE_CONFIG;
+  rds_route_config.value_ = "route_config.123";
+
+  regex_tester.testRegex("http.rds_connection_manager.rds.route_config.123.update_success",
+                         "http.rds.update_success", {rds_hcm, rds_route_config});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {
