@@ -41,6 +41,8 @@ build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
 build:clang-tsan --linkopt -fuse-ld=lld
 build:clang-tsan --define tcmalloc=disabled
+# Needed due to https://github.com/libevent/libevent/issues/777
+build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 
 # Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
 # support (see https://github.com/envoyproxy/envoy/issues/443).
