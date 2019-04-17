@@ -32,12 +32,12 @@ class ScopedRoutesConfigProviderManager;
 class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderBase {
 public:
   InlineScopedRoutesConfigProvider(
-      std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos,
-      const std::string& name, Server::Configuration::FactoryContext& factory_context,
+      std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos, std::string name,
+      Server::Configuration::FactoryContext& factory_context,
       ScopedRoutesConfigProviderManager& config_provider_manager,
-      const envoy::api::v2::core::ConfigSource& rds_config_source,
-      const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
-          ScopeKeyBuilder& scope_key_builder);
+      envoy::api::v2::core::ConfigSource rds_config_source,
+      envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
+          scope_key_builder);
 
   ~InlineScopedRoutesConfigProvider() override = default;
 
@@ -130,7 +130,7 @@ class ScopedRdsConfigProvider : public Envoy::Config::DeltaMutableConfigProvider
 public:
   ScopedRdsConfigProvider(ScopedRdsConfigSubscriptionSharedPtr&& subscription,
                           Server::Configuration::FactoryContext& factory_context,
-                          const envoy::api::v2::core::ConfigSource& rds_config_source,
+                          envoy::api::v2::core::ConfigSource rds_config_source,
                           const envoy::config::filter::network::http_connection_manager::v2::
                               ScopedRoutes::ScopeKeyBuilder& scope_key_builder);
 
@@ -183,11 +183,10 @@ class ScopedRoutesConfigProviderManagerOptArg
     : public Envoy::Config::ConfigProviderManager::OptionalArg {
 public:
   ScopedRoutesConfigProviderManagerOptArg(
-      const std::string& scoped_routes_name,
-      const envoy::api::v2::core::ConfigSource& rds_config_source,
+      std::string scoped_routes_name, const envoy::api::v2::core::ConfigSource& rds_config_source,
       const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
           ScopeKeyBuilder& scope_key_builder)
-      : scoped_routes_name_(scoped_routes_name), rds_config_source_(rds_config_source),
+      : scoped_routes_name_(std::move(scoped_routes_name)), rds_config_source_(rds_config_source),
         scope_key_builder_(scope_key_builder) {}
 
   const std::string scoped_routes_name_;

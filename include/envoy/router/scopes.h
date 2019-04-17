@@ -13,7 +13,7 @@ namespace Router {
  */
 class ScopedConfig : public Envoy::Config::ConfigProvider::Config {
 public:
-  virtual ~ScopedConfig() {}
+  ~ScopedConfig() override = default;
 
   /**
    * Based on the incoming HTTP request headers, returns the configuration to use for selecting a

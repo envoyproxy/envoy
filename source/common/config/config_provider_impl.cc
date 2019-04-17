@@ -74,7 +74,7 @@ bool ConfigSubscriptionInstance::checkAndApplyConfigUpdate(const Protobuf::Messa
 }
 
 void DeltaConfigSubscriptionInstance::applyConfigUpdate(
-    std::function<void(ConfigProvider::ConfigConstSharedPtr)> updateFn) {
+    const std::function<void(const ConfigProvider::ConfigConstSharedPtr&)>& updateFn) {
   for (auto* provider : mutable_config_providers_) {
     auto* typed_provider = static_cast<DeltaMutableConfigProviderBase*>(provider);
     ConfigProvider::ConfigConstSharedPtr config = typed_provider->getConfig();

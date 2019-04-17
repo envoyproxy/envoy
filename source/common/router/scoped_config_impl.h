@@ -23,11 +23,12 @@ namespace Router {
  */
 class ThreadLocalScopedConfigImpl : public ScopedConfig, public ThreadLocal::ThreadLocalObject {
 public:
-  ThreadLocalScopedConfigImpl(const envoy::config::filter::network::http_connection_manager::v2::
-                                  ScopedRoutes::ScopeKeyBuilder& scope_key_builder)
-      : scope_key_builder_(scope_key_builder) {}
+  ThreadLocalScopedConfigImpl(
+      envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
+          scope_key_builder)
+      : scope_key_builder_(std::move(scope_key_builder)) {}
 
-  virtual ~ThreadLocalScopedConfigImpl() = default;
+  ~ThreadLocalScopedConfigImpl() override = default;
 
   void addOrUpdateRoutingScope(ScopedRouteInfoConstSharedPtr scoped_route_info);
   void removeRoutingScope(const std::string& scope_name);

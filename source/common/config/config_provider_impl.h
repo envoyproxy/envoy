@@ -289,7 +289,8 @@ protected:
    *
    * @param updateFn the callback to run on each provider and worker thread.
    */
-  void applyConfigUpdate(std::function<void(ConfigProvider::ConfigConstSharedPtr)> updateFn);
+  void applyConfigUpdate(
+      const std::function<void(const ConfigProvider::ConfigConstSharedPtr&)>& updateFn);
 };
 
 /**
@@ -419,7 +420,7 @@ protected:
    */
   void initialize(ThreadLocal::Slot::InitializeCb initializeCb) {
     subscription_->bindConfigProvider(this);
-    tls_->set(initializeCb);
+    tls_->set(std::move(initializeCb));
   }
 };
 

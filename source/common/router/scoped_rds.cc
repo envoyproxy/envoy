@@ -36,10 +36,9 @@ ConfigProviderPtr ScopedRoutesConfigProviderUtil::maybeCreate(
             config.scoped_routes().scoped_route_configurations_list();
     std::vector<std::unique_ptr<const Protobuf::Message>> config_protos(
         scoped_route_list.scoped_route_configurations().size());
-    for (auto it = scoped_route_list.scoped_route_configurations().begin();
-         it != scoped_route_list.scoped_route_configurations().end(); ++it) {
-      Protobuf::Message* clone = (*it).New();
-      clone->CopyFrom(*it);
+    for (const auto& it : scoped_route_list.scoped_route_configurations()) {
+      Protobuf::Message* clone = it.New();
+      clone->CopyFrom(it);
       config_protos.push_back(std::unique_ptr<const Protobuf::Message>(clone));
     }
 
@@ -67,19 +66,20 @@ ConfigProviderPtr ScopedRoutesConfigProviderUtil::maybeCreate(
 }
 
 InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
-    std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos, const std::string& name,
+    std::vector<std::unique_ptr<const Protobuf::Message>>&& config_protos, std::string name,
     Server::Configuration::FactoryContext& factory_context,
     ScopedRoutesConfigProviderManager& config_provider_manager,
-    const envoy::api::v2::core::ConfigSource& rds_config_source,
-    const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
-        ScopeKeyBuilder& scope_key_builder)
+    envoy::api::v2::core::ConfigSource rds_config_source,
+    envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
+        scope_key_builder)
     : Envoy::Config::ImmutableConfigProviderBase(factory_context, config_provider_manager,
                                                  ConfigProviderInstanceType::Inline,
                                                  ConfigProvider::ApiType::Delta),
-      name_(name), config_(std::make_shared<ThreadLocalScopedConfigImpl>(scope_key_builder)),
+      name_(std::move(name)),
+      config_(std::make_shared<ThreadLocalScopedConfigImpl>(std::move(scope_key_builder))),
       config_protos_(std::make_move_iterator(config_protos.begin()),
                      std::make_move_iterator(config_protos.end())),
-      rds_config_source_(rds_config_source) {}
+      rds_config_source_(std::move(rds_config_source)) {}
 
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::ScopedRds& scoped_rds,
@@ -134,7 +134,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   ScopedConfigManager::ScopedRouteMap scoped_routes_to_remove =
       scoped_config_manager_.scopedRouteMap();
   for (auto& scoped_route : scoped_routes) {
-    const std::string scoped_route_name = scoped_route.name();
+    const std::string& scoped_route_name = scoped_route.name();
     try {
       scoped_routes_to_remove.erase(scoped_route_name);
       ScopedRouteInfoConstSharedPtr scoped_route_info =
@@ -144,10 +144,9 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
             fmt::format("failed to create/update global routing scope {}", scoped_route_name));
       }
       ENVOY_LOG(debug, "srds: add/update scoped_route '{}'", scoped_route_name);
-      applyConfigUpdate([scoped_route_info](ConfigProvider::ConfigConstSharedPtr config) {
-        ThreadLocalScopedConfigImpl* thread_local_scoped_config =
-            const_cast<ThreadLocalScopedConfigImpl*>(
-                static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+      applyConfigUpdate([scoped_route_info](const ConfigProvider::ConfigConstSharedPtr& config) {
+        auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
+            static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
         thread_local_scoped_config->addOrUpdateRoutingScope(scoped_route_info);
       });
     } catch (const EnvoyException& ex) {
@@ -155,13 +154,12 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     }
   }
 
-  for (auto scoped_route : scoped_routes_to_remove) {
+  for (const auto& scoped_route : scoped_routes_to_remove) {
     const std::string scoped_route_name = scoped_route.first;
     ENVOY_LOG(debug, "srds: remove scoped route '{}'", scoped_route_name);
-    applyConfigUpdate([scoped_route_name](ConfigProvider::ConfigConstSharedPtr config) {
-      ThreadLocalScopedConfigImpl* thread_local_scoped_config =
-          const_cast<ThreadLocalScopedConfigImpl*>(
-              static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
+    applyConfigUpdate([scoped_route_name](const ConfigProvider::ConfigConstSharedPtr& config) {
+      auto* thread_local_scoped_config = const_cast<ThreadLocalScopedConfigImpl*>(
+          static_cast<const ThreadLocalScopedConfigImpl*>(config.get()));
       thread_local_scoped_config->removeRoutingScope(scoped_route_name);
     });
   }
@@ -178,14 +176,14 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
     ScopedRdsConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::FactoryContext& factory_context,
-    const envoy::api::v2::core::ConfigSource& rds_config_source,
+    envoy::api::v2::core::ConfigSource rds_config_source,
     const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
         ScopeKeyBuilder& scope_key_builder)
     : DeltaMutableConfigProviderBase(std::move(subscription), factory_context,
                                      ConfigProvider::ApiType::Delta),
       subscription_(static_cast<ScopedRdsConfigSubscription*>(
           MutableConfigProviderCommonBase::subscription_.get())),
-      rds_config_source_(rds_config_source) {
+      rds_config_source_(std::move(rds_config_source)) {
   initialize([scope_key_builder](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalScopedConfigImpl>(scope_key_builder);
   });
@@ -205,9 +203,8 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
       dynamic_config->set_name(typed_subscription->name());
       const ScopedConfigManager::ScopedRouteMap& scoped_route_map =
           typed_subscription->scopedRouteMap();
-      for (ScopedConfigManager::ScopedRouteMap::const_iterator it = scoped_route_map.begin();
-           it != scoped_route_map.end(); ++it) {
-        dynamic_config->mutable_scoped_route_configs()->Add()->MergeFrom(it->second->config_proto_);
+      for (const auto& it : scoped_route_map) {
+        dynamic_config->mutable_scoped_route_configs()->Add()->MergeFrom(it.second->config_proto_);
       }
       TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
@@ -222,9 +219,8 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
         provider->configProtoInfoVector();
     const ConfigProvider::ConfigProtoVector& scoped_route_configurations =
         protos_info.value().config_protos_;
-    for (ConfigProvider::ConfigProtoVector::const_iterator it = scoped_route_configurations.begin();
-         it != scoped_route_configurations.end(); ++it) {
-      inline_config->mutable_scoped_route_configs()->Add()->MergeFrom(**it);
+    for (const auto& it : scoped_route_configurations) {
+      inline_config->mutable_scoped_route_configs()->Add()->MergeFrom(*it);
     }
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *inline_config->mutable_last_updated());

@@ -12,8 +12,8 @@ namespace Router {
 // proto.
 class ScopedRouteInfo {
 public:
-  ScopedRouteInfo(const envoy::api::v2::ScopedRouteConfiguration& config_proto)
-      : config_proto_(config_proto) {}
+  ScopedRouteInfo(envoy::api::v2::ScopedRouteConfiguration config_proto)
+      : config_proto_(std::move(config_proto)) {}
 
   // TODO(AndresGuedez): Add the necessary APIs required for the scoped routing logic.
 
