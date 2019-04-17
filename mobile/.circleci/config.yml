@@ -16,6 +16,10 @@ jobs:
       - checkout
       - run: git submodule update --init
       - run: docs/build.sh
+      - add_ssh_keys:
+          fingerprints:
+            - "a2:f7:59:f0:01:8b:91:31:ab:0c:3f:9f:25:4c:1e:e5"
+      - run: docs/publish.sh
       - store_artifacts:
           path: generated/docs
 
