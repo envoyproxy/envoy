@@ -145,6 +145,8 @@ public:
   const std::string RESPONSE_CODE = "envoy.response_code";
   // Request response code class
   const std::string RESPONSE_CODE_CLASS = "envoy.response_code_class";
+  // Route config name for RDS updates
+  const std::string RDS_ROUTE_CONFIG = "envoy.rds_route_config";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;
