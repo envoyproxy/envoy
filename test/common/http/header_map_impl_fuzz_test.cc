@@ -106,7 +106,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
           header_entry->value().clear();
           break;
         case test::common::http::GetAndMutate::kFind:
-          header_entry->value().find(get_and_mutate.find().c_str());
+          header_entry->value().getStringView().find(get_and_mutate.find());
           break;
         case test::common::http::GetAndMutate::kSetCopy:
           header_entry->value().setCopy(get_and_mutate.set_copy().c_str(),

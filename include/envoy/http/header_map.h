@@ -136,15 +136,7 @@ public:
    */
   bool empty() const { return string_length_ == 0; }
 
-  /**
-   * @return whether a substring exists in the string.
-   *
-   * TODO(dnoe): Eliminate this by migrating callers to use string_view find
-   * directly (#6580)
-   */
-  bool find(const char* str) const {
-    return getStringView().find(absl::string_view(str)) != absl::string_view::npos;
-  }
+  // Looking for find? Use getStringView().find()
 
   /**
    * Set the value of the string by copying data into it. This overwrites any existing string.
