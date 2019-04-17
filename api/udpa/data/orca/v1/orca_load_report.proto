@@ -9,6 +9,9 @@ option go_package = "v1";
 
 import "validate/validate.proto";
 
+// See section `ORCA lad report format` of the design document in
+// :ref:`https://github.com/envoyproxy/envoy/issues/6614`.
+
 message OrcaLoadReport {
   // CPU utilization expressed as a fraction of available CPU resources. This
   // should be derived from a sample or measurement taken during the request.
@@ -19,8 +22,8 @@ message OrcaLoadReport {
   // during the request.
   double mem_utilization = 2 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
 
-  // Application specific requests costs. Values may be absolute costs (e.g.
-  // 3487 bytes of storage) associated with the cost or utilization,
+  // Application specific requests costs. Each value may be an absolute cost (e.g.
+  // 3487 bytes of storage) or utilization associated with the request,
   // expressed as a fraction of total resources available. Utilization
   // metrics should be derived from a sample or measurement taken
   // during the request.

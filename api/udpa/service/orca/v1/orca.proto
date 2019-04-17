@@ -13,6 +13,9 @@ import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
 
+// See section `Out-of-band (OOB) reporting` of the design document in
+// :ref:`https://github.com/envoyproxy/envoy/issues/6614`.
+
 // Out-of-band (OOB) load reporting service for the additional load reporting
 // agent that does not sit in the request path. Reports are periodically sampled
 // with sufficient frequency to provide temporal association with requests.
