@@ -463,7 +463,7 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, IgnoreRedirectionForAsking) {
 // This test verifies that batching works properly. If batching is enabled, when multiple
 // clients make a request to a Redis server within a certain time window, they will be batched
 // together. The below example, two clients send "GET foo", and Redis receives those two as
-// a single, concatendated request.
+// a single, concatenated request.
 
 TEST_P(RedisProxyWithBatchingIntegrationTest, SimpleBatching) {
   initialize();
