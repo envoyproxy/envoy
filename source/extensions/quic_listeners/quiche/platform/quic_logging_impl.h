@@ -82,7 +82,12 @@
 #define QUIC_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
 #endif
 
+#define DCHECK_GT(a, b) DCHECK((a) > (b))
 #define DCHECK_GE(a, b) DCHECK((a) >= (b))
+#define DCHECK_LT(a, b) DCHECK((a) < (b))
+#define DCHECK_LE(a, b) DCHECK((a) <= (b))
+#define DCHECK_NE(a, b) DCHECK((a) != (b))
+#define DCHECK_EQ(a, b) DCHECK((a) == (b))
 
 #define QUIC_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
 

@@ -30,6 +30,9 @@ cat <<EOF >sed_commands
 # Rewrite third_party includes.
 /^#include/ s!third_party/boringssl/src/include/!!
 
+# Rewrite gmock includes.
+/^#include/ s!testing/gmock/include/gmock/!gmock/!
+
 EOF
 
 for src_file in $(SRCS); do

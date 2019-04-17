@@ -29,6 +29,7 @@ load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_copts",
     "envoy_select_quiche",
 )
 
@@ -85,6 +86,7 @@ cc_library(
         "quiche/spdy/platform/api/spdy_endianness_util.h",
         "quiche/spdy/platform/api/spdy_estimate_memory_usage.h",
         "quiche/spdy/platform/api/spdy_export.h",
+	"quiche/spdy/platform/api/spdy_macros.h",
         "quiche/spdy/platform/api/spdy_mem_slice.h",
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
@@ -116,6 +118,28 @@ cc_library(
     hdrs = ["quiche/spdy/platform/api/spdy_unsafe_arena.h"],
     visibility = ["//visibility:public"],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_unsafe_arena_impl_lib"],
+)
+
+cc_library(
+    name = "quiche_spdy_core_lib",
+    hdrs = [
+    	"quiche/spdy/core/spdy_header_block.cc",
+    	"quiche/spdy/core/spdy_test_utils.cc",
+    ],
+    srcs = [
+        "quiche/spdy/core/spdy_alt_svc_wire_format.h",
+	"quiche/spdy/core/spdy_bitmasks.h",
+    	"quiche/spdy/core/spdy_header_block.h",
+        "quiche/spdy/core/spdy_headers_handler_interface.h",
+	"quiche/spdy/core/spdy_protocol.h",
+    	"quiche/spdy/core/spdy_test_utils.h",
+    ],
+    copts = envoy_copts("@envoy") + ["-Wno-unused-parameter",],
+    visibility = ["//visibility:public"],
+    deps = [
+    	":spdy_platform",
+    	":spdy_platform_unsafe_arena_lib",
+    ],
 )
 
 cc_library(
@@ -271,6 +295,16 @@ envoy_cc_test(
     ),
     repository = "@envoy",
     deps = [":spdy_platform"],
+)
+
+envoy_cc_test(
+    name = "quiche_spdy_core_test",
+    srcs = ["quiche/spdy/core/spdy_header_block_test.cc",],
+    repository = "@envoy",
+    deps = [
+    	":spdy_platform",
+	":quiche_spdy_core_lib",
+    ],
 )
 
 envoy_cc_test(
