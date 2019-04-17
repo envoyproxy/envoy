@@ -85,7 +85,7 @@ protected:
     dispatcher_thread_->join();
   }
 
-  NiceMock<Stats::MockStore> scope_;
+  NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, needs to outlive dispatcher_.
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
