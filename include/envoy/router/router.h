@@ -614,7 +614,7 @@ public:
   /**
    * @return absl::optional<std::chrono::milliseconds> the timeout offset to apply to the timeout
    * provided by the 'grpc-timeout' header of a gRPC request. This value will be positive and should
-   * be subtracted from the value provded by the header.
+   * be subtracted from the value provided by the header.
    */
   virtual absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const PURE;
 
