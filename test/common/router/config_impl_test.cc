@@ -1901,7 +1901,7 @@ virtual_hosts:
   {
     EXPECT_EQ(
         absl::make_optional(std::chrono::milliseconds(10)),
-        config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->grpcTimeotOffset());
+        config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->grpcTimeoutOffset());
   }
   EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                                ->routeEntry()
