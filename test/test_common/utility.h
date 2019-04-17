@@ -510,11 +510,10 @@ public:
     }
   };
 
-  TestAllocator(const StatsOptions& stats_options, SymbolTable& symbol_table)
-      : RawStatDataAllocator(mutex_, hash_set_, stats_options, symbol_table),
-        block_memory_(std::make_unique<uint8_t[]>(
-            RawStatDataSet::numBytes(block_hash_options_, stats_options))),
-        hash_set_(block_hash_options_, true /* init */, block_memory_.get(), stats_options) {}
+  TestAllocator(SymbolTable& symbol_table)
+      : RawStatDataAllocator(mutex_, hash_set_, symbol_table),
+        block_memory_(std::make_unique<uint8_t[]>(RawStatDataSet::numBytes(block_hash_options_))),
+        hash_set_(block_hash_options_, true /* init */, block_memory_.get()) {}
   ~TestAllocator() { EXPECT_EQ(0, hash_set_.size()); }
 
 private:
@@ -527,7 +526,7 @@ private:
 
 class MockedTestAllocator : public TestAllocator {
 public:
-  MockedTestAllocator(const StatsOptions& stats_options, SymbolTable& symbol_table);
+  MockedTestAllocator(SymbolTable& symbol_table);
   virtual ~MockedTestAllocator();
 
   MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));

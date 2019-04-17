@@ -33,22 +33,23 @@ using testing::Return;
 namespace Envoy {
 namespace Stats {
 
+const uint64_t MaxStatNameLength = 127;
+
 class StatsThreadLocalStoreTest : public testing::Test {
 public:
   void SetUp() override {
-    alloc_ = std::make_unique<MockedTestAllocator>(options_, symbol_table_);
+    alloc_ = std::make_unique<MockedTestAllocator>(symbol_table_);
     resetStoreWithAlloc(*alloc_);
   }
 
   void resetStoreWithAlloc(StatDataAllocator& alloc) {
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc);
+    store_ = std::make_unique<ThreadLocalStoreImpl>(alloc);
     store_->addSink(sink_);
   }
 
   Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  StatsOptionsImpl options_;
   std::unique_ptr<MockedTestAllocator> alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
@@ -76,10 +77,10 @@ class HistogramTest : public testing::Test {
 public:
   using NameHistogramMap = std::map<std::string, ParentHistogramSharedPtr>;
 
-  HistogramTest() : alloc_(options_, symbol_table_) {}
+  HistogramTest() : alloc_(symbol_table_) {}
 
   void SetUp() override {
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc_);
+    store_ = std::make_unique<ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
@@ -172,7 +173,6 @@ public:
   FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  StatsOptionsImpl options_;
   MockedTestAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
@@ -433,52 +433,9 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   EXPECT_CALL(*alloc_, free(_));
 }
 
-TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
-  InSequence s;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
-
-  // First, with a successful RawStatData allocation:
-  const uint64_t max_name_length = options_.maxNameLength();
-  const std::string name_1(max_name_length + 1, 'A');
-
-  EXPECT_CALL(*alloc_, alloc(_));
-  EXPECT_LOG_CONTAINS("warning", "is too long with", store_->counter(name_1));
-
-  // The stats did not overflow yet.
-  EXPECT_EQ(0UL, store_->counter("stats.overflow").value());
-
-  // The name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
-
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
-
-  // The same should be true with heap allocation, which occurs when the default
-  // allocator fails.
-  const std::string name_2(max_name_length + 1, 'B');
-  EXPECT_CALL(*alloc_, alloc(_)).WillOnce(Return(nullptr));
-  store_->counter(name_2);
-
-  // Same deal: the name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
-
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
-
-  // Now the stats have overflowed.
-  EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
-
-  store_->shutdownThreading();
-  tls_.shutdownThread();
-
-  // Includes overflow, and the first raw-allocated stat, but not the failsafe stat which we
-  // allocated from the heap.
-  EXPECT_CALL(*alloc_, free(_)).Times(2);
-}
-
 class LookupWithStatNameTest : public testing::Test {
 public:
-  LookupWithStatNameTest() : alloc_(symbol_table_), store_(options_, alloc_) {}
+  LookupWithStatNameTest() : alloc_(symbol_table_), store_(alloc_) {}
   ~LookupWithStatNameTest() override {
     store_.shutdownThreading();
     clearStorage();
@@ -503,7 +460,6 @@ public:
 
   Stats::FakeSymbolTableImpl symbol_table_;
   HeapStatDataAllocator alloc_;
-  StatsOptionsImpl options_;
   ThreadLocalStoreImpl store_;
   std::vector<StatNameStorage> stat_name_storage_;
 };
@@ -707,8 +663,7 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
 class RememberStatsMatcherTest : public testing::TestWithParam<bool> {
 public:
   RememberStatsMatcherTest()
-      : heap_alloc_(symbol_table_), store_(options_, heap_alloc_),
-        scope_(store_.createScope("scope.")) {
+      : heap_alloc_(symbol_table_), store_(heap_alloc_), scope_(store_.createScope("scope.")) {
     if (GetParam()) {
       store_.initializeThreading(main_thread_dispatcher_, tls_);
     }
@@ -806,7 +761,6 @@ public:
   Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  StatsOptionsImpl options_;
   HeapStatDataAllocator heap_alloc_;
   ThreadLocalStoreImpl store_;
   ScopePtr scope_;
@@ -898,8 +852,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   // Allocate a stat greater than the max name length.
-  const uint64_t max_name_length = options_.maxNameLength();
-  const std::string name_1(max_name_length + 1, 'A');
+  const std::string name_1(MaxStatNameLength + 1, 'A');
 
   store_->counter(name_1);
 
@@ -1168,21 +1121,6 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
     EXPECT_TRUE(histogram->used());
   }
 }
-
-class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
-protected:
-  TruncatingAllocTest()
-      : test_alloc_(options_, symbol_table_), long_name_(options_.maxNameLength() + 1, 'A') {}
-
-  void SetUp() override {
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
-    // Do not call superclass SetUp.
-  }
-
-  FakeSymbolTableImpl symbol_table_;
-  TestAllocator test_alloc_;
-  std::string long_name_;
-};
 
 } // namespace Stats
 } // namespace Envoy

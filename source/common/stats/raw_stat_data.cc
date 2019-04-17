@@ -22,6 +22,8 @@ uint64_t roundUpMultipleNaturalAlignment(uint64_t val) {
   return (val + multiple - 1) & ~(multiple - 1);
 }
 
+const uint64_t MaxNameLength = 255;
+
 } // namespace
 
 // Normally the compiler would do this, but because name_ is a flexible-array-length
@@ -31,13 +33,11 @@ uint64_t RawStatData::structSize(uint64_t name_size) {
   return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + name_size + 1);
 }
 
-uint64_t RawStatData::structSizeWithOptions(const StatsOptions& stats_options) {
-  return structSize(stats_options.maxNameLength());
-}
+uint64_t RawStatData::structSizeWithOptions() { return structSize(MaxNameLength); }
 
-void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_options) {
+void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
-  ASSERT(key.size() <= stats_options.maxNameLength());
+  ASSERT(key.size() <= MaxNameLength);
   ref_count_ = 1;
   memcpy(name_, key.data(), key.size());
   name_[key.size()] = '\0';
@@ -46,12 +46,12 @@ void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_op
 Stats::RawStatData* RawStatDataAllocator::alloc(absl::string_view name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   Thread::LockGuard lock(mutex_);
-  if (name.length() > options_.maxNameLength()) {
+  if (name.length() > MaxNameLength) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
-        name, name.size(), options_.maxNameLength());
-    name = name.substr(0, options_.maxNameLength());
+        name, name.size(), MaxNameLength);
+    name = name.substr(0, MaxNameLength);
   }
   auto value_created = stats_set_.insert(name);
   Stats::RawStatData* data = value_created.first;
@@ -77,7 +77,7 @@ void RawStatDataAllocator::free(Stats::RawStatData& data) {
   }
   bool key_removed = stats_set_.remove(data.key());
   ASSERT(key_removed);
-  memset(static_cast<void*>(&data), 0, Stats::RawStatData::structSizeWithOptions(options_));
+  memset(static_cast<void*>(&data), 0, Stats::RawStatData::structSizeWithOptions());
 }
 
 template class StatDataAllocatorImpl<RawStatData>;

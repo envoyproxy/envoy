@@ -91,15 +91,16 @@ do
   # string, compare it against a hard-coded string.
   start_test Checking for consistency of /hot_restart_version
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1)
-  EXPECTED_CLI_HOT_RESTART_VERSION="11.104.127"
+  EXPECTED_CLI_HOT_RESTART_VERSION="11.104"
   echo "The Envoy's hot restart version is ${CLI_HOT_RESTART_VERSION}"
   echo "Now checking that the above version is what we expected."
   check [ "${CLI_HOT_RESTART_VERSION}" = "${EXPECTED_CLI_HOT_RESTART_VERSION}" ]
 
+  # TODO(fredlas) max-obj-name-len is a deprecated no-op; can probably remove this test soon.
   start_test Checking for consistency of /hot_restart_version with --max-obj-name-len 500
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
     --max-obj-name-len 500 2>&1)
-  EXPECTED_CLI_HOT_RESTART_VERSION="11.104.567"
+  EXPECTED_CLI_HOT_RESTART_VERSION="11.104"
   check [ "${CLI_HOT_RESTART_VERSION}" = "${EXPECTED_CLI_HOT_RESTART_VERSION}" ]
 
   start_test Checking for match of --hot-restart-version and admin /hot_restart_version
@@ -110,11 +111,6 @@ do
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
     --max-obj-name-len 500 2>&1)
   check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]
-
-  start_test Checking for hot-restart-version mismatch when max-obj-name-len differs
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
-    --max-obj-name-len 1234 2>&1)
-  check [ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]
 
   enableHeapCheck
 

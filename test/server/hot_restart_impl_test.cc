@@ -40,7 +40,6 @@ public:
     }));
     // We bind two sockets: one to talk to parent, one to talk to our (hypothetical eventual) child
     EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(2);
-    EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
 
     // Test we match the correct stat with empty-slots before, after, or both.
     hot_restart_ = std::make_unique<HotRestartImpl>(options_);
@@ -50,7 +49,6 @@ public:
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<MockOptions> options_;
-  Stats::StatsOptionsImpl stats_options_;
   std::vector<uint8_t> buffer_;
   std::unique_ptr<HotRestartImpl> hot_restart_;
 };
@@ -59,7 +57,6 @@ TEST_F(HotRestartImplTest, versionString) {
   // Tests that the version-string will be consistent and HOT_RESTART_VERSION,
   // between multiple instantiations.
   std::string version;
-  uint64_t max_obj_name_length;
 
   // The mocking infrastructure requires a test setup and teardown every time we
   // want to re-instantiate HotRestartImpl.
@@ -67,7 +64,6 @@ TEST_F(HotRestartImplTest, versionString) {
     setup();
     version = hot_restart_->version();
     EXPECT_TRUE(absl::StartsWith(version, fmt::format("{}.", HOT_RESTART_VERSION))) << version;
-    max_obj_name_length = options_.statsOptions().maxObjNameLength();
     TearDown();
   }
 
@@ -75,14 +71,6 @@ TEST_F(HotRestartImplTest, versionString) {
     setup();
     EXPECT_EQ(version, hot_restart_->version()) << "Version string deterministic from options";
     TearDown();
-  }
-
-  {
-    stats_options_.max_obj_name_length_ = 2 * max_obj_name_length;
-    setup();
-    EXPECT_NE(version, hot_restart_->version())
-        << "Version changes when max-obj-name-length changes";
-    // TearDown is called automatically at end of test.
   }
 }
 

@@ -12,7 +12,6 @@
 #include <unordered_map>
 
 #include "envoy/stats/stat_data_allocator.h"
-#include "envoy/stats/stats_options.h"
 #include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
@@ -49,10 +48,10 @@ struct RawStatData {
   static uint64_t structSize(uint64_t name_size);
 
   /**
-   * Wrapper for structSize, taking a StatsOptions struct. Required by
-   * BlockMemoryHashSet, which has the context to supply StatsOptions.
+   * Returns structSize(a constant). TODO(fredlas): remove once all shared-memory-compatible stat
+   * allocation machinery is gone.
    */
-  static uint64_t structSizeWithOptions(const StatsOptions& stats_options);
+  static uint64_t structSizeWithOptions();
 
   /**
    * Initializes this object to have the specified key, a refcount of 1, and all
@@ -61,9 +60,8 @@ struct RawStatData {
    * in order to assert the copy is safe inline.
    *
    * @param key the key
-   * @param stats_options the stats options
    */
-  void initialize(absl::string_view key, const StatsOptions& stats_options);
+  void initialize(absl::string_view key);
 
   /**
    * @return uint64_t a hash of the key. This is required by BlockMemoryHashSet.
@@ -98,9 +96,8 @@ using RawStatDataSet = BlockMemoryHashSet<Stats::RawStatData>;
 class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
   RawStatDataAllocator(Thread::BasicLockable& mutex, RawStatDataSet& stats_set,
-                       const StatsOptions& options, SymbolTable& symbol_table)
-      : StatDataAllocatorImpl(symbol_table), mutex_(mutex), stats_set_(stats_set),
-        options_(options) {}
+                       SymbolTable& symbol_table)
+      : StatDataAllocatorImpl(symbol_table), mutex_(mutex), stats_set_(stats_set) {}
 
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return true; }
@@ -110,7 +107,6 @@ public:
 private:
   Thread::BasicLockable& mutex_;
   RawStatDataSet& stats_set_ GUARDED_BY(mutex_);
-  const StatsOptions& options_;
 };
 
 } // namespace Stats

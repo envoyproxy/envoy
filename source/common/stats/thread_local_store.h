@@ -136,7 +136,7 @@ public:
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
-  ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options, StatDataAllocator& alloc);
+  ThreadLocalStoreImpl(StatDataAllocator& alloc);
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
@@ -178,8 +178,6 @@ public:
   void mergeHistograms(PostMergeCb mergeCb) override;
 
   Source& source() override { return source_; }
-
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
   template <class Stat> using StatMap = ConstCharStarHashMap<Stat>;
@@ -224,7 +222,6 @@ private:
     NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
-    const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
     template <class StatType>
     using MakeStatFn =
@@ -294,7 +291,6 @@ private:
   bool checkAndRememberRejection(const std::string& name, SharedStringSet& central_rejected_stats,
                                  SharedStringSet* tls_rejected_stats);
 
-  const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;

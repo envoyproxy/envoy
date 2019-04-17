@@ -18,7 +18,6 @@
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
 #include "common/stats/raw_stat_data.h"
-#include "common/stats/stats_options_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -94,7 +93,7 @@ void initializeMutex(pthread_mutex_t& mutex) {
 HotRestartImpl::HotRestartImpl(const Options& options)
     : as_child_(HotRestartingChild(options.baseId(), options.restartEpoch())),
       as_parent_(HotRestartingParent(options.baseId(), options.restartEpoch())),
-      shmem_(attachSharedMemory(options)), options_(options), log_lock_(shmem_->log_lock_),
+      shmem_(attachSharedMemory(options)), log_lock_(shmem_->log_lock_),
       access_log_lock_(shmem_->access_log_lock_) {
   // If our parent ever goes away just terminate us so that we don't have to rely on ops/launching
   // logic killing the entire process tree. We should never exist without our parent.
@@ -133,12 +132,10 @@ void HotRestartImpl::mergeParentStats(Stats::StoreRoot& stats_store,
 
 void HotRestartImpl::shutdown() { as_parent_.shutdown(); }
 
-std::string HotRestartImpl::version() {
-  return hotRestartVersion(options_.statsOptions().maxNameLength());
-}
+std::string HotRestartImpl::version() { return hotRestartVersion(); }
 
-std::string HotRestartImpl::hotRestartVersion(uint64_t max_stat_name_len) {
-  return fmt::format("{}.{}.{}", HOT_RESTART_VERSION, sizeof(SharedMemory), max_stat_name_len);
+std::string HotRestartImpl::hotRestartVersion() {
+  return fmt::format("{}.{}", HOT_RESTART_VERSION, sizeof(SharedMemory));
 }
 
 } // namespace Server

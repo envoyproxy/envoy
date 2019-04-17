@@ -80,8 +80,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     // block or not.
     std::set_new_handler([]() { PANIC("out of memory"); });
 
-    stats_store_ =
-        std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(), stats_allocator_);
+    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
     server_ = std::make_unique<Server::InstanceImpl>(
         options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
@@ -146,14 +145,13 @@ MainCommon::MainCommon(int argc, const char* const* argv)
             std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
             platform_impl_.fileSystem()) {}
 
-std::string MainCommon::hotRestartVersion(uint64_t max_stat_name_len, bool hot_restart_enabled) {
+std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {
 #ifdef ENVOY_HOT_RESTART
   if (hot_restart_enabled) {
-    return Server::HotRestartImpl::hotRestartVersion(max_stat_name_len);
+    return Server::HotRestartImpl::hotRestartVersion();
   }
 #else
   UNREFERENCED_PARAMETER(hot_restart_enabled);
-  UNREFERENCED_PARAMETER(max_stat_name_len);
 #endif
   return "disabled";
 }

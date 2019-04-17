@@ -11,7 +11,6 @@
 #include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
-#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/stats/raw_stat_data.h"

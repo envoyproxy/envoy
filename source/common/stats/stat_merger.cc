@@ -33,7 +33,8 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
       {std::regex("^cluster\\..*\\.max_host_weight$"), CombineLogic::OnlyImportWhenUnused},
       {std::regex(".*\\.total_principals$"), CombineLogic::OnlyImportWhenUnused},
       {std::regex("^listener_manager.total_listeners_draining$"), CombineLogic::NoImport},
-      {std::regex("^listener_manager.total_listeners_warming$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^listener_manager.total_listeners_warming$"),
+       CombineLogic::OnlyImportWhenUnused},
       {std::regex("^listener_manager.total_listeners_active$"), CombineLogic::OnlyImportWhenUnused},
       {std::regex("^overload\\..*\\.pressure$"), CombineLogic::OnlyImportWhenUnused},
       {std::regex("^server.concurrency$"), CombineLogic::OnlyImportWhenUnused},
@@ -47,7 +48,7 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
     CombineLogic combine_logic = CombineLogic::Accumulate;
     for (auto exception : combine_logic_exceptions) {
       std::smatch match;
-      if(std::regex_match(gauge.first, match, exception.first)) {
+      if (std::regex_match(gauge.first, match, exception.first)) {
         combine_logic = exception.second;
         break;
       }

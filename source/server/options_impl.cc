@@ -17,17 +17,6 @@
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
-// Can be overridden at compile time
-// See comment in common/stat/stat_impl.h for rationale behind
-// this constant.
-#ifndef ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH
-#define ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH 60
-#endif
-
-#if ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH < 60
-#error "ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH must be >= 60"
-#endif
-
 namespace Envoy {
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                          const HotRestartVersionCb& hot_restart_version_cb,
@@ -104,11 +93,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                       "Deprecated and unused; please do not specify.", false, 123,
                                       "uint64_t", cmd);
   TCLAP::ValueArg<uint64_t> max_obj_name_len("", "max-obj-name-len",
-                                             "Maximum name length for a field in the config "
-                                             "(applies to listener name, route config name and"
-                                             " the cluster name)",
-                                             false, ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH, "uint64_t",
-                                             cmd);
+                                             "Deprecated and unused; please do not specify.", false,
+                                             123, "uint64_t", cmd);
   TCLAP::SwitchArg disable_hot_restart("", "disable-hot-restart",
                                        "Disable hot restart functionality", cmd, false);
   TCLAP::SwitchArg enable_mutex_tracing(
@@ -137,17 +123,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     // --version.
     throw NoServingException();
   }
-
-  auto check_numeric_arg = [](bool is_error, uint64_t value, absl::string_view pattern) {
-    if (is_error) {
-      const std::string message = fmt::format(std::string(pattern), value);
-      throw MalformedArgvException(message);
-    }
-  };
-  check_numeric_arg(max_obj_name_len.getValue() < 60, max_obj_name_len.getValue(),
-                    "error: the 'max-obj-name-len' value specified ({}) is less than the minimum "
-                    "value of 60");
-  // TODO(jmarantz): should we also multiply these to bound the total amount of memory?
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
 
@@ -219,10 +194,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   file_flush_interval_msec_ = std::chrono::milliseconds(file_flush_interval_msec.getValue());
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
-  stats_options_.max_obj_name_length_ = max_obj_name_len.getValue();
 
   if (hot_restart_version_option.getValue()) {
-    std::cerr << hot_restart_version_cb(stats_options_.maxNameLength(), !hot_restart_disabled_);
+    std::cerr << hot_restart_version_cb(!hot_restart_disabled_);
     throw NoServingException();
   }
 }
@@ -300,7 +274,6 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
       Protobuf::util::TimeUtil::SecondsToDuration(parentShutdownTime().count()));
   command_line_options->mutable_drain_time()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(drainTime().count()));
-  command_line_options->set_max_obj_name_len(statsOptions().maxObjNameLength());
   command_line_options->set_disable_hot_restart(hotRestartDisabled());
   command_line_options->set_enable_mutex_tracing(mutexTracingEnabled());
   command_line_options->set_cpuset_threads(cpusetThreadsEnabled());

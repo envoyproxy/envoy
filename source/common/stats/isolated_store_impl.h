@@ -6,12 +6,10 @@
 #include <string>
 
 #include "envoy/stats/stats.h"
-#include "envoy/stats/stats_options.h"
 #include "envoy/stats/store.h"
 
 #include "common/common/utility.h"
 #include "common/stats/heap_stat_data.h"
-#include "common/stats/stats_options_impl.h"
 #include "common/stats/store_impl.h"
 #include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
@@ -68,7 +66,6 @@ public:
   Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
   Histogram& histogram(const std::string& name) override { return histograms_.get(name); }
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -85,7 +82,6 @@ private:
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
-  const StatsOptionsImpl stats_options_;
   NullGaugeImpl null_gauge_;
 };
 

@@ -47,7 +47,6 @@ envoy_cc_library(
         ":histogram_lib",
         ":scope_prefixer_lib",
         ":stats_lib",
-        ":stats_options_lib",
         ":store_impl_lib",
         "//include/envoy/stats:stats_macros",
         "//source/common/stats:heap_stat_data_lib",
@@ -137,7 +136,6 @@ envoy_cc_library(
         ":metric_impl_lib",
         ":raw_stat_data_lib",
         ":source_impl_lib",
-        ":stats_options_lib",
         ":symbol_table_lib",
         ":tag_extractor_lib",
         ":utility_lib",
@@ -175,14 +173,6 @@ envoy_cc_library(
     name = "fake_symbol_table_lib",
     hdrs = ["fake_symbol_table_impl.h"],
     deps = [":symbol_table_lib"],
-)
-
-envoy_cc_library(
-    name = "stats_options_lib",
-    hdrs = ["stats_options_impl.h"],
-    deps = [
-        "//include/envoy/stats:stats_interface",
-    ],
 )
 
 envoy_cc_library(

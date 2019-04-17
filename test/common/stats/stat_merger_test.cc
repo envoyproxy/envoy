@@ -93,7 +93,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   gauges["listener_manager.total_listeners_draining"] = 111;
   gauges["server.hot_restart_epoch"] = 111;
   gauges["server.live"] = 1;
-  gauges["some.connected_state"] = 1;
+  gauges["some.control_plane.connected_state"] = 1;
 
   stat_merger_.mergeStats(counters, gauges);
   EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version").used());

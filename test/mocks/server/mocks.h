@@ -18,7 +18,6 @@
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
 #include "common/http/context_impl.h"
@@ -74,7 +73,6 @@ public:
   MOCK_CONST_METHOD0(serviceClusterName, const std::string&());
   MOCK_CONST_METHOD0(serviceNodeName, const std::string&());
   MOCK_CONST_METHOD0(serviceZone, const std::string&());
-  MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
@@ -90,7 +88,6 @@ public:
   std::string service_zone_name_;
   spdlog::level::level_enum log_level_{spdlog::level::trace};
   std::string log_path_;
-  Stats::StatsOptionsImpl stats_options_;
   uint32_t concurrency_{1};
   uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};

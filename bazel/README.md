@@ -411,16 +411,6 @@ local_repository(
 ...
 ```
 
-## Stats Tunables
-
-The default maximum length of a cluster/route config/listener name can be
-overridden at compile-time by defining `ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH`
-to the desired value. For example:
-
-```
-bazel build --copt=-DENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH=150 //source/exe:envoy-static
-```
-
 # Release builds
 
 Release builds should be built in `opt` mode, processed with `strip` and have a

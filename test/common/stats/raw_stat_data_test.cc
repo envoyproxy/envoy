@@ -1,7 +1,6 @@
 #include <string>
 
 #include "common/stats/raw_stat_data.h"
-#include "common/stats/stats_options_impl.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -14,16 +13,15 @@ namespace {
 
 class RawStatDataTest : public testing::Test {
 public:
-  RawStatDataTest() : allocator_(stats_options_, symbol_table_) {}
+  RawStatDataTest() : allocator_(symbol_table_) {}
 
-  StatsOptionsImpl stats_options_;
   FakeSymbolTableImpl symbol_table_;
   TestAllocator allocator_; // This is RawStatDataAllocator with some size settings.
 };
 
 // Note: a similar test using HeapStatData* is in heap_stat_data_test.cc.
 TEST_F(RawStatDataTest, RawTruncate) {
-  const std::string long_string(stats_options_.maxNameLength() + 1, 'A');
+  const std::string long_string(256, 'A');
   RawStatData* stat{};
   EXPECT_LOG_CONTAINS("warning", " is too long ", stat = allocator_.alloc(long_string));
   EXPECT_NE(stat->key(), long_string);

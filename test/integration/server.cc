@@ -172,7 +172,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
   Server::HotRestartNopImpl restarter;
   ThreadLocal::InstanceImpl tls;
   Stats::HeapStatDataAllocator stats_allocator(symbol_table);
-  Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
+  Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                               access_log_lock, component_factory, std::move(random_generator), tls,

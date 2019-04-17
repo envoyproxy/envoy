@@ -104,7 +104,7 @@ public:
     base_.adminRequest(path_and_query, method, handler);
   }
 
-  static std::string hotRestartVersion(uint64_t max_stat_name_len, bool hot_restart_enabled);
+  static std::string hotRestartVersion(bool hot_restart_enabled);
 
   /**
    * @return a pointer to the server instance, or nullptr if initialized into

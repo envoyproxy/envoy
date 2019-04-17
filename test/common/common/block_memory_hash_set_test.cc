@@ -7,7 +7,6 @@
 #include "common/common/block_memory_hash_set.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
-#include "common/stats/stats_options_impl.h"
 
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
@@ -20,15 +19,11 @@ protected:
   // TestValue that doesn't define a hash.
   struct TestValueBase {
     absl::string_view key() const { return name; }
-    void initialize(absl::string_view key, const Stats::StatsOptions& stats_options) {
-      ASSERT(key.size() <= stats_options.maxNameLength());
+    void initialize(absl::string_view key) {
       memcpy(name, key.data(), key.size());
       name[key.size()] = '\0';
     }
-    static uint64_t structSizeWithOptions(const Stats::StatsOptions& stats_options) {
-      UNREFERENCED_PARAMETER(stats_options);
-      return sizeof(TestValue);
-    }
+    static uint64_t structSizeWithOptions() { return sizeof(TestValue); }
 
     int64_t number;
     char name[256];
@@ -49,8 +44,7 @@ protected:
   template <class TestValueClass> void setUp() {
     hash_set_options_.capacity = 100;
     hash_set_options_.num_slots = 5;
-    const uint32_t mem_size =
-        BlockMemoryHashSet<TestValueClass>::numBytes(hash_set_options_, stats_options_);
+    const uint32_t mem_size = BlockMemoryHashSet<TestValueClass>::numBytes(hash_set_options_);
     memory_ = std::make_unique<uint8_t[]>(mem_size);
     memset(memory_.get(), 0, mem_size);
   }
@@ -79,17 +73,14 @@ protected:
   }
 
   BlockMemoryHashSetOptions hash_set_options_;
-  Stats::StatsOptionsImpl stats_options_;
   std::unique_ptr<uint8_t[]> memory_;
 };
 
 TEST_F(BlockMemoryHashSetTest, initAndAttach) {
   setUp<TestValue>();
   {
-    BlockMemoryHashSet<TestValue> hash_set1(hash_set_options_, true, memory_.get(),
-                                            stats_options_); // init
-    BlockMemoryHashSet<TestValue> hash_set2(hash_set_options_, false, memory_.get(),
-                                            stats_options_); // attach
+    BlockMemoryHashSet<TestValue> hash_set1(hash_set_options_, true, memory_.get());  // init
+    BlockMemoryHashSet<TestValue> hash_set2(hash_set_options_, false, memory_.get()); // attach
   }
 
   // If we tweak an option, we can no longer attach it.
@@ -97,8 +88,7 @@ TEST_F(BlockMemoryHashSetTest, initAndAttach) {
   bool constructor_threw = false;
   try {
     hash_set_options_.capacity = 99;
-    BlockMemoryHashSet<TestValue> hash_set3(hash_set_options_, false, memory_.get(),
-                                            stats_options_);
+    BlockMemoryHashSet<TestValue> hash_set3(hash_set_options_, false, memory_.get());
     constructor_completed = false;
   } catch (const std::exception& e) {
     constructor_threw = true;
@@ -110,7 +100,7 @@ TEST_F(BlockMemoryHashSetTest, initAndAttach) {
 TEST_F(BlockMemoryHashSetTest, putRemove) {
   setUp<TestValue>();
   {
-    BlockMemoryHashSet<TestValue> hash_set1(hash_set_options_, true, memory_.get(), stats_options_);
+    BlockMemoryHashSet<TestValue> hash_set1(hash_set_options_, true, memory_.get());
     hash_set1.sanityCheck();
     EXPECT_EQ(0, hash_set1.size());
     EXPECT_EQ(nullptr, hash_set1.get("no such key"));
@@ -131,8 +121,7 @@ TEST_F(BlockMemoryHashSetTest, putRemove) {
 
   {
     // Now init a new hash-map with the same memory.
-    BlockMemoryHashSet<TestValue> hash_set2(hash_set_options_, false, memory_.get(),
-                                            stats_options_);
+    BlockMemoryHashSet<TestValue> hash_set2(hash_set_options_, false, memory_.get());
     EXPECT_EQ(1, hash_set2.size());
     EXPECT_EQ(nullptr, hash_set2.get("no such key"));
     EXPECT_EQ(6789, hash_set2.get("good key")->number) << hashSetToString<TestValue>(hash_set2);
@@ -147,7 +136,7 @@ TEST_F(BlockMemoryHashSetTest, putRemove) {
 
 TEST_F(BlockMemoryHashSetTest, tooManyValues) {
   setUp<TestValue>();
-  BlockMemoryHashSet<TestValue> hash_set1(hash_set_options_, true, memory_.get(), stats_options_);
+  BlockMemoryHashSet<TestValue> hash_set1(hash_set_options_, true, memory_.get());
   std::vector<std::string> keys;
   for (uint32_t i = 0; i < hash_set_options_.capacity + 1; ++i) {
     keys.push_back(fmt::format("key{}", i));
@@ -191,8 +180,7 @@ TEST_F(BlockMemoryHashSetTest, tooManyValues) {
 
 TEST_F(BlockMemoryHashSetTest, severalKeysZeroHash) {
   setUp<TestValueZeroHash>();
-  BlockMemoryHashSet<TestValueZeroHash> hash_set1(hash_set_options_, true, memory_.get(),
-                                                  stats_options_);
+  BlockMemoryHashSet<TestValueZeroHash> hash_set1(hash_set_options_, true, memory_.get());
   hash_set1.insert("one").first->number = 1;
   hash_set1.insert("two").first->number = 2;
   hash_set1.insert("three").first->number = 3;
@@ -208,9 +196,8 @@ class BlockMemoryHashSetDeathTest : public BlockMemoryHashSetTest {};
 
 TEST_F(BlockMemoryHashSetDeathTest, sanityCheckZeroedMemoryDeathTest) {
   setUp<TestValueZeroHash>();
-  BlockMemoryHashSet<TestValueZeroHash> hash_set1(hash_set_options_, true, memory_.get(),
-                                                  stats_options_);
-  memset(memory_.get(), 0, hash_set1.numBytes(stats_options_));
+  BlockMemoryHashSet<TestValueZeroHash> hash_set1(hash_set_options_, true, memory_.get());
+  memset(memory_.get(), 0, hash_set1.numBytes());
   EXPECT_DEATH(hash_set1.sanityCheck(), "");
 }
 

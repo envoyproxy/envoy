@@ -34,7 +34,6 @@
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_options_impl.h"
 #include "common/filesystem/directory.h"
 #include "common/filesystem/filesystem_impl.h"
 
@@ -382,9 +381,7 @@ bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nul
 
 namespace Stats {
 
-MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options,
-                                         SymbolTable& symbol_table)
-    : TestAllocator(stats_options, symbol_table) {
+MockedTestAllocator::MockedTestAllocator(SymbolTable& symbol_table) : TestAllocator(symbol_table) {
   ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
     return TestAllocator::alloc(name);
   }));

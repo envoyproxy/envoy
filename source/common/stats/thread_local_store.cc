@@ -10,7 +10,6 @@
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
-#include "envoy/stats/stats_options.h"
 
 #include "common/common/lock_guard.h"
 #include "common/stats/stats_matcher_impl.h"
@@ -21,9 +20,8 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
-                                           StatDataAllocator& alloc)
-    : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
+    : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")),

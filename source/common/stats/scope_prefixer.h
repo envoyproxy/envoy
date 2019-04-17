@@ -23,7 +23,6 @@ public:
   Gauge& gaugeFromStatName(StatName name) override;
   Histogram& histogramFromStatName(StatName name) override;
 
-  const Stats::StatsOptions& statsOptions() const override { return scope_.statsOptions(); }
   const SymbolTable& symbolTable() const override { return scope_.symbolTable(); }
   virtual SymbolTable& symbolTable() override { return scope_.symbolTable(); }
 

@@ -37,6 +37,3 @@ expect_fail_with_error "error: invalid log level specified" --component-log-leve
 
 start_test Launching envoy with invalid component.
 expect_fail_with_error "error: invalid component specified" --component-log-level foo:debug
-
-start_test Launching envoy with max-obj-name-len value less than minimum value of 60.
-expect_fail_with_error "error: the 'max-obj-name-len' value specified .* is less than the minimum" --max-obj-name-len 1

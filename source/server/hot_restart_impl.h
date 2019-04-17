@@ -10,8 +10,6 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
-#include "envoy/server/options.h"
-#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/stats/heap_stat_data.h"
@@ -117,7 +115,7 @@ public:
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string
    * based on the configured options.
    */
-  static std::string hotRestartVersion(uint64_t max_stat_name_len);
+  static std::string hotRestartVersion();
 
 private:
   HotRestartingChild as_child_;
@@ -125,7 +123,6 @@ private:
   // This pointer is shared memory, and is expected to exist until process end.
   // It will automatically be unmapped when the process terminates.
   SharedMemory* shmem_;
-  const Options& options_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
 };

@@ -16,7 +16,6 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:heap_stat_data_lib",
-        "//source/common/stats:stats_options_lib",
         "//test/test_common:logging_lib",
     ],
 )
@@ -34,7 +33,6 @@ envoy_cc_test(
     srcs = ["raw_stat_data_test.cc"],
     deps = [
         "//source/common/stats:raw_stat_data_lib",
-        "//source/common/stats:stats_options_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
