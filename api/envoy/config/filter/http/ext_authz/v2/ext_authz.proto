@@ -58,7 +58,9 @@ message ExtAuthz {
   // routing decisions. Filter clears all cached routes when:
   //
   // 1. The field is set to *true*.
+  //
   // 2. The status returned from the authorization service is a HTTP 200 or gRPC 0.
+  //
   // 3. At least one *authorization response header* is added to the client request, or is used for
   // altering another client request header.
   //
