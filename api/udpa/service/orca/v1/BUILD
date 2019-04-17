@@ -1,4 +1,4 @@
-load("@envoy_api//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal")
+load("@envoy_api//bazel:api_build_system.bzl", "api_go_grpc_library", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
 
@@ -7,7 +7,7 @@ api_proto_library_internal(
     srcs = ["orca.proto"],
     has_services = 1,
     deps = [
-        "//envoy/data/orca/v1:orca_load_report",
+        "//udpa/data/orca/v1:orca_load_report",
     ],
 )
 
@@ -15,6 +15,6 @@ api_go_grpc_library(
     name = "orca",
     proto = ":orca",
     deps = [
-        "//envoy/data/orca/v1:orca_load_report",
+        "//udpa/data/orca/v1:orca_load_report_go_proto",
     ],
 )

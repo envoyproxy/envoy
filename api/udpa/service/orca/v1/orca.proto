@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package envoy.service.orca.v1;
+package udpa.service.orca.v1;
 
-option java_outer_classname = "OpenRcaProto";
+option java_outer_classname = "OrcaProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.service.orca.v1";
+option java_package = "io.envoyproxy.udpa.service.orca.v1";
 option go_package = "v1";
 
-import "envoy/data/orca/v1/orca_load_report.proto";
+import "udpa/data/orca/v1/orca_load_report.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -22,7 +22,7 @@ import "validate/validate.proto";
 // streaming service, client needs to terminate current RPC and initiate
 // a new call to change backend reporting frequency.
 service OpenRcaService {
-  rpc StreamCoreMetrics (OrcaLoadReportRequest) returns (stream envoy.data.orca.v1.OrcaLoadReport);
+  rpc StreamCoreMetrics(OrcaLoadReportRequest) returns (stream udpa.data.orca.v1.OrcaLoadReport);
 }
 
 message OrcaLoadReportRequest {

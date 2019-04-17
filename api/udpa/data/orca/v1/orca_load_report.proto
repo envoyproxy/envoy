@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package envoy.data.orca.v1;
+package udpa.data.orca.v1;
 
 option java_outer_classname = "OrcaLoadReportProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.data.orca.v1";
+option java_package = "io.envoyproxy.udpa.data.orca.v1";
 option go_package = "v1";
 
 import "validate/validate.proto";
@@ -24,5 +24,5 @@ message OrcaLoadReport {
   // expressed as a fraction of total resources available. Utilization
   // metrics should be derived from a sample or measurement taken
   // during the request.
-  map<string, double> request_cost_or_utilization = 5;
+  map<string, double> request_cost_or_utilization = 3;
 }
