@@ -23,7 +23,7 @@ To build the Go gRPC service run::
 
   $ pwd
   envoy/examples/grpc-bridge
-  $ script/bootstrap
+  $ script/bootstrap.sh
   $ script/build.sh
 
 Note: ``build.sh`` requires that your Envoy codebase (or a working copy thereof) is in ``$GOPATH/src/github.com/envoyproxy/envoy``.
