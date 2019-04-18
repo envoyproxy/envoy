@@ -59,7 +59,7 @@ public:
     return request_delay_config_.get();
   }
   const std::string& upstreamCluster() const { return upstream_cluster_; }
-  const std::unordered_set<std::string>& downstreamNodes() const { return downstream_nodes_; }
+  const absl::flat_hash_set<std::string>& downstreamNodes() const { return downstream_nodes_; }
   absl::optional<uint64_t> maxActiveFaults() const { return max_active_faults_; }
   const Filters::Common::Fault::FaultRateLimitConfig* responseRateLimit() const {
     return response_rate_limit_.get();
@@ -71,7 +71,7 @@ private:
   Filters::Common::Fault::FaultDelayConfigPtr request_delay_config_;
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
   std::vector<Http::HeaderUtility::HeaderData> fault_filter_headers_;
-  std::unordered_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
+  absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
 };

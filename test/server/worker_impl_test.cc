@@ -71,7 +71,8 @@ TEST_F(WorkerImplTest, BasicFlow) {
     ci.setReady();
   });
 
-  worker_.start(guard_dog_);
+  NiceMock<Stats::MockStore> store;
+  worker_.start(guard_dog_, store, "test");
   ci.waitReady();
 
   // After a worker is started adding/stopping/removing a listener happens on the worker thread.
@@ -140,7 +141,8 @@ TEST_F(WorkerImplTest, ListenerException) {
       .WillOnce(Throw(Network::CreateListenerException("failed")));
   worker_.addListener(listener, [](bool success) -> void { EXPECT_FALSE(success); });
 
-  worker_.start(guard_dog_);
+  NiceMock<Stats::MockStore> store;
+  worker_.start(guard_dog_, store, "test");
   worker_.stop();
 }
 

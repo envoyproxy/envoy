@@ -1,4 +1,4 @@
-version: '2'
+version: "3.7"
 services:
 
   front-envoy:
@@ -13,10 +13,10 @@ services:
       - "80"
       - "8001"
     ports:
-      - "8002:80"
-      - "8003:8001"
+      - "8000:80"
+      - "8001:8001"
 
-  backend-service:
+  frontend-service:
     build:
       context: .
       dockerfile: Dockerfile-service
@@ -25,7 +25,7 @@ services:
     networks:
       envoymesh:
         aliases:
-          - backendservice
+          - frontendservice
     expose:
       - "80"
 

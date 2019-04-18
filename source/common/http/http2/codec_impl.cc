@@ -33,7 +33,8 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
     cookies.append("; ", 2);
   }
 
-  cookies.append(value.c_str(), value.size());
+  const absl::string_view value_view = value.getStringView();
+  cookies.append(value_view.data(), value_view.size());
   return true;
 }
 
@@ -79,9 +80,11 @@ static void insertHeader(std::vector<nghttp2_nv>& headers, const HeaderEntry& he
   if (header.value().type() == HeaderString::Type::Reference) {
     flags |= NGHTTP2_NV_FLAG_NO_COPY_VALUE;
   }
-  headers.push_back({remove_const<uint8_t>(header.key().c_str()),
-                     remove_const<uint8_t>(header.value().c_str()), header.key().size(),
-                     header.value().size(), flags});
+  const absl::string_view header_key = header.key().getStringView();
+  const absl::string_view header_value = header.value().getStringView();
+  headers.push_back({remove_const<uint8_t>(header_key.data()),
+                     remove_const<uint8_t>(header_value.data()), header_key.size(),
+                     header_value.size(), flags});
 }
 
 void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_headers,

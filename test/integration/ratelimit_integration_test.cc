@@ -82,10 +82,11 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = ratelimit_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
-    EXPECT_STREQ("POST", ratelimit_request_->headers().Method()->value().c_str());
-    EXPECT_STREQ("/envoy.service.ratelimit.v2.RateLimitService/ShouldRateLimit",
-                 ratelimit_request_->headers().Path()->value().c_str());
-    EXPECT_STREQ("application/grpc", ratelimit_request_->headers().ContentType()->value().c_str());
+    EXPECT_EQ("POST", ratelimit_request_->headers().Method()->value().getStringView());
+    EXPECT_EQ("/envoy.service.ratelimit.v2.RateLimitService/ShouldRateLimit",
+              ratelimit_request_->headers().Path()->value().getStringView());
+    EXPECT_EQ("application/grpc",
+              ratelimit_request_->headers().ContentType()->value().getStringView());
 
     envoy::service::ratelimit::v2::RateLimitRequest expected_request_msg;
     expected_request_msg.set_domain("some_domain");
@@ -112,15 +113,15 @@ public:
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
 
     EXPECT_TRUE(response_->complete());
-    EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+    EXPECT_EQ("200", response_->headers().Status()->value().getStringView());
     EXPECT_EQ(response_size_, response_->body().size());
   }
 
   void waitForFailedUpstreamResponse(uint32_t response_code) {
     response_->waitForEndStream();
     EXPECT_TRUE(response_->complete());
-    EXPECT_STREQ(std::to_string(response_code).c_str(),
-                 response_->headers().Status()->value().c_str());
+    EXPECT_EQ(std::to_string(response_code),
+              response_->headers().Status()->value().getStringView());
   }
 
   void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code,
@@ -134,8 +135,8 @@ public:
           auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
                             ->mutable_headers()
                             ->Add();
-          header->set_key(h.key().c_str());
-          header->set_value(h.value().c_str());
+          header->set_key(std::string(h.key().getStringView()));
+          header->set_value(std::string(h.value().getStringView()));
           return Http::HeaderMap::Iterate::Continue;
         },
         &response_msg);
@@ -209,8 +210,8 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
   ratelimit_headers.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
         IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
-        Http::LowerCaseString lower_key{entry.key().c_str()};
-        EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
+        Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
+        EXPECT_EQ(entry.value(), response->headers().get(lower_key)->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       },
       response_.get());
@@ -247,8 +248,8 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
   ratelimit_headers.iterate(
       [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
         IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
-        Http::LowerCaseString lower_key{entry.key().c_str()};
-        EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
+        Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
+        EXPECT_EQ(entry.value(), response->headers().get(lower_key)->value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       },
       response_.get());
