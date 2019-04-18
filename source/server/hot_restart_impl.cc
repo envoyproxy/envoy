@@ -17,7 +17,6 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"
-#include "common/stats/raw_stat_data.h"
 
 #include "absl/strings/string_view.h"
 

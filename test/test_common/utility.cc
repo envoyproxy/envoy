@@ -379,24 +379,6 @@ bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nul
 
 } // namespace Http
 
-namespace Stats {
-
-MockedTestAllocator::MockedTestAllocator(SymbolTable& symbol_table) : TestAllocator(symbol_table) {
-  ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
-    return TestAllocator::alloc(name);
-  }));
-
-  ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-    return TestAllocator::free(data);
-  }));
-
-  EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
-}
-
-MockedTestAllocator::~MockedTestAllocator() {}
-
-} // namespace Stats
-
 namespace Api {
 
 class TestImplProvider {

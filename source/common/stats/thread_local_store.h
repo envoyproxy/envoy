@@ -302,8 +302,6 @@ private:
   StatsMatcherPtr stats_matcher_;
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
-  // TODO(fredlas) this (the counter "stats.overflow") can now be deleted.
-  Counter& num_last_resort_stats_;
   HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
   NullGaugeImpl null_gauge_;

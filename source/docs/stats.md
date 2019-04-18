@@ -80,7 +80,7 @@ followed.
 
 Stat names are replicated in several places in various forms.
 
- * Held fully elaborated next to the values, in `RawStatData` and `HeapStatData`
+ * Held fully elaborated next to the values, in `HeapStatData`
  * In [MetricImpl](https://github.com/envoyproxy/envoy/blob/master/source/common/stats/metric_impl.h)
    in a transformed state, with tags extracted into vectors of name/value strings.
  * In static strings across the codebase where stats are referenced
@@ -89,10 +89,9 @@ Stat names are replicated in several places in various forms.
    used to perform tag extraction.
 
 There are stat maps in `ThreadLocalStore` for capturing all stats in a scope,
-and each per-thread caches. However, they don't duplicate the stat
-names. Instead, they reference the `char*` held in the `RawStatData` or
-`HeapStatData itself, and thus are relatively cheap; effectively those maps are
-all pointer-to-pointer.
+and each per-thread caches. However, they don't duplicate the stat names.
+Instead, they reference the `char*` held in the `HeapStatData` itself, and thus
+are relatively cheap; effectively those maps are all pointer-to-pointer.
 
 For this to be safe, cache lookups from locally scoped strings must use `.find`
 rather than `operator[]`, as the latter would insert a pointer to a temporary as

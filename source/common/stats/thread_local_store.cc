@@ -23,9 +23,8 @@ namespace Stats {
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
-      stats_matcher_(std::make_unique<StatsMatcherImpl>()),
-      num_last_resort_stats_(default_scope_->counter("stats.overflow")),
-      heap_allocator_(alloc.symbolTable()), source_(*this) {}
+      stats_matcher_(std::make_unique<StatsMatcherImpl>()), heap_allocator_(alloc.symbolTable()),
+      source_(*this) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);
@@ -272,16 +271,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
     std::shared_ptr<StatType> stat =
         make_stat(parent_.alloc_, name, std::move(tag_extracted_name), std::move(tags));
-    if (stat == nullptr) {
-      // TODO(jmarantz): If make_stat fails, the actual move does not actually occur
-      // for tag_extracted_name and tags, so there is no use-after-move problem.
-      // In order to increase the readability of the code, refactoring is done here.
-      parent_.num_last_resort_stats_.inc();
-      stat = make_stat(parent_.heap_allocator_, name,
-                       std::move(tag_extracted_name), // NOLINT(bugprone-use-after-move)
-                       std::move(tags));              // NOLINT(bugprone-use-after-move)
-      ASSERT(stat != nullptr);
-    }
     central_ref = &central_cache_map[stat->nameCStr()];
     *central_ref = stat;
   }

@@ -22,12 +22,8 @@ namespace Stats {
 // The two production derivations cover using a fixed block of shared-memory for
 // hot restart stat continuity, and heap allocation for more efficient RAM usage
 // for when hot-restart is not required.
-//
-// Also note that RawStatData needs to live in a shared memory block, and it's
-// possible, but not obvious, that a vptr would be usable across processes. In
-// any case, RawStatData is allocated from a shared-memory block rather than via
-// new, so the usual C++ compiler assistance for setting up vptrs will not be
-// available. This could be resolved with placed new, or another nesting level.
+// TODO(fredlas) the above paragraph is obsolete; it's now only heap. So, this
+// interface can hopefully be collapsed down a bit.
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   explicit StatDataAllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}

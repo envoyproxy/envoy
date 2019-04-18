@@ -131,10 +131,8 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:raw_stat_data_lib",
     ],
 )
 
@@ -173,7 +171,6 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/stats:heap_stat_data_lib",
     ],
 )

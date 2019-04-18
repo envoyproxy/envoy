@@ -73,20 +73,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "raw_stat_data_lib",
-    srcs = ["raw_stat_data.cc"],
-    hdrs = ["raw_stat_data.h"],
-    deps = [
-        ":stat_data_allocator_lib",
-        "//include/envoy/stats:stats_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:block_memory_hash_set_lib",
-        "//source/common/common:hash_lib",
-        "//source/common/common:thread_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "scope_prefixer_lib",
     srcs = ["scope_prefixer.cc"],
     hdrs = ["scope_prefixer.h"],
@@ -134,7 +120,6 @@ envoy_cc_library(
     deps = [
         ":histogram_lib",
         ":metric_impl_lib",
-        ":raw_stat_data_lib",
         ":source_impl_lib",
         ":symbol_table_lib",
         ":tag_extractor_lib",

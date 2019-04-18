@@ -13,7 +13,6 @@
 #include "envoy/server/options.h"
 
 #include "common/common/assert.h"
-#include "common/stats/raw_stat_data.h"
 
 namespace Envoy {
 namespace Server {
