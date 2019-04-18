@@ -850,9 +850,10 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_EQ(headers.Host()->value().c_str(), host);
-        EXPECT_EQ(headers.Path()->value().c_str(), path);
-        EXPECT_EQ(headers.Scheme()->value().c_str(), Http::Headers::get().SchemeValues.Http);
+        EXPECT_EQ(headers.Host()->value().getStringView(), host);
+        EXPECT_EQ(headers.Path()->value().getStringView(), path);
+        EXPECT_EQ(headers.Scheme()->value().getStringView(),
+                  Http::Headers::get().SchemeValues.Http);
       }));
   health_checker_->start();
 
@@ -882,9 +883,10 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_EQ(headers.Host()->value().c_str(), host);
-        EXPECT_EQ(headers.Path()->value().c_str(), path);
-        EXPECT_EQ(headers.Scheme()->value().c_str(), Http::Headers::get().SchemeValues.Http);
+        EXPECT_EQ(headers.Host()->value().getStringView(), host);
+        EXPECT_EQ(headers.Path()->value().getStringView(), path);
+        EXPECT_EQ(headers.Scheme()->value().getStringView(),
+                  Http::Headers::get().SchemeValues.Http);
       }));
   health_checker_->start();
 
@@ -916,8 +918,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_EQ(headers.Host()->value().c_str(), host);
-        EXPECT_EQ(headers.Path()->value().c_str(), path);
+        EXPECT_EQ(headers.Host()->value().getStringView(), host);
+        EXPECT_EQ(headers.Path()->value().getStringView(), path);
       }));
   health_checker_->start();
 
@@ -977,23 +979,23 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillRepeatedly(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_EQ(headers.get(header_ok)->value().c_str(), value_ok);
-        EXPECT_EQ(headers.get(header_cool)->value().c_str(), value_cool);
-        EXPECT_EQ(headers.get(header_awesome)->value().c_str(), value_awesome);
+        EXPECT_EQ(headers.get(header_ok)->value().getStringView(), value_ok);
+        EXPECT_EQ(headers.get(header_cool)->value().getStringView(), value_cool);
+        EXPECT_EQ(headers.get(header_awesome)->value().getStringView(), value_awesome);
 
-        EXPECT_EQ(headers.UserAgent()->value().c_str(), value_user_agent);
-        EXPECT_EQ(headers.get(upstream_metadata)->value().c_str(), value_upstream_metadata);
+        EXPECT_EQ(headers.UserAgent()->value().getStringView(), value_user_agent);
+        EXPECT_EQ(headers.get(upstream_metadata)->value().getStringView(), value_upstream_metadata);
 
-        EXPECT_EQ(headers.get(protocol)->value().c_str(), value_protocol);
-        EXPECT_EQ(headers.get(downstream_remote_address_without_port)->value().c_str(),
+        EXPECT_EQ(headers.get(protocol)->value().getStringView(), value_protocol);
+        EXPECT_EQ(headers.get(downstream_remote_address_without_port)->value().getStringView(),
                   value_downstream_remote_address_without_port);
-        EXPECT_EQ(headers.get(downstream_local_address)->value().c_str(),
+        EXPECT_EQ(headers.get(downstream_local_address)->value().getStringView(),
                   value_downstream_local_address);
-        EXPECT_EQ(headers.get(downstream_local_address_without_port)->value().c_str(),
+        EXPECT_EQ(headers.get(downstream_local_address_without_port)->value().getStringView(),
                   value_downstream_local_address_without_port);
 
-        EXPECT_NE(headers.get(start_time)->value().c_str(), current_start_time);
-        current_start_time = headers.get(start_time)->value().c_str();
+        EXPECT_NE(headers.get(start_time)->value().getStringView(), current_start_time);
+        current_start_time = std::string(headers.get(start_time)->value().getStringView());
       }));
   health_checker_->start();
 
@@ -1780,8 +1782,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_EQ(headers.Host()->value().c_str(), host);
-        EXPECT_EQ(headers.Path()->value().c_str(), path);
+        EXPECT_EQ(headers.Host()->value().getStringView(), host);
+        EXPECT_EQ(headers.Path()->value().getStringView(), path);
       }));
   health_checker_->start();
 
@@ -2855,11 +2857,13 @@ public:
     EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
         .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc,
-                    headers.ContentType()->value().c_str());
-          EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"), headers.Path()->value().c_str());
-          EXPECT_EQ(Http::Headers::get().SchemeValues.Http, headers.Scheme()->value().c_str());
+                    headers.ContentType()->value().getStringView());
+          EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"),
+                    headers.Path()->value().getStringView());
+          EXPECT_EQ(Http::Headers::get().SchemeValues.Http,
+                    headers.Scheme()->value().getStringView());
           EXPECT_NE(nullptr, headers.Method());
-          EXPECT_EQ(expected_host, headers.Host()->value().c_str());
+          EXPECT_EQ(expected_host, headers.Host()->value().getStringView());
         }));
     EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
         .WillOnce(Invoke([&](Buffer::Instance& data, bool) {

@@ -2,6 +2,7 @@
 
 #include "envoy/api/v2/eds.pb.validate.h"
 
+#include "common/common/utility.h"
 #include "common/config/subscription_factory.h"
 
 namespace Envoy {
@@ -18,11 +19,11 @@ EdsClusterImpl::EdsClusterImpl(
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {
   Config::Utility::checkLocalInfo("eds", local_info_);
-
-  const auto& eds_config = cluster.eds_cluster_config().eds_config();
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   Runtime::RandomGenerator& random = factory_context.random();
   Upstream::ClusterManager& cm = factory_context.clusterManager();
+  assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
+  const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
       eds_config, local_info_, dispatcher, cm, random, info_->statsScope(),
       "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints",
@@ -118,8 +119,35 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
                                      cluster_load_assignment.cluster_name()));
   }
 
+  // Disable timer (if enabled) as we have received new assignment.
+  if (assignment_timeout_->enabled()) {
+    assignment_timeout_->disableTimer();
+  }
+  // Check if endpoint_stale_after is set.
+  const uint64_t stale_after_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(cluster_load_assignment.policy(), endpoint_stale_after, 0);
+  if (stale_after_ms > 0) {
+    // Stat to track how often we receive valid assignment_timeout in response.
+    info_->stats().assignment_timeout_received_.inc();
+    assignment_timeout_->enableTimer(std::chrono::milliseconds(stale_after_ms));
+  }
+
   BatchUpdateHelper helper(*this, cluster_load_assignment);
   priority_set_.batchHostUpdate(helper);
+}
+
+void EdsClusterImpl::onAssignmentTimeout() {
+  // We can no longer use the assignments, remove them.
+  // TODO(vishalpowar) This is not going to work for incremental updates, and we
+  // need to instead change the health status to indicate the assignments are
+  // stale.
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  envoy::api::v2::ClusterLoadAssignment resource;
+  resource.set_cluster_name(cluster_name_);
+  resources.Add()->PackFrom(resource);
+  onConfigUpdate(resources, "");
+  // Stat to track how often we end up with stale assignments.
+  info_->stats().assignment_stale_.inc();
 }
 
 bool EdsClusterImpl::updateHostsPerLocality(

@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 
 enum class UuidTraceStatus { NoTrace, Sampled, Client, Forced };
@@ -30,7 +32,7 @@ public:
   /**
    * @return status of the uuid, to differentiate reason for tracing, etc.
    */
-  static UuidTraceStatus isTraceableUuid(const std::string& uuid);
+  static UuidTraceStatus isTraceableUuid(absl::string_view uuid);
 
 private:
   // Byte on this position has predefined value of 4 for UUID4.
