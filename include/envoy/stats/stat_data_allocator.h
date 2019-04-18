@@ -49,11 +49,6 @@ public:
   virtual GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
                                    std::vector<Tag>&& tags) PURE;
 
-  /**
-   * Determines whether this stats allocator requires bounded stat-name size.
-   */
-  virtual bool requiresBoundedStatNameSize() const PURE;
-
   virtual const SymbolTable& symbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;
 

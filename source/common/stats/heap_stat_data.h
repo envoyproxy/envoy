@@ -62,9 +62,6 @@ public:
   HeapStatData* alloc(absl::string_view name) override;
   void free(HeapStatData& data) override;
 
-  // StatDataAllocator
-  bool requiresBoundedStatNameSize() const override { return false; }
-
 private:
   struct HeapStatHash {
     size_t operator()(const HeapStatData* a) const { return HashUtil::xxHash64(a->key()); }
