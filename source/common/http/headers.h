@@ -170,11 +170,11 @@ public:
 
   struct {
     const std::string Connect{"CONNECT"};
+    const std::string Delete{"DELETE"};
     const std::string Get{"GET"};
     const std::string Head{"HEAD"};
     const std::string Post{"POST"};
     const std::string Put{"PUT"};
-    const std::string Delete{"DELETE"};
     const std::string Options{"OPTIONS"};
     const std::string Trace{"TRACE"};
   } MethodValues;

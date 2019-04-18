@@ -14,6 +14,42 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Csrf {
 
+namespace {
+bool modifyMethod(const Http::HeaderMap& headers) {
+  const Envoy::Http::HeaderEntry* method = headers.Method();
+  if (method == nullptr) {
+    return false;
+  }
+  const absl::string_view& method_type = method->value().getStringView();
+  const auto& method_values = Http::Headers::get().MethodValues;
+  return (method_type == method_values.Post || method_type == method_values.Put ||
+          method_type == method_values.Delete);
+}
+
+absl::string_view hostAndPort(const Http::HeaderEntry* header) {
+  Http::Utility::Url absolute_url;
+  if (header != nullptr && !header->value().empty()) {
+    if (absolute_url.initialize(header->value().getStringView())) {
+      return absolute_url.host_and_port();
+    }
+    return header->value().getStringView();
+  }
+  return EMPTY_STRING;
+}
+
+absl::string_view sourceOriginValue(const Http::HeaderMap& headers) {
+  const absl::string_view& origin = hostAndPort(headers.Origin());
+  if (origin != EMPTY_STRING) {
+    return origin;
+  }
+  return hostAndPort(headers.Referer());
+}
+
+absl::string_view targetOriginValue(const Http::HeaderMap& headers) {
+  return hostAndPort(headers.Host());
+}
+} // namespace
+
 CsrfFilterConfig::CsrfFilterConfig(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
                                    const std::string& stats_prefix, Stats::Scope& scope,
                                    Runtime::Loader& runtime)
@@ -58,53 +94,14 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bo
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-bool CsrfFilter::modifyMethod(const Http::HeaderMap& headers) {
-  const Envoy::Http::HeaderEntry* method = headers.Method();
-  if (method == nullptr) {
-    return false;
-  }
-  const absl::string_view& method_type = method->value().getStringView();
-  const auto& method_values = Http::Headers::get().MethodValues;
-  return (method_type == method_values.Post || method_type == method_values.Put ||
-          method_type == method_values.Delete);
-}
-
-absl::string_view CsrfFilter::sourceOriginValue(const Http::HeaderMap& headers) {
-  const absl::string_view& origin = hostAndPort(headers.Origin());
-  if (origin != EMPTY_STRING) {
-    return origin;
-  }
-  return hostAndPort(headers.Referer());
-}
-
-absl::string_view CsrfFilter::targetOriginValue(const Http::HeaderMap& headers) {
-  return hostAndPort(headers.Host());
-}
-
-absl::string_view CsrfFilter::hostAndPort(const Http::HeaderEntry* header) {
-  Http::Utility::Url absolute_url;
-  if (header != nullptr && !header->value().empty()) {
-    if (absolute_url.initialize(header->value().getStringView())) {
-      return absolute_url.host_and_port();
-    }
-    return header->value().getStringView();
-  }
-  return EMPTY_STRING;
-}
-
 void CsrfFilter::determinePolicy() {
-  // Prioritize global config first.
-  policy_ = config_->policy();
-  // If the route has a policy use that.
-  if (callbacks_->route() && callbacks_->route()->routeEntry()) {
-    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Csrf;
-    const Router::RouteEntry* route_entry = callbacks_->route()->routeEntry();
-
-    const CsrfPolicy* route_policy = route_entry->perFilterConfigTyped<CsrfPolicy>(name);
-    const CsrfPolicy* per_route_policy =
-        route_policy ? route_policy
-                     : route_entry->virtualHost().perFilterConfigTyped<CsrfPolicy>(name);
-    policy_ = per_route_policy ? per_route_policy : policy_;
+  const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Csrf;
+  const CsrfPolicy* policy =
+      Http::Utility::resolveMostSpecificPerFilterConfig<CsrfPolicy>(name, callbacks_->route());
+  if (policy != nullptr) {
+    policy_ = policy;
+  } else {
+    policy_ = config_->policy();
   }
 }
 

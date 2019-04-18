@@ -105,10 +105,6 @@ public:
   };
 
 private:
-  bool modifyMethod(const Http::HeaderMap& headers);
-  absl::string_view sourceOriginValue(const Http::HeaderMap& headers);
-  absl::string_view targetOriginValue(const Http::HeaderMap& headers);
-  absl::string_view hostAndPort(const Envoy::Http::HeaderEntry* header);
   void determinePolicy();
 
   Http::StreamDecoderFilterCallbacks* callbacks_{};
