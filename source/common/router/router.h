@@ -152,7 +152,7 @@ public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
         do_shadowing_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false) {}
+        attempting_internal_redirect_with_complete_stream_(false), pending_per_try_timeout_(false) {}
 
   ~Filter();
 
@@ -434,6 +434,9 @@ private:
   bool is_retry_ : 1;
   bool include_attempt_count_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;
+  // Tracks whether we deferred a per try timeout because the downstream request
+  // had not been completed yet.
+  bool pending_per_try_timeout_ : 1;
   uint32_t attempt_count_{1};
 };
 

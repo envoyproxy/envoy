@@ -521,6 +521,10 @@ void Filter::onRequestComplete() {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
     }
+
+    if (pending_per_try_timeout_) {
+      upstream_requests_.front()->setupPerTryTimeout();
+    }
   }
 }
 
@@ -1184,7 +1188,11 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
 
-  setupPerTryTimeout();
+  if (parent_.downstream_end_stream_) {
+    setupPerTryTimeout();
+  } else {
+    parent_.pending_per_try_timeout_ = true;
+  }
 
   conn_pool_stream_handle_ = nullptr;
   setRequestEncoder(request_encoder);

@@ -1152,6 +1152,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+// Verifies that the per try timeout is initialized once the downstream request has been read.
 TEST_F(RouterTest, UpstreamPerTryTimeout) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -1167,15 +1168,68 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
         EXPECT_EQ(host_address_, host->address());
       }));
 
-  expectResponseTimerCreate();
+  Http::TestHeaderMapImpl headers{{"x-envoy-internal", "true"},
+                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+
+  // We verify that both timeouts are started after decodeData(_, true) is called. This
+  // verifies that we are not starting the initial per try timeout on the first onPoolReady.
   expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  per_try_timeout_->callback_();
+
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("upstream_rq_per_try_timeout")
+                    .value());
+  EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Verifies that the per try timeout starts when onPoolReady is called when it occurs
+// after the downstream request has been read.
+TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  Http::ConnectionPool::Callbacks* pool_callbacks;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        pool_callbacks = &callbacks;
+        return nullptr;
+      }));
 
   Http::TestHeaderMapImpl headers{{"x-envoy-internal", "true"},
                                   {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
+
+  // Global timeout starts when decodeData(_, true) is called.
+  expectResponseTimerCreate();
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
+
+  // Per try timeout starts when onPoolReady is called.
+  expectPerTryTimerCreate();
+  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
+      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
+        EXPECT_EQ(host_address_, host->address());
+      }));
+
+  pool_callbacks->onPoolReady(encoder, cm_.conn_pool_.host_);
 
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
@@ -1364,8 +1418,8 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
       }));
-  expectResponseTimerCreate();
   expectPerTryTimerCreate();
+  expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
                                   {"x-envoy-internal", "true"},
@@ -1455,8 +1509,8 @@ TEST_F(RouterTest, DontResetStartedResponseOnUpstreamPerTryTimeout) {
         callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_);
         return nullptr;
       }));
-  expectResponseTimerCreate();
   expectPerTryTimerCreate();
+  expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-internal", "true"},
                                   {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
