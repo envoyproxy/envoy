@@ -59,9 +59,22 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
 
   retry_on_ = route_policy.retryOn();
   retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
-  const uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
-  // Cap the max interval to 10 times the base interval to ensure reasonable backoff intervals.
-  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
+
+  std::chrono::milliseconds base_interval(
+      runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
+  if (route_policy.baseInterval()) {
+    base_interval = *route_policy.baseInterval();
+  }
+
+  // By default, cap the max interval to 10 times the base interval to ensure reasonable back-off
+  // intervals.
+  std::chrono::milliseconds max_interval = base_interval * 10;
+  if (route_policy.maxInterval()) {
+    max_interval = *route_policy.maxInterval();
+  }
+
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base_interval.count(),
+                                                                max_interval.count(), random_);
   host_selection_max_attempts_ = route_policy.hostSelectionMaxAttempts();
 
   // Merge in the headers.
