@@ -152,7 +152,7 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyFlushed) {
   Buffer::OwnedImpl data(std::string(127, 'a'));
   upstream_request_->encodeData(data, false);
 
-  // Advance time and wait for a tick worth of data.
+  // Wait for a tick work of data.
   decoder->waitForBodyData(64);
 
   // Advance time and wait for a tick worth of data.
@@ -182,7 +182,7 @@ TEST_P(FaultIntegrationTestHttp2, ResponseRateLimitTrailersBodyNotFlushed) {
   Http::TestHeaderMapImpl trailers{{"hello", "world"}};
   upstream_request_->encodeTrailers(trailers);
 
-  // Advance time and wait for a tick worth of data.
+  // Wait for a tick work of data.
   decoder->waitForBodyData(64);
 
   // Advance time and wait for a tick worth of data, trailers, and end stream.

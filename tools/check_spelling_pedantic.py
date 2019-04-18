@@ -525,14 +525,15 @@ if __name__ == "__main__":
   DEBUG = args.debug
   MARK = args.mark
 
-  target_paths = args.target_paths
-  if not target_paths:
-    exts = ['.cc', '.h', '.proto']
-    target_paths = []
+  paths = args.target_paths
+  if not paths:
     paths = ['./api', './include', './source', './test']
-    for p in paths:
-      for root, _, files in os.walk(p):
-        target_paths += [os.path.join(root, f) for f in files if os.path.splitext(f)[1] in exts]
+
+  exts = ['.cc', '.h', '.proto']
+  target_paths = []
+  for p in paths:
+    for root, _, files in os.walk(p):
+      target_paths += [os.path.join(root, f) for f in files if os.path.splitext(f)[1] in exts]
 
   rv = execute(target_paths, args.dictionary, args.operation_type == 'fix')
 
