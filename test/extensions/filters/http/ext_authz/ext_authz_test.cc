@@ -519,10 +519,10 @@ TEST_F(HttpFilterTest, ClearCache) {
             request_callbacks_ = &callbacks;
           })));
   EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
@@ -558,10 +558,10 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAppendOnly) {
             request_callbacks_ = &callbacks;
           })));
   EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
@@ -596,10 +596,10 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToAddOnly) {
             request_callbacks_ = &callbacks;
           })));
   EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(1);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
@@ -633,10 +633,10 @@ TEST_F(HttpFilterTest, NoClearCacheRoute) {
             request_callbacks_ = &callbacks;
           })));
   EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(0);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
@@ -666,10 +666,10 @@ TEST_F(HttpFilterTest, NoClearCacheRouteConfig) {
             request_callbacks_ = &callbacks;
           })));
   EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(0);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_CALL(filter_callbacks_, continueDecoding());
   EXPECT_CALL(filter_callbacks_.stream_info_,
               setResponseFlag(Envoy::StreamInfo::ResponseFlag::UnauthorizedExternalService))
@@ -709,10 +709,10 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
           })));
   EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
-  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
 }
 
