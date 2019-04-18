@@ -442,6 +442,7 @@ def envoy_cc_test(
         deps = [],
         tags = [],
         args = [],
+        copts = [],
         shard_count = None,
         coverage = True,
         local = False,
@@ -457,10 +458,11 @@ def envoy_cc_test(
         deps = deps,
         repository = repository,
         tags = test_lib_tags,
+        copts = copts,
     )
     native.cc_test(
         name = name,
-        copts = envoy_copts(repository, test = True),
+        copts = envoy_copts(repository, test = True) + copts,
         linkopts = envoy_test_linkopts(),
         linkstatic = 1,
         malloc = tcmalloc_external_dep(repository),
@@ -488,13 +490,14 @@ def envoy_cc_test_infrastructure_library(
         deps = [],
         repository = "",
         tags = [],
-        include_prefix = None):
+        include_prefix = None,
+        copts = []):
     native.cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
         data = data,
-        copts = envoy_copts(repository, test = True),
+        copts = envoy_copts(repository, test = True) + copts,
         testonly = 1,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] + [
             envoy_external_dep_path("googletest"),
@@ -517,7 +520,8 @@ def envoy_cc_test_library(
         deps = [],
         repository = "",
         tags = [],
-        include_prefix = None):
+        include_prefix = None,
+        copts = []):
     deps = deps + [
         repository + "//test/test_common:printers_includes",
     ]
@@ -531,6 +535,7 @@ def envoy_cc_test_library(
         repository,
         tags,
         include_prefix,
+        copts,
     )
 
 # Envoy test binaries should be specified with this function.

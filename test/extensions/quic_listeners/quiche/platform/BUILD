@@ -62,3 +62,35 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "epoll_server_platform_impl_lib",
+    hdrs = [
+        "epoll_address_test_utils_impl.h",
+        "epoll_bug_impl.h",
+        "epoll_expect_bug_impl.h",
+        "epoll_export_impl.h",
+        "epoll_logging_impl.h",
+        "epoll_ptr_util_impl.h",
+        "epoll_test_impl.h",
+        "epoll_thread_impl.h",
+        "epoll_time_impl.h",
+    ],
+    external_deps = ["abseil_time"],
+    deps = [
+        "//include/envoy/network:address_interface",
+        "//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "epoll_server_test",
+    srcs = [
+        "simple_epoll_server_test.cc",
+    ],
+    copts = ["-Wno-error=unused-parameter"],
+    deps = [
+        "@com_googlesource_quiche//:epoll_server_lib",
+    ],
+)

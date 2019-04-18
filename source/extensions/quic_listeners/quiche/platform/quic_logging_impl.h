@@ -59,9 +59,18 @@
 #define CHECK(condition)                                                                           \
   QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << "CHECK failed: " #condition "."
 
+#define CHECK_GT(a, b) CHECK((a) > (b))
+#define CHECK_GE(a, b) CHECK((a) >= (b))
+#define CHECK_LT(a, b) CHECK((a) < (b))
+#define CHECK_LE(a, b) CHECK((a) <= (b))
+#define CHECK_NE(a, b) CHECK((a) != (b))
+#define CHECK_EQ(a, b) CHECK((a) == (b))
+
 #ifdef NDEBUG
 // Release build
-#define DCHECK(condition) QUIC_COMPILED_OUT_LOG()
+#define DCHECK(condition)                                                                          \
+  while (false && (condition))                                                                     \
+  QUIC_COMPILED_OUT_LOG()
 #define QUIC_COMPILED_OUT_LOG() QUIC_LOG_IMPL_INTERNAL(false, quic::NullLogStream().stream())
 #define QUIC_DVLOG_IMPL(verbosity) QUIC_COMPILED_OUT_LOG()
 #define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_COMPILED_OUT_LOG()
@@ -81,6 +90,13 @@
 #define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_LOG_EVERY_N_IMPL(severity, n)
 #define QUIC_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
 #endif
+
+#define DCHECK_GT(a, b) DCHECK((a) > (b))
+#define DCHECK_GE(a, b) DCHECK((a) >= (b))
+#define DCHECK_LT(a, b) DCHECK((a) < (b))
+#define DCHECK_LE(a, b) DCHECK((a) <= (b))
+#define DCHECK_NE(a, b) DCHECK((a) != (b))
+#define DCHECK_EQ(a, b) DCHECK((a) == (b))
 
 #define QUIC_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
 

@@ -29,6 +29,7 @@ load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_copts",
     "envoy_select_quiche",
 )
 
@@ -236,6 +237,48 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [":quic_platform_export"],
+)
+
+cc_library(
+    name = "epoll_server_platform",
+    testonly = 1,
+    hdrs = [
+        "quiche/epoll_server/platform/api/epoll_address_test_utils.h",
+        "quiche/epoll_server/platform/api/epoll_bug.h",
+        "quiche/epoll_server/platform/api/epoll_expect_bug.h",
+        "quiche/epoll_server/platform/api/epoll_export.h",
+        "quiche/epoll_server/platform/api/epoll_logging.h",
+        "quiche/epoll_server/platform/api/epoll_ptr_util.h",
+        "quiche/epoll_server/platform/api/epoll_test.h",
+        "quiche/epoll_server/platform/api/epoll_thread.h",
+        "quiche/epoll_server/platform/api/epoll_time.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:epoll_server_platform_impl_lib"],
+)
+
+cc_library(
+    name = "epoll_server_lib",
+    testonly = 1,
+    srcs = [
+        "quiche/epoll_server/fake_simple_epoll_server.cc",
+        "quiche/epoll_server/simple_epoll_server.cc",
+    ],
+    hdrs = [
+        "quiche/epoll_server/fake_simple_epoll_server.h",
+        "quiche/epoll_server/simple_epoll_server.h",
+    ],
+    copts = envoy_copts("@envoy") + ["-Wno-error=unused-parameter"],
+    visibility = ["//visibility:public"],
+    deps = [":epoll_server_platform"],
+)
+
+envoy_cc_test(
+    name = "epoll_server_test",
+    srcs = ["quiche/epoll_server/simple_epoll_server_test.cc"],
+    copts = ["-Wno-error=unused-parameter"],
+    repository = "@envoy",
+    deps = [":epoll_server_lib"],
 )
 
 envoy_cc_test(
