@@ -2399,6 +2399,115 @@ virtual_hosts:
                 .retryOn());
 }
 
+// Test route-specific retry back-off intervals.
+TEST_F(RouteMatcherTest, RetryBackOffIntervals) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.050s
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.100s
+          max_interval: 0.500s
+  - match:
+      prefix: "/baz"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.0001s # < 1 ms
+          max_interval: 0.0001s
+  - match:
+      prefix: "/"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_on: connect-failure
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(50),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .baseInterval());
+
+  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                               ->routeEntry()
+                               ->retryPolicy()
+                               .maxInterval());
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(100),
+            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .baseInterval());
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(500),
+            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .maxInterval());
+
+  // Sub-millisecond interval converted to 1 ms.
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
+            config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .baseInterval());
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
+            config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .maxInterval());
+
+  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                               ->routeEntry()
+                               ->retryPolicy()
+                               .baseInterval());
+
+  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                               ->routeEntry()
+                               ->retryPolicy()
+                               .maxInterval());
+}
+
+// Test invalid route-specific retry back-off configs.
+TEST_F(RouteMatcherTest, InvalidRetryBackOff) {
+  const std::string invalid_max = R"EOF(
+virtual_hosts:
+  - name: backoff
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          cluster: backoff
+          retry_policy:
+            retry_back_off:
+              base_interval: 10s
+              max_interval: 5s
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_max), factory_context_, true),
+      EnvoyException, "retry_policy.max_interval must greater than or equal to the base_interval");
+}
+
 TEST_F(RouteMatcherTest, HedgeRouteLevel) {
   const std::string yaml = R"EOF(
 name: HedgeRouteLevel
