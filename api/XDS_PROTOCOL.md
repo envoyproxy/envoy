@@ -348,7 +348,9 @@ client spontaneously requests the "wc" resource.
 ![Incremental session example](diagrams/incremental.svg)
 
 On reconnect the Incremental xDS client may tell the server of its known
-resources to avoid resending them over the network. Because no state is assumed to be preserved from the previous stream, the reconnecting client must provide the server with all resource names it is interested in.
+resources to avoid resending them over the network. Because no state is assumed
+to be preserved from the previous stream, the reconnecting client must provide
+the server with all resource names it is interested in.
 
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
 

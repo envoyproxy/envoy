@@ -174,6 +174,12 @@ public:
   }
 
 private:
+  // What's with the optional<UpdateAck>? DeltaDiscoveryRequest plays two independent roles:
+  // informing the server of what resources we're interested in, and acknowledging resources it has
+  // sent us. Some requests are queued up specifically to carry ACKs, and some are queued up for
+  // resource updates. Susbscription changes might get included in an ACK request. In that case, the
+  // pending request that the subscription change queued up does still get sent, just empty and
+  // pointless. (TODO(fredlas) we would like to skip those no-op requests).
   void sendDiscoveryRequest(absl::optional<UpdateAck> maybe_ack) {
     if (maybe_ack.has_value()) {
       const UpdateAck& ack = maybe_ack.value();
@@ -255,13 +261,9 @@ private:
   }
 
   void trySendDiscoveryRequests() {
-    while (!ack_queue_.empty()) {
-      if (shouldSendDiscoveryRequest()) {
-        sendDiscoveryRequest(ack_queue_.front());
-        ack_queue_.pop();
-      } else {
-        break;
-      }
+    while (!ack_queue_.empty() && shouldSendDiscoveryRequest()) {
+      sendDiscoveryRequest(ack_queue_.front());
+      ack_queue_.pop();
     }
     grpc_stream_.maybeUpdateQueueSizeStat(ack_queue_.size());
   }
@@ -321,7 +323,8 @@ private:
   bool paused_{};
 
   // An item in the queue represents a DeltaDiscoveryRequest that must be sent. If an item is not
-  // empty, it is the ACK (nonce + error_detail) to set.
+  // empty, it is the ACK (nonce + error_detail) to set on that request. See
+  // trySendDiscoveryRequests() for more details.
   std::queue<absl::optional<UpdateAck>> ack_queue_;
 
   // Tracking of the delta in our subscription interest since the previous DeltaDiscoveryRequest was
