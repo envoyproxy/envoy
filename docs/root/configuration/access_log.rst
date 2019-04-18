@@ -162,6 +162,8 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+.. _config_access_log_format_response_code_details:
+
 %RESPONSE_CODE_DETAILS%
   HTTP
     HTTP response code details provides additional information about the response code, such as
