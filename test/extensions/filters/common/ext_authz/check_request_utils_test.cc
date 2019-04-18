@@ -75,13 +75,17 @@ TEST_F(CheckRequestUtilsTest, BasicTcp) {
 
 // Verify that createHttpCheck's dependencies are invoked when it's called.
 // Verify that check request object has no request data.
+// Verify that a client supplied EnvoyAuthPartialBody will not affect the
+// CheckRequest call.
 TEST_F(CheckRequestUtilsTest, BasicHttp) {
   const uint64_t size = 0;
-  Http::HeaderMapImpl headers_;
   envoy::service::auth::v2::CheckRequest request_;
 
+  // A client supplied EnvoyAuthPartialBody header should be ignored.
+  Http::TestHeaderMapImpl request_headers{{Http::Headers::get().EnvoyAuthPartialBody.get(), "1"}};
+
   ExpectBasicHttp();
-  CheckRequestUtils::createHttpCheck(&callbacks_, headers_,
+  CheckRequestUtils::createHttpCheck(&callbacks_, request_headers,
                                      Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>(),
                                      request_, size);
   ASSERT_EQ(size, request_.attributes().request().http().body().size());
