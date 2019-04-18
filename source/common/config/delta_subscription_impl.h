@@ -222,7 +222,7 @@ private:
   // What's with the optional<UpdateAck>? DeltaDiscoveryRequest plays two independent roles:
   // informing the server of what resources we're interested in, and acknowledging resources it has
   // sent us. Some requests are queued up specifically to carry ACKs, and some are queued up for
-  // resource updates. Susbscription changes might get included in an ACK request. In that case, the
+  // resource updates. Subscription changes might get included in an ACK request. In that case, the
   // pending request that the subscription change queued up does still get sent, just empty and
   // pointless. (TODO(fredlas) we would like to skip those no-op requests).
   void sendDiscoveryRequest(absl::optional<UpdateAck> maybe_ack) {
