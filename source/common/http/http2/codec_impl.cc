@@ -150,7 +150,10 @@ void ConnectionImpl::StreamImpl::encodeTrailers(const HeaderMap& trailers) {
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
   ASSERT(parent_.allow_metadata_);
 
-  getMetadataEncoder().createPayload(metadata_map_vector);
+  bool success = getMetadataEncoder().createPayload(metadata_map_vector);
+  if (!success) {
+    return;
+  }
 
   // Estimates the number of frames to generate, and breaks the while loop when the size is reached
   // in case submitting succeeds and packing fails, and we don't get error from packing.
