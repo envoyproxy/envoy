@@ -22,7 +22,13 @@ message RedisProxy {
   // Name of cluster from cluster manager. See the :ref:`configuration section
   // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
   // configuring the backing cluster.
-  string cluster = 2 [(validate.rules).string.min_bytes = 1];
+  //
+  // .. attention::
+  //
+  //   This field is deprecated. Use a :ref:`catch-all
+  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>`
+  //   instead.
+  string cluster = 2 [deprecated = true];
 
   // Redis connection pool settings.
   message ConnPoolSettings {
@@ -55,10 +61,63 @@ message RedisProxy {
     bool enable_redirection = 3;
   }
 
-  // Network settings for the connection pool to the upstream cluster.
+  // Network settings for the connection pool to the upstream clusters.
   ConnPoolSettings settings = 3 [(validate.rules).message.required = true];
 
   // Indicates that latency stat should be computed in microseconds. By default it is computed in
   // milliseconds.
   bool latency_in_micros = 4;
+
+  message PrefixRoutes {
+    message Route {
+      // String prefix that must match the beginning of the keys. Envoy will always favor the
+      // longest match.
+      string prefix = 1 [(validate.rules).string.min_bytes = 1];
+
+      // Indicates if the prefix needs to be removed from the key when forwarded.
+      bool remove_prefix = 2;
+
+      // Upstream cluster to forward the command to.
+      string cluster = 3 [(validate.rules).string.min_bytes = 1];
+    }
+
+    // List of prefix routes.
+    repeated Route routes = 1 [(gogoproto.nullable) = false];
+
+    // Indicates that prefix matching should be case insensitive.
+    bool case_insensitive = 2;
+
+    // Optional catch-all route to forward commands that doesn't match any of the routes. The
+    // catch-all route becomes required when no routes are specified.
+    string catch_all_cluster = 3;
+  }
+
+  // List of **unique** prefixes used to separate keys from different workloads to different
+  // clusters. Envoy will always favor the longest match first in case of overlap. A catch-all
+  // cluster can be used to forward commands when there is no match. Time complexity of the
+  // lookups are in O(min(longest key prefix, key length)).
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //    prefix_routes:
+  //      routes:
+  //        - prefix: "ab"
+  //          cluster: "cluster_a"
+  //        - prefix: "abc"
+  //          cluster: "cluster_b"
+  //
+  // When using the above routes, the following prefixes would be sent to:
+  //
+  // * 'get abc:users' would retrive the key 'abc:users' from cluster_b.
+  // * 'get ab:users' would retrive the key 'ab:users' from cluster_a.
+  // * 'get z:users' would return a NoUpstreamHost error. A :ref:`catch-all
+  //   cluster<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_cluster>`
+  //   would have retrieved the key from that cluster instead.
+  //
+  // See the :ref:`configuration section
+  // <arch_overview_redis_configuration>` of the architecture overview for recommendations on
+  // configuring the backing clusters.
+  PrefixRoutes prefix_routes = 5 [(gogoproto.nullable) = false];
 }

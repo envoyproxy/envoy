@@ -36,13 +36,13 @@ public:
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
     ASSERT_TRUE(response->headers().ContentEncoding() != nullptr);
     EXPECT_EQ(Http::Headers::get().ContentEncodingValues.Gzip,
-              response->headers().ContentEncoding()->value().c_str());
+              response->headers().ContentEncoding()->value().getStringView());
     ASSERT_TRUE(response->headers().TransferEncoding() != nullptr);
     EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
-              response->headers().TransferEncoding()->value().c_str());
+              response->headers().TransferEncoding()->value().getStringView());
 
     Buffer::OwnedImpl decompressed_response{};
     const Buffer::OwnedImpl compressed_response{response->body()};
@@ -61,7 +61,7 @@ public:
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
     ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
     ASSERT_EQ(content_length, response->body().size());
     EXPECT_EQ(response->body(), std::string(content_length, 'a'));
@@ -173,8 +173,8 @@ TEST_P(GzipIntegrationTest, UpstreamResponseAlreadyEncoded) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  ASSERT_STREQ("br", response->headers().ContentEncoding()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  ASSERT_EQ("br", response->headers().ContentEncoding()->value().getStringView());
   EXPECT_EQ(128U, response->body().size());
 }
 
@@ -197,7 +197,7 @@ TEST_P(GzipIntegrationTest, NotEnoughContentLength) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
   EXPECT_EQ(10U, response->body().size());
 }
@@ -220,7 +220,7 @@ TEST_P(GzipIntegrationTest, EmptyResponse) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("204", response->headers().Status()->value().c_str());
+  EXPECT_EQ("204", response->headers().Status()->value().getStringView());
   ASSERT_TRUE(response->headers().ContentEncoding() == nullptr);
   EXPECT_EQ(0U, response->body().size());
 }
@@ -275,9 +275,9 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigChunkedResponse) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  ASSERT_STREQ("gzip", response->headers().ContentEncoding()->value().c_str());
-  ASSERT_STREQ("chunked", response->headers().TransferEncoding()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  ASSERT_EQ("gzip", response->headers().ContentEncoding()->value().getStringView());
+  ASSERT_EQ("chunked", response->headers().TransferEncoding()->value().getStringView());
 }
 
 /**
@@ -299,8 +299,8 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigVeryHeader) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  ASSERT_STREQ("gzip", response->headers().ContentEncoding()->value().c_str());
-  ASSERT_STREQ("Cookie, Accept-Encoding", response->headers().Vary()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  ASSERT_EQ("gzip", response->headers().ContentEncoding()->value().getStringView());
+  ASSERT_EQ("Cookie, Accept-Encoding", response->headers().Vary()->value().getStringView());
 }
 } // namespace Envoy

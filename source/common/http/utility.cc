@@ -88,8 +88,8 @@ void Utility::appendVia(HeaderMap& headers, const std::string& via) {
 std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
   ASSERT(headers.Host());
   ASSERT(headers.Path());
-  return fmt::format("https://{}{}", headers.Host()->value().c_str(),
-                     headers.Path()->value().c_str());
+  return fmt::format("https://{}{}", headers.Host()->value().getStringView(),
+                     headers.Path()->value().getStringView());
 }
 
 Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
@@ -121,8 +121,14 @@ Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
   return params;
 }
 
-const char* Utility::findQueryStringStart(const HeaderString& path) {
-  return std::find(path.c_str(), path.c_str() + path.size(), '?');
+absl::string_view Utility::findQueryStringStart(const HeaderString& path) {
+  absl::string_view path_str = path.getStringView();
+  size_t query_offset = path_str.find('?');
+  if (query_offset == absl::string_view::npos) {
+    query_offset = path_str.length();
+  }
+  path_str.remove_prefix(query_offset);
+  return path_str;
 }
 
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
@@ -138,13 +144,14 @@ std::string Utility::parseCookieValue(const HeaderMap& headers, const std::strin
   headers.iterateReverse(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         // Find the cookie headers in the request (typically, there's only one).
-        if (header.key() == Http::Headers::get().Cookie.get().c_str()) {
+        if (header.key() == Http::Headers::get().Cookie.get()) {
+
           // Split the cookie header into individual cookies.
-          for (const auto s : StringUtil::splitToken(header.value().c_str(), ";")) {
+          for (const auto s : StringUtil::splitToken(header.value().getStringView(), ";")) {
             // Find the key part of the cookie (i.e. the name of the cookie).
             size_t first_non_space = s.find_first_not_of(" ");
             size_t equals_index = s.find('=');
-            if (equals_index == std::string::npos) {
+            if (equals_index == absl::string_view::npos) {
               // The cookie is malformed if it does not have an `=`. Continue
               // checking other cookies in this header.
               continue;
@@ -206,15 +213,15 @@ bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
         // Find the set-cookie headers in the request
-        if (header.key() == Http::Headers::get().SetCookie.get().c_str()) {
-          const std::string value{header.value().c_str()};
+        if (header.key() == Http::Headers::get().SetCookie.get()) {
+          const absl::string_view value{header.value().getStringView()};
           const size_t equals_index = value.find('=');
 
-          if (equals_index == std::string::npos) {
+          if (equals_index == absl::string_view::npos) {
             // The cookie is malformed if it does not have an `=`.
             return HeaderMap::Iterate::Continue;
           }
-          std::string k = value.substr(0, equals_index);
+          absl::string_view k = value.substr(0, equals_index);
           State* state = static_cast<State*>(context);
           if (k == state->key_) {
             state->ret_ = true;
@@ -231,7 +238,8 @@ bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
 uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
-  if (!header || !StringUtil::atoull(headers.Status()->value().c_str(), response_code)) {
+  if (!header || !StringUtil::atoull(std::string(headers.Status()->value().getStringView()).c_str(),
+                                     response_code)) {
     throw CodecClientException(":status must be specified and a valid unsigned long");
   }
   return response_code;
@@ -247,7 +255,7 @@ bool Utility::isUpgrade(const HeaderMap& headers) {
 
 bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
   return headers.Method() &&
-         headers.Method()->value().c_str() == Http::Headers::get().MethodValues.Connect &&
+         headers.Method()->value().getStringView() == Http::Headers::get().MethodValues.Connect &&
          headers.Protocol() && !headers.Protocol()->value().empty();
 }
 
@@ -349,7 +357,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
     return {nullptr, false};
   }
 
-  absl::string_view xff_string(xff_header->value().c_str(), xff_header->value().size());
+  absl::string_view xff_string(xff_header->value().getStringView());
   static const std::string separator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
@@ -473,13 +481,13 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
 
   const HeaderString& upgrade = headers.Upgrade()->value();
   headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Connect);
-  headers.insertProtocol().value().setCopy(upgrade.c_str(), upgrade.size());
+  headers.insertProtocol().value().setCopy(upgrade.getStringView());
   headers.removeUpgrade();
   headers.removeConnection();
   // nghttp2 rejects upgrade requests/responses with content length, so strip
   // any unnecessary content length header.
   if (headers.ContentLength() != nullptr &&
-      absl::string_view("0") == headers.ContentLength()->value().c_str()) {
+      headers.ContentLength()->value().getStringView() == "0") {
     headers.removeContentLength();
   }
 }
@@ -491,7 +499,7 @@ void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
   headers.removeUpgrade();
   headers.removeConnection();
   if (headers.ContentLength() != nullptr &&
-      absl::string_view("0") == headers.ContentLength()->value().c_str()) {
+      headers.ContentLength()->value().getStringView() == "0") {
     headers.removeContentLength();
   }
 }
@@ -501,14 +509,14 @@ void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
 
   const HeaderString& protocol = headers.Protocol()->value();
   headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
-  headers.insertUpgrade().value().setCopy(protocol.c_str(), protocol.size());
+  headers.insertUpgrade().value().setCopy(protocol.getStringView());
   headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
   headers.removeProtocol();
 }
 
 void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
-    headers.insertUpgrade().value().setCopy(upgrade.data(), upgrade.size());
+    headers.insertUpgrade().value().setCopy(upgrade);
     headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
     headers.insertStatus().value().setInteger(101);
   }

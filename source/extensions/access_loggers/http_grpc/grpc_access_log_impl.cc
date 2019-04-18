@@ -306,28 +306,34 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
   // TODO(mattklein123): Populate port field.
   auto* request_properties = log_entry->mutable_request();
   if (request_headers->Scheme() != nullptr) {
-    request_properties->set_scheme(request_headers->Scheme()->value().c_str());
+    request_properties->set_scheme(std::string(request_headers->Scheme()->value().getStringView()));
   }
   if (request_headers->Host() != nullptr) {
-    request_properties->set_authority(request_headers->Host()->value().c_str());
+    request_properties->set_authority(
+        std::string(request_headers->Host()->value().getStringView()));
   }
   if (request_headers->Path() != nullptr) {
-    request_properties->set_path(request_headers->Path()->value().c_str());
+    request_properties->set_path(std::string(request_headers->Path()->value().getStringView()));
   }
   if (request_headers->UserAgent() != nullptr) {
-    request_properties->set_user_agent(request_headers->UserAgent()->value().c_str());
+    request_properties->set_user_agent(
+        std::string(request_headers->UserAgent()->value().getStringView()));
   }
   if (request_headers->Referer() != nullptr) {
-    request_properties->set_referer(request_headers->Referer()->value().c_str());
+    request_properties->set_referer(
+        std::string(request_headers->Referer()->value().getStringView()));
   }
   if (request_headers->ForwardedFor() != nullptr) {
-    request_properties->set_forwarded_for(request_headers->ForwardedFor()->value().c_str());
+    request_properties->set_forwarded_for(
+        std::string(request_headers->ForwardedFor()->value().getStringView()));
   }
   if (request_headers->RequestId() != nullptr) {
-    request_properties->set_request_id(request_headers->RequestId()->value().c_str());
+    request_properties->set_request_id(
+        std::string(request_headers->RequestId()->value().getStringView()));
   }
   if (request_headers->EnvoyOriginalPath() != nullptr) {
-    request_properties->set_original_path(request_headers->EnvoyOriginalPath()->value().c_str());
+    request_properties->set_original_path(
+        std::string(request_headers->EnvoyOriginalPath()->value().getStringView()));
   }
   request_properties->set_request_headers_bytes(request_headers->byteSize());
   request_properties->set_request_body_bytes(stream_info.bytesReceived());
@@ -335,7 +341,7 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     envoy::api::v2::core::RequestMethod method =
         envoy::api::v2::core::RequestMethod::METHOD_UNSPECIFIED;
     envoy::api::v2::core::RequestMethod_Parse(
-        std::string(request_headers->Method()->value().c_str()), &method);
+        std::string(request_headers->Method()->value().getStringView()), &method);
     request_properties->set_request_method(method);
   }
   if (!request_headers_to_log_.empty()) {
@@ -344,7 +350,8 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     for (const auto& header : request_headers_to_log_) {
       const Http::HeaderEntry* entry = request_headers->get(header);
       if (entry != nullptr) {
-        logged_headers->insert({header.get(), ProtobufTypes::String(entry->value().c_str())});
+        logged_headers->insert(
+            {header.get(), ProtobufTypes::String(entry->value().getStringView())});
       }
     }
   }
@@ -362,7 +369,8 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     for (const auto& header : response_headers_to_log_) {
       const Http::HeaderEntry* entry = response_headers->get(header);
       if (entry != nullptr) {
-        logged_headers->insert({header.get(), ProtobufTypes::String(entry->value().c_str())});
+        logged_headers->insert(
+            {header.get(), ProtobufTypes::String(entry->value().getStringView())});
       }
     }
   }
@@ -373,7 +381,8 @@ void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,
     for (const auto& header : response_trailers_to_log_) {
       const Http::HeaderEntry* entry = response_trailers->get(header);
       if (entry != nullptr) {
-        logged_headers->insert({header.get(), ProtobufTypes::String(entry->value().c_str())});
+        logged_headers->insert(
+            {header.get(), ProtobufTypes::String(entry->value().getStringView())});
       }
     }
   }
