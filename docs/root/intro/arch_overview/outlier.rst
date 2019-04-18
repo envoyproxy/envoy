@@ -32,7 +32,7 @@ in the same bucket and are compared against
 configuration items. For example, if connection to an upstream HTTP server fails twice because of timeout and 
 then, after successful connection, the server returns error code 500, the total error count will be 3. 
 
-Outlier detection may also be configured to distinquish locally originated (connection) errors from externally originated (transaction) errors. 
+Outlier detection may also be configured to distinguish locally originated (connection) errors from externally originated (transaction) errors. 
 It is done via 
 :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` configuration item. 
 In that mode locally originated (connection) errors are tracked by separate counters than externally originated 

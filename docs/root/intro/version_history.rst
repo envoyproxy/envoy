@@ -12,6 +12,7 @@ Version history
 * redis: add support for zpopmax and zpopmin commands.
 * router: added ability to control retry back-off intervals via :ref:`retry policy <envoy_api_msg_route.RetryPolicy.RetryBackOff>`.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
+* upstream.outlier_detector: added configuration :ref:`outlier_detection.split_external_local_origin_errors<envoy_api_field_cluster.OutlierDetection.split_external_local_origin_errors>` to distinguish locally and externally generated errors. See :ref:`arch_overview_outlier_detection` for full details.
 
 1.10.0 (Apr 5, 2019)
 ====================
