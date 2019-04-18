@@ -10,6 +10,9 @@ Version history
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
 * redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
 * redis: add support for zpopmax and zpopmin commands.
+* redis: added 
+  :ref:`max_buffer_size_before_flush <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.max_buffer_size_before_flush>` to batch commands together until the encoder buffer hits a certain size, and
+  :ref:`buffer_flush_timeout <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings.buffer_flush_timeout>` to control how quickly the buffer is flushed if it is not full.
 * router: added ability to control retry back-off intervals via :ref:`retry policy <envoy_api_msg_route.RetryPolicy.RetryBackOff>`.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 

@@ -65,6 +65,12 @@ const std::string CONFIG_WITH_REDIRECTION = CONFIG + R"EOF(
             enable_redirection: true
 )EOF";
 
+// This is a configuration with batching enabled.
+const std::string CONFIG_WITH_BATCHING = CONFIG + R"EOF(
+            max_buffer_size_before_flush: 1024 
+            buffer_flush_timeout: 0.003s 
+)EOF";
+
 const std::string CONFIG_WITH_ROUTES = R"EOF(
 admin:
   access_log_path: /dev/null
@@ -242,6 +248,11 @@ public:
                          const std::string& asking_response = "+OK\r\n");
 };
 
+class RedisProxyWithBatchingIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithBatchingIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_BATCHING, 2) {}
+};
+
 class RedisProxyWithRoutesIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyWithRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES, 6) {}
@@ -252,6 +263,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithBatchingIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -547,6 +562,42 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, IgnoreRedirectionForAsking) {
   asking_response << "-ASK 1111 " << redisAddressAndPort(fake_upstreams_[0]) << "\r\n";
   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n",
                     asking_response.str());
+}
+
+// This test verifies that batching works properly. If batching is enabled, when multiple
+// clients make a request to a Redis server within a certain time window, they will be batched
+// together. The below example, two clients send "GET foo", and Redis receives those two as
+// a single concatenated request.
+
+TEST_P(RedisProxyWithBatchingIntegrationTest, SimpleBatching) {
+  initialize();
+
+  const std::string& request = makeBulkStringArray({"get", "foo"});
+  const std::string& response = "$3\r\nbar\r\n";
+
+  std::string proxy_to_server;
+  IntegrationTcpClientPtr redis_client_1 = makeTcpConnection(lookupPort("redis_proxy"));
+  IntegrationTcpClientPtr redis_client_2 = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client_1->write(request);
+  redis_client_2->write(request);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  EXPECT_TRUE(fake_upstream_connection->waitForData(request.size() * 2, &proxy_to_server));
+  // The original request should be the same as the data received by the server.
+  EXPECT_EQ(request + request, proxy_to_server);
+
+  EXPECT_TRUE(fake_upstream_connection->write(response + response));
+  redis_client_1->waitForData(response);
+  redis_client_2->waitForData(response);
+  // The original response should be received by the fake Redis client.
+  EXPECT_EQ(response, redis_client_1->data());
+  EXPECT_EQ(response, redis_client_2->data());
+
+  redis_client_1->close();
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client_2->close();
+  EXPECT_TRUE(fake_upstream_connection->close());
 }
 
 // This test verifies that it's possible to route keys to 3 different upstream pools.
