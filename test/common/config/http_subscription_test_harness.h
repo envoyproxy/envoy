@@ -30,8 +30,6 @@ using testing::Return;
 namespace Envoy {
 namespace Config {
 
-typedef HttpSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment> HttpEdsSubscriptionImpl;
-
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   HttpSubscriptionTestHarness() : HttpSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
@@ -46,7 +44,7 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_ = std::make_unique<HttpEdsSubscriptionImpl>(
+    subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
         std::chrono::milliseconds(1000), *method_descriptor_, stats_, init_fetch_timeout);
   }
@@ -66,12 +64,12 @@ public:
                                                         Http::AsyncClient::Callbacks& callbacks,
                                                         const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
-          EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
+          EXPECT_EQ("POST", std::string(request->headers().Method()->value().getStringView()));
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
-                    std::string(request->headers().ContentType()->value().c_str()));
-          EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().c_str()));
+                    std::string(request->headers().ContentType()->value().getStringView()));
+          EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().getStringView()));
           EXPECT_EQ("/v2/discovery:endpoints",
-                    std::string(request->headers().Path()->value().c_str()));
+                    std::string(request->headers().Path()->value().getStringView()));
           std::string expected_request = "{";
           if (!version_.empty()) {
             expected_request += "\"version_info\":\"" + version + "\",";
@@ -84,7 +82,7 @@ public:
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
           EXPECT_EQ(fmt::format_int(expected_request.size()).str(),
-                    std::string(request->headers().ContentLength()->value().c_str()));
+                    std::string(request->headers().ContentLength()->value().getStringView()));
           request_in_progress_ = true;
           return &http_request_;
         }));
@@ -119,12 +117,7 @@ public:
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "200"}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
     message->body() = std::make_unique<Buffer::OwnedImpl>(response_json);
-    EXPECT_CALL(callbacks_,
-                onConfigUpdate(
-                    RepeatedProtoEq(
-                        Config::Utility::getTypedResources<envoy::api::v2::ClusterLoadAssignment>(
-                            response_pb)),
-                    version))
+    EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (!accept) {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
@@ -172,7 +165,7 @@ public:
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
-  std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;
+  std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;
 };

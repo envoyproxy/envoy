@@ -5,6 +5,7 @@
 #include "common/common/mutex_tracer_impl.h"
 
 #include "test/test_common/contention.h"
+#include "test/test_common/utility.h"
 
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
@@ -72,13 +73,16 @@ TEST_F(MutexTracerTest, TryLockNoContention) {
 }
 
 TEST_F(MutexTracerTest, TwoThreadsWithContention) {
+  Api::ApiPtr api = Api::createApiForTest();
+  int64_t prev_num_contentions = tracer_.numContentions();
   for (int i = 1; i <= 10; ++i) {
     int64_t curr_num_lifetime_wait_cycles = tracer_.lifetimeWaitCycles();
 
-    Thread::TestUtil::ContentionGenerator contention_generator;
-
+    Thread::TestUtil::ContentionGenerator contention_generator(*api);
     contention_generator.generateContention(tracer_);
-    EXPECT_EQ(tracer_.numContentions(), i);
+    int64_t num_contentions = tracer_.numContentions();
+    EXPECT_LT(prev_num_contentions, num_contentions);
+    prev_num_contentions = num_contentions;
     EXPECT_GT(tracer_.currentWaitCycles(), 0); // This shouldn't be hardcoded.
     EXPECT_GT(tracer_.lifetimeWaitCycles(), 0);
     EXPECT_GT(tracer_.lifetimeWaitCycles(), curr_num_lifetime_wait_cycles);

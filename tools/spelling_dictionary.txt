@@ -39,7 +39,9 @@ CSV
 CTX
 CTXs
 CVC
+CVE
 CX
+CloseAterFlush
 DCHECK
 DER
 DESC
@@ -137,6 +139,7 @@ LC
 LDS
 LEV
 LHS
+LF
 MB
 MD
 MGET
@@ -147,6 +150,7 @@ MiB
 NACK
 NACKed
 NBF
+NBSP
 NDEBUG
 NGHTTP
 NOLINT
@@ -156,8 +160,10 @@ NUL
 Nilsson
 OCSP
 OK
+OOB
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -177,6 +183,7 @@ POSTs
 PREBIND
 PRNG
 PROT
+QPS
 QUIC
 RAII
 RANLUX
@@ -185,6 +192,7 @@ RCU
 RDN
 RDS
 RDWR
+README
 REIMPLEMENT
 REQ
 RFC
@@ -253,7 +261,9 @@ UTC
 UTF
 UUID
 UUIDs
+VC
 VH
+VHDS
 VLOG
 WKT
 WRR
@@ -278,6 +288,7 @@ accessors
 acls
 addr
 agg
+alignof
 alloc
 alloca
 allocator
@@ -317,8 +328,11 @@ broadcasted
 buf
 builtin
 cancellable
+canonicalization
 canonicalize
+canonicalizing
 canonicalized
+canonicalizer
 cardinality
 casted
 chrono
@@ -413,6 +427,7 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
+evwatch
 exe
 execlp
 facto
@@ -420,6 +435,7 @@ favicon
 fd
 fds
 fileno
+fixup
 fld
 fmt
 fmtlib
@@ -682,6 +698,7 @@ symlinked
 sync
 sys
 sysctl
+sz
 tbl
 tcmalloc
 templated
@@ -693,6 +710,8 @@ th
 thru
 tm
 tmp
+tokenize
+tokenizes
 tokenizing
 traceid
 trie
@@ -712,7 +731,10 @@ undrained
 uneject
 unejected
 unejection
+unescape
 unescaped
+unescaping
+unindexed
 uninsantiated
 uninstantiated
 unix
@@ -766,6 +788,8 @@ xhtml
 xid
 xxhash
 xxs
+xxxx
+xxxxx
 xyz
 zag
 zig

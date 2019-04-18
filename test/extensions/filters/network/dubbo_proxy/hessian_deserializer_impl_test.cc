@@ -32,10 +32,11 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
         0x05, '0', '.', '0', '.', '0', // Service version
         0x04, 't', 'e', 's', 't',      // method name
     }));
-    auto invo = deserializer.deserializeRpcInvocation(buffer, buffer.length());
-    EXPECT_STREQ("test", invo->getMethodName().c_str());
-    EXPECT_STREQ("test", invo->getServiceName().c_str());
-    EXPECT_STREQ("0.0.0", invo->getServiceVersion().c_str());
+    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+    deserializer.deserializeRpcInvocation(buffer, buffer.length(), metadata);
+    EXPECT_STREQ("test", metadata->method_name().value().c_str());
+    EXPECT_STREQ("test", metadata->service_name().c_str());
+    EXPECT_STREQ("0.0.0", metadata->service_version().value().c_str());
   }
 
   // incorrect body size
@@ -49,8 +50,10 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
     }));
     std::string exception_string = fmt::format("RpcInvocation size({}) large than body size({})",
                                                buffer.length(), buffer.length() - 1);
-    EXPECT_THROW_WITH_MESSAGE(deserializer.deserializeRpcInvocation(buffer, buffer.length() - 1),
-                              EnvoyException, exception_string);
+    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+    EXPECT_THROW_WITH_MESSAGE(
+        deserializer.deserializeRpcInvocation(buffer, buffer.length() - 1, metadata),
+        EnvoyException, exception_string);
   }
 }
 

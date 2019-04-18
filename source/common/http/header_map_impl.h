@@ -61,6 +61,7 @@ public:
    * comparison (order matters).
    */
   bool operator==(const HeaderMapImpl& rhs) const;
+  bool operator!=(const HeaderMapImpl& rhs) const;
 
   // Http::HeaderMap
   void addReference(const LowerCaseString& key, const std::string& value) override;
@@ -79,6 +80,7 @@ public:
   void remove(const LowerCaseString& key) override;
   void removePrefix(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
+  bool empty() const override { return headers_.empty(); }
 
 protected:
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
@@ -136,7 +138,9 @@ protected:
   public:
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
-    template <class Key> bool isPseudoHeader(const Key& key) { return key.c_str()[0] == ':'; }
+    template <class Key> bool isPseudoHeader(const Key& key) {
+      return !key.getStringView().empty() && key.getStringView()[0] == ':';
+    }
 
     template <class Key, class... Value>
     std::list<HeaderEntryImpl>::iterator insert(Key&& key, Value&&... value) {
@@ -176,6 +180,7 @@ protected:
     std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
     std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
     size_t size() const { return headers_.size(); }
+    bool empty() const { return headers_.empty(); }
 
   private:
     std::list<HeaderEntryImpl> headers_;
@@ -186,7 +191,7 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
-  HeaderEntryImpl* getExistingInline(const char* key);
+  HeaderEntryImpl* getExistingInline(absl::string_view key);
 
   void removeInline(HeaderEntryImpl** entry);
 

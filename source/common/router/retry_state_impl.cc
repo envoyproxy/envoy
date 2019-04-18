@@ -57,16 +57,39 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()) {
 
+  retry_on_ = route_policy.retryOn();
+  retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
+
+  std::chrono::milliseconds base_interval(
+      runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
+  if (route_policy.baseInterval()) {
+    base_interval = *route_policy.baseInterval();
+  }
+
+  // By default, cap the max interval to 10 times the base interval to ensure reasonable back-off
+  // intervals.
+  std::chrono::milliseconds max_interval = base_interval * 10;
+  if (route_policy.maxInterval()) {
+    max_interval = *route_policy.maxInterval();
+  }
+
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base_interval.count(),
+                                                                max_interval.count(), random_);
+  host_selection_max_attempts_ = route_policy.hostSelectionMaxAttempts();
+
+  // Merge in the headers.
   if (request_headers.EnvoyRetryOn()) {
-    retry_on_ = parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
+    retry_on_ |= parseRetryOn(request_headers.EnvoyRetryOn()->value().getStringView());
   }
   if (request_headers.EnvoyRetryGrpcOn()) {
-    retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().c_str());
+    retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView());
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
-    const char* max_retries = request_headers.EnvoyMaxRetries()->value().c_str();
+    // TODO(dnoe): Migrate to pure string_view (#6580)
+    const std::string max_retries(request_headers.EnvoyMaxRetries()->value().getStringView());
     uint64_t temp;
-    if (StringUtil::atoull(max_retries, temp)) {
+    if (StringUtil::atoull(max_retries.c_str(), temp)) {
+      // The max retries header takes precedence if set.
       retries_remaining_ = temp;
     }
   }
@@ -79,14 +102,6 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       }
     }
   }
-
-  // Merge in the route policy.
-  retry_on_ |= route_policy.retryOn();
-  retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
-  const uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
-  // Cap the max interval to 10 times the base interval to ensure reasonable backoff intervals.
-  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
-  host_selection_max_attempts_ = route_policy.hostSelectionMaxAttempts();
 }
 
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }
@@ -157,14 +172,15 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
   resetRetry();
 
+  if (!would_retry) {
+    return RetryStatus::No;
+  }
+
   if (retries_remaining_ == 0) {
     return RetryStatus::NoRetryLimitExceeded;
   }
 
   retries_remaining_--;
-  if (!would_retry) {
-    return RetryStatus::No;
-  }
 
   if (!cluster_.resourceManager(priority_).retries().canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();

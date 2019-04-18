@@ -3,9 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/config_source.pb.validate.h"
+
 #include "common/config/utility.h"
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
+#include "common/protobuf/utility.h"
 #include "common/upstream/cds_api_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -36,19 +39,16 @@ protected:
   CdsApiImplTest() : request_(&cm_.async_client_), api_(Api::createApiForTest(store_)) {}
 
   void setup() {
-    const std::string config_json = R"EOF(
-    {
-      "cluster": {
-        "name": "foo_cluster"
-      }
-    }
+    const std::string config_yaml = R"EOF(
+api_config_source:
+  cluster_names:
+  - foo_cluster
+  refresh_delay: 1s
+  api_type: REST
     )EOF";
 
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
     envoy::api::v2::core::ConfigSource cds_config;
-    Config::Utility::translateCdsConfig(*config, cds_config);
-    cds_config.mutable_api_config_source()->set_api_type(
-        envoy::api::v2::core::ApiConfigSource::REST);
+    MessageUtil::loadFromYamlAndValidate(config_yaml, cds_config);
     cluster_map_.emplace("foo_cluster", mock_cluster_);
     EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
     EXPECT_CALL(mock_cluster_, info()).Times(AnyNumber());
@@ -186,8 +186,9 @@ TEST_F(CdsApiImplTest, ValidateFail) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
-  clusters.Add();
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
+  envoy::api::v2::Cluster cluster;
+  clusters.Add()->PackFrom(cluster);
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
   EXPECT_CALL(initialized_, ready());
@@ -201,12 +202,11 @@ TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
 
   setup();
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
-  auto* cluster_1 = clusters.Add();
-  cluster_1->set_name("duplicate_cluster");
-
-  auto* cluster_2 = clusters.Add();
-  cluster_2->set_name("duplicate_cluster");
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
+  envoy::api::v2::Cluster cluster_1;
+  cluster_1.set_name("duplicate_cluster");
+  clusters.Add()->PackFrom(cluster_1);
+  clusters.Add()->PackFrom(cluster_1);
 
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map_));
   EXPECT_CALL(initialized_, ready());
@@ -226,7 +226,7 @@ TEST_F(CdsApiImplTest, EmptyConfigUpdate) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
   dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, "");
 }
 
@@ -240,13 +240,16 @@ TEST_F(CdsApiImplTest, ConfigUpdateWith2ValidClusters) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
-  auto* cluster_1 = clusters.Add();
-  cluster_1->set_name("cluster_1");
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
+
+  envoy::api::v2::Cluster cluster_1;
+  cluster_1.set_name("cluster_1");
+  clusters.Add()->PackFrom(cluster_1);
   cm_.expectAdd("cluster_1");
 
-  auto* cluster_2 = clusters.Add();
-  cluster_2->set_name("cluster_2");
+  envoy::api::v2::Cluster cluster_2;
+  cluster_2.set_name("cluster_2");
+  clusters.Add()->PackFrom(cluster_2);
   cm_.expectAdd("cluster_2");
 
   dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, "");
@@ -262,17 +265,21 @@ TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(request_, cancel());
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
-  auto* cluster_1 = clusters.Add();
-  cluster_1->set_name("cluster_1");
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> clusters;
+
+  envoy::api::v2::Cluster cluster_1;
+  cluster_1.set_name("cluster_1");
+  clusters.Add()->PackFrom(cluster_1);
   cm_.expectAddToThrow("cluster_1", "An exception");
 
-  auto* cluster_2 = clusters.Add();
-  cluster_2->set_name("cluster_2");
+  envoy::api::v2::Cluster cluster_2;
+  cluster_2.set_name("cluster_2");
+  clusters.Add()->PackFrom(cluster_2);
   cm_.expectAdd("cluster_2");
 
-  auto* cluster_3 = clusters.Add();
-  cluster_3->set_name("cluster_3");
+  envoy::api::v2::Cluster cluster_3;
+  cluster_3.set_name("cluster_3");
+  clusters.Add()->PackFrom(cluster_3);
   cm_.expectAddToThrow("cluster_3", "Another exception");
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -281,19 +288,17 @@ TEST_F(CdsApiImplTest, ConfigUpdateAddsSecondClusterEvenIfFirstThrows) {
 }
 
 TEST_F(CdsApiImplTest, InvalidOptions) {
-  const std::string config_json = R"EOF(
-  {
-    "cluster": {
-      "name": "foo_cluster"
-    }
-  }
+  const std::string config_yaml = R"EOF(
+api_config_source:
+  cluster_names:
+  - foo_cluster
+  refresh_delay: 1s
   )EOF";
 
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
   local_info_.node_.set_cluster("");
   local_info_.node_.set_id("");
   envoy::api::v2::core::ConfigSource cds_config;
-  Config::Utility::translateCdsConfig(*config, cds_config);
+  MessageUtil::loadFromYamlAndValidate(config_yaml, cds_config);
   EXPECT_THROW(
       CdsApiImpl::create(cds_config, cm_, dispatcher_, random_, local_info_, store_, *api_),
       EnvoyException);

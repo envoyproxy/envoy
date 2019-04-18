@@ -82,7 +82,7 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
   return Http::TestHeaderMapImpl{{":authority", host},        {":path", path},
                                  {":method", method},         {"x-safe", "safe"},
                                  {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
-                                 {"x-route-nope", "route"}};
+                                 {"x-route-nope", "route"},   {"x-forwarded-proto", "http"}};
 }
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
@@ -602,7 +602,7 @@ virtual_hosts:
                           EnvoyException, "Invalid regex '\\^/\\(\\+invalid\\)':");
 }
 
-// Validates behavior of request_headers_to_add at router, vhost, and route action levels.
+// Validates behavior of request_headers_to_add at router, vhost, and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -626,24 +626,24 @@ virtual_hosts:
     route:
       prefix_rewrite: "/api/new_endpoint"
       cluster: www2
-      request_headers_to_add:
-      - header:
-          key: x-global-header1
-          value: route-override
-      - header:
-          key: x-vhost-header1
-          value: route-override
-      - header:
-          key: x-route-action-header
-          value: route-new_endpoint
+    request_headers_to_add:
+    - header:
+        key: x-global-header1
+        value: route-override
+    - header:
+        key: x-vhost-header1
+        value: route-override
+    - header:
+        key: x-route-header
+        value: route-new_endpoint
   - match:
       path: "/"
     route:
       cluster: root_www2
-      request_headers_to_add:
-      - header:
-          key: x-route-action-header
-          value: route-allpath
+    request_headers_to_add:
+    - header:
+        key: x-route-header
+        value: route-allpath
   - match:
       prefix: "/"
     route:
@@ -661,10 +661,10 @@ virtual_hosts:
       prefix: "/"
     route:
       cluster: www2_staging
-      request_headers_to_add:
-      - header:
-          key: x-route-action-header
-          value: route-allprefix
+    request_headers_to_add:
+    - header:
+        key: x-route-header
+        value: route-allprefix
 - name: default
   domains:
   - "*"
@@ -701,7 +701,7 @@ request_headers_to_add:
       route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-new_endpoint", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-new_endpoint", headers.get_("x-route-header"));
     }
 
     // Multiple routes can have same route-level headers with different values.
@@ -711,7 +711,7 @@ request_headers_to_add:
       route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-allpath", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
     }
 
     // Multiple virtual hosts can have same virtual host level headers with different values.
@@ -721,7 +721,7 @@ request_headers_to_add:
       route->finalizeRequestHeaders(headers, stream_info, true);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-allprefix", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
     }
 
     // Global headers.
@@ -734,8 +734,8 @@ request_headers_to_add:
   }
 }
 
-// Validates behavior of request_headers_to_add at router, vhost, route, and route action levels
-// when append is disabled.
+// Validates behavior of request_headers_to_add at router, vhost, and route levels when append is
+// disabled.
 TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
   const std::string yaml = R"EOF(
 name: foo
@@ -770,22 +770,6 @@ virtual_hosts:
         request_headers_to_remove: ["x-route-nope"]
         route:
           cluster: www2
-          request_headers_to_add:
-            - header:
-                key: x-global-header
-                value: route-action-endpoint
-              append: false
-            - header:
-                key: x-vhost-header
-                value: route-action-endpoint
-              append: false
-            - header:
-                key: x-route-header
-                value: route-action-endpoint
-            - header:
-                key: x-route-action-header
-                value: route-action-endpoint
-              append: false
       - match: { prefix: "/" }
         route: { cluster: www2 }
   - name: default
@@ -818,7 +802,6 @@ request_headers_to_remove: ["x-global-nope"]
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
       EXPECT_EQ("route-endpoint", headers.get_("x-route-header"));
-      EXPECT_EQ("route-action-endpoint", headers.get_("x-route-action-header"));
       // Removed headers.
       EXPECT_FALSE(headers.has("x-global-nope"));
       EXPECT_FALSE(headers.has("x-vhost-nope"));
@@ -834,7 +817,6 @@ request_headers_to_remove: ["x-global-nope"]
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
       EXPECT_FALSE(headers.has("x-route-header"));
-      EXPECT_FALSE(headers.has("x-route-action-header"));
       // Removed headers.
       EXPECT_FALSE(headers.has("x-global-nope"));
       EXPECT_FALSE(headers.has("x-vhost-nope"));
@@ -850,7 +832,6 @@ request_headers_to_remove: ["x-global-nope"]
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_FALSE(headers.has("x-vhost-header"));
       EXPECT_FALSE(headers.has("x-route-header"));
-      EXPECT_FALSE(headers.has("x-route-action-header"));
       // Removed headers.
       EXPECT_FALSE(headers.has("x-global-nope"));
       EXPECT_TRUE(headers.has("x-vhost-nope"));
@@ -860,7 +841,7 @@ request_headers_to_remove: ["x-global-nope"]
 }
 
 // Validates behavior of response_headers_to_add and response_headers_to_remove at router, vhost,
-// route, and route action levels.
+// and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
   const std::string yaml = R"EOF(
 name: foo
@@ -877,31 +858,27 @@ virtual_hosts:
     response_headers_to_remove: ["x-vhost-remove"]
     routes:
       - match: { prefix: "/new_endpoint" }
+        route:
+          prefix_rewrite: "/api/new_endpoint"
+          cluster: www2
         response_headers_to_add:
           - header:
               key: x-route-header
               value: route-override
-        route:
-          prefix_rewrite: "/api/new_endpoint"
-          cluster: www2
-          response_headers_to_add:
-            - header:
-                key: x-global-header1
-                value: route-override
-            - header:
-                key: x-vhost-header1
-                value: route-override
-            - header:
-                key: x-route-action-header
-                value: route-new_endpoint
+          - header:
+              key: x-global-header1
+              value: route-override
+          - header:
+              key: x-vhost-header1
+              value: route-override
       - match: { path: "/" }
         route:
           cluster: root_www2
-          response_headers_to_add:
-            - header:
-                key: x-route-action-header
-                value: route-allpath
-          response_headers_to_remove: ["x-route-remove"]
+        response_headers_to_add:
+          - header:
+              key: x-route-header
+              value: route-allpath
+        response_headers_to_remove: ["x-route-remove"]
       - match: { prefix: "/" }
         route: { cluster: "www2" }
   - name: www2_staging
@@ -914,10 +891,10 @@ virtual_hosts:
       - match: { prefix: "/" }
         route:
           cluster: www2_staging
-          response_headers_to_add:
-            - header:
-                key: x-route-action-header
-                value: route-allprefix
+        response_headers_to_add:
+          - header:
+              key: x-route-header
+              value: route-allprefix
   - name: default
     domains: ["*"]
     routes:
@@ -944,7 +921,6 @@ response_headers_to_remove: ["x-global-remove"]
       route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("route-override", headers.get_("x-global-header1"));
       EXPECT_EQ("route-override", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-new_endpoint", headers.get_("x-route-action-header"));
       EXPECT_EQ("route-override", headers.get_("x-route-header"));
     }
 
@@ -956,7 +932,7 @@ response_headers_to_remove: ["x-global-remove"]
       route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("vhost-override", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-allpath", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-allpath", headers.get_("x-route-header"));
     }
 
     // Multiple virtual hosts can have same virtual host level headers with different values.
@@ -967,7 +943,7 @@ response_headers_to_remove: ["x-global-remove"]
       route->finalizeResponseHeaders(headers, stream_info);
       EXPECT_EQ("global1", headers.get_("x-global-header1"));
       EXPECT_EQ("vhost1-www2_staging", headers.get_("x-vhost-header1"));
-      EXPECT_EQ("route-allprefix", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-allprefix", headers.get_("x-route-header"));
     }
 
     // Global headers.
@@ -2423,6 +2399,115 @@ virtual_hosts:
                 .retryOn());
 }
 
+// Test route-specific retry back-off intervals.
+TEST_F(RouteMatcherTest, RetryBackOffIntervals) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.050s
+  - match:
+      prefix: "/bar"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.100s
+          max_interval: 0.500s
+  - match:
+      prefix: "/baz"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_back_off:
+          base_interval: 0.0001s # < 1 ms
+          max_interval: 0.0001s
+  - match:
+      prefix: "/"
+    route:
+      cluster: www2
+      retry_policy:
+        retry_on: connect-failure
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(50),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .baseInterval());
+
+  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                               ->routeEntry()
+                               ->retryPolicy()
+                               .maxInterval());
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(100),
+            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .baseInterval());
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(500),
+            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .maxInterval());
+
+  // Sub-millisecond interval converted to 1 ms.
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
+            config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .baseInterval());
+
+  EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
+            config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+                ->routeEntry()
+                ->retryPolicy()
+                .maxInterval());
+
+  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                               ->routeEntry()
+                               ->retryPolicy()
+                               .baseInterval());
+
+  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                               ->routeEntry()
+                               ->retryPolicy()
+                               .maxInterval());
+}
+
+// Test invalid route-specific retry back-off configs.
+TEST_F(RouteMatcherTest, InvalidRetryBackOff) {
+  const std::string invalid_max = R"EOF(
+virtual_hosts:
+  - name: backoff
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route:
+          cluster: backoff
+          retry_policy:
+            retry_back_off:
+              base_interval: 10s
+              max_interval: 5s
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(invalid_max), factory_context_, true),
+      EnvoyException, "retry_policy.max_interval must greater than or equal to the base_interval");
+}
+
 TEST_F(RouteMatcherTest, HedgeRouteLevel) {
   const std::string yaml = R"EOF(
 name: HedgeRouteLevel
@@ -2643,6 +2728,134 @@ virtual_hosts:
                      factory_context_, true),
       EnvoyException,
       "Only unique values for domains are permitted. Duplicate entry of domain www.lyft.com");
+}
+
+TEST_F(RouteMatcherTest, TestDuplicateWildcardDomainConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2 }
+- name: www2_staging
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2_staging }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Only a single wildcard domain is permitted");
+}
+
+TEST_F(RouteMatcherTest, TestDuplicateSuffixWildcardDomainConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["*.lyft.com"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2 }
+- name: www2_staging
+  domains: ["*.LYFT.COM"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2_staging }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "Only unique values for domains are permitted. Duplicate entry of domain *.lyft.com");
+}
+
+TEST_F(RouteMatcherTest, TestDuplicatePrefixWildcardDomainConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["bar.*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2 }
+- name: www2_staging
+  domains: ["BAR.*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: www2_staging }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException,
+      "Only unique values for domains are permitted. Duplicate entry of domain bar.*");
+}
+
+TEST_F(RouteMatcherTest, TestDomainMatchOrderConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: exact
+  domains: ["www.example.com", "www.example.cc", "wwww.example.com" ]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: exact }
+- name: suffix
+  domains: ["*w.example.com" ]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: suffix }
+- name: prefix
+  domains: ["www.example.c*", "ww.example.c*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: prefix }
+- name: default
+  domains: ["*"]
+  routes:
+  - match: { prefix: "/" }
+    route: { cluster: default }
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  EXPECT_EQ(
+      "exact",
+      config.route(genHeaders("www.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ(
+      "exact",
+      config.route(genHeaders("wwww.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("exact",
+            config.route(genHeaders("www.example.cc", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("suffix",
+            config.route(genHeaders("ww.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("prefix",
+            config.route(genHeaders("www.example.co", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("default",
+            config.route(genHeaders("w.example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("default",
+            config.route(genHeaders("www.example.c", "/", "GET"), 0)->routeEntry()->clusterName());
+}
+
+TEST_F(RouteMatcherTest, NoProtocolInHeadersWhenTlsIsRequired) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www
+  require_tls: all
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/"
+    route:
+      cluster: www
+  )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  // route may be called early in some edge cases and "x-forwarded-proto" will not be set.
+  Http::TestHeaderMapImpl headers{{":authority", "www.lyft.com"}, {":path", "/"}};
+  EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
 static Http::TestHeaderMapImpl genRedirectHeaders(const std::string& host, const std::string& path,
@@ -4033,6 +4246,26 @@ virtual_hosts:
   EXPECT_EQ(cors_policy->allowCredentials(), true);
 }
 
+TEST_F(RoutePropertyTest, TestBadCorsConfig) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: default
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/api"
+    route:
+      cluster: ats
+      cors:
+        enabled: 0
+)EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Unable to parse JSON as proto .*: invalid value 0 for type TYPE_BOOL");
+}
+
 TEST_F(RouteMatcherTest, Decorator) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -4090,10 +4323,10 @@ virtual_hosts:
     route:
       prefix_rewrite: "/api/new_endpoint"
       cluster: www2
-      request_headers_to_add:
-      - header:
-          key: x-client-ip
-          value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    request_headers_to_add:
+    - header:
+        key: x-client-ip
+        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
 request_headers_to_add:
 - header:
     key: x-client-ip
@@ -4127,10 +4360,10 @@ virtual_hosts:
     route:
       prefix_rewrite: "/api/new_endpoint"
       cluster: www2
-      request_headers_to_add:
-      - header:
-          key: x-client-ip
-          value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
+    request_headers_to_add:
+    - header:
+        key: x-client-ip
+        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT"
 request_headers_to_add:
 - header:
     key: x-client-ip
@@ -4932,8 +5165,10 @@ virtual_hosts:
           idle_timeout: 0s
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeout), EnvoyException,
-                          "value must be greater than \" \"0s");
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeout), factory_context_, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(0, route_entry->idleTimeout().value().count());
 }
 
 TEST_F(RouteConfigurationV2, ExplicitIdleTimeout) {

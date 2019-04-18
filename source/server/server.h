@@ -36,6 +36,7 @@
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -206,7 +207,8 @@ private:
   uint64_t numConnections();
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb = [] {});
+  void notifyCallbacksForStage(
+      Stage stage, Event::PostCb completion_cb = [] {});
 
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
@@ -260,8 +262,8 @@ private:
   Http::ContextImpl http_context_;
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;
   const std::thread::id main_thread_id_;
-  std::unordered_map<Stage, std::vector<StageCallback>> stage_callbacks_;
-  std::unordered_map<Stage, std::vector<StageCallbackWithCompletion>> stage_completable_callbacks_;
+  absl::flat_hash_map<Stage, std::vector<StageCallback>> stage_callbacks_;
+  absl::flat_hash_map<Stage, std::vector<StageCallbackWithCompletion>> stage_completable_callbacks_;
 };
 
 } // namespace Server
