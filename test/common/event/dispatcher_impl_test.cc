@@ -85,7 +85,6 @@ protected:
     dispatcher_thread_->join();
   }
 
-  NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
@@ -97,9 +96,11 @@ protected:
 };
 
 TEST_F(DispatcherImplTest, InitializeStats) {
-  EXPECT_CALL(scope_, histogram("test.dispatcher.loop_duration_us"));
-  EXPECT_CALL(scope_, histogram("test.dispatcher.poll_delay_us"));
-  dispatcher_->initializeStats(scope_, "test.");
+  // NiceMock because deliverHistogramToSinks may or may not be called, depending on timing.
+  NiceMock<Stats::MockStore> scope;
+  EXPECT_CALL(scope, histogram("test.dispatcher.loop_duration_us"));
+  EXPECT_CALL(scope, histogram("test.dispatcher.poll_delay_us"));
+  dispatcher_->initializeStats(scope, "test.");
 }
 
 TEST_F(DispatcherImplTest, Post) {
