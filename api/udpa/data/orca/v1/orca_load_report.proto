@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package udpa.data.orca.v1;
+
+option java_outer_classname = "OrcaLoadReportProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.udpa.data.orca.v1";
+option go_package = "v1";
+
+import "validate/validate.proto";
+
+// See section `ORCA load report format` of the design document in
+// :ref:`https://github.com/envoyproxy/envoy/issues/6614`.
+
+message OrcaLoadReport {
+  // CPU utilization expressed as a fraction of available CPU resources. This
+  // should be derived from a sample or measurement taken during the request.
+  double cpu_utilization = 1 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
+
+  // Memory utilization expressed as a fraction of available memory
+  // resources. This should be derived from a sample or measurement taken
+  // during the request.
+  double mem_utilization = 2 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
+
+  // Application specific requests costs. Each value may be an absolute cost (e.g.
+  // 3487 bytes of storage) or utilization associated with the request,
+  // expressed as a fraction of total resources available. Utilization
+  // metrics should be derived from a sample or measurement taken
+  // during the request.
+  map<string, double> request_cost_or_utilization = 3;
+}
