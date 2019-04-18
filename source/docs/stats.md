@@ -12,6 +12,9 @@ binary program restarts. The metrics are tracked as:
 In order to support restarting the Envoy binary program without losing counter and gauge
 values, they are passed from parent to child in an RPC protocol.
 They were previously held in shared memory, which imposed various restrictions.
+Unlike the shared memory implementation, the RPC passing *requires special indication
+in source/common/stats/stat_merger.cc when simple addition is not appropriate for
+combining two instances of a given stat*.
 
 ## Performance and Thread Local Storage
 
