@@ -3,16 +3,14 @@ Version history
 
 1.11.0 (Pending)
 ================
-* hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC.
-* server: stats are now preserved across hot restart by being explicitly communicated through the hot
-          restart protocol, rather than living in shared memory.
-* server: hot restart version incremented to 11.
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 * eds: added support to specify max time for which endpoints can be used :ref:`gRPC filter <envoy_api_msg_ClusterLoadAssignment.Policy>`.
+* hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC.
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
 * redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
 * redis: add support for zpopmax and zpopmin commands.
+* server: hot restart version incremented to 11.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 
 1.10.0 (Apr 5, 2019)
