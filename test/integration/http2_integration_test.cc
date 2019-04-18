@@ -649,12 +649,14 @@ void Http2MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Sends multiple metadata.
+  const size_t size = 10;
+  default_request_headers_.addCopy("content_size", std::to_string(size));
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
   Http::MetadataMap metadata_map = {{"metadata1", "metadata1"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
-  codec_client_->sendData(*request_encoder_, 10, false);
+  codec_client_->sendData(*request_encoder_, size, false);
   metadata_map = {{"metadata2", "metadata2"}};
   codec_client_->sendMetadata(*request_encoder_, metadata_map);
   metadata_map = {{"consume", "consume"}};

@@ -21,10 +21,10 @@ class MetadataStopAllFilter : public Http::PassThroughFilter {
 public:
   constexpr static char name[] = "metadata-stop-all-filter";
 
-  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& /*header_map*/, bool) override {
-    // Http::HeaderEntry* entry_content =
-    // header_map.get(Envoy::Http::LowerCaseString("content_size")); ASSERT(entry_content !=
-    // nullptr); content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
+  Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
+    Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    ASSERT(entry_content != nullptr);
+    content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
 
     createTimerForContinue();
 
@@ -50,19 +50,15 @@ private:
   // Creates a timer to continue iteration after conditions meet.
   void createTimerForContinue() {
     delay_timer_ = decoder_callbacks_->dispatcher().createTimer([this]() -> void {
-      // If decodeHeaders() returns StopAllIterationAndBuffer, triggers the timer when all the
-      // request data has been received. If decodeHeaders() returns StopAllIterationAndWatermark,
-      // triggers the timer when received data exceed buffer limit.
-      // if (content_size_ > 0 &&
-      //     decoder_callbacks_->streamInfo().bytesReceived() >= content_size_) {
-      timer_triggered_ = true;
-      decoder_callbacks_->continueDecoding();
-      //} else {
-      // Create a new timer to try again later.
-      //  createTimerForContinue();
-      //}
+      if (content_size_ > 0 && decoder_callbacks_->streamInfo().bytesReceived() >= content_size_) {
+        timer_triggered_ = true;
+        decoder_callbacks_->continueDecoding();
+      } else {
+        // Creates a new timer to try again later.
+        createTimerForContinue();
+      }
     });
-    delay_timer_->enableTimer(std::chrono::milliseconds(5000));
+    delay_timer_->enableTimer(std::chrono::milliseconds(50));
   }
 
   Event::TimerPtr delay_timer_;
