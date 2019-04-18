@@ -21,7 +21,7 @@ WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager) {
       overload_manager, api_)};
 }
 
-WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks,
+WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
                        OverloadManager& overload_manager, Api::Api& api)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),

@@ -13,7 +13,7 @@
 
 #include "server/options_impl.h"
 #include "server/server.h"
-#include "server/test_hooks.h"
+#include "server/listener_hooks.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
@@ -34,7 +34,7 @@ class MainCommonBase {
 public:
   // Consumer must guarantee that all passed references are alive until this object is
   // destructed.
-  MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
+  MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system, ListenerHooks& test_hooks,
                  Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                  Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system);
@@ -121,7 +121,7 @@ private:
   PlatformImpl platform_impl_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_;
-  DefaultTestHooks default_test_hooks_;
+  DefaultListenerHooks default_test_hooks_;
   ProdComponentFactory prod_component_factory_;
   MainCommonBase base_;
 };

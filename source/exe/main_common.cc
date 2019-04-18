@@ -17,7 +17,7 @@
 #include "server/options_impl.h"
 #include "server/proto_descriptors.h"
 #include "server/server.h"
-#include "server/test_hooks.h"
+#include "server/listener_hooks.h"
 
 #include "absl/strings/str_split.h"
 
@@ -43,7 +43,7 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 }
 
 MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
-                               TestHooks& test_hooks, Server::ComponentFactory& component_factory,
+                               ListenerHooks& test_hooks, Server::ComponentFactory& component_factory,
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory,
                                Filesystem::Instance& file_system)

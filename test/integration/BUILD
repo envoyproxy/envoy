@@ -353,7 +353,7 @@ envoy_cc_test_library(
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
         "//source/server:server_lib",
-        "//source/server:test_hooks_lib",
+        "//source/server:listener_hooks_lib",
         "//test/common/runtime:utility_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
