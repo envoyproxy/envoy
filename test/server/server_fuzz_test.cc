@@ -3,9 +3,9 @@
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/listener_hooks.h"
 #include "server/proto_descriptors.h"
 #include "server/server.h"
-#include "server/listener_hooks.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"

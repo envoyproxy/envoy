@@ -29,9 +29,9 @@
 
 #include "server/configuration_impl.h"
 #include "server/http/admin.h"
+#include "server/listener_hooks.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
-#include "server/listener_hooks.h"
 #include "server/worker_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"

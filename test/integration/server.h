@@ -15,9 +15,9 @@
 #include "common/common/thread.h"
 #include "common/stats/source_impl.h"
 
+#include "server/listener_hooks.h"
 #include "server/options_impl.h"
 #include "server/server.h"
-#include "server/listener_hooks.h"
 
 #include "test/integration/server_stats.h"
 #include "test/integration/tcp_dump.h"
