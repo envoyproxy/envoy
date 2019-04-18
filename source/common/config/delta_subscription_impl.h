@@ -49,6 +49,37 @@ public:
     request_.mutable_node()->MergeFrom(local_info_.node());
   }
 
+  void pause() {
+    ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url_);
+    ASSERT(!paused_);
+    paused_ = true;
+  }
+
+  void resume() {
+    ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url_);
+    ASSERT(paused_);
+    paused_ = false;
+    trySendDiscoveryRequests();
+  }
+
+  envoy::api::v2::DeltaDiscoveryRequest internalRequestStateForTest() const { return request_; }
+
+  // Config::Subscription
+  void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+
+    if (init_fetch_timeout_.count() > 0) {
+      init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
+        ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
+        callbacks_->onConfigUpdateFailed(nullptr);
+      });
+      init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
+    }
+
+    grpc_stream_.establishNewStream();
+    updateResources(resources);
+  }
+
   void updateResources(const std::set<std::string>& update_to_these_names) override {
     std::vector<std::string> cur_added;
     std::vector<std::string> cur_removed;
@@ -85,21 +116,6 @@ public:
       kickOffDiscoveryRequest();
     }
   }
-
-  void pause() {
-    ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url_);
-    ASSERT(!paused_);
-    paused_ = true;
-  }
-
-  void resume() {
-    ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url_);
-    ASSERT(paused_);
-    paused_ = false;
-    trySendDiscoveryRequests();
-  }
-
-  envoy::api::v2::DeltaDiscoveryRequest internalRequestStateForTest() const { return request_; }
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override {
@@ -157,50 +173,7 @@ public:
 
   void onWriteable() override { trySendDiscoveryRequests(); }
 
-  // Config::Subscription
-  void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) override {
-    callbacks_ = &callbacks;
-
-    if (init_fetch_timeout_.count() > 0) {
-      init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
-        ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
-        callbacks_->onConfigUpdateFailed(nullptr);
-      });
-      init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
-    }
-
-    grpc_stream_.establishNewStream();
-    updateResources(resources);
-  }
-
 private:
-  // What's with the optional<UpdateAck>? DeltaDiscoveryRequest plays two independent roles:
-  // informing the server of what resources we're interested in, and acknowledging resources it has
-  // sent us. Some requests are queued up specifically to carry ACKs, and some are queued up for
-  // resource updates. Susbscription changes might get included in an ACK request. In that case, the
-  // pending request that the subscription change queued up does still get sent, just empty and
-  // pointless. (TODO(fredlas) we would like to skip those no-op requests).
-  void sendDiscoveryRequest(absl::optional<UpdateAck> maybe_ack) {
-    if (maybe_ack.has_value()) {
-      const UpdateAck& ack = maybe_ack.value();
-      request_.set_response_nonce(ack.nonce_);
-      *request_.mutable_error_detail() = ack.error_detail_;
-    }
-    request_.clear_resource_names_subscribe();
-    request_.clear_resource_names_unsubscribe();
-    std::copy(names_added_.begin(), names_added_.end(),
-              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_subscribe()));
-    std::copy(names_removed_.begin(), names_removed_.end(),
-              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_unsubscribe()));
-    names_added_.clear();
-    names_removed_.clear();
-
-    ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request_.DebugString());
-    grpc_stream_.sendMessage(request_);
-    request_.clear_error_detail();
-    request_.clear_initial_resource_versions();
-  }
-
   void
   handleConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
@@ -244,6 +217,33 @@ private:
   void kickOffDiscoveryRequestWithAck(absl::optional<UpdateAck> ack) {
     ack_queue_.push(ack);
     trySendDiscoveryRequests();
+  }
+
+  // What's with the optional<UpdateAck>? DeltaDiscoveryRequest plays two independent roles:
+  // informing the server of what resources we're interested in, and acknowledging resources it has
+  // sent us. Some requests are queued up specifically to carry ACKs, and some are queued up for
+  // resource updates. Susbscription changes might get included in an ACK request. In that case, the
+  // pending request that the subscription change queued up does still get sent, just empty and
+  // pointless. (TODO(fredlas) we would like to skip those no-op requests).
+  void sendDiscoveryRequest(absl::optional<UpdateAck> maybe_ack) {
+    if (maybe_ack.has_value()) {
+      const UpdateAck& ack = maybe_ack.value();
+      request_.set_response_nonce(ack.nonce_);
+      *request_.mutable_error_detail() = ack.error_detail_;
+    }
+    request_.clear_resource_names_subscribe();
+    request_.clear_resource_names_unsubscribe();
+    std::copy(names_added_.begin(), names_added_.end(),
+              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_subscribe()));
+    std::copy(names_removed_.begin(), names_removed_.end(),
+              Protobuf::RepeatedFieldBackInserter(request_.mutable_resource_names_unsubscribe()));
+    names_added_.clear();
+    names_removed_.clear();
+
+    ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request_.DebugString());
+    grpc_stream_.sendMessage(request_);
+    request_.clear_error_detail();
+    request_.clear_initial_resource_versions();
   }
 
   bool shouldSendDiscoveryRequest() {
