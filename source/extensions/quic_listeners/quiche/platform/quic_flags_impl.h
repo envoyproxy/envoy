@@ -11,9 +11,11 @@
 
 #include "extensions/quic_listeners/quiche/platform/flags_impl.h"
 
-#define GetQuicFlagImpl(flag) quiche::FLAGS_##flag->value()
+// |flag| is the global flag variable, which is a pointer to TypedFlag<type>.
+#define GetQuicFlagImpl(flag) quiche::##flag->value()
 
-#define SetQuicFlagImpl(flag, value) quiche::FLAGS_##flag->SetValue(value)
+// |flag| is the address of the global flag variable, i.e. a TypedFlag<type> **.
+#define SetQuicFlagImpl(flag, value) (*quiche::##flag)->SetValue(value)
 
 #define GetQuicReloadableFlagImpl(flag) quiche::FLAGS_quic_reloadable_flag_##flag->value()
 

@@ -150,6 +150,7 @@ envoy_cc_library(
     hdrs = [
         "quic_cert_utils_impl.h",
         "quic_mutex_impl.h",
+        "quic_pcc_sender_impl.h",
         "quic_str_cat_impl.h",
     ] + envoy_select_quiche([
         "quic_file_utils_impl.h",

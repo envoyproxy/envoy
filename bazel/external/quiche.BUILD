@@ -159,6 +159,7 @@ envoy_cc_library(
     hdrs = [
         "quiche/quic/platform/api/quic_cert_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
+        "quiche/quic/platform/api/quic_pcc_sender.h",
         "quiche/quic/platform/api/quic_str_cat.h",
     ] + envoy_select_quiche(
         [
@@ -263,7 +264,6 @@ envoy_cc_library(
         # "quiche/quic/platform/api/quic_mem_slice.h",
         # "quiche/quic/platform/api/quic_mem_slice_span.h",
         # "quiche/quic/platform/api/quic_mem_slice_storage.h",
-        # "quiche/quic/platform/api/quic_pcc_sender.h",
         # "quiche/quic/platform/api/quic_socket_address.h",
         # "quiche/quic/platform/api/quic_test_loopback.h",
         # "quiche/quic/platform/api/quic_test_mem_slice_vector.h",
@@ -363,6 +363,40 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_epoll.h"],
     repository = "@envoy",
     deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_epoll_impl_lib"],
+)
+
+envoy_cc_library(
+    name = "quic_core_base",
+    srcs = [
+        "quiche/quic/core/crypto/quic_random.cc",
+        "quiche/quic/core/quic_connection_id.cc",
+        "quiche/quic/core/quic_constants.cc",
+        "quiche/quic/core/quic_error_codes.cc",
+        "quiche/quic/core/quic_packet_number.cc",
+        "quiche/quic/core/quic_tag.cc",
+        "quiche/quic/core/quic_types.cc",
+        "quiche/quic/core/quic_versions.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/crypto/quic_random.h",
+        "quiche/quic/core/quic_connection_id.h",
+        "quiche/quic/core/quic_constants.h",
+        "quiche/quic/core/quic_error_codes.h",
+        "quiche/quic/core/quic_interval.h",
+        "quiche/quic/core/quic_interval_set.h",
+        "quiche/quic/core/quic_packet_number.h",
+        "quiche/quic/core/quic_tag.h",
+        "quiche/quic/core/quic_types.h",
+        "quiche/quic/core/quic_versions.h",
+    ],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_base",
+        ":quic_time_lib",
+        "//external:ssl",
+    ],
 )
 
 envoy_cc_test(

@@ -184,6 +184,9 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_optimize_inflight_check, false,
             "Stop checking QuicUnackedPacketMap::HasUnackedRetransmittableFrames "
             "and instead rely on the existing check that bytes_in_flight > 0")
 
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_print_tag_hex, false,
+            "When true, non-ASCII QUIC tags are printed as hex instead of integers.")
+
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_proxy_check_toss_on_insertion_failure, false,
             "If true, enable the code that fixes a race condition for quic udp "
             "proxying in L0. See b/70036019.")
@@ -368,6 +371,9 @@ QUICHE_FLAG(double, quic_bbr_cwnd_gain, 2.0f,
 QUICHE_FLAG(int32_t, quic_buffered_data_threshold, 8 * 1024,
             "If buffered data in QUIC stream is less than this "
             "threshold, buffers all provided data or asks upper layer for more data")
+
+QUICHE_FLAG(int32_t, quic_ietf_draft_version, 0,
+            "Mechanism to override version label and ALPN for IETF interop.")
 
 QUICHE_FLAG(int32_t, quic_send_buffer_max_data_slice_size, 4 * 1024,
             "Max size of data slice in bytes for QUIC stream send buffer.")
