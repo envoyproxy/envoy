@@ -4,10 +4,10 @@ Version history
 1.11.0 (Pending)
 ================
 * dubbo_proxy: support the :ref:`Dubbo proxy filter <config_network_filters_dubbo_proxy>`.
+* ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `0|1` indicating if there is a partial body sent in the authorization request message.
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
 * redis: add support for zpopmax and zpopmin commands.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
-* ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `0|1` indicating if there is a partial body sent in the authorization request message.
 
 1.10.0 (Apr 5, 2019)
 ====================
