@@ -111,23 +111,27 @@ int HotRestartImpl::duplicateParentListenSocket(const std::string& address) {
   return as_child_.duplicateParentListenSocket(address);
 }
 
-std::unique_ptr<envoy::HotRestartMessage> HotRestartImpl::getParentStats() {
-  return as_child_.getParentStats();
-}
-
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   as_parent_.initialize(dispatcher, server);
 }
 
-void HotRestartImpl::shutdownParentAdmin(ShutdownParentAdminInfo& info) {
-  as_child_.shutdownParentAdmin(info);
+void HotRestartImpl::sendParentAdminShutdownRequest(time_t& original_start_time) {
+  as_child_.sendParentAdminShutdownRequest(original_start_time);
 }
 
-void HotRestartImpl::terminateParent() { as_child_.terminateParent(); }
+void HotRestartImpl::sendParentTerminateRequest() { as_child_.sendParentTerminateRequest(); }
 
-void HotRestartImpl::mergeParentStats(Stats::StoreRoot& stats_store,
-                                      const envoy::HotRestartMessage::Reply::Stats& stats_proto) {
-  as_child_.mergeParentStats(stats_store, stats_proto);
+HotRestart::ServerStatsFromParent
+HotRestartImpl::mergeParentStatsIfAny(Stats::StoreRoot& stats_store) {
+  std::unique_ptr<envoy::HotRestartMessage> wrapper_msg = as_child_.getParentStats();
+  ServerStatsFromParent response;
+  // getParentStats() will happily and cleanly return nullptr if we have no parent.
+  if (wrapper_msg) {
+    as_child_.mergeParentStats(stats_store, wrapper_msg->reply().stats());
+    response.parent_memory_allocated_ = wrapper_msg->reply().stats().memory_allocated();
+    response.parent_connections_ = wrapper_msg->reply().stats().num_connections();
+  }
+  return response;
 }
 
 void HotRestartImpl::shutdown() { as_parent_.shutdown(); }

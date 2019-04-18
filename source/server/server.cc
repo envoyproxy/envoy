@@ -148,22 +148,16 @@ void InstanceImpl::flushStats() {
   // A shutdown initiated before this callback may prevent this from being called as per
   // the semantics documented in ThreadLocal's runOnAllThreads method.
   stats_store_.mergeHistograms([this]() -> void {
-    uint64_t parent_memory_allocated = 0;
-    uint64_t parent_connections = 0;
-    std::unique_ptr<envoy::HotRestartMessage> wrapper_msg = restarter_.getParentStats();
-    // getParentStats() will happily and cleanly return nullptr if we have no parent.
-    if (wrapper_msg) {
-      restarter_.mergeParentStats(stats_store_, wrapper_msg->reply().stats());
-      parent_memory_allocated = wrapper_msg->reply().stats().memory_allocated();
-      parent_connections = wrapper_msg->reply().stats().num_connections();
-    }
+    // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
+    HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
 
     server_stats_->uptime_.set(time(nullptr) - original_start_time_);
     server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
-                                         parent_memory_allocated);
+                                         parent_stats.parent_memory_allocated_);
     server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
-    server_stats_->parent_connections_.set(parent_connections);
-    server_stats_->total_connections_.set(listener_manager_->numConnections() + parent_connections);
+    server_stats_->parent_connections_.set(parent_stats.parent_connections_);
+    server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                          parent_stats.parent_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
     InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_.source());
@@ -272,10 +266,8 @@ void InstanceImpl::initialize(const Options& options,
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
-  HotRestart::ShutdownParentAdminInfo info;
-  info.original_start_time_ = original_start_time_;
-  restarter_.shutdownParentAdmin(info);
-  original_start_time_ = info.original_start_time_;
+  // Learn original_start_time_ if our parent is still around to inform us of it.
+  restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
   if (initial_config.admin().address()) {
     if (initial_config.admin().accessLogPath().empty()) {
@@ -532,7 +524,7 @@ Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(
 void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");
   shutdown_ = true;
-  restarter_.terminateParent();
+  restarter_.sendParentTerminateRequest();
   notifyCallbacksForStage(Stage::ShutdownExit, [this] { dispatcher_->exit(); });
 }
 
@@ -545,8 +537,9 @@ void InstanceImpl::shutdownAdmin() {
   handler_->stopListeners();
   admin_->closeSocket();
 
+  // If we still have a parent, it should be terminated now that we have a child.
   ENVOY_LOG(warn, "terminating parent process");
-  restarter_.terminateParent();
+  restarter_.sendParentTerminateRequest();
 }
 
 void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {

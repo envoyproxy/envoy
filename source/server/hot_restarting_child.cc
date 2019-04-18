@@ -57,7 +57,7 @@ void HotRestartingChild::drainParentListeners() {
   sendHotRestartMessage(parent_address_, wrapped_request);
 }
 
-void HotRestartingChild::shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo& info) {
+void HotRestartingChild::sendParentAdminShutdownRequest(time_t& original_start_time) {
   if (restart_epoch_ == 0 || parent_terminated_) {
     return;
   }
@@ -69,10 +69,10 @@ void HotRestartingChild::shutdownParentAdmin(HotRestart::ShutdownParentAdminInfo
   std::unique_ptr<HotRestartMessage> wrapped_reply = receiveHotRestartMessage(Blocking::Yes);
   RELEASE_ASSERT(replyIsExpectedType(wrapped_reply.get(), HotRestartMessage::Reply::kShutdownAdmin),
                  "Hot restart parent did not respond as expected to ShutdownParentAdmin.");
-  info.original_start_time_ = wrapped_reply->reply().shutdown_admin().original_start_time();
+  original_start_time = wrapped_reply->reply().shutdown_admin().original_start_time();
 }
 
-void HotRestartingChild::terminateParent() {
+void HotRestartingChild::sendParentTerminateRequest() {
   if (restart_epoch_ == 0 || parent_terminated_) {
     return;
   }

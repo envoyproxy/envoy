@@ -18,11 +18,11 @@ public:
   // Server::HotRestart
   void drainParentListeners() override {}
   int duplicateParentListenSocket(const std::string&) override { return -1; }
-  std::unique_ptr<envoy::HotRestartMessage> getParentStats() override { return nullptr; }
   void initialize(Event::Dispatcher&, Server::Instance&) override {}
-  void shutdownParentAdmin(ShutdownParentAdminInfo&) override {}
-  void terminateParent() override {}
-  void mergeParentStats(Stats::StoreRoot&, const envoy::HotRestartMessage::Reply::Stats&) override {
+  void sendParentAdminShutdownRequest(time_t&) override {}
+  void sendParentTerminateRequest() override {}
+  ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot&) override {
+    return ServerStatsFromParent();
   }
   void shutdown() override {}
   std::string version() override { return "disabled"; }
