@@ -41,6 +41,7 @@ public:
                Runtime::Loader& runtime, Http::Context& http_context)
       : allow_partial_message_(config.with_request_body().allow_partial_message()),
         failure_mode_allow_(config.failure_mode_allow()),
+        clear_route_cache_(config.clear_route_cache()),
         max_request_bytes_(config.with_request_body().max_request_bytes()), local_info_(local_info),
         scope_(scope), runtime_(runtime), http_context_(http_context) {}
 
@@ -49,6 +50,8 @@ public:
   bool withRequestBody() const { return max_request_bytes_ > 0; }
 
   bool failureModeAllow() const { return failure_mode_allow_; }
+
+  bool clearRouteCache() const { return clear_route_cache_; }
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
@@ -63,6 +66,7 @@ public:
 private:
   const bool allow_partial_message_;
   const bool failure_mode_allow_;
+  const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;

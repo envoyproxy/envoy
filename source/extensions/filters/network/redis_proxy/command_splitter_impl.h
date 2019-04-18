@@ -17,6 +17,7 @@
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/redis_proxy/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -68,9 +69,9 @@ public:
 
 class CommandHandlerBase {
 protected:
-  CommandHandlerBase(ConnPool::Instance& conn_pool) : conn_pool_(conn_pool) {}
+  CommandHandlerBase(Router& router) : router_(router) {}
 
-  ConnPool::Instance& conn_pool_;
+  Router& router_;
 };
 
 class SplitRequestBase : public SplitRequest {
@@ -114,7 +115,7 @@ protected:
       : SplitRequestBase(command_stats, time_source, latency_in_micros), callbacks_(callbacks) {}
 
   SplitCallbacks& callbacks_;
-  ConnPool::Instance* conn_pool_{};
+  ConnPool::InstanceSharedPtr conn_pool_;
   Common::Redis::Client::PoolRequest* handle_{};
   Common::Redis::RespValuePtr incoming_request_;
 };
@@ -124,8 +125,7 @@ protected:
  */
 class SimpleRequest : public SingleServerRequest {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -140,8 +140,7 @@ private:
  */
 class EvalRequest : public SingleServerRequest {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -184,13 +183,13 @@ protected:
     FragmentedRequest& parent_;
     const uint32_t index_;
     Common::Redis::Client::PoolRequest* handle_{};
-    ConnPool::Instance* conn_pool_{};
+    ConnPool::InstanceSharedPtr conn_pool_;
   };
 
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
   void onChildFailure(uint32_t index);
   bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                          ConnPool::Instance* conn_pool);
+                          const ConnPool::InstanceSharedPtr& conn_pool);
   virtual void recreate(Common::Redis::RespValue& request, uint32_t index) PURE;
 
   SplitCallbacks& callbacks_;
@@ -208,8 +207,7 @@ protected:
  */
 class MGETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -231,8 +229,7 @@ private:
  */
 class SplitKeysSumResultRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -255,8 +252,7 @@ private:
  */
 class MSETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(ConnPool::Instance& conn_pool,
-                                Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -277,12 +273,12 @@ private:
 template <class RequestClass>
 class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:
-  CommandHandlerFactory(ConnPool::Instance& conn_pool) : CommandHandlerBase(conn_pool) {}
+  CommandHandlerFactory(Router& router) : CommandHandlerBase(router) {}
   SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
                                CommandStats& command_stats, TimeSource& time_source,
                                bool latency_in_micros) {
-    return RequestClass::create(conn_pool_, std::move(request), callbacks, command_stats,
-                                time_source, latency_in_micros);
+    return RequestClass::create(router_, std::move(request), callbacks, command_stats, time_source,
+                                latency_in_micros);
   }
 };
 
@@ -304,8 +300,8 @@ struct InstanceStats {
 
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
-  InstanceImpl(ConnPool::InstancePtr&& conn_pool, Stats::Scope& scope,
-               const std::string& stat_prefix, TimeSource& time_source, bool latency_in_micros);
+  InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
+               TimeSource& time_source, bool latency_in_micros);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request,
@@ -323,7 +319,7 @@ private:
                   CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
 
-  ConnPool::InstancePtr conn_pool_;
+  RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;

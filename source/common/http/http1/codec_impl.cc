@@ -42,6 +42,9 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
 }
+void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
+  this->encodeHeader(key.data(), key.size(), value.data(), value.size());
+}
 
 void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
@@ -54,11 +57,11 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
   bool saw_content_length = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        const char* key_to_use = header.key().c_str();
+        absl::string_view key_to_use = header.key().getStringView();
         uint32_t key_size_to_use = header.key().size();
         // Translate :authority -> host so that upper layers do not need to deal with this.
         if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-          key_to_use = Headers::get().HostLegacy.get().c_str();
+          key_to_use = absl::string_view(Headers::get().HostLegacy.get());
           key_size_to_use = Headers::get().HostLegacy.get().size();
         }
 
@@ -67,8 +70,8 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
           return HeaderMap::Iterate::Continue;
         }
 
-        static_cast<StreamEncoderImpl*>(context)->encodeHeader(
-            key_to_use, key_size_to_use, header.value().c_str(), header.value().size());
+        static_cast<StreamEncoderImpl*>(context)->encodeHeader(key_to_use,
+                                                               header.value().getStringView());
         return HeaderMap::Iterate::Continue;
       },
       this);
@@ -265,14 +268,14 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   if (!method || !path) {
     throw CodecClientException(":method and :path must be specified");
   }
-  if (method->value() == Headers::get().MethodValues.Head.c_str()) {
+  if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
   }
   connection_.onEncodeHeaders(headers);
   connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
-  connection_.copyToBuffer(method->value().c_str(), method->value().size());
+  connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
-  connection_.copyToBuffer(path->value().c_str(), path->value().size());
+  connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
@@ -328,7 +331,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
 
 void ConnectionImpl::completeLastHeader() {
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
-                 current_header_field_.c_str(), current_header_value_.c_str());
+                 current_header_field_.getStringView(), current_header_value_.getStringView());
   if (!current_header_field_.empty()) {
     toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
     current_header_map_->addViaMove(std::move(current_header_field_),
@@ -508,8 +511,9 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   bool is_connect = (method == HTTP_CONNECT);
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
-  if (active_request_->request_url_.c_str()[0] == '/' ||
-      ((method == HTTP_OPTIONS) && active_request_->request_url_.c_str()[0] == '*')) {
+  if (!active_request_->request_url_.getStringView().empty() &&
+      (active_request_->request_url_.getStringView()[0] == '/' ||
+       ((method == HTTP_OPTIONS) && active_request_->request_url_.getStringView()[0] == '*'))) {
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }

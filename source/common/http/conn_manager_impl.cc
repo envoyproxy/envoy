@@ -573,7 +573,8 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 // e.g. many early returns do not currently handle connection: close properly.
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   request_headers_ = std::move(headers);
-  if (Http::Headers::get().MethodValues.Head == request_headers_->Method()->value().c_str()) {
+  if (Http::Headers::get().MethodValues.Head ==
+      request_headers_->Method()->value().getStringView()) {
     is_head_request_ = true;
   }
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
@@ -661,7 +662,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // when the allow_absolute_url flag is enabled on the HCM.
   // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
   // :path because CONNECT does not have a path, and we don't support that currently.
-  if (!request_headers_->Path() || request_headers_->Path()->value().c_str()[0] != '/') {
+  if (!request_headers_->Path() || request_headers_->Path()->value().getStringView().empty() ||
+      request_headers_->Path()->value().getStringView()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
                    is_head_request_, absl::nullopt);
@@ -779,7 +781,8 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     // should be used to override the active span's operation.
     if (req_operation_override) {
       if (!req_operation_override->value().empty()) {
-        active_span_->setOperation(req_operation_override->value().c_str());
+        // TODO(dnoe): Migrate setOperation to take string_view (#6580)
+        active_span_->setOperation(std::string(req_operation_override->value().getStringView()));
 
         // Clear the decorated operation so won't be used in the response header, as
         // it has been overridden by the inbound decorator operation request header.
@@ -1345,7 +1348,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
       // should be used to override the active span's operation.
       if (resp_operation_override) {
         if (!resp_operation_override->value().empty() && active_span_) {
-          active_span_->setOperation(resp_operation_override->value().c_str());
+          active_span_->setOperation(std::string(resp_operation_override->value().getStringView()));
         }
         // Remove header so not propagated to service.
         headers.removeEnvoyDecoratorOperation();
@@ -1614,16 +1617,16 @@ bool ConnectionManagerImpl::ActiveStream::verbose() const {
 
 void ConnectionManagerImpl::ActiveStream::callHighWatermarkCallbacks() {
   ++high_watermark_count_;
-  if (watermark_callbacks_) {
-    watermark_callbacks_->onAboveWriteBufferHighWatermark();
+  for (auto watermark_callbacks : watermark_callbacks_) {
+    watermark_callbacks->onAboveWriteBufferHighWatermark();
   }
 }
 
 void ConnectionManagerImpl::ActiveStream::callLowWatermarkCallbacks() {
   ASSERT(high_watermark_count_ > 0);
   --high_watermark_count_;
-  if (watermark_callbacks_) {
-    watermark_callbacks_->onBelowWriteBufferLowWatermark();
+  for (auto watermark_callbacks : watermark_callbacks_) {
+    watermark_callbacks->onBelowWriteBufferLowWatermark();
   }
 }
 
@@ -1655,7 +1658,7 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
     }
 
     if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
-            upgrade->value().c_str(), upgrade_map, *this)) {
+            upgrade->value().getStringView(), upgrade_map, *this)) {
       state_.successful_upgrade_ = true;
       connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
       connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
@@ -1883,7 +1886,7 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::cre
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::handleMetadataAfterHeadersCallback() {
-  // If we drain acumulated metadata, the iteration must start with the current filter.
+  // If we drain accumulated metadata, the iteration must start with the current filter.
   bool saved_state = iterate_from_current_filter_;
   iterate_from_current_filter_ = true;
   // If decodeHeaders() returns StopAllIteration, we should skip draining metadata, and wait
@@ -1891,7 +1894,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::handleMetadataAfterHeader
   if (!stoppedAll() && !saved_request_metadata_.empty()) {
     drainSavedRequestMetadata();
   }
-  // Restores the originial value of iterate_from_current_filter_.
+  // Restores the original value of iterate_from_current_filter_.
   iterate_from_current_filter_ = saved_state;
 }
 
@@ -1982,19 +1985,20 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  // This is called exactly once per stream, by the router filter.
-  // If there's ever a need for another filter to subscribe to watermark callbacks this can be
-  // turned into a vector.
-  ASSERT(parent_.watermark_callbacks_ == nullptr);
-  parent_.watermark_callbacks_ = &watermark_callbacks;
+  // This is called exactly once per upstream-stream, by the router filter. Therefore, we
+  // expect the same callbacks to not be registered twice.
+  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
+                   &watermark_callbacks) == parent_.watermark_callbacks_.end());
+  parent_.watermark_callbacks_.emplace(parent_.watermark_callbacks_.end(), &watermark_callbacks);
   for (uint32_t i = 0; i < parent_.high_watermark_count_; ++i) {
     watermark_callbacks.onAboveWriteBufferHighWatermark();
   }
 }
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  ASSERT(parent_.watermark_callbacks_ == &watermark_callbacks);
-  parent_.watermark_callbacks_ = nullptr;
+  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
+                   &watermark_callbacks) != parent_.watermark_callbacks_.end());
+  parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
 
 bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {

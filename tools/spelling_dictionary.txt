@@ -160,8 +160,10 @@ NUL
 Nilsson
 OCSP
 OK
+OOB
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -181,6 +183,7 @@ POSTs
 PREBIND
 PRNG
 PROT
+QPS
 QUIC
 RAII
 RANLUX
@@ -285,6 +288,7 @@ accessors
 acls
 addr
 agg
+alignof
 alloc
 alloca
 allocator

@@ -538,7 +538,7 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
-    DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
+    std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
     // Stores metadata added in the decoding filter that is being processed. Will be cleared before
     // processing the next filter.
     MetadataMapVector request_metadata_map_vector_;

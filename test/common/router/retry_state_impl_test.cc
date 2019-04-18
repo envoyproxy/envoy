@@ -505,6 +505,77 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   EXPECT_EQ(0UL, cluster_.circuit_breakers_stats_.rq_retry_open_.value());
 }
 
+// Test customized retry back-off intervals.
+TEST_F(RouterRetryStateImplTest, CustomBackOffInterval) {
+  policy_.num_retries_ = 10;
+  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  policy_.base_interval_ = std::chrono::milliseconds(100);
+  policy_.max_interval_ = std::chrono::milliseconds(1200);
+  Http::TestHeaderMapImpl request_headers;
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(149));
+  retry_timer_ = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(49)));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(350));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(50)));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(751));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(51)));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(1499));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1200)));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+}
+
+// Test the default maximum retry back-off interval.
+TEST_F(RouterRetryStateImplTest, CustomBackOffIntervalDefaultMax) {
+  policy_.num_retries_ = 10;
+  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  policy_.base_interval_ = std::chrono::milliseconds(100);
+  Http::TestHeaderMapImpl request_headers;
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(149));
+  retry_timer_ = new Event::MockTimer(&dispatcher_);
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(49)));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(350));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(50)));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(751));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(51)));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(1499));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, callback_));
+  EXPECT_CALL(callback_ready_, ready());
+  retry_timer_->callback_();
+}
+
 TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {
   policy_.host_selection_max_attempts_ = 2;
   policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
