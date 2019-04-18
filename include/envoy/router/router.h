@@ -201,6 +201,16 @@ public:
    * policy is enabled.
    */
   virtual const std::vector<uint32_t>& retriableStatusCodes() const PURE;
+
+  /**
+   * @return absl::optional<std::chrono::milliseconds> base retry interval
+   */
+  virtual absl::optional<std::chrono::milliseconds> baseInterval() const PURE;
+
+  /**
+   * @return absl::optional<std::chrono::milliseconds> maximum retry interval
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
 };
 
 /**

@@ -96,6 +96,27 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
   for (auto code : retry_policy.retriable_status_codes()) {
     retriable_status_codes_.emplace_back(code);
   }
+
+  if (retry_policy.has_retry_back_off()) {
+    base_interval_ = std::chrono::milliseconds(
+        PROTOBUF_GET_MS_REQUIRED(retry_policy.retry_back_off(), base_interval));
+    if ((*base_interval_).count() < 1) {
+      base_interval_ = std::chrono::milliseconds(1);
+    }
+
+    max_interval_ = PROTOBUF_GET_OPTIONAL_MS(retry_policy.retry_back_off(), max_interval);
+    if (max_interval_) {
+      // Apply the same rounding to max interval in case both are set to sub-millisecond values.
+      if ((*max_interval_).count() < 1) {
+        max_interval_ = std::chrono::milliseconds(1);
+      }
+
+      if ((*max_interval_).count() < (*base_interval_).count()) {
+        throw EnvoyException(
+            "retry_policy.max_interval must greater than or equal to the base_interval");
+      }
+    }
+  }
 }
 
 std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {

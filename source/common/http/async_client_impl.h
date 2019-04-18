@@ -148,8 +148,12 @@ private:
     const std::vector<uint32_t>& retriableStatusCodes() const override {
       return retriable_status_codes_;
     }
+    absl::optional<std::chrono::milliseconds> baseInterval() const override {
+      return absl::nullopt;
+    }
+    absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
 
-    const std::vector<uint32_t> retriable_status_codes_;
+    const std::vector<uint32_t> retriable_status_codes_{};
   };
 
   struct NullShadowPolicy : public Router::ShadowPolicy {

@@ -91,12 +91,16 @@ public:
   const std::vector<uint32_t>& retriableStatusCodes() const override {
     return retriable_status_codes_;
   }
+  absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
+  absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
 
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
   uint32_t host_selection_max_attempts_;
   std::vector<uint32_t> retriable_status_codes_;
+  absl::optional<std::chrono::milliseconds> base_interval_{};
+  absl::optional<std::chrono::milliseconds> max_interval_{};
 };
 
 class MockRetryState : public RetryState {
