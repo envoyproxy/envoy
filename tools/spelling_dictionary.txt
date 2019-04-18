@@ -427,7 +427,6 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
-evwatch
 exe
 execlp
 facto
