@@ -77,7 +77,7 @@ message RedisProxy {
     // being batched together at a high rate, the buffer will likely be filled before the timer
     // fires. Alternatively, if the request rate is lower the buffer will not be filled as often
     // before the timer fires.
-    // If `max_buffer_size_before_flush` is set, but `buffer_flush_timeout`, the latter
+    // If `max_buffer_size_before_flush` is set, but `buffer_flush_timeout` is not, the latter
     // defaults to 3ms.
     google.protobuf.Duration buffer_flush_timeout = 5 [(gogoproto.stdduration) = true];
   }
