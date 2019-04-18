@@ -62,7 +62,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
     if (withhold_grpc_frames_) {
       // Adjust the content-length header to account for us removing the gRPC frame header.
-      adjustContentLength(headers, [](auto size) { return size - Grpc::GRPC_FRAME_HEADER_SIZE; });
+      adjustContentLength(headers, [](auto size) {
+            if (Grpc::GRPC_FRAME_HEADER_SIZE > size) {
+                return 0UL;
+            } else {
+                return size - Grpc::GRPC_FRAME_HEADER_SIZE;
+            }
+        });
     }
 
     // Clear the route cache to recompute the cache. This provides additional
@@ -91,7 +97,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
-  if (enabled_) {
+  if (enabled_ && headers.ContentType() && headers.Status()) {
     auto content_type = headers.ContentType();
 
     // If the response from upstream does not have the correct content-type,
@@ -115,8 +121,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
 
     if (withhold_grpc_frames_) {
       // Adjust content-length to account for the frame header that's added.
-      adjustContentLength(headers,
-                          [](auto length) { return length + Grpc::GRPC_FRAME_HEADER_SIZE; });
+      adjustContentLength(headers, [](auto length) {
+                            uint64_t adjusted_length = length + Grpc::GRPC_FRAME_HEADER_SIZE;
+                            if (length > adjusted_length) {
+                                return length;
+                            } else {
+                                return adjusted_length;
+                            }
+                        });
     }
     // We can only insert trailers at the end of data, so keep track of this value
     // until then.
