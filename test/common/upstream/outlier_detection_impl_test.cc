@@ -73,7 +73,7 @@ public:
 
     // Prepare separate config with split_external_local_origin_errors set to true.
     // It will be used for tests with split external and local origin errors.
-    outlier_detection_split_.mutable_split_external_local_origin_errors()->set_value(true);
+    outlier_detection_split_.set_split_external_local_origin_errors(true);
   }
 
   void addHosts(std::vector<std::string> urls, bool primary = true) {

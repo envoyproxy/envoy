@@ -233,8 +233,7 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_gateway_failure, 0))),
       enforcing_success_rate_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))),
-      split_external_local_origin_errors_(static_cast<bool>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, split_external_local_origin_errors, false))),
+      split_external_local_origin_errors_(config.split_external_local_origin_errors()),
       consecutive_local_origin_failure_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_local_origin_failure, 5))),
       enforcing_consecutive_local_origin_failure_(
