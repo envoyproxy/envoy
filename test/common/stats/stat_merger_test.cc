@@ -100,8 +100,10 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   EXPECT_FALSE(store_.gauge("runtime.admin_overrides_active").used());
   EXPECT_FALSE(store_.gauge("runtime.num_keys").used());
   EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_draining").used());
+  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_warming").used());
   EXPECT_FALSE(store_.gauge("server.hot_restart_epoch").used());
   EXPECT_FALSE(store_.gauge("server.live").used());
+  EXPECT_FALSE(store_.gauge("server.concurrency").used());
   EXPECT_FALSE(store_.gauge("some.connected_state").used());
 }
 
@@ -116,10 +118,8 @@ TEST_F(StatMergerTest, onlyImportWhenUnused) {
   gauges["cluster.rds.membership_degraded"] = 33;
   gauges["cluster.rds.max_host_weight"] = 33;
   gauges["anything.total_principals"] = 33;
-  gauges["listener_manager.total_listeners_warming"] = 33;
   gauges["listener_manager.total_listeners_active"] = 33;
   gauges["some_sort_of_pressure"] = 33;
-  gauges["server.concurrency"] = 33;
   // 33 is stored into the child's until-now-undefined gauges
   stat_merger_.mergeStats(counters, gauges);
   EXPECT_EQ(33, store_.gauge("cluster_manager.active_clusters").value());
@@ -129,10 +129,8 @@ TEST_F(StatMergerTest, onlyImportWhenUnused) {
   EXPECT_EQ(33, store_.gauge("cluster.rds.membership_degraded").value());
   EXPECT_EQ(33, store_.gauge("cluster.rds.max_host_weight").value());
   EXPECT_EQ(33, store_.gauge("anything.total_principals").value());
-  EXPECT_EQ(33, store_.gauge("listener_manager.total_listeners_warming").value());
   EXPECT_EQ(33, store_.gauge("listener_manager.total_listeners_active").value());
   EXPECT_EQ(33, store_.gauge("some_sort_of_pressure").value());
-  EXPECT_EQ(33, store_.gauge("server.concurrency").value());
   store_.gauge("cluster_manager.active_clusters").set(88);
   store_.gauge("cluster_manager.warming_clusters").set(88);
   store_.gauge("cluster.rds.membership_total").set(88);
@@ -140,10 +138,8 @@ TEST_F(StatMergerTest, onlyImportWhenUnused) {
   store_.gauge("cluster.rds.membership_degraded").set(88);
   store_.gauge("cluster.rds.max_host_weight").set(88);
   store_.gauge("anything.total_principals").set(88);
-  store_.gauge("listener_manager.total_listeners_warming").set(88);
   store_.gauge("listener_manager.total_listeners_active").set(88);
   store_.gauge("some_sort_of_pressure").set(88);
-  store_.gauge("server.concurrency").set(88);
   // Now that the child's gauges have been set to 88, merging the "33" values will make no change.
   stat_merger_.mergeStats(counters, gauges);
   EXPECT_EQ(88, store_.gauge("cluster_manager.active_clusters").value());
@@ -153,10 +149,8 @@ TEST_F(StatMergerTest, onlyImportWhenUnused) {
   EXPECT_EQ(88, store_.gauge("cluster.rds.membership_degraded").value());
   EXPECT_EQ(88, store_.gauge("cluster.rds.max_host_weight").value());
   EXPECT_EQ(88, store_.gauge("anything.total_principals").value());
-  EXPECT_EQ(88, store_.gauge("listener_manager.total_listeners_warming").value());
   EXPECT_EQ(88, store_.gauge("listener_manager.total_listeners_active").value());
   EXPECT_EQ(88, store_.gauge("some_sort_of_pressure").value());
-  EXPECT_EQ(88, store_.gauge("server.concurrency").value());
 }
 
 } // namespace
