@@ -50,6 +50,7 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
 HeapStatData* HeapStatData::alloc(absl::string_view name) {
   void* memory = ::malloc(sizeof(HeapStatData) + name.size() + 1);
   ASSERT(memory);
+  // TODO(fredlas) call StatMerger::verifyCombineLogicSpecified() here?
   return new (memory) HeapStatData(name);
 }
 

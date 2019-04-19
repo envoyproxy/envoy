@@ -27,6 +27,11 @@ public:
   // addition, while gauges default to addition but have exceptions.
   void mergeStats(const Protobuf::Map<std::string, uint64_t>& counters,
                   const Protobuf::Map<std::string, uint64_t>& gauges);
+
+  // TODO(fredlas) add void verifyCombineLogicSpecified(absl::string_view gauge_name), to
+  // be called at gauge allocation, to ensure (with an ASSERT) that anyone adding a new stat
+  // will be forced to come across this code and explicitly specify combination logic.
+
   // Looks up gauge_name in our nonstandard combine logic rules, and returns the result (nullopt
   // meaning not nonstandard, implying Accumulate).
   static absl::optional<StatMerger::CombineLogic> getCombineLogic(const std::string& gauge_name);
