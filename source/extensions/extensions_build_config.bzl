@@ -71,9 +71,7 @@ EXTENSIONS = {
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
     # NOTE: Kafka filter does not have a proper filter implemented right now. We are referencing to
     #       codec implementation that is going to be used by the filter.
-    "envoy.filters.network.kafka_parser_lib":           "//source/extensions/filters/network/kafka:parser_lib",
-    "envoy.filters.network.kafka_serialization_lib":    "//source/extensions/filters/network/kafka:serialization_lib",
-
+    "envoy.filters.network.kafka":                      "//source/extensions/filters/network/kafka:kafka_request_lib",
     "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
     "envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",
     "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",

@@ -12,6 +12,52 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "kafka_request_lib",
+    srcs = [
+        "kafka_request_parser.cc",
+        "kafka_request_resolver.cc",
+    ],
+    hdrs = [
+        "kafka_request.h",
+        "kafka_request_parser.h",
+        "requests.h",
+    ],
+    deps = [
+        ":parser_lib",
+        ":serialization_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+genrule(
+    name = "kafka_generated_source",
+    srcs = [
+        "@kafka_source//:request_protocol_files",
+    ],
+    outs = [
+        "requests.h",
+        "kafka_request_resolver.cc",
+    ],
+    cmd = """
+      ./$(location :kafka_code_generator) generate-source \
+        $(location requests.h) $(location kafka_request_resolver.cc) \
+        $(SRCS)
+    """,
+    tools = [
+        ":kafka_code_generator",
+    ],
+)
+
+py_binary(
+    name = "kafka_code_generator",
+    srcs = ["protocol_code_generator/kafka_generator.py"],
+    data = glob(["protocol_code_generator/*.j2"]),
+    main = "protocol_code_generator/kafka_generator.py",
+    deps = ["@com_github_pallets_jinja//:jinja2"],
+)
+
+envoy_cc_library(
     name = "parser_lib",
     hdrs = ["parser.h"],
     deps = [
