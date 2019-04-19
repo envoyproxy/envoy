@@ -248,9 +248,7 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
         pending_value_stack_.front().value_->type(RespType::Integer);
         break;
       }
-      default: {
-        throw ProtocolError("invalid value type");
-      }
+      default: { throw ProtocolError("invalid value type"); }
       }
 
       remaining--;
