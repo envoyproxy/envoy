@@ -21,10 +21,12 @@ namespace {
 int addressFamilyUnderTestHelper() {
   std::vector<Envoy::Network::Address::IpVersion> versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
-  if (std::find(versions.begin(), versions.end(), Envoy::Network::Address::IpVersion::v4) != std::end(versions)) {
+  if (std::find(versions.begin(), versions.end(), Envoy::Network::Address::IpVersion::v4) !=
+      std::end(versions)) {
     return AF_INET;
   }
-  if (std::find(versions.begin(), versions.end(), Envoy::Network::Address::IpVersion::v6) != std::end(versions)) {
+  if (std::find(versions.begin(), versions.end(), Envoy::Network::Address::IpVersion::v6) !=
+      std::end(versions)) {
     return AF_INET6;
   }
   return -1;
