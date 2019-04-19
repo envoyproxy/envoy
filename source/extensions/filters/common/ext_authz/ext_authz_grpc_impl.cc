@@ -38,11 +38,11 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
+  request_ = async_client_->sendTyped(service_method_, request, *this, parent_span, timeout_);
 }
 
-void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
-                               Tracing::Span& span) {
+void GrpcClientImpl::onSuccessTyped(
+    std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response, Tracing::Span& span) {
   ASSERT(response->status().code() != Grpc::Status::GrpcStatus::Unknown);
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
 

@@ -184,7 +184,7 @@ TEST_P(GrpcClientIntegrationTest, ReplyNoTrailers) {
   stream->sendServerInitialMetadata(empty_metadata_);
   helloworld::HelloReply reply;
   reply.set_message(HELLO_REPLY);
-  EXPECT_CALL(*stream, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY))).WillExitIfNeeded();
+  EXPECT_CALL(*stream, onReceiveMessageTyped_(HelloworldReplyEq(HELLO_REPLY))).WillExitIfNeeded();
   dispatcher_helper_.setStreamEventPending();
   stream->expectTrailingMetadata(empty_metadata_);
   stream->expectGrpcStatus(Status::GrpcStatus::InvalidCode);

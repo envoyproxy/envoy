@@ -56,10 +56,10 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   envoy::service::ratelimit::v2::RateLimitRequest request;
   createRequest(request, domain, descriptors);
 
-  request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
+  request_ = async_client_->sendTyped(service_method_, request, *this, parent_span, timeout_);
 }
 
-void GrpcClientImpl::onSuccess(
+void GrpcClientImpl::onSuccessTyped(
     std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
     Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;

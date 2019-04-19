@@ -22,14 +22,14 @@ GrpcMetricsStreamerImpl::GrpcMetricsStreamerImpl(Grpc::AsyncClientFactoryPtr&& f
 
 void GrpcMetricsStreamerImpl::send(envoy::service::metrics::v2::StreamMetricsMessage& message) {
   if (stream_ == nullptr) {
-    stream_ = client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                                 "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
-                             *this);
+    stream_ = client_->startTyped(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                                      "envoy.service.metrics.v2.MetricsService.StreamMetrics"),
+                                  *this);
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = local_info_.node();
   }
   if (stream_ != nullptr) {
-    stream_->sendMessage(message, false);
+    stream_->sendMessageTyped(message, false);
   }
 }
 

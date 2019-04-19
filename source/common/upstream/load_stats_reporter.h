@@ -40,7 +40,7 @@ public:
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
-  void onReceiveMessage(
+  void onReceiveMessageTyped(
       std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
@@ -57,8 +57,10 @@ private:
 
   ClusterManager& cm_;
   LoadReporterStats stats_;
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncStream* stream_{};
+  Grpc::TypedAsyncClient<envoy::service::load_stats::v2::LoadStatsRequest,
+                         envoy::service::load_stats::v2::LoadStatsResponse>
+      async_client_;
+  Grpc::TypedAsyncStream<envoy::service::load_stats::v2::LoadStatsRequest> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;

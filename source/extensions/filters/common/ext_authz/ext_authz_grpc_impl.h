@@ -16,6 +16,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/grpc/typed_async_client.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
@@ -59,8 +60,8 @@ public:
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
-                 Tracing::Span& span) override;
+  void onSuccessTyped(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
+                      Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
@@ -70,7 +71,9 @@ private:
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers);
   const Protobuf::MethodDescriptor& service_method_;
-  Grpc::AsyncClientPtr async_client_;
+  Grpc::TypedAsyncClient<envoy::service::auth::v2::CheckRequest,
+                         envoy::service::auth::v2::CheckResponse>
+      async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};

@@ -28,7 +28,7 @@ public:
   DeltaSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
-        async_client_(new Grpc::MockAsyncClient()) {
+        async_client_(new NiceMock<Grpc::MockAsyncClient>()) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_));
@@ -39,7 +39,7 @@ public:
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
-    EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage({}, "");
     expectSendMessage(last_cluster_names_, "");
@@ -72,7 +72,7 @@ public:
       error_detail->set_message(error_message);
     }
     std::cerr << "EXPECTING DiscoveryRequest: " << expected_request.DebugString() << std::endl;
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
+    EXPECT_CALL(async_stream_, sendMessage(Grpc::ProtoBufferEq(expected_request), false));
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
@@ -104,7 +104,7 @@ public:
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
       expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config");
     }
-    subscription_->onReceiveMessage(std::move(response));
+    subscription_->onReceiveMessageTyped(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -137,7 +137,7 @@ public:
   Event::MockDispatcher dispatcher_;
   Runtime::MockRandomGenerator random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Grpc::MockAsyncStream async_stream_;
+  NiceMock<Grpc::MockAsyncStream> async_stream_;
   std::unique_ptr<DeltaSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::vector<std::string> last_cluster_names_;

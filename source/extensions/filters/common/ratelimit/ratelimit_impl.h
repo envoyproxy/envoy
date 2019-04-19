@@ -16,6 +16,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
+#include "common/grpc/typed_async_client.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
@@ -60,14 +61,16 @@ public:
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
-                 Tracing::Span& span) override;
+  void onSuccessTyped(std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
+                      Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
-  Grpc::AsyncClientPtr async_client_;
+  Grpc::TypedAsyncClient<envoy::service::ratelimit::v2::RateLimitRequest,
+                         envoy::service::ratelimit::v2::RateLimitResponse>
+      async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};

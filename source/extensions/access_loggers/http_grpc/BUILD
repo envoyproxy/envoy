@@ -24,6 +24,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/grpc:async_client_lib",
+        "//source/common/grpc:typed_async_client_lib",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/accesslog/v2:als_cc",
         "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",

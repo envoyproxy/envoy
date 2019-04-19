@@ -83,6 +83,7 @@ envoy_cc_test(
     srcs = ["grpc_subscription_impl_test.cc"],
     deps = [
         ":grpc_subscription_test_harness",
+        "//source/common/buffer:zero_copy_input_stream_lib",
     ],
 )
 

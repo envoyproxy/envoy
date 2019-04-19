@@ -26,7 +26,7 @@ namespace {
 
 class GrpcAccessLogStreamerImplTest : public testing::Test {
 public:
-  using MockAccessLogStream = Grpc::MockAsyncStream;
+  using MockAccessLogStream = NiceMock<Grpc::MockAsyncStream>;
   using AccessLogCallbacks =
       Grpc::TypedAsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse>;
 
@@ -39,8 +39,8 @@ public:
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
-    EXPECT_CALL(*async_client_, start(_, _))
-        .WillOnce(Invoke([&stream, callbacks_to_set](const Protobuf::MethodDescriptor&,
+    EXPECT_CALL(*async_client_, start(_, _, _))
+        .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
                                                      Grpc::AsyncStreamCallbacks& callbacks) {
           *callbacks_to_set = dynamic_cast<AccessLogCallbacks*>(&callbacks);
           return &stream;
@@ -49,7 +49,7 @@ public:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   LocalInfo::MockLocalInfo local_info_;
-  Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient};
+  Grpc::MockAsyncClient* async_client_{new NiceMock<Grpc::MockAsyncClient>};
   Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};
   std::unique_ptr<GrpcAccessLogStreamerImpl> streamer_;
 };
@@ -81,7 +81,7 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
   streamer_->send(message_log2, "log2");
 
   // Verify that sending an empty response message doesn't do anything bad.
-  callbacks1->onReceiveMessage(
+  callbacks1->onReceiveMessageTyped(
       std::make_unique<envoy::service::accesslog::v2::StreamAccessLogsResponse>());
 
   // Close stream 2 and make sure we make a new one.
@@ -96,9 +96,9 @@ TEST_F(GrpcAccessLogStreamerImplTest, BasicFlow) {
 TEST_F(GrpcAccessLogStreamerImplTest, StreamFailure) {
   InSequence s;
 
-  EXPECT_CALL(*async_client_, start(_, _))
+  EXPECT_CALL(*async_client_, start(_, _, _))
       .WillOnce(
-          Invoke([](const Protobuf::MethodDescriptor&, Grpc::AsyncStreamCallbacks& callbacks) {
+          Invoke([](absl::string_view, absl::string_view, Grpc::AsyncStreamCallbacks& callbacks) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));

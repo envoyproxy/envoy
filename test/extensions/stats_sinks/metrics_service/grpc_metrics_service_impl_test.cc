@@ -22,7 +22,7 @@ namespace {
 
 class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
-  using MockMetricsStream = Grpc::MockAsyncStream;
+  using MockMetricsStream = NiceMock<Grpc::MockAsyncStream>;
   using MetricsServiceCallbacks =
       Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse>;
 
@@ -35,8 +35,8 @@ public:
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
-    EXPECT_CALL(*async_client_, start(_, _))
-        .WillOnce(Invoke([&stream, callbacks_to_set](const Protobuf::MethodDescriptor&,
+    EXPECT_CALL(*async_client_, start(_, _, _))
+        .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
                                                      Grpc::AsyncStreamCallbacks& callbacks) {
           *callbacks_to_set = dynamic_cast<MetricsServiceCallbacks*>(&callbacks);
           return &stream;
@@ -44,7 +44,7 @@ public:
   }
 
   LocalInfo::MockLocalInfo local_info_;
-  Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient};
+  Grpc::MockAsyncClient* async_client_{new NiceMock<Grpc::MockAsyncClient>};
   Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};
   std::unique_ptr<GrpcMetricsStreamerImpl> streamer_;
 };
@@ -62,7 +62,7 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
   envoy::service::metrics::v2::StreamMetricsMessage message_metrics1;
   streamer_->send(message_metrics1);
   // Verify that sending an empty response message doesn't do anything bad.
-  callbacks1->onReceiveMessage(
+  callbacks1->onReceiveMessageTyped(
       std::make_unique<envoy::service::metrics::v2::StreamMetricsResponse>());
 }
 
@@ -70,9 +70,9 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
 TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
   InSequence s;
 
-  EXPECT_CALL(*async_client_, start(_, _))
+  EXPECT_CALL(*async_client_, start(_, _, _))
       .WillOnce(
-          Invoke([](const Protobuf::MethodDescriptor&, Grpc::AsyncStreamCallbacks& callbacks) {
+          Invoke([](absl::string_view, absl::string_view, Grpc::AsyncStreamCallbacks& callbacks) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));

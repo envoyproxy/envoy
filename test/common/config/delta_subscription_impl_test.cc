@@ -1,3 +1,5 @@
+#include "common/buffer/zero_copy_input_stream_impl.h"
+
 #include "test/common/config/delta_subscription_test_harness.h"
 
 using testing::AnyNumber;
@@ -66,10 +68,12 @@ TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   // ...but our own map should remember our interest. In particular, losing interest in all 3 should
   // cause their names to appear in the resource_names_unsubscribe field of a DeltaDiscoveryRequest.
   subscription_->resume(); // now we do want the request to actually get sendMessage()'d.
-  EXPECT_CALL(async_stream_, sendMessage(_, _)).WillOnce([](const Protobuf::Message& msg, bool) {
-    auto sent_request = static_cast<const envoy::api::v2::DeltaDiscoveryRequest*>(&msg);
-    EXPECT_THAT(sent_request->resource_names_subscribe(), UnorderedElementsAre("name4"));
-    EXPECT_THAT(sent_request->resource_names_unsubscribe(),
+  EXPECT_CALL(async_stream_, sendMessage(_, _)).WillOnce([](Buffer::InstancePtr&& msg, bool) {
+    envoy::api::v2::DeltaDiscoveryRequest sent_request;
+    Buffer::ZeroCopyInputStreamImpl stream(std::move(msg));
+    EXPECT_TRUE(sent_request.ParseFromZeroCopyStream(&stream));
+    EXPECT_THAT(sent_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
+    EXPECT_THAT(sent_request.resource_names_unsubscribe(),
                 UnorderedElementsAre("name1", "name2", "name3"));
   });
   subscription_->subscribe({"name4"}); // (implies "we no longer care about name1,2,3")

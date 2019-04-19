@@ -123,7 +123,7 @@ public:
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
-  void onReceiveMessage(
+  void onReceiveMessageTyped(
       std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
@@ -145,8 +145,11 @@ private:
   HdsDelegateStats stats_;
   const Protobuf::MethodDescriptor& service_method_;
 
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncStream* stream_{};
+  Grpc::TypedAsyncClient<envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse,
+                         envoy::service::discovery::v2::HealthCheckSpecifier>
+      async_client_;
+  Grpc::TypedAsyncStream<envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse>
+      stream_{};
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
   Envoy::Stats::Store& store_stats;

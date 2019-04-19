@@ -54,7 +54,7 @@ void HdsDelegate::setHdsStreamResponseTimer() {
 
 void HdsDelegate::establishNewStream() {
   ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-  stream_ = async_client_->start(service_method_, *this);
+  stream_ = async_client_->startTyped(service_method_, *this);
   if (stream_ == nullptr) {
     ENVOY_LOG(warn, "Unable to establish new stream");
     handleFailure();
@@ -62,7 +62,7 @@ void HdsDelegate::establishNewStream() {
   }
 
   ENVOY_LOG(debug, "Sending HealthCheckRequest {} ", health_check_request_.DebugString());
-  stream_->sendMessage(health_check_request_, false);
+  stream_->sendMessageTyped(health_check_request_, false);
   stats_.responses_.inc();
   backoff_strategy_->reset();
 }
@@ -101,7 +101,7 @@ HdsDelegate::sendResponse() {
     }
   }
   ENVOY_LOG(debug, "Sending EndpointHealthResponse to server {}", response.DebugString());
-  stream_->sendMessage(response, false);
+  stream_->sendMessageTyped(response, false);
   stats_.responses_.inc();
   setHdsStreamResponseTimer();
   return response;
@@ -157,7 +157,7 @@ void HdsDelegate::processMessage(
 
 // TODO(lilika): Add support for subsequent HealthCheckSpecifier messages that
 // might modify the HdsClusters
-void HdsDelegate::onReceiveMessage(
+void HdsDelegate::onReceiveMessageTyped(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());

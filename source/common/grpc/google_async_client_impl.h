@@ -12,6 +12,7 @@
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
+#include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "grpcpp/generic/generic_stub.h"
@@ -160,16 +161,13 @@ public:
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
-  AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
-                     const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
+  AsyncRequest* send(absl::string_view service_full_name, absl::string_view method_name,
+                     Buffer::InstancePtr&& request, AsyncRequestCallbacks& callbacks,
                      Tracing::Span& parent_span,
                      const absl::optional<std::chrono::milliseconds>& timeout) override;
-  AsyncRequest* sendRaw(absl::string_view service_full_name, absl::string_view method_name,
-                        Buffer::InstancePtr request, RawAsyncRequestCallbacks& callbacks,
-                        Tracing::Span& parent_span,
-                        const absl::optional<std::chrono::milliseconds>& timeout) override;
-  AsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
-                        RawAsyncStreamCallbacks& callbacks) override;
+  AsyncStream* start(absl::string_view service_full_name, absl::string_view method_name,
+                     AsyncStreamCallbacks& callbacks) override;
+  bool isGrpcHeaderRequired() override { return false; }
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
@@ -199,22 +197,18 @@ class GoogleAsyncStreamImpl : public AsyncStream,
                               Logger::Loggable<Logger::Id::grpc>,
                               LinkedObject<GoogleAsyncStreamImpl> {
 public:
-  GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
-                        const Protobuf::MethodDescriptor& service_method,
-                        AsyncStreamCallbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout);
   GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
-                        absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
+                        absl::string_view method_name, AsyncStreamCallbacks& callbacks,
                         const absl::optional<std::chrono::milliseconds>& timeout);
   ~GoogleAsyncStreamImpl();
 
   virtual void initialize(bool buffer_body_for_retry);
 
   // Grpc::AsyncStream
-  void sendMessage(const Protobuf::Message& request, bool end_stream) override;
-  void sendRawMessage(Buffer::InstancePtr request, bool end_stream) override;
+  void sendMessage(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
+  bool isGrpcHeaderRequired() override { return false; }
 
 protected:
   bool call_failed() const { return call_failed_; }
@@ -270,7 +264,7 @@ private:
   std::shared_ptr<GoogleStub> stub_;
   std::string service_full_name_;
   std::string method_name_;
-  RawAsyncStreamCallbacks& callbacks_;
+  AsyncStreamCallbacks& callbacks_;
   const absl::optional<std::chrono::milliseconds>& timeout_;
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
@@ -303,16 +297,11 @@ private:
 
 class GoogleAsyncRequestImpl : public AsyncRequest,
                                public GoogleAsyncStreamImpl,
-                               RawAsyncStreamCallbacks {
+                               AsyncStreamCallbacks {
 public:
-  GoogleAsyncRequestImpl(GoogleAsyncClientImpl& parent,
-                         const Protobuf::MethodDescriptor& service_method,
-                         const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
-                         Tracing::Span& parent_span,
-                         const absl::optional<std::chrono::milliseconds>& timeout);
   GoogleAsyncRequestImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
                          absl::string_view method_name, Buffer::InstancePtr request,
-                         RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+                         AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
                          const absl::optional<std::chrono::milliseconds>& timeout);
 
   void initialize(bool buffer_body_for_retry) override;
@@ -324,13 +313,12 @@ private:
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
-  bool onReceiveRawMessage(Buffer::InstancePtr response) override;
+  bool onReceiveMessage(Buffer::InstancePtr&& response) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
-  ProtobufTypes::MessagePtr createEmptyResponse() override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   Buffer::InstancePtr request_;
-  RawAsyncRequestCallbacks& callbacks_;
+  AsyncRequestCallbacks& callbacks_;
   Tracing::SpanPtr current_span_;
   Buffer::InstancePtr response_;
 };
