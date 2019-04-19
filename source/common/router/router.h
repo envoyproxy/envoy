@@ -321,12 +321,21 @@ private:
     void onBelowWriteBufferLowWatermark() override { enableDataFromDownstream(); }
 
     void disableDataFromDownstream() {
-      ASSERT(parent_.upstream_requests_.size() == 1);
+      // If there is only one upstream request, we can be assured that
+      // disabling reads will not slow down other upstream requests. If we've
+      // already seen the full downstream requst (downstream_end_stream_) then
+      // disabling reads is a no-op.
+      ASSERT(parent_.upstream_requests_.size() == 1 || downstream_end_stream_);
       parent_.cluster_->stats().upstream_flow_control_backed_up_total_.inc();
       parent_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
     }
+
     void enableDataFromDownstream() {
-      ASSERT(parent_.upstream_requests_.size() == 1);
+      // If there is only one upstream request, we can be assured that
+      // disabling reads will not overflow any write buffers in other upstream
+      // requests. If we've already seen the full downstream requst
+      // (downstream_end_stream_) then enabling reads is a no-op.
+      ASSERT(parent_.upstream_requests_.size() == 1 || downstream_end_stream_);
       parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
       parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
     }
