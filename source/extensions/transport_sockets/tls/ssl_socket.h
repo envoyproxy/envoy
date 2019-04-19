@@ -75,6 +75,12 @@ public:
   SSL* rawSslForTest() const { return ssl_.get(); }
 
 private:
+  struct ReadResult {
+    bool commit_slice_{};
+    absl::optional<int> error_;
+  };
+  ReadResult sslReadIntoSlice(Buffer::RawSlice& slice);
+
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();
