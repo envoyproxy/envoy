@@ -9,15 +9,8 @@ const RequestParserResolver& RequestParserResolver::getDefaultInstance() {
   CONSTRUCT_ON_FIRST_USE(RequestParserResolver);
 }
 
-ParseResponse RequestStartParser::parse(absl::string_view& data) {
-  request_length_.feed(data);
-  if (request_length_.ready()) {
-    context_->remaining_request_size_ = request_length_.get();
-    return ParseResponse::nextParser(
-        std::make_shared<RequestHeaderParser>(parser_resolver_, context_));
-  } else {
-    return ParseResponse::stillWaiting();
-  }
+ParseResponse RequestStartParser::parse(absl::string_view&) {
+  return ParseResponse::stillWaiting();
 }
 
 ParseResponse RequestHeaderParser::parse(absl::string_view& data) {
