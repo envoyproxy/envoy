@@ -572,14 +572,13 @@ template <class Value> struct TrieLookupTable {
    * exists.
    * @return false when a value already exists for the given key.
    */
-  bool add(const char* key, Value value, bool overwrite_existing = true) {
+  bool add(absl::string_view key, Value value, bool overwrite_existing = true) {
     TrieEntry<Value>* current = &root_;
-    while (uint8_t c = *key) {
+    for (uint8_t c : key) {
       if (!current->entries_[c]) {
         current->entries_[c] = std::make_unique<TrieEntry<Value>>();
       }
       current = current->entries_[c].get();
-      key++;
     }
     if (current->value_ && !overwrite_existing) {
       return false;
@@ -593,13 +592,11 @@ template <class Value> struct TrieLookupTable {
    * @param key the key used to find.
    * @return the value associated with the key.
    */
-  Value find(const char* key) const {
+  Value find(absl::string_view key) const {
     const TrieEntry<Value>* current = &root_;
-    while (uint8_t c = *key) {
+    for (uint8_t c : key) {
       current = current->entries_[c].get();
-      if (current) {
-        key++;
-      } else {
+      if (current == nullptr) {
         return nullptr;
       }
     }

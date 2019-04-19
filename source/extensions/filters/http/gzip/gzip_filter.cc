@@ -149,8 +149,8 @@ Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_s
 bool GzipFilter::hasCacheControlNoTransform(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* cache_control = headers.CacheControl();
   if (cache_control) {
-    return StringUtil::caseFindToken(cache_control->value().c_str(), ",",
-                                     Http::Headers::get().CacheControlValues.NoTransform.c_str());
+    return StringUtil::caseFindToken(cache_control->value().getStringView(), ",",
+                                     Http::Headers::get().CacheControlValues.NoTransform);
   }
 
   return false;
@@ -166,8 +166,8 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
 
   if (accept_encoding) {
     bool is_wildcard = false; // true if found and not followed by `q=0`.
-    for (const auto token : StringUtil::splitToken(headers.AcceptEncoding()->value().c_str(), ",",
-                                                   false /* keep_empty */)) {
+    for (const auto token : StringUtil::splitToken(
+             headers.AcceptEncoding()->value().getStringView(), ",", false /* keep_empty */)) {
       const auto value = StringUtil::trim(StringUtil::cropRight(token, ";"));
       const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";"));
       // If value is the gzip coding, check the qvalue and return.
@@ -211,7 +211,9 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
 bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type && !config_->contentTypeValues().empty()) {
-    std::string value{StringUtil::trim(StringUtil::cropRight(content_type->value().c_str(), ";"))};
+    // TODO(dnoe): Eliminate std:string construction with Swiss table (#6580)
+    const std::string value{
+        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"))};
     return config_->contentTypeValues().find(value) != config_->contentTypeValues().end();
   }
 
@@ -230,9 +232,10 @@ bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length) {
     uint64_t length;
-    const bool is_minimum_content_length =
-        StringUtil::atoull(content_length->value().c_str(), length) &&
-        length >= config_->minimumLength();
+    // TODO(dnoe): Make StringUtil::atoull and friends string_view friendly.
+    const std::string content_length_str(content_length->value().getStringView());
+    const bool is_minimum_content_length = StringUtil::atoull(content_length_str.c_str(), length) &&
+                                           length >= config_->minimumLength();
     if (!is_minimum_content_length) {
       config_->stats().content_length_too_small_.inc();
     }
@@ -241,8 +244,8 @@ bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
 
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();
   return (transfer_encoding &&
-          StringUtil::caseFindToken(transfer_encoding->value().c_str(), ",",
-                                    Http::Headers::get().TransferEncodingValues.Chunked.c_str()));
+          StringUtil::caseFindToken(transfer_encoding->value().getStringView(), ",",
+                                    Http::Headers::get().TransferEncodingValues.Chunked));
 }
 
 bool GzipFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
@@ -251,7 +254,7 @@ bool GzipFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
     for (auto header_value :
          // TODO(gsagula): add Http::HeaderMap::string_view() so string length doesn't need to be
          // computed twice. Find all other sites where this can be improved.
-         StringUtil::splitToken(transfer_encoding->value().c_str(), ",", true)) {
+         StringUtil::splitToken(transfer_encoding->value().getStringView(), ",", true)) {
       const auto trimmed_value = StringUtil::trim(header_value);
       if (StringUtil::caseCompare(trimmed_value,
                                   Http::Headers::get().TransferEncodingValues.Gzip) ||
@@ -268,10 +271,10 @@ bool GzipFilter::isTransferEncodingAllowed(Http::HeaderMap& headers) const {
 void GzipFilter::insertVaryHeader(Http::HeaderMap& headers) {
   const Http::HeaderEntry* vary = headers.Vary();
   if (vary) {
-    if (!StringUtil::findToken(vary->value().c_str(), ",",
+    if (!StringUtil::findToken(vary->value().getStringView(), ",",
                                Http::Headers::get().VaryValues.AcceptEncoding, true)) {
       std::string new_header;
-      absl::StrAppend(&new_header, vary->value().c_str(), ", ",
+      absl::StrAppend(&new_header, vary->value().getStringView(), ", ",
                       Http::Headers::get().VaryValues.AcceptEncoding);
       headers.insertVary().value(new_header);
     }
@@ -288,7 +291,7 @@ void GzipFilter::insertVaryHeader(Http::HeaderMap& headers) {
 void GzipFilter::sanitizeEtagHeader(Http::HeaderMap& headers) {
   const Http::HeaderEntry* etag = headers.Etag();
   if (etag) {
-    absl::string_view value(etag->value().c_str());
+    absl::string_view value(etag->value().getStringView());
     if (value.length() > 2 && !((value[0] == 'w' || value[0] == 'W') && value[1] == '/')) {
       headers.removeEtag();
     }

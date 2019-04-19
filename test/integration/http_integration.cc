@@ -340,7 +340,7 @@ void HttpIntegrationTest::checkSimpleRequestSuccess(uint64_t expected_request_si
   EXPECT_EQ(expected_request_size, upstream_request_->bodyLength());
 
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(expected_response_size, response->body().size());
 }
 
@@ -394,7 +394,7 @@ void HttpIntegrationTest::testRouterNotFound() {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
 }
 
 // Change the default route to be restrictive, and send a POST to an alternate route.
@@ -405,7 +405,7 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "POST", "/notfound", "foo", downstream_protocol_, version_);
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
@@ -433,7 +433,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
             "termination",
             response->body());
@@ -461,7 +461,7 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_FALSE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(0U, response->body().size());
 }
 
@@ -523,7 +523,7 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_FALSE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 }
 
@@ -557,7 +557,7 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 }
 
@@ -590,7 +590,7 @@ void HttpIntegrationTest::testRetry() {
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 }
 
@@ -614,7 +614,10 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
 
-  EXPECT_EQ(atoi(upstream_request_->headers().EnvoyAttemptCount()->value().c_str()), 1);
+  EXPECT_EQ(
+      atoi(std::string(upstream_request_->headers().EnvoyAttemptCount()->value().getStringView())
+               .c_str()),
+      1);
 
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -623,7 +626,10 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
   waitForNextUpstreamRequest();
-  EXPECT_EQ(atoi(upstream_request_->headers().EnvoyAttemptCount()->value().c_str()), 2);
+  EXPECT_EQ(
+      atoi(std::string(upstream_request_->headers().EnvoyAttemptCount()->value().getStringView())
+               .c_str()),
+      2);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
 
@@ -632,7 +638,7 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 }
 
@@ -673,7 +679,7 @@ void HttpIntegrationTest::testGrpcRetry() {
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
     EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
@@ -706,8 +712,8 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   if (via.empty()) {
     EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Via));
   } else {
-    EXPECT_STREQ(via.c_str(),
-                 upstream_request_->headers().get(Http::Headers::get().Via)->value().c_str());
+    EXPECT_EQ(via,
+              upstream_request_->headers().get(Http::Headers::get().Via)->value().getStringView());
   }
 
   if (additional_continue_from_upstream) {
@@ -721,13 +727,13 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   ASSERT(response->continue_headers() != nullptr);
-  EXPECT_STREQ("100", response->continue_headers()->Status()->value().c_str());
+  EXPECT_EQ("100", response->continue_headers()->Status()->value().getStringView());
   EXPECT_EQ(nullptr, response->continue_headers()->Via());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   if (via.empty()) {
     EXPECT_EQ(nullptr, response->headers().Via());
   } else {
-    EXPECT_STREQ(via.c_str(), response->headers().Via()->value().c_str());
+    EXPECT_EQ(via.c_str(), response->headers().Via()->value().getStringView());
   }
 }
 
@@ -788,9 +794,9 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
   ASSERT(response->continue_headers() != nullptr);
-  EXPECT_STREQ("100", response->continue_headers()->Status()->value().c_str());
+  EXPECT_EQ("100", response->continue_headers()->Status()->value().getStringView());
 
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 void HttpIntegrationTest::testTwoRequests(bool network_backup) {
@@ -822,7 +828,7 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 
   // Request 2.
@@ -835,7 +841,7 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(512U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(1024U, response->body().size());
 }
 
@@ -864,7 +870,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t max_si
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       codec_client_->waitForDisconnect();
       EXPECT_TRUE(response->complete());
-      EXPECT_STREQ("431", response->headers().Status()->value().c_str());
+      EXPECT_EQ("431", response->headers().Status()->value().getStringView());
     } else {
       response->waitForReset();
       codec_client_->close();
@@ -872,7 +878,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t max_si
   } else {
     auto response = sendRequestAndWaitForResponse(big_headers, 0, default_response_headers_, 0);
     EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
 }
 
@@ -914,7 +920,7 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_FALSE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 }
 
@@ -946,7 +952,7 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
   }
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(response_size, response->body().size());
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
     EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));

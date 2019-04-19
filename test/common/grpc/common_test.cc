@@ -79,25 +79,25 @@ TEST(GrpcCommonTest, ToGrpcTimeout) {
   Http::HeaderString value;
 
   Common::toGrpcTimeout(std::chrono::milliseconds(0UL), value);
-  EXPECT_STREQ("0m", value.c_str());
+  EXPECT_EQ("0m", value.getStringView());
 
   Common::toGrpcTimeout(std::chrono::milliseconds(1UL), value);
-  EXPECT_STREQ("1m", value.c_str());
+  EXPECT_EQ("1m", value.getStringView());
 
   Common::toGrpcTimeout(std::chrono::milliseconds(100000000UL), value);
-  EXPECT_STREQ("100000S", value.c_str());
+  EXPECT_EQ("100000S", value.getStringView());
 
   Common::toGrpcTimeout(std::chrono::milliseconds(100000000000UL), value);
-  EXPECT_STREQ("1666666M", value.c_str());
+  EXPECT_EQ("1666666M", value.getStringView());
 
   Common::toGrpcTimeout(std::chrono::milliseconds(9000000000000UL), value);
-  EXPECT_STREQ("2500000H", value.c_str());
+  EXPECT_EQ("2500000H", value.getStringView());
 
   Common::toGrpcTimeout(std::chrono::milliseconds(360000000000000UL), value);
-  EXPECT_STREQ("99999999H", value.c_str());
+  EXPECT_EQ("99999999H", value.getStringView());
 
   Common::toGrpcTimeout(std::chrono::milliseconds(UINT64_MAX), value);
-  EXPECT_STREQ("99999999H", value.c_str());
+  EXPECT_EQ("99999999H", value.getStringView());
 }
 
 TEST(GrpcCommonTest, ChargeStats) {
@@ -135,71 +135,71 @@ TEST(GrpcCommonTest, PrepareHeaders) {
     Http::MessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name", absl::nullopt);
 
-    EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
-    EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
-    EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
-    EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
+    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
+    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
+    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
+    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
   }
   {
     Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
                                                       absl::optional<std::chrono::milliseconds>(1));
 
-    EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
-    EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
-    EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
-    EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-    EXPECT_STREQ("1m", message->headers().GrpcTimeout()->value().c_str());
+    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
+    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
+    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
+    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
+    EXPECT_EQ("1m", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
     Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
                                                       absl::optional<std::chrono::seconds>(1));
 
-    EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
-    EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
-    EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
-    EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-    EXPECT_STREQ("1000m", message->headers().GrpcTimeout()->value().c_str());
+    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
+    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
+    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
+    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
+    EXPECT_EQ("1000m", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
     Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
                                                       absl::optional<std::chrono::minutes>(1));
 
-    EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
-    EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
-    EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
-    EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-    EXPECT_STREQ("60000m", message->headers().GrpcTimeout()->value().c_str());
+    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
+    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
+    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
+    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
+    EXPECT_EQ("60000m", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
     Http::MessagePtr message = Common::prepareHeaders("cluster", "service_name", "method_name",
                                                       absl::optional<std::chrono::hours>(1));
 
-    EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
-    EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
-    EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
-    EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-    EXPECT_STREQ("3600000m", message->headers().GrpcTimeout()->value().c_str());
+    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
+    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
+    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
+    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
+    EXPECT_EQ("3600000m", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
     Http::MessagePtr message = Common::prepareHeaders(
         "cluster", "service_name", "method_name", absl::optional<std::chrono::hours>(100000000));
 
-    EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
-    EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
-    EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
-    EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-    EXPECT_STREQ("99999999H", message->headers().GrpcTimeout()->value().c_str());
+    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
+    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
+    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
+    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
+    EXPECT_EQ("99999999H", message->headers().GrpcTimeout()->value().getStringView());
   }
   {
     Http::MessagePtr message =
         Common::prepareHeaders("cluster", "service_name", "method_name",
                                absl::optional<std::chrono::milliseconds>(100000000000));
 
-    EXPECT_STREQ("POST", message->headers().Method()->value().c_str());
-    EXPECT_STREQ("/service_name/method_name", message->headers().Path()->value().c_str());
-    EXPECT_STREQ("cluster", message->headers().Host()->value().c_str());
-    EXPECT_STREQ("application/grpc", message->headers().ContentType()->value().c_str());
-    EXPECT_STREQ("1666666M", message->headers().GrpcTimeout()->value().c_str());
+    EXPECT_EQ("POST", message->headers().Method()->value().getStringView());
+    EXPECT_EQ("/service_name/method_name", message->headers().Path()->value().getStringView());
+    EXPECT_EQ("cluster", message->headers().Host()->value().getStringView());
+    EXPECT_EQ("application/grpc", message->headers().ContentType()->value().getStringView());
+    EXPECT_EQ("1666666M", message->headers().GrpcTimeout()->value().getStringView());
   }
 }
 

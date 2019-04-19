@@ -159,8 +159,8 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
   if (expected_xfcc.empty()) {
     EXPECT_EQ(nullptr, upstream_request_->headers().ForwardedClientCert());
   } else {
-    EXPECT_STREQ(expected_xfcc.c_str(),
-                 upstream_request_->headers().ForwardedClientCert()->value().c_str());
+    EXPECT_EQ(expected_xfcc,
+              upstream_request_->headers().ForwardedClientCert()->value().getStringView());
   }
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();

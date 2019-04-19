@@ -11,7 +11,14 @@ ConfigImpl::ConfigImpl(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
     : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
       enable_hashtagging_(config.enable_hashtagging()),
-      enable_redirection_(config.enable_redirection()) {}
+      enable_redirection_(config.enable_redirection()),
+      max_buffer_size_before_flush_(
+          config.max_buffer_size_before_flush()), // This is a scalar, so default is zero.
+      buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, buffer_flush_timeout,
+          3)) // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
+              // as the buffer is flushed on each request immediately.
+{}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
@@ -31,7 +38,8 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
-      connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })) {
+      connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })),
+      flush_timer_(dispatcher.createTimer([this]() -> void { flushBufferAndResetTimer(); })) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
   host->cluster().stats().upstream_cx_active_.inc();
@@ -48,12 +56,27 @@ ClientImpl::~ClientImpl() {
 
 void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
+void ClientImpl::flushBufferAndResetTimer() {
+  if (flush_timer_->enabled()) {
+    flush_timer_->disableTimer();
+  }
+  connection_->write(encoder_buffer_, false);
+}
+
 PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
+  const bool empty_buffer = encoder_buffer_.length() == 0;
+
   pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
-  connection_->write(encoder_buffer_, false);
+
+  // If buffer is full, flush. If the the buffer was empty before the request, start the timer.
+  if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
+    flushBufferAndResetTimer();
+  } else if (empty_buffer) {
+    flush_timer_->enableTimer(std::chrono::milliseconds(config_.bufferFlushTimeoutInMs()));
+  }
 
   // Only boost the op timeout if:
   // - We are not already connected. Otherwise, we are governed by the connect timeout and the timer
