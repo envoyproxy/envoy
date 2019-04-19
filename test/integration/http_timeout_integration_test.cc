@@ -36,7 +36,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
 
   // Ensure we got a timeout downstream and canceled the upstream request.
   response->waitForHeaders();
-  ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::milliseconds(0)));
+  ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
 
   codec_client_->close();
 
@@ -143,7 +143,7 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeout) {
   response->waitForHeaders();
 
   // The second request should be reset since we used the response from the first request.
-  ASSERT_TRUE(upstream_request2->waitForReset(std::chrono::milliseconds(0)));
+  ASSERT_TRUE(upstream_request2->waitForReset(std::chrono::seconds(15)));
 
   codec_client_->close();
 
@@ -219,7 +219,7 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
   response->waitForHeaders();
 
   // The second request should be reset since we used the response from the first request.
-  ASSERT_TRUE(upstream_request2->waitForReset(std::chrono::milliseconds(0)));
+  ASSERT_TRUE(upstream_request2->waitForReset(std::chrono::seconds(15)));
 
   if (response_size) {
     upstream_request_->encodeData(response_size, true);
