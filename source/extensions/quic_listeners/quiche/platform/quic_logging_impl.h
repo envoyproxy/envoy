@@ -70,7 +70,7 @@
 // Release build
 #define DCHECK(condition) QUIC_COMPILED_OUT_LOG(condition)
 #define QUIC_COMPILED_OUT_LOG(condition)                                                           \
-  QUIC_LOG_IMPL_INTERNAL(false && condition, quic::NullLogStream().stream())
+  QUIC_LOG_IMPL_INTERNAL(false && (condition), quic::NullLogStream().stream())
 #define QUIC_DVLOG_IMPL(verbosity) QUIC_COMPILED_OUT_LOG(false)
 #define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_COMPILED_OUT_LOG(condition)
 #define QUIC_DLOG_IMPL(severity) QUIC_COMPILED_OUT_LOG(false)
