@@ -9,4 +9,4 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#define EpollTestImpl ::testing::Test
+using EpollTestImpl = ::testing::Test;

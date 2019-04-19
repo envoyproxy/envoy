@@ -15,10 +15,6 @@ namespace epoll_server {
 
 #define EPOLL_PLOG_IMPL(severity) QUIC_PLOG_IMPL(severity)
 
-#ifndef NDEBUG
-#define EPOLL_DVLOG_IMPL(verbosity) QUIC_VLOG_IMPL(verbosity)
-#else
-#define EPOLL_DVLOG_IMPL(verbosity) QUIC_VLOG_IF_IMPL(verbosity, false)
-#endif
+#define EPOLL_DVLOG_IMPL(verbosity) QUIC_DVLOG_IMPL(verbosity)
 
 } // namespace epoll_server
