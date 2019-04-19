@@ -20,7 +20,7 @@ namespace Kafka {
  * @param api_version Kafka request's version
  * @param context parse context
  */
-ParserSharedPtr RequestParserResolver::createParser(int16_t api_key, int16_t api_version,
+ParserSharedPtr RequestParserResolver::createParser(int16_t, int16_t,
                                                     RequestContextSharedPtr context) const {
 
 {% for request_type in request_types %}{% for field_list in request_type.compute_field_lists() %}

@@ -62,8 +62,7 @@ def main():
       request = parse_request(request_spec)
       requests.append(request)
 
-  # Sort requests by api_key.
-  requests.sort(key=lambda x: x.get_extra('api_key'))
+  requests = []
 
   # Generate main source code.
   if 'generate-source' == command:
