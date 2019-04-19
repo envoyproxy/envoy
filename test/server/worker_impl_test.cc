@@ -71,7 +71,9 @@ TEST_F(WorkerImplTest, BasicFlow) {
     ci.setReady();
   });
 
+  NiceMock<Stats::MockStore> store;
   worker_.start(guard_dog_);
+  worker_.initializeStats(store, "test");
   ci.waitReady();
 
   // After a worker is started adding/stopping/removing a listener happens on the worker thread.

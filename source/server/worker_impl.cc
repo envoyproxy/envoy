@@ -73,6 +73,10 @@ void WorkerImpl::start(GuardDog& guard_dog) {
       api_.threadFactory().createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
 }
 
+void WorkerImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
+  dispatcher_->initializeStats(scope, prefix);
+}
+
 void WorkerImpl::stop() {
   // It's possible for the server to cleanly shut down while cluster initialization during startup
   // is happening, so we might not yet have a thread.
