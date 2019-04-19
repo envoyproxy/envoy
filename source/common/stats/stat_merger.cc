@@ -7,19 +7,10 @@ namespace Stats {
 
 StatMerger::StatMerger(Stats::Store& target_store) : target_store_(target_store) {}
 
-void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters,
-                            const Protobuf::Map<std::string, uint64_t>& gauges) {
-  for (const auto& counter : counters) {
-    uint64_t new_parent_value = counter.second;
-    auto found_value = parent_counter_values_.find(counter.first);
-    uint64_t old_parent_value =
-        found_value == parent_counter_values_.end() ? 0 : found_value->second;
-    parent_counter_values_[counter.first] = new_parent_value;
-    target_store_.counter(counter.first).add(new_parent_value - old_parent_value);
-  }
-
+absl::optional<StatMerger::CombineLogic>
+StatMerger::getCombineLogic(const std::string& gauge_name) {
   // Gauge name *substrings*, and special logic to use for combining those gauges' values.
-  static const std::vector<std::pair<std::regex, CombineLogic>> combine_logic_exceptions{
+  static const std::vector<std::pair<std::regex, CombineLogic>> nonstandard_combine_logic{
       // Any .version is either a static property of the binary, or an opaque identifier for
       // resources that are not passed across hot restart.
       {std::regex(".*\\.version$"), CombineLogic::NoImport},
@@ -50,19 +41,35 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
       {std::regex("^runtime.admin_overrides_active$"), CombineLogic::NoImport},
       {std::regex("^runtime.num_keys$"), CombineLogic::NoImport},
   };
+  for (auto exception : nonstandard_combine_logic) {
+    std::smatch match;
+    if (std::regex_match(gauge_name, match, exception.first)) {
+      return exception.second;
+    }
+  }
+  return absl::nullopt;
+}
+
+void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counters) {
+  for (const auto& counter : counters) {
+    uint64_t new_parent_value = counter.second;
+    auto found_value = parent_counter_values_.find(counter.first);
+    uint64_t old_parent_value =
+        found_value == parent_counter_values_.end() ? 0 : found_value->second;
+    parent_counter_values_[counter.first] = new_parent_value;
+    target_store_.counter(counter.first).add(new_parent_value - old_parent_value);
+  }
+}
+
+void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
   for (const auto& gauge : gauges) {
     uint64_t new_parent_value = gauge.second;
     auto found_value = parent_gauge_values_.find(gauge.first);
     uint64_t old_parent_value = found_value == parent_gauge_values_.end() ? 0 : found_value->second;
     parent_gauge_values_[gauge.first] = new_parent_value;
-    CombineLogic combine_logic = CombineLogic::Accumulate;
-    for (auto exception : combine_logic_exceptions) {
-      std::smatch match;
-      if (std::regex_match(gauge.first, match, exception.first)) {
-        combine_logic = exception.second;
-        break;
-      }
-    }
+
+    CombineLogic combine_logic =
+        StatMerger::getCombineLogic(gauge.first).value_or(CombineLogic::Accumulate);
     if (combine_logic == CombineLogic::NoImport) {
       continue;
     }
@@ -87,6 +94,12 @@ void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters
       break;
     }
   }
+}
+
+void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters,
+                            const Protobuf::Map<std::string, uint64_t>& gauges) {
+  mergeCounters(counters);
+  mergeGauges(gauges);
 }
 
 } // namespace Stats
