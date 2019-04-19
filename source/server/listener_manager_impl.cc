@@ -672,8 +672,7 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
                                          WorkerFactory& worker_factory)
-    : server_(server), factory_(listener_factory),
-      scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
+    : server_(server), factory_(listener_factory), stats_(generateStats(server.stats())),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
@@ -719,7 +718,9 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
 }
 
 ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
-  return {ALL_LISTENER_MANAGER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
+  const std::string final_prefix = "listener_manager.";
+  return {ALL_LISTENER_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
@@ -1005,13 +1006,12 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
   ASSERT(!workers_started_);
   workers_started_ = true;
-  uint32_t i = 0;
   for (const auto& worker : workers_) {
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
       addListenerToWorker(*worker, *listener);
     }
-    worker->start(guard_dog, *scope_, fmt::format("worker_{}.", i++));
+    worker->start(guard_dog);
   }
 }
 
