@@ -3422,7 +3422,10 @@ TEST_F(WatermarkTest, DownstreamWatermarks) {
 }
 
 TEST_F(WatermarkTest, UpstreamWatermarks) {
-  sendRequest();
+  sendRequest(false);
+
+  response_decoder_->decodeHeaders(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}, false);
 
   ASSERT(callbacks_.callbacks_.begin() != callbacks_.callbacks_.end());
   Envoy::Http::DownstreamWatermarkCallbacks* watermark_callbacks = *callbacks_.callbacks_.begin();
@@ -3441,7 +3444,9 @@ TEST_F(WatermarkTest, UpstreamWatermarks) {
                     .counter("upstream_flow_control_resumed_reading_total")
                     .value());
 
-  sendResponse();
+  Buffer::OwnedImpl data;
+  EXPECT_CALL(encoder_, getStream()).Times(2).WillRepeatedly(ReturnRef(stream_));
+  response_decoder_->decodeData(data, true);
 }
 
 TEST_F(WatermarkTest, FilterWatermarks) {
