@@ -2590,7 +2590,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "1m"}};
     FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
-    EXPECT_EQ(std::chrono::milliseconds(999), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(1), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
   }
   {
