@@ -512,7 +512,8 @@ void Filter::cleanup() {
     if (upstream_request.get() == final_upstream_request_) {
       callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
     }
-    if ((upstream_request.get() != final_upstream_request_) || !attempting_internal_redirect_with_complete_stream_) {
+    if ((upstream_request.get() != final_upstream_request_) ||
+        !attempting_internal_redirect_with_complete_stream_) {
       upstream_request->resetStream(); // Idempotent.
     }
   }
