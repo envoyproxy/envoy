@@ -128,7 +128,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
     if (route.grpcTimeoutOffset()) {
       // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
       // setting it to 0 means infinity and a negative timeout makes no sense.
-      const auto& offset = *route.grpcTimeoutOffset();
+      const auto offset = *route.grpcTimeoutOffset();
       if (offset < grpc_timeout) {
         grpc_timeout -= offset;
       }
