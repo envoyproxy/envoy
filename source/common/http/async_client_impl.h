@@ -148,8 +148,12 @@ private:
     const std::vector<uint32_t>& retriableStatusCodes() const override {
       return retriable_status_codes_;
     }
+    absl::optional<std::chrono::milliseconds> baseInterval() const override {
+      return absl::nullopt;
+    }
+    absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
 
-    const std::vector<uint32_t> retriable_status_codes_;
+    const std::vector<uint32_t> retriable_status_codes_{};
   };
 
   struct NullShadowPolicy : public Router::ShadowPolicy {
@@ -321,6 +325,8 @@ private:
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
+    // TODO(#6542): add an extra parameter for setting rc details
+    stream_info_.setResponseCodeDetails("");
     Utility::sendLocalReply(
         is_grpc_request_,
         [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {

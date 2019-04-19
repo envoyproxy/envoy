@@ -113,7 +113,7 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
-  if (Http::Headers::get().MethodValues.Head == headers.Method()->value().c_str()) {
+  if (Http::Headers::get().MethodValues.Head == headers.Method()->value().getStringView()) {
     is_head_request_ = true;
   }
 

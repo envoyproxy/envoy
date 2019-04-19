@@ -393,13 +393,15 @@ public:
 
           RequestHeader& rh = *static_cast<RequestHeader*>(cb);
           if (key == Headers::get().ClientId.get()) {
-            rh.client_id_ = ClientId(header.value().c_str());
+            rh.client_id_ = ClientId(std::string(header.value().getStringView()));
           } else if (key == Headers::get().Dest.get()) {
-            rh.dest_ = header.value().c_str();
+            rh.dest_ = std::string(header.value().getStringView());
           } else if (key.find(":d:") == 0 && key.size() > 3) {
-            rh.delegations_.emplace_back(std::string(key.substr(3)), header.value().c_str());
+            rh.delegations_.emplace_back(std::string(key.substr(3)),
+                                         std::string(header.value().getStringView()));
           } else if (key[0] != ':') {
-            rh.contexts_.emplace_back(std::string(key), header.value().c_str());
+            rh.contexts_.emplace_back(std::string(key),
+                                      std::string(header.value().getStringView()));
           }
           return Http::HeaderMap::Iterate::Continue;
         },
@@ -577,8 +579,8 @@ public:
         [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
           absl::string_view key = header.key().getStringView();
           if (!key.empty() && key[0] != ':') {
-            static_cast<std::list<RequestContext>*>(cb)->emplace_back(std::string(key),
-                                                                      header.value().c_str());
+            static_cast<std::list<RequestContext>*>(cb)->emplace_back(
+                std::string(key), std::string(header.value().getStringView()));
           }
           return Http::HeaderMap::Iterate::Continue;
         },

@@ -53,6 +53,18 @@ message ExtAuthz {
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   BufferSettings with_request_body = 5;
+
+  // Clears route cache in order to allow the external authorization service to correctly affect
+  // routing decisions. Filter clears all cached routes when:
+  //
+  // 1. The field is set to *true*.
+  //
+  // 2. The status returned from the authorization service is a HTTP 200 or gRPC 0.
+  //
+  // 3. At least one *authorization response header* is added to the client request, or is used for
+  // altering another client request header.
+  //
+  bool clear_route_cache = 6;
 }
 
 // Configuration for buffering the request data.

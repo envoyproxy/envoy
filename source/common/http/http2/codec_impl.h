@@ -244,7 +244,7 @@ protected:
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     void transformUpgradeFromH1toH2(HeaderMap& headers) override {
-      upgrade_type_ = headers.Upgrade()->value().c_str();
+      upgrade_type_ = std::string(headers.Upgrade()->value().getStringView());
       Http::Utility::transformUpgradeRequestFromH1toH2(headers);
     }
     void maybeTransformUpgradeFromH2ToH1() override {

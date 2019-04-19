@@ -167,6 +167,30 @@ public:
   virtual const Network::Address::InstanceConstSharedPtr& remoteAddress() const PURE;
 
   /**
+   * Credentials of the peer of a socket as decided by SO_PEERCRED.
+   */
+  struct UnixDomainSocketPeerCredentials {
+    /**
+     * The process id of the peer.
+     */
+    int32_t pid;
+    /**
+     * The user id of the peer.
+     */
+    uint32_t uid;
+    /**
+     * The group id of the peer.
+     */
+    uint32_t gid;
+  };
+
+  /**
+   * @return The unix socket peer credentials of the the remote client. Note that this is only
+   * supported for unix socket connections.
+   */
+  virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
+
+  /**
    * @return the local address of the connection. For client connections, this is the origin
    * address. For server connections, this is the local destination address. For server connections
    * it can be different from the proxy address if the downstream connection has been redirected or

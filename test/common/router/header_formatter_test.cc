@@ -676,15 +676,15 @@ request_headers_to_add:
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
             header_map.get_("x-request-start-range"));
 
-  typedef std::map<std::string, int> CountMap;
+  typedef absl::flat_hash_map<std::string, int> CountMap;
   CountMap counts;
   header_map.iterate(
       [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
         CountMap* m = static_cast<CountMap*>(cb_v);
-        std::string key = std::string{header.key().c_str()};
+        absl::string_view key = header.key().getStringView();
         CountMap::iterator i = m->find(key);
         if (i == m->end()) {
-          m->insert({key, 1});
+          m->insert({std::string(key), 1});
         } else {
           i->second++;
         }
