@@ -38,11 +38,17 @@ A few notes on how Envoy does retries:
 * The route timeout (set via :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms` or the
   :ref:`route configuration <envoy_api_field_route.RouteAction.timeout>`) **includes** all
   retries. Thus if the request timeout is set to 3s, and the first request attempt takes 2.7s, the
-  retry (including backoff) has .3s to complete. This is by design to avoid an exponential
+  retry (including back-off) has .3s to complete. This is by design to avoid an exponential
   retry/timeout explosion.
-* Envoy uses a fully jittered exponential backoff algorithm for retries with a base time of 25ms.
-  The first retry will be delayed randomly between 0-24ms, the 2nd between 0-74ms, the 3rd between
-  0-174ms and so on.
+* Envoy uses a fully jittered exponential back-off algorithm for retries with a default base
+  interval of 25ms. Given a base interval B and retry number N, the back-off for the retry is in
+  the range :math:`\big[0, (2^N-1)B\big)`. For example, given the default interval, the first retry
+  will be delayed randomly by 0-24ms, the 2nd by 0-74ms, the 3rd by 0-174ms, and so on. The
+  interval is capped at a maximum interval, which defaults to 10 times the base interval (250ms).
+  The default base interval (and therefore the maximum interval) can be manipulated by setting the
+  upstream.base_retry_backoff_ms runtime parameter. The back-off intervals can also be modified
+  by configuring the retry policy's
+  :ref:`retry back-off <envoy_api_field_route.RetryPolicy.retry_back_off>`.
 * If max retries is set both by header as well as in the route configuration, the maximum value is
   taken when determining the max retries to use for the request.
 
@@ -156,7 +162,7 @@ x-envoy-retriable-status-codes
 Setting this header informs Envoy about what status codes should be considered retriable when used in
 conjunction with the :ref:`retriable-status-code <config_http_filters_router_x-envoy-retry-on>` retry policy.
 When the corresponding retry policy is set, the list of retriable status codes will be considered retriable
-in addition to the status codes enabled for retry through other retry policies. 
+in addition to the status codes enabled for retry through other retry policies.
 
 The list is a comma delimited list of integers: "409" would cause 409 to be considered retriable, while "504,409"
 would consider both 504 and 409 retriable.
@@ -239,7 +245,7 @@ x-envoy-ratelimited
 
 If this header is set by upstream, Envoy will not retry. Currently the value of the header is not
 looked at, only its presence. This header is set by :ref:`rate limit filter<config_http_filters_rate_limit>`
-when the request is rate limited. 
+when the request is rate limited.
 
 .. _config_http_filters_router_x-envoy-decorator-operation:
 
@@ -350,8 +356,9 @@ Runtime
 The router filter supports the following runtime settings:
 
 upstream.base_retry_backoff_ms
-  Base exponential retry back off time. See :ref:`here <arch_overview_http_routing_retry>` for more
-  information. Defaults to 25ms.
+  Base exponential retry back-off time. See :ref:`here <arch_overview_http_routing_retry>` and
+  :ref:`config_http_filters_router_x-envoy-max-retries` for more information. Defaults to 25ms.
+  The default maximum retry back-off time is 10 times this value.
 
 .. _config_http_filters_router_runtime_maintenance_mode:
 

@@ -64,12 +64,12 @@ public:
                                                         Http::AsyncClient::Callbacks& callbacks,
                                                         const Http::AsyncClient::RequestOptions&) {
           http_callbacks_ = &callbacks;
-          EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
+          EXPECT_EQ("POST", std::string(request->headers().Method()->value().getStringView()));
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
-                    std::string(request->headers().ContentType()->value().c_str()));
-          EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().c_str()));
+                    std::string(request->headers().ContentType()->value().getStringView()));
+          EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().getStringView()));
           EXPECT_EQ("/v2/discovery:endpoints",
-                    std::string(request->headers().Path()->value().c_str()));
+                    std::string(request->headers().Path()->value().getStringView()));
           std::string expected_request = "{";
           if (!version_.empty()) {
             expected_request += "\"version_info\":\"" + version + "\",";
@@ -82,7 +82,7 @@ public:
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
           EXPECT_EQ(fmt::format_int(expected_request.size()).str(),
-                    std::string(request->headers().ContentLength()->value().c_str()));
+                    std::string(request->headers().ContentLength()->value().getStringView()));
           request_in_progress_ = true;
           return &http_request_;
         }));

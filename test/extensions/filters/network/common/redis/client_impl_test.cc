@@ -64,6 +64,11 @@ public:
     upstream_connection_ = new NiceMock<Network::MockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = upstream_connection_;
+
+    // Create timers in order they are created in client_impl.cc
+    connect_or_op_timer_ = new Event::MockTimer(&dispatcher_);
+    flush_timer_ = new Event::MockTimer(&dispatcher_);
+
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
     EXPECT_CALL(*host_, createConnection_(_, _)).WillOnce(Return(conn_info));
     EXPECT_CALL(*upstream_connection_, addReadFilter(_))
@@ -89,7 +94,8 @@ public:
   const std::string cluster_name_{"foo"};
   std::shared_ptr<Upstream::MockHost> host_{new NiceMock<Upstream::MockHost>()};
   Event::MockDispatcher dispatcher_;
-  Event::MockTimer* connect_or_op_timer_{new Event::MockTimer(&dispatcher_)};
+  Event::MockTimer* flush_timer_{};
+  Event::MockTimer* connect_or_op_timer_{};
   MockEncoder* encoder_{new MockEncoder()};
   MockDecoder* decoder_{new MockDecoder()};
   Common::Redis::DecoderCallbacks* callbacks_{};
@@ -99,6 +105,138 @@ public:
   ClientPtr client_;
 };
 
+TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
+  // Basic test with a single request, default buffer size (0) and timeout (0).
+  // This means we do not batch requests, and thus the flush timer is never enabled.
+  InSequence s;
+
+  setup();
+
+  // Make the dummy request
+  Common::Redis::RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  // Process the dummy request
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response1));
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+class ConfigBufferSizeGTSingleRequest : public Config {
+  bool disableOutlierEvents() const override { return false; }
+  std::chrono::milliseconds opTimeout() const override { return std::chrono::milliseconds(25); }
+  bool enableHashtagging() const override { return false; }
+  bool enableRedirection() const override { return false; }
+  unsigned int maxBufferSizeBeforeFlush() const override { return 8; }
+  std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
+    return std::chrono::milliseconds(1);
+  }
+};
+
+TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
+  // With a flush buffer > single request length, the flush timer comes into play.
+  // In this test, we make a single request that doesn't fill the buffer, so we
+  // have to wait for the flush timer to fire.
+  InSequence s;
+
+  setup(std::make_unique<ConfigBufferSizeGTSingleRequest>());
+
+  // Make the dummy request
+  Common::Redis::RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enableTimer(_));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  // Pretend the the flush timer fires.
+  // The timer callback is the general-purpose flush function, also used when
+  // the buffer is filled. If the buffer fills before the timer fires, we need
+  // to check if the timer is active and cancel it. However, if the timer fires
+  // the callback, this internal check returns false as the timer is finished.
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  flush_timer_->invokeCallback();
+
+  // Process the dummy request
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response1));
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
+  // Expanding on the previous test, let's the flush buffer is filled by two requests.
+  // In this test, we make a single request that doesn't fill the buffer, and the timer
+  // starts. However, a second request comes in, which should cancel the timer, such
+  // that it is never invoked.
+  InSequence s;
+
+  setup(std::make_unique<ConfigBufferSizeGTSingleRequest>());
+
+  // Make the dummy request (doesn't fill buffer, starts timer)
+  Common::Redis::RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enableTimer(_));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  // Make a second dummy request (fills buffer, cancels timer)
+  Common::Redis::RespValue request2;
+  MockPoolCallbacks callbacks2;
+  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(true));
+  ;
+  EXPECT_CALL(*flush_timer_, disableTimer());
+  PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
+  EXPECT_NE(nullptr, handle2);
+
+  // Process the dummy requests
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response1));
+
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response2));
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
 TEST_F(RedisClientImplTest, Basic) {
   InSequence s;
 
@@ -107,6 +245,7 @@ TEST_F(RedisClientImplTest, Basic) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -115,6 +254,7 @@ TEST_F(RedisClientImplTest, Basic) {
   Common::Redis::RespValue request2;
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
@@ -153,6 +293,7 @@ TEST_F(RedisClientImplTest, Cancel) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -161,6 +302,7 @@ TEST_F(RedisClientImplTest, Cancel) {
   Common::Redis::RespValue request2;
   MockPoolCallbacks callbacks2;
   EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
@@ -202,6 +344,7 @@ TEST_F(RedisClientImplTest, FailAll) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -228,6 +371,7 @@ TEST_F(RedisClientImplTest, FailAllWithCancel) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -252,6 +396,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -279,6 +424,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -295,6 +441,11 @@ class ConfigOutlierDisabled : public Config {
   bool disableOutlierEvents() const override { return true; }
   std::chrono::milliseconds opTimeout() const override { return std::chrono::milliseconds(25); }
   bool enableHashtagging() const override { return false; }
+  bool enableRedirection() const override { return false; }
+  unsigned int maxBufferSizeBeforeFlush() const override { return 0; }
+  std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
+    return std::chrono::milliseconds(0);
+  }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {
@@ -305,6 +456,7 @@ TEST_F(RedisClientImplTest, OutlierDisabled) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -325,6 +477,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -346,6 +499,7 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   Common::Redis::RespValue request1;
   MockPoolCallbacks callbacks1;
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
   EXPECT_NE(nullptr, handle1);
 
@@ -359,6 +513,247 @@ TEST_F(RedisClientImplTest, OpTimeout) {
 
   EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_timeout_.value());
+}
+
+TEST_F(RedisClientImplTest, AskRedirection) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  onConnected();
+
+  Common::Redis::RespValue request2;
+  MockPoolCallbacks callbacks2;
+  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
+  EXPECT_NE(nullptr, handle2);
+
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    response1->type(Common::Redis::RespType::Error);
+    // The exact values of the hash slot and IP info are not important.
+    response1->asString() = "ASK 1111 10.1.2.3:4321";
+    // Simulate redirection failure.
+    EXPECT_CALL(callbacks1, onRedirection(Ref(*response1))).WillOnce(Return(false));
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response1));
+
+    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+    response2->type(Common::Redis::RespType::Error);
+    // The exact values of the hash slot and IP info are not important.
+    response2->asString() = "ASK 2222 10.1.2.4:4321";
+    EXPECT_CALL(callbacks2, onRedirection(Ref(*response2))).WillOnce(Return(true));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response2));
+
+    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+TEST_F(RedisClientImplTest, MovedRedirection) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  onConnected();
+
+  Common::Redis::RespValue request2;
+  MockPoolCallbacks callbacks2;
+  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
+  EXPECT_NE(nullptr, handle2);
+
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    response1->type(Common::Redis::RespType::Error);
+    // The exact values of the hash slot and IP info are not important.
+    response1->asString() = "MOVED 1111 10.1.2.3:4321";
+    // Simulate redirection failure.
+    EXPECT_CALL(callbacks1, onRedirection(Ref(*response1))).WillOnce(Return(false));
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response1));
+
+    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+    response2->type(Common::Redis::RespType::Error);
+    // The exact values of the hash slot and IP info are not important.
+    response2->asString() = "MOVED 2222 10.1.2.4:4321";
+    EXPECT_CALL(callbacks2, onRedirection(Ref(*response2))).WillOnce(Return(true));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response2));
+
+    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
+  InSequence s;
+
+  setup(std::make_unique<ConfigImpl>(createConnPoolSettings(20, true, false)));
+
+  Common::Redis::RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  onConnected();
+
+  Common::Redis::RespValue request2;
+  MockPoolCallbacks callbacks2;
+  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
+  EXPECT_NE(nullptr, handle2);
+
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    response1->type(Common::Redis::RespType::Error);
+    // The exact values of the hash slot and IP info are not important.
+    response1->asString() = "ASK 1111 10.1.2.3:4321";
+    // Simulate redirection failure.
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response1));
+
+    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
+
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+    response2->type(Common::Redis::RespType::Error);
+    // The exact values of the hash slot and IP info are not important.
+    response2->asString() = "ASK 2222 10.1.2.4:4321";
+    EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response2));
+
+    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
+TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
+  InSequence s;
+
+  setup(std::make_unique<ConfigImpl>(createConnPoolSettings(20, true, false)));
+
+  Common::Redis::RespValue request1;
+  MockPoolCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  onConnected();
+
+  Common::Redis::RespValue request2;
+  MockPoolCallbacks callbacks2;
+  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
+  EXPECT_NE(nullptr, handle2);
+
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    response1->type(Common::Redis::RespType::Error);
+    // The exact values of the hash slot and IP info are not important.
+    response1->asString() = "MOVED 1111 10.1.2.3:4321";
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response1));
+
+    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
+    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+    response2->type(Common::Redis::RespType::Error);
+    // The exact values of the hash slot and IP info are not important.
+    response2->asString() = "MOVED 2222 10.1.2.4:4321";
+    EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    callbacks_->onRespValue(std::move(response2));
+
+    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
+    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+  }));
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
 }
 
 TEST(RedisClientFactoryImplTest, Basic) {

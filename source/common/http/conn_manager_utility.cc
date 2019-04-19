@@ -10,6 +10,7 @@
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/path_utility.h"
 #include "common/http/utility.h"
 #include "common/network/utility.h"
 #include "common/runtime/uuid_util.h"
@@ -222,7 +223,8 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     return;
   }
 
-  std::string x_request_id = request_headers.RequestId()->value().c_str();
+  // TODO(dnoe): Migrate uuidModBy and others below to take string_view (#6580)
+  std::string x_request_id(request_headers.RequestId()->value().getStringView());
   uint64_t result;
   // Skip if x-request-id is corrupted.
   if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {
@@ -362,6 +364,16 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);
   }
+}
+
+/* static */
+bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
+                                                  const ConnectionManagerConfig& config) {
+  ASSERT(request_headers.Path());
+  if (config.shouldNormalizePath()) {
+    return PathUtil::canonicalPath(*request_headers.Path());
+  }
+  return true;
 }
 
 } // namespace Http

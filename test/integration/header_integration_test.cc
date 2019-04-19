@@ -145,6 +145,23 @@ route_config:
             - header:
                 key: "authorization"
                 value: "token2"
+    - name: path-sanitization
+      domains: ["path-sanitization.com"]
+      routes:
+        - match: { prefix: "/private" }
+          route:
+            cluster: cluster_0
+          request_headers_to_add:
+            - header:
+                key: "x-site"
+                value: "private"
+        - match: { prefix: "/public" }
+          route:
+            cluster: cluster_0
+          request_headers_to_add:
+            - header:
+                key: "x-site"
+                value: "public"
 )EOF";
 
 } // namespace
@@ -294,6 +311,8 @@ public:
             }
           }
 
+          hcm.mutable_normalize_path()->set_value(normalize_path_);
+
           if (append) {
             // The config specifies append by default: no modifications needed.
             return;
@@ -412,6 +431,7 @@ protected:
   }
 
   bool use_eds_{false};
+  bool normalize_path_{false};
   FakeHttpConnectionPtr eds_connection_;
   FakeStreamPtr eds_stream_;
 };
@@ -988,4 +1008,63 @@ TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
       });
 }
 
+// Validates behavior when normalize path is off.
+// Route selection and path to upstream are the exact string literal
+// from downstream.
+TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
+  normalize_path_ = false;
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                              {":path", "/private/../public"},
+                              {":method", "GET"},
+                              {"x-site", "private"}},
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+// Validates behavior when normalize path is on.
+// Path to decide route and path to upstream are both
+// the normalized.
+TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
+  normalize_path_ = true;
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                              {":path", "/public"},
+                              {":method", "GET"},
+                              {"x-site", "public"}},
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
 } // namespace Envoy
