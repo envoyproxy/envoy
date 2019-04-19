@@ -12,20 +12,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "kafka_request_codec_lib",
-    srcs = ["request_codec.cc"],
-    hdrs = [
-        "codec.h",
-        "request_codec.h",
-    ],
-    deps = [
-        ":kafka_request_lib",
-        ":message_lib",
-        "//source/common/buffer:buffer_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "kafka_request_lib",
     srcs = [
         "kafka_request_parser.cc",
