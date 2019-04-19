@@ -444,7 +444,6 @@ void Filter::sendNoHealthyUpstreamResponse() {
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
-  ASSERT(upstream_requests_.size() == 1);
   bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
   if (buffering && buffer_limit_ > 0 &&
       getLength(callbacks_->decodingBuffer()) + data.length() > buffer_limit_) {
@@ -1030,7 +1029,6 @@ bool Filter::setupRetry() {
     return false;
   }
 
-  ASSERT(upstream_requests_.size() == 1);
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
 
   return true;
@@ -1396,7 +1394,12 @@ void Filter::UpstreamRequest::clearRequestEncoder() {
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.request_encoder_);
-  ASSERT(parent_.parent_.upstream_requests_.size() == 1);
+
+  // We only write response data downstream for the "winning" upstream request,
+  // so we shouldn't get the watermark callback invoked on the non-winning
+  // upstream request.
+  ASSERT(&parent_ == parent_.parent_.final_upstream_request_);
+
   // The downstream connection is overrun. Pause reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(true);
@@ -1404,7 +1407,7 @@ void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHigh
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
   ASSERT(parent_.request_encoder_);
-  ASSERT(parent_.parent_.upstream_requests_.size() == 1);
+
   // The downstream connection has buffer available. Resume reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(false);
