@@ -525,7 +525,7 @@ void Filter::onRequestComplete() {
     }
 
     for (auto& upstream_request : upstream_requests_) {
-      if (upstream_request->pending_per_try_timeout_) {
+      if (upstream_request->create_per_try_timeout_on_request_complete_) {
         upstream_request->setupPerTryTimeout();
       }
     }
@@ -992,7 +992,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
       calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
-      encode_trailers_(false), pending_per_try_timeout_(false) {
+      encode_trailers_(false), create_per_try_timeout_on_request_complete_(false) {
 
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
@@ -1195,7 +1195,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   if (parent_.downstream_end_stream_) {
     setupPerTryTimeout();
   } else {
-    pending_per_try_timeout_ = true;
+    create_per_try_timeout_on_request_complete_ = true;
   }
 
   conn_pool_stream_handle_ = nullptr;
