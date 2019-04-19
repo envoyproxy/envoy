@@ -71,15 +71,6 @@ public:
   const CsrfPolicy* policy() { return &policy_; }
 
 private:
-  static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    const std::string final_prefix = prefix + "csrf.";
-    return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
-  }
-  static const CsrfPolicy generatePolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-                                         Runtime::Loader& runtime) {
-    return CsrfPolicy(policy, runtime);
-  }
-
   CsrfStats stats_;
   const CsrfPolicy policy_;
 };

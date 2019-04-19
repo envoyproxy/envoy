@@ -48,6 +48,16 @@ absl::string_view sourceOriginValue(const Http::HeaderMap& headers) {
 absl::string_view targetOriginValue(const Http::HeaderMap& headers) {
   return hostAndPort(headers.Host());
 }
+
+static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+  const std::string final_prefix = prefix + "csrf.";
+  return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+}
+
+static const CsrfPolicy generatePolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
+                                       Runtime::Loader& runtime) {
+  return CsrfPolicy(policy, runtime);
+}
 } // namespace
 
 CsrfFilterConfig::CsrfFilterConfig(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
