@@ -779,53 +779,59 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
 }
 
 // Tests how much memory is consumed allocating 100k stats.
-TEST_F(StatsThreadLocalStoreTest, MemoryWithoutTls) {
+TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;
   }
+  Stats::FakeSymbolTableImpl symbol_table;
+  HeapStatDataAllocator alloc(symbol_table);
+  auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
 
   // Use a tag producer that will produce tags.
   envoy::config::metrics::v2::StatsConfig stats_config;
-  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  store->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
-  const size_t million = 1000 * 1000;
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
   if (start_mem == 0) {
     // Skip this test for platforms where we can't measure memory.
     return;
   }
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+      1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
+  const size_t million = 1000 * 1000;
   EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
-  store_->shutdownThreading();
-  tls_.shutdownThread();
 }
 
-TEST_F(StatsThreadLocalStoreTest, MemoryWithTls) {
+TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;
   }
+  Stats::FakeSymbolTableImpl symbol_table;
+  HeapStatDataAllocator alloc(symbol_table);
+  auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
 
   // Use a tag producer that will produce tags.
   envoy::config::metrics::v2::StatsConfig stats_config;
-  store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
+  store->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
 
-  const size_t million = 1000 * 1000;
-  store_->initializeThreading(main_thread_dispatcher_, tls_);
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  store->initializeThreading(main_thread_dispatcher, tls);
   const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
   if (start_mem == 0) {
     // Skip this test for platforms where we can't measure memory.
     return;
   }
   TestUtil::forEachSampleStat(
-      1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
+      1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
+  const size_t million = 1000 * 1000;
   EXPECT_LT(end_mem - start_mem, 31 * million); // actual value: 30482576 as of Oct 29, 2018
-  store_->shutdownThreading();
-  tls_.shutdownThread();
+  store->shutdownThreading();
+  tls.shutdownThread();
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
