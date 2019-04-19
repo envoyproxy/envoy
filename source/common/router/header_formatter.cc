@@ -136,7 +136,7 @@ parsePerRequestStateField(absl::string_view param_str) {
     throw EnvoyException(formatPerRequestStateParseException(param_str));
   }
   modified_param_str = modified_param_str.substr(1, modified_param_str.size() - 2); // trim parens
-  if (modified_param_str.size() == 0) {
+  if (modified_param_str.empty()) {
     throw EnvoyException(formatPerRequestStateParseException(param_str));
   }
 

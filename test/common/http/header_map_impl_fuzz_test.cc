@@ -91,8 +91,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       auto* header_entry = header_map->get(Http::LowerCaseString(get_and_mutate.key()));
       if (header_entry != nullptr) {
         // Do some read-only stuff.
-        (void)strlen(header_entry->key().c_str());
-        (void)strlen(header_entry->value().c_str());
+        (void)strlen(std::string(header_entry->key().getStringView()).c_str());
+        (void)strlen(std::string(header_entry->value().getStringView()).c_str());
         (void)strlen(header_entry->value().buffer());
         header_entry->key().empty();
         header_entry->value().empty();
@@ -106,7 +106,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
           header_entry->value().clear();
           break;
         case test::common::http::GetAndMutate::kFind:
-          header_entry->value().find(get_and_mutate.find().c_str());
+          header_entry->value().getStringView().find(get_and_mutate.find());
           break;
         case test::common::http::GetAndMutate::kSetCopy:
           header_entry->value().setCopy(get_and_mutate.set_copy().c_str(),

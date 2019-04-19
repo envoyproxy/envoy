@@ -236,8 +236,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4fbea5de9afdf30611b27afd54c45a596944f9c2.tar.gz
-        sha256 = "2cf9f5ea62a03ca0d8773fe4f56949b72c28ac5b1bcf43d850a571f4e32add2a",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/4fbea5de9afdf30611b27afd54c45a596944f9c2.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/840edb6d672931ff936004fc35a82ecac6060844.tar.gz
+        sha256 = "1aba26cec596e9f3b52d93fe40e1640c854e3a4c8949e362647f67eb8e2382e3",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/840edb6d672931ff936004fc35a82ecac6060844.tar.gz"],
     ),
 )

@@ -24,20 +24,20 @@ public:
    * Start subscription and set related expectations.
    * @param cluster_names initial cluster names to request via EDS.
    */
-  virtual void startSubscription(const std::vector<std::string>& cluster_names) PURE;
+  virtual void startSubscription(const std::set<std::string>& cluster_names) PURE;
 
   /**
    * Update cluster names to be delivered via EDS.
    * @param cluster_names cluster names.
    */
-  virtual void updateResources(const std::vector<std::string>& cluster_names) PURE;
+  virtual void updateResources(const std::set<std::string>& cluster_names) PURE;
 
   /**
    * Expect that an update request is sent by the Subscription implementation.
    * @param cluster_names cluster names to expect in the request.
    * @param version version_info to expect in the request.
    */
-  virtual void expectSendMessage(const std::vector<std::string>& cluster_names,
+  virtual void expectSendMessage(const std::set<std::string>& cluster_names,
                                  const std::string& version) PURE;
 
   /**

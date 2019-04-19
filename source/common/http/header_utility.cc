@@ -87,16 +87,19 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   }
 
   bool match;
+  const absl::string_view header_view = header->value().getStringView();
   switch (header_data.header_match_type_) {
   case HeaderMatchType::Value:
-    match = header_data.value_.empty() || header->value() == header_data.value_.c_str();
+    match = header_data.value_.empty() || header_view == header_data.value_;
     break;
   case HeaderMatchType::Regex:
-    match = std::regex_match(header->value().c_str(), header_data.regex_pattern_);
+    match = std::regex_match(header_view.begin(), header_view.end(), header_data.regex_pattern_);
     break;
   case HeaderMatchType::Range: {
     int64_t header_value = 0;
-    match = StringUtil::atoll(header->value().c_str(), header_value, 10) &&
+    // TODO(dnoe): Migrate to pure string_view to eliminate std:string instance (#6580)
+    const std::string header_string(header_view);
+    match = StringUtil::atoll(header_string.c_str(), header_value, 10) &&
             header_value >= header_data.range_.start() && header_value < header_data.range_.end();
     break;
   }
@@ -104,10 +107,10 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
     match = true;
     break;
   case HeaderMatchType::Prefix:
-    match = absl::StartsWith(header->value().getStringView(), header_data.value_);
+    match = absl::StartsWith(header_view, header_data.value_);
     break;
   case HeaderMatchType::Suffix:
-    match = absl::EndsWith(header->value().getStringView(), header_data.value_);
+    match = absl::EndsWith(header_view, header_data.value_);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -120,9 +123,9 @@ void HeaderUtility::addHeaders(Http::HeaderMap& headers, const Http::HeaderMap& 
   headers_to_add.iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         Http::HeaderString k;
-        k.setCopy(header.key().c_str(), header.key().size());
+        k.setCopy(header.key().getStringView());
         Http::HeaderString v;
-        v.setCopy(header.value().c_str(), header.value().size());
+        v.setCopy(header.value().getStringView());
         static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
         return Http::HeaderMap::Iterate::Continue;
       },
