@@ -283,7 +283,7 @@ cc_library(
         "quiche/epoll_server/fake_simple_epoll_server.h",
         "quiche/epoll_server/simple_epoll_server.h",
     ],
-    copts = envoy_copts("@envoy") + ["-Wno-error=unused-parameter"],
+    copts = envoy_copts("@envoy") + ["-Wno-unused-parameter"],
     visibility = ["//visibility:public"],
     deps = [":epoll_server_platform"],
 )
@@ -291,7 +291,7 @@ cc_library(
 envoy_cc_test(
     name = "epoll_server_test",
     srcs = ["quiche/epoll_server/simple_epoll_server_test.cc"],
-    copts = ["-Wno-error=unused-parameter"],
+    copts = ["-Wno-unused-parameter"],
     repository = "@envoy",
     deps = [":epoll_server_lib"],
 )
