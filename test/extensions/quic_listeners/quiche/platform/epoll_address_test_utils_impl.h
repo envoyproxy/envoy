@@ -8,6 +8,8 @@
 
 #include <sys/socket.h>
 
+#include <algorithm>
+
 #include "envoy/network/address.h"
 
 #include "test/test_common/environment.h"
@@ -19,11 +21,10 @@ namespace {
 int addressFamilyUnderTestHelper() {
   std::vector<Envoy::Network::Address::IpVersion> versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
-  if (versions.size() == 2 ||
-      (versions.size() == 1 && versions[0] == Envoy::Network::Address::IpVersion::v4)) {
+  if (std::find(versions.begin(), versions.end(), Envoy::Network::Address:IpVersion::v4) {
     return AF_INET;
-  } else if (versions.size() == 1) {
-    ASSERT(versions[0] == Envoy::Network::Address::IpVersion::v6);
+  }
+  if (std::find(versions.begin(), versions.end(), Envoy::Network::Address:IpVersion::v6) {
     return AF_INET6;
   }
   return -1;
@@ -32,8 +33,8 @@ int addressFamilyUnderTestHelper() {
 } // namespace
 
 int AddressFamilyUnderTestImpl() {
-  static const int* version = new int(addressFamilyUnderTestHelper());
-  return *version;
+  static const int version = addressFamilyUnderTestHelper();
+  return version;
 }
 
 } // namespace epoll_server

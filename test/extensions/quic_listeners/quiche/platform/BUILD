@@ -83,14 +83,3 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
     ],
 )
-
-envoy_cc_test(
-    name = "epoll_server_test",
-    srcs = [
-        "simple_epoll_server_test.cc",
-    ],
-    copts = ["-Wno-error=unused-parameter"],
-    deps = [
-        "@com_googlesource_quiche//:epoll_server_lib",
-    ],
-)
