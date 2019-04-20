@@ -88,7 +88,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
       uint64_t offset = 0;
       while (offset < slices[i].len_) {
         int rc = SSL_read(ssl_.get(), static_cast<uint8_t*>(slices[i].mem_) + offset,
-          slices[i].len_ - offset);
+                          slices[i].len_ - offset);
         ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_->connection(), rc);
         if (rc > 0) {
           offset += rc;
