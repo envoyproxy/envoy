@@ -130,7 +130,7 @@ void CheckRequestUtils::setHttpRequest(
 
     // Add in a header to detect when a partial body is used.
     (*mutable_headers)[Http::Headers::get().EnvoyAuthPartialBody.get()] =
-        length != buffer->length() ? "1" : "0";
+        length != buffer->length() ? "true" : "false";
   }
 }
 
