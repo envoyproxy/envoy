@@ -125,6 +125,15 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   if (grpc_request && route.maxGrpcTimeout()) {
     const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
     std::chrono::milliseconds grpc_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+    if (route.grpcTimeoutOffset()) {
+      // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
+      // setting it to 0 means infinity and a negative timeout makes no sense.
+      const auto offset = *route.grpcTimeoutOffset();
+      if (offset < grpc_timeout) {
+        grpc_timeout -= offset;
+      }
+    }
+
     // Cap gRPC timeout to the configured maximum considering that 0 means infinity.
     if (max_grpc_timeout != std::chrono::milliseconds(0) &&
         (grpc_timeout == std::chrono::milliseconds(0) || grpc_timeout > max_grpc_timeout)) {
