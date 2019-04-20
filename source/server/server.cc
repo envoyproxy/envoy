@@ -311,9 +311,6 @@ void InstanceImpl::initialize(const Options& options,
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
 
-  // It's now safe to start writing stats from the main thread's dispatcher.
-  dispatcher_->initializeStats(stats_store_, "server.");
-
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
   runtime_singleton_ = std::make_unique<Runtime::ScopedLoaderSingleton>(

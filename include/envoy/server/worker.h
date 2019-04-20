@@ -38,12 +38,10 @@ public:
   virtual uint64_t numConnections() PURE;
 
   /**
-   * Start the worker thread. The worker will output thread-specific stats under the given scope.
+   * Start the worker thread.
    * @param guard_dog supplies the guard dog to use for thread watching.
-   * @param scope the scope to add the new worker stats to.
-   * @param prefix the prefix for the new stats, identifying this worker.
    */
-  virtual void start(GuardDog& guard_dog, Stats::Scope& scope, const std::string& prefix) PURE;
+  virtual void start(GuardDog& guard_dog) PURE;
 
   /**
    * Stop the worker thread.

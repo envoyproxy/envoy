@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <functional>
 #include <list>
-#include <memory>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -11,7 +10,6 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection_handler.h"
-#include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
 #include "common/common/thread.h"
@@ -38,7 +36,6 @@ public:
 
   // Event::Dispatcher
   TimeSource& timeSource() override { return api_.timeSource(); }
-  void initializeStats(Stats::Scope& scope, const std::string& prefix) override;
   void clearDeferredDeleteList() override;
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
@@ -75,8 +72,6 @@ private:
   bool isThreadSafe() const { return run_tid_ == nullptr || run_tid_->isCurrentThreadId(); }
 
   Api::Api& api_;
-  std::string stats_prefix_;
-  std::unique_ptr<DispatcherStats> stats_;
   Thread::ThreadIdPtr run_tid_;
   Buffer::WatermarkFactoryPtr buffer_factory_;
   LibeventScheduler base_scheduler_;

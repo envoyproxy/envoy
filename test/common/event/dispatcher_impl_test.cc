@@ -8,17 +8,12 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::InSequence;
-using testing::NiceMock;
-using testing::Return;
-using testing::StartsWith;
 
 namespace Envoy {
 namespace Event {
@@ -85,7 +80,6 @@ protected:
     dispatcher_thread_->join();
   }
 
-  NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
   Api::ApiPtr api_;
   Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
@@ -95,12 +89,6 @@ protected:
   bool work_finished_;
   TimerPtr keepalive_timer_;
 };
-
-TEST_F(DispatcherImplTest, InitializeStats) {
-  EXPECT_CALL(scope_, histogram("test.dispatcher.loop_duration_us"));
-  EXPECT_CALL(scope_, histogram("test.dispatcher.poll_delay_us"));
-  dispatcher_->initializeStats(scope_, "test.");
-}
 
 TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
