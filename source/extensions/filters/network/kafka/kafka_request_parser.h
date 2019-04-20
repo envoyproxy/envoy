@@ -55,8 +55,7 @@ public:
  */
 class RequestStartParser : public Parser {
 public:
-  RequestStartParser(const RequestParserResolver& parser_resolver)
-      : parser_resolver_{parser_resolver}, context_{std::make_shared<RequestContext>()} {};
+  RequestStartParser(): context_{std::make_shared<RequestContext>()} {};
 
   /**
    * Consumes 4 bytes (INT32) as request length and updates the context with that value.
@@ -67,7 +66,6 @@ public:
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
 private:
-  const RequestParserResolver& parser_resolver_;
   const RequestContextSharedPtr context_;
   Int32Deserializer request_length_;
 };
@@ -93,15 +91,12 @@ typedef std::unique_ptr<RequestHeaderDeserializer> RequestHeaderDeserializerPtr;
 class RequestHeaderParser : public Parser {
 public:
   // Default constructor.
-  RequestHeaderParser(const RequestParserResolver& parser_resolver, RequestContextSharedPtr context)
-      : RequestHeaderParser{parser_resolver, context,
-                            std::make_unique<RequestHeaderDeserializer>()} {};
+  RequestHeaderParser(RequestContextSharedPtr context)
+      : RequestHeaderParser{context, std::make_unique<RequestHeaderDeserializer>()} {};
 
   // Constructor visible for testing (allows for initial parser injection).
-  RequestHeaderParser(const RequestParserResolver& parser_resolver, RequestContextSharedPtr context,
-                      RequestHeaderDeserializerPtr deserializer)
-      : parser_resolver_{parser_resolver}, context_{context}, deserializer_{
-                                                                  std::move(deserializer)} {};
+  RequestHeaderParser(RequestContextSharedPtr context, RequestHeaderDeserializerPtr deserializer)
+      : context_{context}, deserializer_{std::move(deserializer)} {};
 
   /**
    * Uses data provided to compute request header.
@@ -112,7 +107,6 @@ public:
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
 private:
-  const RequestParserResolver& parser_resolver_;
   const RequestContextSharedPtr context_;
   RequestHeaderDeserializerPtr deserializer_;
 };
