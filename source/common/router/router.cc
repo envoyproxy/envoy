@@ -507,6 +507,8 @@ void Filter::maybeDoShadowing() {
 }
 
 void Filter::onRequestComplete() {
+  // This should be called exactly once, when the downstream request has been received in full.
+  ASSERT(!downstream_end_stream_);
   downstream_end_stream_ = true;
   Event::Dispatcher& dispatcher = callbacks_->dispatcher();
   downstream_request_complete_time_ = dispatcher.timeSource().monotonicTime();
@@ -520,6 +522,12 @@ void Filter::onRequestComplete() {
     if (timeout_.global_timeout_.count() > 0) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
+    }
+
+    for (auto& upstream_request : upstream_requests_) {
+      if (upstream_request->create_per_try_timeout_on_request_complete_) {
+        upstream_request->setupPerTryTimeout();
+      }
     }
   }
 }
@@ -984,7 +992,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
       calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
-      encode_trailers_(false) {
+      encode_trailers_(false), create_per_try_timeout_on_request_complete_(false) {
 
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
@@ -1184,7 +1192,11 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
 
-  setupPerTryTimeout();
+  if (parent_.downstream_end_stream_) {
+    setupPerTryTimeout();
+  } else {
+    create_per_try_timeout_on_request_complete_ = true;
+  }
 
   conn_pool_stream_handle_ = nullptr;
   setRequestEncoder(request_encoder);
