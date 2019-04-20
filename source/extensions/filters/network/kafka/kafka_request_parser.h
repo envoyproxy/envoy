@@ -59,7 +59,6 @@ public:
 
   /**
    * Consumes 4 bytes (INT32) as request length and updates the context with that value.
-   * @return RequestHeaderParser instance to process request header
    */
   ParseResponse parse(absl::string_view& data) override;
 
@@ -81,35 +80,6 @@ class RequestHeaderDeserializer
                                                  NullableStringDeserializer> {};
 
 typedef std::unique_ptr<RequestHeaderDeserializer> RequestHeaderDeserializerPtr;
-
-/**
- * Parser responsible for extracting the request header and putting it into context.
- * On a successful parse the resolved data (api_key & api_version) is used to determine the next
- * parser.
- * @see http://kafka.apache.org/protocol.html#protocol_messages
- */
-class RequestHeaderParser : public Parser {
-public:
-  // Default constructor.
-  RequestHeaderParser(RequestContextSharedPtr context)
-      : RequestHeaderParser{context, std::make_unique<RequestHeaderDeserializer>()} {};
-
-  // Constructor visible for testing (allows for initial parser injection).
-  RequestHeaderParser(RequestContextSharedPtr context, RequestHeaderDeserializerPtr deserializer)
-      : context_{context}, deserializer_{std::move(deserializer)} {};
-
-  /**
-   * Uses data provided to compute request header.
-   * @return Parser instance responsible for processing rest of the message
-   */
-  ParseResponse parse(absl::string_view& data) override;
-
-  const RequestContextSharedPtr contextForTest() const { return context_; }
-
-private:
-  const RequestContextSharedPtr context_;
-  RequestHeaderDeserializerPtr deserializer_;
-};
 
 /**
  * Sentinel parser that is responsible for consuming message bytes for messages that had unsupported
