@@ -373,7 +373,8 @@ TEST_P(OwnedImplTest, ReserveCommitReuse) {
   // second slice from the previous reservation.
   num_reserved = buffer.reserve(16384, iovecs, NumIovecs);
   EXPECT_EQ(2, num_reserved);
-  EXPECT_EQ(static_cast<const uint8_t*>(first_slice) + 1, static_cast<const uint8_t*>(iovecs[0].mem_));
+  EXPECT_EQ(static_cast<const uint8_t*>(first_slice) + 1,
+            static_cast<const uint8_t*>(iovecs[0].mem_));
   EXPECT_EQ(second_slice, iovecs[1].mem_);
 }
 
