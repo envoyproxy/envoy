@@ -84,31 +84,38 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
     Buffer::RawSlice slices[2];
     uint64_t slices_to_commit = 0;
     uint64_t num_slices = read_buffer.reserve(16384, slices, 2);
-    for (uint64_t i = 0; i < num_slices; i++) {
-      int rc = SSL_read(ssl_.get(), slices[i].mem_, slices[i].len_);
-      ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_->connection(), rc);
-      if (rc > 0) {
-        slices[i].len_ = rc;
-        slices_to_commit++;
-        bytes_read += rc;
-      } else {
-        keep_reading = false;
-        int err = SSL_get_error(ssl_.get(), rc);
-        switch (err) {
-        case SSL_ERROR_WANT_READ:
-          break;
-        case SSL_ERROR_ZERO_RETURN:
-          end_stream = true;
-          break;
-        case SSL_ERROR_WANT_WRITE:
-        // Renegotiation has started. We don't handle renegotiation so just fall through.
-        default:
-          drainErrorQueue();
-          action = PostIoAction::Close;
+    for (uint64_t i = 0; i < num_slices && keep_reading; i++) {
+      uint64_t offset = 0;
+      while (offset < slices[i].len_) {
+        int rc = SSL_read(ssl_.get(), static_cast<uint8_t*>(slices[i].mem_) + offset,
+          slices[i].len_ - offset);
+        ENVOY_CONN_LOG(trace, "ssl read returns: {}", callbacks_->connection(), rc);
+        if (rc > 0) {
+          offset += rc;
+          bytes_read += rc;
+        } else {
+          keep_reading = false;
+          int err = SSL_get_error(ssl_.get(), rc);
+          switch (err) {
+          case SSL_ERROR_WANT_READ:
+            break;
+          case SSL_ERROR_ZERO_RETURN:
+            end_stream = true;
+            break;
+          case SSL_ERROR_WANT_WRITE:
+          // Renegotiation has started. We don't handle renegotiation so just fall through.
+          default:
+            drainErrorQueue();
+            action = PostIoAction::Close;
+            break;
+          }
+
           break;
         }
-
-        break;
+      }
+      if (offset > 0) {
+        slices[i].len_ = offset;
+        slices_to_commit++;
       }
     }
 
