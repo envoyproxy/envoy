@@ -1878,6 +1878,36 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, GrpcTimeoutOffset) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      cluster: local_service_grpc
+  - match:
+      prefix: "/"
+    route:
+      grpc_timeout_offset: 0.01s
+      cluster: local_service_grpc
+      )EOF";
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+  {
+    EXPECT_EQ(
+        absl::make_optional(std::chrono::milliseconds(10)),
+        config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->grpcTimeoutOffset());
+  }
+  EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                               ->routeEntry()
+                               ->grpcTimeoutOffset());
+}
+
 TEST_F(RouteMatcherTest, FractionalRuntime) {
   const std::string yaml = R"EOF(
 virtual_hosts:

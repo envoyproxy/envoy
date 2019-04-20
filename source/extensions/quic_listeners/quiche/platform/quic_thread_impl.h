@@ -30,10 +30,11 @@ public:
   }
 
   void Start() {
+    ASSERT(thread_factory_ != nullptr);
     if (thread_ != nullptr || thread_is_set_.HasBeenNotified()) {
       PANIC("QuicThread can only be started once.");
     }
-    thread_ = Envoy::Thread::ThreadFactorySingleton::get().createThread([this]() {
+    thread_ = thread_factory_->createThread([this]() {
       thread_is_set_.WaitForNotification();
       this->Run();
     });
@@ -46,6 +47,14 @@ public:
     }
     thread_->join();
     thread_ = nullptr;
+  }
+
+  // Sets the thread factory to use.
+  // NOTE: The factory can not be passed via a constructor argument because this class is itself a
+  // dependency of an external library that derives from it and expects a single argument
+  // constructor.
+  void setThreadFactory(Envoy::Thread::ThreadFactory& thread_factory) {
+    thread_factory_ = &thread_factory;
   }
 
 protected:
@@ -61,6 +70,7 @@ protected:
 
 private:
   Envoy::Thread::ThreadPtr thread_;
+  Envoy::Thread::ThreadFactory* thread_factory_;
   absl::Notification thread_is_set_; // Whether |thread_| is set in parent.
 };
 
