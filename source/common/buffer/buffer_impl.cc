@@ -147,6 +147,15 @@ void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
       }
     }
 
+    // If the slices just committed are not at the very end of the buffer,
+    // the caller probably used reserve() to get multiple iovecs but didn't
+    // read enough data to fill them all. In this case, we clear out the
+    // reservations for all the remaining slices at the end of the buffer
+    // so the next reserve() call can reuse them.
+    while (slice_index < static_cast<ssize_t>(slices_.size())) {
+      slices_[slice_index++]->clearReservation();
+    }
+
     ASSERT(num_slices_committed > 0);
   }
 }
