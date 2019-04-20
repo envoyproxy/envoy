@@ -44,8 +44,13 @@ public:
   virtual std::vector<Tag> tags() const PURE;
 
   /**
-   * Returns the name of the Metric with the portions designated as tags
-   * removed as a string.
+   * Returns the name of the Metric with the portions designated as tags removed
+   * as a string. For example, The stat name "vhost.foo.vcluster.bar.c1" would
+   * have "foo" extracted as the value of tag "vhost" and "bar" extracted as the
+   * value of tag "vcluster". Thus the tagExtractedName is simply
+   * "vhost.vcluster.c1".
+   *
+   * @return The stat name with all tag values extracted.
    */
   virtual std::string tagExtractedName() const PURE;
 

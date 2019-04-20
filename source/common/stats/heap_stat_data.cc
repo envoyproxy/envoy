@@ -24,7 +24,8 @@ void HeapStatData::free(SymbolTable& symbol_table) {
 }
 
 HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
-  std::unique_ptr<HeapStatData, std::function<void(HeapStatData * d)>> data_ptr(
+  using HeapStatDataFreeFn = std::function<void(HeapStatData * d)>;
+  std::unique_ptr<HeapStatData, HeapStatDataFreeFn> data_ptr(
       HeapStatData::alloc(name, symbolTable()),
       [this](HeapStatData* d) { d->free(symbolTable()); });
   Thread::ReleasableLockGuard lock(mutex_);

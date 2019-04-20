@@ -74,6 +74,16 @@ protected:
     return stat_name_storage_.back().statName();
   }
 
+  void exerciseStatNameStorageSetInsertAndFind(StatNameStorageSet& set) {
+    for (int i = 0; i < 10; ++i) {
+      std::string foo = absl::StrCat("foo", i);
+      auto insertion = set.insert(StatNameStorage(foo, *table_));
+      StatNameTempStorage temp_foo(foo, *table_);
+      auto found = set.find(temp_foo.statName());
+      EXPECT_EQ(found->statName().data(), insertion.first->statName().data());
+    }
+  }
+
   FakeSymbolTableImpl* fake_symbol_table_{nullptr};
   SymbolTableImpl* real_symbol_table_{nullptr};
   std::unique_ptr<SymbolTable> table_;
@@ -507,18 +517,21 @@ TEST_P(StatNameTest, MutexContentionOnExistingSymbols) {
   }
 }
 
-TEST_P(StatNameTest, SharedStatNameStorageSet) {
+TEST_P(StatNameTest, SharedStatNameStorageSetInsertAndFind) {
   StatNameStorageSet set;
-  {
-    for (int i = 0; i < 10; ++i) {
-      std::string foo = absl::StrCat("foo", i);
-      auto insertion = set.insert(StatNameStorage(foo, *table_));
-      StatNameTempStorage temp_foo(foo, *table_);
-      auto found = set.find(temp_foo.statName());
-      EXPECT_EQ(found->statName().data(), insertion.first->statName().data());
-    }
-  }
+  exerciseStatNameStorageSetInsertAndFind(set);
   set.free(*table_);
+}
+
+TEST_P(StatNameTest, SharedStatNameStorageSetAssertIfNotFreed) {
+#ifndef NDEBUG
+  EXPECT_DEATH(
+      {
+        StatNameStorageSet set;
+        exerciseStatNameStorageSetInsertAndFind(set);
+      },
+      "");
+#endif
 }
 
 // Tests the memory savings realized from using symbol tables with 1k
