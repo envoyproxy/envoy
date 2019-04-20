@@ -524,12 +524,14 @@ TEST_P(StatNameTest, SharedStatNameStorageSetInsertAndFind) {
 }
 
 TEST_P(StatNameTest, SharedStatNameStorageSetAssertIfNotFreed) {
+#ifndef NDEBUG
   EXPECT_DEATH(
       {
         StatNameStorageSet set;
         exerciseStatNameStorageSetInsertAndFind(set);
       },
       "");
+#endif
 }
 
 // Tests the memory savings realized from using symbol tables with 1k
