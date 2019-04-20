@@ -30,7 +30,6 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/thread:thread_factory_singleton_lib",
         "//test/common/runtime:utility_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/test_common:environment_lib",
