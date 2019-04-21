@@ -513,15 +513,44 @@ class StatNameStorageSet {
 public:
   using HashSet =
       absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
+  using iterator = HashSet::iterator;
 
   ~StatNameStorageSet();
+
+  /**
+   * Releases all symbols held in this set. Must be called prior to destruction.
+   *
+   * @param symbol_table The symbol table that owns the symbols.
+   */
   void free(SymbolTable& symbol_table);
 
+  /**
+   * @param storage The StatNameStorage to add to the set.
+   */
   std::pair<HashSet::iterator, bool> insert(StatNameStorage&& storage) {
     return hash_set_.insert(std::move(storage));
   }
 
-  HashSet::iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
+  /**
+   * @param stat_name The stat_name to find.
+   * @return the iterator pointing to the stat_name, or end() if not found.
+   */
+  iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
+
+  /**
+   * @return the end-marker.
+   */
+  iterator end() { return hash_set_.end(); }
+
+  /**
+   * @param set the storage set to swap with.
+   */
+  void swap(StatNameStorageSet& set) { hash_set_.swap(set.hash_set_); }
+
+  /**
+   * @return the number of elements in the set.
+   */
+  size_t size() const { return hash_set_.size(); }
 
 private:
   HashSet hash_set_;
