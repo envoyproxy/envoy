@@ -547,6 +547,11 @@ public:
    */
   void swap(StatNameStorageSet& set) { hash_set_.swap(set.hash_set_); }
 
+  /**
+   * @return the number of elements in the set.
+   */
+  size_t size() const { return hash_set_.size(); }
+
 private:
   HashSet hash_set_;
 };
