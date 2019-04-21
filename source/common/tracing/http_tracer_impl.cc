@@ -23,13 +23,13 @@ static std::string buildResponseCode(const StreamInfo::StreamInfo& info) {
 }
 
 static std::string valueOrDefault(const Http::HeaderEntry* header, const char* default_value) {
-  return header ? header->value().c_str() : default_value;
+  return header ? std::string(header->value().getStringView()) : default_value;
 }
 
 static std::string buildUrl(const Http::HeaderMap& request_headers) {
-  std::string path = request_headers.EnvoyOriginalPath()
-                         ? request_headers.EnvoyOriginalPath()->value().c_str()
-                         : request_headers.Path()->value().c_str();
+  std::string path(request_headers.EnvoyOriginalPath()
+                       ? request_headers.EnvoyOriginalPath()->value().getStringView()
+                       : request_headers.Path()->value().getStringView());
   static const size_t max_path_length = 256;
   if (path.length() > max_path_length) {
     path = path.substr(0, max_path_length);
@@ -64,9 +64,8 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
     return {Reason::NotTraceableRequestId, false};
   }
 
-  // TODO PERF: Avoid copy.
   UuidTraceStatus trace_status =
-      UuidUtils::isTraceableUuid(request_headers.RequestId()->value().c_str());
+      UuidUtils::isTraceableUuid(request_headers.RequestId()->value().getStringView());
 
   switch (trace_status) {
   case UuidTraceStatus::Client:
@@ -128,10 +127,11 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
   if (request_headers) {
     if (request_headers->RequestId()) {
       span.setTag(Tracing::Tags::get().GuidXRequestId,
-                  std::string(request_headers->RequestId()->value().c_str()));
+                  std::string(request_headers->RequestId()->value().getStringView()));
     }
     span.setTag(Tracing::Tags::get().HttpUrl, buildUrl(*request_headers));
-    span.setTag(Tracing::Tags::get().HttpMethod, request_headers->Method()->value().c_str());
+    span.setTag(Tracing::Tags::get().HttpMethod,
+                std::string(request_headers->Method()->value().getStringView()));
     span.setTag(Tracing::Tags::get().DownstreamCluster,
                 valueOrDefault(request_headers->EnvoyDownstreamServiceCluster(), "-"));
     span.setTag(Tracing::Tags::get().UserAgent, valueOrDefault(request_headers->UserAgent(), "-"));
@@ -140,14 +140,14 @@ void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_
 
     if (request_headers->ClientTraceId()) {
       span.setTag(Tracing::Tags::get().GuidXClientTraceId,
-                  std::string(request_headers->ClientTraceId()->value().c_str()));
+                  std::string(request_headers->ClientTraceId()->value().getStringView()));
     }
 
     // Build tags based on the custom headers.
     for (const Http::LowerCaseString& header : tracing_config.requestHeadersForTags()) {
       const Http::HeaderEntry* entry = request_headers->get(header);
       if (entry) {
-        span.setTag(header.get(), entry->value().c_str());
+        span.setTag(header.get(), std::string(entry->value().getStringView()));
       }
     }
   }
@@ -184,7 +184,7 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::HeaderMap& request
 
   if (config.operationName() == OperationName::Egress) {
     span_name.append(" ");
-    span_name.append(request_headers.Host()->value().c_str());
+    span_name.append(std::string(request_headers.Host()->value().getStringView()));
   }
 
   SpanPtr active_span = driver_->startSpan(config, request_headers, span_name,

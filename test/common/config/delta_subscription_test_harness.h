@@ -13,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::InSequence;
 using testing::Mock;
 using testing::NiceMock;
 using testing::Return;
@@ -38,7 +37,7 @@ public:
         rate_limit_settings_, stats_, init_fetch_timeout);
   }
 
-  void startSubscription(const std::vector<std::string>& cluster_names) override {
+  void startSubscription(const std::set<std::string>& cluster_names) override {
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage({}, "");
@@ -46,23 +45,23 @@ public:
     subscription_->start(cluster_names, callbacks_);
   }
 
-  void expectSendMessage(const std::vector<std::string>& cluster_names,
+  void expectSendMessage(const std::set<std::string>& cluster_names,
                          const std::string& version) override {
     UNREFERENCED_PARAMETER(version);
     expectSendMessage(cluster_names, {}, Grpc::Status::GrpcStatus::Ok, "");
   }
 
-  void expectSendMessage(const std::vector<std::string>& subscribe,
-                         const std::vector<std::string>& unsubscribe,
-                         const Protobuf::int32 error_code, const std::string& error_message) {
+  void expectSendMessage(const std::set<std::string>& subscribe,
+                         const std::set<std::string>& unsubscribe, const Protobuf::int32 error_code,
+                         const std::string& error_message) {
     envoy::api::v2::DeltaDiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
-    for (const auto& resource : subscribe) {
-      expected_request.add_resource_names_subscribe(resource);
-    }
-    for (auto resource = unsubscribe.rbegin(); resource != unsubscribe.rend(); ++resource) {
-      expected_request.add_resource_names_unsubscribe(*resource);
-    }
+    std::copy(
+        subscribe.begin(), subscribe.end(),
+        Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_subscribe()));
+    std::copy(
+        unsubscribe.begin(), unsubscribe.end(),
+        Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_unsubscribe()));
     expected_request.set_response_nonce(last_response_nonce_);
     expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
@@ -71,7 +70,6 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    std::cerr << "EXPECTING DiscoveryRequest: " << expected_request.DebugString() << std::endl;
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
@@ -108,11 +106,17 @@ public:
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
-  void updateResources(const std::vector<std::string>& cluster_names) override {
-    std::vector<std::string> cluster_superset = cluster_names;
-    cluster_superset.insert(cluster_superset.end(), last_cluster_names_.begin(),
-                            last_cluster_names_.end());
-    expectSendMessage(cluster_names, last_cluster_names_, Grpc::Status::GrpcStatus::Ok, "");
+  void updateResources(const std::set<std::string>& cluster_names) override {
+    std::set<std::string> sub;
+    std::set<std::string> unsub;
+
+    std::set_difference(cluster_names.begin(), cluster_names.end(), last_cluster_names_.begin(),
+                        last_cluster_names_.end(), std::inserter(sub, sub.begin()));
+    std::set_difference(last_cluster_names_.begin(), last_cluster_names_.end(),
+                        cluster_names.begin(), cluster_names.end(),
+                        std::inserter(unsub, unsub.begin()));
+
+    expectSendMessage(sub, unsub, Grpc::Status::GrpcStatus::Ok, "");
     subscription_->updateResources(cluster_names);
     last_cluster_names_ = cluster_names;
   }
@@ -140,7 +144,7 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<DeltaSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
-  std::vector<std::string> last_cluster_names_;
+  std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
   envoy::api::v2::core::Node node_;

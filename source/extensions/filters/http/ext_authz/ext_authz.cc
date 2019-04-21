@@ -81,8 +81,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   initiateCall(headers);
-  return filter_return_ == FilterReturn::StopDecoding ? Http::FilterHeadersStatus::StopIteration
-                                                      : Http::FilterHeadersStatus::Continue;
+  return filter_return_ == FilterReturn::StopDecoding
+             ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
+             : Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
@@ -90,24 +91,28 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
     if (end_stream || isBufferFull()) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
       initiateCall(*request_headers_);
+      return filter_return_ == FilterReturn::StopDecoding
+                 ? Http::FilterDataStatus::StopIterationAndWatermark
+                 : Http::FilterDataStatus::Continue;
     } else {
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
   }
 
-  return filter_return_ == FilterReturn::StopDecoding
-             ? Http::FilterDataStatus::StopIterationAndWatermark
-             : Http::FilterDataStatus::Continue;
+  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
-  if (buffer_data_ && filter_return_ != FilterReturn::StopDecoding) {
-    ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
-    initiateCall(*request_headers_);
+  if (buffer_data_) {
+    if (filter_return_ != FilterReturn::StopDecoding) {
+      ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
+      initiateCall(*request_headers_);
+    }
+    return filter_return_ == FilterReturn::StopDecoding ? Http::FilterTrailersStatus::StopIteration
+                                                        : Http::FilterTrailersStatus::Continue;
   }
 
-  return filter_return_ == FilterReturn::StopDecoding ? Http::FilterTrailersStatus::StopIteration
-                                                      : Http::FilterTrailersStatus::Continue;
+  return Http::FilterTrailersStatus::Continue;
 }
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
@@ -182,6 +187,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // Only send headers if the response is ok.
     if (response->status == CheckStatus::OK) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter added header(s) to the request:", *callbacks_);
+      if (config_->clearRouteCache() &&
+          (!response->headers_to_add.empty() || !response->headers_to_append.empty())) {
+        ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *callbacks_);
+        callbacks_->clearRouteCache();
+      }
+
       for (const auto& header : response->headers_to_add) {
         Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
         if (header_to_modify) {

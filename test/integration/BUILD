@@ -172,6 +172,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_timeout_integration_test",
+    srcs = [
+        "http_timeout_integration_test.cc",
+        "http_timeout_integration_test.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "protocol_integration_test",
     srcs = [
         "protocol_integration_test.cc",
@@ -346,6 +357,7 @@ envoy_cc_test_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -380,7 +392,6 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",

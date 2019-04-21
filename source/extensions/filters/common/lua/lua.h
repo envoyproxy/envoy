@@ -44,7 +44,8 @@ namespace Lua {
  */
 #define DECLARE_LUA_FUNCTION_EX(Class, Name, Index)                                                \
   static int static_##Name(lua_State* state) {                                                     \
-    Class* object = static_cast<Class*>(luaL_checkudata(state, Index, typeid(Class).name()));      \
+    Class* object = ::Envoy::Extensions::Filters::Common::Lua::alignAndCast<Class>(                \
+        luaL_checkudata(state, Index, typeid(Class).name()));                                      \
     object->checkDead(state);                                                                      \
     return object->Name(state);                                                                    \
   }                                                                                                \
@@ -59,6 +60,32 @@ namespace Lua {
  * Declare a Lua function in which userdata is in upvalue slot 1. See DECLARE_LUA_FUNCTION_EX()
  */
 #define DECLARE_LUA_CLOSURE(Class, Name) DECLARE_LUA_FUNCTION_EX(Class, Name, lua_upvalueindex(1))
+
+/**
+ * Calculate the maximum space needed to be aligned.
+ */
+template <typename T> constexpr size_t maximumSpaceNeededToAlign() {
+  // The allocated memory can be misaligned up to `alignof(T) - 1` bytes. Adding it to the size to
+  // allocate.
+  return sizeof(T) + alignof(T) - 1;
+}
+
+template <typename T> inline T* alignAndCast(void* mem) {
+  size_t size = maximumSpaceNeededToAlign<T>();
+  return static_cast<T*>(std::align(alignof(T), sizeof(T), mem, size));
+}
+
+/**
+ * Create a new user data and assign its metatable.
+ */
+template <typename T> inline T* allocateLuaUserData(lua_State* state) {
+  void* mem = lua_newuserdata(state, maximumSpaceNeededToAlign<T>());
+  luaL_getmetatable(state, typeid(T).name());
+  ASSERT(lua_istable(state, -1));
+  lua_setmetatable(state, -2);
+
+  return alignAndCast<T>(mem);
+}
 
 /**
  * This is the base class for all C++ objects that we expose out to Lua. The goal is to hide as
@@ -90,14 +117,9 @@ public:
    */
   template <typename... ConstructorArgs>
   static std::pair<T*, lua_State*> create(lua_State* state, ConstructorArgs&&... args) {
-    // Create a new user data and assign its metatable.
-    void* mem = lua_newuserdata(state, sizeof(T));
-    luaL_getmetatable(state, typeid(T).name());
-    ASSERT(lua_istable(state, -1));
-    lua_setmetatable(state, -2);
-
     // Memory is allocated via Lua and it is raw. We use placement new to run the constructor.
-    ENVOY_LOG(trace, "creating {} at {}", typeid(T).name(), mem);
+    T* mem = allocateLuaUserData<T>(state);
+    ENVOY_LOG(trace, "creating {} at {}", typeid(T).name(), static_cast<void*>(mem));
     return {new (mem) T(std::forward<ConstructorArgs>(args)...), state};
   }
 
@@ -119,7 +141,7 @@ public:
     // manually because the memory is raw and was allocated by Lua.
     to_register.push_back(
         {"__gc", [](lua_State* state) {
-           T* object = static_cast<T*>(luaL_checkudata(state, 1, typeid(T).name()));
+           T* object = alignAndCast<T>(luaL_checkudata(state, 1, typeid(T).name()));
            ENVOY_LOG(trace, "destroying {} at {}", typeid(T).name(), static_cast<void*>(object));
            object->~T();
            return 0;
