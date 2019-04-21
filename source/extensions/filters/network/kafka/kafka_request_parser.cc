@@ -5,10 +5,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-const RequestParserResolver& RequestParserResolver::getDefaultInstance() {
-  CONSTRUCT_ON_FIRST_USE(RequestParserResolver);
-}
-
 ParseResponse RequestStartParser::parse(absl::string_view& data) {
   request_length_.feed(data);
   if (request_length_.ready()) {

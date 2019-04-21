@@ -39,7 +39,7 @@ def main():
   command = sys.argv[1]
   if 'generate-source' == command:
     requests_h_file = os.path.abspath(sys.argv[2])
-    kafka_request_resolver_cc_file = os.path.abspath(sys.argv[3])
+    kafka_request_resolver_cc_file = 'ignore'
     input_files = sys.argv[4:]
   elif 'generate-test' == command:
     requests_test_cc_file = os.path.abspath(sys.argv[2])
@@ -83,12 +83,6 @@ def main():
     contents = template.render(contents=requests_h_contents)
 
     with open(requests_h_file, 'w') as fd:
-      fd.write(contents)
-
-    template = RenderingHelper.get_template('kafka_request_resolver_cc.j2')
-    contents = template.render(request_types=requests)
-
-    with open(kafka_request_resolver_cc_file, 'w') as fd:
       fd.write(contents)
 
   # Generate test code.

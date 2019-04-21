@@ -25,31 +25,6 @@ struct RequestContext {
 typedef std::shared_ptr<RequestContext> RequestContextSharedPtr;
 
 /**
- * Request decoder configuration object.
- * Resolves the parser that will be responsible for consuming the request-specific data.
- * In other words: provides (api_key, api_version) -> Parser function.
- */
-class RequestParserResolver {
-public:
-  virtual ~RequestParserResolver() = default;
-
-  /**
-   * Creates a parser that is going to process data specific for given api_key & api_version.
-   * @param api_key request type
-   * @param api_version request version
-   * @param context context to be used by parser
-   * @return parser that is capable of processing data for given request type & version
-   */
-  virtual ParserSharedPtr createParser(int16_t api_key, int16_t api_version,
-                                       RequestContextSharedPtr context) const;
-
-  /**
-   * Return default resolver, that uses request's api key and version to provide a matching parser.
-   */
-  static const RequestParserResolver& getDefaultInstance();
-};
-
-/**
  * Request parser responsible for consuming request length and setting up context with this data.
  * @see http://kafka.apache.org/protocol.html#protocol_common
  */

@@ -15,7 +15,6 @@ envoy_cc_library(
     name = "kafka_request_lib",
     srcs = [
         "kafka_request_parser.cc",
-        "kafka_request_resolver.cc",
     ],
     hdrs = [
         "kafka_request.h",
@@ -37,11 +36,10 @@ genrule(
     ],
     outs = [
         "requests.h",
-        "kafka_request_resolver.cc",
     ],
     cmd = """
       ./$(location :kafka_code_generator) generate-source \
-        $(location requests.h) $(location kafka_request_resolver.cc) \
+        $(location requests.h) ignore \
         $(SRCS)
     """,
     tools = [
