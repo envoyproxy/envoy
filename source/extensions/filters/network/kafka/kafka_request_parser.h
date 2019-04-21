@@ -57,26 +57,6 @@ class RequestHeaderDeserializer
 typedef std::unique_ptr<RequestHeaderDeserializer> RequestHeaderDeserializerPtr;
 
 /**
- * Sentinel parser that is responsible for consuming message bytes for messages that had unsupported
- * api_key & api_version. It does not attempt to capture any data, just throws it away until end of
- * message.
- */
-class SentinelParser : public Parser {
-public:
-  SentinelParser(RequestContextSharedPtr context) : context_{context} {};
-
-  /**
-   * Returns UnknownRequest. Ignores (jumps over) the data provided.
-   */
-  ParseResponse parse(absl::string_view& data) override;
-
-  const RequestContextSharedPtr contextForTest() const { return context_; }
-
-private:
-  const RequestContextSharedPtr context_;
-};
-
-/**
  * Request parser uses a single deserializer to construct a request object.
  * This parser is responsible for consuming request-specific data (e.g. topic names) and always
  * returns a parsed message.
@@ -108,7 +88,7 @@ public:
       } else {
         // The message makes no sense, the deserializer that matches the schema consumed all
         // necessary data, but there are still bytes in this message.
-        return ParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
+        return ParseResponse::stillWaiting();
       }
     } else {
       return ParseResponse::stillWaiting();
