@@ -204,11 +204,11 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   //
   // History of golden values:
   //
-  // Date        PR       Bytes Per Cluster   Author              Notes
-  // ----------  -----    -----------------   ----------------    -----
-  // 2019/03/20  6329     59015               cmluciano           Initial version
-  // 2019/04/12  6477     59576               htuch               Implementing Endpoint lease...
-  // 2019/04/20  6161     49415               jmarantz            Pack tags and tag extracted names
+  // Date        PR       Bytes Per Cluster   Notes
+  // ----------  -----    -----------------   -----
+  // 2019/03/20  6329     59015               Initial version
+  // 2019/04/12  6477     59576               Implementing Endpoint lease...
+  // 2019/04/20  6161     49415               Pack tags and tag extracted names
 
   EXPECT_EQ(m_per_cluster, 49415);
 }
