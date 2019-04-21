@@ -197,7 +197,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   EXPECT_LT(start_mem, m1001);
 
   // Note: if you are increasing this golden value because you are adding a
-  // stat, please confirim that this will be generally useful to most Envoy
+  // stat, please confirm that this will be generally useful to most Envoy
   // users. Otherwise you are adding to the per-cluster memory overhead, which
   // will be significant for Envoy installations that are massively
   // multi-tenant.
