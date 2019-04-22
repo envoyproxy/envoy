@@ -27,6 +27,9 @@ admin:
     socket_address:
       address: 127.0.0.1
       port_value: 0
+dynamic_resources:
+  lds_config:
+    path: /dev/null
 static_resources:
   clusters:
     name: cluster_0
@@ -240,11 +243,17 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   }
 }
 
-void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
-  RELEASE_ASSERT(!finalized_, "");
+void ConfigHelper::applyConfigModifiers() {
   for (auto config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
   }
+  config_modifiers_.clear();
+}
+
+void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
+  RELEASE_ASSERT(!finalized_, "");
+
+  applyConfigModifiers();
 
   uint32_t port_idx = 0;
   bool eds_hosts = false;
@@ -596,6 +605,17 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);
   });
+}
+
+envoy::api::v2::DiscoveryResponse
+ConfigHelper::createLdsResponse(absl::string_view version_info) const {
+  envoy::api::v2::DiscoveryResponse lds;
+  lds.set_version_info(std::string(version_info));
+  for (auto& listener : bootstrap_.static_resources().listeners()) {
+    ProtobufWkt::Any* resource = lds.add_resources();
+    resource->PackFrom(listener);
+  }
+  return lds;
 }
 
 EdsHelper::EdsHelper() : eds_path_(TestEnvironment::writeStringToFileForTest("eds.pb_text", "")) {

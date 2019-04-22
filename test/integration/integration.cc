@@ -300,16 +300,40 @@ void BaseIntegrationTest::createEnvoy() {
       ports.push_back(upstream->localAddress()->ip()->port());
     }
   }
+
+  if (use_lds_) {
+    ENVOY_LOG_MISC(debug, "Setting up file-based LDS");
+    envoy::api::v2::DiscoveryResponse lds;
+    lds.set_version_info("0");
+    for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
+      ProtobufWkt::Any* resource = lds.add_resources();
+      resource->PackFrom(listener);
+    }
+    std::string lds_filename = TestUtility::uniqueFilename();
+    const std::string lds_path = TestEnvironment::writeStringToFileForTest(
+        lds_filename, MessageUtil::getJsonStringFromMessage(lds));
+    config_helper_.addConfigModifier(
+        [lds_path](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+          bootstrap.mutable_dynamic_resources()->mutable_lds_config()->set_path(lds_path);
+        });
+  }
+
   // Note that finalize assumes that every fake_upstream_ must correspond to a bootstrap config
   // static entry. So, if you want to manually create a fake upstream without specifying it in the
   // config, you will need to do so *after* initialize() (which calls this function) is done.
   config_helper_.finalize(ports);
 
+  envoy::config::bootstrap::v2::Bootstrap bootstrap = config_helper_.bootstrap();
+  if (use_lds_) {
+    // The listeners have been written to the lds_file. Remove them from static
+    // resources or they will not be reloadable.
+    bootstrap.mutable_static_resources()->mutable_listeners()->Clear();
+  }
   ENVOY_LOG_MISC(debug, "Running Envoy with configuration:\n{}",
-                 MessageUtil::getYamlStringFromMessage(config_helper_.bootstrap()));
+                 MessageUtil::getYamlStringFromMessage(bootstrap));
 
   const std::string bootstrap_path = TestEnvironment::writeStringToFileForTest(
-      "bootstrap.json", MessageUtil::getJsonStringFromMessage(config_helper_.bootstrap()));
+      "bootstrap.json", MessageUtil::getJsonStringFromMessage(bootstrap));
 
   std::vector<std::string> named_ports;
   const auto& static_resources = config_helper_.bootstrap().static_resources();
