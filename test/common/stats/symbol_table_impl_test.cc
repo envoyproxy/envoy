@@ -534,17 +534,6 @@ TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
   set2.free(*table_);
 }
 
-TEST_P(StatNameTest, SharedStatNameStorageSetIfDestroyedWithoutFree) {
-#ifndef NDEBUG
-  EXPECT_DEATH(
-      {
-        StatNameStorageSet set;
-        set.insert(StatNameStorage("foo", *table_));
-      },
-      "");
-#endif
-}
-
 // Tests the memory savings realized from using symbol tables with 1k
 // clusters. This test shows the memory drops from almost 8M to less than
 // 2M. Note that only SymbolTableImpl is tested for memory consumption,
