@@ -75,8 +75,8 @@ public:
 
 private:
   Store& parent_;
-  histogram_t* interval_histogram_{};
-  histogram_t* cumulative_histogram_{};
+  histogram_t* const interval_histogram_{};
+  histogram_t* const cumulative_histogram_{};
   HistogramStatisticsImpl interval_statistics_;
   HistogramStatisticsImpl cumulative_statistics_;
   bool used_{};
