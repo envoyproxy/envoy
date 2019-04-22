@@ -502,7 +502,7 @@ struct HeterogeneousStatNameEqual {
   size_t operator()(const StatNameStorage& a, StatName b) const { return a.statName() == b; }
 };
 
-// Encapsulates a set<StatNameStorage>. We use a subclass here rather than a
+// Encapsulates a set<StatNameStorage>. We use containment here rather than a
 // 'using' alias because we need to ensure that when the set is destructed,
 // StatNameStorage::free(symbol_table) is called on each entry. It is a little
 // easier at the call-sites in thread_local_store.cc to implement this an
