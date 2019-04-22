@@ -49,6 +49,8 @@ genrule(
     visibility = ["//visibility:private"],
 )
 
+quiche_copt = ["-Wno-unused-parameter",]
+
 cc_library(
     name = "http2_platform",
     hdrs = [
@@ -283,7 +285,7 @@ cc_library(
         "quiche/epoll_server/fake_simple_epoll_server.h",
         "quiche/epoll_server/simple_epoll_server.h",
     ],
-    copts = envoy_copts("@envoy") + ["-Wno-unused-parameter"],
+    copts = envoy_copts("@envoy") + quiche_copt,
     visibility = ["//visibility:public"],
     deps = [":epoll_server_platform"],
 )
@@ -291,7 +293,7 @@ cc_library(
 envoy_cc_test(
     name = "epoll_server_test",
     srcs = ["quiche/epoll_server/simple_epoll_server_test.cc"],
-    copts = ["-Wno-unused-parameter"],
+    copts = quiche_copt,
     repository = "@envoy",
     deps = [":epoll_server_lib"],
 )
