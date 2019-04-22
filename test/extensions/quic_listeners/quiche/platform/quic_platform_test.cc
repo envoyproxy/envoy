@@ -9,8 +9,10 @@
 #include <fstream>
 #include <unordered_set>
 
+#include "common/memory/stats.h"
 #include "common/network/utility.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
@@ -42,13 +44,11 @@
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
+#include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
-
-using testing::_;
-using testing::HasSubstr;
 
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -56,6 +56,8 @@ using testing::HasSubstr;
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
+using testing::_;
+using testing::HasSubstr;
 using testing::Return;
 
 namespace quic {
@@ -570,6 +572,22 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
       .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
   EXPECT_DEATH_LOG_TO_STDERR(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
+}
+
+TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
+  bool deterministic_stats = Envoy::Stats::TestUtil::hasDeterministicMallocStats();
+  const size_t start_mem = Envoy::Memory::Stats::totalCurrentlyAllocated();
+  QuicStreamBufferAllocator allocator;
+  char* p = allocator.New(1024);
+  if (deterministic_stats) {
+    EXPECT_LT(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
+  }
+  EXPECT_NE(nullptr, p);
+  memset(p, 'a', 1024);
+  allocator.Delete(p);
+  if (deterministic_stats) {
+    EXPECT_EQ(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
+  }
 }
 
 } // namespace

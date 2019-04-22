@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -1428,6 +1429,107 @@ TEST_F(EdsTest, MalformedIP) {
   EXPECT_THROW_WITH_MESSAGE(cluster_->onConfigUpdate(resources, ""), EnvoyException,
                             "malformed IP address: foo.bar.com. Consider setting resolver_name or "
                             "setting cluster type to 'STRICT_DNS' or 'LOGICAL_DNS'");
+}
+
+class EdsAssignmentTimeoutTest : public EdsTest {
+public:
+  EdsAssignmentTimeoutTest() : EdsTest(), interval_timer_(nullptr) {
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .WillOnce(Invoke([this](Event::TimerCb cb) {
+          timer_cb_ = cb;
+          EXPECT_EQ(nullptr, interval_timer_);
+          interval_timer_ = new Event::MockTimer();
+          return interval_timer_;
+        }))
+        .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
+
+    resetCluster();
+  }
+
+  Event::MockTimer* interval_timer_;
+  Event::TimerCb timer_cb_;
+};
+
+// Test that assignment timeout is enabled and disabled correctly.
+TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto* socket_address = endpoints->add_lb_endpoints()
+                             ->mutable_endpoint()
+                             ->mutable_address()
+                             ->mutable_socket_address();
+  socket_address->set_address("1.2.3.4");
+  socket_address->set_port_value(80);
+
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment_lease = cluster_load_assignment;
+  cluster_load_assignment_lease.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(1));
+
+  EXPECT_CALL(*interval_timer_, enableTimer(_)).Times(2); // Timer enabled twice.
+  EXPECT_CALL(*interval_timer_, disableTimer()).Times(1); // Timer disabled once.
+  EXPECT_CALL(*interval_timer_, enabled()).Times(6);      // Includes calls by test.
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_lease);
+  // Check that the timer is enabled.
+  EXPECT_EQ(interval_timer_->enabled(), true);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  // Check that the timer is disabled.
+  EXPECT_EQ(interval_timer_->enabled(), false);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment_lease);
+  // Check that the timer is enabled.
+  EXPECT_EQ(interval_timer_->enabled(), true);
+}
+
+// Test that assignment timeout is called and removes all the endpoints.
+TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  cluster_load_assignment.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
+      Protobuf::util::TimeUtil::SecondsToDuration(1));
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto add_endpoint = [&cluster_load_assignment](int port) {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  // Add two endpoints to the cluster assignment.
+  add_endpoint(80);
+  add_endpoint(81);
+
+  // Expect the timer to be enabled once.
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000)));
+  // Expect the timer to be disabled when stale assignments are removed.
+  EXPECT_CALL(*interval_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enabled()).Times(2);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+  }
+  // Call the timer callback to indicate timeout.
+  timer_cb_();
+  // Test that stale endpoints are removed.
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 0);
+  }
 }
 
 } // namespace

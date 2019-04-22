@@ -102,6 +102,7 @@ envoy_cc_library(
         "quic_ptr_util_impl.h",
         "quic_server_stats_impl.h",
         "quic_string_piece_impl.h",
+        "quic_stream_buffer_allocator_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
         "quic_expect_bug_impl.h",
@@ -121,7 +122,10 @@ envoy_cc_library(
         "googletest",
     ],
     visibility = ["//visibility:public"],
-    deps = ["@com_googlesource_quiche//:quic_platform_export"] + envoy_select_quiche([
+    deps = [
+        "@com_googlesource_quiche//:quic_platform_export",
+        "@com_googlesource_quiche//:quic_buffer_allocator_lib",
+    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
@@ -185,7 +189,6 @@ envoy_cc_library(
         "spdy_string_piece_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
-        "spdy_unsafe_arena_impl.h",
     ] + envoy_select_quiche([
         "spdy_bug_tracker_impl.h",
         "spdy_logging_impl.h",
@@ -203,5 +206,16 @@ envoy_cc_library(
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
+    ]),
+)
+
+envoy_cc_library(
+    name = "spdy_platform_unsafe_arena_impl_lib",
+    hdrs = [
+        "spdy_unsafe_arena_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = envoy_select_quiche([
+        "@com_googlesource_quiche//:spdy_simple_arena_lib",
     ]),
 )

@@ -2,7 +2,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
-#include "common/http/codes.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
 
@@ -12,6 +11,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
+
+using Filters::Common::ExtAuthz::CheckStatus;
 
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   disabled_ = other.disabled_;
@@ -81,8 +82,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   initiateCall(headers);
-  return filter_return_ == FilterReturn::StopDecoding ? Http::FilterHeadersStatus::StopIteration
-                                                      : Http::FilterHeadersStatus::Continue;
+  return filter_return_ == FilterReturn::StopDecoding
+             ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
+             : Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
@@ -90,24 +92,28 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance&, bool end_stream) {
     if (end_stream || isBufferFull()) {
       ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
       initiateCall(*request_headers_);
+      return filter_return_ == FilterReturn::StopDecoding
+                 ? Http::FilterDataStatus::StopIterationAndWatermark
+                 : Http::FilterDataStatus::Continue;
     } else {
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
   }
 
-  return filter_return_ == FilterReturn::StopDecoding
-             ? Http::FilterDataStatus::StopIterationAndWatermark
-             : Http::FilterDataStatus::Continue;
+  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap&) {
-  if (buffer_data_ && filter_return_ != FilterReturn::StopDecoding) {
-    ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
-    initiateCall(*request_headers_);
+  if (buffer_data_) {
+    if (filter_return_ != FilterReturn::StopDecoding) {
+      ENVOY_STREAM_LOG(debug, "ext_authz filter finished buffering the request", *callbacks_);
+      initiateCall(*request_headers_);
+    }
+    return filter_return_ == FilterReturn::StopDecoding ? Http::FilterTrailersStatus::StopIteration
+                                                        : Http::FilterTrailersStatus::Continue;
   }
 
-  return filter_return_ == FilterReturn::StopDecoding ? Http::FilterTrailersStatus::StopIteration
-                                                      : Http::FilterTrailersStatus::Continue;
+  return Http::FilterTrailersStatus::Continue;
 }
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
@@ -124,16 +130,41 @@ void Filter::onDestroy() {
 void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   ASSERT(cluster_);
   state_ = State::Complete;
-  using Filters::Common::ExtAuthz::CheckStatus;
 
   switch (response->status) {
-  case CheckStatus::OK:
+  case CheckStatus::OK: {
+    ENVOY_STREAM_LOG(trace, "ext_authz filter added header(s) to the request:", *callbacks_);
+    if (config_->clearRouteCache() &&
+        (!response->headers_to_add.empty() || !response->headers_to_append.empty())) {
+      ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *callbacks_);
+      callbacks_->clearRouteCache();
+    }
+
+    for (const auto& header : response->headers_to_add) {
+      ENVOY_STREAM_LOG(trace, " '{}':'{}'", *callbacks_, header.first.get(), header.second);
+      Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
+      if (header_to_modify) {
+        header_to_modify->value(header.second.c_str(), header.second.size());
+      } else {
+        request_headers_->addCopy(header.first, header.second);
+      }
+    }
+
+    for (const auto& header : response->headers_to_append) {
+      Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
+      if (header_to_modify) {
+        ENVOY_STREAM_LOG(trace, " '{}':'{}'", *callbacks_, header.first.get(), header.second);
+        Http::HeaderMapImpl::appendToHeader(header_to_modify->value(), header.second);
+      }
+    }
+
     cluster_->statsScope().counter("ext_authz.ok").inc();
+    continueDecoding();
     break;
-  case CheckStatus::Error:
-    cluster_->statsScope().counter("ext_authz.error").inc();
-    break;
-  case CheckStatus::Denied:
+  }
+
+  case CheckStatus::Denied: {
+    ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request", *callbacks_);
     cluster_->statsScope().counter("ext_authz.denied").inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
@@ -146,65 +177,41 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                            EMPTY_STRING,
                                            false};
     config_->httpContext().codeStats().chargeResponseStat(info);
-    break;
-  }
-
-  ENVOY_STREAM_LOG(trace, "ext_authz filter received status code {}", *callbacks_,
-                   enumToInt(response->status_code));
-
-  const bool is_error = response->status == CheckStatus::Error;
-
-  // We fail open/fail close based of filter config
-  // if there is an error contacting the service.
-  if (response->status == CheckStatus::Denied || (is_error && !config_->failureModeAllow())) {
-    ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request", *callbacks_);
     callbacks_->sendLocalReply(
-        is_error ? config_->statusOnError() : response->status_code, response->body,
+        response->status_code, response->body,
         [& headers = response->headers_to_add,
          &callbacks = *callbacks_](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
           for (const auto& header : headers) {
+            ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
             response_headers.remove(header.first);
             response_headers.addCopy(header.first, header.second);
-            ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, header.first.get(), header.second);
           }
         },
         absl::nullopt);
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService);
-  } else {
-    ENVOY_STREAM_LOG(debug, "ext_authz filter accepted the request", *callbacks_);
-    // Let the filter chain continue.
-    filter_return_ = FilterReturn::ContinueDecoding;
-    if (config_->failureModeAllow() && response->status == CheckStatus::Error) {
-      // Status is Error and yet we are allowing the request. Click a counter.
-      cluster_->statsScope().counter("ext_authz.failure_mode_allowed").inc();
-    }
-    // Only send headers if the response is ok.
-    if (response->status == CheckStatus::OK) {
-      ENVOY_STREAM_LOG(trace, "ext_authz filter added header(s) to the request:", *callbacks_);
-      for (const auto& header : response->headers_to_add) {
-        Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
-        if (header_to_modify) {
-          header_to_modify->value(header.second.c_str(), header.second.size());
-        } else {
-          request_headers_->addCopy(header.first, header.second);
-        }
-        ENVOY_STREAM_LOG(trace, " '{}':'{}'", *callbacks_, header.first.get(), header.second);
-      }
-      for (const auto& header : response->headers_to_append) {
-        Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
-        if (header_to_modify) {
-          Http::HeaderMapImpl::appendToHeader(header_to_modify->value(), header.second);
-          ENVOY_STREAM_LOG(trace, " '{}':'{}'", *callbacks_, header.first.get(), header.second);
-        }
-      }
-    }
+    break;
+  }
 
-    if (!initiating_call_) {
-      // We got completion async. Let the filter chain continue.
-      callbacks_->continueDecoding();
+  case CheckStatus::Error: {
+    cluster_->statsScope().counter("ext_authz.error").inc();
+    if (config_->failureModeAllow()) {
+      ENVOY_STREAM_LOG(trace, "ext_authz filter allowed the request with error", *callbacks_);
+      cluster_->statsScope().counter("ext_authz.failure_mode_allowed").inc();
+      continueDecoding();
+    } else {
+      ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request with an error", *callbacks_);
+      callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::ResponseFlag::UnauthorizedExternalService);
+      callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt);
     }
+    break;
+  }
+
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+    break;
   }
 }
 
@@ -214,6 +221,13 @@ bool Filter::isBufferFull() {
     return buffer->length() >= config_->maxRequestBytes();
   }
   return false;
+}
+
+void Filter::continueDecoding() {
+  filter_return_ = FilterReturn::ContinueDecoding;
+  if (!initiating_call_) {
+    callbacks_->continueDecoding();
+  }
 }
 
 } // namespace ExtAuthz

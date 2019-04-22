@@ -42,8 +42,8 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
   headers.iterate(
       [](const Http::HeaderEntry& header, void* ctxt) -> Http::HeaderMap::Iterate {
         auto* fuzz_header = static_cast<test::fuzz::Headers*>(ctxt)->add_headers();
-        fuzz_header->set_key(header.key().c_str());
-        fuzz_header->set_value(header.value().c_str());
+        fuzz_header->set_key(std::string(header.key().getStringView()));
+        fuzz_header->set_value(std::string(header.value().getStringView()));
         return Http::HeaderMap::Iterate::Continue;
       },
       &fuzz_headers);

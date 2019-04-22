@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
@@ -110,6 +112,16 @@ public:
    * processed.
    */
   virtual bool enableRedirection() const PURE;
+
+  /**
+   * @return buffer size for batching commands for a single upstream host.
+   */
+  virtual uint32_t maxBufferSizeBeforeFlush() const PURE;
+
+  /**
+   * @return timeout for batching commands for a single upstream host.
+   */
+  virtual std::chrono::milliseconds bufferFlushTimeoutInMs() const PURE;
 };
 
 /**

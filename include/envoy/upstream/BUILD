@@ -145,6 +145,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/upstream:types_interface",
     ],
 )
 

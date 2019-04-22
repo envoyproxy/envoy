@@ -39,7 +39,9 @@ CSV
 CTX
 CTXs
 CVC
+CVE
 CX
+CloseAterFlush
 DCHECK
 DER
 DESC
@@ -158,8 +160,10 @@ NUL
 Nilsson
 OCSP
 OK
+OOB
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -179,6 +183,7 @@ POSTs
 PREBIND
 PRNG
 PROT
+QPS
 QUIC
 RAII
 RANLUX
@@ -283,6 +288,7 @@ accessors
 acls
 addr
 agg
+alignof
 alloc
 alloca
 allocator
@@ -421,6 +427,7 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
+evwatch
 exe
 execlp
 facto
@@ -428,6 +435,7 @@ favicon
 fd
 fds
 fileno
+fixup
 fld
 fmt
 fmtlib
@@ -726,6 +734,7 @@ unejection
 unescape
 unescaped
 unescaping
+unindexed
 uninsantiated
 uninstantiated
 unix

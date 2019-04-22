@@ -67,10 +67,11 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
   });
 }
 
-void WorkerImpl::start(GuardDog& guard_dog) {
+void WorkerImpl::start(GuardDog& guard_dog, Stats::Scope& scope, const std::string& prefix) {
   ASSERT(!thread_);
   thread_ =
       api_.threadFactory().createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
+  dispatcher_->initializeStats(scope, prefix);
 }
 
 void WorkerImpl::stop() {

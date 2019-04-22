@@ -31,6 +31,8 @@ envoy_cc_test(
     ],
     external_deps = ["quiche_quic_platform"],
     deps = [
+        "//source/common/memory:stats_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
         "//test/mocks/api:api_mocks",
         "//test/test_common:logging_lib",
