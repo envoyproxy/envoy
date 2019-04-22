@@ -1423,10 +1423,12 @@ void Filter::UpstreamRequest::clearRequestEncoder() {
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.request_encoder_);
 
-  // We only write response data downstream for the "winning" upstream request,
-  // so we shouldn't get the watermark callback invoked on the non-winning
-  // upstream request.
-  ASSERT(&parent_ == parent_.parent_.final_upstream_request_);
+  // There are two states we should get this callback in: 1) the watermark was
+  // hit due to writes from a different filter instance over a shared
+  // downstream connection, or 2) the watermark was hit due to THIS filter
+  // instance due to writing back the "winning" upstream request. In either
+  // case we can disable reads from upstream.
+  ASSERT(!parent_.parent_.final_upstream_request_ || &parent_ == parent_.parent_.final_upstream_request_);
 
   // The downstream connection is overrun. Pause reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
