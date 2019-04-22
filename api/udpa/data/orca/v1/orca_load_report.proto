@@ -22,10 +22,13 @@ message OrcaLoadReport {
   // during the request.
   double mem_utilization = 2 [(validate.rules).double.gte = 0, (validate.rules).double.lte = 1];
 
+  // Total QPS being served by an endpoint.
+  uint64 qps = 3;
+
   // Application specific requests costs. Each value may be an absolute cost (e.g.
   // 3487 bytes of storage) or utilization associated with the request,
   // expressed as a fraction of total resources available. Utilization
   // metrics should be derived from a sample or measurement taken
   // during the request.
-  map<string, double> request_cost_or_utilization = 3;
+  map<string, double> request_cost_or_utilization = 4;
 }
