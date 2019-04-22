@@ -31,11 +31,6 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
         build_file_content = OPENCENSUSTRACE_BUILD_CONTENT,
     )
-    envoy_http_archive(
-        name = "kafka_source",
-        locations = REPOSITORY_LOCATIONS,
-        build_file_content = KAFKASOURCE_BUILD_CONTENT,
-    )
 
 GOOGLEAPIS_BUILD_CONTENT = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
@@ -289,16 +284,4 @@ go_proto_library(
     proto = ":trace_model",
     visibility = ["//visibility:public"],
 )
-"""
-
-KAFKASOURCE_BUILD_CONTENT = """
-
-filegroup(
-    name = "request_protocol_files",
-    srcs = glob([
-        "*Request.json",
-    ]),
-    visibility = ["//visibility:public"],
-)
-
 """

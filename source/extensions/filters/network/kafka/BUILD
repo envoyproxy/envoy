@@ -14,87 +14,41 @@ envoy_package()
 envoy_cc_library(
     name = "kafka_request_lib",
     srcs = [
-        "kafka_request_parser.cc",
+        "normal_code.cc",
     ],
     hdrs = [
-        "kafka_request.h",
-        "kafka_request_parser.h",
-        "requests.h",
+        "normal_code.h",
     ],
     deps = [
-        ":parser_lib",
-        ":serialization_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:minimal_logger_lib",
+        ":generated_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "generated_lib",
+    srcs = [],
+    hdrs = [
+        "generated_header.h",
     ],
 )
 
 genrule(
-    name = "kafka_generated_source",
+    name = "generate_header_genrule",
     srcs = [
-        "@kafka_source//:request_protocol_files",
     ],
     outs = [
-        "requests.h",
+        "generated_header.h",
     ],
-    cmd = """
-      ./$(location :kafka_code_generator) generate-source \
-        $(location requests.h) ignore \
-        $(SRCS)
-    """,
+    cmd = "./$(location :code_generator_binary) $(location generated_header.h)",
     tools = [
-        ":kafka_code_generator",
+        ":code_generator_binary",
     ],
 )
 
 py_binary(
-    name = "kafka_code_generator",
-    srcs = ["protocol_code_generator/kafka_generator.py"],
-    data = glob(["protocol_code_generator/*.j2"]),
-    main = "protocol_code_generator/kafka_generator.py",
+    name = "code_generator_binary",
+    srcs = ["code_generator/generator_script.py"],
+    data = glob(["code_generator/*.j2"]),
+    main = "code_generator/generator_script.py",
     deps = ["@com_github_pallets_jinja//:jinja2"],
-)
-
-envoy_cc_library(
-    name = "parser_lib",
-    hdrs = ["parser.h"],
-    deps = [
-        ":kafka_protocol_lib",
-        ":message_lib",
-        "//source/common/common:minimal_logger_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "message_lib",
-    hdrs = [
-        "message.h",
-    ],
-    deps = [
-        "//include/envoy/buffer:buffer_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "serialization_lib",
-    hdrs = [
-        "serialization.h",
-        "serialization_composite.h",
-    ],
-    deps = [
-        ":kafka_protocol_lib",
-        "//include/envoy/buffer:buffer_interface",
-        "//source/common/common:byte_order_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "kafka_protocol_lib",
-    hdrs = [
-        "kafka_types.h",
-    ],
-    external_deps = ["abseil_optional"],
-    deps = [
-        "//source/common/common:macros",
-    ],
 )
