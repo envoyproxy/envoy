@@ -6,9 +6,9 @@ querying one or more management servers. Collectively, these discovery
 services and their corresponding APIs are referred to as *xDS*.
 Resources are requested via *subscriptions*, by specifying a filesystem
 path to watch, initiating gRPC streams or polling a REST-JSON URL. The
-latter two methods involve sending requests with a :ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>`
+latter two methods involve sending requests with a :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>`
 proto payload. Resources are delivered in a
-:ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>`
+:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
 proto payload in all methods. We discuss each type of subscription
 below.
 
@@ -19,10 +19,10 @@ The simplest approach to delivering dynamic configuration is to place it
 at a well known path specified in the :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>`.
 Envoy will use `inotify` (`kqueue` on macOS) to monitor the file for
 changes and parse the 
-:ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>` proto in the file on update.
+:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` proto in the file on update.
 Binary protobufs, JSON, YAML and proto text are supported formats for
 the 
-:ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>`.
+:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`.
 
 There is no mechanism available for filesystem subscriptions to ACK/NACK
 updates beyond stats counters and logs. The last valid configuration for
@@ -67,7 +67,7 @@ ACK/NACK and versioning
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 Each stream begins with a 
-:ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` from Envoy, specifying
+:ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` from Envoy, specifying
 the list of resources to subscribe to, the type URL corresponding to the
 subscribed resources, the node identifier and an empty :ref:`version_info <envoy_api_field_DiscoveryRequest.version_info>`.
 An example EDS request might be:
@@ -83,7 +83,7 @@ An example EDS request might be:
     response_nonce:
 
 The management server may reply either immediately or when the requested
-resources are available with a :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>`, e.g.:
+resources are available with a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`, e.g.:
 
 .. code:: yaml
 
@@ -94,7 +94,7 @@ resources are available with a :ref:`Discovery Response <envoy_api_msg_Discovery
     type_url: type.googleapis.com/envoy.api.v2.ClusterLoadAssignment
     nonce: A
 
-After processing the :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>`, Envoy will send a new
+After processing the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`, Envoy will send a new
 request on the stream, specifying the last version successfully applied
 and the nonce provided by the management server. If the update was
 successfully applied, the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
@@ -105,8 +105,8 @@ in the sequence diagram:
 
 In this sequence diagram, and below, the following format is used to abbreviate messages: 
 
-- *DiscoveryRequest*: (V=`version_info`,R=`resource_names`,N=`response_nonce`,T=`type_url`)
-- *DiscoveryResponse*: (V=`version_info`,R=`resources`,N=`nonce`,T=`type_url`)
+- *DiscoveryRequest*: (V=version_info,R=resource_names,N=response_nonce,T=type_url)
+- *DiscoveryResponse*: (V=version_info,R=resources,N=nonce,T=type_url)
 
 The version provides Envoy and the management server a shared notion of
 the currently applied configuration, as well as a mechanism to ACK/NACK
@@ -128,7 +128,7 @@ Later, an API update may succeed at a new version **Y**:
 Each stream has its own notion of versioning, there is no shared
 versioning across resource types. When ADS is not used, even each
 resource of a given resource type may have a distinct version, since the
-Envoy API allows distinct EDS/RDS resources to point at different :ref:`Config Sources <envoy_api_msg_core.ConfigSource>`.
+Envoy API allows distinct EDS/RDS resources to point at different :ref:`ConfigSources <envoy_api_msg_core.ConfigSource>`.
 
 .. _Resource Updates:
 
@@ -136,22 +136,22 @@ When to send an update
 ^^^^^^^^^^^^^^^^^^^^^^
 
 The management server should only send updates to the Envoy client when
-the resources in the :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>` have changed. Envoy replies
-to any :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>` with a :ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` containing the
+the resources in the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` have changed. Envoy replies
+to any :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` with a :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` containing the
 ACK/NACK immediately after it has been either accepted or rejected. If
 the management server provides the same set of resources rather than
 waiting for a change to occur, it will cause Envoy and the management
 server to spin and have a severe performance impact.
 
-Within a stream, new :ref:`Discovery Requests <envoy_api_msg_DiscoveryRequest>` supersede any prior
-:ref:`Discovery Requests <envoy_api_msg_DiscoveryRequest>` having the same resource type. This means that
+Within a stream, new :ref:`DiscoveryRequests <envoy_api_msg_DiscoveryRequest>` supersede any prior
+:ref:`DiscoveryRequests <envoy_api_msg_DiscoveryRequest>` having the same resource type. This means that
 the management server only needs to respond to the latest
-:ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` on each stream for any given resource type.
+:ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` on each stream for any given resource type.
 
 Resource hints
 ^^^^^^^^^^^^^^
 
-The :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` specified in the :ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` are a hint.
+The :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` specified in the :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` are a hint.
 Some resource types, e.g. `Clusters` and `Listeners` will
 specify an empty :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` list, since Envoy is interested in
 learning about all the :ref:`Clusters (CDS) <envoy_api_msg_Cluster>` and :ref:`Listeners (LDS) <envoy_api_msg_Listener>`
@@ -175,8 +175,8 @@ except in the case where the `Cluster` or `Listener` is being
 warmed. See :ref:`Resource warming` section below on
 the expectations during warming. The management server may be able to
 infer all the required EDS/RDS resources from the :ref:`node <envoy_api_msg_Core.Node>`
-identification in the :ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>`, in which case this hint may
-be discarded. An empty EDS/RDS :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>` is effectively a
+identification in the :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>`, in which case this hint may
+be discarded. An empty EDS/RDS :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` is effectively a
 nop from the perspective of the respective resources in the Envoy.
 
 When a `Listener` or `Cluster` is deleted, its corresponding EDS and
@@ -203,13 +203,13 @@ Resource updates
 ^^^^^^^^^^^^^^^^
 
 As discussed above, Envoy may update the list of :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` it
-presents to the management server in each :ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` that
-ACK/NACKs a specific :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>`. In addition, Envoy may later
-issue additional :ref:`Discovery Requests <envoy_api_msg_DiscoveryRequest>` at a given :ref:`version_info <envoy_api_field_DiscoveryRequest.version_info>` to
+presents to the management server in each :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` that
+ACK/NACKs a specific :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`. In addition, Envoy may later
+issue additional :ref:`DiscoveryRequests <envoy_api_msg_DiscoveryRequest>` at a given :ref:`version_info <envoy_api_field_DiscoveryRequest.version_info>` to
 update the management server with new resource hints. For example, if
 Envoy is at EDS version **X** and knows only about cluster ``foo``, but
 then receives a CDS update and learns about ``bar`` in addition, it may
-issue an additional :ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` for **X** with `{foo,bar}` as
+issue an additional :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` for **X** with `{foo,bar}` as
 `resource_names`.
 
 .. figure:: diagrams/cds-eds-resources.svg
@@ -220,25 +220,25 @@ update is issued by Envoy at **X**, but before the management server
 processes the update it replies with a new version **Y**, the resource
 hint update may be interpreted as a rejection of **Y** by presenting an
 **X** :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>`. To avoid this, the management server provides a
-``nonce`` that Envoy uses to indicate the specific :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>`
-each :ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` corresponds to:
+``nonce`` that Envoy uses to indicate the specific :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+each :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` corresponds to:
 
 .. figure:: diagrams/update-race.svg
    :alt: EDS update race motivates nonces
 
-The management server should not send a :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>` for any
-:ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` that has a stale nonce. A nonce becomes stale
+The management server should not send a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` for any
+:ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` that has a stale nonce. A nonce becomes stale
 following a newer nonce being presented to Envoy in a
-:ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>`. A management server does not need to send an
+:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`. A management server does not need to send an
 update until it determines a new version is available. Earlier requests
 at a version then also become stale. It may process multiple
-:ref:`Discovery Requests <envoy_api_msg_DiscoveryRequest>` at a version until a new version is ready.
+:ref:`DiscoveryRequests <envoy_api_msg_DiscoveryRequest>` at a version until a new version is ready.
 
 .. figure:: diagrams/stale-requests.svg
    :alt: Requests become stale
 
 An implication of the above resource update sequencing is that Envoy
-does not expect a :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>` for every :ref:`Discovery Requests <envoy_api_msg_DiscoveryRequest>`
+does not expect a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` for every :ref:`DiscoveryRequests <envoy_api_msg_DiscoveryRequest>`
 it issues.
 
 .. _Resource Warming:
@@ -306,9 +306,9 @@ traffic drop when management servers are distributed. ADS allow a single
 management server, via a single gRPC stream, to deliver all API updates.
 This provides the ability to carefully sequence updates to avoid traffic
 drop. With ADS, a single stream is used with multiple independent
-:ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>`/:ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>` sequences multiplexed via the
+:ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>`/:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` sequences multiplexed via the
 type URL. For any given type URL, the above sequencing of
-:ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` and :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>` messages applies. An
+:ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` and :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` messages applies. An
 example update sequence might look like:
 
 .. figure:: diagrams/ads.svg
@@ -444,12 +444,12 @@ expected that there is only a single outstanding request at any point in
 time, and as a result the response nonce is optional in REST-JSON. The
 `JSON canonical transform of
 proto3 <https://developers.google.com/protocol-buffers/docs/proto3#json>`__
-is used to encode :ref:`Discovery Request <envoy_api_msg_DiscoveryRequest>` and :ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>`
+is used to encode :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` and :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
 messages. ADS is not available for REST-JSON polling.
 
 When the poll period is set to a small value, with the intention of long
 polling, then there is also a requirement to avoid sending a
-:ref:`Discovery Response <envoy_api_msg_DiscoveryResponse>` :ref:`unless a change to the underlying resources has
+:ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` :ref:`unless a change to the underlying resources has
 occurred <Resource Updates>`.
 
 .. |Multiple EDS requests on the same stream| image:: diagrams/eds-same-stream.svg

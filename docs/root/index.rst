@@ -18,6 +18,5 @@ Envoy documentation
   configuration/configuration
   operations/operations
   extending/extending
-  api-v2/api
-  api-docs/xds_protocol
+  api/api
   faq/overview
