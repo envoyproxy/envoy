@@ -25,15 +25,15 @@ public:
         grpc_mux_subscription_(grpc_mux_, stats, type_url, dispatcher, init_fetch_timeout) {}
 
   // Config::Subscription
-  void start(const std::vector<std::string>& resources,
+  void start(const std::set<std::string>& resources,
              Config::SubscriptionCallbacks& callbacks) override {
     // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
     grpc_mux_subscription_.start(resources, callbacks);
     grpc_mux_.start();
   }
 
-  void updateResources(const std::vector<std::string>& resources) override {
-    grpc_mux_subscription_.updateResources(resources);
+  void updateResources(const std::set<std::string>& update_to_these_names) override {
+    grpc_mux_subscription_.updateResources(update_to_these_names);
   }
 
   GrpcMuxImpl& grpcMux() { return grpc_mux_; }

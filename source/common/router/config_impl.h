@@ -393,6 +393,9 @@ public:
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
     return max_grpc_timeout_;
   }
+  absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
+    return grpc_timeout_offset_;
+  }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -479,6 +482,9 @@ private:
       return parent_->idleTimeout();
     }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
+      return parent_->maxGrpcTimeout();
+    }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
       return parent_->maxGrpcTimeout();
     }
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -604,6 +610,7 @@ private:
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
+  const absl::optional<std::chrono::milliseconds> grpc_timeout_offset_;
   Runtime::Loader& loader_;
   const absl::optional<RuntimeData> runtime_;
   const std::string scheme_redirect_;
