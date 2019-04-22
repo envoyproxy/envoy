@@ -136,7 +136,7 @@ def checkToolNotFoundError():
   # Temporarily change PATH to test the error about lack of external tools.
   oldPath = os.environ["PATH"]
   os.environ["PATH"] = "/sbin:/usr/sbin"
-  clang_format = os.getenv("CLANG_FORMAT", "clang-format-7")
+  clang_format = os.getenv("CLANG_FORMAT", "clang-format-8")
   errors = checkFileExpectingError("no_namespace_envoy.cc", "Command %s not found." % clang_format)
   os.environ["PATH"] = oldPath
   return errors

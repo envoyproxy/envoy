@@ -1,11 +1,10 @@
 #!/bin/bash
 
-. tools/shell_utils.sh
-
 set -e
 
 VENV_DIR="pyformat"
 SCRIPTPATH=$(realpath "$(dirname $0)")
+. $SCRIPTPATH/shell_utils.sh
 cd "$SCRIPTPATH"
 
 source_venv "$VENV_DIR"

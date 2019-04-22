@@ -310,6 +310,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
       return stream_info.responseCode() ? fmt::format_int(stream_info.responseCode().value()).str()
                                         : "0";
     };
+  } else if (field_name == "RESPONSE_CODE_DETAILS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.responseCodeDetails() ? stream_info.responseCodeDetails().value()
+                                               : UnspecifiedValueString;
+    };
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       return fmt::format_int(stream_info.bytesSent()).str();
@@ -434,7 +439,7 @@ std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
   if (!header) {
     header_value_string = UnspecifiedValueString;
   } else {
-    header_value_string = header->value().c_str();
+    header_value_string = std::string(header->value().getStringView());
   }
 
   if (max_length_ && header_value_string.length() > max_length_.value()) {

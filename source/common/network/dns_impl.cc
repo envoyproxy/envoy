@@ -223,12 +223,12 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 }
 
 void DnsResolverImpl::PendingResolution::getHostByName(int family) {
-  ares_gethostbyname(channel_, dns_name_.c_str(), family,
-                     [](void* arg, int status, int timeouts, hostent* hostent) {
-                       static_cast<PendingResolution*>(arg)->onAresHostCallback(status, timeouts,
-                                                                                hostent);
-                     },
-                     this);
+  ares_gethostbyname(
+      channel_, dns_name_.c_str(), family,
+      [](void* arg, int status, int timeouts, hostent* hostent) {
+        static_cast<PendingResolution*>(arg)->onAresHostCallback(status, timeouts, hostent);
+      },
+      this);
 }
 
 } // namespace Network

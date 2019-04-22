@@ -45,7 +45,7 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     const Http::HeaderMap& original_request_headers) {
   Http::TestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
   if (proxied_request_headers.ForwardedProto()) {
-    ASSERT_STREQ(proxied_request_headers.ForwardedProto()->value().c_str(), "http");
+    ASSERT_EQ(proxied_request_headers.ForwardedProto()->value().getStringView(), "http");
     proxied_request_headers.removeForwardedProto();
   }
 
@@ -55,7 +55,7 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
   proxied_request_headers.removeEnvoyExpectedRequestTimeoutMs();
 
   if (proxied_request_headers.Scheme()) {
-    ASSERT_STREQ(proxied_request_headers.Scheme()->value().c_str(), "http");
+    ASSERT_EQ(proxied_request_headers.Scheme()->value().getStringView(), "http");
   } else {
     proxied_request_headers.insertScheme().value().append("http", 4);
   }
@@ -74,7 +74,7 @@ void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
   // Check for and remove headers added by default for HTTP responses.
   ASSERT_TRUE(proxied_response_headers.Date() != nullptr);
   ASSERT_TRUE(proxied_response_headers.Server() != nullptr);
-  ASSERT_STREQ(proxied_response_headers.Server()->value().c_str(), "envoy");
+  ASSERT_EQ(proxied_response_headers.Server()->value().getStringView(), "envoy");
   proxied_response_headers.removeDate();
   proxied_response_headers.removeServer();
 
@@ -93,7 +93,7 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
   // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
   if (original_headers.ContentLength() == nullptr &&
       proxied_headers.TransferEncoding() != nullptr) {
-    ASSERT_STREQ(proxied_headers.TransferEncoding()->value().c_str(), "chunked");
+    ASSERT_EQ(proxied_headers.TransferEncoding()->value().getStringView(), "chunked");
     proxied_headers.removeTransferEncoding();
   }
   if (proxied_headers.Connection() != nullptr &&
@@ -369,7 +369,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     response_->waitForEndStream();
-    EXPECT_STREQ("413", response_->headers().Status()->value().c_str());
+    EXPECT_EQ("413", response_->headers().Status()->value().getStringView());
     waitForClientDisconnectOrReset();
     codec_client_->close();
   }
@@ -386,7 +386,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     response_ = std::move(encoder_decoder.second);
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     response_->waitForEndStream();
-    EXPECT_STREQ("413", response_->headers().Status()->value().c_str());
+    EXPECT_EQ("413", response_->headers().Status()->value().getStringView());
     waitForClientDisconnectOrReset();
     codec_client_->close();
   }
