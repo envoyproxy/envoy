@@ -13,4 +13,3 @@ Introduction
   getting_help
   version_history
   deprecated
-  ../api-docs/xds_protocol
