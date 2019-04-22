@@ -49,7 +49,7 @@ genrule(
     visibility = ["//visibility:private"],
 )
 
-quiche_copt = ["-Wno-unused-parameter",]
+quiche_copt = ["-Wno-unused-parameter"]
 
 cc_library(
     name = "http2_platform",
