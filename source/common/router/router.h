@@ -323,7 +323,7 @@ private:
     void disableDataFromDownstream() {
       // If there is only one upstream request, we can be assured that
       // disabling reads will not slow down other upstream requests. If we've
-      // already seen the full downstream requst (downstream_end_stream_) then
+      // already seen the full downstream request (downstream_end_stream_) then
       // disabling reads is a no-op.
       ASSERT(parent_.upstream_requests_.size() == 1 || parent_.downstream_end_stream_);
       parent_.cluster_->stats().upstream_flow_control_backed_up_total_.inc();
@@ -333,7 +333,7 @@ private:
     void enableDataFromDownstream() {
       // If there is only one upstream request, we can be assured that
       // disabling reads will not overflow any write buffers in other upstream
-      // requests. If we've already seen the full downstream requst
+      // requests. If we've already seen the full downstream request
       // (downstream_end_stream_) then enabling reads is a no-op.
       ASSERT(parent_.upstream_requests_.size() == 1 || parent_.downstream_end_stream_);
       parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
