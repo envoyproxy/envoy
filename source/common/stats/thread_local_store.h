@@ -69,11 +69,11 @@ class TlsScope;
 /**
  * Log Linear Histogram implementation that is stored in the main thread.
  */
-class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
+class ThreadLocalParentHistogramImpl : public ParentHistogram, public MetricImpl {
 public:
-  ParentHistogramImpl(const std::string& name, Store& parent, TlsScope& tlsScope,
-                      std::string&& tag_extracted_name, std::vector<Tag>&& tags);
-  ~ParentHistogramImpl();
+  ThreadLocalParentHistogramImpl(const std::string& name, Store& parent, TlsScope& tlsScope,
+                                 std::string&& tag_extracted_name, std::vector<Tag>&& tags);
+  ~ThreadLocalParentHistogramImpl();
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
   bool used() const override;
@@ -113,7 +113,7 @@ private:
   const std::string name_;
 };
 
-typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;
+typedef std::shared_ptr<ThreadLocalParentHistogramImpl> ThreadLocalParentHistogramImplSharedPtr;
 
 /**
  * Class used to create ThreadLocalHistogram in the scope.
@@ -127,7 +127,8 @@ public:
    * @return a ThreadLocalHistogram within the scope's namespace.
    * @param name name of the histogram with scope prefix attached.
    */
-  virtual Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) PURE;
+  virtual Histogram& tlsHistogram(const std::string& name,
+                                  ThreadLocalParentHistogramImpl& parent) PURE;
 };
 
 /**
@@ -202,7 +203,7 @@ private:
   struct CentralCacheEntry {
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
-    StatMap<ParentHistogramImplSharedPtr> histograms_;
+    StatMap<ThreadLocalParentHistogramImplSharedPtr> histograms_;
     SharedStringSet rejected_stats_;
   };
 
@@ -223,7 +224,8 @@ private:
     Gauge& gauge(const std::string& name) override;
     NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
     Histogram& histogram(const std::string& name) override;
-    Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
+    Histogram& tlsHistogram(const std::string& name,
+                            ThreadLocalParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
     template <class StatType>

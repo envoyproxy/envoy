@@ -74,7 +74,7 @@ public:
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
   std::vector<GaugeSharedPtr> gauges() const override { return gauges_.toVector(); }
   std::vector<ParentHistogramSharedPtr> histograms() const override {
-    return std::vector<ParentHistogramSharedPtr>{};
+    return histograms_.toVector();
   }
 
 private:
@@ -84,7 +84,7 @@ private:
   HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
-  IsolatedStatsCache<Histogram> histograms_;
+  IsolatedStatsCache<ParentHistogram> histograms_;
   const StatsOptionsImpl stats_options_;
   NullGaugeImpl null_gauge_;
 };

@@ -18,7 +18,8 @@ namespace Stats {
 
 /**
  * This structure is an alternate backing store for both CounterImpl and GaugeImpl. It is designed
- * so that it can be allocated efficiently from the heap on demand.
+ * so that it can be allocated efficiently from the heap on demand. Note that this is not used for
+ * histograms, which are implemented with an external dependency and take non-constant heap space.
  */
 struct HeapStatData {
   /**

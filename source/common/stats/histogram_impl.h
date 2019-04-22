@@ -48,27 +48,38 @@ private:
 };
 
 /**
- * Histogram implementation for the heap.
+ * Parent histogram implementation, used in IsolatedStoreImpl.
  */
-class HistogramImpl : public Histogram, public MetricImpl {
+class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
 public:
-  HistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
-                std::vector<Tag>&& tags)
-      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent), name_(name) {}
+  ParentHistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
+                      std::vector<Tag>&& tags);
+  ~ParentHistogramImpl();
 
-  // Stats:;Metric
+  // Stats::Metric
   std::string name() const override { return name_; }
   const char* nameCStr() const override { return name_.c_str(); }
+  bool used() const override { return used_; }
 
   // Stats::Histogram
-  void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
+  void recordValue(uint64_t value) override;
 
-  bool used() const override { return true; }
+  // Stats::ParentHistogram
+  void merge() override;
+  const HistogramStatistics& intervalStatistics() const override { return interval_statistics_; }
+  const HistogramStatistics& cumulativeStatistics() const override {
+    return cumulative_statistics_;
+  }
+  const std::string quantileSummary() const override;
+  const std::string bucketSummary() const override;
 
 private:
-  // This is used for delivering the histogram data to sinks.
   Store& parent_;
-
+  histogram_t* interval_histogram_{};
+  histogram_t* cumulative_histogram_{};
+  HistogramStatisticsImpl interval_statistics_;
+  HistogramStatisticsImpl cumulative_statistics_;
+  bool used_{};
   const std::string name_;
 };
 

@@ -438,7 +438,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
 
   Thread::LockGuard lock(parent_.lock_);
   auto iter = central_cache_.histograms_.find(final_name.c_str());
-  ParentHistogramImplSharedPtr* central_ref = nullptr;
+  ThreadLocalParentHistogramImplSharedPtr* central_ref = nullptr;
   if (iter != central_cache_.histograms_.end()) {
     central_ref = &iter->second;
   } else if (parent_.checkAndRememberRejection(final_name, central_cache_.rejected_stats_,
@@ -447,7 +447,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   } else {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
-    auto stat = std::make_shared<ParentHistogramImpl>(
+    auto stat = std::make_shared<ThreadLocalParentHistogramImpl>(
         final_name, parent_, *this, std::move(tag_extracted_name), std::move(tags));
     central_ref = &central_cache_.histograms_[stat->nameCStr()];
     *central_ref = stat;
@@ -460,7 +460,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name,
-                                                         ParentHistogramImpl& parent) {
+                                                         ThreadLocalParentHistogramImpl& parent) {
   // tlsHistogram() is generally not called for a histogram that is rejected by
   // the matcher, so no further rejection-checking is needed at this level.
   // TlsHistogram inherits its reject/accept status from ParentHistogram.
@@ -514,31 +514,32 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
   hist_clear(*other_histogram);
 }
 
-ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
-                                         TlsScope& tls_scope, std::string&& tag_extracted_name,
-                                         std::vector<Tag>&& tags)
+ThreadLocalParentHistogramImpl::ThreadLocalParentHistogramImpl(const std::string& name,
+                                                               Store& parent, TlsScope& tls_scope,
+                                                               std::string&& tag_extracted_name,
+                                                               std::vector<Tag>&& tags)
     : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
       merged_(false), name_(name) {}
 
-ParentHistogramImpl::~ParentHistogramImpl() {
+ThreadLocalParentHistogramImpl::~ThreadLocalParentHistogramImpl() {
   hist_free(interval_histogram_);
   hist_free(cumulative_histogram_);
 }
 
-void ParentHistogramImpl::recordValue(uint64_t value) {
+void ThreadLocalParentHistogramImpl::recordValue(uint64_t value) {
   Histogram& tls_histogram = tls_scope_.tlsHistogram(name(), *this);
   tls_histogram.recordValue(value);
   parent_.deliverHistogramToSinks(*this, value);
 }
 
-bool ParentHistogramImpl::used() const {
+bool ThreadLocalParentHistogramImpl::used() const {
   // Consider ParentHistogram used only if has ever been merged.
   return merged_;
 }
 
-void ParentHistogramImpl::merge() {
+void ThreadLocalParentHistogramImpl::merge() {
   Thread::ReleasableLockGuard lock(merge_lock_);
   if (merged_ || usedLockHeld()) {
     hist_clear(interval_histogram_);
@@ -558,7 +559,7 @@ void ParentHistogramImpl::merge() {
   }
 }
 
-const std::string ParentHistogramImpl::quantileSummary() const {
+const std::string ThreadLocalParentHistogramImpl::quantileSummary() const {
   if (used()) {
     std::vector<std::string> summary;
     const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
@@ -574,7 +575,7 @@ const std::string ParentHistogramImpl::quantileSummary() const {
   }
 }
 
-const std::string ParentHistogramImpl::bucketSummary() const {
+const std::string ThreadLocalParentHistogramImpl::bucketSummary() const {
   if (used()) {
     std::vector<std::string> bucket_summary;
     const std::vector<double>& supported_buckets = interval_statistics_.supportedBuckets();
@@ -590,12 +591,12 @@ const std::string ParentHistogramImpl::bucketSummary() const {
   }
 }
 
-void ParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
+void ThreadLocalParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
   Thread::LockGuard lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);
 }
 
-bool ParentHistogramImpl::usedLockHeld() const {
+bool ThreadLocalParentHistogramImpl::usedLockHeld() const {
   for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
     if (tls_histogram->used()) {
       return true;

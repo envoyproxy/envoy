@@ -22,6 +22,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "histogram_impl_test",
+    srcs = ["histogram_impl_test.cc"],
+    deps = [
+        "//source/common/stats:histogram_lib",
+        "//test/mocks/stats:stats_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
     deps = [

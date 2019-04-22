@@ -34,8 +34,9 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
         std::vector<Tag> tags;
         return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
       }),
-      histograms_([this](const std::string& name) -> HistogramSharedPtr {
-        return std::make_shared<HistogramImpl>(name, *this, std::string(name), std::vector<Tag>());
+      histograms_([this](const std::string& name) -> ParentHistogramSharedPtr {
+        return std::make_shared<ParentHistogramImpl>(name, *this, std::string(name),
+                                                     std::vector<Tag>());
       }) {}
 
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
