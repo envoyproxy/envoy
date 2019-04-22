@@ -125,6 +125,15 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   if (grpc_request && route.maxGrpcTimeout()) {
     const std::chrono::milliseconds max_grpc_timeout = route.maxGrpcTimeout().value();
     std::chrono::milliseconds grpc_timeout = Grpc::Common::getGrpcTimeout(request_headers);
+    if (route.grpcTimeoutOffset()) {
+      // We only apply the offset if it won't result in grpc_timeout hitting 0 or below, as
+      // setting it to 0 means infinity and a negative timeout makes no sense.
+      const auto offset = *route.grpcTimeoutOffset();
+      if (offset < grpc_timeout) {
+        grpc_timeout -= offset;
+      }
+    }
+
     // Cap gRPC timeout to the configured maximum considering that 0 means infinity.
     if (max_grpc_timeout != std::chrono::milliseconds(0) &&
         (grpc_timeout == std::chrono::milliseconds(0) || grpc_timeout > max_grpc_timeout)) {
@@ -506,6 +515,8 @@ void Filter::maybeDoShadowing() {
 }
 
 void Filter::onRequestComplete() {
+  // This should be called exactly once, when the downstream request has been received in full.
+  ASSERT(!downstream_end_stream_);
   downstream_end_stream_ = true;
   Event::Dispatcher& dispatcher = callbacks_->dispatcher();
   downstream_request_complete_time_ = dispatcher.timeSource().monotonicTime();
@@ -519,6 +530,12 @@ void Filter::onRequestComplete() {
     if (timeout_.global_timeout_.count() > 0) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
+    }
+
+    for (auto& upstream_request : upstream_requests_) {
+      if (upstream_request->create_per_try_timeout_on_request_complete_) {
+        upstream_request->setupPerTryTimeout();
+      }
     }
   }
 }
@@ -983,7 +1000,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
       calling_encode_headers_(false), upstream_canary_(false), encode_complete_(false),
-      encode_trailers_(false) {
+      encode_trailers_(false), create_per_try_timeout_on_request_complete_(false) {
 
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
@@ -1183,7 +1200,11 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
 
-  setupPerTryTimeout();
+  if (parent_.downstream_end_stream_) {
+    setupPerTryTimeout();
+  } else {
+    create_per_try_timeout_on_request_complete_ = true;
+  }
 
   conn_pool_stream_handle_ = nullptr;
   setRequestEncoder(request_encoder);

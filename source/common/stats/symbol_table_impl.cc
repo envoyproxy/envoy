@@ -334,11 +334,12 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
   // immediately. This gives us a chance to call free() on each one before they
   // are destroyed.
   //
-  // One risk here is if removing elements via flat_hash_set::begin() is
-  // inefficient to use in a loop like this. One can imagine a hash-table
-  // implementation where the performance if this usage-model would be
-  // poor. However, tests with 100k elements appeared to run quickly when
-  // compiled for optimization, so at present this is not a performance issue.
+  // There's a performance risk here, if removing elements via
+  // flat_hash_set::begin() is inefficient to use in a loop like this. One can
+  // imagine a hash-table implementation where the performance of this
+  // usage-model would be poor. However, tests with 100k elements appeared to
+  // run quickly when compiled for optimization, so at present this is not a
+  // performance issue.
 
   while (!hash_set_.empty()) {
     auto storage = hash_set_.extract(hash_set_.begin());
