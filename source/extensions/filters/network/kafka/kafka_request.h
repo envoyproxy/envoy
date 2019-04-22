@@ -11,6 +11,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+struct NoArgSomething {
+};
+
 /**
  * Represents fields that are present in every Kafka request message.
  * @see http://kafka.apache.org/protocol.html#protocol_messages

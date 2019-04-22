@@ -28,10 +28,8 @@ public:
  * Can throw, as one of the fields (client-id) can throw (nullable string with invalid length).
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
-class RequestHeaderDeserializer
-    : public CompositeDeserializerWith4Delegates<RequestHeader, Int16Deserializer,
-                                                 Int16Deserializer, Int32Deserializer,
-                                                 NullableStringDeserializer> {};
+class RequestHeaderDeserializer: public CompositeDeserializerWith0Delegates<NoArgSomething> {
+};
 
 typedef std::unique_ptr<RequestHeaderDeserializer> RequestHeaderDeserializerPtr;
 
