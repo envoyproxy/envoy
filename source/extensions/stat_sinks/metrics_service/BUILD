@@ -30,7 +30,6 @@ envoy_cc_library(
     srcs = ["grpc_metrics_proto_descriptors.cc"],
     hdrs = ["grpc_metrics_proto_descriptors.h"],
     deps = [
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
         "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     ],

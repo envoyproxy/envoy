@@ -3,7 +3,6 @@
 #include "envoy/service/metrics/v2/metrics_service.pb.h"
 
 #include "common/common/fmt.h"
-#include "common/config/protobuf_link_hacks.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
