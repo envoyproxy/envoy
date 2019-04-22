@@ -1428,7 +1428,8 @@ void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHigh
   // downstream connection, or 2) the watermark was hit due to THIS filter
   // instance due to writing back the "winning" upstream request. In either
   // case we can disable reads from upstream.
-  ASSERT(!parent_.parent_.final_upstream_request_ || &parent_ == parent_.parent_.final_upstream_request_);
+  ASSERT(!parent_.parent_.final_upstream_request_ ||
+         &parent_ == parent_.parent_.final_upstream_request_);
 
   // The downstream connection is overrun. Pause reads from upstream.
   parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
