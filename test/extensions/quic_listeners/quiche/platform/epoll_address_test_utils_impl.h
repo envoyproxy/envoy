@@ -34,6 +34,8 @@ int addressFamilyUnderTestHelper() {
 
 } // namespace
 
+// Returns the address family to be used for test. Return v4 if the environment
+// supports v4 only or both v4 and v6. Otherwise return v6 or an invalid value.
 int AddressFamilyUnderTestImpl() {
   static const int version = addressFamilyUnderTestHelper();
   return version;
