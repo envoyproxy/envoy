@@ -32,6 +32,7 @@ else
 fi
 
 SCRIPT_DIR=$(dirname "$0")
+API_DIR=$(dirname "$dir")/api
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 [[ -z "${GENERATED_RST_DIR}" ]] && GENERATED_RST_DIR=generated/rst
@@ -158,6 +159,12 @@ do
   cp -f bazel-bin/external/envoy_api/"${p}" "$(dirname "${DEST}")"
   [ -n "${CPROFILE_ENABLED}" ] && cp -f bazel-bin/"${p}".profile "$(dirname "${DEST}")"
 done
+
+mkdir -p ${GENERATED_RST_DIR}/api-docs
+
+cp -f $API_DIR/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+
+rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 
 rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${GENERATED_RST_DIR}"
 
