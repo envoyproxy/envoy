@@ -82,6 +82,8 @@
 #define QUIC_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
 #endif
 
+#define DCHECK_GE(a, b) DCHECK((a) >= (b))
+
 #define QUIC_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
 
 namespace quic {

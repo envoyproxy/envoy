@@ -7,21 +7,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-class RpcInvocationImpl : public RpcInvocation {
-public:
-  ~RpcInvocationImpl();
-  RpcInvocationImpl(const std::string& method_name, const std::string& service_name,
-                    const std::string& service_version);
-  virtual const std::string& getMethodName() const override { return method_name_; }
-  virtual const std::string& getServiceName() const override { return service_name_; }
-  virtual const std::string& getServiceVersion() const override { return service_version_; }
-
-private:
-  std::string method_name_;
-  std::string service_name_;
-  std::string service_version_;
-};
-
 class RpcResultImpl : public RpcResult {
 public:
   RpcResultImpl() {}

@@ -348,7 +348,9 @@ client spontaneously requests the "wc" resource.
 ![Incremental session example](diagrams/incremental.svg)
 
 On reconnect the Incremental xDS client may tell the server of its known
-resources to avoid resending them over the network.
+resources to avoid resending them over the network. Because no state is assumed
+to be preserved from the previous stream, the reconnecting client must provide
+the server with all resource names it is interested in.
 
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
 
@@ -358,17 +360,24 @@ identified by the alias field in the resource of a `DeltaDiscoveryResponse`. The
 be returned in the name field in the resource of a `DeltaDiscoveryResponse`.
 
 #### Subscribing to Resources
-Envoy can send either an alias or the name of a resource in the `resource_names_subscribe` field of
-a `DeltaDiscoveryRequest` in order to subscribe to a resource. Envoy should check both the names and
-aliases of resources in order to determine whether the entity in question has been subscribed to.
+The client can send either an alias or the name of a resource in the `resource_names_subscribe`
+field of a `DeltaDiscoveryRequest` in order to subscribe to a resource. Both the names and aliases
+of resources should be checked in order to determine whether the entity in question has been
+subscribed to.
+
+A `resource_names_subscribe` field may contain resource names that the server believes the client
+is already subscribed to, and furthermore has the most recent versions of. However, the server
+*must* still provide those resources in the response; due to implementation details hidden from
+the server, the client may have "forgotten" those resources despite apparently remaining subscribed.
 
 #### Unsubscribing from Resources
-Envoy will keep track of a per resource reference count internally. This count will keep track of the
-total number of aliases/resource names that are currently subscribed to. When the reference count
-reaches zero, Envoy will send a `DeltaDiscoveryRequest` containing the resource name of the resource
-to unsubscribe from in the `resource_names_unsubscribe` field. When Envoy unsubscribes from a resource,
-it should check for both the resource name and all aliases and appropriately update all resources
-that reference either.
+When a client loses interest in some resources, it will indicate that with the
+`resource_names_unsubscribe` field of a `DeltaDiscoveryRequest`. As with `resource_names_subscribe`,
+these may be resource names or aliases.
+
+A `resource_names_unsubscribe` field may contain superfluous resource names, which the server
+thought the client was already not subscribed to. The server must cleanly process such a request;
+it can simply ignore these phantom unsubscriptions.
 
 ## REST-JSON polling subscriptions
 

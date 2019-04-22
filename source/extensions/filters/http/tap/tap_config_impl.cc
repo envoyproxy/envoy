@@ -17,8 +17,8 @@ Http::HeaderMap::Iterate fillHeaderList(const Http::HeaderEntry& header, void* c
   Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& header_list =
       *reinterpret_cast<Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>*>(context);
   auto& new_header = *header_list.Add();
-  new_header.set_key(header.key().c_str());
-  new_header.set_value(header.value().c_str());
+  new_header.set_key(std::string(header.key().getStringView()));
+  new_header.set_value(std::string(header.value().getStringView()));
   return Http::HeaderMap::Iterate::Continue;
 }
 } // namespace

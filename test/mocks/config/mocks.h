@@ -41,8 +41,8 @@ public:
 class MockSubscription : public Subscription {
 public:
   MOCK_METHOD2_T(start,
-                 void(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks));
-  MOCK_METHOD1_T(updateResources, void(const std::vector<std::string>& resources));
+                 void(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks));
+  MOCK_METHOD1_T(updateResources, void(const std::set<std::string>& update_to_these_names));
 };
 
 class MockGrpcMuxWatch : public GrpcMuxWatch {
@@ -60,9 +60,9 @@ public:
 
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
-               GrpcMuxWatch*(const std::string& type_url, const std::vector<std::string>& resources,
+               GrpcMuxWatch*(const std::string& type_url, const std::set<std::string>& resources,
                              GrpcMuxCallbacks& callbacks));
-  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
+  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
                             GrpcMuxCallbacks& callbacks);
   MOCK_METHOD1(pause, void(const std::string& type_url));
   MOCK_METHOD1(resume, void(const std::string& type_url));

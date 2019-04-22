@@ -511,11 +511,22 @@ struct HeterogeneousStatNameEqual {
 // explicit free() method, analogous to StatNameStorage::free(), compared to
 // storing a SymbolTable reference in the class and doing the free in the
 // destructor, like StatNameTempStorage.
-class StatNameStorageSet : public absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash,
-                                                      HeterogeneousStatNameEqual> {
+class StatNameStorageSet {
 public:
+  using HashSet =
+      absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
+
   ~StatNameStorageSet();
   void free(SymbolTable& symbol_table);
+
+  std::pair<HashSet::iterator, bool> insert(StatNameStorage&& storage) {
+    return hash_set_.insert(std::move(storage));
+  }
+
+  HashSet::iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
+
+ private:
+  HashSet hash_set_;
 };
 
 } // namespace Stats

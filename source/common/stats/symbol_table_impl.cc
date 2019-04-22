@@ -320,7 +320,7 @@ void StatNameStorage::free(SymbolTable& table) {
 StatNameStorageSet::~StatNameStorageSet() {
   // free() must be called before destructing StatNameStorageSet to decrement
   // references to all symbols.
-  ASSERT(empty());
+  ASSERT(hash_set_.empty());
 }
 
 void StatNameStorageSet::free(SymbolTable& symbol_table) {
@@ -340,8 +340,8 @@ void StatNameStorageSet::free(SymbolTable& symbol_table) {
   // poor. However, tests with 100k elements appeared to run quickly when
   // compiled for optimization, so at present this is not a performance issue.
 
-  while (!empty()) {
-    auto storage = extract(begin());
+  while (!hash_set_.empty()) {
+    auto storage = hash_set_.extract(hash_set_.begin());
     storage.value().free(symbol_table);
   }
 }
