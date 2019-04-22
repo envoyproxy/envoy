@@ -44,7 +44,7 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STR("504", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("504", response->headers().Status()->value().getStringView());
 }
 
 // Sends a request with a global timeout and per try timeout specified, sleeps
@@ -92,7 +92,7 @@ TEST_P(HttpTimeoutIntegrationTest, PerTryTimeout) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STR("504", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("504", response->headers().Status()->value().getStringView());
 }
 
 // With hedge_on_per_try_timeout enabled via config, sends a request with a
@@ -151,7 +151,7 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeout) {
   EXPECT_EQ(0U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STR("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutWithBodyNoBuffer) {
@@ -233,7 +233,7 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STR("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 } // namespace Envoy
