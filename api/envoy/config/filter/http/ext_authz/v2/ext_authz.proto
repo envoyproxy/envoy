@@ -68,7 +68,7 @@ message ExtAuthz {
   bool clear_route_cache = 6;
 
   // Sets the HTTP status that is returned to the client when a network error compromises the
-  // comunication between the filter and the authorization server. The default status is HTTP 403
+  // communication between the filter and the authorization server. The default status is HTTP 403
   // Forbidden.
   envoy.type.HttpStatus status_on_error = 7;
 }
