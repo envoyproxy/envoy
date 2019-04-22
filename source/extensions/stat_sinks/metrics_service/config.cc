@@ -8,8 +8,8 @@
 #include "common/grpc/async_client_impl.h"
 #include "common/network/resolver_impl.h"
 
-#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
+#include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 #include "extensions/stat_sinks/well_known_names.h"
 
 namespace Envoy {
