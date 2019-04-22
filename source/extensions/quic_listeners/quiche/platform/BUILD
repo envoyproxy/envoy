@@ -129,6 +129,7 @@ envoy_cc_library(
         ":quic_platform_logging_impl_lib",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:byte_order_lib",
         "//source/server:backtrace_lib",
     ]),
 )

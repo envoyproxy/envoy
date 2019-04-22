@@ -385,6 +385,9 @@ private:
     bool encode_trailers_ : 1;
     bool retried_ : 1;
     bool outlier_detection_timeout_recorded_ : 1;
+    // Tracks whether we deferred a per try timeout because the downstream request
+    // had not been completed yet.
+    bool create_per_try_timeout_on_request_complete_ : 1;
   };
 
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;

@@ -277,6 +277,7 @@ envoy_cc_test(
     name = "quic_platform_test",
     srcs = envoy_select_quiche(
         [
+            "quiche/quic/platform/api/quic_endian_test.cc",
             "quiche/quic/platform/api/quic_reference_counted_test.cc",
             "quiche/quic/platform/api/quic_string_utils_test.cc",
             "quiche/quic/platform/api/quic_text_utils_test.cc",
