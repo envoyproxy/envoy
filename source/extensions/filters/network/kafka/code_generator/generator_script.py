@@ -1,12 +1,13 @@
 #!/usr/bin/python
 
+
 def main():
   import sys
   import os
 
   output_file = os.path.abspath(sys.argv[1])
 
-  template = RenderingHelper.get_template('generated_header_h.j2')
+  template = RenderingHelper.get_template('code_cc.j2')
   contents = template.render()
 
   with open(output_file, 'w') as fd:

@@ -5,7 +5,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-class NormalCode {
+class Something {
+public:
   int doSomething();
 };
 

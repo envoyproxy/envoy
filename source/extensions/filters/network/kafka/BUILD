@@ -14,21 +14,10 @@ envoy_package()
 envoy_cc_library(
     name = "kafka_request_lib",
     srcs = [
-        "normal_code.cc",
+        "code.cc",
     ],
     hdrs = [
-        "normal_code.h",
-    ],
-    deps = [
-        ":generated_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "generated_lib",
-    srcs = [],
-    hdrs = [
-        "generated_header.h",
+        "header.h",
     ],
 )
 
@@ -37,9 +26,9 @@ genrule(
     srcs = [
     ],
     outs = [
-        "generated_header.h",
+        "code.cc",
     ],
-    cmd = "./$(location :code_generator_binary) $(location generated_header.h)",
+    cmd = "./$(location :code_generator_binary) $(location code.cc)",
     tools = [
         ":code_generator_binary",
     ],
