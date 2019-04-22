@@ -1143,7 +1143,8 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
       encode_complete_(false), encode_trailers_(false), retried_(false),
-      outlier_detection_timeout_recorded_(false), create_per_try_timeout_on_request_complete_(false) {
+      outlier_detection_timeout_recorded_(false),
+      create_per_try_timeout_on_request_complete_(false) {
 
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
