@@ -823,7 +823,7 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsIntegrationTest, TransparentAuthentic
   initialize();
 
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection[3];
+  std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
 
   // roundtrip to cluster_0 (catch_all route)
   roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n",

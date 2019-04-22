@@ -121,7 +121,7 @@ public:
 
   RedisProxyFilterTest() : RedisProxyFilterTest(default_config) {}
 
-  ~RedisProxyFilterTest() {
+  ~RedisProxyFilterTest() override {
     filter_.reset();
     for (const Stats::GaugeSharedPtr& gauge : store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());

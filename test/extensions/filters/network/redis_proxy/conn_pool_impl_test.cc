@@ -38,7 +38,6 @@ namespace {
 Common::Redis::RespValue makeAuthCommand(const std::string& password) {
   Common::Redis::RespValue auth_command;
   auth_command.type(Common::Redis::RespType::Array);
-  auth_command.asArray().emplace_back();
   auth_command.asArray().resize(2);
   auth_command.asArray()[0].type(Common::Redis::RespType::BulkString);
   auth_command.asArray()[1].type(Common::Redis::RespType::BulkString);

@@ -34,7 +34,7 @@ struct ResponseValues {
   const std::string AuthRequiredError = "NOAUTH Authentication required.";
 };
 
-typedef ConstSingleton<ResponseValues> Response;
+using Response = ConstSingleton<ResponseValues>;
 
 class Utility {
 public:

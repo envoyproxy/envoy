@@ -17,7 +17,7 @@ namespace CommandSplitter {
  */
 class SplitRequest {
 public:
-  virtual ~SplitRequest() {}
+  virtual ~SplitRequest() = default;
 
   /**
    * Cancel the request. No further request callbacks will be called.
@@ -32,7 +32,7 @@ typedef std::unique_ptr<SplitRequest> SplitRequestPtr;
  */
 class SplitCallbacks {
 public:
-  virtual ~SplitCallbacks() {}
+  virtual ~SplitCallbacks() = default;
 
   /**
    * Called to verify that commands should be processed.
@@ -59,7 +59,7 @@ public:
  */
 class Instance {
 public:
-  virtual ~Instance() {}
+  virtual ~Instance() = default;
 
   /**
    * Make a split redis request capable of being retried/redirected.
