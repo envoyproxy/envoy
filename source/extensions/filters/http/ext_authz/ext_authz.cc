@@ -139,7 +139,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *callbacks_);
       callbacks_->clearRouteCache();
     }
-
     for (const auto& header : response->headers_to_add) {
       ENVOY_STREAM_LOG(trace, " '{}':'{}'", *callbacks_, header.first.get(), header.second);
       Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
@@ -149,7 +148,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         request_headers_->addCopy(header.first, header.second);
       }
     }
-
     for (const auto& header : response->headers_to_append) {
       Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
       if (header_to_modify) {
@@ -157,7 +155,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         Http::HeaderMapImpl::appendToHeader(header_to_modify->value(), header.second);
       }
     }
-
     cluster_->statsScope().counter("ext_authz.ok").inc();
     continueDecoding();
     break;
