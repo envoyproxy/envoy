@@ -88,29 +88,6 @@ envoy_cc_library(
     ],
 )
 
-genrule(
-    name = "serialization_composite_generated_source",
-    srcs = [],
-    outs = [
-        "serialization_composite.h",
-    ],
-    cmd = """
-      ./$(location :serialization_composite_generator) generate-source \
-      $(location serialization_composite.h)
-    """,
-    tools = [
-        ":serialization_composite_generator",
-    ],
-)
-
-py_binary(
-    name = "serialization_composite_generator",
-    srcs = ["serialization_code_generator/serialization_composite_generator.py"],
-    data = glob(["serialization_code_generator/*.j2"]),
-    main = "serialization_code_generator/serialization_composite_generator.py",
-    deps = ["@com_github_pallets_jinja//:jinja2"],
-)
-
 envoy_cc_library(
     name = "kafka_protocol_lib",
     hdrs = [
