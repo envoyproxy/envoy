@@ -12,26 +12,25 @@ and held to a lower quality standard, but that is out of scope currently.
 The following procedure will be used when proposing new extensions for inclusion in the repository:
   1. A GitHub issue should be opened describing the proposed extension as with any major feature
   proposal.
-  1. All extensions must be sponsored by an existing maintainer. Sponsorship means that the
+  2. All extensions must be sponsored by an existing maintainer. Sponsorship means that the
   maintainer will shepherd the extension through design/code reviews. Maintainers can self-sponsor
   extensions if they are going to write them, shepherd them, and maintain them.
+  
+     Sponsorship serves two purposes:
+     * It ensures that the extension will ultimately meet the Envoy quality bar.
+     * It makes sure that incentives are aligned and that extensions are not added to the repo without
+     sufficient thought put into future maintenance.
 
-  Sponsorship serves two purposes.
-
-    - It ensures that the extension will ultimately meet the Envoy quality bar.
-    - It makes sure that incentives are aligned and that extensions are not added to the repo without
-    sufficient thought put into future maintenance.
-
-    *If sponsorship cannot be found from an existing maintainer, an organization can consider
-    [doing the work to become a maintainer](./GOVERNANCE.md#process-for-becoming-a-maintainer) in
-    order to be able to self-sponsor extensions.*
-
-  1. Each extension must have two reviewers proposed for reviewing PRs to the extension. Neither of
+     *If sponsorship cannot be found from an existing maintainer, an organization can consider
+     [doing the work to become a maintainer](./GOVERNANCE.md#process-for-becoming-a-maintainer) in
+     order to be able to self-sponsor extensions.*
+  
+  3. Each extension must have two reviewers proposed for reviewing PRs to the extension. Neither of
   the reviewers must be a senior maintainer. Existing maintainers (including the sponsor) and other
   contributors can count towards this number. The initial reviewers will be codified in the
   [CODEOWNERS](./CODEOWNERS) file for long term maintenance. These reviewers can be swapped out as
   needed.
-  1. Any extension added via this process becomes a full part of the repository. This means that any
+  4. Any extension added via this process becomes a full part of the repository. This means that any
   API breaking changes in the core code will be automatically fixed as part of the normal PR process
   by other contributors.
 
