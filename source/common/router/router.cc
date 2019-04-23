@@ -1237,13 +1237,16 @@ void Filter::UpstreamRequest::clearRequestEncoder() {
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHighWatermark() {
   ASSERT(parent_.request_encoder_);
   // The downstream connection is overrun. Pause reads from upstream.
+  // If there are multiple calls to readDisable either the codec (H2) or the underlying
+  // Network::Connection (H1) will handle reference counting.
   parent_.parent_.cluster_->stats().upstream_flow_control_paused_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(true);
 }
 
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
   ASSERT(parent_.request_encoder_);
-  // The downstream connection has buffer available. Resume reads from upstream.
+  // One source of connection blockage has buffer available.  Pass this on to the stream, which
+  // will resume reads if this was the last remaining high watermark.
   parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(false);
 }
