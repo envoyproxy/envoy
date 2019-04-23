@@ -67,6 +67,7 @@ public:
   const LowerCaseString Etag{"etag"};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
+  const LowerCaseString ForwardedUntrustedClientCert{"x-forwarded-untrusted-client-cert"};
   const LowerCaseString ForwardedFor{"x-forwarded-for"};
   const LowerCaseString ForwardedHost{"x-forwarded-host"};
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};

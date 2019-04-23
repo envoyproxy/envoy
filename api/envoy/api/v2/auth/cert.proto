@@ -256,6 +256,16 @@ message CertificateValidationContext {
 
   // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
+
+  // If specified, Envoy will always request for clients to provide their
+  // certificate.
+  bool request_client_certificate = 9;
+
+  // If specified, Envoy will NOT reject connections using client certificates that have failed validation.
+  bool permit_untrusted_client_certificate = 10;
+
+  // If specified, Envoy will NOT require a client certificate if a validation context exists.
+  bool validation_permits_no_client_certificate = 11;
 }
 
 // TLS context shared by both client and server TLS contexts.

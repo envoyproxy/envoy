@@ -32,6 +32,9 @@ public:
     return verify_certificate_spki_list_;
   }
   bool allowExpiredCertificate() const override { return allow_expired_certificate_; }
+  bool requestClientCertificate() const override { return request_client_certificate_; }
+  bool permitUntrustedClientCertificate() const override { return permit_untrusted_client_certificate_; }
+  bool validationPermitsNoClientCertificate() const override { return validation_permits_no_client_certificate_; }
 
 private:
   const std::string ca_cert_;
@@ -42,6 +45,9 @@ private:
   const std::vector<std::string> verify_certificate_hash_list_;
   const std::vector<std::string> verify_certificate_spki_list_;
   const bool allow_expired_certificate_;
+  const bool request_client_certificate_;
+  const bool permit_untrusted_client_certificate_;
+  const bool validation_permits_no_client_certificate_;
 };
 
 } // namespace Ssl
