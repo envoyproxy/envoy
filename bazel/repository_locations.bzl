@@ -129,13 +129,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "ab3af422b7e4c6d9276b3637d87edb6cf628fd91c9206260b759778c3a28b330",
-        # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
-        # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
-        # in the watchers (see https://github.com/libevent/libevent/pull/802).
-        # TODO(mergeconflict): Update to v2.2 when it is released.
-        strip_prefix = "libevent-1cd8830de27c30c5324c75bfb6012c969c09ca2c",
-        urls = ["https://github.com/libevent/libevent/archive/1cd8830de27c30c5324c75bfb6012c969c09ca2c.tar.gz"],
+        sha256 = "53d4bb49b837944893b7caf9ae8eb43e94690ee5babea6469cc4a928722f99b1",
+        strip_prefix = "libevent-c4fbae3ae6166dddfa126734edd63213afa14dce",
+        urls = ["https://github.com/libevent/libevent/archive/c4fbae3ae6166dddfa126734edd63213afa14dce.tar.gz"],
     ),
     com_github_madler_zlib = dict(
         sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",

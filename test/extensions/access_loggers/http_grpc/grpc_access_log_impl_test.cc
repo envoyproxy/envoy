@@ -227,6 +227,7 @@ http_logs:
     stream_info.addBytesReceived(10);
     stream_info.addBytesSent(20);
     stream_info.response_code_ = 200;
+    stream_info.response_code_details_ = "via_upstream";
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 
@@ -300,6 +301,7 @@ http_logs:
         value: 200
       response_headers_bytes: 10
       response_body_bytes: 20
+      response_code_details: "via_upstream"
 )EOF");
     access_log_->log(&request_headers, &response_headers, nullptr, stream_info);
   }

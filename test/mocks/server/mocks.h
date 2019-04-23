@@ -307,7 +307,7 @@ public:
   MOCK_METHOD0(numConnections, uint64_t());
   MOCK_METHOD2(removeListener,
                void(Network::ListenerConfig& listener, std::function<void()> completion));
-  MOCK_METHOD3(start, void(GuardDog& guard_dog, Stats::Scope& scope, const std::string& prefix));
+  MOCK_METHOD1(start, void(GuardDog& guard_dog));
   MOCK_METHOD0(stop, void());
   MOCK_METHOD1(stopListener, void(Network::ListenerConfig& listener));
   MOCK_METHOD0(stopListeners, void());
