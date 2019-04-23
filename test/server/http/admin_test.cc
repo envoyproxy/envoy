@@ -1240,7 +1240,7 @@ TEST_P(AdminInstanceTest, GetReadyzRequest) {
     Http::HeaderMapImpl response_headers;
     std::string body;
 
-    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::NotInitialized));
+    ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
     EXPECT_EQ(Http::Code::ServiceUnavailable, admin_.request("/readyz", "GET", response_headers, body));
     EXPECT_EQ(body, "PRE_INITIALIZING\n");
     EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
