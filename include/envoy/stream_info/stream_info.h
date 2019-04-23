@@ -65,9 +65,17 @@ enum ResponseFlag {
   LastFlag = StreamIdleTimeout
 };
 
+/**
+ * Constants for the response code details field of StreamInfo.
+ *
+ * These provide details about the stream state such as whether the
+ * response is from the upstream or from envoy (in case of a local reply).
+ * Custom extensions can define additional values provided they are appropriately
+ * scoped to avoid collisions.
+ */
 struct ResponseCodeDetailValues {
-  const std::string SET_BY_UPSTREAM = "set_by_upstream";
-  // Envoy is doing non-streaming proxying, and the request payload exceeded
+  // Response code was set by the upstream.
+  const std::string ViaUpstream = "via_upstream";
   // configured limits.
   const std::string REQUEST_PAYLOAD_TOO_LARGE = "request_payload_too_large";
   // Envoy is doing non-streaming proxying, and the response payload exceeded
@@ -105,6 +113,7 @@ struct ResponseCodeDetailValues {
   const std::string NO_HEALTHY_UPSTREAM = "no_healthy_upstream";
   // The upstream stream was reset
   const std::string Upstream = "upstream_reset{%s}";
+  // TODO(#6542): continue addding values for sendLocalReply use-cases
 };
 
 typedef ConstSingleton<ResponseCodeDetailValues> ResponseCodeDetails;
@@ -162,6 +171,12 @@ public:
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
+   * @param rc_details the response code details string to set for this request.
+   * See ResponseCodeDetailValues above for well-known constants.
+   */
+  virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
+
+  /**
    * @param response_flags the response_flags to intersect with.
    * @return true if the intersection of the response_flags argument and the currently set response
    * flags is non-empty.
@@ -197,6 +212,11 @@ public:
    * @return the response code.
    */
   virtual absl::optional<uint32_t> responseCode() const PURE;
+
+  /**
+   * @return the response code details.
+   */
+  virtual const absl::optional<std::string>& responseCodeDetails() const PURE;
 
   /**
    * @return the time that the first byte of the request was received.

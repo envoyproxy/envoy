@@ -25,6 +25,8 @@ distribution.
 * Cluster manager :ref:`configuration <config_cluster_manager>`.
 * CDS :ref:`configuration <config_cluster_manager_cds>`.
 
+.. _arch_overview_cluster_warming:
+
 Cluster warming
 ---------------
 

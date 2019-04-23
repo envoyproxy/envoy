@@ -32,6 +32,7 @@ else
 fi
 
 SCRIPT_DIR=$(dirname "$0")
+API_DIR=$(dirname "$dir")/api
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 [[ -z "${GENERATED_RST_DIR}" ]] && GENERATED_RST_DIR=generated/rst
@@ -105,6 +106,9 @@ PROTO_RST="
   /envoy/config/filter/http/tap/v2alpha/tap/envoy/config/filter/http/tap/v2alpha/tap.proto.rst
   /envoy/config/filter/http/transcoder/v2/transcoder/envoy/config/filter/http/transcoder/v2/transcoder.proto.rst
   /envoy/config/filter/listener/original_src/v2alpha1/original_src/envoy/config/filter/listener/original_src/v2alpha1/original_src.proto.rst
+  /envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy/envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.proto.rst
+  /envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy/envoy/config/filter/network/dubbo_proxy/v2alpha1/route.proto.rst
+  /envoy/config/filter/dubbo/router/v2alpha1/router/envoy/config/filter/dubbo/router/v2alpha1/router.proto.rst
   /envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth/envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.proto.rst
   /envoy/config/filter/network/ext_authz/v2/ext_authz/envoy/config/filter/network/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/network/http_connection_manager/v2/http_connection_manager/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.rst
@@ -155,6 +159,12 @@ do
   cp -f bazel-bin/external/envoy_api/"${p}" "$(dirname "${DEST}")"
   [ -n "${CPROFILE_ENABLED}" ] && cp -f bazel-bin/"${p}".profile "$(dirname "${DEST}")"
 done
+
+mkdir -p ${GENERATED_RST_DIR}/api-docs
+
+cp -f $API_DIR/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+
+rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 
 rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${GENERATED_RST_DIR}"
 

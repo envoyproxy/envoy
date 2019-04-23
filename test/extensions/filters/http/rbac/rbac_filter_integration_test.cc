@@ -57,7 +57,7 @@ TEST_P(RBACIntegrationTest, Allowed) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(RBACIntegrationTest, Denied) {
@@ -77,7 +77,7 @@ TEST_P(RBACIntegrationTest, Denied) {
       1024);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("403", response->headers().Status()->value().c_str());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
@@ -104,7 +104,7 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
@@ -129,7 +129,7 @@ TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("403", response->headers().Status()->value().c_str());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(RBACIntegrationTest, DeniedHeadReply) {
@@ -149,10 +149,10 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
       1024);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("403", response->headers().Status()->value().c_str());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
   ASSERT_TRUE(response->headers().ContentLength());
-  EXPECT_STRNE("0", response->headers().ContentLength()->value().c_str());
-  EXPECT_STREQ("", response->body().c_str());
+  EXPECT_NE("0", response->headers().ContentLength()->value().getStringView());
+  EXPECT_THAT(response->body(), ::testing::IsEmpty());
 }
 
 TEST_P(RBACIntegrationTest, RouteOverride) {
@@ -188,7 +188,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 } // namespace

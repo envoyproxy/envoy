@@ -185,7 +185,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         config.tcp_fast_open_queue_length().value()));
   }
 
-  if (config.socket_options().size() > 0) {
+  if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
