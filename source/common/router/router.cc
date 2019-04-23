@@ -1284,7 +1284,7 @@ void Filter::UpstreamRequest::DownstreamWatermarkManager::onAboveWriteBufferHigh
 void Filter::UpstreamRequest::DownstreamWatermarkManager::onBelowWriteBufferLowWatermark() {
   ASSERT(parent_.request_encoder_);
   ASSERT(parent_.parent_.upstream_requests_.size() == 1);
-  // One source of connection blockage has buffer available.  Pass this on to the stream, which
+  // One source of connection blockage has buffer available. Pass this on to the stream, which
   // will resume reads if this was the last remaining high watermark.
   parent_.parent_.cluster_->stats().upstream_flow_control_resumed_reading_total_.inc();
   parent_.request_encoder_->getStream().readDisable(false);

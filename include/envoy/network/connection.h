@@ -145,7 +145,7 @@ public:
    * the filter chain.
    * @param disable supplies TRUE is reads should be disabled, FALSE if they should be enabled.
    *
-   * Note that this function reference counts calls.  For example
+   * Note that this function reference counts calls. For example
    * readDisable(true);  // Disables data
    * readDisable(true);  // Notes the connection is blocked by two sources
    * readDisable(false);  // Notes the connection is blocked by one source
