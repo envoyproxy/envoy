@@ -481,7 +481,7 @@ message ScopedRoutes {
 
         oneof extract_type {
           // Specifies the index of the element to extract.
-          int32 index = 3;
+          uint32 index = 3;
 
           // Specifies the key value pair to extract the value from.
           KvElement element = 4;
