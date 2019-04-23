@@ -3104,7 +3104,7 @@ TEST_F(HttpConnectionManagerImplTest, HitFilterWatermarkLimits) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndWatermark));
   decoder_filters_[0]->callbacks_->encodeData(fake_response, false);
 
-  // deregister callbacks2
+  // unregister callbacks2
   decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks2);
 
   // Change the limit so the buffered data is below the new watermark.
