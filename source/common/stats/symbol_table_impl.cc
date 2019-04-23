@@ -317,6 +317,36 @@ void StatNameStorage::free(SymbolTable& table) {
   bytes_.reset();
 }
 
+StatNameStorageSet::~StatNameStorageSet() {
+  // free() must be called before destructing StatNameStorageSet to decrement
+  // references to all symbols.
+  ASSERT(hash_set_.empty());
+}
+
+void StatNameStorageSet::free(SymbolTable& symbol_table) {
+  // We must free() all symbols referenced in the set, otherwise the symbols
+  // will leak when the flat_hash_map superclass is destructed. They cannot
+  // self-destruct without an explicit free() as each individual StatNameStorage
+  // object does not have a reference to the symbol table, which would waste 8
+  // bytes per stat-name. The easiest way to safely free all the contents of the
+  // symbol table set is to use flat_hash_map::extract(), which removes and
+  // returns an element from the set without destructing the element
+  // immediately. This gives us a chance to call free() on each one before they
+  // are destroyed.
+  //
+  // There's a performance risk here, if removing elements via
+  // flat_hash_set::begin() is inefficient to use in a loop like this. One can
+  // imagine a hash-table implementation where the performance of this
+  // usage-model would be poor. However, tests with 100k elements appeared to
+  // run quickly when compiled for optimization, so at present this is not a
+  // performance issue.
+
+  while (!hash_set_.empty()) {
+    auto storage = hash_set_.extract(hash_set_.begin());
+    storage.value().free(symbol_table);
+  }
+}
+
 SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {

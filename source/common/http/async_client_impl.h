@@ -234,6 +234,9 @@ private:
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return absl::nullopt;
     }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
+      return absl::nullopt;
+    }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
       return nullptr;
     }
