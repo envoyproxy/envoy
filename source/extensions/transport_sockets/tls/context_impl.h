@@ -44,6 +44,14 @@ struct SslStats {
   ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
+struct ClientValidationStatus {
+  enum class Status { NotValidated, NoClientCertificate, Validated, Failed };
+
+  ClientValidationStatus() : status(Status::NotValidated) {}
+
+  Status status;
+};
+
 class ContextImpl : public virtual Envoy::Ssl::Context {
 public:
   virtual bssl::UniquePtr<SSL> newSsl(absl::optional<std::string> override_server_name);
@@ -73,6 +81,12 @@ public:
 
   SslStats& stats() { return stats_; }
 
+  /**
+   * The global SSL-library index used for storing a pointer to the SslSocket
+   * class in the SSL instance, for retrieval in callbacks.
+   */
+  static int sslCustomDataIndex();
+
   // Ssl::Context
   size_t daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
@@ -94,7 +108,7 @@ protected:
   // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
 
-  int verifyCertificate(X509* cert);
+  ClientValidationStatus::Status verifyCertificate(X509* cert);
 
   /**
    * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER-encoded
@@ -150,6 +164,7 @@ protected:
   std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
+  bool allow_untrusted_certificate_{false};
   Stats::Scope& scope_;
   SslStats stats_;
   std::vector<uint8_t> parsed_alpn_protocols_;

@@ -48,6 +48,11 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
       ssl_(ctx_->newSsl(transport_socket_options != nullptr
                             ? transport_socket_options->serverNameOverride()
                             : absl::nullopt)) {
+  if (!SSL_set_ex_data(ssl_.get(), ctx_->sslCustomDataIndex(),
+                       &(this->certificate_validation_status_))) {
+    ENVOY_LOG(error, "SslSocket::SslSocket SSL_set_ex_data failed");
+  }
+
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
@@ -250,6 +255,10 @@ void SslSocket::shutdownSsl() {
 bool SslSocket::peerCertificatePresented() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   return cert != nullptr;
+}
+
+bool SslSocket::peerCertificateValidated() const {
+  return certificate_validation_status_.status == ClientValidationStatus::Status::Validated;
 }
 
 std::vector<std::string> SslSocket::uriSanLocalCertificate() const {

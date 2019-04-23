@@ -298,6 +298,7 @@ private:
   HEADER_FUNC(Etag)                                                                                \
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
+  HEADER_FUNC(ForwardedUntrustedClientCert)                                                        \
   HEADER_FUNC(ForwardedFor)                                                                        \
   HEADER_FUNC(ForwardedProto)                                                                      \
   HEADER_FUNC(GrpcAcceptEncoding)                                                                  \
