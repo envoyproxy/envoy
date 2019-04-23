@@ -48,6 +48,7 @@ public:
 
   // Ssl::Connection
   bool peerCertificatePresented() const override;
+  bool peerCertificateValidated() const override;
   std::vector<std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   std::string serialNumberPeerCertificate() const override;
@@ -86,6 +87,7 @@ private:
   bool shutdown_sent_{};
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
+  ClientValidationStatus certificate_validation_status_{};
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;

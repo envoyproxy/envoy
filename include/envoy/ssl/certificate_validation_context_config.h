@@ -54,6 +54,22 @@ public:
    * @return whether to ignore expired certificates (both too new and too old).
    */
   virtual bool allowExpiredCertificate() const PURE;
+
+  /**
+   * @return True if client certificate is requested (without being required), false otherwise.
+   */
+  virtual bool requestClientCertificate() const PURE;
+
+  /**
+   * @return True if client certificate does not require validation, false otherwise.
+   */
+  virtual bool permitUntrustedClientCertificate() const PURE;
+
+  /**
+   * @return True if client certificate is NOT required to be presented when a validation context
+   * exists.
+   */
+  virtual bool validationPermitsNoClientCertificate() const PURE;
 };
 
 typedef std::unique_ptr<CertificateValidationContextConfig> CertificateValidationContextConfigPtr;
