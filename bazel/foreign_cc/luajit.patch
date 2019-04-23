@@ -29,7 +29,7 @@ index f56465d..3f4f2fa 100644
  # code (e.g. __pairs or os.execute() return values) can be enabled here.
  # Note: this does not provide full compatibility with Lua 5.2 at this time.
 -#XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
-+XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT
++XCFLAGS+= -DLUAJIT_ENABLE_LUA52COMPAT -DLUAJIT_ENABLE_GC64
  #
  # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
  #XCFLAGS+= -DLUAJIT_DISABLE_JIT
@@ -80,7 +80,7 @@ index 0000000..9c71271
 +      with open("clang-asan-blacklist.txt", "w") as f:
 +        f.write("fun:lj_*\nfun:bcread_*\n")
 +
-+    os.system('make V=1 PREFIX="{}" XCFLAGS=-DLUAJIT_ENABLE_GC64 install'.format(args.prefix))
++    os.system('make V=1 PREFIX="{}" install'.format(args.prefix))
 +
 +main()
 +
