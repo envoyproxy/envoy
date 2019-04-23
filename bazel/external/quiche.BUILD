@@ -31,7 +31,6 @@ load(
     "envoy_cc_library",
     "envoy_cc_test",
     "envoy_cc_test_library",
-    "envoy_copts",
     "envoy_select_quiche",
 )
 
@@ -294,7 +293,7 @@ envoy_cc_test_library(
         "quiche/epoll_server/fake_simple_epoll_server.h",
         "quiche/epoll_server/simple_epoll_server.h",
     ],
-    copts = envoy_copts("@envoy") + quiche_copt,
+    copts = quiche_copt,
     repository = "@envoy",
     deps = [":epoll_server_platform"],
 )
