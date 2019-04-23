@@ -47,7 +47,7 @@ public:
   NiceMock<MockOverloadManager> overload_manager_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  DefaultTestHooks hooks_;
+  DefaultListenerHooks hooks_;
   Event::TimerPtr no_exit_timer_;
   WorkerImpl worker_;
 };
@@ -71,7 +71,9 @@ TEST_F(WorkerImplTest, BasicFlow) {
     ci.setReady();
   });
 
+  NiceMock<Stats::MockStore> store;
   worker_.start(guard_dog_);
+  worker_.initializeStats(store, "test");
   ci.waitReady();
 
   // After a worker is started adding/stopping/removing a listener happens on the worker thread.

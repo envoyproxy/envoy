@@ -474,11 +474,13 @@ def execute(files, dictionary_file, fix):
   if fix:
     handler = partial(fix_error, checker)
 
+  total_files = 0
   total_comments = 0
   total_errors = 0
   for path in files:
     with open(path, 'r') as f:
       lines = f.readlines()
+      total_files += 1
       (num_comments, num_errors) = check_file(checker, path, lines, handler)
       total_comments += num_comments
       total_errors += num_errors
@@ -489,7 +491,8 @@ def execute(files, dictionary_file, fix):
 
   checker.stop()
 
-  print("Checked %d comments, found %d errors." % (total_comments, total_errors))
+  print("Checked %d file(s) and %d comment(s), found %d error(s)." % (total_files, total_comments,
+                                                                      total_errors))
 
   return total_errors == 0
 
@@ -525,14 +528,18 @@ if __name__ == "__main__":
   DEBUG = args.debug
   MARK = args.mark
 
-  target_paths = args.target_paths
-  if not target_paths:
-    exts = ['.cc', '.h', '.proto']
-    target_paths = []
+  paths = args.target_paths
+  if not paths:
     paths = ['./api', './include', './source', './test']
-    for p in paths:
+
+  exts = ['.cc', '.h', '.proto']
+  target_paths = []
+  for p in paths:
+    if os.path.isdir(p):
       for root, _, files in os.walk(p):
         target_paths += [os.path.join(root, f) for f in files if os.path.splitext(f)[1] in exts]
+    if os.path.isfile(p) and os.path.splitext(p)[1] in exts:
+      target_paths += [p]
 
   rv = execute(target_paths, args.dictionary, args.operation_type == 'fix')
 
