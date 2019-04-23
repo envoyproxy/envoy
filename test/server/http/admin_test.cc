@@ -1241,7 +1241,8 @@ TEST_P(AdminInstanceTest, GetReadyzRequest) {
     std::string body;
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
-    EXPECT_EQ(Http::Code::ServiceUnavailable, admin_.request("/readyz", "GET", response_headers, body));
+    EXPECT_EQ(Http::Code::ServiceUnavailable,
+              admin_.request("/readyz", "GET", response_headers, body));
     EXPECT_EQ(body, "PRE_INITIALIZING\n");
     EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
                 HasSubstr("text/plain"));
@@ -1251,7 +1252,8 @@ TEST_P(AdminInstanceTest, GetReadyzRequest) {
   std::string body;
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
-  EXPECT_EQ(Http::Code::ServiceUnavailable, admin_.request("/readyz", "GET", response_headers, body));
+  EXPECT_EQ(Http::Code::ServiceUnavailable,
+            admin_.request("/readyz", "GET", response_headers, body));
   EXPECT_EQ(body, "INITIALIZING\n");
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
               HasSubstr("text/plain"));

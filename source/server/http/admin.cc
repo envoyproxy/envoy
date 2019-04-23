@@ -661,8 +661,8 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
   return Http::Code::OK;
 }
 
-Http::Code AdminImpl::handlerReadyz(absl::string_view, Http::HeaderMap&,
-                                        Buffer::Instance& response, AdminStream&) {
+Http::Code AdminImpl::handlerReadyz(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
+                                    AdminStream&) {
   envoy::admin::v2alpha::ServerInfo::State state;
 
   switch (server_.initManager().state()) {
@@ -674,12 +674,13 @@ Http::Code AdminImpl::handlerReadyz(absl::string_view, Http::HeaderMap&,
     break;
   default:
     state = server_.healthCheckFailed() ? envoy::admin::v2alpha::ServerInfo::DRAINING
-                                                      : envoy::admin::v2alpha::ServerInfo::LIVE;
+                                        : envoy::admin::v2alpha::ServerInfo::LIVE;
   }
 
   response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
-  Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE ? Http::Code::OK
-                                                      : Http::Code::ServiceUnavailable;
+  Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
+                        ? Http::Code::OK
+                        : Http::Code::ServiceUnavailable;
   return code;
 }
 
