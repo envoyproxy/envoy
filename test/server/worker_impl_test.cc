@@ -47,7 +47,7 @@ public:
   NiceMock<MockOverloadManager> overload_manager_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  DefaultTestHooks hooks_;
+  DefaultListenerHooks hooks_;
   Event::TimerPtr no_exit_timer_;
   WorkerImpl worker_;
 };
