@@ -8,6 +8,13 @@ At it's simplest, CSRF is an attack that occurs when a malicious third-party
 exploits a vulnerability that allows them to submit an undesired request on the
 user's behalf.
 
+A real-life example is cited in section 1 of `Robust Defenses for Cross-Site Request Forgery <https://seclab.stanford.edu/websec/csrf/csrf.pdf>`_:
+
+    "For example, in late 2007 [42], Gmail had a CSRF vulnerability. When a Gmail user visited
+    a malicious site, the malicious site could generate a request to Gmail that Gmail treated
+    as part of its ongoing session with the victim. In November 2007, a web attacker exploited
+    this CSRF vulnerability to inject an email filter into David Airey’s Gmail account [1]."
+
 There are many ways to mitigate CSRF, some of which have been outlined in the
 `OWASP Prevention Cheat Sheet <https://github.com/OWASP/CheatSheetSeries/blob/5a1044e38778b42a19c6adbb4dfef7a0fb071099/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.md>`_.
 This filter employs a stateless mitigation pattern known as origin verification.
