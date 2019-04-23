@@ -70,10 +70,11 @@ QueryParams parseQueryString(absl::string_view url);
 /**
  * Finds the start of the query string in a path
  * @param path supplies a HeaderString& to search for the query string
- * @return const char* a pointer to the beginning of the query string, or the end of the
- *         path if there is no query
+ * @return absl::string_view starting at the beginning of the query string,
+ *         or a string_view starting at the end of the path if there was
+ *         no query string.
  */
-const char* findQueryStringStart(const HeaderString& path);
+absl::string_view findQueryStringStart(const HeaderString& path);
 
 /**
  * Parse a particular value out of a cookie

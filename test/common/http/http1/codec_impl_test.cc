@@ -787,7 +787,9 @@ TEST_F(Http1ClientConnectionImplTest, Reset) {
   request_encoder.getStream().resetStream(StreamResetReason::LocalReset);
 }
 
-TEST_F(Http1ClientConnectionImplTest, MultipleHeaderOnlyThenNoContentLength) {
+// Verify that we correctly enable reads on the connection when the final pipeline response is
+// received.
+TEST_F(Http1ClientConnectionImplTest, FlowControlReadDisabledReenable) {
   initialize();
 
   Http::MockStreamDecoder response_decoder;
@@ -796,26 +798,36 @@ TEST_F(Http1ClientConnectionImplTest, MultipleHeaderOnlyThenNoContentLength) {
   std::string output;
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
+  // 1st pipeline request.
   TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   request_encoder->encodeHeaders(headers, true);
-
   EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
   output.clear();
 
+  // 2nd pipeline request.
+  request_encoder = &codec_->newStream(response_decoder);
+  request_encoder->encodeHeaders(headers, false);
+  Buffer::OwnedImpl empty;
+  request_encoder->encodeData(empty, true);
+  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n", output);
+
+  // 1st response.
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  Buffer::OwnedImpl response("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
+  codec_->dispatch(response);
+
   // Simulate the underlying connection being backed up. Ensure that it is
-  // read-enabled as the new stream is created.
+  // read-enabled when the final response completes.
   EXPECT_CALL(connection_, readEnabled())
       .Times(2)
       .WillOnce(Return(false))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(connection_, readDisable(false));
-  request_encoder = &codec_->newStream(response_decoder);
-  request_encoder->encodeHeaders(headers, false);
 
-  Buffer::OwnedImpl empty;
-  request_encoder->encodeData(empty, true);
-
-  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\ntransfer-encoding: chunked\r\n\r\n0\r\n\r\n", output);
+  // 2nd response.
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, true));
+  Buffer::OwnedImpl response2("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
+  codec_->dispatch(response2);
 }
 
 TEST_F(Http1ClientConnectionImplTest, PrematureResponse) {

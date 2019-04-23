@@ -1,3 +1,9 @@
+// NOLINT(namespace-envoy)
+
+// This file is part of the QUICHE platform implementation, and is not to be
+// consumed or referenced directly by other Envoy code. It serves purely as a
+// porting layer for QUICHE.
+
 #include <memory>
 
 #include "test/test_common/logging.h"
@@ -8,6 +14,7 @@
 #include "quiche/http2/platform/api/http2_containers.h"
 #include "quiche/http2/platform/api/http2_estimate_memory_usage.h"
 #include "quiche/http2/platform/api/http2_logging.h"
+#include "quiche/http2/platform/api/http2_macros.h"
 #include "quiche/http2/platform/api/http2_optional.h"
 #include "quiche/http2/platform/api/http2_ptr_util.h"
 #include "quiche/http2/platform/api/http2_string.h"
@@ -19,10 +26,7 @@
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
-namespace Envoy {
-namespace Extensions {
-namespace QuicListeners {
-namespace Quiche {
+namespace http2 {
 namespace {
 
 TEST(Http2PlatformTest, Http2Arraysize) {
@@ -96,8 +100,10 @@ TEST(Http2PlatformTest, Http2StringPiece) {
   EXPECT_EQ('b', sp[0]);
 }
 
+TEST(Http2PlatformTest, Http2Macro) {
+  EXPECT_DEBUG_DEATH(HTTP2_UNREACHABLE(), "");
+  EXPECT_DEATH(HTTP2_DIE_IF_NULL(nullptr), "");
+}
+
 } // namespace
-} // namespace Quiche
-} // namespace QuicListeners
-} // namespace Extensions
-} // namespace Envoy
+} // namespace http2

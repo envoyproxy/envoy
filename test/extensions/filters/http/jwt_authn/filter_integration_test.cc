@@ -111,7 +111,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 // With local Jwks, this test verifies a request is rejected with an expired Jwt token.
@@ -131,7 +131,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(LocalJwksIntegrationTest, MissingToken) {
@@ -149,7 +149,7 @@ TEST_P(LocalJwksIntegrationTest, MissingToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
@@ -168,9 +168,9 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
-  EXPECT_STRNE("0", response->headers().ContentLength()->value().c_str());
-  EXPECT_STREQ("", response->body().c_str());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
+  EXPECT_NE("0", response->headers().ContentLength()->value().getStringView());
+  EXPECT_THAT(response->body(), ::testing::IsEmpty());
 }
 
 // This test verifies a request is passed with a path that don't match any requirements.
@@ -192,7 +192,7 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 // This test verifies JwtRequirement specified from filer state rules
@@ -269,7 +269,7 @@ TEST_P(LocalJwksIntegrationTest, FilterStateRequirement) {
 
     response->waitForEndStream();
     ASSERT_TRUE(response->complete());
-    EXPECT_EQ(test.expected_status, response->headers().Status()->value().c_str());
+    EXPECT_EQ(test.expected_status, response->headers().Status()->value().getStringView());
   }
 }
 
@@ -364,7 +364,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 
   cleanup();
 }
@@ -389,7 +389,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
 
   cleanup();
 }

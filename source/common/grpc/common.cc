@@ -31,7 +31,8 @@ bool Common::hasGrpcContentType(const Http::HeaderMap& headers) {
          absl::StartsWith(content_type->value().getStringView(),
                           Http::Headers::get().ContentTypeValues.Grpc) &&
          (content_type->value().size() == Http::Headers::get().ContentTypeValues.Grpc.size() ||
-          content_type->value().c_str()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
+          content_type->value()
+                  .getStringView()[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
 bool Common::isGrpcResponseHeader(const Http::HeaderMap& headers, bool end_stream) {
@@ -53,11 +54,13 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
   }
   cluster.statsScope()
       .counter(fmt::format("{}.{}.{}.{}", protocol, grpc_service, grpc_method,
-                           grpc_status->value().c_str()))
+                           grpc_status->value().getStringView()))
       .inc();
   uint64_t grpc_status_code;
+  const std::string grpc_status_string(grpc_status->value().getStringView());
+  // TODO(dnoe): Migrate to pure string_view (#6580)
   const bool success =
-      StringUtil::atoull(grpc_status->value().c_str(), grpc_status_code) && grpc_status_code == 0;
+      StringUtil::atoull(grpc_status_string.c_str(), grpc_status_code) && grpc_status_code == 0;
   chargeStat(cluster, protocol, grpc_service, grpc_method, success);
 }
 
@@ -85,7 +88,9 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
   if (!grpc_status_header || grpc_status_header->value().empty()) {
     return absl::optional<Status::GrpcStatus>();
   }
-  if (!StringUtil::atoull(grpc_status_header->value().c_str(), grpc_status_code) ||
+  // TODO(dnoe): Migrate to pure string_view (#6580)
+  std::string grpc_status_header_string(grpc_status_header->value().getStringView());
+  if (!StringUtil::atoull(grpc_status_header_string.c_str(), grpc_status_code) ||
       grpc_status_code > Status::GrpcStatus::MaximumValid) {
     return absl::optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }
@@ -94,15 +99,15 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
 
 std::string Common::getGrpcMessage(const Http::HeaderMap& trailers) {
   const auto entry = trailers.GrpcMessage();
-  return entry ? entry->value().c_str() : EMPTY_STRING;
+  return entry ? std::string(entry->value().getStringView()) : EMPTY_STRING;
 }
 
 bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string* service,
                                      std::string* method) {
-  if (path == nullptr || path->value().c_str() == nullptr) {
+  if (path == nullptr) {
     return false;
   }
-  const auto parts = StringUtil::splitToken(path->value().c_str(), "/");
+  const auto parts = StringUtil::splitToken(path->value().getStringView(), "/");
   if (parts.size() != 2) {
     return false;
   }
@@ -138,8 +143,9 @@ std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_header
   Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
   if (header_grpc_timeout_entry) {
     uint64_t grpc_timeout;
-    const char* unit =
-        StringUtil::strtoull(header_grpc_timeout_entry->value().c_str(), grpc_timeout);
+    // TODO(dnoe): Migrate to pure string_view (#6580)
+    std::string grpc_timeout_string(header_grpc_timeout_entry->value().getStringView());
+    const char* unit = StringUtil::strtoull(grpc_timeout_string.c_str(), grpc_timeout);
     if (unit != nullptr && *unit != '\0') {
       switch (*unit) {
       case 'H':
@@ -231,9 +237,7 @@ void Common::checkForHeaderOnlyError(Http::Message& http_response) {
     throw Exception(absl::optional<uint64_t>(), "bad grpc-status header");
   }
 
-  const Http::HeaderEntry* grpc_status_message = http_response.headers().GrpcMessage();
-  throw Exception(grpc_status_code.value(),
-                  grpc_status_message ? grpc_status_message->value().c_str() : EMPTY_STRING);
+  throw Exception(grpc_status_code.value(), Common::getGrpcMessage(http_response.headers()));
 }
 
 void Common::validateResponse(Http::Message& http_response) {
@@ -255,9 +259,7 @@ void Common::validateResponse(Http::Message& http_response) {
   }
 
   if (grpc_status_code.value() != 0) {
-    const Http::HeaderEntry* grpc_status_message = http_response.trailers()->GrpcMessage();
-    throw Exception(grpc_status_code.value(),
-                    grpc_status_message ? grpc_status_message->value().c_str() : EMPTY_STRING);
+    throw Exception(grpc_status_code.value(), Common::getGrpcMessage(*http_response.trailers()));
   }
 }
 

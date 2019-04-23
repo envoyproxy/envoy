@@ -145,9 +145,10 @@ TEST_F(ZipkinDriverTest, FlushSeveralSpans) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
-            EXPECT_STREQ("application/json", message->headers().ContentType()->value().c_str());
+            EXPECT_EQ("/api/v1/spans", message->headers().Path()->value().getStringView());
+            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
+            EXPECT_EQ("application/json",
+                      message->headers().ContentType()->value().getStringView());
 
             return &request;
           }));
@@ -195,9 +196,10 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_STREQ("/api/v1/spans", message->headers().Path()->value().c_str());
-            EXPECT_STREQ("fake_cluster", message->headers().Host()->value().c_str());
-            EXPECT_STREQ("application/json", message->headers().ContentType()->value().c_str());
+            EXPECT_EQ("/api/v1/spans", message->headers().Path()->value().getStringView());
+            EXPECT_EQ("fake_cluster", message->headers().Host()->value().getStringView());
+            EXPECT_EQ("application/json",
+                      message->headers().ContentType()->value().getStringView());
 
             return &request;
           }));
@@ -633,9 +635,9 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, false});
 
-  typedef std::function<bool(const std::string& key)> DupCallback;
-  DupCallback dup_callback = [](const std::string& key) -> bool {
-    static std::unordered_map<std::string, bool> dup;
+  typedef std::function<bool(absl::string_view key)> DupCallback;
+  DupCallback dup_callback = [](absl::string_view key) -> bool {
+    static absl::flat_hash_map<std::string, bool> dup;
     if (dup.find(key) == dup.end()) {
       dup[key] = true;
       return false;
@@ -647,7 +649,7 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   span->injectContext(request_headers_);
   request_headers_.iterate(
       [](const Http::HeaderEntry& header, void* cb) -> Http::HeaderMap::Iterate {
-        EXPECT_FALSE(static_cast<DupCallback*>(cb)->operator()(header.key().c_str()));
+        EXPECT_FALSE(static_cast<DupCallback*>(cb)->operator()(header.key().getStringView()));
         return Http::HeaderMap::Iterate::Continue;
       },
       &dup_callback);

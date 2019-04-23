@@ -18,70 +18,63 @@ using testing::StrictMock;
 
 TEST(DubboProtocolImplTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
-  MockProtocolCallbacks cb;
-  DubboProtocolImpl dubbo_protocol(&cb);
+  DubboProtocolImpl dubbo_protocol;
   Protocol::Context context;
-  EXPECT_FALSE(dubbo_protocol.decode(buffer, &context));
+  MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+  EXPECT_FALSE(dubbo_protocol.decode(buffer, &context, metadata));
   buffer.add(std::string(15, 0x00));
-  EXPECT_FALSE(dubbo_protocol.decode(buffer, &context));
+  EXPECT_FALSE(dubbo_protocol.decode(buffer, &context, metadata));
 }
 
 TEST(DubboProtocolImplTest, Name) {
-  MockProtocolCallbacks cb;
-  DubboProtocolImpl dubbo_protocol(&cb);
+  DubboProtocolImpl dubbo_protocol;
   EXPECT_EQ(dubbo_protocol.name(), "dubbo");
 }
 
 TEST(DubboProtocolImplTest, Normal) {
-  MockProtocolCallbacks cb;
-  DubboProtocolImpl dubbo_protocol(&cb);
+  DubboProtocolImpl dubbo_protocol;
   // Normal dubbo request message
   {
     Buffer::OwnedImpl buffer;
     Protocol::Context context;
+    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
     addInt64(buffer, 1);
     addInt32(buffer, 1);
-    EXPECT_CALL(cb, onRequestMessageRvr).WillOnce(Invoke([&](RequestMessage* res) -> void {
-      EXPECT_EQ(MessageType::Request, res->messageType());
-      EXPECT_EQ(SerializationType::Hessian, res->serializationType());
-      EXPECT_EQ(1, res->bodySize());
-      EXPECT_GE(res->toString().size(), 0);
-    }));
-    EXPECT_TRUE(dubbo_protocol.decode(buffer, &context));
+    EXPECT_TRUE(dubbo_protocol.decode(buffer, &context, metadata));
+    EXPECT_EQ(1, metadata->request_id());
     EXPECT_EQ(1, context.body_size_);
-    EXPECT_TRUE(context.is_request_);
+    EXPECT_EQ(false, context.is_heartbeat_);
+    EXPECT_EQ(MessageType::Request, metadata->message_type());
   }
 
   // Normal dubbo response message
   {
     Buffer::OwnedImpl buffer;
     Protocol::Context context;
+    MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
     buffer.add(std::string({'\xda', '\xbb', 0x42, 20}));
     addInt64(buffer, 1);
     addInt32(buffer, 1);
-    EXPECT_CALL(cb, onResponseMessageRvr).WillOnce(Invoke([](ResponseMessage* res) -> void {
-      EXPECT_EQ(ResponseStatus::Ok, res->responseStatus());
-      EXPECT_EQ(MessageType::Response, res->messageType());
-      EXPECT_GE(res->toString().size(), 0);
-    }));
-    EXPECT_TRUE(dubbo_protocol.decode(buffer, &context));
+    EXPECT_TRUE(dubbo_protocol.decode(buffer, &context, metadata));
+    EXPECT_EQ(1, metadata->request_id());
     EXPECT_EQ(1, context.body_size_);
-    EXPECT_FALSE(context.is_request_);
+    EXPECT_EQ(false, context.is_heartbeat_);
+    EXPECT_EQ(MessageType::Response, metadata->message_type());
   }
 }
 
 TEST(DubboProtocolImplTest, InvalidProtocol) {
-  MockProtocolCallbacks cb;
-  DubboProtocolImpl dubbo_protocol(&cb);
+  DubboProtocolImpl dubbo_protocol;
   Protocol::Context context;
+  MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
 
   // Invalid dubbo magic number
   {
     Buffer::OwnedImpl buffer;
     addInt64(buffer, 0);
     addInt64(buffer, 0);
-    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context, metadata), EnvoyException,
                               "invalid dubbo message magic number 0");
   }
 
@@ -93,7 +86,7 @@ TEST(DubboProtocolImplTest, InvalidProtocol) {
     addInt32(buffer, DubboProtocolImpl::MaxBodySize + 1);
     std::string exception_string =
         fmt::format("invalid dubbo message size {}", DubboProtocolImpl::MaxBodySize + 1);
-    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context, metadata), EnvoyException,
                               exception_string);
   }
 
@@ -103,7 +96,7 @@ TEST(DubboProtocolImplTest, InvalidProtocol) {
     buffer.add(std::string({'\xda', '\xbb', '\xc3', 0x00}));
     addInt64(buffer, 1);
     addInt32(buffer, 0xff);
-    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context, metadata), EnvoyException,
                               "invalid dubbo message serialization type 3");
   }
 
@@ -113,14 +106,13 @@ TEST(DubboProtocolImplTest, InvalidProtocol) {
     buffer.add(std::string({'\xda', '\xbb', 0x42, 0x00}));
     addInt64(buffer, 1);
     addInt32(buffer, 0xff);
-    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(dubbo_protocol.decode(buffer, &context, metadata), EnvoyException,
                               "invalid dubbo message response status 0");
   }
 }
 
 TEST(DubboProtocolImplTest, DubboProtocolConfigFactory) {
-  MockProtocolCallbacks cb;
-  auto protocol = NamedProtocolConfigFactory::getFactory(ProtocolType::Dubbo).createProtocol(cb);
+  auto protocol = NamedProtocolConfigFactory::getFactory(ProtocolType::Dubbo).createProtocol();
   EXPECT_EQ(protocol->name(), "dubbo");
   EXPECT_EQ(protocol->type(), ProtocolType::Dubbo);
 }

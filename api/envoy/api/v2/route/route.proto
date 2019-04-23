@@ -765,6 +765,15 @@ message RouteAction {
   // time gaps between gRPC request and response in gRPC streaming mode.
   google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
 
+  // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
+  // the provided duration from the header. This is useful in allowing Envoy to set its global
+  // timeout to be less than that of the deadline imposed by the calling client, which makes it more
+  // likely that Envoy will handle the timeout instead of having the call canceled by the client.
+  // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
+  // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
+  // infinity).
+  google.protobuf.Duration grpc_timeout_offset = 28 [(gogoproto.stdduration) = true];
+
   // Allows enabling and disabling upgrades on a per-route basis.
   // This overrides any enabled/disabled upgrade filter chain specified in the
   // HttpConnectionManager
@@ -796,6 +805,7 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
+// [#comment:next free field: 9]
 message RetryPolicy {
   // Specifies the conditions under which retry takes place. These are the same
   // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
@@ -856,6 +866,34 @@ message RetryPolicy {
 
   // HTTP status codes that should trigger a retry in addition to those specified by retry_on.
   repeated uint32 retriable_status_codes = 7;
+
+  message RetryBackOff {
+    // Specifies the base interval between retries. This parameter is required and must be greater
+    // than zero. Values less than 1 ms are rounded up to 1 ms.
+    // See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion of Envoy's
+    // back-off algorithm.
+    google.protobuf.Duration base_interval = 1 [
+      (validate.rules).duration = {
+        required: true,
+        gt: {seconds: 0}
+      },
+      (gogoproto.stdduration) = true
+    ];
+
+    // Specifies the maximum interval between retries. This parameter is optional, but must be
+    // greater than or equal to the `base_interval` if set. The default is 10 times the
+    // `base_interval`. See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion
+    // of Envoy's back-off algorithm.
+    google.protobuf.Duration max_interval = 2
+        [(validate.rules).duration.gt = {seconds: 0}, (gogoproto.stdduration) = true];
+  }
+
+  // Specifies parameters that control retry back off. This parameter is optional, in which case the
+  // default base interval is 25 milliseconds or, if set, the current value of the
+  // `upstream.base_retry_backoff_ms` runtime parameter. The default maximum interval is 10 times
+  // the base interval. The documentation for :ref:`config_http_filters_router_x-envoy-max-retries`
+  // describes Envoy's back-off algorithm.
+  RetryBackOff retry_back_off = 8;
 }
 
 // HTTP request hedging TODO(mpuncel) docs
