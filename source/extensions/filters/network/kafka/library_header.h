@@ -7,8 +7,7 @@ namespace Kafka {
 
 class Runner {
 public:
-  virtual ~Runner() = default;
-  virtual int doSomething();
+  int doSomething();
 };
 
 } // namespace Kafka
