@@ -165,8 +165,8 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public Upstream::LoadBalancerContextBase {
 public:
   Filter(FilterConfig& config)
-      : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
-        do_shadowing_(false), is_retry_(false),
+      : config_(config), final_upstream_request_(nullptr), downstream_response_started_(false),
+        downstream_end_stream_(false), do_shadowing_(false), is_retry_(false),
         attempting_internal_redirect_with_complete_stream_(false) {}
 
   ~Filter();
