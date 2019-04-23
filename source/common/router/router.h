@@ -424,6 +424,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   std::string alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
+  Http::ConnectionPool::Instance* conn_pool_{};
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
@@ -434,6 +435,7 @@ private:
   MonotonicTime downstream_request_complete_time_;
   uint32_t buffer_limit_{0};
   MetadataMatchCriteriaConstPtr metadata_match_;
+  std::function<void(Http::HeaderMap&)> modify_headers_;
 
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;

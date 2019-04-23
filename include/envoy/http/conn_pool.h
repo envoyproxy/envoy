@@ -116,6 +116,11 @@ public:
    *                      should be done by resetting the stream.
    */
   virtual Cancellable* newStream(Http::StreamDecoder& response_decoder, Callbacks& callbacks) PURE;
+
+  /**
+   * @return Upstream::HostConstSharedPtr the host for which connections are pooled.
+   */
+  virtual Upstream::HostConstSharedPtr host() const PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

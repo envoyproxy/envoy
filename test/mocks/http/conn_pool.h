@@ -32,6 +32,7 @@ public:
   MOCK_CONST_METHOD0(hasActiveConnections, bool());
   MOCK_METHOD2(newStream, Cancellable*(Http::StreamDecoder& response_decoder,
                                        Http::ConnectionPool::Callbacks& callbacks));
+  MOCK_METHOD0(host, Upstream::HostConstSharedPtr());
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;
 };
