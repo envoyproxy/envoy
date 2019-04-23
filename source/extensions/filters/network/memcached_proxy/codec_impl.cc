@@ -17,17 +17,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MemcachedProxy {
 
-void GetRequestImpl::fromBuffer(Buffer::Instance& data) {
+void GetRequestImpl::fromBuffer(Buffer::Instance&) {
   ENVOY_LOG(trace, "decoding get request");
-  key_ = BufferHelper::removeCString(data);
+  // key_ = BufferHelper::removeCString(data);
 }
 
-void SetRequestImpl::fromBuffer(Buffer::Instance& data) {
+void SetRequestImpl::fromBuffer(Buffer::Instance&) {
   ENVOY_LOG(trace, "decoding set request");
-  key_ = BufferHelper::removeCString(data);
-  flags_ = BufferHelper::removeInt32(data);
-  expiration_ = BufferHelper::removeInt32(data);
-  body_ = BufferHelper::removeCString(data);
+  // key_ = BufferHelper::removeCString(data);
+  // flags_ = BufferHelper::removeInt32(data);
+  // expiration_ = BufferHelper::removeInt32(data);
+  // body_ = BufferHelper::removeCString(data);
 }
 
 bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
@@ -37,26 +37,29 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
     .key_length = data.drainBEInt<uint16_t>(),
     .extras_length = data.drainBEInt<uint8_t>(),
     .data_type = data.drainBEInt<uint8_t>(),
-    .vbucket_id = data.drainBEInt<uint8_t>(),
+    .vbucket_id_or_status = data.drainBEInt<uint8_t>(),
     .body_length = data.drainBEInt<uint32_t>(),
     .opaque = data.drainBEInt<uint32_t>(),
     .cas = data.drainBEInt<uint64_t>(),
   };
 
-  switch (header.op_code) {
+
+  Message::OpCode op_code = static_cast<Message::OpCode>(header.op_code);
+
+  switch (op_code) {
   case Message::OpCode::OP_GET:
   case Message::OpCode::OP_GETQ: {
-    auto message = std::make_unique<GetMessageImpl>(std::move(header), false);
+    auto message = std::make_unique<GetRequestImpl>(std::move(header));
     message->fromBuffer(data);
-    callbacks_.decodeReply(std::move(message));
+    callbacks_.decodeGet(std::move(message));
     break;
   }
 
   case Message::OpCode::OP_SET:
   case Message::OpCode::OP_SETQ: {
-    auto message = std::make_unique<SetMessageImpl>(std::move(header), false);
+    auto message = std::make_unique<SetRequestImpl>(std::move(header));
     message->fromBuffer(data);
-    callbacks_.decodeReply(std::move(message));
+    callbacks_.decodeSet(std::move(message));
     break;
   }
 
@@ -64,7 +67,7 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
     throw EnvoyException(fmt::format("invalid memcached op {}", header.op_code));
   }
 
-  return true
+  return true;
 }
 
 bool DecoderImpl::decode(Buffer::Instance& data) {
@@ -73,7 +76,8 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
     return false;
   }
 
-  switch (data.peekBEInt<uint32_t>()) {
+  auto magic = data.peekBEInt<uint32_t>();
+  switch (magic) {
   case Message::RequestV1: {
     return decodeRequest(data);
   }
@@ -96,7 +100,7 @@ void EncoderImpl::encodeRequestHeader(
   uint32_t key_length,
   uint32_t body_length,
   uint32_t extras_length,
-  const Message& message,
+  const Request& request,
   Message::OpCode op_code) {
 
   output_.writeByte(Message::RequestV1);
@@ -104,35 +108,35 @@ void EncoderImpl::encodeRequestHeader(
   output_.writeBEInt<uint16_t>(key_length);
   output_.writeByte(extras_length);
   output_.writeByte(Message::RawDataType);
-  output_.writeByte(message.vbucketIdOrStatus());
+  output_.writeByte(request.vbucketIdOrStatus());
   output_.writeBEInt<uint32_t>(body_length);
-  output_.writeBEInt<uint32_t>(message.opaque());
-  output_.writeBEInt<uint32_t>(message.cas());
+  output_.writeBEInt<uint32_t>(request.opaque());
+  output_.writeBEInt<uint32_t>(request.cas());
 }
 
-void EncoderImpl::encodeGet(const GetMessage& message) {
+void EncoderImpl::encodeGet(const GetRequest& request) {
   uint32_t key_length = 0; // todo
   uint32_t body_length = 0; // todo
   uint32_t extras_length = 0; // todo
 
-  encodeRequestHeader(key_length, body_length, extras_length, message,
-    message.quiet() ? Message::OpCode::OP_GETQ : Message::OpCode::OP_GET);
+  encodeRequestHeader(key_length, body_length, extras_length, request,
+    request.quiet() ? Message::OpCode::OP_GETQ : Message::OpCode::OP_GET);
 
-  output_.add(message.key());
+  output_.add(request.key());
 }
 
-void EncoderImpl::encodeSet(const SetMessage& message) {
+void EncoderImpl::encodeSet(const SetRequest& request) {
   uint32_t key_length = 0; // todo
   uint32_t body_length = 0; // todo
   uint32_t extras_length = 0; // todo
 
-  encodeRequestHeader(key_length, body_length, extras_length, message,
-    message.quiet() ? Message::OpCode::OP_SETQ : Message::OpCode::OP_SET);
+  encodeRequestHeader(key_length, body_length, extras_length, request,
+    request.quiet() ? Message::OpCode::OP_SETQ : Message::OpCode::OP_SET);
 
-  output_.writeBEInt<uint32_t>(message.flags());
-  output_.writeBEInt<uint32_t>(message.expiration());
-  output_.add(message.key());
-  output_.add(message.value());
+  output_.writeBEInt<uint32_t>(request.flags());
+  output_.writeBEInt<uint32_t>(request.expiration());
+  output_.add(request.key());
+  output_.add(request.body());
 }
 
 }

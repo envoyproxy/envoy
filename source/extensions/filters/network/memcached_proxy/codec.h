@@ -57,7 +57,7 @@ typedef std::unique_ptr<Request> RequestPtr;
 /**
  * Memcached OP_GET message.
  */
-class GetRequest : public virtual Message {
+class GetRequest : public virtual Request {
 public:
   virtual ~GetRequest() = default;
 

@@ -99,7 +99,7 @@ private:
     uint32_t key_length,
     uint32_t body_length,
     uint32_t extras_length,
-    const Message& message,
+    const Request& request,
     Message::OpCode op);
 
   Buffer::Instance& output_;
