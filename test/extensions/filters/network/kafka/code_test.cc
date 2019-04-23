@@ -1,4 +1,4 @@
-#include "extensions/filters/network/kafka/header.h"
+#include "extensions/filters/network/kafka/library_header.h"
 
 #include "gtest/gtest.h"
 
@@ -7,15 +7,15 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-TEST(Something, test) {
+TEST(Runner, test) {
   // given
-  Something testee;
+  Runner testee;
 
   // when
-  int result = testee.doSomething();
+  const int result = testee.doSomething();
 
   // then
-  ASSERT_EQ(result, 13);
+  ASSERT_EQ(result, 2);
 }
 
 } // namespace Kafka

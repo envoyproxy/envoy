@@ -1,0 +1,22 @@
+#pragma once
+
+#include "extensions/filters/network/kafka/normal_header.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+class Something2: public Something {
+public:
+  Something2() {};
+
+  int someMethod() {
+    return 2;
+  }
+};
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

@@ -7,7 +7,15 @@ namespace Kafka {
 
 class Something {
 public:
-  int doSomething();
+  virtual ~Something() = default;
+  virtual int someMethod() = 0;
+};
+
+class Something1 : public Something {
+public:
+  Something1(){};
+
+  int someMethod() { return 1; }
 };
 
 } // namespace Kafka

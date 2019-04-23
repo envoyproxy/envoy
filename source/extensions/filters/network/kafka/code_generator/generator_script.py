@@ -7,7 +7,7 @@ def main():
 
   output_file = os.path.abspath(sys.argv[1])
 
-  template = RenderingHelper.get_template('code_cc.j2')
+  template = RenderingHelper.get_template('generated_h.j2')
   contents = template.render()
 
   with open(output_file, 'w') as fd:

@@ -1,13 +1,15 @@
-#include "extensions/filters/network/kafka/header.h"
+#pragma once
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-int Something::doSomething() {
-  return 13;
-}
+class Runner {
+public:
+  virtual ~Runner() = default;
+  virtual int doSomething();
+};
 
 } // namespace Kafka
 } // namespace NetworkFilters
