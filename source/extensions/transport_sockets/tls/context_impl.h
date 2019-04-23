@@ -44,19 +44,12 @@ struct SslStats {
   ALL_SSL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
-struct ClientValidationStatus
-{
-    enum class Status
-    {
-        NotValidated,
-        NoClientCertificate,
-        Validated,
-        Failed
-    };
+struct ClientValidationStatus {
+  enum class Status { NotValidated, NoClientCertificate, Validated, Failed };
 
-    ClientValidationStatus() : status(Status::NotValidated) {}
+  ClientValidationStatus() : status(Status::NotValidated) {}
 
-    Status status;
+  Status status;
 };
 
 class ContextImpl : public virtual Envoy::Ssl::Context {

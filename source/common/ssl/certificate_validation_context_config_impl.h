@@ -33,8 +33,12 @@ public:
   }
   bool allowExpiredCertificate() const override { return allow_expired_certificate_; }
   bool requestClientCertificate() const override { return request_client_certificate_; }
-  bool permitUntrustedClientCertificate() const override { return permit_untrusted_client_certificate_; }
-  bool validationPermitsNoClientCertificate() const override { return validation_permits_no_client_certificate_; }
+  bool permitUntrustedClientCertificate() const override {
+    return permit_untrusted_client_certificate_;
+  }
+  bool validationPermitsNoClientCertificate() const override {
+    return validation_permits_no_client_certificate_;
+  }
 
 private:
   const std::string ca_cert_;

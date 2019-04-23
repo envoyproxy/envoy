@@ -66,7 +66,8 @@ public:
   virtual bool permitUntrustedClientCertificate() const PURE;
 
   /**
-   * @return True if client certificate is NOT required to be presented when a validation context exists.
+   * @return True if client certificate is NOT required to be presented when a validation context
+   * exists.
    */
   virtual bool validationPermitsNoClientCertificate() const PURE;
 };

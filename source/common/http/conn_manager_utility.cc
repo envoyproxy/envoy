@@ -326,9 +326,11 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
-    HeaderMapImpl::appendToHeader(connection.ssl()->peerCertificateValidated() ? request_headers.insertForwardedClientCert().value() :
-                                                                                 request_headers.insertForwardedUntrustedClientCert().value(),
-                                  client_cert_details_str);
+    HeaderMapImpl::appendToHeader(
+        connection.ssl()->peerCertificateValidated()
+            ? request_headers.insertForwardedClientCert().value()
+            : request_headers.insertForwardedUntrustedClientCert().value(),
+        client_cert_details_str);
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     if (connection.ssl()->peerCertificateValidated()) {
       request_headers.insertForwardedClientCert().value(client_cert_details_str);

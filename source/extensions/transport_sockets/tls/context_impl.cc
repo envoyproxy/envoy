@@ -99,9 +99,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   const int verify_mode_validation_context =
-    config.certificateValidationContext() != nullptr &&
-    config.certificateValidationContext()->validationPermitsNoClientCertificate() ?
-      SSL_VERIFY_PEER : SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+      config.certificateValidationContext() != nullptr &&
+              config.certificateValidationContext()->validationPermitsNoClientCertificate()
+          ? SSL_VERIFY_PEER
+          : SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 
   if (config.certificateValidationContext() != nullptr &&
       !config.certificateValidationContext()->caCert().empty()) {
@@ -362,7 +363,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   if (config.certificateValidationContext() != nullptr) {
-    permit_untrusted_certificate_ = config.certificateValidationContext()->permitUntrustedClientCertificate();
+    permit_untrusted_certificate_ =
+        config.certificateValidationContext()->permitUntrustedClientCertificate();
   }
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
@@ -431,15 +433,14 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   ContextImpl* impl = reinterpret_cast<ContextImpl*>(arg);
   SSL* ssl = reinterpret_cast<SSL*>(
       X509_STORE_CTX_get_ex_data(store_ctx, SSL_get_ex_data_X509_STORE_CTX_idx()));
-  ClientValidationStatus* clientValidationStatus =
-    reinterpret_cast<ClientValidationStatus*>(SSL_get_ex_data(ssl, ContextImpl::sslCustomDataIndex()));
+  ClientValidationStatus* clientValidationStatus = reinterpret_cast<ClientValidationStatus*>(
+      SSL_get_ex_data(ssl, ContextImpl::sslCustomDataIndex()));
 
   if (impl->verify_trusted_ca_) {
     int ret = X509_verify_cert(store_ctx);
     if (clientValidationStatus) {
-      clientValidationStatus->status = ret == 1 ?
-                                  ClientValidationStatus::Status::Validated :
-                                  ClientValidationStatus::Status::Failed;
+      clientValidationStatus->status = ret == 1 ? ClientValidationStatus::Status::Validated
+                                                : ClientValidationStatus::Status::Failed;
     }
     if (ret <= 0) {
       impl->stats_.fail_verify_error_.inc();
@@ -453,15 +454,15 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   if (clientValidationStatus) {
     if (clientValidationStatus->status == ClientValidationStatus::Status::NotValidated) {
       clientValidationStatus->status = validated;
-    }
-    else if (validated != ClientValidationStatus::Status::NotValidated) {
+    } else if (validated != ClientValidationStatus::Status::NotValidated) {
       clientValidationStatus->status = validated;
     }
   }
 
   // permit connection through if 'permit_untrusted_certificate' configured
-  return impl->permit_untrusted_certificate_ ? 1 :
-    (validated != ClientValidationStatus::Status::Failed);
+  return impl->permit_untrusted_certificate_
+             ? 1
+             : (validated != ClientValidationStatus::Status::Failed);
 }
 
 ClientValidationStatus::Status ContextImpl::verifyCertificate(X509* cert) {

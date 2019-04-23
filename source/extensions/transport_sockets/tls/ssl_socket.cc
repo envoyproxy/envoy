@@ -48,7 +48,8 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
       ssl_(ctx_->newSsl(transport_socket_options != nullptr
                             ? transport_socket_options->serverNameOverride()
                             : absl::nullopt)) {
-  if (!SSL_set_ex_data(ssl_.get(), ctx_->sslCustomDataIndex(), &(this->certificate_validation_status_))) {
+  if (!SSL_set_ex_data(ssl_.get(), ctx_->sslCustomDataIndex(),
+                       &(this->certificate_validation_status_))) {
     ENVOY_LOG(error, "SslSocket::SslSocket SSL_set_ex_data failed");
   }
 
