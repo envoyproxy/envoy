@@ -164,15 +164,9 @@ envoy_cc_library(
 
 envoy_cc_test_library(
     name = "quic_platform_port_utils",
-    hdrs = envoy_select_quiche(
-        ["quiche/quic/platform/api/quic_port_utils.h"],
-        "@envoy",
-    ),
+    hdrs = ["quiche/quic/platform/api/quic_port_utils.h"],
     repository = "@envoy",
-    deps = envoy_select_quiche(
-        ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
-        "@envoy",
-    ),
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
 )
 
 envoy_cc_library(
