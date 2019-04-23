@@ -97,7 +97,7 @@ void HotRestartingBase::sendHotRestartMessage(sockaddr_un& address,
 }
 
 bool HotRestartingBase::replyIsExpectedType(const HotRestartMessage* proto,
-                                            HotRestartMessage::Reply::ReplyCase oneof_type) {
+                                            HotRestartMessage::Reply::ReplyCase oneof_type) const {
   return proto != nullptr && proto->requestreply_case() == HotRestartMessage::kReply &&
          proto->reply().reply_case() == oneof_type;
 }

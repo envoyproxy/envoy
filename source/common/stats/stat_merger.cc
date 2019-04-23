@@ -22,15 +22,18 @@ StatMerger::getCombineLogic(const std::string& gauge_name) {
       // last value should be a relatively accurate starting point, and then the child can update
       // from there when appropriate. (All of these exceptional stats used with set() rather than
       // add()/sub(), so the child's new value will in fact overwrite.)
-      {std::regex("^cluster_manager.active_clusters$"), CombineLogic::OnlyImportWhenUnused},
-      {std::regex("^cluster_manager.warming_clusters$"), CombineLogic::OnlyImportWhenUnused},
-      {std::regex("^cluster\\..*\\.membership_total$"), CombineLogic::OnlyImportWhenUnused},
-      {std::regex("^cluster\\..*\\.membership_healthy$"), CombineLogic::OnlyImportWhenUnused},
-      {std::regex("^cluster\\..*\\.membership_degraded$"), CombineLogic::OnlyImportWhenUnused},
-      {std::regex("^cluster\\..*\\.max_host_weight$"), CombineLogic::OnlyImportWhenUnused},
-      {std::regex(".*\\.total_principals$"), CombineLogic::OnlyImportWhenUnused},
-      {std::regex("^listener_manager.total_listeners_active$"), CombineLogic::OnlyImportWhenUnused},
-      {std::regex("^overload\\..*\\.pressure$"), CombineLogic::OnlyImportWhenUnused},
+      {std::regex("^cluster_manager.active_clusters$"), CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster_manager.warming_clusters$"), CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster\\..*\\.membership_total$"), CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster\\..*\\.membership_healthy$"),
+       CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster\\..*\\.membership_degraded$"),
+       CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster\\..*\\.max_host_weight$"), CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex(".*\\.total_principals$"), CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^listener_manager.total_listeners_active$"),
+       CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^overload\\..*\\.pressure$"), CombineLogic::OnlyImportWhenUnusedInChild},
       // Due to the fd passing, the parent's view of whether its listeners are in transitive states
       // is not useful.
       {std::regex("^listener_manager.total_listeners_draining$"), CombineLogic::NoImport},
@@ -52,21 +55,20 @@ StatMerger::getCombineLogic(const std::string& gauge_name) {
 
 void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counters) {
   for (const auto& counter : counters) {
+    uint64_t& parent_value_ref = parent_counter_values_[counter.first];
+    uint64_t old_parent_value = parent_value_ref;
     uint64_t new_parent_value = counter.second;
-    auto found_value = parent_counter_values_.find(counter.first);
-    uint64_t old_parent_value =
-        found_value == parent_counter_values_.end() ? 0 : found_value->second;
-    parent_counter_values_[counter.first] = new_parent_value;
     target_store_.counter(counter.first).add(new_parent_value - old_parent_value);
+    parent_value_ref = new_parent_value;
   }
 }
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
   for (const auto& gauge : gauges) {
+    uint64_t& parent_value_ref = parent_gauge_values_[gauge.first];
+    uint64_t old_parent_value = parent_value_ref;
     uint64_t new_parent_value = gauge.second;
-    auto found_value = parent_gauge_values_.find(gauge.first);
-    uint64_t old_parent_value = found_value == parent_gauge_values_.end() ? 0 : found_value->second;
-    parent_gauge_values_[gauge.first] = new_parent_value;
+    parent_value_ref = new_parent_value;
 
     CombineLogic combine_logic =
         StatMerger::getCombineLogic(gauge.first).value_or(CombineLogic::Accumulate);
@@ -80,7 +82,7 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
       continue;
     }
     switch (combine_logic) {
-    case CombineLogic::OnlyImportWhenUnused:
+    case CombineLogic::OnlyImportWhenUnusedInChild:
       // Already set above; nothing left to do.
       break;
     case CombineLogic::NoImport:

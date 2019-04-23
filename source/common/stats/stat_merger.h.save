@@ -1,25 +1,26 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "envoy/stats/store.h"
 
 #include "common/protobuf/protobuf.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
 
 // Responsible for the sensible merging of two instances of the same stat from two different
-// (typically hot restart parent+child) Envoy processes.
+// (typically hot restart parent+child) Envoy processes. Server::InstanceImpl holds one of these
+// throughout its life, but 
 class StatMerger {
 public:
   StatMerger(Stats::Store& target_store);
 
   enum class CombineLogic {
-    Accumulate,                  // the default; the merged result is old+new.
-    OnlyImportWhenUnusedInChild, // import parent value only if child stat is undefined. (So, just
-                                 // once.)
+    Accumulate,           // the default; the merged result is old+new.
+    OnlyImportWhenUnusedInChild, // import parent value only if child stat is undefined. (So, just once.)
     NoImport, // ignore parent entirely; child stat is undefined until it sets its own value.
   };
 
@@ -39,8 +40,8 @@ public:
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counters);
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges);
-  absl::flat_hash_map<std::string, uint64_t> parent_counter_values_;
-  absl::flat_hash_map<std::string, uint64_t> parent_gauge_values_;
+  std::unordered_map<std::string, uint64_t> parent_counter_values_;
+  std::unordered_map<std::string, uint64_t> parent_gauge_values_;
   Stats::Store& target_store_;
 };
 

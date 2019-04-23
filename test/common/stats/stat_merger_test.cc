@@ -107,7 +107,7 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   EXPECT_FALSE(store_.gauge("some.connected_state").used());
 }
 
-// The OnlyImportWhenUnused logic should overwrite an undefined gauge, but not a defined one.
+// The OnlyImportWhenUnusedInChild logic should overwrite an undefined gauge, but not a defined one.
 TEST_F(StatMergerTest, onlyImportWhenUnused) {
   Protobuf::Map<std::string, uint64_t> counters;
   Protobuf::Map<std::string, uint64_t> gauges;

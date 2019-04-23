@@ -22,6 +22,7 @@ namespace Stats {
 // The two production derivations cover using a fixed block of shared-memory for
 // hot restart stat continuity, and heap allocation for more efficient RAM usage
 // for when hot-restart is not required.
+//
 // TODO(fredlas) the above paragraph is obsolete; it's now only heap. So, this
 // interface can hopefully be collapsed down a bit.
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
