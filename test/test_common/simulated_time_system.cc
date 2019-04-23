@@ -207,6 +207,7 @@ MonotonicTime SimulatedTimeSystemHelper::monotonicTime() {
 }
 
 void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
+  only_one_thread_.checkOneThread();
   mutex_.lock();
   MonotonicTime monotonic_time =
       monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
@@ -216,6 +217,7 @@ void SimulatedTimeSystemHelper::sleep(const Duration& duration) {
 Thread::CondVar::WaitStatus SimulatedTimeSystemHelper::waitFor(
     Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
     const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) {
+  only_one_thread_.checkOneThread();
   const Duration real_time_poll_delay(
       std::min(std::chrono::duration_cast<Duration>(std::chrono::milliseconds(50)), duration));
   const MonotonicTime end_time = monotonicTime() + duration;

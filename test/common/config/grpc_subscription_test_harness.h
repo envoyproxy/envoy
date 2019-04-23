@@ -50,12 +50,12 @@ public:
 
   ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
 
-  void expectSendMessage(const std::vector<std::string>& cluster_names,
+  void expectSendMessage(const std::set<std::string>& cluster_names,
                          const std::string& version) override {
     expectSendMessage(cluster_names, version, Grpc::Status::GrpcStatus::Ok, "");
   }
 
-  void expectSendMessage(const std::vector<std::string>& cluster_names, const std::string& version,
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
                          const Protobuf::int32 error_code, const std::string& error_message) {
     envoy::api::v2::DiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
@@ -75,7 +75,7 @@ public:
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
   }
 
-  void startSubscription(const std::vector<std::string>& cluster_names) override {
+  void startSubscription(const std::set<std::string>& cluster_names) override {
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
@@ -113,11 +113,19 @@ public:
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
-  void updateResources(const std::vector<std::string>& cluster_names) override {
-    std::vector<std::string> cluster_superset = cluster_names;
-    cluster_superset.insert(cluster_superset.end(), last_cluster_names_.begin(),
-                            last_cluster_names_.end());
-    expectSendMessage(cluster_superset, version_);
+  void updateResources(const std::set<std::string>& cluster_names) override {
+    // The "watch" mechanism means that updates that lose interest in a resource
+    // will first generate a request for [still watched resources, i.e. without newly unwatched
+    // ones] before generating the request for all of cluster_names.
+    // TODO(fredlas) this unnecessary second request will stop happening once the watch mechanism is
+    // no longer internally used by GrpcSubscriptionImpl.
+    std::set<std::string> both;
+    for (const auto& n : cluster_names) {
+      if (last_cluster_names_.find(n) != last_cluster_names_.end()) {
+        both.insert(n);
+      }
+    }
+    expectSendMessage(both, version_);
     expectSendMessage(cluster_names, version_);
     subscription_->updateResources(cluster_names);
     last_cluster_names_ = cluster_names;
@@ -151,7 +159,7 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
-  std::vector<std::string> last_cluster_names_;
+  std::set<std::string> last_cluster_names_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;

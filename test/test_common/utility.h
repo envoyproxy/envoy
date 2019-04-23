@@ -24,7 +24,9 @@
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/raw_stat_data.h"
 
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/time/time.h"
 #include "gmock/gmock.h"
@@ -464,7 +466,8 @@ public:
     p.iterate(
         [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
           std::ostream* local_os = static_cast<std::ostream*>(context);
-          *local_os << header.key().c_str() << " " << header.value().c_str() << std::endl;
+          *local_os << header.key().getStringView() << " " << header.value().getStringView()
+                    << std::endl;
           return HeaderMap::Iterate::Continue;
         },
         &os);
@@ -533,14 +536,6 @@ public:
 };
 
 } // namespace Stats
-
-namespace Thread {
-ThreadFactory& threadFactoryForTest();
-} // namespace Thread
-
-namespace Filesystem {
-Instance& fileSystemForTest();
-} // namespace Filesystem
 
 namespace Api {
 ApiPtr createApiForTest();

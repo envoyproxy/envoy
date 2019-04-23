@@ -101,10 +101,22 @@ cc_library(
         "@envoy",
     ),
     visibility = ["//visibility:public"],
-    deps = [
-        ":quic_buffer_allocator_lib",
-        "@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib",
-    ],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib"],
+)
+
+cc_library(
+    name = "spdy_simple_arena_lib",
+    srcs = ["quiche/spdy/core/spdy_simple_arena.cc"],
+    hdrs = ["quiche/spdy/core/spdy_simple_arena.h"],
+    visibility = ["//visibility:public"],
+    deps = [":spdy_platform"],
+)
+
+cc_library(
+    name = "spdy_platform_unsafe_arena_lib",
+    hdrs = ["quiche/spdy/platform/api/spdy_unsafe_arena.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_unsafe_arena_impl_lib"],
 )
 
 cc_library(
@@ -278,6 +290,9 @@ cc_library(
         "quiche/quic/platform/api/quic_mem_slice_span.h",
     ],
     visibility = ["//visibility:public"],
+    copts = envoy_copts("@envoy") + [
+        "-Wno-error=unused-parameter",
+    ],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_span_impl_lib"],
 )
 
@@ -327,7 +342,10 @@ cc_library(
         "@envoy",
     ),
     # Need to use same compiler options as envoy_cc_library uses to enforce compiler version and c++ version.
-    copts = envoy_copts("@envoy"),
+    copts = envoy_copts("@envoy") + [
+        "-Wno-error=invalid-offsetof",
+        "-Wno-error=unused-parameter",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
@@ -341,7 +359,6 @@ cc_library(
     srcs = envoy_select_quiche(
         [
             "quiche/quic/core/frames/quic_ack_frame.cc",
-            "quiche/quic/core/frames/quic_application_close_frame.cc",
             "quiche/quic/core/frames/quic_blocked_frame.cc",
             "quiche/quic/core/frames/quic_connection_close_frame.cc",
             "quiche/quic/core/frames/quic_crypto_frame.cc",
@@ -368,7 +385,6 @@ cc_library(
     hdrs = envoy_select_quiche(
         [
             "quiche/quic/core/frames/quic_ack_frame.h",
-            "quiche/quic/core/frames/quic_application_close_frame.h",
             "quiche/quic/core/frames/quic_blocked_frame.h",
             "quiche/quic/core/frames/quic_connection_close_frame.h",
             "quiche/quic/core/frames/quic_crypto_frame.h",
@@ -442,6 +458,7 @@ envoy_cc_test(
     name = "quic_platform_test",
     srcs = envoy_select_quiche(
         [
+            "quiche/quic/platform/api/quic_endian_test.cc",
             "quiche/quic/platform/api/quic_mem_slice_span_test.cc",
             "quiche/quic/platform/api/quic_mem_slice_storage_test.cc",
             "quiche/quic/platform/api/quic_mem_slice_test.cc",

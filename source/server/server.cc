@@ -42,14 +42,14 @@
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
-#include "server/test_hooks.h"
+#include "server/listener_hooks.h"
 
 namespace Envoy {
 namespace Server {
 
 InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
-                           Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
-                           HotRestart& restarter, Stats::StoreRoot& store,
+                           Network::Address::InstanceConstSharedPtr local_address,
+                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
@@ -200,7 +200,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
-                              ComponentFactory& component_factory, TestHooks& hooks) {
+                              ComponentFactory& component_factory, ListenerHooks& hooks) {
   ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 

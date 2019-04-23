@@ -32,17 +32,8 @@ public:
   void onResponse(Common::Redis::RespValuePtr&&) override {}
 };
 
-class NullInstanceImpl : public ConnPool::Instance {
-  Common::Redis::Client::PoolRequest* makeRequest(const std::string&,
-                                                  const Common::Redis::RespValue&,
-                                                  Common::Redis::Client::PoolCallbacks&) override {
-    return nullptr;
-  }
-  Common::Redis::Client::PoolRequest*
-  makeRequestToHost(const std::string&, const Common::Redis::RespValue&,
-                    Common::Redis::Client::PoolCallbacks&) override {
-    return nullptr;
-  }
+class NullRouterImpl : public Router {
+  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return nullptr; }
 };
 
 class CommandLookUpSpeedTest {
@@ -73,11 +64,11 @@ public:
     }
   }
 
-  ConnPool::Instance* conn_pool_{new NullInstanceImpl()};
+  Router* router_{new NullRouterImpl()};
   Stats::IsolatedStoreImpl store_;
   Event::SimulatedTimeSystem time_system_;
-  CommandSplitter::InstanceImpl splitter_{ConnPool::InstancePtr{conn_pool_}, store_, "redis.foo.",
-                                          time_system_, false};
+  CommandSplitter::InstanceImpl splitter_{RouterPtr{router_}, store_, "redis.foo.", time_system_,
+                                          false};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };

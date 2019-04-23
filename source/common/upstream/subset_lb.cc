@@ -535,19 +535,19 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
-  auto healthy_hosts = std::make_shared<HostVector>();
-  healthy_hosts->reserve(original_host_set_.healthyHosts().size());
+  auto healthy_hosts = std::make_shared<HealthyHostVector>();
+  healthy_hosts->get().reserve(original_host_set_.healthyHosts().size());
   for (const auto& host : original_host_set_.healthyHosts()) {
     if (cached_predicate(*host)) {
-      healthy_hosts->emplace_back(host);
+      healthy_hosts->get().emplace_back(host);
     }
   }
 
-  auto degraded_hosts = std::make_shared<HostVector>();
-  degraded_hosts->reserve(original_host_set_.degradedHosts().size());
+  auto degraded_hosts = std::make_shared<DegradedHostVector>();
+  degraded_hosts->get().reserve(original_host_set_.degradedHosts().size());
   for (const auto& host : original_host_set_.degradedHosts()) {
     if (cached_predicate(*host)) {
-      degraded_hosts->emplace_back(host);
+      degraded_hosts->get().emplace_back(host);
     }
   }
 
@@ -561,13 +561,13 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     hosts_per_locality = std::make_shared<HostsPerLocalityImpl>(
         *hosts, original_host_set_.hostsPerLocality().hasLocalLocality());
   } else {
-    hosts_per_locality = original_host_set_.hostsPerLocality().filter(cached_predicate);
+    hosts_per_locality = original_host_set_.hostsPerLocality().filter({cached_predicate})[0];
   }
 
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
-      original_host_set_.healthyHostsPerLocality().filter(cached_predicate);
+      original_host_set_.healthyHostsPerLocality().filter({cached_predicate})[0];
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality =
-      original_host_set_.degradedHostsPerLocality().filter(cached_predicate);
+      original_host_set_.degradedHostsPerLocality().filter({cached_predicate})[0];
 
   // We can use the cached predicate here, since we trust that the hosts in hosts_added were also
   // present in the list of all hosts.

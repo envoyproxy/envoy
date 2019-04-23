@@ -313,9 +313,17 @@ should only be done to correct a DCO mistake.
 
 ## Triggering CI re-run without making changes
 
-Sometimes CI test runs fail due to obvious resource problems or other issues
-which are not related to your PR. It may be desirable to re-trigger CI without
-making any code changes. Consider adding an alias into your `.gitconfig` file:
+To rerun failed tasks in CI, add a comment with the the line
+
+```
+/retest
+```
+
+in it. This should rebuild only the failed tasks.
+
+Sometimes tasks will be stuck in CI and won't be marked as failed, which means
+the above command won't work. Should this happen, pushing an empty commit should
+re-run all the CI tasks. Consider adding an alias into your `.gitconfig` file:
 
 ```
 [alias]

@@ -38,4 +38,10 @@ std::chrono::milliseconds TokenBucketImpl::nextTokenAvailable() {
   return std::chrono::milliseconds(static_cast<uint64_t>(std::ceil((1 / fill_rate_) * 1000)));
 }
 
+void TokenBucketImpl::reset(uint64_t num_tokens) {
+  ASSERT(num_tokens <= max_tokens_);
+  tokens_ = num_tokens;
+  last_fill_ = time_source_.monotonicTime();
+}
+
 } // namespace Envoy

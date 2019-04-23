@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
+    "envoy_cc_platform_dep",
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
@@ -41,7 +42,7 @@ envoy_cc_test(
         "@com_googlesource_quiche//:quic_buffer_allocator_lib",
         "@com_googlesource_quiche//:quic_platform_port_utils",
         "@com_googlesource_quiche//:quic_platform_sleep",
-    ],
+    ] + envoy_cc_platform_dep("//source/exe:platform_impl_lib"),
 )
 
 envoy_cc_test(

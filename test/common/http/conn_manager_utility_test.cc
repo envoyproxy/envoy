@@ -209,7 +209,7 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
 
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_STREQ("198.51.100.1", headers.ForwardedFor()->value().c_str());
+  EXPECT_EQ("198.51.100.1", headers.ForwardedFor()->value().getStringView());
 }
 
 // Verify internal request and XFF is set when we are using remote address and the address is
