@@ -129,6 +129,7 @@ envoy_cc_library(
         ":quic_platform_logging_impl_lib",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:byte_order_lib",
         "//source/server:backtrace_lib",
     ]),
 )
@@ -189,7 +190,6 @@ envoy_cc_library(
         "spdy_string_piece_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
-        "spdy_unsafe_arena_impl.h",
     ] + envoy_select_quiche([
         "spdy_bug_tracker_impl.h",
         "spdy_logging_impl.h",
@@ -207,5 +207,16 @@ envoy_cc_library(
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
+    ]),
+)
+
+envoy_cc_library(
+    name = "spdy_platform_unsafe_arena_impl_lib",
+    hdrs = [
+        "spdy_unsafe_arena_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = envoy_select_quiche([
+        "@com_googlesource_quiche//:spdy_simple_arena_lib",
     ]),
 )

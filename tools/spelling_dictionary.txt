@@ -427,7 +427,6 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
-evwatch
 exe
 execlp
 facto
@@ -758,6 +757,7 @@ unterminated
 untruncated
 untrusted
 untyped
+unwatched
 unweighted
 unzigzag
 upstreams

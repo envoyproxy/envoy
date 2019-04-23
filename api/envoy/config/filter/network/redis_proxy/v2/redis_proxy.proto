@@ -59,6 +59,27 @@ message RedisProxy {
     // need to be known to the cluster manager. If the command cannot be redirected, then the
     // original error is passed downstream unchanged. By default, this support is not enabled.
     bool enable_redirection = 3;
+
+    // Maximum size of encoded request buffer before flush is triggered and encoded requests
+    // are sent upstream. If this is unset, the buffer flushes whenever it receives data
+    // and performs no batching.
+    // This feature makes it possible for multiple clients to send requests to Envoy and have
+    // them batched- for example if one is running several worker processes, each with its own
+    // Redis connection. There is no benefit to using this with a single downstream process.
+    // Recommended size (if enabled) is 1024 bytes.
+    uint32 max_buffer_size_before_flush = 4;
+
+    // The encoded request buffer is flushed N milliseconds after the first request has been
+    // encoded, unless the buffer size has already exceeded `max_buffer_size_before_flush`.
+    // If `max_buffer_size_before_flush` is not set, this flush timer is not used. Otherwise,
+    // the timer should be set according to the number of clients, overall request rate and
+    // desired maximum latency for a single command. For example, if there are many requests
+    // being batched together at a high rate, the buffer will likely be filled before the timer
+    // fires. Alternatively, if the request rate is lower the buffer will not be filled as often
+    // before the timer fires.
+    // If `max_buffer_size_before_flush` is set, but `buffer_flush_timeout` is not, the latter
+    // defaults to 3ms.
+    google.protobuf.Duration buffer_flush_timeout = 5 [(gogoproto.stdduration) = true];
   }
 
   // Network settings for the connection pool to the upstream clusters.

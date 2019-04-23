@@ -132,7 +132,7 @@ public:
   bool lessThan(const StatName& a, const StatName& b) const override;
   void free(const StatName& stat_name) override;
   void incRefCount(const StatName& stat_name) override;
-  SymbolTable::StoragePtr join(const std::vector<StatName>& stat_names) const override;
+  StoragePtr join(const std::vector<StatName>& stat_names) const override;
   void populateList(const absl::string_view* names, uint32_t num_names,
                     StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
@@ -474,6 +474,86 @@ struct StatNameLessThan {
   }
 
   const SymbolTable& symbol_table_;
+};
+
+struct HeterogeneousStatNameHash {
+  // Specifying is_transparent indicates to the library infrastructure that
+  // type-conversions should not be applied when calling find(), but instead
+  // pass the actual types of the contained and searched-for objects directly to
+  // these functors. See
+  // https://en.cppreference.com/w/cpp/utility/functional/less_void for an
+  // official reference, and https://abseil.io/tips/144 for a description of
+  // using it in the context of absl.
+  using is_transparent = void;
+
+  size_t operator()(StatName a) const { return a.hash(); }
+  size_t operator()(const StatNameStorage& a) const { return a.statName().hash(); }
+};
+
+struct HeterogeneousStatNameEqual {
+  // See description for HeterogeneousStatNameHash::is_transparent.
+  using is_transparent = void;
+
+  size_t operator()(StatName a, StatName b) const { return a == b; }
+  size_t operator()(const StatNameStorage& a, const StatNameStorage& b) const {
+    return a.statName() == b.statName();
+  }
+  size_t operator()(StatName a, const StatNameStorage& b) const { return a == b.statName(); }
+  size_t operator()(const StatNameStorage& a, StatName b) const { return a.statName() == b; }
+};
+
+// Encapsulates a set<StatNameStorage>. We use containment here rather than a
+// 'using' alias because we need to ensure that when the set is destructed,
+// StatNameStorage::free(symbol_table) is called on each entry. It is a little
+// easier at the call-sites in thread_local_store.cc to implement this an
+// explicit free() method, analogous to StatNameStorage::free(), compared to
+// storing a SymbolTable reference in the class and doing the free in the
+// destructor, like StatNameTempStorage.
+class StatNameStorageSet {
+public:
+  using HashSet =
+      absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
+  using iterator = HashSet::iterator;
+
+  ~StatNameStorageSet();
+
+  /**
+   * Releases all symbols held in this set. Must be called prior to destruction.
+   *
+   * @param symbol_table The symbol table that owns the symbols.
+   */
+  void free(SymbolTable& symbol_table);
+
+  /**
+   * @param storage The StatNameStorage to add to the set.
+   */
+  std::pair<HashSet::iterator, bool> insert(StatNameStorage&& storage) {
+    return hash_set_.insert(std::move(storage));
+  }
+
+  /**
+   * @param stat_name The stat_name to find.
+   * @return the iterator pointing to the stat_name, or end() if not found.
+   */
+  iterator find(StatName stat_name) { return hash_set_.find(stat_name); }
+
+  /**
+   * @return the end-marker.
+   */
+  iterator end() { return hash_set_.end(); }
+
+  /**
+   * @param set the storage set to swap with.
+   */
+  void swap(StatNameStorageSet& set) { hash_set_.swap(set.hash_set_); }
+
+  /**
+   * @return the number of elements in the set.
+   */
+  size_t size() const { return hash_set_.size(); }
+
+private:
+  HashSet hash_set_;
 };
 
 } // namespace Stats

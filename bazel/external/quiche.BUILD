@@ -104,6 +104,21 @@ cc_library(
 )
 
 cc_library(
+    name = "spdy_simple_arena_lib",
+    srcs = ["quiche/spdy/core/spdy_simple_arena.cc"],
+    hdrs = ["quiche/spdy/core/spdy_simple_arena.h"],
+    visibility = ["//visibility:public"],
+    deps = [":spdy_platform"],
+)
+
+cc_library(
+    name = "spdy_platform_unsafe_arena_lib",
+    hdrs = ["quiche/spdy/platform/api/spdy_unsafe_arena.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_unsafe_arena_impl_lib"],
+)
+
+cc_library(
     name = "quic_platform",
     srcs = ["quiche/quic/platform/api/quic_mutex.cc"] + envoy_select_quiche(
         [
@@ -262,6 +277,7 @@ envoy_cc_test(
     name = "quic_platform_test",
     srcs = envoy_select_quiche(
         [
+            "quiche/quic/platform/api/quic_endian_test.cc",
             "quiche/quic/platform/api/quic_reference_counted_test.cc",
             "quiche/quic/platform/api/quic_string_utils_test.cc",
             "quiche/quic/platform/api/quic_text_utils_test.cc",
