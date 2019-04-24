@@ -38,26 +38,6 @@ const std::vector<double>& HistogramStatisticsImpl::supportedBuckets() const {
   return supported_buckets;
 }
 
-std::string HistogramStatisticsImpl::quantileSummary() const {
-  std::vector<std::string> summary;
-  const std::vector<double>& supported_quantiles = supportedQuantiles();
-  summary.reserve(supported_quantiles.size());
-  for (size_t i = 0; i < supported_quantiles.size(); ++i) {
-    summary.push_back(fmt::format("P{}: {}", 100 * supported_quantiles[i], computed_quantiles_[i]));
-  }
-  return absl::StrJoin(summary, ", ");
-}
-
-std::string HistogramStatisticsImpl::bucketSummary() const {
-  std::vector<std::string> bucket_summary;
-  const std::vector<double>& supported_buckets = supportedBuckets();
-  bucket_summary.reserve(supported_buckets.size());
-  for (size_t i = 0; i < supported_buckets.size(); ++i) {
-    bucket_summary.push_back(fmt::format("B{}: {}", supported_buckets[i], computed_buckets_[i]));
-  }
-  return absl::StrJoin(bucket_summary, ", ");
-}
-
 /**
  * Clears the old computed values and refreshes it with values computed from passed histogram.
  */
@@ -102,40 +82,6 @@ void ParentHistogramImpl::merge() {
   interval_statistics_.refresh(interval_histogram_);
   cumulative_statistics_.refresh(cumulative_histogram_);
   hist_clear(interval_histogram_);
-}
-
-// TODO(mergeconflict): figure out the best way to eliminate duplication between this and
-// bucketSummary below, and the implementations in ThreadLocalParentHistogramImpl.
-const std::string ParentHistogramImpl::quantileSummary() const {
-  if (used()) {
-    std::vector<std::string> summary;
-    const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
-    summary.reserve(supported_quantiles_ref.size());
-    for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
-      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
-                                    interval_statistics_.computedQuantiles()[i],
-                                    cumulative_statistics_.computedQuantiles()[i]));
-    }
-    return absl::StrJoin(summary, " ");
-  } else {
-    return std::string("No recorded values");
-  }
-}
-
-const std::string ParentHistogramImpl::bucketSummary() const {
-  if (used()) {
-    std::vector<std::string> bucket_summary;
-    const std::vector<double>& supported_buckets = interval_statistics_.supportedBuckets();
-    bucket_summary.reserve(supported_buckets.size());
-    for (size_t i = 0; i < supported_buckets.size(); ++i) {
-      bucket_summary.push_back(fmt::format("B{}({},{})", supported_buckets[i],
-                                           interval_statistics_.computedBuckets()[i],
-                                           cumulative_statistics_.computedBuckets()[i]));
-    }
-    return absl::StrJoin(bucket_summary, " ");
-  } else {
-    return std::string("No recorded values");
-  }
 }
 
 } // namespace Stats

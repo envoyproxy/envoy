@@ -3,57 +3,65 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::NiceMock;
 
 namespace Envoy {
 namespace Stats {
 namespace {
 
-TEST(HistogramImplTest, Basic) {
-  MockStore store;
-  ParentHistogramImpl histogram("test", store, "test", std::vector<Tag>());
-  const HistogramStatistics &intervalStats = histogram.intervalStatistics(),
-                            &cumulativeStats = histogram.cumulativeStatistics();
+struct HistogramImplTest : public testing::Test {
+  HistogramImplTest()
+      : histogram_("test", store_, "test", std::vector<Tag>()),
+        interval_stats_(histogram_.intervalStatistics()),
+        cumulative_stats_(histogram_.cumulativeStatistics()) {}
 
-  // A histogram should retain the name it was given.
-  ASSERT_EQ("test", histogram.name());
-  EXPECT_STREQ("test", histogram.nameCStr());
+  NiceMock<MockStore> store_;
+  ParentHistogramImpl histogram_;
+  const HistogramStatistics &interval_stats_, &cumulative_stats_;
+};
 
-  // A histogram that hasn't been written to is not "used" and has no interesting statistics.
-  ASSERT_FALSE(histogram.used());
-  ASSERT_EQ(0, intervalStats.sampleCount());
-  ASSERT_EQ(0, cumulativeStats.sampleCount());
+// A histogram should retain the name it was given.
+TEST_F(HistogramImplTest, Name) {
+  EXPECT_EQ("test", histogram_.name());
+  EXPECT_STREQ("test", histogram_.nameCStr());
+}
 
-  // Recording a value marks the histogram as "used" and delivers to sinks.
-  EXPECT_CALL(store, deliverHistogramToSinks(_, 123));
-  histogram.recordValue(123);
-  ASSERT_TRUE(histogram.used());
+// A histogram that hasn't been written to is not "used" and has no interesting statistics.
+TEST_F(HistogramImplTest, Empty) {
+  EXPECT_FALSE(histogram_.used());
+  EXPECT_EQ(0, interval_stats_.sampleCount());
+  EXPECT_EQ(0, cumulative_stats_.sampleCount());
+}
 
-  // Merging should populate statistics for the last interval, and cumulative statistics. Note that
-  // the sample sum loses precision; supposedly 125 is close enough to 123...
-  histogram.merge();
-  ASSERT_EQ(1, intervalStats.sampleCount());
-  ASSERT_EQ(125, intervalStats.sampleSum());
-  ASSERT_EQ(1, cumulativeStats.sampleCount());
-  ASSERT_EQ(125, cumulativeStats.sampleSum());
+// Recording a value marks the histogram as "used" and delivers to sinks.
+TEST_F(HistogramImplTest, RecordValue) {
+  EXPECT_CALL(store_, deliverHistogramToSinks(_, 123));
+  histogram_.recordValue(123);
+  EXPECT_TRUE(histogram_.used());
+}
 
-  // Recording another value and merging again should yield fresh interval statistics, and add to
-  // cumulative statistics.
-  EXPECT_CALL(store, deliverHistogramToSinks(_, 456));
-  histogram.recordValue(456);
-  histogram.merge();
-  ASSERT_EQ(1, intervalStats.sampleCount());
-  ASSERT_EQ(455, intervalStats.sampleSum()); // 455 ~= 456
-  ASSERT_EQ(2, cumulativeStats.sampleCount());
-  ASSERT_EQ(580, cumulativeStats.sampleSum()); // 580 == 125 + 455.
+// Merging should populate statistics for the last interval, and cumulative statistics. Note that
+// the sample sum loses precision.
+TEST_F(HistogramImplTest, RecordAndMerge) {
+  histogram_.recordValue(123);
+  histogram_.merge();
+  EXPECT_EQ(1, interval_stats_.sampleCount());
+  EXPECT_EQ(125, interval_stats_.sampleSum()); // 125 ~= 123
+  EXPECT_EQ(1, cumulative_stats_.sampleCount());
+  EXPECT_EQ(125, cumulative_stats_.sampleSum()); // same
+}
 
-  // String quantile and bucket summaries should look sane.
-  EXPECT_EQ("P0(450,120) P25(452.5,125) P50(455,130) P75(457.5,455) P90(459,458) P95(459.5,459) "
-            "P99(459.9,459.8) P99.5(459.95,459.9) P99.9(459.99,459.98) P100(460,460)",
-            histogram.quantileSummary());
-  EXPECT_EQ("B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(0,0) B50(0,0) B100(0,0) B250(0,1) B500(1,2) "
-            "B1000(1,2) B2500(1,2) B5000(1,2) B10000(1,2) B30000(1,2) B60000(1,2) B300000(1,2) "
-            "B600000(1,2) B1.8e+06(1,2) B3.6e+06(1,2)",
-            histogram.bucketSummary());
+// Recording another value and merging again should yield fresh interval statistics, and add to
+// cumulative statistics. Again, the sample sum loses precision.
+TEST_F(HistogramImplTest, RecordAndMergeTwice) {
+  histogram_.recordValue(123);
+  histogram_.merge();
+  histogram_.recordValue(456);
+  histogram_.merge();
+  EXPECT_EQ(1, interval_stats_.sampleCount());
+  EXPECT_EQ(455, interval_stats_.sampleSum()); // 455 ~= 456
+  EXPECT_EQ(2, cumulative_stats_.sampleCount());
+  EXPECT_EQ(580, cumulative_stats_.sampleSum()); // 580 == 125 + 455.
 }
 
 } // namespace

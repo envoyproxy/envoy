@@ -559,38 +559,6 @@ void ThreadLocalParentHistogramImpl::merge() {
   }
 }
 
-const std::string ThreadLocalParentHistogramImpl::quantileSummary() const {
-  if (used()) {
-    std::vector<std::string> summary;
-    const std::vector<double>& supported_quantiles_ref = interval_statistics_.supportedQuantiles();
-    summary.reserve(supported_quantiles_ref.size());
-    for (size_t i = 0; i < supported_quantiles_ref.size(); ++i) {
-      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles_ref[i],
-                                    interval_statistics_.computedQuantiles()[i],
-                                    cumulative_statistics_.computedQuantiles()[i]));
-    }
-    return absl::StrJoin(summary, " ");
-  } else {
-    return std::string("No recorded values");
-  }
-}
-
-const std::string ThreadLocalParentHistogramImpl::bucketSummary() const {
-  if (used()) {
-    std::vector<std::string> bucket_summary;
-    const std::vector<double>& supported_buckets = interval_statistics_.supportedBuckets();
-    bucket_summary.reserve(supported_buckets.size());
-    for (size_t i = 0; i < supported_buckets.size(); ++i) {
-      bucket_summary.push_back(fmt::format("B{}({},{})", supported_buckets[i],
-                                           interval_statistics_.computedBuckets()[i],
-                                           cumulative_statistics_.computedBuckets()[i]));
-    }
-    return absl::StrJoin(bucket_summary, " ");
-  } else {
-    return std::string("No recorded values");
-  }
-}
-
 void ThreadLocalParentHistogramImpl::addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr) {
   Thread::LockGuard lock(merge_lock_);
   tls_histograms_.emplace_back(hist_ptr);

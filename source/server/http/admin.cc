@@ -661,6 +661,29 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
   return Http::Code::OK;
 }
 
+namespace {
+std::string quantileSummary(const Stats::ParentHistogram& histogram) {
+  if (histogram.used()) {
+    const auto &interval_stats = histogram.intervalStatistics(),
+               &cumulative_stats = histogram.cumulativeStatistics();
+    const auto &supported_quantiles = interval_stats.supportedQuantiles(),
+               &interval_computed_quantiles = interval_stats.computedQuantiles(),
+               &cumulative_computed_quantiles = cumulative_stats.computedQuantiles();
+
+    std::vector<std::string> summary;
+    summary.reserve(supported_quantiles.size());
+    for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+      summary.push_back(fmt::format("P{}({},{})", 100 * supported_quantiles[i],
+                                    interval_computed_quantiles[i],
+                                    cumulative_computed_quantiles[i]));
+    }
+    return absl::StrJoin(summary, " ");
+  } else {
+    return "No recorded values";
+  }
+}
+} // namespace
+
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream& admin_stream) {
   Http::Code rc = Http::Code::OK;
@@ -710,7 +733,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     std::multimap<std::string, std::string> all_histograms;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
       if (shouldShowMetric(histogram, used_only, regex)) {
-        all_histograms.emplace(histogram->name(), histogram->quantileSummary());
+        all_histograms.emplace(histogram->name(), quantileSummary(*histogram));
       }
     }
     for (auto histogram : all_histograms) {

@@ -18,16 +18,6 @@ public:
   virtual ~HistogramStatistics() {}
 
   /**
-   * Returns quantile summary representation of the histogram.
-   */
-  virtual std::string quantileSummary() const PURE;
-
-  /**
-   * Returns bucket summary representation of the histogram.
-   */
-  virtual std::string bucketSummary() const PURE;
-
-  /**
    * Returns supported quantiles.
    */
   virtual const std::vector<double>& supportedQuantiles() const PURE;
@@ -105,16 +95,6 @@ public:
    * Returns the cumulative histogram summary statistics.
    */
   virtual const HistogramStatistics& cumulativeStatistics() const PURE;
-
-  /**
-   * Returns the quantile summary representation.
-   */
-  virtual const std::string quantileSummary() const PURE;
-
-  /**
-   * Returns the bucket summary representation.
-   */
-  virtual const std::string bucketSummary() const PURE;
 };
 
 typedef std::shared_ptr<ParentHistogram> ParentHistogramSharedPtr;
