@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "extensions/filters/network/kafka/generated.h"
+#include "extensions/filters/network/kafka/external/generated.h"
 
 namespace Envoy {
 namespace Extensions {

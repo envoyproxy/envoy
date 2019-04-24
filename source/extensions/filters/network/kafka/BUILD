@@ -27,7 +27,7 @@ envoy_cc_library(
     name = "generated_lib",
     srcs = [],
     hdrs = [
-        "generated.h",
+        "external/generated.h",
         "normal_header.h",
     ],
 )
@@ -37,9 +37,9 @@ genrule(
     srcs = [
     ],
     outs = [
-        "generated.h",
+        "external/generated.h",
     ],
-    cmd = "./$(location :code_generator_binary) $(location generated.h)",
+    cmd = "./$(location :code_generator_binary) $(location external/generated.h)",
     tools = [
         ":code_generator_binary",
     ],
