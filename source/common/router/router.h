@@ -384,7 +384,7 @@ private:
   void onResponseTimeout();
   void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
   // Handle an upstream request aborted due to a local timeout.
-  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag);
+  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag, absl::string_view details);
   // Handle an "aborted" upstream request, meaning we didn't see response
   // headers (e.g. due to a reset). Handles recording stats and responding
   // downstream if appropriate.
