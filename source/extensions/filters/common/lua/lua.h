@@ -11,8 +11,6 @@
 #include "common/common/c_smart_ptr.h"
 #include "common/common/logger.h"
 
-#define LUAJIT_ENABLE_GC64
-#define LUAJIT_USE_SYSMALLOC
 #include "luajit-2.1/lua.hpp"
 
 namespace Envoy {

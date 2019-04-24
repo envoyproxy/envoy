@@ -319,6 +319,8 @@ def _com_github_madler_zlib():
     http_archive(
         name = "com_github_madler_zlib",
         build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
         **location
     )
     native.bind(
