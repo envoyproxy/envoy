@@ -31,7 +31,7 @@ message HotRestartMessage {
       int32 fd = 1;
     }
     message ShutdownAdmin {
-      uint64 original_start_time = 1;
+      uint64 original_start_time_unix_seconds = 1;
     }
     message Stats {
       // Values for server_stats, which don't fit with the "combination logic" approach.

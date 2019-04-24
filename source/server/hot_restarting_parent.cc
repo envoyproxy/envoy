@@ -41,7 +41,7 @@ void HotRestartingParent::onSocketEvent() {
     case HotRestartMessage::Request::kShutdownAdmin: {
       server_->shutdownAdmin();
       HotRestartMessage wrapped_reply;
-      wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_original_start_time(
+      wrapped_reply.mutable_reply()->mutable_shutdown_admin()->set_original_start_time_unix_seconds(
           server_->startTimeFirstEpoch());
       sendHotRestartMessage(child_address_, wrapped_reply);
       break;
