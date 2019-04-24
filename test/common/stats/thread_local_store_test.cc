@@ -806,15 +806,17 @@ TEST_F(StatsThreadLocalStoreTest, NonHotRestartNoTruncation) {
   tls_.shutdownThread();
 }
 
-/*
 // Tests how much memory is consumed allocating 100k stats.
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;
   }
+
+  MockSink sink;
   Stats::FakeSymbolTableImpl symbol_table;
   HeapStatDataAllocator alloc(symbol_table);
   auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
+  store->addSink(sink);
 
   // Use a tag producer that will produce tags.
   envoy::config::metrics::v2::StatsConfig stats_config;
@@ -831,7 +833,14 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
   EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
-}*/
+
+  // HACK: doesn't like shutting down without threading having started.
+  NiceMock<Event::MockDispatcher> main_thread_dispatcher;
+  NiceMock<ThreadLocal::MockInstance> tls;
+  store->initializeThreading(main_thread_dispatcher, tls);
+  store->shutdownThreading();
+  tls.shutdownThread();
+}
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   if (!TestUtil::hasDeterministicMallocStats()) {
