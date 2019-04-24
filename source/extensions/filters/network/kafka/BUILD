@@ -14,7 +14,6 @@ envoy_package()
 envoy_cc_library(
     name = "kafka_request_lib",
     srcs = [
-        "library_code.cc",
     ],
     hdrs = [
         "library_header.h",
