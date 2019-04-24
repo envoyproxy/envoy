@@ -161,7 +161,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   case CheckStatus::Denied: {
-    ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request", *callbacks_);
+    ENVOY_STREAM_LOG(trace, "ext_authz filter rejected the request. Response status code: {}",
+                     response->status_code, *callbacks_);
     cluster_->statsScope().counter("ext_authz.denied").inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
@@ -198,7 +199,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       cluster_->statsScope().counter("ext_authz.failure_mode_allowed").inc();
       continueDecoding();
     } else {
-      ENVOY_STREAM_LOG(debug, "ext_authz filter rejected the request with an error", *callbacks_);
+      ENVOY_STREAM_LOG(
+          trace, "ext_authz filter rejected the request with an error. Response status code: {}",
+          config_->statusOnError(), *callbacks_);
       callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
       callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt);
