@@ -14,41 +14,112 @@ envoy_package()
 envoy_cc_library(
     name = "kafka_request_lib",
     srcs = [
+        "kafka_request_parser.cc",
+        "external/kafka_request_resolver.cc",
     ],
     hdrs = [
-        "library_header.h",
+        "kafka_request.h",
+        "kafka_request_parser.h",
+        "external/requests.h",
     ],
     deps = [
-        ":generated_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "generated_lib",
-    srcs = [],
-    hdrs = [
-        "external/generated.h",
-        "normal_header.h",
+        ":parser_lib",
+        ":serialization_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
     ],
 )
 
 genrule(
-    name = "generate_header_genrule",
+    name = "kafka_generated_source",
     srcs = [
+        "@kafka_source//:request_protocol_files",
     ],
     outs = [
-        "external/generated.h",
+        "external/requests.h",
+        "external/kafka_request_resolver.cc",
     ],
-    cmd = "./$(location :code_generator_binary) $(location external/generated.h)",
+    cmd = """
+      ./$(location :kafka_code_generator) generate-source \
+        $(location external/requests.h) $(location external/kafka_request_resolver.cc) \
+        $(SRCS)
+    """,
     tools = [
-        ":code_generator_binary",
+        ":kafka_code_generator",
     ],
 )
 
 py_binary(
-    name = "code_generator_binary",
-    srcs = ["code_generator/generator_script.py"],
-    data = glob(["code_generator/*.j2"]),
-    main = "code_generator/generator_script.py",
+    name = "kafka_code_generator",
+    srcs = ["protocol_code_generator/kafka_generator.py"],
+    data = glob(["protocol_code_generator/*.j2"]),
+    main = "protocol_code_generator/kafka_generator.py",
     deps = ["@com_github_pallets_jinja//:jinja2"],
+)
+
+envoy_cc_library(
+    name = "parser_lib",
+    hdrs = ["parser.h"],
+    deps = [
+        ":kafka_protocol_lib",
+        ":message_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "message_lib",
+    hdrs = [
+        "message.h",
+    ],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "serialization_lib",
+    hdrs = [
+        "serialization.h",
+        "external/serialization_composite.h",
+    ],
+    deps = [
+        ":kafka_protocol_lib",
+        "//include/envoy/buffer:buffer_interface",
+        "//source/common/common:byte_order_lib",
+    ],
+)
+
+genrule(
+    name = "serialization_composite_generated_source",
+    srcs = [],
+    outs = [
+        "external/serialization_composite.h",
+    ],
+    cmd = """
+      ./$(location :serialization_composite_generator) generate-source \
+      $(location external/serialization_composite.h)
+    """,
+    tools = [
+        ":serialization_composite_generator",
+    ],
+)
+
+py_binary(
+    name = "serialization_composite_generator",
+    srcs = ["serialization_code_generator/serialization_composite_generator.py"],
+    data = glob(["serialization_code_generator/*.j2"]),
+    main = "serialization_code_generator/serialization_composite_generator.py",
+    deps = ["@com_github_pallets_jinja//:jinja2"],
+)
+
+envoy_cc_library(
+    name = "kafka_protocol_lib",
+    hdrs = [
+        "kafka_types.h",
+    ],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//source/common/common:macros",
+    ],
 )
