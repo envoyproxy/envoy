@@ -19,7 +19,11 @@ src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath quic/core/quic_constant
 # sed commands to apply to each source file.
 cat <<EOF >sed_commands
 # Rewrite include directives for testonly platform impl files.
+/^#include/ s!net/quic/platform/impl/quic_expect_bug_impl.h!test/extensions/quic_listeners/quiche/platform/quic_expect_bug_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_mock_log_impl.h!test/extensions/quic_listeners/quiche/platform/quic_mock_log_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_port_utils_impl.h!test/extensions/quic_listeners/quiche/platform/quic_port_utils_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_test_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_impl.h!
+/^#include/ s!net/quic/platform/impl/quic_test_output_impl.h!test/extensions/quic_listeners/quiche/platform/quic_test_output_impl.h!
 
 # Rewrite include directives for platform impl files.
 /^#include/ s!net/(http2|spdy|quic)/platform/impl/!extensions/quic_listeners/quiche/platform/!
