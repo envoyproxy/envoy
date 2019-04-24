@@ -325,7 +325,8 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
       const auto result = target_buffer.write(io_handle);
       FUZZ_ASSERT(result.ok());
       rc = result.rc_;
-      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc, rc < 0 ? result.err_->getErrorDetails() : 0);
+      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc,
+                     rc < 0 ? result.err_->getErrorDetails() : 0);
       if (empty) {
         FUZZ_ASSERT(rc == 0);
       } else {
