@@ -42,14 +42,14 @@
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
-#include "server/test_hooks.h"
+#include "server/listener_hooks.h"
 
 namespace Envoy {
 namespace Server {
 
 InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
-                           Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
-                           HotRestart& restarter, Stats::StoreRoot& store,
+                           Network::Address::InstanceConstSharedPtr local_address,
+                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
@@ -197,7 +197,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
-                              ComponentFactory& component_factory, TestHooks& hooks) {
+                              ComponentFactory& component_factory, ListenerHooks& hooks) {
   ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
@@ -296,8 +296,8 @@ void InstanceImpl::initialize(const Options& options,
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_ =
-      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_);
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(
+      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -305,6 +305,11 @@ void InstanceImpl::initialize(const Options& options,
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
+
+  // It's now safe to start writing stats from the main thread's dispatcher.
+  if (bootstrap_.enable_dispatcher_stats()) {
+    dispatcher_->initializeStats(stats_store_, "server.");
+  }
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.

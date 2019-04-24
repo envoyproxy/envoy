@@ -39,7 +39,7 @@ struct SuccessResponse {
           if (context->matchers_->matches(header.key().getStringView())) {
             context->response_->headers_to_add.emplace_back(
                 Http::LowerCaseString{std::string(header.key().getStringView())},
-                header.value().getStringView());
+                std::string(header.value().getStringView()));
           }
           return Http::HeaderMap::Iterate::Continue;
         },

@@ -35,6 +35,8 @@ CREAT
 CRL
 CRLFs
 CRT
+CSRF
+CSRFPOLICY
 CSS
 CSV
 CTX
@@ -428,6 +430,7 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
+evwatch
 exe
 execlp
 facto

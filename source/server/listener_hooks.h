@@ -8,9 +8,9 @@ namespace Envoy {
  * Hooks in the server to allow for integration testing. The real server just uses an empty
  * implementation defined below.
  */
-class TestHooks {
+class ListenerHooks {
 public:
-  virtual ~TestHooks() {}
+  virtual ~ListenerHooks() {}
 
   /**
    * Called when a worker has added a listener and it is listening.
@@ -29,11 +29,11 @@ public:
 };
 
 /**
- * Empty implementation of TestHooks.
+ * Empty implementation of ListenerHooks.
  */
-class DefaultTestHooks : public TestHooks {
+class DefaultListenerHooks : public ListenerHooks {
 public:
-  // TestHooks
+  // ListenerHooks
   void onWorkerListenerAdded() override {}
   void onWorkerListenerRemoved() override {}
   void onRuntimeCreated() override {}

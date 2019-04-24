@@ -52,6 +52,8 @@ message ExtAuthz {
   bool use_alpha = 4 [deprecated = true];
 
   // Enables filter to buffer the client request body and send it within the authorization request.
+  // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization
+  // request message indicating if the body data is partial.
   BufferSettings with_request_body = 5;
 
   // Clears route cache in order to allow the external authorization service to correctly affect
