@@ -88,6 +88,10 @@ public:
   void reset() override { data_.value_ = 0; }
   bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
+  void stealthyAdd(uint64_t amount) override {
+    data_.value_ += amount;
+    data_.flags_ |= Flags::Used;
+  }
 
 private:
   StatData& data_;
@@ -112,6 +116,7 @@ public:
   void reset() override {}
   bool used() const override { return false; }
   uint64_t value() const override { return 0; }
+  void stealthyAdd(uint64_t) override {}
 };
 
 /**

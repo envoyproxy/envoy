@@ -63,7 +63,8 @@ public:
 /**
  * An always incrementing counter with latching capability. Each increment is added both to a
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
- * clears it.
+ * clears it. When the counter needs to start life at a non-zero value, stealthyAdd() allows
+ * setting that value without the value appearing as part of the first period's increment.
  */
 class Counter : public virtual Metric {
 public:
@@ -73,6 +74,11 @@ public:
   virtual uint64_t latch() PURE;
   virtual void reset() PURE;
   virtual uint64_t value() const PURE;
+  /**
+   * stealthyAdd() was added to facilitate hot restart stat transfers. You probably should not
+   * use it at all.
+   */
+  virtual void stealthyAdd(uint64_t amount) PURE;
 };
 
 typedef std::shared_ptr<Counter> CounterSharedPtr;

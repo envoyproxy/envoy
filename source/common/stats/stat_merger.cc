@@ -55,11 +55,15 @@ StatMerger::getCombineLogic(const std::string& gauge_name) {
 
 void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counters) {
   for (const auto& counter : counters) {
-    uint64_t& parent_value_ref = parent_counter_values_[counter.first];
-    uint64_t old_parent_value = parent_value_ref;
     uint64_t new_parent_value = counter.second;
-    target_store_.counter(counter.first).add(new_parent_value - old_parent_value);
-    parent_value_ref = new_parent_value;
+    auto found_value = parent_counter_values_.find(counter.first);
+    if (found_value == parent_counter_values_.end()) {
+      target_store_.counter(counter.first).stealthyAdd(new_parent_value);
+    } else {
+      uint64_t old_parent_value = found_value->second;
+      target_store_.counter(counter.first).add(new_parent_value - old_parent_value);
+    }
+    parent_counter_values_[counter.first] = new_parent_value;
   }
 }
 

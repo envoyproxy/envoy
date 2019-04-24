@@ -45,6 +45,7 @@ public:
   MOCK_METHOD0(reset, void());
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
+  MOCK_METHOD1(stealthyAdd, void(uint64_t amount));
 
   bool used_;
   uint64_t value_;
