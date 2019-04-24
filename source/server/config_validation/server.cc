@@ -86,7 +86,7 @@ void ValidationInstance::initialize(const Options& options,
   Configuration::InitialImpl initial_config(bootstrap);
   overload_manager_ = std::make_unique<OverloadManagerImpl>(dispatcher(), stats(), threadLocal(),
                                                             bootstrap.overload_manager(), *api_);
-  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this);
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(*this, *this, *this, false);
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>();

@@ -507,6 +507,33 @@ TEST_P(StatNameTest, MutexContentionOnExistingSymbols) {
   }
 }
 
+TEST_P(StatNameTest, SharedStatNameStorageSetInsertAndFind) {
+  StatNameStorageSet set;
+  const int iters = 10;
+  for (int i = 0; i < iters; ++i) {
+    std::string foo = absl::StrCat("foo", i);
+    auto insertion = set.insert(StatNameStorage(foo, *table_));
+    StatNameTempStorage temp_foo(foo, *table_);
+    auto found = set.find(temp_foo.statName());
+    EXPECT_EQ(found->statName().data(), insertion.first->statName().data());
+  }
+  StatNameTempStorage bar("bar", *table_);
+  EXPECT_EQ(set.end(), set.find(bar.statName()));
+  EXPECT_EQ(iters, set.size());
+  set.free(*table_);
+}
+
+TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
+  StatNameStorageSet set1, set2;
+  set1.insert(StatNameStorage("foo", *table_));
+  EXPECT_EQ(1, set1.size());
+  EXPECT_EQ(0, set2.size());
+  set1.swap(set2);
+  EXPECT_EQ(0, set1.size());
+  EXPECT_EQ(1, set2.size());
+  set2.free(*table_);
+}
+
 // Tests the memory savings realized from using symbol tables with 1k
 // clusters. This test shows the memory drops from almost 8M to less than
 // 2M. Note that only SymbolTableImpl is tested for memory consumption,
