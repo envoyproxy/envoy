@@ -14,10 +14,10 @@
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"
 #include "server/hot_restart_nop_impl.h"
+#include "server/listener_hooks.h"
 #include "server/options_impl.h"
 #include "server/proto_descriptors.h"
 #include "server/server.h"
-#include "server/test_hooks.h"
 
 #include "absl/strings/str_split.h"
 
@@ -43,7 +43,8 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 }
 
 MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
-                               TestHooks& test_hooks, Server::ComponentFactory& component_factory,
+                               ListenerHooks& listener_hooks,
+                               Server::ComponentFactory& component_factory,
                                std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
                                Thread::ThreadFactory& thread_factory,
                                Filesystem::Instance& file_system)
@@ -83,7 +84,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                                                  restarter_->statsAllocator());
 
     server_ = std::make_unique<Server::InstanceImpl>(
-        options_, time_system, local_address, test_hooks, *restarter_, *stats_store_,
+        options_, time_system, local_address, listener_hooks, *restarter_, *stats_store_,
         access_log_lock, component_factory, std::move(random_generator), *tls_, thread_factory_,
         file_system_);
 
@@ -138,7 +139,7 @@ void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string
 
 MainCommon::MainCommon(int argc, const char* const* argv)
     : options_(argc, argv, &MainCommon::hotRestartVersion, spdlog::level::info),
-      base_(options_, real_time_system_, default_test_hooks_, prod_component_factory_,
+      base_(options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
             std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
             platform_impl_.fileSystem()) {}
 
