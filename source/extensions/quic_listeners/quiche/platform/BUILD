@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_platform_dep",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_quiche",
@@ -79,6 +80,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
+    srcs = ["quic_thread_impl.cc"],
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
@@ -124,7 +126,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
         "//source/server:backtrace_lib",
-    ]),
+    ]) + envoy_cc_platform_dep("//source/exe:platform_impl_lib"),
 )
 
 envoy_cc_library(

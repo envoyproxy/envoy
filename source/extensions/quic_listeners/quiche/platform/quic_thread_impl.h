@@ -19,7 +19,7 @@ namespace quic {
 // A class representing a thread of execution in QUIC.
 class QuicThreadImpl {
 public:
-  QuicThreadImpl(const std::string& /*name*/) {}
+  QuicThreadImpl(const std::string& name);
   QuicThreadImpl(const QuicThreadImpl&) = delete;
   QuicThreadImpl& operator=(const QuicThreadImpl&) = delete;
 
@@ -47,14 +47,6 @@ public:
     }
     thread_->join();
     thread_ = nullptr;
-  }
-
-  // Sets the thread factory to use.
-  // NOTE: The factory can not be passed via a constructor argument because this class is itself a
-  // dependency of an external library that derives from it and expects a single argument
-  // constructor.
-  void setThreadFactory(Envoy::Thread::ThreadFactory& thread_factory) {
-    thread_factory_ = &thread_factory;
   }
 
 protected:
