@@ -56,9 +56,12 @@ public:
       EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
     }
 
-    conn_pool_ = std::make_unique<InstanceImpl>(
+    std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
-        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true), auth_password_);
+        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true));
+    // Set the authentication password for this connection pool.
+    conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
+    conn_pool_ = std::move(conn_pool_impl);
     test_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   }
 

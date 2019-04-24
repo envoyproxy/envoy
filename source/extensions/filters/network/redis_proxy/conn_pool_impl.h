@@ -39,8 +39,7 @@ public:
   InstanceImpl(
       const std::string& cluster_name, Upstream::ClusterManager& cm,
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
-      const std::string& auth_password);
+      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, const Common::Redis::RespValue& request,
@@ -48,6 +47,9 @@ public:
   Common::Redis::Client::PoolRequest*
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::PoolCallbacks& callbacks) override;
+
+  // Allow the unit test to have access to private members.
+  friend class RedisConnPoolImplTest;
 
 private:
   struct ThreadLocalPool;
@@ -94,6 +96,7 @@ private:
     std::unordered_map<Upstream::HostConstSharedPtr, ThreadLocalActiveClientPtr> client_map_;
     Envoy::Common::CallbackHandle* host_set_member_update_cb_handle_{};
     std::unordered_map<std::string, Upstream::HostConstSharedPtr> host_address_map_;
+    std::string auth_password_;
   };
 
   struct LbContextImpl : public Upstream::LoadBalancerContextBase {
@@ -111,7 +114,6 @@ private:
   Common::Redis::Client::ClientFactory& client_factory_;
   ThreadLocal::SlotPtr tls_;
   Common::Redis::Client::ConfigImpl config_;
-  std::string auth_password_;
 };
 
 } // namespace ConnPool

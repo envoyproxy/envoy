@@ -7,6 +7,9 @@
 
 #include "common/common/assert.h"
 
+#include "extensions/filters/network/redis_proxy/config.h"
+#include "extensions/filters/network/well_known_names.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -33,10 +36,8 @@ Common::Redis::RespValue makeAuthCommand(const std::string& password) {
 InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
-    const std::string& auth_password)
-    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
-      auth_password_(auth_password) {
+    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
+    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -63,6 +64,11 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
   cluster_update_handle_ = parent_.cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent_.cm_.get(cluster_name_);
   if (cluster != nullptr) {
+    auto options = cluster->info()->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      auth_password_ = options->auth_password();
+    }
     onClusterAddOrUpdateNonVirtual(*cluster);
   }
 }
@@ -155,10 +161,9 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key,
     client->host_ = host;
     client->redis_client_ = parent_.client_factory_.create(host, dispatcher_, parent_.config_);
     client->redis_client_->addConnectionCallbacks(*client);
-    if (!parent_.auth_password_.empty()) {
+    if (!auth_password_.empty()) {
       // Send an AUTH command to the upstream server.
-      client->redis_client_->makeRequest(makeAuthCommand(parent_.auth_password_),
-                                         null_pool_callbacks);
+      client->redis_client_->makeRequest(makeAuthCommand(auth_password_), null_pool_callbacks);
     }
   }
 
@@ -242,10 +247,9 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
     client->redis_client_ =
         parent_.client_factory_.create(it->second, dispatcher_, parent_.config_);
     client->redis_client_->addConnectionCallbacks(*client);
-    if (!parent_.auth_password_.empty()) {
+    if (!auth_password_.empty()) {
       // Send an AUTH command to the upstream server.
-      client->redis_client_->makeRequest(makeAuthCommand(parent_.auth_password_),
-                                         null_pool_callbacks);
+      client->redis_client_->makeRequest(makeAuthCommand(auth_password_), null_pool_callbacks);
     }
   }
 
