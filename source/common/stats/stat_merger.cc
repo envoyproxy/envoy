@@ -44,7 +44,7 @@ StatMerger::getCombineLogic(const std::string& gauge_name) {
       {std::regex("^runtime.admin_overrides_active$"), CombineLogic::NoImport},
       {std::regex("^runtime.num_keys$"), CombineLogic::NoImport},
   };
-  for (auto exception : nonstandard_combine_logic) {
+  for (const auto& exception : nonstandard_combine_logic) {
     std::smatch match;
     if (std::regex_match(gauge_name, match, exception.first)) {
       return exception.second;
@@ -56,7 +56,7 @@ StatMerger::getCombineLogic(const std::string& gauge_name) {
 void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counters) {
   for (const auto& counter : counters) {
     uint64_t new_parent_value = counter.second;
-    auto found_value = parent_counter_values_.find(counter.first.c_str());
+    const auto& found_value = parent_counter_values_.find(counter.first.c_str());
     if (found_value == parent_counter_values_.end()) {
       target_store_.counter(counter.first).stealthyAdd(new_parent_value);
     } else {

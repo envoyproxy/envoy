@@ -39,6 +39,7 @@ message HotRestartMessage {
       uint64 num_connections = 2;
 
       // The parent's current values for various stats in its stats store.
+      // Keys are fully qualified stat names.
       map<string, uint64> counters = 3;
       map<string, uint64> gauges = 4;
     }
