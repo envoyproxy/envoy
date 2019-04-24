@@ -122,9 +122,9 @@ void DecoderImpl::onData(Buffer::Instance& data) {
 }
 
 void EncoderImpl::encodeRequestHeader(
-  uint32_t key_length,
+  uint16_t key_length,
+  uint8_t extras_length,
   uint32_t body_length,
-  uint32_t extras_length,
   const Request& request,
   Message::OpCode op_code) {
 
@@ -153,8 +153,8 @@ void EncoderImpl::encodeGet(const GetRequest& request) {
 void EncoderImpl::encodeSet(const SetRequest& request) {
   encodeRequestHeader(
     request.key().length(),
-    request.body().length(),
     8,
+    request.body().length(),
     request,
     request.quiet() ? Message::OpCode::OP_SETQ : Message::OpCode::OP_SET);
 

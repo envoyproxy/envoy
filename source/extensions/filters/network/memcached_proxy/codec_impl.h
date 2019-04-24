@@ -114,9 +114,9 @@ public:
 
 private:
   void encodeRequestHeader(
-    uint32_t key_length,
+    uint16_t key_length,
+    uint8_t extras_length,
     uint32_t body_length,
-    uint32_t extras_length,
     const Request& request,
     Message::OpCode op);
 
