@@ -11,3 +11,13 @@ load(
 )
 
 envoy_package()
+
+envoy_extension_cc_test(
+    name = "kafka_request_lib_test",
+    srcs = ["code_test.cc"],
+    extension_name = "envoy.filters.network.kafka",
+    deps = [
+        "//source/extensions/filters/network/kafka:kafka_request_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)

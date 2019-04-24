@@ -7,12 +7,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-class Something2: public Something {
+class Something2 {
 public:
   Something2() {};
 
-  int someMethod() {
-    return 2;
+  int someMethod(Argument& arg) {
+    return arg.value() + 2;
   }
 };
 

@@ -5,10 +5,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
-class Something {
+class Argument {
 public:
-  virtual ~Something() = default;
-  virtual int someMethod() = 0;
+  int value() {
+    return 123;
+  }
 };
 
 } // namespace Kafka
