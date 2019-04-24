@@ -81,6 +81,34 @@ TEST_F(MemcachedCodecImplTest, SetEquality) {
     s2.body("bar");
     EXPECT_FALSE(s1 == s2);
   }
+
+  {
+    SetRequestImpl s1(1, 1, 1);
+    s1.expiration(1);
+    SetRequestImpl s2(1, 1, 1);
+    s2.expiration(2);
+    EXPECT_FALSE(s1 == s2);
+  }
+
+  {
+    SetRequestImpl s1(1, 1, 1);
+    s1.flags(1);
+    SetRequestImpl s2(1, 1, 1);
+    s2.flags(2);
+    EXPECT_FALSE(s1 == s2);
+  }
+
+  {
+    SetRequestImpl s1(1, 1, 1);
+    s1.body("foo");
+    s1.expiration(1336);
+    s1.flags(1337);
+    SetRequestImpl s2(1, 1, 1);
+    s2.body("foo");
+    s2.expiration(1336);
+    s2.flags(1337);
+    EXPECT_TRUE(s1 == s2);
+  }
 }
 
 TEST_F(MemcachedCodecImplTest, GetRoundTrip) {

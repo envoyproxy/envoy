@@ -19,14 +19,14 @@ namespace MemcachedProxy {
 
 std::string BufferHelper::drainString(Buffer::Instance& data, uint32_t length) {
   char* start = reinterpret_cast<char*>(data.linearize(length));
-  std::string ret(start);
+  std::string ret(start, length);
   data.drain(length);
   return ret;
 }
 
 void GetRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t, Buffer::Instance& data) {
-  ENVOY_LOG(trace, "decoding get request");
   key_ = BufferHelper::drainString(data, key_length);
+  ENVOY_LOG(trace, "decoded `GET` key={}", key_);
 }
 
 bool GetRequestImpl::operator==(const GetRequest& rhs) const {
@@ -37,11 +37,11 @@ bool GetRequestImpl::operator==(const GetRequest& rhs) const {
 }
 
 void SetRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t body_length, Buffer::Instance& data) {
-  ENVOY_LOG(trace, "decoding set request");
-  key_ = BufferHelper::drainString(data, key_length);
   flags_ = data.drainBEInt<uint32_t>();
   expiration_ = data.drainBEInt<uint32_t>();
+  key_ = BufferHelper::drainString(data, key_length);
   body_ = BufferHelper::drainString(data, body_length);
+  ENVOY_LOG(trace, "decoded `SET` key={}, body={}", key_, body_);
 }
 
 bool SetRequestImpl::operator==(const SetRequest& rhs) const {
@@ -55,14 +55,16 @@ bool SetRequestImpl::operator==(const SetRequest& rhs) const {
 }
 
 bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
-  auto op_code = static_cast<Message::OpCode>(data.drainBEInt<uint8_t>());
+  auto raw_op_code = data.drainBEInt<uint8_t>();
+  auto op_code = static_cast<Message::OpCode>(raw_op_code);
   auto key_length = data.drainBEInt<uint16_t>();
   auto extras_length = data.drainBEInt<uint8_t>();
-  data.drainBEInt<uint8_t>(); // skip data type as it's always 0x00.
-  auto vbucket_id_or_status = data.drainBEInt<uint8_t>();
+  data.drainBEInt<uint8_t>(); // skip data_type as it's always 0x00.
+  auto vbucket_id_or_status = data.drainBEInt<uint16_t>();
   auto body_length = data.drainBEInt<uint32_t>();
   auto opaque = data.drainBEInt<uint32_t>();
   auto cas = data.drainBEInt<uint64_t>();
+
 
   switch (op_code) {
   case Message::OpCode::OP_GET:
@@ -100,7 +102,6 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   }
 
   auto magic = data.drainBEInt<uint8_t>();
-  ENVOY_LOG(trace, "magic byte {}", magic);
   switch (magic) {
   case Message::RequestV1: {
     return decodeRequest(data);
@@ -153,7 +154,7 @@ void EncoderImpl::encodeSet(const SetRequest& request) {
   encodeRequestHeader(
     request.key().length(),
     request.body().length(),
-    64,
+    8,
     request,
     request.quiet() ? Message::OpCode::OP_SETQ : Message::OpCode::OP_SET);
 
