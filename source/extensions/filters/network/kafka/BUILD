@@ -29,9 +29,7 @@ envoy_cc_library(
     srcs = [],
     hdrs = [
         "generated.h",
-    ],
-    deps = [
-        ":normal_lib",
+        "normal_header.h",
     ],
 )
 
@@ -54,12 +52,4 @@ py_binary(
     data = glob(["code_generator/*.j2"]),
     main = "code_generator/generator_script.py",
     deps = ["@com_github_pallets_jinja//:jinja2"],
-)
-
-envoy_cc_library(
-    name = "normal_lib",
-    srcs = [],
-    hdrs = [
-        "normal_header.h",
-    ],
 )
