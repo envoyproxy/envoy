@@ -35,7 +35,7 @@ public:
   }
 
   // Config::Subscription
-  void start(const std::vector<std::string>& resources,
+  void start(const std::set<std::string>& resources,
              Config::SubscriptionCallbacks& callbacks) override {
     // We report all discovered resources in the watched file.
     UNREFERENCED_PARAMETER(resources);
@@ -45,7 +45,7 @@ public:
     refresh();
   }
 
-  void updateResources(const std::vector<std::string>& resources) override {
+  void updateResources(const std::set<std::string>& resources) override {
     // We report all discovered resources in the watched file.
     UNREFERENCED_PARAMETER(resources);
     // Bump stats for consistence behavior with other xDS.

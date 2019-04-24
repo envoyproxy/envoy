@@ -69,18 +69,18 @@ public:
   /**
    * Start a configuration subscription asynchronously. This should be called once and will continue
    * to fetch throughout the lifetime of the Subscription object.
-   * @param resources vector of resource names to fetch.
+   * @param resources set of resource names to fetch.
    * @param callbacks the callbacks to be notified of configuration updates. The callback must not
    *        result in the deletion of the Subscription object.
    */
-  virtual void start(const std::vector<std::string>& resources,
-                     SubscriptionCallbacks& callbacks) PURE;
+  virtual void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) PURE;
 
   /**
    * Update the resources to fetch.
-   * @param resources vector of resource names to fetch.
+   * @param resources vector of resource names to fetch. It's a (not unordered_)set so that it can
+   * be passed to std::set_difference, which must be given sorted collections.
    */
-  virtual void updateResources(const std::vector<std::string>& resources) PURE;
+  virtual void updateResources(const std::set<std::string>& update_to_these_names) PURE;
 };
 
 /**

@@ -21,7 +21,7 @@ WorkerPtr ProdWorkerFactory::createWorker(OverloadManager& overload_manager) {
       overload_manager, api_)};
 }
 
-WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, TestHooks& hooks,
+WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
                        OverloadManager& overload_manager, Api::Api& api)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
@@ -67,10 +67,13 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
   });
 }
 
-void WorkerImpl::start(GuardDog& guard_dog, Stats::Scope& scope, const std::string& prefix) {
+void WorkerImpl::start(GuardDog& guard_dog) {
   ASSERT(!thread_);
   thread_ =
       api_.threadFactory().createThread([this, &guard_dog]() -> void { threadRoutine(guard_dog); });
+}
+
+void WorkerImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
   dispatcher_->initializeStats(scope, prefix);
 }
 

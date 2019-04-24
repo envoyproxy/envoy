@@ -671,11 +671,13 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
-                                         WorkerFactory& worker_factory)
+                                         WorkerFactory& worker_factory,
+                                         bool enable_dispatcher_stats)
     : server_(server), factory_(listener_factory),
       scope_(server.stats().createScope("listener_manager.")), stats_(generateStats(*scope_)),
       config_tracker_entry_(server.admin().getConfigTracker().add(
-          "listeners", [this] { return dumpListenerConfigs(); })) {
+          "listeners", [this] { return dumpListenerConfigs(); })),
+      enable_dispatcher_stats_(enable_dispatcher_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(worker_factory.createWorker(server.overloadManager()));
   }
@@ -1011,7 +1013,10 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     for (const auto& listener : active_listeners_) {
       addListenerToWorker(*worker, *listener);
     }
-    worker->start(guard_dog, *scope_, fmt::format("worker_{}.", i++));
+    worker->start(guard_dog);
+    if (enable_dispatcher_stats_) {
+      worker->initializeStats(*scope_, fmt::format("worker_{}.", i++));
+    }
   }
 }
 

@@ -163,8 +163,8 @@ public:
               callbacks.onPoolReady(encoder1, context_.cluster_manager_.conn_pool_.host_);
               return nullptr;
             }));
-    expectResponseTimerCreate();
     expectPerTryTimerCreate();
+    expectResponseTimerCreate();
 
     Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
                                     {"x-envoy-internal", "true"},

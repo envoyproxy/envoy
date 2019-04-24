@@ -3,9 +3,9 @@
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/listener_hooks.h"
 #include "server/proto_descriptors.h"
 #include "server/server.h"
-#include "server/test_hooks.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
@@ -54,7 +54,7 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
 
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
-  DefaultTestHooks hooks;
+  DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
   Stats::TestIsolatedStoreImpl stats_store;
   Thread::MutexBasicLockable fakelock;

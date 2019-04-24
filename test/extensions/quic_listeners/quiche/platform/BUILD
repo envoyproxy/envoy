@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
+    "envoy_cc_platform_dep",
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
@@ -40,7 +41,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:quic_platform_port_utils",
         "@com_googlesource_quiche//:quic_platform_sleep",
-    ],
+    ] + envoy_cc_platform_dep("//source/exe:platform_impl_lib"),
 )
 
 envoy_cc_test(
@@ -54,9 +55,9 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
-    name = "quic_platform_port_utils_test_impl_lib",
-    srcs = ["quic_port_utils_test_impl.cc"],
-    hdrs = ["quic_port_utils_test_impl.h"],
+    name = "quic_platform_port_utils_impl_lib",
+    srcs = ["quic_port_utils_impl.cc"],
+    hdrs = ["quic_port_utils_impl.h"],
     deps = [
         "//source/common/network:utility_lib",
         "//test/test_common:environment_lib",

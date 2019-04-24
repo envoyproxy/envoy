@@ -622,6 +622,13 @@ public:
   virtual absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const PURE;
 
   /**
+   * @return absl::optional<std::chrono::milliseconds> the timeout offset to apply to the timeout
+   * provided by the 'grpc-timeout' header of a gRPC request. This value will be positive and should
+   * be subtracted from the value provided by the header.
+   */
+  virtual absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const PURE;
+
+  /**
    * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
    * @param headers supplies the request headers.
    * @return the virtual cluster or nullptr if there is no match.

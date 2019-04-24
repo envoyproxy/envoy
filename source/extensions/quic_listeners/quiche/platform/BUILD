@@ -66,13 +66,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
 )
 
-envoy_cc_test_library(
-    name = "quic_platform_port_utils_impl_lib",
-    hdrs = ["quic_port_utils_impl.h"],
-    include_prefix = "extensions/quic_listeners/quiche/platform",
-    deps = ["//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_test_impl_lib"],
-)
-
 envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = ["quic_logging_impl.cc"],
@@ -129,6 +122,7 @@ envoy_cc_library(
         ":quic_platform_logging_impl_lib",
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:byte_order_lib",
         "//source/server:backtrace_lib",
     ]),
 )

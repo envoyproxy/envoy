@@ -155,15 +155,9 @@ cc_library(
 cc_library(
     name = "quic_platform_port_utils",
     testonly = 1,
-    hdrs = envoy_select_quiche(
-        ["quiche/quic/platform/api/quic_port_utils.h"],
-        "@envoy",
-    ),
+    hdrs = ["quiche/quic/platform/api/quic_port_utils.h"],
     visibility = ["//visibility:public"],
-    deps = envoy_select_quiche(
-        ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
-        "@envoy",
-    ),
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
 )
 
 cc_library(
@@ -277,6 +271,7 @@ envoy_cc_test(
     name = "quic_platform_test",
     srcs = envoy_select_quiche(
         [
+            "quiche/quic/platform/api/quic_endian_test.cc",
             "quiche/quic/platform/api/quic_reference_counted_test.cc",
             "quiche/quic/platform/api/quic_string_utils_test.cc",
             "quiche/quic/platform/api/quic_text_utils_test.cc",
