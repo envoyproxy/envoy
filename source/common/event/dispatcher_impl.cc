@@ -42,7 +42,7 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
 DispatcherImpl::~DispatcherImpl() {}
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
-  // this needs to be run in the dispatcher's thread, so that we have a thread id to log
+  // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
   post([this, &scope, prefix] {
     stats_prefix_ = prefix + "dispatcher";
     stats_ = std::make_unique<DispatcherStats>(
