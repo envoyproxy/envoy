@@ -20,7 +20,7 @@ MetricImpl::MetricImpl(absl::string_view tag_extracted_name, const std::vector<T
   // required bytes. 1 is added to account for the tag_extracted_name, and we
   // multiply the number of tags by 2 to account for the name and value of each
   // tag.
-  uint32_t num_names = 1 + 2 * tags.size();
+  const uint32_t num_names = 1 + 2 * tags.size();
   STACK_ARRAY(names, absl::string_view, num_names);
   names[0] = tag_extracted_name;
   int index = 0;

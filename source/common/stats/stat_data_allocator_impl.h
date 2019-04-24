@@ -63,6 +63,11 @@ public:
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
   ~CounterImpl() override {
     alloc_.free(data_);
+
+    // MetricImpl must be explicitly cleared() before destruction, otherwise it
+    // will not be able to access the SymbolTable& to free the symbols. An RAII
+    // alternative would be to store the SymbolTable reference in the
+    // MetricImpl, costing 8 bytes per stat.
     MetricImpl::clear();
   }
 
@@ -94,7 +99,13 @@ protected:
 class NullCounterImpl : public Counter, NullMetricImpl {
 public:
   explicit NullCounterImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
-  ~NullCounterImpl() override { MetricImpl::clear(); }
+  ~NullCounterImpl() override {
+    // MetricImpl must be explicitly cleared() before destruction, otherwise it
+    // will not be able to access the SymbolTable& to free the symbols. An RAII
+    // alternative would be to store the SymbolTable reference in the
+    // MetricImpl, costing 8 bytes per stat.
+    MetricImpl::clear();
+  }
 
   void add(uint64_t) override {}
   void inc() override {}
@@ -113,6 +124,11 @@ public:
       : MetricImpl(tag_extracted_name, tags, alloc.symbolTable()), data_(data), alloc_(alloc) {}
   ~GaugeImpl() override {
     alloc_.free(data_);
+
+    // MetricImpl must be explicitly cleared() before destruction, otherwise it
+    // will not be able to access the SymbolTable& to free the symbols. An RAII
+    // alternative would be to store the SymbolTable reference in the
+    // MetricImpl, costing 8 bytes per stat.
     MetricImpl::clear();
   }
 
@@ -150,7 +166,13 @@ protected:
 class NullGaugeImpl : public Gauge, NullMetricImpl {
 public:
   explicit NullGaugeImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
-  ~NullGaugeImpl() override { MetricImpl::clear(); }
+  ~NullGaugeImpl() override {
+    // MetricImpl must be explicitly cleared() before destruction, otherwise it
+    // will not be able to access the SymbolTable& to free the symbols. An RAII
+    // alternative would be to store the SymbolTable reference in the
+    // MetricImpl, costing 8 bytes per stat.
+    MetricImpl::clear();
+  }
 
   void add(uint64_t) override {}
   void inc() override {}

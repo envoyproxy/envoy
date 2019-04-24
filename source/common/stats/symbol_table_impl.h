@@ -384,6 +384,9 @@ public:
 
   ~StatNameTempStorage() { free(symbol_table_); }
 
+  SymbolTable& symbolTable() { return symbol_table_; }
+  const SymbolTable& symbolTable() const { return symbol_table_; }
+
 private:
   SymbolTable& symbol_table_;
 };
