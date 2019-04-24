@@ -9,7 +9,7 @@ namespace Envoy {
 namespace Grpc {
 
 void UntypedAsyncStream::sendMessageUntyped(const Protobuf::Message& request, bool end_stream) {
-  stream_->sendMessage(stream_->isGrpcHeaderRequired() ? Common::serializeBody(request)
+  stream_->sendMessage(stream_->isGrpcHeaderRequired() ? Common::serializeToGrpcFrame(request)
                                                        : Common::serializeMessage(request),
                        end_stream);
 }
@@ -54,7 +54,7 @@ UntypedAsyncClient::sendUntyped(const Protobuf::MethodDescriptor& service_method
                                 UntypedAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
                                 const absl::optional<std::chrono::milliseconds>& timeout) {
   return client_->send(service_method.service()->full_name(), service_method.name(),
-                       client_->isGrpcHeaderRequired() ? Common::serializeBody(request)
+                       client_->isGrpcHeaderRequired() ? Common::serializeToGrpcFrame(request)
                                                        : Common::serializeMessage(request),
                        callbacks, parent_span, timeout);
 }

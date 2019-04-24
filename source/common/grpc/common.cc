@@ -113,7 +113,7 @@ bool Common::resolveServiceAndMethod(const Http::HeaderEntry* path, std::string*
   return true;
 }
 
-Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
+Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& message) {
   // http://www.grpc.io/docs/guides/wire.html
   // Reserve enough space for the entire message and the 5 byte header.
   Buffer::InstancePtr body(new Buffer::OwnedImpl());

@@ -122,7 +122,7 @@ public:
   /**
    * Serialize protobuf message. With grpc header.
    */
-  static Buffer::InstancePtr serializeBody(const Protobuf::Message& message);
+  static Buffer::InstancePtr serializeToGrpcFrame(const Protobuf::Message& message);
 
   /**
    * Serialize protobuf message. Without grpc header.
