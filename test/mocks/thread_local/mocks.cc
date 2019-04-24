@@ -15,6 +15,7 @@ MockInstance::MockInstance() {
   ON_CALL(*this, runOnAllThreads(_, _))
       .WillByDefault(Invoke(this, &MockInstance::runOnAllThreads2_));
   ON_CALL(*this, shutdownThread()).WillByDefault(Invoke(this, &MockInstance::shutdownThread_));
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
 }
 
 MockInstance::~MockInstance() { shutdownThread_(); }

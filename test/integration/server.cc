@@ -166,7 +166,7 @@ void IntegrationTestServer::onRuntimeCreated() {
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
-    Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+    Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
   Stats::FakeSymbolTableImpl symbol_table;
