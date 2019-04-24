@@ -55,7 +55,6 @@ bool SetRequestImpl::operator==(const SetRequest& rhs) const {
 }
 
 bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
-  data.drainBEInt<uint8_t>(); // skip magic byte as we've already peeked it.
   auto op_code = static_cast<Message::OpCode>(data.drainBEInt<uint8_t>());
   auto key_length = data.drainBEInt<uint16_t>();
   auto extras_length = data.drainBEInt<uint8_t>();
@@ -100,7 +99,8 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
     return false;
   }
 
-  auto magic = data.peekBEInt<uint32_t>();
+  auto magic = data.drainBEInt<uint8_t>();
+  ENVOY_LOG(trace, "magic byte {}", magic);
   switch (magic) {
   case Message::RequestV1: {
     return decodeRequest(data);
@@ -132,10 +132,10 @@ void EncoderImpl::encodeRequestHeader(
   output_.writeBEInt<uint16_t>(key_length);
   output_.writeByte(extras_length);
   output_.writeByte(Message::RawDataType);
-  output_.writeByte(request.vbucketIdOrStatus());
+  output_.writeBEInt<uint16_t>(request.vbucketIdOrStatus());
   output_.writeBEInt<uint32_t>(body_length);
   output_.writeBEInt<uint32_t>(request.opaque());
-  output_.writeBEInt<uint32_t>(request.cas());
+  output_.writeBEInt<uint64_t>(request.cas());
 }
 
 void EncoderImpl::encodeGet(const GetRequest& request) {
