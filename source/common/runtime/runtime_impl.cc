@@ -309,7 +309,7 @@ bool SnapshotImpl::parseEntryBooleanValue(Entry& entry) {
 
 bool SnapshotImpl::parseEntryUintValue(Entry& entry) {
   uint64_t converted_uint64;
-  if (StringUtil::atoull(entry.raw_string_value_.c_str(), converted_uint64)) {
+  if (absl::SimpleAtoi(entry.raw_string_value_, &converted_uint64)) {
     entry.uint_value_ = converted_uint64;
     return true;
   }
