@@ -12,6 +12,8 @@
 
 #include "common/common/assert.h"
 
+#include "test/test_common/thread_factory_for_test.h"
+
 #include "absl/synchronization/notification.h"
 
 namespace quic {
@@ -19,7 +21,10 @@ namespace quic {
 // A class representing a thread of execution in QUIC.
 class QuicThreadImpl {
 public:
-  QuicThreadImpl(const std::string& name);
+  QuicThreadImpl(const std::string& /*name*/) {
+    thread_factory_ = &Envoy::Thread::threadFactoryForTest();
+  }
+
   QuicThreadImpl(const QuicThreadImpl&) = delete;
   QuicThreadImpl& operator=(const QuicThreadImpl&) = delete;
 
