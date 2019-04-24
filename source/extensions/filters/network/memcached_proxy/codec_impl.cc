@@ -17,56 +17,63 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MemcachedProxy {
 
-void GetRequestImpl::fromBuffer(Buffer::Instance&) {
-  ENVOY_LOG(trace, "decoding get request");
-  // key_ = BufferHelper::removeCString(data);
+std::string BufferHelper::drainString(Buffer::Instance& data, uint32_t length) {
+  char* start = reinterpret_cast<char*>(data.linearize(length));
+  std::string ret(start);
+  data.drain(length);
+  return ret;
 }
 
-void SetRequestImpl::fromBuffer(Buffer::Instance&) {
+void GetRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t, Buffer::Instance& data) {
+  ENVOY_LOG(trace, "decoding get request");
+  key_ = BufferHelper::drainString(data, key_length);
+}
+
+void SetRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t body_length, Buffer::Instance& data) {
   ENVOY_LOG(trace, "decoding set request");
-  // key_ = BufferHelper::removeCString(data);
-  // flags_ = BufferHelper::removeInt32(data);
-  // expiration_ = BufferHelper::removeInt32(data);
-  // body_ = BufferHelper::removeCString(data);
+  key_ = BufferHelper::drainString(data, key_length);
+  flags_ = data.drainBEInt<uint32_t>();
+  expiration_ = data.drainBEInt<uint32_t>();
+  body_ = BufferHelper::drainString(data, body_length);
 }
 
 bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
-  Message::Header header{
-    .magic = data.drainBEInt<uint8_t>(),
-    .op_code = data.drainBEInt<uint8_t>(),
-    .key_length = data.drainBEInt<uint16_t>(),
-    .extras_length = data.drainBEInt<uint8_t>(),
-    .data_type = data.drainBEInt<uint8_t>(),
-    .vbucket_id_or_status = data.drainBEInt<uint8_t>(),
-    .body_length = data.drainBEInt<uint32_t>(),
-    .opaque = data.drainBEInt<uint32_t>(),
-    .cas = data.drainBEInt<uint64_t>(),
-  };
-
-
-  Message::OpCode op_code = static_cast<Message::OpCode>(header.op_code);
+  data.drainBEInt<uint8_t>(); // skip magic byte as we've already peeked it.
+  auto op_code = static_cast<Message::OpCode>(data.drainBEInt<uint8_t>());
+  auto key_length = data.drainBEInt<uint16_t>();
+  auto extras_length = data.drainBEInt<uint8_t>();
+  data.drainBEInt<uint8_t>(); // skip data type as it's always 0x00.
+  auto vbucket_id_or_status = data.drainBEInt<uint8_t>();
+  auto body_length = data.drainBEInt<uint32_t>();
+  auto opaque = data.drainBEInt<uint32_t>();
+  auto cas = data.drainBEInt<uint64_t>();
 
   switch (op_code) {
   case Message::OpCode::OP_GET:
   case Message::OpCode::OP_GETQ: {
-    auto message = std::make_unique<GetRequestImpl>(std::move(header));
-    message->fromBuffer(data);
+    auto message = std::make_unique<GetRequestImpl>(vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
     callbacks_.decodeGet(std::move(message));
     break;
   }
 
   case Message::OpCode::OP_SET:
   case Message::OpCode::OP_SETQ: {
-    auto message = std::make_unique<SetRequestImpl>(std::move(header));
-    message->fromBuffer(data);
+    auto message = std::make_unique<SetRequestImpl>(vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
     callbacks_.decodeSet(std::move(message));
     break;
   }
 
   default:
-    throw EnvoyException(fmt::format("invalid memcached op {}", header.op_code));
+    throw EnvoyException(fmt::format("invalid memcached op {}", static_cast<uint8_t>(op_code)));
   }
 
+  return true;
+}
+
+bool DecoderImpl::decodeResponse(Buffer::Instance&) {
+  // TODO: ???
   return true;
 }
 
@@ -115,22 +122,22 @@ void EncoderImpl::encodeRequestHeader(
 }
 
 void EncoderImpl::encodeGet(const GetRequest& request) {
-  uint32_t key_length = 0; // todo
-  uint32_t body_length = 0; // todo
-  uint32_t extras_length = 0; // todo
-
-  encodeRequestHeader(key_length, body_length, extras_length, request,
+  encodeRequestHeader(
+    request.key().length(),
+    0,
+    0,
+    request,
     request.quiet() ? Message::OpCode::OP_GETQ : Message::OpCode::OP_GET);
 
   output_.add(request.key());
 }
 
 void EncoderImpl::encodeSet(const SetRequest& request) {
-  uint32_t key_length = 0; // todo
-  uint32_t body_length = 0; // todo
-  uint32_t extras_length = 0; // todo
-
-  encodeRequestHeader(key_length, body_length, extras_length, request,
+  encodeRequestHeader(
+    request.key().length(),
+    request.body().length(),
+    64,
+    request,
     request.quiet() ? Message::OpCode::OP_SETQ : Message::OpCode::OP_SET);
 
   output_.writeBEInt<uint32_t>(request.flags());

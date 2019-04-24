@@ -1,7 +1,6 @@
 #include <string>
 
 #include "common/buffer/buffer_impl.h"
-#include "common/json/json_loader.h"
 
 #include "extensions/filters/network/memcached_proxy/codec_impl.h"
 
@@ -21,11 +20,11 @@ namespace MemcachedProxy {
 
 class TestDecoderCallbacks : public DecoderCallbacks {
 public:
-  void decodeGet(GetMessagePtr&& message) override { decodeGet_(message); }
-  void decodeSet(SetMessagePtr&& message) override { decodeSet_(message); }
+  void decodeGet(GetRequestPtr&& message) override { decodeGet_(message); }
+  void decodeSet(SetRequestPtr&& message) override { decodeSet_(message); }
 
-  MOCK_METHOD1(decodeGet_, void(GetMessagePtr& message));
-  MOCK_METHOD1(decodeSet_, void(SetMessagePtr& message));
+  MOCK_METHOD1(decodeGet_, void(GetRequestPtr& message));
+  MOCK_METHOD1(decodeSet_, void(SetRequestPtr& message));
 };
 
 class MemcachedCodecImplTest : public testing::Test {
@@ -52,14 +51,22 @@ public:
 //   }
 // }
 
-TEST_F(MemcachedCodecImplTest, GetMore) {
-  GetMoreMessageImpl get_more(3, 3);
-  get_more.fullCollectionName("test");
-  get_more.numberToReturn(20);
-  get_more.cursorId(20000);
+TEST_F(MemcachedCodecImplTest, Get) {
+  GetRequestImpl get(3, 3, 3);
+  get.key("foo");
 
-  encoder_.encodeGetMore(get_more);
-  EXPECT_CALL(callbacks_, decodeGetMore_(Pointee(Eq(get_more))));
+  encoder_.encodeGet(get);
+  EXPECT_CALL(callbacks_, decodeGet_(Pointee(Eq(get))));
+  decoder_.onData(output_);
+}
+
+TEST_F(MemcachedCodecImplTest, Set) {
+  SetRequestImpl set(3, 3, 3);
+  set.key("foo");
+  set.body("bar");
+
+  encoder_.encodeSet(set);
+  EXPECT_CALL(callbacks_, decodeSet_(Pointee(Eq(set))));
   decoder_.onData(output_);
 }
 

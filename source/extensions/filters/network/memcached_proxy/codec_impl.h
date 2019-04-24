@@ -21,31 +21,39 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MemcachedProxy {
 
+class BufferHelper {
+public:
+  static std::string drainString(Buffer::Instance& buffer, uint32_t size);
+};
+
 class RequestImpl : public virtual Request {
 public:
-  RequestImpl(Message::Header header) : header_(header) {}
+  RequestImpl(uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    vbucket_id_or_status_(vbucket_id_or_status), opaque_(opaque), cas_(cas) {}
 
-  virtual void fromBuffer(Buffer::Instance& data) PURE;
+  virtual void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) PURE;
 
-  uint8_t vbucketIdOrStatus() const override { return header_.vbucket_id_or_status; }
-  uint32_t opaque() const override { return header_.opaque; }
-  uint64_t cas() const override { return header_.cas; }
-
+  uint8_t vbucketIdOrStatus() const override { return vbucket_id_or_status_; }
+  uint32_t opaque() const override { return opaque_; }
+  uint64_t cas() const override { return cas_; }
 private:
-  Message::Header header_;
+  uint8_t vbucket_id_or_status_;
+  uint32_t opaque_;
+  uint64_t cas_;
 };
 
 class GetRequestImpl : public RequestImpl,
                        public GetRequest,
                        Logger::Loggable<Logger::Id::memcached> {
 public:
-  GetRequestImpl(Message::Header header) : RequestImpl(header) {}
+  GetRequestImpl(uint8_t vbucket_id_or_status_, uint32_t opaque, uint64_t cas) : RequestImpl(vbucket_id_or_status_, opaque, cas) {}
 
   // RequestImpl
-  void fromBuffer(Buffer::Instance& data) override;
+  void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
 
   bool quiet() const override { return false; }
   const std::string& key() const override { return key_; }
+  void key(const std::string& key) { key_ = key; }
 private:
   std::string key_;
 };
@@ -54,10 +62,10 @@ class SetRequestImpl : public RequestImpl,
                        public SetRequest,
                        Logger::Loggable<Logger::Id::memcached> {
 public:
-  SetRequestImpl(Message::Header header) : RequestImpl(header) {}
+  SetRequestImpl(uint8_t vbucket_id_or_status_, uint32_t opaque, uint64_t cas) : RequestImpl(vbucket_id_or_status_, opaque, cas) {}
 
   // RequestImpl
-  void fromBuffer(Buffer::Instance& data) override;
+  void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
 
   bool quiet() const override { return false; }
   const std::string& key() const override { return key_; }
