@@ -116,6 +116,14 @@ struct ResponseCodeDetailValues {
   const std::string UpstreamTimeout = "upstream_response_timeout";
   // The final upstream try timed out
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
+  // The upstream connection was reset before a response was started. This
+  // will generally be accompanied by details about why the reset occurred.
+  const std::string EarlyUpstreamReset = "upstream_reset_before_response_started";
+  // The upstream connection was reset before a response was started. This
+  // will generally be accompanied by details about why the reset occurred but
+  // indicates that original "success" headers may have been sent downstream
+  // despite the subsequent failure.
+  const std::string LateUpstreamReset = "upstream_reset_after_response_started";
   // TODO(#6542): continue addding values for sendLocalReply use-cases
 };
 
