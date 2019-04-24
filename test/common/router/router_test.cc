@@ -210,7 +210,6 @@ public:
   }
 
   void enableHedgeOnPerTryTimeout() {
-    callbacks_.route_->route_entry_.hedge_policy_.initial_requests_ = 1;
     callbacks_.route_->route_entry_.hedge_policy_.hedge_on_per_try_timeout_ = true;
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_ =
         envoy::type::FractionalPercent{};
@@ -2846,41 +2845,6 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   EXPECT_EQ(stream_info.firstUpstreamRxByteReceived().value(), std::chrono::milliseconds(56));
 }
 
-TEST(RouterFilterUtilityTest, FinalHedgingParamsInitialRequests) {
-  Http::TestHeaderMapImpl empty_headers;
-  { // no chance of additional request, header not present
-    NiceMock<MockRouteEntry> route;
-    route.hedge_policy_.initial_requests_ = 10;
-    EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, empty_headers, 0);
-    EXPECT_EQ(10, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 10);
-    EXPECT_EQ(10, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 100);
-    EXPECT_EQ(10, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 1000);
-    EXPECT_EQ(10, hedgingParams.initial_requests_);
-  }
-  { // 50% chance additional request
-    NiceMock<MockRouteEntry> route;
-    route.hedge_policy_.initial_requests_ = 10;
-    route.hedge_policy_.additional_request_chance_.set_numerator(50);
-    EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, empty_headers, 0);
-    EXPECT_EQ(11, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 49);
-    EXPECT_EQ(11, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 50);
-    EXPECT_EQ(10, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 99);
-    EXPECT_EQ(10, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 100);
-    EXPECT_EQ(11, hedgingParams.initial_requests_);
-  }
-}
-
 TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
   Http::TestHeaderMapImpl empty_headers;
   { // route says true, header not present, expect true.
@@ -2888,7 +2852,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, empty_headers, 0);
+        FilterUtility::finalHedgingParams(route, empty_headers);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header not present, expect false.
@@ -2896,7 +2860,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, empty_headers, 0);
+        FilterUtility::finalHedgingParams(route, empty_headers);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header says true, expect true.
@@ -2905,7 +2869,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers, 0);
+        FilterUtility::finalHedgingParams(route, headers);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header says false, expect false.
@@ -2914,7 +2878,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers, 0);
+        FilterUtility::finalHedgingParams(route, headers);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header says false, expect false.
@@ -2923,7 +2887,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers, 0);
+        FilterUtility::finalHedgingParams(route, headers);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header says true, expect true.
@@ -2932,7 +2896,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers, 0);
+        FilterUtility::finalHedgingParams(route, headers);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header is invalid, expect true.
@@ -2941,7 +2905,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers, 0);
+        FilterUtility::finalHedgingParams(route, headers);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header is invalid, expect false.
@@ -2950,25 +2914,8 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers, 0);
+        FilterUtility::finalHedgingParams(route, headers);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
-  }
-  { // 50% chance additional request
-    NiceMock<MockRouteEntry> route;
-    route.hedge_policy_.initial_requests_ = 10;
-    route.hedge_policy_.additional_request_chance_.set_numerator(50);
-    EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, empty_headers, 0);
-    EXPECT_EQ(11, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 49);
-    EXPECT_EQ(11, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 50);
-    EXPECT_EQ(10, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 99);
-    EXPECT_EQ(10, hedgingParams.initial_requests_);
-    hedgingParams = FilterUtility::finalHedgingParams(route, empty_headers, 100);
-    EXPECT_EQ(11, hedgingParams.initial_requests_);
   }
 }
 

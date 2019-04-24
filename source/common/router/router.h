@@ -63,7 +63,6 @@ public:
   };
 
   struct HedgingParams {
-    uint32_t initial_requests_;
     bool hedge_on_per_try_timeout_;
   };
 
@@ -98,12 +97,10 @@ public:
   /**
    * Determine the final hedging settings after applying randomized behavior.
    * @param route supplies the request route.
-   * @param random_value supplies a stable random value to use for evaluating whether an additional
-   *        initial request should be sent
+   * @param request_headers supplies the request headers.
    * @return HedgingParams the final parameters to use for request hedging
    */
-  static HedgingParams finalHedgingParams(const RouteEntry& route, Http::HeaderMap& request_headers,
-                                          uint64_t random_value);
+  static HedgingParams finalHedgingParams(const RouteEntry& route, Http::HeaderMap& request_headers);
 };
 
 /**
@@ -325,6 +322,11 @@ private:
       // disabling reads will not slow down other upstream requests. If we've
       // already seen the full downstream request (downstream_end_stream_) then
       // disabling reads is a no-op.
+      // This assert condition must be true because
+      // parent_.upstream_requests_.size() can only be greater than 1 in the
+      // case of a per-try-timeout with hedge_on_per_try_timeout enabled, and
+      // the per try timeout timer is started only after downstream_end_stream_
+      // is true.
       ASSERT(parent_.upstream_requests_.size() == 1 || parent_.downstream_end_stream_);
       parent_.cluster_->stats().upstream_flow_control_backed_up_total_.inc();
       parent_.callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
@@ -335,6 +337,11 @@ private:
       // disabling reads will not overflow any write buffers in other upstream
       // requests. If we've already seen the full downstream request
       // (downstream_end_stream_) then enabling reads is a no-op.
+      // This assert condition must be true because
+      // parent_.upstream_requests_.size() can only be greater than 1 in the
+      // case of a per-try-timeout with hedge_on_per_try_timeout enabled, and
+      // the per try timeout timer is started only after downstream_end_stream_
+      // is true.
       ASSERT(parent_.upstream_requests_.size() == 1 || parent_.downstream_end_stream_);
       parent_.cluster_->stats().upstream_flow_control_drained_total_.inc();
       parent_.callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();

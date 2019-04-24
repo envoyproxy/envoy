@@ -194,16 +194,9 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
 }
 
 FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
-                                                               Http::HeaderMap& request_headers,
-                                                               uint64_t random_value) {
+                                                               Http::HeaderMap& request_headers) {
   HedgingParams hedgingParams;
-  hedgingParams.initial_requests_ = route.hedgePolicy().initialRequests();
   hedgingParams.hedge_on_per_try_timeout_ = route.hedgePolicy().hedgeOnPerTryTimeout();
-
-  if (ProtobufPercentHelper::evaluateFractionalPercent(
-          route.hedgePolicy().additionalRequestChance(), random_value)) {
-    hedgingParams.initial_requests_++;
-  }
 
   Http::HeaderEntry* hedge_on_per_try_timeout_entry = request_headers.EnvoyHedgeOnPerTryTimeout();
   if (hedge_on_per_try_timeout_entry) {
@@ -414,7 +407,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   ASSERT(headers.Scheme());
 
   hedging_params_ =
-      FilterUtility::finalHedgingParams(*route_entry_, headers, callbacks_->streamId());
+      FilterUtility::finalHedgingParams(*route_entry_, headers);
 
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
@@ -458,6 +451,12 @@ void Filter::sendNoHealthyUpstreamResponse() {
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
+  // upstream_requests_.size() cannot be 0 because we add to it unconditionally
+  // in decodeHeaders(). It cannot be > 1 because that only happens when a per
+  // try timeout occurs with hedge_on_per_try_timeout enabled but the the per
+  // try timeout timer is not started until onUpstreamComplete().
+  ASSERT(upstream_requests_.size() == 1);
+
   bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
   if (buffering && buffer_limit_ > 0 &&
       getLength(callbacks_->decodingBuffer()) + data.length() > buffer_limit_) {
@@ -468,25 +467,20 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     do_shadowing_ = false;
   }
 
-  for (auto& upstream_request : upstream_requests_) {
-    if (buffering) {
-      // We need to make a copy before encoding since it's all moves from here
-      // on if we might have multiple upstream requests or traffic
-      // shadowing/retries.
-      Buffer::OwnedImpl copy(data);
-      upstream_request->encodeData(copy, end_stream);
-    } else {
-      upstream_request->encodeData(data, end_stream);
-    }
-  }
-
   if (buffering) {
+    // If we are going to buffer for retries or shadowing, we need to make a copy before encoding
+    // since it's all moves from here on.
+    Buffer::OwnedImpl copy(data);
+    upstream_requests_.front()->encodeData(copy, end_stream);
+
     // If we are potentially going to retry or shadow this request we need to buffer.
     // This will not cause the connection manager to 413 because before we hit the
     // buffer limit we give up on retries and buffering. We must buffer using addDecodedData()
     // so that all buffered data is available by the time we do request complete processing and
     // potentially shadow.
     callbacks_->addDecodedData(data, true);
+  } else {
+    upstream_requests_.front()->encodeData(data, end_stream);
   }
 
   if (end_stream) {
@@ -610,10 +604,8 @@ void Filter::onResponseTimeout() {
 // Called when the per try timeout is hit but we didn't reset the request
 // (hedge_on_per_try_timeout enabled).
 void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
-  // Even though we didn't cancel the request yet we still want to track it
-  // in outlier detection.
-  // TODO(mpuncel) is it weird to have a pretend response code here? we might
-  // get a 200 back from this request later.
+  // Track this as a timeout for outlier detection purposes even though we didn't
+  // cancel the request yet and might get a 2xx later.
   updateOutlierDetection(timeout_response_code_, upstream_request);
   upstream_request.outlier_detection_timeout_recorded_ = true;
 
