@@ -127,7 +127,7 @@ TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::REQUEST_SUCCESS, _));
     callbacks_->onRespValue(std::move(response1));
   }));
   upstream_read_filter_->onData(fake_data, false);
@@ -178,7 +178,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::REQUEST_SUCCESS, _));
     callbacks_->onRespValue(std::move(response1));
   }));
   upstream_read_filter_->onData(fake_data, false);
@@ -221,13 +221,13 @@ TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_));
-    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::REQUEST_SUCCESS, _));
     callbacks_->onRespValue(std::move(response1));
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
-    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::SUCCESS));
+    EXPECT_CALL(host_->outlier_detector_, putResult(Upstream::Outlier::Result::REQUEST_SUCCESS, _));
     callbacks_->onRespValue(std::move(response2));
   }));
   upstream_read_filter_->onData(fake_data, false);
