@@ -14,18 +14,6 @@ namespace MemcachedProxy {
 
 class Message {
 public:
-  struct Header {
-    uint8_t magic;
-    uint8_t op_code;
-    uint16_t key_length;
-    uint8_t extras_length;
-    uint8_t data_type;
-    uint16_t vbucket_id_or_status;
-    uint32_t body_length;
-    uint32_t opaque;
-    uint64_t cas;
-  };
-
   enum class OpCode {
     OP_GET = 0x00,
     OP_SET = 0x01,
@@ -61,6 +49,7 @@ class GetRequest : public virtual Request {
 public:
   virtual ~GetRequest() = default;
 
+  virtual bool operator==(const GetRequest& rhs) const PURE;
   virtual bool quiet() const PURE;
   virtual const std::string& key() const PURE;
 };
@@ -74,6 +63,7 @@ class SetRequest : public virtual Request {
 public:
   virtual ~SetRequest() = default;
 
+  virtual bool operator==(const SetRequest& rhs) const PURE;
   virtual bool quiet() const PURE;
   virtual const std::string& key() const PURE;
   virtual const std::string& body() const PURE;

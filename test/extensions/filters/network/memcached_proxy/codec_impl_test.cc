@@ -35,23 +35,55 @@ public:
   DecoderImpl decoder_{callbacks_};
 };
 
-// TEST_F(MemcachedCodecImplTest, GetMoreEqual) {
-//   {
-//     GetMoreMessageImpl g1(0, 0);
-//     GetMoreMessageImpl g2(1, 1);
-//     EXPECT_FALSE(g1 == g2);
-//   }
+TEST_F(MemcachedCodecImplTest, GetEquality) {
+  {
+    GetRequestImpl g1(1, 1, 1);
+    GetRequestImpl g2(2, 2, 2);
+    EXPECT_FALSE(g1 == g2);
+  }
 
-//   {
-//     GetMoreMessageImpl g1(0, 0);
-//     g1.cursorId(1);
-//     GetMoreMessageImpl g2(0, 0);
-//     g1.cursorId(2);
-//     EXPECT_FALSE(g1 == g2);
-//   }
-// }
+  {
+    GetRequestImpl g1(1, 1, 1);
+    g1.key("foo");
+    GetRequestImpl g2(1, 1, 1);
+    g2.key("bar");
+    EXPECT_FALSE(g1 == g2);
+  }
 
-TEST_F(MemcachedCodecImplTest, Get) {
+  {
+    GetRequestImpl g1(1, 1, 1);
+    g1.key("foo");
+    GetRequestImpl g2(1, 1, 1);
+    g2.key("foo");
+    EXPECT_TRUE(g1 == g2);
+  }
+}
+
+TEST_F(MemcachedCodecImplTest, SetEquality) {
+  {
+    SetRequestImpl s1(1, 1, 1);
+    SetRequestImpl s2(2, 2, 2);
+    EXPECT_FALSE(s1 == s2);
+  }
+
+  {
+    SetRequestImpl s1(1, 1, 1);
+    s1.key("foo");
+    SetRequestImpl s2(1, 1, 1);
+    s2.key("bar");
+    EXPECT_FALSE(s1 == s2);
+  }
+
+  {
+    SetRequestImpl s1(1, 1, 1);
+    s1.body("foo");
+    SetRequestImpl s2(1, 1, 1);
+    s2.body("bar");
+    EXPECT_FALSE(s1 == s2);
+  }
+}
+
+TEST_F(MemcachedCodecImplTest, GetRoundTrip) {
   GetRequestImpl get(3, 3, 3);
   get.key("foo");
 
@@ -60,7 +92,7 @@ TEST_F(MemcachedCodecImplTest, Get) {
   decoder_.onData(output_);
 }
 
-TEST_F(MemcachedCodecImplTest, Set) {
+TEST_F(MemcachedCodecImplTest, SetRoundTrip) {
   SetRequestImpl set(3, 3, 3);
   set.key("foo");
   set.body("bar");

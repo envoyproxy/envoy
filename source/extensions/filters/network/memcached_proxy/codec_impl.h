@@ -51,8 +51,11 @@ public:
   // RequestImpl
   void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
 
+  // GetRequest
+  bool operator==(const GetRequest& rhs) const override;
   bool quiet() const override { return false; }
   const std::string& key() const override { return key_; }
+
   void key(const std::string& key) { key_ = key; }
 private:
   std::string key_;
@@ -67,11 +70,18 @@ public:
   // RequestImpl
   void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
 
+  // SetRequest
+  bool operator==(const SetRequest& rhs) const override;
   bool quiet() const override { return false; }
   const std::string& key() const override { return key_; }
   const std::string& body() const override { return body_; }
   uint32_t flags() const override { return flags_; }
   uint32_t expiration() const override { return expiration_; }
+
+  void key(const std::string& key) { key_ = key; }
+  void body(const std::string& body) { body_ = body; }
+  void flags(uint32_t flags) { flags_ = flags; }
+  void expiration(uint32_t expiration) { expiration_ = expiration; }
 private:
   std::string key_;
   std::string body_;

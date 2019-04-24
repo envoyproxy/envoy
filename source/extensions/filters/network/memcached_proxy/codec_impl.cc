@@ -29,12 +29,29 @@ void GetRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t, Buffer::
   key_ = BufferHelper::drainString(data, key_length);
 }
 
+bool GetRequestImpl::operator==(const GetRequest& rhs) const {
+  return vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
+    opaque() == rhs.opaque() &&
+    cas() == rhs.cas() &&
+    key() == rhs.key();
+}
+
 void SetRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t body_length, Buffer::Instance& data) {
   ENVOY_LOG(trace, "decoding set request");
   key_ = BufferHelper::drainString(data, key_length);
   flags_ = data.drainBEInt<uint32_t>();
   expiration_ = data.drainBEInt<uint32_t>();
   body_ = BufferHelper::drainString(data, body_length);
+}
+
+bool SetRequestImpl::operator==(const SetRequest& rhs) const {
+  return vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
+    opaque() == rhs.opaque() &&
+    cas() == rhs.cas() &&
+    key() == rhs.key() &&
+    body() == rhs.body() &&
+    expiration() == rhs.expiration() &&
+    flags() == rhs.flags();
 }
 
 bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
