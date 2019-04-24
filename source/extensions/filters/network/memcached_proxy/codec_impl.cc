@@ -65,10 +65,12 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
   auto opaque = data.drainBEInt<uint32_t>();
   auto cas = data.drainBEInt<uint64_t>();
 
-
   switch (op_code) {
   case Message::OpCode::OP_GET:
-  case Message::OpCode::OP_GETQ: {
+  case Message::OpCode::OP_GETQ:
+  case Message::OpCode::OP_GETK:
+  case Message::OpCode::OP_GETKQ: {
+    // TODO: quiet, w/ key.
     auto message = std::make_unique<GetRequestImpl>(vbucket_id_or_status, opaque, cas);
     message->fromBuffer(key_length, extras_length, body_length, data);
     callbacks_.decodeGet(std::move(message));

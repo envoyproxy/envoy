@@ -19,6 +19,9 @@ public:
     OP_SET = 0x01,
     OP_GETQ = 0x09,
     OP_SETQ = 0x11,
+    OP_GETK = 0x0c,
+    OP_GETKQ = 0x0d,
+
   };
 
   // Define some constants used in memcached messages encoding
