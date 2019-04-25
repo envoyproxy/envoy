@@ -462,7 +462,7 @@ def envoy_cc_test(
         copts = envoy_copts(repository, test = True),
         linkopts = envoy_test_linkopts(),
         linkstatic = select({
-            "//bazel:asan_build": 0,
+            repository + "//bazel:asan_build": 0,
             "//conditions:default": 1,
         }),
         malloc = tcmalloc_external_dep(repository),

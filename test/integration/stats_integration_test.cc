@@ -209,9 +209,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/03/20  6329     59015               Initial version
   // 2019/04/12  6477     59576               Implementing Endpoint lease...
   // 2019/04/23  6659     59512               Reintroduce dispatcher stats...
-  // 2019/04/24  6704     59456               Dynamic link tests
 
-  EXPECT_EQ(m_per_cluster, 59456);
+  EXPECT_EQ(m_per_cluster, 59512);
 }
 
 } // namespace
