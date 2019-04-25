@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/common/hash.h"
+
 #include "server/hot_restarting_base.h"
 
 namespace Envoy {
