@@ -42,10 +42,14 @@ DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& 
 DispatcherImpl::~DispatcherImpl() {}
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
-  stats_prefix_ = prefix + "dispatcher";
-  stats_ = std::make_unique<DispatcherStats>(
-      DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
-  base_scheduler_.initializeStats(stats_.get());
+  // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
+  post([this, &scope, prefix] {
+    stats_prefix_ = prefix + "dispatcher";
+    stats_ = std::make_unique<DispatcherStats>(
+        DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
+    base_scheduler_.initializeStats(stats_.get());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_->debugString());
+  });
 }
 
 void DispatcherImpl::clearDeferredDeleteList() {
@@ -165,9 +169,6 @@ void DispatcherImpl::post(std::function<void()> callback) {
 
 void DispatcherImpl::run(RunType type) {
   run_tid_ = api_.threadFactory().currentThreadId();
-  if (!stats_prefix_.empty()) {
-    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_->debugString());
-  }
 
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
