@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -58,13 +59,25 @@ public:
    * Indicates whether this metric has been updated since the server was started.
    */
   virtual bool used() const PURE;
+
+  /**
+   * Flags:
+   * Used: used by all stats types to figure out whether they have been used.
+   * Logic...: used by gauges to cache how they should be combined with a parent's value.
+   */
+  struct Flags {
+    static const uint8_t Used = 0x01;
+    static const uint8_t LogicAccumulate = 0x02;
+    static const uint8_t LogicUnusedOnly = 0x04;
+    static const uint8_t LogicNeverImport = 0x08;
+    static const uint8_t LogicKnown = LogicAccumulate | LogicUnusedOnly | LogicNeverImport;
+  };
 };
 
 /**
  * An always incrementing counter with latching capability. Each increment is added both to a
  * global counter as well as periodic counter. Calling latch() returns the periodic counter and
- * clears it. When the counter needs to start life at a non-zero value, stealthyAdd() allows
- * setting that value without the value appearing as part of the first period's increment.
+ * clears it.
  */
 class Counter : public virtual Metric {
 public:
@@ -74,11 +87,6 @@ public:
   virtual uint64_t latch() PURE;
   virtual void reset() PURE;
   virtual uint64_t value() const PURE;
-  /**
-   * stealthyAdd() was added to facilitate hot restart stat transfers. You probably should not
-   * use it at all.
-   */
-  virtual void stealthyAdd(uint64_t amount) PURE;
 };
 
 typedef std::shared_ptr<Counter> CounterSharedPtr;
@@ -96,6 +104,27 @@ public:
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
   virtual uint64_t value() const PURE;
+
+  // Different approaches to importing a parent's stat value. Only used for gauges; all counters
+  // simply bring in the periodic deltas.
+  enum class CombineLogic {
+    // the default; the merged result is old+new.
+    Accumulate = Flags::LogicAccumulate,
+    // import parent value only if child stat is undefined. (So, just once.)
+    OnlyImportWhenUnusedInChild = Flags::LogicUnusedOnly,
+    // ignore parent entirely; child stat is undefined until it sets its own value.
+    NoImport = Flags::LogicNeverImport,
+  };
+
+  /**
+   * Returns the stat's combine logic, if known.
+   */
+  virtual absl::optional<CombineLogic> cachedCombineLogic() const PURE;
+
+  /**
+   * Sets the value to be returned by cachedCombineLogic().
+   */
+  virtual void setCombineLogic(CombineLogic logic) PURE;
 };
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;

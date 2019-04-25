@@ -7,57 +7,63 @@ namespace Stats {
 
 StatMerger::StatMerger(Stats::Store& target_store) : target_store_(target_store) {}
 
-absl::optional<StatMerger::CombineLogic>
-StatMerger::getCombineLogic(const std::string& gauge_name) {
+Gauge::CombineLogic StatMerger::getCombineLogic(Gauge& gauge, const std::string& gauge_name) {
+  absl::optional<Gauge::CombineLogic> cached_logic = gauge.cachedCombineLogic();
+  if (cached_logic.has_value()) {
+    return cached_logic.value();
+  }
+
   // Gauge name *substrings*, and special logic to use for combining those gauges' values.
-  static const std::vector<std::pair<std::regex, CombineLogic>> nonstandard_combine_logic{
+  static const std::vector<std::pair<std::regex, Gauge::CombineLogic>> nonstandard_combine_logic{
       // Any .version is either a static property of the binary, or an opaque identifier for
       // resources that are not passed across hot restart.
-      {std::regex(".*\\.version$"), CombineLogic::NoImport},
+      {std::regex(".*\\.version$"), Gauge::CombineLogic::NoImport},
       // Once the child is up and reporting stats, its own control plane state and liveness is what
       // we're interested in.
-      {std::regex(".*\\.control_plane.connected_state$"), CombineLogic::NoImport},
-      {std::regex("^server.live$"), CombineLogic::NoImport},
+      {std::regex(".*\\.control_plane.connected_state$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^server.live$"), Gauge::CombineLogic::NoImport},
       // Properties that should reasonably have some continuity across hot restart. The parent's
       // last value should be a relatively accurate starting point, and then the child can update
       // from there when appropriate. (All of these exceptional stats used with set() rather than
       // add()/sub(), so the child's new value will in fact overwrite.)
-      {std::regex("^cluster_manager.active_clusters$"), CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^cluster_manager.warming_clusters$"), CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^cluster\\..*\\.membership_total$"), CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster_manager.active_clusters$"),
+       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster_manager.warming_clusters$"),
+       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster\\..*\\.membership_total$"),
+       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
       {std::regex("^cluster\\..*\\.membership_healthy$"),
-       CombineLogic::OnlyImportWhenUnusedInChild},
+       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
       {std::regex("^cluster\\..*\\.membership_degraded$"),
-       CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^cluster\\..*\\.max_host_weight$"), CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex(".*\\.total_principals$"), CombineLogic::OnlyImportWhenUnusedInChild},
+       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster\\..*\\.max_host_weight$"),
+       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex(".*\\.total_principals$"), Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
       {std::regex("^listener_manager.total_listeners_active$"),
-       CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^overload\\..*\\.pressure$"), CombineLogic::OnlyImportWhenUnusedInChild},
+       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^overload\\..*\\.pressure$"), Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
       // Due to the fd passing, the parent's view of whether its listeners are in transitive states
       // is not useful.
-      {std::regex("^listener_manager.total_listeners_draining$"), CombineLogic::NoImport},
-      {std::regex("^listener_manager.total_listeners_warming$"), CombineLogic::NoImport},
+      {std::regex("^listener_manager.total_listeners_draining$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^listener_manager.total_listeners_warming$"), Gauge::CombineLogic::NoImport},
       // Static properties known at startup.
-      {std::regex("^server.concurrency$"), CombineLogic::NoImport},
-      {std::regex("^server.hot_restart_epoch$"), CombineLogic::NoImport},
-      {std::regex("^runtime.admin_overrides_active$"), CombineLogic::NoImport},
-      {std::regex("^runtime.num_keys$"), CombineLogic::NoImport},
+      {std::regex("^server.concurrency$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^server.hot_restart_epoch$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^runtime.admin_overrides_active$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^runtime.num_keys$"), Gauge::CombineLogic::NoImport},
   };
   for (const auto& exception : nonstandard_combine_logic) {
     std::smatch match;
     if (std::regex_match(gauge_name, match, exception.first)) {
+      gauge.setCombineLogic(exception.second);
       return exception.second;
     }
   }
-  return absl::nullopt;
+  gauge.setCombineLogic(Gauge::CombineLogic::Accumulate);
+  return Gauge::CombineLogic::Accumulate;
 }
 
-void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_values,
-                               const Protobuf::Map<std::string, uint64_t>& counter_deltas) {
-  for (const auto& counter : counter_values) {
-    target_store_.counter(counter.first).stealthyAdd(counter.second);
-  }
+void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas) {
   for (const auto& counter : counter_deltas) {
     target_store_.counter(counter.first).add(counter.second);
   }
@@ -70,24 +76,23 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
     uint64_t new_parent_value = gauge.second;
     parent_value_ref = new_parent_value;
 
-    CombineLogic combine_logic =
-        StatMerger::getCombineLogic(gauge.first).value_or(CombineLogic::Accumulate);
-    if (combine_logic == CombineLogic::NoImport) {
+    auto& gauge_ref = target_store_.gauge(gauge.first);
+    Gauge::CombineLogic combine_logic = StatMerger::getCombineLogic(gauge_ref, gauge.first);
+    if (combine_logic == Gauge::CombineLogic::NoImport) {
       continue;
     }
-    auto& gauge_ref = target_store_.gauge(gauge.first);
     // If undefined, take parent's value unless explicitly told NoImport.
     if (!gauge_ref.used()) {
       gauge_ref.set(new_parent_value);
       continue;
     }
     switch (combine_logic) {
-    case CombineLogic::OnlyImportWhenUnusedInChild:
+    case Gauge::CombineLogic::OnlyImportWhenUnusedInChild:
       // Already set above; nothing left to do.
       break;
-    case CombineLogic::NoImport:
+    case Gauge::CombineLogic::NoImport:
       break;
-    case CombineLogic::Accumulate:
+    case Gauge::CombineLogic::Accumulate:
       if (new_parent_value > old_parent_value) {
         gauge_ref.add(new_parent_value - old_parent_value);
       } else {
@@ -98,10 +103,9 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
   }
 }
 
-void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_values,
-                            const Protobuf::Map<std::string, uint64_t>& counter_deltas,
+void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                             const Protobuf::Map<std::string, uint64_t>& gauges) {
-  mergeCounters(counter_values, counter_deltas);
+  mergeCounters(counter_deltas);
   mergeGauges(gauges);
 }
 

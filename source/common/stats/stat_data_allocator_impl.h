@@ -88,10 +88,6 @@ public:
   void reset() override { data_.value_ = 0; }
   bool used() const override { return data_.flags_ & Flags::Used; }
   uint64_t value() const override { return data_.value_; }
-  void stealthyAdd(uint64_t amount) override {
-    data_.value_ += amount;
-    data_.flags_ |= Flags::Used;
-  }
 
 private:
   StatData& data_;
@@ -116,7 +112,6 @@ public:
   void reset() override {}
   bool used() const override { return false; }
   uint64_t value() const override { return 0; }
-  void stealthyAdd(uint64_t) override {}
 };
 
 /**
@@ -134,23 +129,44 @@ public:
   const char* nameCStr() const override { return data_.name(); }
 
   // Stats::Gauge
-  virtual void add(uint64_t amount) override {
+  void add(uint64_t amount) override {
     data_.value_ += amount;
     data_.flags_ |= Flags::Used;
   }
-  virtual void dec() override { sub(1); }
-  virtual void inc() override { add(1); }
-  virtual void set(uint64_t value) override {
+  void dec() override { sub(1); }
+  void inc() override { add(1); }
+  void set(uint64_t value) override {
     data_.value_ = value;
     data_.flags_ |= Flags::Used;
   }
-  virtual void sub(uint64_t amount) override {
+  void sub(uint64_t amount) override {
     ASSERT(data_.value_ >= amount);
     ASSERT(used() || amount == 0);
     data_.value_ -= amount;
   }
-  virtual uint64_t value() const override { return data_.value_; }
+  uint64_t value() const override { return data_.value_; }
   bool used() const override { return data_.flags_ & Flags::Used; }
+
+  absl::optional<CombineLogic> cachedCombineLogic() const override {
+    if ((data_.flags_ & Flags::LogicKnown) == 0) {
+      return absl::nullopt;
+    }
+    return CombineLogic(data_.flags_ & Flags::LogicKnown);
+  }
+
+  void setCombineLogic(CombineLogic logic) override {
+    switch (logic) {
+    case CombineLogic::Accumulate:
+      data_.flags_ |= Flags::LogicAccumulate;
+      break;
+    case CombineLogic::OnlyImportWhenUnusedInChild:
+      data_.flags_ |= Flags::LogicUnusedOnly;
+      break;
+    case CombineLogic::NoImport:
+      data_.flags_ |= Flags::LogicNeverImport;
+      break;
+    }
+  }
 
 private:
   StatData& data_;
@@ -176,6 +192,8 @@ public:
   void sub(uint64_t) override {}
   bool used() const override { return false; }
   uint64_t value() const override { return 0; }
+  absl::optional<CombineLogic> cachedCombineLogic() const override { return absl::nullopt; }
+  void setCombineLogic(CombineLogic) override {}
 };
 
 template <class StatData>
