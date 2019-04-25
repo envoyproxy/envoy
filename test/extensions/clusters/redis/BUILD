@@ -38,3 +38,15 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/cluster/redis:redis_cluster_cc",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "redis_cluster_integration_test",
+    size = "small",
+    srcs = ["redis_cluster_integration_test.cc"],
+    extension_name = "envoy.clusters.redis",
+    deps = [
+        "//source/extensions/clusters/redis:redis_cluster",
+        "//source/extensions/filters/network/redis_proxy:config",
+        "//test/integration:integration_lib",
+    ],
+)

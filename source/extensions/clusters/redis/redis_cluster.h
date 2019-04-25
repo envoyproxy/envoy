@@ -83,7 +83,8 @@ namespace Redis {
  * is a flexible approach for handling the slot mapping, but it will a decent amount of  memory
  * (16384 std::string's) and CPU cycles (as seen here in the copying of 16384 strings over all
  * cluster members) for a map that will generally scale as O(n) where n is the number of cluster
- * nodes.
+ * nodes. This is expected to change when we implement read from replica, each slot will store a
+ * pointer to a structure with master and slave information.
  */
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
@@ -152,7 +153,7 @@ private:
   // Resolve the discovery endpoint
   struct DnsDiscoveryResolveTarget {
     DnsDiscoveryResolveTarget(
-        RedisCluster& parent, const std::string& dns_address,
+        RedisCluster& parent, const std::string& dns_address, const uint32_t port,
         const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
         const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
 
@@ -163,23 +164,41 @@ private:
     RedisCluster& parent_;
     Network::ActiveDnsQuery* active_query_{};
     std::string dns_address_;
+    uint32_t port_;
     const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
     const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
   };
 
   typedef std::unique_ptr<DnsDiscoveryResolveTarget> DnsDiscoveryResolveTargetPtr;
 
+  struct RedisDiscoverySession;
+
+  struct RedisDiscoveryClient : public Network::ConnectionCallbacks {
+    RedisDiscoveryClient(RedisDiscoverySession& parent) : parent_(parent) {}
+
+    // Network::ConnectionCallbacks
+    void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
+
+    RedisDiscoverySession& parent_;
+    std::string host_;
+    Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
+  };
+
+  typedef std::unique_ptr<RedisDiscoveryClient> RedisDiscoveryClientPtr;
+
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks,
-        public Network::ConnectionCallbacks {
+        public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks {
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
     ~RedisDiscoverySession();
 
     void registerDiscoveryAddress(
-        const std::list<Network::Address::InstanceConstSharedPtr>& address_list);
+        const std::list<Network::Address::InstanceConstSharedPtr>& address_list,
+        const uint32_t port);
 
     // Start discovery against a random host from existing hosts
     void startResolve();
@@ -199,14 +218,11 @@ private:
     // Note: Below callback isn't used in topology updates
     bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) override { return true; }
 
-    // Network::ConnectionCallbacks
-    void onEvent(Network::ConnectionEvent event) override;
-    void onAboveWriteBufferHighWatermark() override {}
-    void onBelowWriteBufferLowWatermark() override {}
-
     RedisCluster& parent_;
-    Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
+    Event::Dispatcher& dispatcher_;
+    std::string current_host_address_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
+    std::unordered_map<std::string, RedisDiscoveryClientPtr> client_map_;
 
     std::list<Network::Address::InstanceConstSharedPtr> discovery_address_list_;
     // the slot to master node map

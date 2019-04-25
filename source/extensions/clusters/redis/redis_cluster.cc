@@ -34,7 +34,8 @@ RedisCluster::RedisCluster(
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& host = lb_endpoint.endpoint().address();
       dns_discovery_resolve_targets_.emplace_back(new DnsDiscoveryResolveTarget(
-          *this, host.socket_address().address(), locality_lb_endpoint, lb_endpoint));
+          *this, host.socket_address().address(), host.socket_address().port_value(),
+          locality_lb_endpoint, lb_endpoint));
     }
   }
 };
@@ -65,11 +66,11 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
 
 // DnsDiscoveryResolveTarget
 RedisCluster::DnsDiscoveryResolveTarget::DnsDiscoveryResolveTarget(
-    RedisCluster& parent, const std::string& dns_address,
+    RedisCluster& parent, const std::string& dns_address, const uint32_t port,
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
-    : parent_(parent), dns_address_(dns_address), locality_lb_endpoint_(locality_lb_endpoint),
-      lb_endpoint_(lb_endpoint) {}
+    : parent_(parent), dns_address_(dns_address), port_(port),
+      locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
 
 RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
   if (active_query_) {
@@ -85,7 +86,7 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
       [this](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
-        parent_.redis_discovery_session_->registerDiscoveryAddress(address_list);
+        parent_.redis_discovery_session_->registerDiscoveryAddress(address_list, port_);
         parent_.redis_discovery_session_->startResolve();
       });
 }
@@ -94,7 +95,7 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
 RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     Envoy::Extensions::Clusters::Redis::RedisCluster& parent,
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
-    : parent_(parent),
+    : parent_(parent), dispatcher_(parent.dispatcher_),
       resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolve(); })),
       client_factory_(client_factory) {}
 
@@ -117,24 +118,30 @@ RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
     current_request_ = nullptr;
   }
 
-  if (client_) {
-    client_->close();
+  while (!client_map_.empty()) {
+    client_map_.begin()->second->client_->close();
   }
 }
 
-void RedisCluster::RedisDiscoverySession::onEvent(Network::ConnectionEvent event) {
+void RedisCluster::RedisDiscoveryClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    // This should only happen after any active requests have been failed/cancelled.
-    ASSERT(!current_request_);
-    parent_.dispatcher_.deferredDelete(std::move(client_));
+    auto client_to_delete = parent_.client_map_.find(host_);
+    ASSERT(client_to_delete != parent_.client_map_.end());
+    parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->client_));
+    parent_.client_map_.erase(client_to_delete);
   }
 }
 
 void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
-    const std::list<Envoy::Network::Address::InstanceConstSharedPtr>& address_list) {
-  discovery_address_list_.insert(discovery_address_list_.end(), address_list.begin(),
-                                 address_list.end());
+    const std::list<Envoy::Network::Address::InstanceConstSharedPtr>& address_list,
+    const uint32_t port) {
+  // Since the address from DNS does not have port, we need to make a new address that has port in
+  // it.
+  for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+    ASSERT(address != nullptr);
+    discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*address, port));
+  }
 }
 
 void RedisCluster::RedisDiscoverySession::startResolve() {
@@ -157,22 +164,21 @@ void RedisCluster::RedisDiscoverySession::startResolve() {
     host = hosts_[rand_idx];
   }
 
-  if (!client_) {
-    client_ = client_factory_.create(host, parent_.dispatcher_, *this);
-    client_->addConnectionCallbacks(*this);
+  current_host_address_ = host->address()->asString();
+  RedisDiscoveryClientPtr& client = client_map_[current_host_address_];
+  if (!client) {
+    client.reset(new RedisDiscoveryClient(*this));
+    client->host_ = current_host_address_;
+    client->client_ = client_factory_.create(host, dispatcher_, *this);
+    client->client_->addConnectionCallbacks(*client);
   }
 
-  current_request_ = client_->makeRequest(ClusterSlotsRequest::instance_, *this);
+  current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
 }
 
 void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
-  // TODO(hyang): move to use connection pool for the cluster and avoid closing the connection each
-  // time
-  if (client_) {
-    client_->close();
-  }
 
   if (value->type() != NetworkFilters::Common::Redis::RespType::Array) {
     ENVOY_LOG(error, "Unexpected response to cluster slot command: {}", value->toString());
@@ -234,8 +240,11 @@ void RedisCluster::RedisDiscoverySession::onResponse(
 
 void RedisCluster::RedisDiscoverySession::onFailure() {
   current_request_ = nullptr;
-  if (client_) {
-    client_->close();
+  if (!current_host_address_.empty()) {
+    auto client_to_delete = client_map_.find(current_host_address_);
+    if (client_to_delete != client_map_.end()) {
+      client_to_delete->second->client_->close();
+    }
   }
   parent_.info()->stats().update_failure_.inc();
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);

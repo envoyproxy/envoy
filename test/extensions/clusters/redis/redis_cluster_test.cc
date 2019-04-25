@@ -40,12 +40,14 @@ class RedisClusterTest : public testing::Test,
 public:
   // ClientFactory
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
-  create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
+  create(Upstream::HostConstSharedPtr host, Event::Dispatcher&,
          const Extensions::NetworkFilters::Common::Redis::Client::Config&) override {
-    return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
+    EXPECT_EQ(22120, host->address()->ip()->port());
+    return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{
+        create_(host->address()->asString())};
   }
 
-  MOCK_METHOD0(create_, Extensions::NetworkFilters::Common::Redis::Client::Client*());
+  MOCK_METHOD1(create_, Extensions::NetworkFilters::Common::Redis::Client::Client*(std::string));
 
 protected:
   RedisClusterTest() : api_(Api::createApiForTest(stats_store_)) {}
@@ -98,24 +100,28 @@ protected:
         }));
   }
 
-  void expectRedisSessionCreated() { resolve_timer_ = new Event::MockTimer(&dispatcher_); }
+  void expectRedisSessionCreated() {
+    resolve_timer_ = new Event::MockTimer(&dispatcher_);
+    ON_CALL(random_, random()).WillByDefault(Return(0));
+  }
 
-  void expectRedisResolve() {
-    client_ = new Extensions::NetworkFilters::Common::Redis::Client::MockClient();
-    EXPECT_CALL(*this, create_()).WillOnce(Return(client_));
-    EXPECT_CALL(*client_, addConnectionCallbacks(_));
+  void expectRedisResolve(bool createClient = false) {
+    if (createClient) {
+      client_ = new Extensions::NetworkFilters::Common::Redis::Client::MockClient();
+      EXPECT_CALL(*this, create_(_)).WillOnce(Return(client_));
+      EXPECT_CALL(*client_, addConnectionCallbacks(_));
+      EXPECT_CALL(*client_, close());
+    }
     EXPECT_CALL(*client_, makeRequest(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
         .WillOnce(Return(&pool_request_));
   }
 
   void expectClusterSlotResponse(NetworkFilters::Common::Redis::RespValuePtr&& response) {
-    EXPECT_CALL(*client_, close());
     EXPECT_CALL(*resolve_timer_, enableTimer(_));
     pool_callbacks_->onResponse(std::move(response));
   }
 
   void expectClusterSlotFailure() {
-    EXPECT_CALL(*client_, close());
     EXPECT_CALL(*resolve_timer_, enableTimer(_));
     pool_callbacks_->onFailure();
   }
@@ -217,7 +223,7 @@ protected:
     const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
     expectResolveDiscovery(Network::DnsLookupFamily::V4Only, expected_discovery_address,
                            resolved_addresses);
-    expectRedisResolve();
+    expectRedisResolve(true);
 
     EXPECT_CALL(membership_updated_, ready());
     EXPECT_CALL(initialized_, ready());
@@ -255,7 +261,6 @@ protected:
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;
-  std::shared_ptr<RedisCluster> cluster_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -270,6 +275,7 @@ protected:
   Extensions::NetworkFilters::Common::Redis::Client::MockClient* client_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
   Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
+  std::shared_ptr<RedisCluster> cluster_;
 };
 
 typedef std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>,
@@ -336,7 +342,7 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
 
   setupFromV2Yaml(config);
 
-  expectRedisResolve();
+  expectRedisResolve(true);
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
@@ -422,7 +428,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   setupFromV2Yaml(basic_yaml_hosts);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
   expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
-  expectRedisResolve();
+  expectRedisResolve(true);
 
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
@@ -431,7 +437,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   EXPECT_EQ(1U, cluster_->info()->stats().update_attempt_.value());
   EXPECT_EQ(1U, cluster_->info()->stats().update_failure_.value());
 
-  expectRedisResolve();
+  expectRedisResolve(true);
   resolve_timer_->callback_();
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
