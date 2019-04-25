@@ -200,20 +200,6 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
-  // The first receipt from the hot restart parent of a counter's value may
-  // come before or after it is first locally incremented; both should work.
-  c1.inc();
-  c1.stealthyAdd(1000000);
-  EXPECT_EQ(1000001L, c1.value());
-  EXPECT_EQ(1L, c1.latch());
-  Counter& c2 = store_->counter("c2");
-  c2.stealthyAdd(2000000);
-  EXPECT_EQ(2000000L, c2.value());
-  EXPECT_EQ(0L, c2.latch());
-  c2.inc();
-  EXPECT_EQ(2000001L, c2.value());
-  EXPECT_EQ(1L, c2.latch());
-
   store_->shutdownThreading();
 }
 
@@ -237,24 +223,10 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(3L, store_->gauges().front().use_count());
 
-  // The first receipt from the hot restart parent of a counter's value may
-  // come before or after it is first locally incremented; both should work.
-  c1.inc();
-  c1.stealthyAdd(1000000);
-  EXPECT_EQ(1000001L, c1.value());
-  EXPECT_EQ(1L, c1.latch());
-  Counter& c2 = store_->counter("c2");
-  c2.stealthyAdd(2000000);
-  EXPECT_EQ(2000000L, c2.value());
-  EXPECT_EQ(0L, c2.latch());
-  c2.inc();
-  EXPECT_EQ(2000001L, c2.value());
-  EXPECT_EQ(1L, c2.latch());
-
   store_->shutdownThreading();
   tls_.shutdownThread();
 
-  EXPECT_EQ(2UL, store_->counters().size());
+  EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());

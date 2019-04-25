@@ -72,6 +72,8 @@ public:
   MOCK_METHOD1(sub, void(uint64_t amount));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_CONST_METHOD0(value, uint64_t());
+  MOCK_CONST_METHOD0(cachedCombineLogic, absl::optional<CombineLogic>());
+  MOCK_METHOD1(setCombineLogic, void(CombineLogic logic));
 
   bool used_;
   uint64_t value_;

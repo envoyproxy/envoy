@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common/common/hash.h"
-
 #include "server/hot_restarting_base.h"
 
 namespace Envoy {
@@ -25,7 +24,6 @@ private:
   sockaddr_un child_address_;
   Event::FileEventPtr socket_event_;
   Server::Instance* server_{};
-  ConstCharStarHashSet counters_already_sent_;
 };
 
 } // namespace Server

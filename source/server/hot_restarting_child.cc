@@ -90,8 +90,7 @@ void HotRestartingChild::mergeParentStats(Stats::Store& stats_store,
   if (!stat_merger_) {
     stat_merger_ = std::make_unique<Stats::StatMerger>(stats_store);
   }
-  stat_merger_->mergeStats(stats_proto.counter_values(), stats_proto.counter_deltas(),
-                           stats_proto.gauges());
+  stat_merger_->mergeStats(stats_proto.counter_deltas(), stats_proto.gauges());
 }
 
 } // namespace Server
