@@ -645,7 +645,6 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
   updateOutlierDetection(timeout_response_code_, upstream_request);
 
   if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
-    upstream_request.removeFromList(upstream_requests_);
     return;
   }
 
@@ -723,6 +722,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
     if (upstream_request.upstream_host_) {
       upstream_request.upstream_host_->stats().rq_error_.inc();
     }
+    upstream_request.removeFromList(upstream_requests_);
     return true;
   } else if (retry_status == RetryStatus::NoOverflow) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
