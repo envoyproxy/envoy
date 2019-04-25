@@ -22,6 +22,11 @@ Version history
   in full by the router. This ensures that the per try timeout does not account for slow
   downstreams and that will not start before the global timeout.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
+* upstream: an EDS management server can now force removal of a host that is still passing active
+  health checking by first marking the host as failed via EDS health check and subsequently removing
+  it in a future update. This is a mechanism to work around a race condition in which an EDS
+  implementation may remove a host before it has stopped passing active HC, thus causing the host
+  to become stranded until a future update.
 
 1.10.0 (Apr 5, 2019)
 ====================
