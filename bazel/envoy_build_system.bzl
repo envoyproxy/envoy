@@ -461,6 +461,10 @@ def envoy_cc_test(
         name = name,
         copts = envoy_copts(repository, test = True),
         linkopts = envoy_test_linkopts(),
+        linkstatic = select({
+            "//bazel:asan_build": 0,
+            "//conditions:default": 1,
+        }),
         malloc = tcmalloc_external_dep(repository),
         deps = [
             ":" + name + "_lib",
