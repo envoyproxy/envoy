@@ -72,12 +72,9 @@ private:
   histogram_t* histogram_;
 };
 
-namespace {
-void expectStatsEq(const Stats::HistogramStatistics& lhs, const Stats::HistogramStatistics& rhs) {
-  EXPECT_EQ(lhs.supportedBuckets(), rhs.supportedBuckets());
+#define EXPECT_STATS_EQ(lhs, rhs)                                                                  \
+  EXPECT_EQ(lhs.supportedBuckets(), rhs.supportedBuckets());                                       \
   EXPECT_EQ(lhs.computedBuckets(), rhs.computedBuckets());
-}
-} // namespace
 
 class HistogramTest : public testing::Test {
 public:
@@ -137,17 +134,13 @@ public:
 
     NameHistogramMap name_histogram_map = makeHistogramMap(histogram_list);
     const ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
-    expectStatsEq(h1->cumulativeStatistics(), h1_cumulative_statistics);
-    expectStatsEq(h1->intervalStatistics(), h1_interval_statistics);
-    expectStatsEq(h1->cumulativeStatistics(), h1_cumulative_statistics);
-    expectStatsEq(h1->intervalStatistics(), h1_interval_statistics);
+    EXPECT_STATS_EQ(h1->cumulativeStatistics(), h1_cumulative_statistics);
+    EXPECT_STATS_EQ(h1->intervalStatistics(), h1_interval_statistics);
 
     if (histogram_list.size() > 1) {
       const ParentHistogramSharedPtr& h2 = name_histogram_map["h2"];
-      expectStatsEq(h2->cumulativeStatistics(), h2_cumulative_statistics);
-      expectStatsEq(h2->intervalStatistics(), h2_interval_statistics);
-      expectStatsEq(h2->cumulativeStatistics(), h2_cumulative_statistics);
-      expectStatsEq(h2->intervalStatistics(), h2_interval_statistics);
+      EXPECT_STATS_EQ(h2->cumulativeStatistics(), h2_cumulative_statistics);
+      EXPECT_STATS_EQ(h2->intervalStatistics(), h2_interval_statistics);
     }
 
     h1_interval_values_.clear();

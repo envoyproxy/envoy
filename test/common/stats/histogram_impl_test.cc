@@ -40,28 +40,27 @@ TEST_F(HistogramImplTest, RecordValue) {
   EXPECT_TRUE(histogram_.used());
 }
 
-// Merging should populate statistics for the last interval, and cumulative statistics. Note that
-// the sample sum loses precision.
+// Merging should populate statistics for the last interval, and cumulative statistics.
 TEST_F(HistogramImplTest, RecordAndMerge) {
   histogram_.recordValue(123);
   histogram_.merge();
   EXPECT_EQ(1, interval_stats_.sampleCount());
-  EXPECT_EQ(125, interval_stats_.sampleSum()); // 125 ~= 123
+  EXPECT_EQ(123, interval_stats_.sampleSum());
   EXPECT_EQ(1, cumulative_stats_.sampleCount());
-  EXPECT_EQ(125, cumulative_stats_.sampleSum()); // same
+  EXPECT_EQ(123, cumulative_stats_.sampleSum());
 }
 
 // Recording another value and merging again should yield fresh interval statistics, and add to
-// cumulative statistics. Again, the sample sum loses precision.
+// cumulative statistics.
 TEST_F(HistogramImplTest, RecordAndMergeTwice) {
   histogram_.recordValue(123);
   histogram_.merge();
   histogram_.recordValue(456);
   histogram_.merge();
   EXPECT_EQ(1, interval_stats_.sampleCount());
-  EXPECT_EQ(455, interval_stats_.sampleSum()); // 455 ~= 456
+  EXPECT_EQ(456, interval_stats_.sampleSum());
   EXPECT_EQ(2, cumulative_stats_.sampleCount());
-  EXPECT_EQ(580, cumulative_stats_.sampleSum()); // 580 == 125 + 455.
+  EXPECT_EQ(579, cumulative_stats_.sampleSum());
 }
 
 } // namespace

@@ -61,28 +61,27 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
 
 ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
                                          std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent),
-      interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
-      interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
-      used_(false), name_(name) {}
-
-ParentHistogramImpl::~ParentHistogramImpl() {
-  hist_free(interval_histogram_);
-  hist_free(cumulative_histogram_);
-}
+    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent), used_(false),
+      name_(name) {}
 
 void ParentHistogramImpl::recordValue(uint64_t value) {
   used_ = true;
-  hist_insert_intscale(interval_histogram_, value, 0, 1);
+  count_++;
+  sum_ += value;
   parent_.deliverHistogramToSinks(*this, value);
 }
 
 void ParentHistogramImpl::merge() {
-  hist_accumulate(cumulative_histogram_, &interval_histogram_, 1);
-  interval_statistics_.refresh(interval_histogram_);
-  cumulative_statistics_.refresh(cumulative_histogram_);
-  hist_clear(interval_histogram_);
+  interval_statistics_.count_ = count_;
+  interval_statistics_.sum_ = sum_;
+  cumulative_statistics_.count_ += count_;
+  cumulative_statistics_.sum_ += sum_;
+  count_ = 0;
+  sum_ = 0;
 }
+
+const std::vector<double> ParentHistogramImpl::TrivialStatistics::empty_doubles_{};
+const std::vector<uint64_t> ParentHistogramImpl::TrivialStatistics::empty_ints_{};
 
 } // namespace Stats
 } // namespace Envoy

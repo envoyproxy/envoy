@@ -52,7 +52,6 @@ class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
 public:
   ParentHistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
                       std::vector<Tag>&& tags);
-  ~ParentHistogramImpl();
 
   // Stats::Metric
   std::string name() const override { return name_; }
@@ -70,11 +69,24 @@ public:
   }
 
 private:
+  struct TrivialStatistics : public HistogramStatistics {
+    // Stats::HistogramStatistics
+    const std::vector<double>& supportedQuantiles() const override { return empty_doubles_; }
+    const std::vector<double>& computedQuantiles() const override { return empty_doubles_; }
+    const std::vector<double>& supportedBuckets() const override { return empty_doubles_; }
+    const std::vector<uint64_t>& computedBuckets() const override { return empty_ints_; }
+    uint64_t sampleCount() const override { return count_; }
+    double sampleSum() const override { return sum_; }
+
+    static const std::vector<double> empty_doubles_;
+    static const std::vector<uint64_t> empty_ints_;
+    uint64_t count_{}, sum_{};
+  };
+
   Store& parent_;
-  histogram_t* const interval_histogram_{};
-  histogram_t* const cumulative_histogram_{};
-  HistogramStatisticsImpl interval_statistics_;
-  HistogramStatisticsImpl cumulative_statistics_;
+  uint64_t count_{}, sum_{};
+  TrivialStatistics interval_statistics_;
+  TrivialStatistics cumulative_statistics_;
   bool used_{};
   const std::string name_;
 };
