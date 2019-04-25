@@ -93,8 +93,8 @@ envoy_cc_test_library(
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
         "//test/test_common:thread_factory_for_test_lib",
-        ],
-    )
+    ],
+)
 
 envoy_cc_test_library(
     name = "quic_platform_test_impl_lib",
