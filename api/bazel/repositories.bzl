@@ -115,6 +115,7 @@ cc_proto_library(
     ],
     default_runtime = "@com_google_protobuf//:protobuf",
     protoc = "@com_google_protobuf//:protoc",
+    linkstatic = 1,
     deps = ["@com_google_protobuf//:cc_wkt_protos"],
     visibility = ["//visibility:public"],
 )
