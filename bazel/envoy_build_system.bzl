@@ -335,7 +335,6 @@ def envoy_cc_library(
         ],
         include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
-        linkstatic = 1,
         linkstamp = select({
             repository + "//bazel:windows_x86_64": None,
             "//conditions:default": linkstamp,
@@ -462,7 +461,6 @@ def envoy_cc_test(
         name = name,
         copts = envoy_copts(repository, test = True),
         linkopts = envoy_test_linkopts(),
-        linkstatic = 1,
         malloc = tcmalloc_external_dep(repository),
         deps = [
             ":" + name + "_lib",
@@ -502,7 +500,6 @@ def envoy_cc_test_infrastructure_library(
         tags = tags,
         include_prefix = include_prefix,
         alwayslink = 1,
-        linkstatic = 1,
         visibility = ["//visibility:public"],
     )
 
