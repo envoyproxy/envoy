@@ -29,7 +29,7 @@ TEST_F(RequestCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
     const int16_t api_key = static_cast<int16_t>(base_api_key + i);
     const RequestHeader header = {api_key, 0, 0, "client-id"};
     const std::vector<unsigned char> data = std::vector<unsigned char>(1024);
-    putInBuffer(ConcreteRequest<std::vector<unsigned char>>{header, data});
+    putInBuffer(Request<std::vector<unsigned char>>{header, data});
     sent_headers.push_back(header);
   }
 
@@ -45,21 +45,24 @@ TEST_F(RequestCodecIntegrationTest, shouldProduceAbortedMessageOnUnknownData) {
   testee.onData(buffer_);
 
   // then
-  const std::vector<MessageSharedPtr>& received = request_callback->getCaptured();
-  ASSERT_EQ(received.size(), sent_headers.size());
+  ASSERT_EQ(request_callback->getCaptured().size(), 0);
 
-  for (size_t i = 0; i < received.size(); ++i) {
-    const std::shared_ptr<UnknownRequest> request =
-        std::dynamic_pointer_cast<UnknownRequest>(received[i]);
-    ASSERT_NE(request, nullptr);
-    ASSERT_EQ(request->request_header_, sent_headers[i]);
+  const std::vector<RequestParseFailureSharedPtr>& parse_failures =
+      request_callback->getParseFailures();
+  ASSERT_EQ(parse_failures.size(), sent_headers.size());
+
+  for (size_t i = 0; i < parse_failures.size(); ++i) {
+    const std::shared_ptr<RequestParseFailure> failure_data =
+        std::dynamic_pointer_cast<RequestParseFailure>(parse_failures[i]);
+    ASSERT_NE(failure_data, nullptr);
+    ASSERT_EQ(failure_data->request_header_, sent_headers[i]);
   }
 }
 
 // Helper function.
 template <typename T> void RequestCodecIntegrationTest::putInBuffer(T arg) {
-  MessageEncoderImpl serializer{buffer_};
-  serializer.encode(arg);
+  RequestEncoder encoder{buffer_};
+  encoder.encode(arg);
 }
 
 } // namespace RequestCodecIntegrationTest

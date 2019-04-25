@@ -64,7 +64,7 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.network.kafka",
     deps = [
         ":serialization_utilities_lib",
-        "//source/extensions/filters/network/kafka:kafka_request_lib",
+        "//source/extensions/filters/network/kafka:kafka_request_parser_lib",
         "//test/mocks/server:server_mocks",
     ],
 )

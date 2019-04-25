@@ -19,28 +19,38 @@ envoy_cc_library(
         "request_codec.h",
     ],
     deps = [
-        ":kafka_request_lib",
-        ":message_lib",
+        ":kafka_request_parser_lib",
         "//source/common/buffer:buffer_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "kafka_request_lib",
+    name = "kafka_request_parser_lib",
     srcs = [
         "external/kafka_request_resolver.cc",
         "kafka_request_parser.cc",
     ],
     hdrs = [
         "external/requests.h",
-        "kafka_request.h",
         "kafka_request_parser.h",
     ],
     deps = [
+        ":kafka_request_lib",
         ":parser_lib",
-        ":serialization_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_request_lib",
+    srcs = [
+    ],
+    hdrs = [
+        "kafka_request.h",
+    ],
+    deps = [
+        ":serialization_lib",
     ],
 )
 
@@ -75,19 +85,7 @@ envoy_cc_library(
     name = "parser_lib",
     hdrs = ["parser.h"],
     deps = [
-        ":kafka_protocol_lib",
-        ":message_lib",
         "//source/common/common:minimal_logger_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "message_lib",
-    hdrs = [
-        "message.h",
-    ],
-    deps = [
-        "//include/envoy/buffer:buffer_interface",
     ],
 )
 
@@ -98,7 +96,7 @@ envoy_cc_library(
         "serialization.h",
     ],
     deps = [
-        ":kafka_protocol_lib",
+        ":kafka_types_lib",
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:byte_order_lib",
     ],
@@ -128,7 +126,7 @@ py_binary(
 )
 
 envoy_cc_library(
-    name = "kafka_protocol_lib",
+    name = "kafka_types_lib",
     hdrs = [
         "kafka_types.h",
     ],

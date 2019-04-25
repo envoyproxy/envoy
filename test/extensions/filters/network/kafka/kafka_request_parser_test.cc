@@ -42,7 +42,8 @@ protected:
 class MockRequestParserResolver : public RequestParserResolver {
 public:
   MockRequestParserResolver(){};
-  MOCK_CONST_METHOD3(createParser, ParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
+  MOCK_CONST_METHOD3(createParser,
+                     RequestParserSharedPtr(int16_t, int16_t, RequestContextSharedPtr));
 };
 
 TEST_F(KafkaRequestParserTest, RequestStartParserTestShouldReturnRequestHeaderParser) {
@@ -57,19 +58,20 @@ TEST_F(KafkaRequestParserTest, RequestStartParserTestShouldReturnRequestHeaderPa
   absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(data);
+  const RequestParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
   ASSERT_NE(std::dynamic_pointer_cast<RequestHeaderParser>(result.next_parser_), nullptr);
   ASSERT_EQ(result.message_, nullptr);
+  ASSERT_EQ(result.failure_data_, nullptr);
   ASSERT_EQ(testee.contextForTest()->remaining_request_size_, request_len);
   assertStringViewIncrement(data, orig_data, sizeof(int32_t));
 }
 
-class MockParser : public Parser {
+class MockParser : public RequestParser {
 public:
-  ParseResponse parse(absl::string_view&) override {
+  RequestParseResponse parse(absl::string_view&) override {
     throw new EnvoyException("should not be invoked");
   }
 };
@@ -77,7 +79,7 @@ public:
 TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldExtractHeaderAndResolveNextParser) {
   // given
   const MockRequestParserResolver parser_resolver;
-  const ParserSharedPtr parser{new MockParser{}};
+  const RequestParserSharedPtr parser{new MockParser{}};
   EXPECT_CALL(parser_resolver, createParser(_, _, _)).WillOnce(Return(parser));
 
   const int32_t request_len = 1000;
@@ -99,12 +101,13 @@ TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldExtractHeaderAndResolveN
   absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(data);
+  const RequestParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
   ASSERT_EQ(result.next_parser_, parser);
   ASSERT_EQ(result.message_, nullptr);
+  ASSERT_EQ(result.failure_data_, nullptr);
 
   const RequestHeader expected_header{api_key, api_version, correlation_id, client_id};
   ASSERT_EQ(testee.contextForTest()->request_header_, expected_header);
@@ -143,12 +146,13 @@ TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldHandleExceptionsDuringFe
   absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(data);
+  const RequestParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
   ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result.next_parser_), nullptr);
   ASSERT_EQ(result.message_, nullptr);
+  ASSERT_EQ(result.failure_data_, nullptr);
 
   ASSERT_EQ(testee.contextForTest()->remaining_request_size_,
             request_size - FAILED_DESERIALIZER_STEP);
@@ -156,7 +160,7 @@ TEST_F(KafkaRequestParserTest, RequestHeaderParserShouldHandleExceptionsDuringFe
   assertStringViewIncrement(data, orig_data, FAILED_DESERIALIZER_STEP);
 }
 
-TEST_F(KafkaRequestParserTest, RequestParserShouldHandleDeserializerExceptionsDuringFeeding) {
+TEST_F(KafkaRequestParserTest, RequestDataParserShouldHandleDeserializerExceptionsDuringFeeding) {
   // given
 
   // This deserializer throws during feeding.
@@ -173,7 +177,7 @@ TEST_F(KafkaRequestParserTest, RequestParserShouldHandleDeserializerExceptionsDu
   };
 
   RequestContextSharedPtr request_context{new RequestContext{1024, {}}};
-  RequestParser<int32_t, ThrowingDeserializer> testee{request_context};
+  RequestDataParser<int32_t, ThrowingDeserializer> testee{request_context};
 
   absl::string_view data = putGarbageIntoBuffer();
 
@@ -202,23 +206,25 @@ public:
   int32_t get() const override { return 0; };
 };
 
-TEST_F(KafkaRequestParserTest, RequestParserShouldHandleDeserializerReturningReadyButLeavingData) {
+TEST_F(KafkaRequestParserTest,
+       RequestDataParserShouldHandleDeserializerReturningReadyButLeavingData) {
   // given
   const int32_t request_size = 1024; // There are still 1024 bytes to read to complete the request.
   RequestContextSharedPtr request_context{new RequestContext{request_size, {}}};
 
-  RequestParser<int32_t, SomeBytesDeserializer> testee{request_context};
+  RequestDataParser<int32_t, SomeBytesDeserializer> testee{request_context};
 
   const absl::string_view orig_data = putGarbageIntoBuffer();
   absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(data);
+  const RequestParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
   ASSERT_NE(std::dynamic_pointer_cast<SentinelParser>(result.next_parser_), nullptr);
   ASSERT_EQ(result.message_, nullptr);
+  ASSERT_EQ(result.failure_data_, nullptr);
 
   ASSERT_EQ(testee.contextForTest()->remaining_request_size_,
             request_size - FAILED_DESERIALIZER_STEP);
@@ -237,12 +243,13 @@ TEST_F(KafkaRequestParserTest, SentinelParserShouldConsumeDataUntilEndOfRequest)
   absl::string_view data = orig_data;
 
   // when
-  const ParseResponse result = testee.parse(data);
+  const RequestParseResponse result = testee.parse(data);
 
   // then
   ASSERT_EQ(result.hasData(), true);
   ASSERT_EQ(result.next_parser_, nullptr);
-  ASSERT_NE(std::dynamic_pointer_cast<UnknownRequest>(result.message_), nullptr);
+  ASSERT_EQ(result.message_, nullptr);
+  ASSERT_NE(std::dynamic_pointer_cast<RequestParseFailure>(result.failure_data_), nullptr);
 
   ASSERT_EQ(testee.contextForTest()->remaining_request_size_, 0);
 

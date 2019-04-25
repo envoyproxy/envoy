@@ -11,7 +11,7 @@ namespace NetworkFilters {
 namespace Kafka {
 
 class RequestStartParserFactory : public InitialParserFactory {
-  ParserSharedPtr create(const RequestParserResolver& parser_resolver) const override {
+  RequestParserSharedPtr create(const RequestParserResolver& parser_resolver) const override {
     return std::make_shared<RequestStartParser>(parser_resolver);
   }
 };
@@ -48,15 +48,21 @@ void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
   while (!data.empty()) {
 
     // Feed the data to the parser.
-    ParseResponse result = current_parser_->parse(data);
+    RequestParseResponse result = current_parser_->parse(data);
     // This loop guarantees that parsers consuming 0 bytes also get processed in this invocation.
     while (result.hasData()) {
       if (!result.next_parser_) {
 
         // Next parser is not present, so we have finished parsing a message.
-        MessageSharedPtr message = result.message_;
-        for (auto& callback : callbacks_) {
-          callback->onMessage(result.message_);
+        // Depending on whether the parse was successful, invoke the correct callback.
+        if (result.message_) {
+          for (auto& callback : callbacks_) {
+            callback->onMessage(result.message_);
+          }
+        } else {
+          for (auto& callback : callbacks_) {
+            callback->onFailedParse(result.failure_data_);
+          }
         }
 
         // As we finished parsing this request, re-initialize the parser.
@@ -73,7 +79,7 @@ void RequestDecoder::doParse(const Buffer::RawSlice& slice) {
   }
 }
 
-void MessageEncoderImpl::encode(const Message& message) {
+void RequestEncoder::encode(const AbstractRequest& message) {
   Buffer::OwnedImpl data_buffer;
   // TODO(adamkotwasinski) Precompute the size instead of using temporary buffer.
   // When we have the 'computeSize' method, then we can push encoding request's size into

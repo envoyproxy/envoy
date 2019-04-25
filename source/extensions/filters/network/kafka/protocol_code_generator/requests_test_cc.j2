@@ -26,7 +26,8 @@ public:
 
 class MockMessageListener : public RequestCallback {
 public:
-  MOCK_METHOD1(onMessage, void(MessageSharedPtr));
+  MOCK_METHOD1(onMessage, void(AbstractRequestSharedPtr));
+  MOCK_METHOD1(onFailedParse, void(RequestParseFailureSharedPtr));
 };
 
 /**
@@ -35,13 +36,13 @@ public:
  * This method gets executed for every request * version pair.
  */
 template <typename T> std::shared_ptr<T> RequestTest::serializeAndDeserialize(T request) {
-  MessageEncoderImpl serializer{buffer_};
-  serializer.encode(request);
+  RequestEncoder encoder{buffer_};
+  encoder.encode(request);
 
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
   RequestDecoder testee{RequestParserResolver::getDefaultInstance(), {mock_listener}};
 
-  MessageSharedPtr receivedMessage;
+  AbstractRequestSharedPtr receivedMessage;
   EXPECT_CALL(*mock_listener, onMessage(testing::_))
     .WillOnce(testing::SaveArg<0>(&receivedMessage));
 
@@ -59,7 +60,7 @@ template <typename T> std::shared_ptr<T> RequestTest::serializeAndDeserialize(T 
 TEST_F(RequestTest, shouldParse{{ request_type.name }}V{{ field_list.version }}) {
   // given
   {{ request_type.name }} data = { {{ field_list.example_value() }} };
-  ConcreteRequest<{{ request_type.name }}> request = { {
+  Request<{{ request_type.name }}> request = { {
     {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, 0, absl::nullopt }, data };
 
   // when

@@ -40,7 +40,7 @@ namespace Kafka {
  * Composite deserializer that uses 0 deserializer(s) (corner case).
  * Does not consume any bytes, and is always ready to return the result.
  * Creates a result value using the no-arg ResponseType constructor.
- * @param ResponseType type of deserialized data
+ * @param ResponseType type of deserialized data.
  */
 template <typename ResponseType>
 class CompositeDeserializerWith0Delegates : public Deserializer<ResponseType> {
@@ -58,10 +58,10 @@ public:
  * consume data, so it's safe).
  * The composite deserializer is ready when the last deserializer is ready (what means that all
  * deserializers before it are ready too).
- * Constructs the result of type ResponseType using { delegate1_.get(), delegate2_.get() ... }
+ * Constructs the result of type ResponseType using { delegate1_.get(), delegate2_.get() ... }.
  *
- * @param ResponseType type of deserialized data{% for field in range(1, field_count + 1) %}
- * @param DeserializerType{{ field }} deserializer {{ field }}
+ * @param ResponseType type of deserialized data{% for field in range(1, field_count + 1) %}.
+ * @param DeserializerType{{ field }} deserializer {{ field }}.
 {% endfor %} */
 template <
   typename ResponseType{% for field in range(1, field_count + 1) %},

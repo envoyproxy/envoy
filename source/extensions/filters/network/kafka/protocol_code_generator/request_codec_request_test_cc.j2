@@ -36,9 +36,9 @@ protected:
 
 TEST_F(RequestCodecRequestTest, shouldHandle{{ request_type.name }}Messages) {
   // given
-  using Request = ConcreteRequest<{{ request_type.name }}>;
+  using RequestUnderTest = Request<{{ request_type.name }}>;
 
-  std::vector<Request> sent;
+  std::vector<RequestUnderTest> sent;
   int32_t correlation = 0;
 
   {% for field_list in request_type.compute_field_lists() %}
@@ -46,7 +46,7 @@ TEST_F(RequestCodecRequestTest, shouldHandle{{ request_type.name }}Messages) {
     const RequestHeader header =
       { {{ request_type.get_extra('api_key') }}, {{ field_list.version }}, correlation++, "id" };
     const {{ request_type.name }} data = { {{ field_list.example_value() }} };
-    const Request request = {header, data};
+    const RequestUnderTest request = {header, data};
     putInBuffer(request);
     sent.push_back(request);
   }
@@ -64,11 +64,12 @@ TEST_F(RequestCodecRequestTest, shouldHandle{{ request_type.name }}Messages) {
   testee.onData(buffer_);
 
   // then
-  const std::vector<MessageSharedPtr>& received = request_callback->getCaptured();
+  const std::vector<AbstractRequestSharedPtr>& received = request_callback->getCaptured();
   ASSERT_EQ(received.size(), sent.size());
 
   for (size_t i = 0; i < received.size(); ++i) {
-    const std::shared_ptr<Request> request = std::dynamic_pointer_cast<Request>(received[i]);
+    const std::shared_ptr<RequestUnderTest> request =
+      std::dynamic_pointer_cast<RequestUnderTest>(received[i]);
     ASSERT_NE(request, nullptr);
     ASSERT_EQ(*request, sent[i]);
   }
@@ -77,8 +78,8 @@ TEST_F(RequestCodecRequestTest, shouldHandle{{ request_type.name }}Messages) {
 
 template <typename T>
 void RequestCodecRequestTest::putInBuffer(const T arg) {
-  MessageEncoderImpl serializer{buffer_};
-  serializer.encode(arg);
+  RequestEncoder encoder{buffer_};
+  encoder.encode(arg);
 }
 
 } // namespace RequestCodecRequestTest

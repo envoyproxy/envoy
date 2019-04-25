@@ -3,7 +3,6 @@
 #include "envoy/common/exception.h"
 
 #include "extensions/filters/network/kafka/external/serialization_composite.h"
-#include "extensions/filters/network/kafka/message.h"
 #include "extensions/filters/network/kafka/serialization.h"
 
 namespace Envoy {
@@ -28,13 +27,11 @@ struct RequestHeader {
 };
 
 /**
- * Abstract Kafka request.
- * Contains data present in every request (the header with request key, version, etc.).
- * @see http://kafka.apache.org/protocol.html#protocol_messages
+ * Carries information that could be extracted during the failed parse.
  */
-class AbstractRequest : public Message {
+class RequestParseFailure {
 public:
-  AbstractRequest(const RequestHeader& request_header) : request_header_{request_header} {};
+  RequestParseFailure(const RequestHeader& request_header) : request_header_{request_header} {};
 
   /**
    * Request's header.
@@ -42,15 +39,47 @@ public:
   const RequestHeader request_header_;
 };
 
+typedef std::shared_ptr<RequestParseFailure> RequestParseFailureSharedPtr;
+
+/**
+ * Abstract Kafka request.
+ * Contains data present in every request (the header with request key, version, etc.).
+ * @see http://kafka.apache.org/protocol.html#protocol_messages
+ */
+class AbstractRequest {
+public:
+  virtual ~AbstractRequest() = default;
+
+  /**
+   * Constructs a request with given header data.
+   * @param request_header request's header.
+   */
+  AbstractRequest(const RequestHeader& request_header) : request_header_{request_header} {};
+
+  /**
+   * Encode the contents of this message into a given buffer.
+   * @param dst buffer instance to keep serialized message
+   */
+  virtual size_t encode(Buffer::Instance& dst) const PURE;
+
+  /**
+   * Request's header.
+   */
+  const RequestHeader request_header_;
+};
+
+typedef std::shared_ptr<AbstractRequest> AbstractRequestSharedPtr;
+
 /**
  * Concrete request that carries data particular to given request type.
+ * @param Data concrete request data type.
  */
-template <typename RequestData> class ConcreteRequest : public AbstractRequest {
+template <typename Data> class Request : public AbstractRequest {
 public:
   /**
    * Request header fields need to be initialized by user in case of newly created requests.
    */
-  ConcreteRequest(const RequestHeader& request_header, const RequestData& data)
+  Request(const RequestHeader& request_header, const Data& data)
       : AbstractRequest{request_header}, data_{data} {};
 
   /**
@@ -69,29 +98,12 @@ public:
     return written;
   }
 
-  bool operator==(const ConcreteRequest<RequestData>& rhs) const {
+  bool operator==(const Request<Data>& rhs) const {
     return request_header_ == rhs.request_header_ && data_ == rhs.data_;
   };
 
 private:
-  const RequestData data_;
-};
-
-/**
- * Request that did not have api_key & api_version that could be matched with any of
- * request-specific parsers.
- * Right now it acts as a placeholder only, and does not carry the request data.
- */
-class UnknownRequest : public AbstractRequest {
-public:
-  UnknownRequest(const RequestHeader& request_header) : AbstractRequest{request_header} {};
-
-  /**
-   * It is impossible to encode unknown request, as it is only a placeholder.
-   */
-  size_t encode(Buffer::Instance&) const override {
-    throw EnvoyException("cannot serialize unknown request");
-  }
+  const Data data_;
 };
 
 } // namespace Kafka

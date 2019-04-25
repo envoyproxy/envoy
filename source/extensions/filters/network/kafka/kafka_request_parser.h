@@ -14,6 +14,10 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 
+using RequestParseResponse = ParseResponse<AbstractRequestSharedPtr, RequestParseFailureSharedPtr>;
+using RequestParser = Parser<AbstractRequestSharedPtr, RequestParseFailureSharedPtr>;
+using RequestParserSharedPtr = std::shared_ptr<RequestParser>;
+
 /**
  * Context that is shared between parsers that are handling the same single message.
  */
@@ -35,13 +39,13 @@ public:
 
   /**
    * Creates a parser that is going to process data specific for given api_key & api_version.
-   * @param api_key request type
-   * @param api_version request version
-   * @param context context to be used by parser
-   * @return parser that is capable of processing data for given request type & version
+   * @param api_key request type.
+   * @param api_version request version.
+   * @param context context to be used by parser.
+   * @return parser that is capable of processing data for given request type & version.
    */
-  virtual ParserSharedPtr createParser(int16_t api_key, int16_t api_version,
-                                       RequestContextSharedPtr context) const;
+  virtual RequestParserSharedPtr createParser(int16_t api_key, int16_t api_version,
+                                              RequestContextSharedPtr context) const;
 
   /**
    * Return default resolver, that uses request's api key and version to provide a matching parser.
@@ -53,16 +57,16 @@ public:
  * Request parser responsible for consuming request length and setting up context with this data.
  * @see http://kafka.apache.org/protocol.html#protocol_common
  */
-class RequestStartParser : public Parser {
+class RequestStartParser : public RequestParser {
 public:
   RequestStartParser(const RequestParserResolver& parser_resolver)
       : parser_resolver_{parser_resolver}, context_{std::make_shared<RequestContext>()} {};
 
   /**
    * Consumes 4 bytes (INT32) as request length and updates the context with that value.
-   * @return RequestHeaderParser instance to process request header
+   * @return RequestHeaderParser instance to process request header.
    */
-  ParseResponse parse(absl::string_view& data) override;
+  RequestParseResponse parse(absl::string_view& data) override;
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
@@ -90,7 +94,7 @@ typedef std::unique_ptr<RequestHeaderDeserializer> RequestHeaderDeserializerPtr;
  * parser.
  * @see http://kafka.apache.org/protocol.html#protocol_messages
  */
-class RequestHeaderParser : public Parser {
+class RequestHeaderParser : public RequestParser {
 public:
   // Default constructor.
   RequestHeaderParser(const RequestParserResolver& parser_resolver, RequestContextSharedPtr context)
@@ -107,7 +111,7 @@ public:
    * Uses data provided to compute request header.
    * @return Parser instance responsible for processing rest of the message
    */
-  ParseResponse parse(absl::string_view& data) override;
+  RequestParseResponse parse(absl::string_view& data) override;
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
@@ -122,14 +126,14 @@ private:
  * api_key & api_version. It does not attempt to capture any data, just throws it away until end of
  * message.
  */
-class SentinelParser : public Parser {
+class SentinelParser : public RequestParser {
 public:
   SentinelParser(RequestContextSharedPtr context) : context_{context} {};
 
   /**
-   * Returns UnknownRequest. Ignores (jumps over) the data provided.
+   * Returns failed parse data. Ignores (jumps over) the data provided.
    */
-  ParseResponse parse(absl::string_view& data) override;
+  RequestParseResponse parse(absl::string_view& data) override;
 
   const RequestContextSharedPtr contextForTest() const { return context_; }
 
@@ -141,38 +145,39 @@ private:
  * Request parser uses a single deserializer to construct a request object.
  * This parser is responsible for consuming request-specific data (e.g. topic names) and always
  * returns a parsed message.
- * @param RequestType request class
+ * @param RequestType request class.
  * @param DeserializerType deserializer type corresponding to request class (should be subclass of
- * Deserializer<RequestType>)
+ * Deserializer<RequestType>).
  */
-template <typename RequestType, typename DeserializerType> class RequestParser : public Parser {
+template <typename RequestType, typename DeserializerType>
+class RequestDataParser : public RequestParser {
 public:
   /**
    * Create a parser with given context.
-   * @param context parse context containing request header
+   * @param context parse context containing request header.
    */
-  RequestParser(RequestContextSharedPtr context) : context_{context} {};
+  RequestDataParser(RequestContextSharedPtr context) : context_{context} {};
 
   /**
    * Consume enough data to fill in deserializer and receive the parsed request.
    * Fill in request's header with data stored in context.
    */
-  ParseResponse parse(absl::string_view& data) override {
+  RequestParseResponse parse(absl::string_view& data) override {
     context_->remaining_request_size_ -= deserializer.feed(data);
 
     if (deserializer.ready()) {
       if (0 == context_->remaining_request_size_) {
         // After a successful parse, there should be nothing left - we have consumed all the bytes.
-        MessageSharedPtr msg = std::make_shared<ConcreteRequest<RequestType>>(
-            context_->request_header_, deserializer.get());
-        return ParseResponse::parsedMessage(msg);
+        AbstractRequestSharedPtr msg =
+            std::make_shared<Request<RequestType>>(context_->request_header_, deserializer.get());
+        return RequestParseResponse::parsedMessage(msg);
       } else {
         // The message makes no sense, the deserializer that matches the schema consumed all
         // necessary data, but there are still bytes in this message.
-        return ParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
+        return RequestParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
       }
     } else {
-      return ParseResponse::stillWaiting();
+      return RequestParseResponse::stillWaiting();
     }
   }
 

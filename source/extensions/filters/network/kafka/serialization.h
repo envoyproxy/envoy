@@ -27,7 +27,7 @@ namespace Kafka {
  * When ready(), it is safe to call get() to transform the internally stored bytes into result.
  * Further feed()-ing should have no effect on a buffer (should return 0 and not move
  * provided pointer).
- * @param T type of deserialized data
+ * @param T type of deserialized data.
  */
 template <typename T> class Deserializer {
 public:
@@ -37,8 +37,8 @@ public:
    * Submit data to be processed, will consume as much data as it is necessary.
    * If any bytes are consumed, then the provided string view is updated by stepping over consumed
    * bytes. Invoking this method when deserializer is ready has no effect (consumes 0 bytes).
-   * @param data bytes to be processed, will be updated if any have been consumed
-   * @return number of bytes consumed (equal to change in 'data')
+   * @param data bytes to be processed, will be updated if any have been consumed.
+   * @return number of bytes consumed (equal to change in 'data').
    */
   virtual size_t feed(absl::string_view& data) PURE;
 
@@ -145,7 +145,7 @@ public:
 };
 
 /**
- * Deserializer for boolean values
+ * Deserializer for boolean values.
  * Uses a single int8 deserializer, and checks whether the results equals 0.
  * When reading a boolean value, any non-zero value is considered true.
  * Impl note: could have been a subclass of IntDeserializer<int8_t> with a different get function,
@@ -169,7 +169,7 @@ private:
  * Deserializer of string value.
  * First reads length (INT16) and then allocates the buffer of given length.
  *
- * From documentation:
+ * From Kafka documentation:
  * First the length N is given as an INT16.
  * Then N bytes follow which are the UTF-8 encoding of the character sequence.
  * Length must not be negative.
@@ -230,7 +230,7 @@ private:
  * If length was -1, buffer allocation is omitted and deserializer is immediately ready (returning
  * null value).
  *
- * From documentation:
+ * From Kafka documentation:
  * For non-null strings, first the length N is given as an INT16.
  * Then N bytes follow which are the UTF-8 encoding of the character sequence.
  * A null value is encoded with length of -1 and there are no following bytes.
@@ -304,7 +304,7 @@ private:
  * Deserializer of bytes value.
  * First reads length (INT32) and then allocates the buffer of given length.
  *
- * From documentation:
+ * From Kafka documentation:
  * First the length N is given as an INT32. Then N bytes follow.
  */
 class BytesDeserializer : public Deserializer<Bytes> {
@@ -362,7 +362,7 @@ private:
  * If length was -1, buffer allocation is omitted and deserializer is immediately ready (returning
  * null value).
  *
- * From documentation:
+ * From Kafka documentation:
  * For non-null values, first the length N is given as an INT32. Then N bytes follow.
  * A null value is encoded with length of -1 and there are no following bytes.
  */
@@ -439,10 +439,10 @@ private:
  * First reads the length of the array, then initializes N underlying deserializers of type
  * DeserializerType. After the last of N deserializers is ready, the results of each of them are
  * gathered and put in a vector.
- * @param ResponseType result type returned by deserializer of type DeserializerType
- * @param DeserializerType underlying deserializer type
+ * @param ResponseType result type returned by deserializer of type DeserializerType.
+ * @param DeserializerType underlying deserializer type.
  *
- * From documentation:
+ * From Kafka documentation:
  * Represents a sequence of objects of a given type T. Type T can be either a primitive type (e.g.
  * STRING) or a structure. First, the length N is given as an int32_t. Then N instances of type T
  * follow. A null array is represented with a length of -1.
@@ -516,10 +516,10 @@ private:
  * First reads the length of the array, then initializes N underlying deserializers of type
  * DeserializerType. After the last of N deserializers is ready, the results of each of them are
  * gathered and put in a vector.
- * @param ResponseType result type returned by deserializer of type DeserializerType
- * @param DeserializerType underlying deserializer type
+ * @param ResponseType result type returned by deserializer of type DeserializerType.
+ * @param DeserializerType underlying deserializer type.
  *
- * From documentation:
+ * From Kafka documentation:
  * Represents a sequence of objects of a given type T. Type T can be either a primitive type (e.g.
  * STRING) or a structure. First, the length N is given as an int32_t. Then N instances of type T
  * follow. A null array is represented with a length of -1.

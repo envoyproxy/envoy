@@ -9,18 +9,18 @@ const RequestParserResolver& RequestParserResolver::getDefaultInstance() {
   CONSTRUCT_ON_FIRST_USE(RequestParserResolver);
 }
 
-ParseResponse RequestStartParser::parse(absl::string_view& data) {
+RequestParseResponse RequestStartParser::parse(absl::string_view& data) {
   request_length_.feed(data);
   if (request_length_.ready()) {
     context_->remaining_request_size_ = request_length_.get();
-    return ParseResponse::nextParser(
+    return RequestParseResponse::nextParser(
         std::make_shared<RequestHeaderParser>(parser_resolver_, context_));
   } else {
-    return ParseResponse::stillWaiting();
+    return RequestParseResponse::stillWaiting();
   }
 }
 
-ParseResponse RequestHeaderParser::parse(absl::string_view& data) {
+RequestParseResponse RequestHeaderParser::parse(absl::string_view& data) {
   const absl::string_view orig_data = data;
   try {
     context_->remaining_request_size_ -= deserializer_->feed(data);
@@ -30,29 +30,29 @@ ParseResponse RequestHeaderParser::parse(absl::string_view& data) {
     const int32_t consumed = static_cast<int32_t>(orig_data.size() - data.size());
     context_->remaining_request_size_ -= consumed;
     context_->request_header_ = {-1, -1, -1, absl::nullopt};
-    return ParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
+    return RequestParseResponse::nextParser(std::make_shared<SentinelParser>(context_));
   }
 
   if (deserializer_->ready()) {
     RequestHeader request_header = deserializer_->get();
     context_->request_header_ = request_header;
-    ParserSharedPtr next_parser = parser_resolver_.createParser(
+    RequestParserSharedPtr next_parser = parser_resolver_.createParser(
         request_header.api_key_, request_header.api_version_, context_);
-    return ParseResponse::nextParser(next_parser);
+    return RequestParseResponse::nextParser(next_parser);
   } else {
-    return ParseResponse::stillWaiting();
+    return RequestParseResponse::stillWaiting();
   }
 }
 
-ParseResponse SentinelParser::parse(absl::string_view& data) {
+RequestParseResponse SentinelParser::parse(absl::string_view& data) {
   const size_t min = std::min<size_t>(context_->remaining_request_size_, data.size());
   data = {data.data() + min, data.size() - min};
   context_->remaining_request_size_ -= min;
   if (0 == context_->remaining_request_size_) {
-    return ParseResponse::parsedMessage(
-        std::make_shared<UnknownRequest>(context_->request_header_));
+    return RequestParseResponse::parseFailure(
+        std::make_shared<RequestParseFailure>(context_->request_header_));
   } else {
-    return ParseResponse::stillWaiting();
+    return RequestParseResponse::stillWaiting();
   }
 }
 

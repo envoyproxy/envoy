@@ -121,15 +121,20 @@ public:
   /**
    * Stores the message.
    */
-  virtual void onMessage(MessageSharedPtr request) override;
+  virtual void onMessage(AbstractRequestSharedPtr request) override;
 
   /**
    * Returns the stored messages.
    */
-  const std::vector<MessageSharedPtr>& getCaptured() const;
+  const std::vector<AbstractRequestSharedPtr>& getCaptured() const;
+
+  virtual void onFailedParse(RequestParseFailureSharedPtr failure_data) override;
+
+  const std::vector<RequestParseFailureSharedPtr>& getParseFailures() const;
 
 private:
-  std::vector<MessageSharedPtr> captured_;
+  std::vector<AbstractRequestSharedPtr> captured_;
+  std::vector<RequestParseFailureSharedPtr> parse_failures_;
 };
 
 typedef std::shared_ptr<CapturingRequestCallback> CapturingRequestCallbackSharedPtr;

@@ -19,10 +19,21 @@ const char* getRawData(const Buffer::OwnedImpl& buffer) {
   return reinterpret_cast<const char*>((slices[0]).mem_);
 }
 
-void CapturingRequestCallback::onMessage(MessageSharedPtr message) { captured_.push_back(message); }
+void CapturingRequestCallback::onMessage(AbstractRequestSharedPtr message) {
+  captured_.push_back(message);
+}
 
-const std::vector<MessageSharedPtr>& CapturingRequestCallback::getCaptured() const {
+void CapturingRequestCallback::onFailedParse(RequestParseFailureSharedPtr failure_data) {
+  parse_failures_.push_back(failure_data);
+}
+
+const std::vector<AbstractRequestSharedPtr>& CapturingRequestCallback::getCaptured() const {
   return captured_;
+}
+
+const std::vector<RequestParseFailureSharedPtr>&
+CapturingRequestCallback::getParseFailures() const {
+  return parse_failures_;
 }
 
 } // namespace Kafka
