@@ -232,10 +232,9 @@ bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length) {
     uint64_t length;
-    // TODO(dnoe): Make StringUtil::atoull and friends string_view friendly.
-    const std::string content_length_str(content_length->value().getStringView());
-    const bool is_minimum_content_length = StringUtil::atoull(content_length_str.c_str(), length) &&
-                                           length >= config_->minimumLength();
+    const bool is_minimum_content_length =
+        absl::SimpleAtoi(content_length->value().getStringView(), &length) &&
+        length >= config_->minimumLength();
     if (!is_minimum_content_length) {
       config_->stats().content_length_too_small_.inc();
     }
