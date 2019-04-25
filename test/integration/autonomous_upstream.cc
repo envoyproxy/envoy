@@ -4,7 +4,7 @@ namespace Envoy {
 namespace {
 
 void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeaderMapImpl& headers) {
-  absl::string_view header_value(headers.get_(header_name));
+  const std::string header_value(headers.get_(header_name));
   if (!header_value.empty()) {
     uint64_t parsed_value;
     RELEASE_ASSERT(absl::SimpleAtoi(header_value, &parsed_value) &&
