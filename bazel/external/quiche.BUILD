@@ -291,7 +291,7 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     copts = envoy_copts("@envoy") + [
-        "-Wno-error=unused-parameter",
+        "-Wno-unused-parameter",
     ],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_mem_slice_span_impl_lib"],
 )
@@ -344,7 +344,7 @@ cc_library(
     # Need to use same compiler options as envoy_cc_library uses to enforce compiler version and c++ version.
     copts = envoy_copts("@envoy") + [
         "-Wno-error=invalid-offsetof",
-        "-Wno-error=unused-parameter",
+        "-Wno-unused-parameter",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -414,7 +414,7 @@ cc_library(
     # QUIC uses offsetof() to optimize memory usage in frames.
     copts = envoy_copts("@envoy") + [
         "-Wno-error=invalid-offsetof",
-        "-Wno-error=unused-parameter",
+        "-Wno-unused-parameter",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -446,7 +446,10 @@ cc_library(
         ],
         "@envoy",
     ),
-    copts = envoy_copts("@envoy") + ["-Wno-error=invalid-offsetof"],
+    copts = envoy_copts("@envoy") + [
+    	"-Wno-error=invalid-offsetof",
+    	"-Wno-unused-parameter",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_quic_core_base",
@@ -469,6 +472,7 @@ envoy_cc_test(
         "@envoy",
     ),
     repository = "@envoy",
+    copts = ["-Wno-unused-parameter"],
     deps = [
         ":quic_buffer_allocator_lib",
         ":quic_platform",
