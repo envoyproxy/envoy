@@ -9,7 +9,12 @@ set -x
 
 # This is the target that will be run to generate coverage data. It can be overridden by consumer
 # projects that want to run coverage on a different/combined target.
-[[ -z "${COVERAGE_TARGET}" ]] && COVERAGE_TARGET="//test/..."
+#[[ -z "${COVERAGE_TARGET}" ]] && COVERAGE_TARGET="//test/..."
+[[ -z "${COVERAGE_TARGET}" ]] && COVERAGE_TARGET="//test/coverage:coverage_tests"
+
+# Make sure ${COVERAGE_TARGET} is up-to-date.
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+(BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh)
 
 # Generate coverage data.
 "${BAZEL_COVERAGE}" coverage ${BAZEL_TEST_OPTIONS} \
@@ -18,7 +23,7 @@ set -x
   --instrumentation_filter=//source/...,//include/... \
   --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main \
   --combined_report=lcov \
-  --define ENVOY_CONFIG_COVERAGE=1 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --copt=-DNDEBUG --test_tag_filters=coverage_test
+  --define ENVOY_CONFIG_COVERAGE=1 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --copt=-DNDEBUG
 
 # Generate HTML
 declare -r COVERAGE_DIR="${SRCDIR}"/generated/coverage

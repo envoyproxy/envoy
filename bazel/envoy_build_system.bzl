@@ -449,7 +449,7 @@ def envoy_cc_test(
     test_lib_tags = []
     if coverage:
         test_lib_tags.append("coverage_test_lib")
-        tags = tags + ['coverage_test']
+        tags = tags + ["coverage_test"]
 
     envoy_cc_test_library(
         name = name + "_lib",
