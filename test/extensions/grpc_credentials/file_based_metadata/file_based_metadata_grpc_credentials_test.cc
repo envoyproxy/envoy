@@ -19,7 +19,8 @@ namespace {
 class GrpcFileBasedMetadataClientIntegrationTest : public GrpcSslClientIntegrationTest {
 public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
-    fake_stream.waitForHeadersComplete();
+    AssertionResult result = fake_stream.waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
     if (!header_value_1_.empty()) {
       EXPECT_EQ(header_prefix_1_ + header_value_1_, stream_headers.get_(header_key_1_));
@@ -76,8 +77,8 @@ secret_data:
 };
 
 // Parameterize the loopback test server socket address and gRPC client type.
-INSTANTIATE_TEST_CASE_P(SslIpVersionsClientType, GrpcFileBasedMetadataClientIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcFileBasedMetadataClientIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Validate that a simple request-reply unary RPC works with FileBasedMetadata auth.
 TEST_P(GrpcFileBasedMetadataClientIntegrationTest, FileBasedMetadataGrpcAuthRequest) {

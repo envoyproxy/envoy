@@ -18,17 +18,22 @@
 using testing::ElementsAre;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+namespace {
 
-class LoadBalancerTestBase : public ::testing::TestWithParam<bool> {
+class LoadBalancerTestBase : public testing::TestWithParam<bool> {
 protected:
-  // Run all tests aginst both priority 0 and priority 1 host sets, to ensure
+  // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functonality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 
-  LoadBalancerTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {}
+  LoadBalancerTestBase() : stats_(ClusterInfoImpl::generateStats(stats_store_)) {
+    least_request_lb_config_.mutable_choice_count()->set_value(2);
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -38,6 +43,7 @@ protected:
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config_;
 };
 
 class TestLb : public LoadBalancerBase {
@@ -47,49 +53,80 @@ public:
          const envoy::api::v2::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
+  using LoadBalancerBase::isInPanic;
+  using LoadBalancerBase::percentageDegradedLoad;
   using LoadBalancerBase::percentageLoad;
+
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
 public:
-  void updateHostSet(MockHostSet& host_set, uint32_t num_hosts, uint32_t num_healthy_hosts) {
-    ASSERT(num_healthy_hosts <= num_hosts);
+  void updateHostSet(MockHostSet& host_set, uint32_t num_hosts, uint32_t num_healthy_hosts,
+                     uint32_t num_degraded_hosts = 0) {
+    ASSERT(num_healthy_hosts + num_degraded_hosts <= num_hosts);
 
     host_set.hosts_.clear();
     host_set.healthy_hosts_.clear();
+    host_set.degraded_hosts_.clear();
     for (uint32_t i = 0; i < num_hosts; ++i) {
       host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
     }
-    for (uint32_t i = 0; i < num_healthy_hosts; ++i) {
+    uint32_t i = 0;
+    for (; i < num_healthy_hosts; ++i) {
       host_set.healthy_hosts_.push_back(host_set.hosts_[i]);
+    }
+    for (; i < num_degraded_hosts; ++i) {
+      host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
     }
     host_set.runCallbacks({}, {});
   }
 
-  std::vector<uint32_t> getLoadPercentage() {
-    std::vector<uint32_t> ret;
+  template <typename T, typename FUNC>
+  std::vector<T> aggregatePrioritySetsValues(TestLb& lb, FUNC func) {
+    std::vector<T> ret;
+
     for (size_t i = 0; i < priority_set_.host_sets_.size(); ++i) {
-      ret.push_back(lb_.percentageLoad(i));
+      ret.push_back((lb.*func)(i));
     }
+
     return ret;
+  }
+
+  std::vector<uint32_t> getLoadPercentage() {
+    return aggregatePrioritySetsValues<uint32_t>(lb_, &TestLb::percentageLoad);
+  }
+
+  std::vector<uint32_t> getDegradedLoadPercentage() {
+    return aggregatePrioritySetsValues<uint32_t>(lb_, &TestLb::percentageDegradedLoad);
+  }
+
+  std::vector<bool> getPanic() {
+    return aggregatePrioritySetsValues<bool>(lb_, &TestLb::isInPanic);
   }
 
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
   TestLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
 };
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LoadBalancerBaseTest, ::testing::Values(true));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LoadBalancerBaseTest, ::testing::Values(true));
 
 // Basic test of host set selection.
 TEST_P(LoadBalancerBaseTest, PrioritySelection) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 0);
 
+  HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({100, 0, 0}),
+                                       Upstream::DegradedLoad({0, 0, 0})};
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
-  EXPECT_EQ(&host_set_, &lb_.chooseHostSet());
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
   // Update the priority set with a new priority level P=2 and ensure the host
   // is chosen
@@ -98,7 +135,8 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet());
+  priority_load.healthy_priority_load_ = HealthyLoad({0u, 0u, 100});
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
   updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
@@ -106,36 +144,145 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   host_set_.runCallbacks({}, {});
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(2));
-  EXPECT_EQ(&host_set_, &lb_.chooseHostSet());
+  priority_load.healthy_priority_load_ = HealthyLoad({100u, 0u, 0u});
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet());
+  priority_load.healthy_priority_load_ = HealthyLoad({0u, 0u, 100});
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
+}
+
+// Tests host selection with a randomized number of healthy, degraded and unhealthy hosts.
+TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
+  TestRandomGenerator rand;
+
+  // Determine total number of hosts.
+  const auto total_hosts = 1 + (rand.random() % 10);
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  const auto host_set_hosts = rand.random() % total_hosts;
+
+  if (host_set_hosts == 0) {
+    updateHostSet(host_set_, 0, 0);
+  } else {
+    // We get on average 50% healthy hosts, 25% degraded hosts and 25% unhealthy hosts.
+    const auto healthy_hosts = rand.random() % host_set_hosts;
+    const auto degraded_hosts = rand.random() % (host_set_hosts - healthy_hosts);
+    const auto unhealthy_hosts = host_set_hosts - healthy_hosts - degraded_hosts;
+
+    updateHostSet(host_set_, host_set_hosts, unhealthy_hosts, degraded_hosts);
+  }
+
+  const auto failover_set_hosts = total_hosts - host_set_hosts;
+
+  if (host_set_hosts == 0) {
+    updateHostSet(failover_host_set_, 0, 0);
+  } else {
+    // We get on average 50% healthy hosts, 25% degraded hosts and 25% unhealthy hosts.
+    const auto healthy_hosts = rand.random() % failover_set_hosts;
+    const auto degraded_hosts = rand.random() % (failover_set_hosts - healthy_hosts);
+    const auto unhealthy_hosts = failover_set_hosts - healthy_hosts - degraded_hosts;
+
+    updateHostSet(failover_host_set_, failover_set_hosts, unhealthy_hosts, degraded_hosts);
+  }
+
+  EXPECT_CALL(context, determinePriorityLoad(_, _))
+      .WillRepeatedly(
+          Invoke([](const auto&, const auto& original_load) -> const HealthyAndDegradedLoad& {
+            return original_load;
+          }));
+
+  for (uint64_t i = 0; i < total_hosts; ++i) {
+    const auto hs = lb_.chooseHostSet(&context);
+    switch (hs.second) {
+    case LoadBalancerBase::HostAvailability::Healthy:
+      // Either we selected one of the healthy hosts or we failed to select anything and defaulted
+      // to healthy.
+      EXPECT_TRUE(!hs.first.healthyHosts().empty() ||
+                  (hs.first.healthyHosts().empty() && hs.first.degradedHosts().empty()));
+      break;
+    case LoadBalancerBase::HostAvailability::Degraded:
+      EXPECT_FALSE(hs.first.degradedHosts().empty());
+      break;
+    }
+  }
+}
+
+// Test of host set selection with priority filter
+TEST_P(LoadBalancerBaseTest, PrioritySelectionWithFilter) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({0u, 100u}),
+                                       Upstream::DegradedLoad({0, 0})};
+  // return a filter that excludes priority 0
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+
+  updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 1, 1);
+
+  // Since we've excluded P0, we should pick the failover host set
+  EXPECT_EQ(failover_host_set_.priority(), lb_.chooseHostSet(&context).first.priority());
+
+  updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */,
+                1 /* num_degraded_hosts */);
+  updateHostSet(failover_host_set_, 1, 0, 1);
+
+  // exclude priority 0 for degraded hosts
+  priority_load.healthy_priority_load_ = Upstream::HealthyLoad({0, 0});
+  priority_load.degraded_priority_load_ = Upstream::DegradedLoad({0, 100});
+
+  // Since we've excluded P0, we should pick the failover host set
+  EXPECT_EQ(failover_host_set_.priority(), lb_.chooseHostSet(&context).first.priority());
+}
+
+TEST_P(LoadBalancerBaseTest, OverProvisioningFactor) {
+  // Default overprovisioning factor 1.4 makes P0 receives 70% load.
+  updateHostSet(host_set_, 4, 2);
+  updateHostSet(failover_host_set_, 4, 2);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(70, 30));
+
+  // Set overprovisioning factor to 1, now it should be proportioned to healthy ratio.
+  host_set_.setOverprovisioningFactor(100);
+  updateHostSet(host_set_, 4, 2);
+  failover_host_set_.setOverprovisioningFactor(100);
+  updateHostSet(failover_host_set_, 4, 2);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
 }
 
 TEST_P(LoadBalancerBaseTest, GentleFailover) {
   // With 100% of P=0 hosts healthy, P=0 gets all the load.
+  // None of the levels is in Panic mode
   updateHostSet(host_set_, 1, 1);
   updateHostSet(failover_host_set_, 1, 1);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(100, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false));
 
   // Health P=0 == 50*1.4 == 70
+  // Total health = 70 + 70 >= 100%. None of the levels should be in panic mode.
   updateHostSet(host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(70, 30));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false));
 
   // Health P=0 == 25*1.4 == 35   P=1 is healthy so takes all spillover.
+  // Total health = 35+100 >= 100%. P=0 is below Panic level but it is ignored, because
+  // Total health >= 100%.
   updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 2 /* num_hosts */, 2 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(35, 65));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false));
 
   // Health P=0 == 25*1.4 == 35   P=1 == 35
   // Health is then scaled up by (100 / (35 + 35) == 50)
+  // Total health = 35% + 35% is less than 100%. Panic levels per priority kick in.
   updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true));
 }
 
 TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
@@ -145,6 +292,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 1, 1);
   updateHostSet(tertiary_host_set_, 1, 1);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(100, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
 
   // Health P=0 == 50*1.4 == 70
   // Health P=0 == 50, so can take the 30% spillover.
@@ -152,12 +300,14 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(70, 30, 0));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
 
   // Health P=0 == 25*1.4 == 35   P=1 is healthy so takes all spillover.
   updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 2 /* num_hosts */, 2 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 2 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(35, 65, 0));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
 
   // This is the first test where health (P=0 + P=1 < 100)
   // Health P=0 == 25*1.4 == 35   P=1 == 35  P=2 == 35
@@ -165,6 +315,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(35, 35, 30));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
 
   // This is the first test where (health P=0 + P=1 < 100)
   // Health P=0 == 25*1.4 == 35   P=1 == 35  P=2 == 35
@@ -172,6 +323,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(35, 35, 30));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
 
   // Now all health is (20% * 1.5 == 28). 28 * 3 < 100 so we have to scale.
   // Each Priority level gets 33% of the load, with P=0 picking up the rounding error.
@@ -179,6 +331,85 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(failover_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+
+  // Levels P=0 and P=1 are totally down. P=2 is totally healthy.
+  // 100% of the traffic should go to P=2 and P=0 and P=1 should
+  // not be in panic mode.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 5 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
+
+  // Levels P=0 and P=1 are totally down. P=2 is 80*1.4 >= 100% healthy.
+  // 100% of the traffic should go to P=2 and P=0 and P=1 should
+  // not be in panic mode.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 4 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
+
+  // Levels P=0 and P=1 are totally down. P=2 is 40*1.4=56%% healthy.
+  // 100% of the traffic should go to P=2. All levels P=0, P=1 and P=2 should
+  // be in panic mode even though P=0 and P=1 do not receive any load.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 100));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+
+  // Level P=0 is totally degraded. P=1 is 40*1.4=56% healthy and 40*1.4=56% degraded. P=2 is
+  // 40*1.4=56%% healthy. 100% of the traffic should go to P=2. No priorities should be in panic
+  // mode.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                5 /* num_degraded_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */,
+                2 /* num_degraded_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 56, 44));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
+
+  // All levels are completely down. 100% of traffic should go to P=0
+  // and P=0 should be in panic mode
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(100, _, _));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(true, _, _));
+
+  // Rounding errors should be picked up by the first healthy priority.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 2 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 67, 33));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+
+  // Load should spill over into degraded.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                1 /* num_degraded_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                5 /* num_degraded_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 28));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(28, 44, 0));
+
+  // Rounding errors should be picked up by the first priority with degraded hosts when
+  // there are no healthy priorities.
+  updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                2 /* num_degraded_hosts */);
+  updateHostSet(tertiary_host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
+                1 /* num_degraded_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 67, 33));
 }
 
 TEST_P(LoadBalancerBaseTest, BoundaryConditions) {
@@ -198,14 +429,13 @@ public:
   void init(bool need_local_cluster) {
     if (need_local_cluster) {
       local_priority_set_.reset(new PrioritySetImpl());
-      local_host_set_ = reinterpret_cast<HostSetImpl*>(&local_priority_set_->getOrCreateHostSet(0));
+      local_priority_set_->getOrCreateHostSet(0);
     }
     lb_.reset(new RoundRobinLoadBalancer(priority_set_, local_priority_set_.get(), stats_, runtime_,
                                          random_, common_config_));
   }
 
   std::shared_ptr<PrioritySetImpl> local_priority_set_;
-  HostSetImpl* local_host_set_{nullptr};
   std::shared_ptr<LoadBalancer> lb_;
   HostsPerLocalityConstSharedPtr empty_locality_;
   HostVector empty_host_vector_;
@@ -218,6 +448,26 @@ typedef RoundRobinLoadBalancerTest FailoverTest;
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(FailoverTest, BasicFailover) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
+  init(false);
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+}
+
+// Ensure if all the hosts with priority 0 degraded, the first priority degraded hosts are used.
+TEST_P(FailoverTest, BasicDegradedHosts) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  host_set_.degraded_hosts_ = host_set_.hosts_;
+  failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
+  init(false);
+  EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->chooseHost(nullptr));
+}
+
+// Ensure if all the hosts with priority 0 degraded, but healthy hosts in the failover, the healthy
+// hosts in the second priority are used.
+TEST_P(FailoverTest, BasicFailoverDegradedHosts) {
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  host_set_.degraded_hosts_ = host_set_.hosts_;
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
@@ -303,12 +553,16 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   // Update the local hosts. We're not doing locality based routing in this
   // test, but it should at least do no harm.
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
-  local_priority_set_->getOrCreateHostSet(0).updateHosts(
-      hosts, hosts, empty_locality_, empty_locality_, {}, empty_host_vector_, empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(hosts, HostsPerLocalityImpl::empty(),
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     HostsPerLocalityImpl::empty()),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, FailoverTest, ::testing::Values(true));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, FailoverTest, ::testing::Values(true));
 
 TEST_P(RoundRobinLoadBalancerTest, NoHosts) {
   init(false);
@@ -359,24 +613,53 @@ TEST_P(RoundRobinLoadBalancerTest, Locality) {
   hostSet().healthy_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(false);
-  // chooseLocality() return value determines which locality we use.
-  EXPECT_CALL(hostSet(), chooseLocality()).WillOnce(Return(0));
+  // chooseHealthyLocality() return value determines which locality we use.
+  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_CALL(hostSet(), chooseLocality()).WillOnce(Return(1));
+  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_CALL(hostSet(), chooseLocality()).WillOnce(Return(0));
+  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_CALL(hostSet(), chooseLocality()).WillOnce(Return(1));
+  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(1));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_CALL(hostSet(), chooseLocality()).WillOnce(Return(0));
+  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
   // When there is no locality, we RR over all available hosts.
-  EXPECT_CALL(hostSet(), chooseLocality()).WillOnce(Return(absl::optional<uint32_t>()));
+  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(absl::optional<uint32_t>()));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_CALL(hostSet(), chooseLocality()).WillOnce(Return(absl::optional<uint32_t>()));
+  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(absl::optional<uint32_t>()));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_CALL(hostSet(), chooseLocality()).WillOnce(Return(absl::optional<uint32_t>()));
+  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(absl::optional<uint32_t>()));
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+}
+
+TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80"),
+                                            makeTestHost(info_, "tcp://127.0.0.1:81"),
+                                            makeTestHost(info_, "tcp://127.0.0.1:84")}));
+  HostVectorSharedPtr healthy_hosts(new HostVector({(*hosts)[0]}));
+  HostVectorSharedPtr degraded_hosts(new HostVector({(*hosts)[1], (*hosts)[2]}));
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{(*hosts)[0]}, {(*hosts)[1], (*hosts)[2]}});
+  HostsPerLocalitySharedPtr healthy_hosts_per_locality = makeHostsPerLocality({{(*hosts)[0]}, {}});
+  HostsPerLocalitySharedPtr degraded_hosts_per_locality =
+      makeHostsPerLocality({{}, {(*hosts)[1], (*hosts)[2]}});
+
+  hostSet().hosts_ = *hosts;
+  hostSet().healthy_hosts_ = *healthy_hosts;
+  hostSet().degraded_hosts_ = *degraded_hosts;
+  hostSet().hosts_per_locality_ = hosts_per_locality;
+  hostSet().healthy_hosts_per_locality_ = healthy_hosts_per_locality;
+  hostSet().degraded_hosts_per_locality_ = degraded_hosts_per_locality;
+  init(false);
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(50)).WillOnce(Return(0));
+  // Since we're split between healthy and degraded, the LB should call into both
+  // chooseHealthyLocality and chooseDegradedLocality.
+  EXPECT_CALL(hostSet(), chooseDegradedLocality()).WillOnce(Return(1));
+  EXPECT_EQ(hostSet().degraded_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
 
 TEST_P(RoundRobinLoadBalancerTest, Weighted) {
@@ -481,6 +764,51 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
 }
 
+// Test of host set selection with host filter
+TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  HostVectorSharedPtr hosts(new HostVector(
+      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")}));
+  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality(
+      {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}});
+
+  hostSet().hosts_ = *hosts;
+  hostSet().healthy_hosts_ = *hosts;
+  hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
+
+  init(false);
+
+  // return a predicate that only accepts the first host
+  EXPECT_CALL(context, shouldSelectAnotherHost(_))
+      .WillRepeatedly(Invoke([&](const Host& host) -> bool {
+        return host.address()->asString() != hostSet().hosts_[0]->address()->asString();
+      }));
+  HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({0, 0}),
+                                       Upstream::DegradedLoad({0, 0})};
+
+  if (GetParam()) {
+    priority_load.healthy_priority_load_ = HealthyLoad({100u, 0u});
+  } else {
+    priority_load.healthy_priority_load_ = HealthyLoad({0u, 100u});
+  }
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(2));
+
+  // Calling chooseHost multiple times always returns host one, since the filter will reject
+  // the other host.
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
+
+  // By setting the retry counter to zero, we effectively disable the filter.
+  EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(0));
+
+  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(&context));
+}
+
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80"),
                                             makeTestHost(info_, "tcp://127.0.0.1:81"),
@@ -497,8 +825,12 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
   common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
-                               empty_host_vector_, empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 0))
       .WillRepeatedly(Return(50));
@@ -521,8 +853,12 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 7))
       .WillRepeatedly(Return(1));
   // Trigger reload.
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
-                               empty_host_vector_, empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
 }
 
@@ -547,8 +883,12 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
   common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
   common_config_.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(7);
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, local_hosts_per_locality, local_hosts_per_locality, {},
-                               empty_host_vector_, empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(hosts, local_hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     local_hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 100))
       .WillRepeatedly(Return(50));
@@ -584,8 +924,12 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
-                               empty_host_vector_, empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
@@ -632,9 +976,12 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
   hostSet().hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality,
-                               local_hosts_per_locality, {}, empty_host_vector_,
-                               empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*local_hosts),
+                                     local_hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
@@ -703,9 +1050,12 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
 
   // To trigger update callback.
   auto local_hosts_per_locality_shared = makeHostsPerLocality(std::move(local_hosts_per_locality));
-  local_host_set_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality_shared,
-                               local_hosts_per_locality_shared, {}, empty_host_vector_,
-                               empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality_shared,
+                                     std::make_shared<const HealthyHostVector>(*local_hosts),
+                                     local_hosts_per_locality_shared),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // Force request out of small zone and to randomly select zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
@@ -725,8 +1075,12 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
-                               empty_host_vector_, empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
 
@@ -740,8 +1094,12 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, {},
-                               empty_host_vector_, empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*hosts),
+                                     hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // local zone has no healthy hosts, take from the all healthy hosts.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -761,7 +1119,6 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   HostsPerLocalitySharedPtr local_hosts_per_locality = makeHostsPerLocality({{}, {}});
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
-      .WillOnce(Return(50))
       .WillOnce(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillOnce(Return(true));
@@ -772,9 +1129,12 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   hostSet().hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality,
-                               local_hosts_per_locality, {}, empty_host_vector_,
-                               empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*local_hosts),
+                                     local_hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // Local cluster is not OK, we'll do regular routing.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -801,9 +1161,12 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   hostSet().hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
-  local_host_set_->updateHosts(local_hosts, local_hosts, local_hosts_per_locality,
-                               local_hosts_per_locality, {}, empty_host_vector_,
-                               empty_host_vector_);
+  local_priority_set_->updateHosts(
+      0,
+      HostSetImpl::updateHostsParams(local_hosts, local_hosts_per_locality,
+                                     std::make_shared<const HealthyHostVector>(*local_hosts),
+                                     local_hosts_per_locality),
+      {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
 
   // Local cluster is not OK, we'll do regular routing.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
@@ -811,12 +1174,13 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
-                        ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
+                         ::testing::Values(true, false));
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  LeastRequestLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_config_};
+  LeastRequestLoadBalancer lb_{
+      priority_set_, nullptr, stats_, runtime_, random_, common_config_, least_request_lb_config_};
 };
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
@@ -864,8 +1228,6 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
   stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
@@ -876,6 +1238,54 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+}
+
+TEST_P(LeastRequestLoadBalancerTest, PNC) {
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
+  stats_.max_host_weight_.set(1UL);
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(4);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(3);
+  hostSet().healthy_hosts_[2]->stats().rq_active_.set(2);
+  hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
+
+  // Creating various load balancer objects with different choice configs.
+  envoy::api::v2::Cluster::LeastRequestLbConfig lr_lb_config;
+  lr_lb_config.mutable_choice_count()->set_value(2);
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
+                                random_,       common_config_, lr_lb_config};
+  lr_lb_config.mutable_choice_count()->set_value(5);
+  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,      runtime_,
+                                random_,       common_config_, lr_lb_config};
+
+  // Verify correct number of choices.
+
+  // 0 choices configured should default to P2C.
+  EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+
+  // 2 choices configured results in P2C.
+  EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+
+  // 5 choices configured results in P5C.
+  EXPECT_CALL(random_, random()).Times(6).WillRepeatedly(Return(0));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_5.chooseHost(nullptr));
+
+  // Verify correct host chosen in P5C scenario.
+  EXPECT_CALL(random_, random())
+      .Times(6)
+      .WillOnce(Return(0))
+      .WillOnce(Return(3))
+      .WillOnce(Return(0))
+      .WillOnce(Return(3))
+      .WillOnce(Return(2))
+      .WillOnce(Return(1));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
@@ -943,8 +1353,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
 }
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
-                        ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, LeastRequestLoadBalancerTest,
+                         ::testing::Values(true, false));
 
 class RandomLoadBalancerTest : public LoadBalancerTestBase {
 public:
@@ -964,7 +1374,7 @@ TEST_P(RandomLoadBalancerTest, Normal) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 }
 
-INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RandomLoadBalancerTest, ::testing::Values(true, false));
+INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RandomLoadBalancerTest, ::testing::Values(true, false));
 
 TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
   auto subset_info =
@@ -998,5 +1408,6 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   EXPECT_EQ(subset_info.subsetKeys()[0], std::set<std::string>({"selector_key"}));
 }
 
+} // namespace
 } // namespace Upstream
 } // namespace Envoy

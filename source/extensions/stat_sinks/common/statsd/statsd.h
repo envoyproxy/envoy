@@ -2,12 +2,18 @@
 
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/connection.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/sink.h"
+#include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/tag.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/macros.h"
+#include "common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,15 +30,15 @@ class Writer : public ThreadLocal::ThreadLocalObject {
 public:
   Writer(Network::Address::InstanceConstSharedPtr address);
   // For testing.
-  Writer() : fd_(-1) {}
+  Writer() : io_handle_(std::make_unique<Network::IoSocketHandleImpl>()) {}
   virtual ~Writer();
 
   virtual void write(const std::string& message);
   // Called in unit test to validate address.
-  int getFdForTests() const { return fd_; };
+  int getFdForTests() const { return io_handle_->fd(); }
 
 private:
-  int fd_;
+  Network::IoHandlePtr io_handle_;
 };
 
 /**

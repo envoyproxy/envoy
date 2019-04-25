@@ -3,26 +3,23 @@
 External Authorization
 ======================
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
-* :ref:`HTTP filter v2 API reference <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`
+* :ref:`HTTP filter v2 API reference <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`
+* This filter should be configured with the name *envoy.ext_authz*.
 
-The external authorization HTTP filter calls an external gRPC or HTTP service to check if the incoming
+The external authorization filter calls an external gRPC or HTTP service to check whether an incoming
 HTTP request is authorized or not.
-If the request is deemed unauthorized then the request will be denied normally with 403 (Forbidden) response.
-Note that sending additional custom metadata from the authorization service to the upstream, or to the downstream is 
-also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`.
+If the request is deemed unauthorized, then the request will be denied normally with 403 (Forbidden) response.
+Note that sending additional custom metadata from the authorization service to the upstream, to the downstream or to the authorization service is
+also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`.
 
-.. tip::
-  It is recommended that this filter is configured first in the filter chain so that requests are
-  authorized prior to the rest of filters processing the request.
-
-The content of the requests that are passed to an authorization service is specified by 
-:ref:`CheckRequest <envoy_api_msg_service.auth.v2alpha.CheckRequest>`.
+The content of the requests that are passed to an authorization service is specified by
+:ref:`CheckRequest <envoy_api_msg_service.auth.v2.CheckRequest>`.
 
 .. _config_http_filters_ext_authz_http_configuration:
 
 The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You can see all the
 configuration options at
-:ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`.
+:ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2.ExtAuthz>`.
 
 Configuration Examples
 -----------------------------
@@ -35,8 +32,11 @@ A sample filter configuration for a gRPC authorization server:
     - name: envoy.ext_authz
       config:
         grpc_service:
-           envoy_grpc:
-             cluster_name: ext-authz
+          envoy_grpc:
+            cluster_name: ext-authz
+
+          # Default is 200ms; override if your server needs e.g. warmup time.
+          timeout: 0.5s
 
 .. code-block:: yaml
 
@@ -44,8 +44,19 @@ A sample filter configuration for a gRPC authorization server:
     - name: ext-authz
       type: static
       http2_protocol_options: {}
-      hosts:
-        - socket_address: { address: 127.0.0.1, port_value: 10003 }
+      load_assignment:
+        cluster_name: ext-authz
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 10003
+
+      # This timeout controls the initial TCP handshake timeout - not the timeout for the
+      # entire request.
+      connect_timeout: 0.25s
 
 A sample filter configuration for a raw HTTP authorization server:
 
@@ -60,19 +71,55 @@ A sample filter configuration for a raw HTTP authorization server:
               cluster: ext-authz
               timeout: 0.25s
               failure_mode_allow: false
-  
+
 .. code-block:: yaml
-  
+
   clusters:
     - name: ext-authz
       connect_timeout: 0.25s
       type: logical_dns
       lb_policy: round_robin
-      hosts:
-        - socket_address: { address: 127.0.0.1, port_value: 10003 }
+      load_assignment:
+        cluster_name: ext-authz
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 10003
+
+Per-Route Configuration
+-----------------------
+
+A sample virtual host and route filter configuration.
+In this example we add additional context on the virtual host, and disabled the filter for `/static` prefixed routes.
+
+.. code-block:: yaml
+
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      per_filter_config:
+        envoy.ext_authz:
+          check_settings:
+            context_extensions:
+              virtual_host: local_service
+      routes:
+      - match: { prefix: "/static" }
+        route: { cluster: some_service }
+        per_filter_config:
+          envoy.ext_authz:
+            disabled: true
+      - match: { prefix: "/" }
+        route: { cluster: some_service }
 
 Statistics
 ----------
+.. _config_http_filters_ext_authz_stats:
+
 The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_authz.* namespace.
 
 .. csv-table::
@@ -82,5 +129,5 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   ok, Counter, Total responses from the filter.
   error, Counter, Total errors contacting the external service.
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
-  failure_mode_allow, Counter, "Total requests that were error(s) but were allowed through because
+  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of failure_mode_allow set to true."

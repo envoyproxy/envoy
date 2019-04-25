@@ -35,7 +35,7 @@ void Util::addArrayToJson(std::string& target, const std::vector<std::string>& j
                           const std::string& field_name) {
   std::string stringified_json_array = "[";
 
-  if (json_array.size() > 0) {
+  if (!json_array.empty()) {
     stringified_json_array += json_array[0];
     for (auto it = json_array.begin() + 1; it != json_array.end(); it++) {
       stringified_json_array += ",";
@@ -47,9 +47,9 @@ void Util::addArrayToJson(std::string& target, const std::vector<std::string>& j
   mergeJsons(target, stringified_json_array, field_name);
 }
 
-uint64_t Util::generateRandom64() {
+uint64_t Util::generateRandom64(TimeSource& time_source) {
   uint64_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                      time_source.systemTime().time_since_epoch())
                       .count();
   std::mt19937_64 rand_64(seed);
   return rand_64();

@@ -1,9 +1,15 @@
 syntax = "proto3";
 
 package envoy.config.filter.network.rate_limit.v2;
+
+option java_outer_classname = "RateLimitProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.network.rate_limit.v2";
 option go_package = "v2";
 
 import "envoy/api/v2/ratelimit/ratelimit.proto";
+import "envoy/config/ratelimit/v2/rls.proto";
+
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
@@ -26,4 +32,16 @@ message RateLimit {
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.
   google.protobuf.Duration timeout = 4 [(gogoproto.stdduration) = true];
+
+  // The filter's behaviour in case the rate limiting service does
+  // not respond back. When it is set to true, Envoy will not allow traffic in case of
+  // communication failure between rate limiting service and the proxy.
+  // Defaults to false.
+  bool failure_mode_deny = 5;
+
+  // Configuration for an external rate limit service provider. If not
+  // specified, any calls to the rate limit service will immediately return
+  // success.
+  envoy.config.ratelimit.v2.RateLimitServiceConfig rate_limit_service = 6
+      [(validate.rules).message.required = true];
 }

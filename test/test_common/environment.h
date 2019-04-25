@@ -120,7 +120,7 @@ public:
              Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
   /**
-   * Substitute ports, paths, and IP loopback addressses in a JSON file in the
+   * Substitute ports, paths, and IP loopback addresses in a JSON file in the
    * private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
    * @param port_map map from port name to port number.
@@ -130,7 +130,7 @@ public:
   static std::string temporaryFileSubstitute(const std::string& path, const PortMap& port_map,
                                              Network::Address::IpVersion version);
   /**
-   * Substitute ports, paths, and IP loopback addressses in a JSON file in the
+   * Substitute ports, paths, and IP loopback addresses in a JSON file in the
    * private writable test temporary directory.
    * @param path path prefix for the input file with port and path templates.
    * @param param_map map from parameter name to values.
@@ -172,8 +172,35 @@ public:
    * Dumps the contents of the file into the string.
    *
    * @param filename: the fully qualified name of the file to use
+   * @param require_existence if true, RELEASE_ASSERT if the file does not exist.
+   *   If false, an empty string will be returned if the file is not present.
    * @return string the contents of the file.
    */
-  static std::string readFileToStringForTest(const std::string& filename);
+  static std::string readFileToStringForTest(const std::string& filename,
+                                             bool require_existence = true);
+
+  /**
+   * Create a path on the filesystem (mkdir -p ... equivalent).
+   * @param path.
+   */
+  static void createPath(const std::string& path);
+
+  /**
+   * Create a parent path on the filesystem (mkdir -p $(dirname ...) equivalent).
+   * @param path.
+   */
+  static void createParentPath(const std::string& path);
+
+  /**
+   * Remove a path on the filesystem (rm -rf ... equivalent).
+   * @param path.
+   */
+  static void removePath(const std::string& path);
+
+  /**
+   * Set environment variable. Same args as setenv(2).
+   */
+  static void setEnvVar(const std::string& name, const std::string& value, int overwrite);
 };
+
 } // namespace Envoy

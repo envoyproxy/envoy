@@ -225,7 +225,8 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
   JSON_UTIL_SET_BOOL(json_route, *match, case_sensitive);
 
   if (json_route.hasObject("runtime")) {
-    BaseJson::translateRuntimeUInt32(*json_route.getObject("runtime"), *match->mutable_runtime());
+    BaseJson::translateRuntimeFraction(*json_route.getObject("runtime"),
+                                       *match->mutable_runtime_fraction());
   }
 
   for (const auto json_header_matcher : json_route.getObjectArray("headers", true)) {
@@ -245,9 +246,6 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
     auto* redirect = route.mutable_redirect();
     JSON_UTIL_SET_STRING(json_route, *redirect, host_redirect);
     JSON_UTIL_SET_STRING(json_route, *redirect, path_redirect);
-    if (json_route.hasObject("use_websocket")) {
-      throw EnvoyException("Redirect route entries must not have WebSockets set");
-    }
   }
   const bool has_cluster = json_route.hasObject("cluster") ||
                            json_route.hasObject("cluster_header") ||
@@ -291,7 +289,6 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
       JSON_UTIL_SET_BOOL(json_route, *action, auto_host_rewrite);
     }
 
-    JSON_UTIL_SET_BOOL(json_route, *action, use_websocket);
     JSON_UTIL_SET_DURATION(json_route, *action, timeout);
 
     if (json_route.hasObject("retry_policy")) {
@@ -315,7 +312,7 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
     action->set_priority(priority);
 
     for (const auto header_value : json_route.getObjectArray("request_headers_to_add", true)) {
-      auto* header_value_option = action->mutable_request_headers_to_add()->Add();
+      auto* header_value_option = route.mutable_request_headers_to_add()->Add();
       BaseJson::translateHeaderValueOption(*header_value, *header_value_option);
     }
 

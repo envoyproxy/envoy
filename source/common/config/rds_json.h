@@ -3,7 +3,7 @@
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/json/json_object.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
 
 namespace Envoy {
 namespace Config {

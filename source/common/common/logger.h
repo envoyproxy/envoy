@@ -12,6 +12,7 @@
 #include "common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/synchronization/mutex.h"
 #include "fmt/ostream.h"
 #include "spdlog/spdlog.h"
 
@@ -26,6 +27,7 @@ namespace Logger {
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \
+  FUNCTION(dubbo)                \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
   FUNCTION(grpc)                 \
@@ -34,16 +36,20 @@ namespace Logger {
   FUNCTION(http)                 \
   FUNCTION(http2)                \
   FUNCTION(hystrix)              \
+  FUNCTION(init)                 \
   FUNCTION(lua)                  \
   FUNCTION(main)                 \
   FUNCTION(misc)                 \
   FUNCTION(mongo)                \
+  FUNCTION(quic)                 \
   FUNCTION(pool)                 \
   FUNCTION(rbac)                 \
   FUNCTION(redis)                \
   FUNCTION(router)               \
   FUNCTION(runtime)              \
   FUNCTION(stats)                \
+  FUNCTION(secret)               \
+  FUNCTION(tap)                  \
   FUNCTION(testing)              \
   FUNCTION(thrift)               \
   FUNCTION(tracing)              \
@@ -74,7 +80,9 @@ public:
     off = spdlog::level::off
   } levels;
 
-  std::string levelString() const { return spdlog::level::level_names[logger_->level()]; }
+  spdlog::string_view_t levelString() const {
+    return spdlog::level::level_string_views[logger_->level()];
+  }
   std::string name() const { return logger_->name(); }
   void setLevel(spdlog::level::level_enum level) { logger_->set_level(level); }
   spdlog::level::level_enum level() const { return logger_->level(); }
@@ -126,6 +134,8 @@ public:
 
   bool hasLock() const { return lock_ != nullptr; }
   void setLock(Thread::BasicLockable& lock) { lock_ = &lock; }
+  void clearLock() { lock_ = nullptr; }
+  Thread::BasicLockable* lock() { return lock_; }
 
 private:
   Thread::BasicLockable* lock_{};
@@ -133,15 +143,20 @@ private:
 
 /**
  * Stacks logging sinks, so you can temporarily override the logging mechanism, restoring
- * the prevoius state when the DelegatingSink is destructed.
+ * the previous state when the DelegatingSink is destructed.
  */
 class DelegatingLogSink : public spdlog::sinks::sink {
 public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
+  void clearLock() { stderr_sink_->clearLock(); }
 
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override { sink_->flush(); }
+  void set_pattern(const std::string& pattern) override {
+    set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
+  }
+  void set_formatter(std::unique_ptr<spdlog::formatter> formatter) override;
 
   /**
    * @return bool whether a lock has been established.
@@ -166,6 +181,34 @@ private:
 
   SinkDelegate* sink_{nullptr};
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
+  std::unique_ptr<spdlog::formatter> formatter_ GUARDED_BY(format_mutex_);
+  absl::Mutex format_mutex_; // direct absl reference to break build cycle.
+};
+
+/**
+ * Defines a scope for the logging system with the specified lock and log level.
+ * This is equivalent to setLogLevel, setLogFormat, and setLock, which can be
+ * called individually as well, e.g. to set the log level without changing the
+ * lock or format.
+ *
+ * Contexts can be nested. When a nested context is destroyed, the previous
+ * context is restored. When all contexts are destroyed, the lock is cleared,
+ * and logging will remain unlocked, the same state it is in prior to
+ * instantiating a Context.
+ */
+class Context {
+public:
+  Context(spdlog::level::level_enum log_level, const std::string& log_format,
+          Thread::BasicLockable& lock);
+  ~Context();
+
+private:
+  void activate();
+
+  const spdlog::level::level_enum log_level_;
+  const std::string log_format_;
+  Thread::BasicLockable& lock_;
+  Context* const save_context_;
 };
 
 /**
@@ -188,15 +231,6 @@ public:
     return sink;
   }
 
-  /*
-   * Initialize the logging system with the specified lock and log level.
-   * This is equivalalent to setLogLevel, setLogFormat, and setLock, which
-   * can be called individually as well, e.g. to set the log level without
-   * changing the lock or format.
-   */
-  static void initialize(spdlog::level::level_enum log_level, const std::string& log_format,
-                         Thread::BasicLockable& lock);
-
   /**
    * Sets the minimum log severity required to print messages.
    * Messages below this loglevel will be suppressed.
@@ -218,6 +252,8 @@ public:
    */
   static bool initialized() { return getSink()->hasLock(); }
 
+  static Logger* logger(const std::string& log_name);
+
 private:
   /*
    * @return std::vector<Logger>& return the installed loggers.
@@ -226,7 +262,7 @@ private:
 };
 
 /**
- * Mixin class that allows any class to peform logging with a logger of a particular ID.
+ * Mixin class that allows any class to perform logging with a logger of a particular ID.
  */
 template <Id id> class Loggable {
 protected:
@@ -240,13 +276,13 @@ protected:
   }
 };
 
-} // Logger
+} // namespace Logger
 
 // Convert the line macro to a string literal for concatenation in log macros.
 #define DO_STRINGIZE(x) STRINGIZE(x)
 #define STRINGIZE(x) #x
 #define LINE_STRING DO_STRINGIZE(__LINE__)
-#define LOG_PREFIX __FILE__ ":" LINE_STRING "] "
+#define LOG_PREFIX "[" __FILE__ ":" LINE_STRING "] "
 
 /**
  * Base logging macros. It is expected that users will use the convenience macros below rather than

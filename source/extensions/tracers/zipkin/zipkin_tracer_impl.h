@@ -62,6 +62,8 @@ public:
    */
   void setTag(const std::string& name, const std::string& value) override;
 
+  void log(SystemTime timestamp, const std::string& event) override;
+
   void injectContext(Http::HeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
@@ -89,9 +91,11 @@ public:
    * Constructor. It adds itself and a newly-created Zipkin::Tracer object to a thread-local store.
    * Also, it associates the given random-number generator to the Zipkin::Tracer object it creates.
    */
-  Driver(const Json::Object& config, Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
+  Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
+         Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-         const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator);
+         const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator,
+         TimeSource& time_source);
 
   /**
    * This function is inherited from the abstract Driver class.
@@ -130,6 +134,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
+  TimeSource& time_source_;
 };
 
 /**
@@ -204,7 +209,7 @@ private:
   SpanBuffer span_buffer_;
   const std::string collector_endpoint_;
 };
-}
+} // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy

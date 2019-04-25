@@ -1,18 +1,28 @@
 #include <functional>
 
+#include "envoy/thread/thread.h"
+
+#include "common/api/api_impl.h"
 #include "common/common/lock_guard.h"
-#include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/stats/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
+using testing::NiceMock;
+using testing::Return;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Event {
+namespace {
 
 class TestDeferredDeletable : public DeferredDeletable {
 public:
@@ -25,38 +35,41 @@ private:
 
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
-  DispatcherImpl dispatcher;
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher());
   ReadyWatcher watcher1;
 
-  dispatcher.deferredDelete(
+  dispatcher->deferredDelete(
       DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void { watcher1.ready(); })});
 
   // The first one will get deleted inline.
   EXPECT_CALL(watcher1, ready());
-  dispatcher.clearDeferredDeleteList();
+  dispatcher->clearDeferredDeleteList();
 
   // This one does a nested deferred delete. We should need two clear calls to actually get
   // rid of it with the vector swapping. We also test that inline clear() call does nothing.
   ReadyWatcher watcher2;
   ReadyWatcher watcher3;
-  dispatcher.deferredDelete(DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void {
+  dispatcher->deferredDelete(DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void {
     watcher2.ready();
-    dispatcher.deferredDelete(
+    dispatcher->deferredDelete(
         DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void { watcher3.ready(); })});
-    dispatcher.clearDeferredDeleteList();
+    dispatcher->clearDeferredDeleteList();
   })});
 
   EXPECT_CALL(watcher2, ready());
-  dispatcher.clearDeferredDeleteList();
+  dispatcher->clearDeferredDeleteList();
 
   EXPECT_CALL(watcher3, ready());
-  dispatcher.clearDeferredDeleteList();
+  dispatcher->clearDeferredDeleteList();
 }
 
-class DispatcherImplTest : public ::testing::Test {
+class DispatcherImplTest : public testing::Test {
 protected:
-  DispatcherImplTest() : dispatcher_(std::make_unique<DispatcherImpl>()), work_finished_(false) {
-    dispatcher_thread_ = std::make_unique<Thread::Thread>([this]() {
+  DispatcherImplTest()
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
+        work_finished_(false) {
+    dispatcher_thread_ = api_->threadFactory().createThread([this]() {
       // Must create a keepalive timer to keep the dispatcher from exiting.
       std::chrono::milliseconds time_interval(500);
       keepalive_timer_ = dispatcher_->createTimer(
@@ -72,7 +85,9 @@ protected:
     dispatcher_thread_->join();
   }
 
-  std::unique_ptr<Thread::Thread> dispatcher_thread_;
+  NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
+  Api::ApiPtr api_;
+  Thread::ThreadPtr dispatcher_thread_;
   DispatcherPtr dispatcher_;
   Thread::MutexBasicLockable mu_;
   Thread::CondVar cv_;
@@ -80,6 +95,14 @@ protected:
   bool work_finished_;
   TimerPtr keepalive_timer_;
 };
+
+// TODO(mergeconflict): We also need integration testing to validate that the expected histograms
+// are written when `enable_dispatcher_stats` is true. See issue #6582.
+TEST_F(DispatcherImplTest, InitializeStats) {
+  EXPECT_CALL(scope_, histogram("test.dispatcher.loop_duration_us"));
+  EXPECT_CALL(scope_, histogram("test.dispatcher.poll_delay_us"));
+  dispatcher_->initializeStats(scope_, "test.");
+}
 
 TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
@@ -147,6 +170,7 @@ TEST_F(DispatcherImplTest, Timer) {
         }
         cv_.notifyOne();
       });
+      EXPECT_FALSE(timer->enabled());
     }
     cv_.notifyOne();
   });
@@ -162,5 +186,17 @@ TEST_F(DispatcherImplTest, Timer) {
   }
 }
 
+TEST(TimerImplTest, TimerEnabledDisabled) {
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher());
+  Event::TimerPtr timer = dispatcher->createTimer([] {});
+  EXPECT_FALSE(timer->enabled());
+  timer->enableTimer(std::chrono::milliseconds(0));
+  EXPECT_TRUE(timer->enabled());
+  dispatcher->run(Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(timer->enabled());
+}
+
+} // namespace
 } // namespace Event
 } // namespace Envoy

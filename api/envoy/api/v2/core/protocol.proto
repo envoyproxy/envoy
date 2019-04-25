@@ -4,6 +4,10 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
+option java_outer_classname = "ProtocolProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2.core";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -46,20 +50,20 @@ message Http1ProtocolOptions {
 }
 
 message Http2ProtocolOptions {
-  // `Maximum table size <http://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
+  // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
   // range from 0 to 4294967295 (2^32 - 1) and defaults to 4096. 0 effectively disables header
   // compression.
   google.protobuf.UInt32Value hpack_table_size = 1;
 
-  // `Maximum concurrent streams <http://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
+  // `Maximum concurrent streams <https://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
   // allowed for peer on one HTTP/2 connection. Valid values range from 1 to 2147483647 (2^31 - 1)
   // and defaults to 2147483647.
   google.protobuf.UInt32Value max_concurrent_streams = 2
       [(validate.rules).uint32 = {gte: 1, lte: 2147483647}];
 
   // `Initial stream-level flow-control window
-  // <http://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
+  // <https://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
   // (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 268435456
   // (256 * 1024 * 1024).
   //
@@ -76,6 +80,17 @@ message Http2ProtocolOptions {
   // window. Currently, this has the same minimum/maximum/default as *initial_stream_window_size*.
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {gte: 65535, lte: 2147483647}];
+
+  // Allows proxying Websocket and other upgrades over H2 connect.
+  bool allow_connect = 5;
+
+  // [#not-implemented-hide:] Hiding until envoy has full metadata support.
+  // Still under implementation. DO NOT USE.
+  //
+  // Allows metadata. See [metadata
+  // docs](https://github.com/envoyproxy/envoy/blob/master/source/docs/h2_metadata.md) for more
+  // information.
+  bool allow_metadata = 6;
 }
 
 // [#not-implemented-hide:]

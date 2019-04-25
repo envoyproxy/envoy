@@ -13,17 +13,25 @@ namespace Router {
 
 void ShadowWriterImpl::shadow(const std::string& cluster, Http::MessagePtr&& request,
                               std::chrono::milliseconds timeout) {
+  // It's possible that the cluster specified in the route configuration no longer exists due
+  // to a CDS removal. Check that it still exists before shadowing.
+  // TODO(mattklein123): Optimally we would have a stat but for now just fix the crashing issue.
+  if (!cm_.get(cluster)) {
+    ENVOY_LOG(debug, "shadow cluster '{}' does not exist", cluster);
+    return;
+  }
+
   ASSERT(!request->headers().Host()->value().empty());
   // Switch authority to add a shadow postfix. This allows upstream logging to make more sense.
-  auto parts = StringUtil::splitToken(request->headers().Host()->value().c_str(), ":");
-  ASSERT(parts.size() > 0 && parts.size() <= 2);
+  auto parts = StringUtil::splitToken(request->headers().Host()->value().getStringView(), ":");
+  ASSERT(!parts.empty() && parts.size() <= 2);
   request->headers().Host()->value(
-      parts.size() == 2 ? absl::StrJoin(parts, "-shadow:")
-                        : absl::StrCat(request->headers().Host()->value().c_str(), "-shadow"));
-  // Configuration should guarantee that cluster exists before calling here. This is basically
-  // fire and forget. We don't handle cancelling.
-  cm_.httpAsyncClientForCluster(cluster).send(std::move(request), *this,
-                                              absl::optional<std::chrono::milliseconds>(timeout));
+      parts.size() == 2
+          ? absl::StrJoin(parts, "-shadow:")
+          : absl::StrCat(request->headers().Host()->value().getStringView(), "-shadow"));
+  // This is basically fire and forget. We don't handle cancelling.
+  cm_.httpAsyncClientForCluster(cluster).send(
+      std::move(request), *this, Http::AsyncClient::RequestOptions().setTimeout(timeout));
 }
 
 } // namespace Router

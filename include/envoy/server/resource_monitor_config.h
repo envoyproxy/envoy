@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/resource_monitor.h"
@@ -19,6 +20,11 @@ public:
    *         for all singleton processing.
    */
   virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return reference to the Api object
+   */
+  virtual Api::Api& api() PURE;
 };
 
 /**
@@ -40,6 +46,13 @@ public:
    */
   virtual ResourceMonitorPtr createResourceMonitor(const Protobuf::Message& config,
                                                    ResourceMonitorFactoryContext& context) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message. The resource monitor
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted
+   *         to JSON and then parsed into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of a resource

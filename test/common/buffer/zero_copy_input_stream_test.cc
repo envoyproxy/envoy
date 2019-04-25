@@ -1,16 +1,19 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
 
+#include "test/common/buffer/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Buffer {
 namespace {
 
-class ZeroCopyInputStreamTest : public testing::Test {
+class ZeroCopyInputStreamTest : public BufferImplementationParamTest {
 public:
   ZeroCopyInputStreamTest() {
     Buffer::OwnedImpl buffer{"abcd"};
+    verifyImplementation(buffer);
     stream_.move(buffer);
   }
 
@@ -21,21 +24,23 @@ public:
   int size_;
 };
 
-TEST_F(ZeroCopyInputStreamTest, Move) {
+TEST_P(ZeroCopyInputStreamTest, Move) {
   Buffer::OwnedImpl buffer{"abcd"};
+  verifyImplementation(buffer);
   stream_.move(buffer);
 
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(ZeroCopyInputStreamTest, Next) {
+TEST_P(ZeroCopyInputStreamTest, Next) {
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(4, size_);
   EXPECT_EQ(0, memcmp(slice_data_.data(), data_, size_));
 }
 
-TEST_F(ZeroCopyInputStreamTest, TwoSlices) {
+TEST_P(ZeroCopyInputStreamTest, TwoSlices) {
   Buffer::OwnedImpl buffer("efgh");
+  verifyImplementation(buffer);
 
   stream_.move(buffer);
 
@@ -47,7 +52,7 @@ TEST_F(ZeroCopyInputStreamTest, TwoSlices) {
   EXPECT_EQ(0, memcmp("efgh", data_, size_));
 }
 
-TEST_F(ZeroCopyInputStreamTest, BackUp) {
+TEST_P(ZeroCopyInputStreamTest, BackUp) {
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(4, size_);
 
@@ -60,7 +65,7 @@ TEST_F(ZeroCopyInputStreamTest, BackUp) {
   EXPECT_EQ(4, stream_.ByteCount());
 }
 
-TEST_F(ZeroCopyInputStreamTest, BackUpFull) {
+TEST_P(ZeroCopyInputStreamTest, BackUpFull) {
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(4, size_);
 
@@ -71,13 +76,13 @@ TEST_F(ZeroCopyInputStreamTest, BackUpFull) {
   EXPECT_EQ(4, stream_.ByteCount());
 }
 
-TEST_F(ZeroCopyInputStreamTest, ByteCount) {
+TEST_P(ZeroCopyInputStreamTest, ByteCount) {
   EXPECT_EQ(0, stream_.ByteCount());
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(4, stream_.ByteCount());
 }
 
-TEST_F(ZeroCopyInputStreamTest, Finish) {
+TEST_P(ZeroCopyInputStreamTest, Finish) {
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_TRUE(stream_.Next(&data_, &size_));
   EXPECT_EQ(0, size_);

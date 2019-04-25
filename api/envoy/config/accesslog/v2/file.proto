@@ -1,9 +1,14 @@
 syntax = "proto3";
 
 package envoy.config.accesslog.v2;
+
+option java_outer_classname = "FileProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.accesslog.v2";
 option go_package = "v2";
 
 import "validate/validate.proto";
+import "google/protobuf/struct.proto";
 
 // [#protodoc-title: File access log]
 
@@ -17,5 +22,11 @@ message FileAccessLog {
   // Access log format. Envoy supports :ref:`custom access log formats
   // <config_access_log_format>` as well as a :ref:`default format
   // <config_access_log_default_format>`.
-  string format = 2;
+  oneof access_log_format {
+    // Access log :ref:`format string<config_access_log_format_strings>`
+    string format = 2;
+
+    // Access log :ref:`format dictionary<config_access_log_format_dictionaries>`
+    google.protobuf.Struct json_format = 3;
+  }
 }

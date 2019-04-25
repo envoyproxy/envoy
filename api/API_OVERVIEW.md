@@ -9,7 +9,8 @@ Version 2 of the Envoy API evolves existing APIs and introduces new APIs to:
 
 * Allow for more advanced load balancing through load and resource utilization reporting to management servers.
 * Improve N^2 health check scalability issues by optionally offloading health checking to other Envoy instances.
-* Support Envoy deployment in edge, sidecar and middle proxy deployment models via changes to the listener model and CDS/SDS APIs.
+* Support Envoy deployment in edge, sidecar and middle proxy deployment models via changes to the listener model,
+  CDS API, and EDS (formerly called SDS in v1) API.
 * Allow streaming updates from the management server on change, instead of polling APIs from Envoy. gRPC APIs will be supported
   alongside JSON REST APIs to provide for this.
 * Ensure all Envoy runtime configuration is dynamically discoverable via API

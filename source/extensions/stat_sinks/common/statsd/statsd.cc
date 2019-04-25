@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -19,22 +20,22 @@ namespace StatSinks {
 namespace Common {
 namespace Statsd {
 
-Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
-  fd_ = address->socket(Network::Address::SocketType::Datagram);
-  ASSERT(fd_ != -1);
+Writer::Writer(Network::Address::InstanceConstSharedPtr address)
+    : io_handle_(address->socket(Network::Address::SocketType::Datagram)) {
+  ASSERT(io_handle_->fd() != -1);
 
-  int rc = address->connect(fd_);
-  ASSERT(rc != -1);
+  const Api::SysCallIntResult result = address->connect(io_handle_->fd());
+  ASSERT(result.rc_ != -1);
 }
 
 Writer::~Writer() {
-  if (fd_ != -1) {
-    RELEASE_ASSERT(close(fd_) == 0, "");
+  if (io_handle_->isOpen()) {
+    RELEASE_ASSERT(io_handle_->close().err_ == nullptr, "");
   }
 }
 
 void Writer::write(const std::string& message) {
-  ::send(fd_, message.c_str(), message.size(), MSG_DONTWAIT);
+  ::send(io_handle_->fd(), message.c_str(), message.size(), MSG_DONTWAIT);
 }
 
 UdpStatsdSink::UdpStatsdSink(ThreadLocal::SlotAllocator& tls,
@@ -189,6 +190,7 @@ void TcpStatsdSink::TlsSink::endFlush(bool do_write) {
   current_slice_mem_ = nullptr;
   if (do_write) {
     write(buffer_);
+    ASSERT(buffer_.length() == 0);
   }
 }
 
@@ -232,8 +234,9 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
 
   if (!connection_) {
     Upstream::Host::CreateConnectionData info =
-        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr);
+        parent_.cluster_manager_.tcpConnForCluster(parent_.cluster_info_->name(), nullptr, nullptr);
     if (!info.connection_) {
+      buffer.drain(buffer.length());
       return;
     }
 
@@ -243,7 +246,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
                                      parent_.cluster_info_->stats().upstream_cx_rx_bytes_buffered_,
                                      parent_.cluster_info_->stats().upstream_cx_tx_bytes_total_,
                                      parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_,
-                                     &parent_.cluster_info_->stats().bind_errors_});
+                                     &parent_.cluster_info_->stats().bind_errors_, nullptr});
     connection_->connect();
   }
 

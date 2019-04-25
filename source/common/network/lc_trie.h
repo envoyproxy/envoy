@@ -32,7 +32,7 @@ constexpr size_t MaxLcTrieNodes = (1 << 20);
  * Level Compressed Trie for associating data with CIDR ranges. Both IPv4 and IPv6 addresses are
  * supported within this class with no calling pattern changes.
  *
- * The algorithm to build the LC-Trie is desribed in the paper 'IP-address lookup using LC-tries'
+ * The algorithm to build the LC-Trie is described in the paper 'IP-address lookup using LC-tries'
  * by 'S. Nilsson' and 'G. Karlsson'. The paper and reference C implementation can be found here:
  * https://www.nada.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/
  *
@@ -289,7 +289,7 @@ private:
 
     std::string asString() { return fmt::format("{}/{}", toString(ip_), length_); }
 
-    // The address represented either in Ipv4(uint32_t) or Ipv6(asbl::uint128).
+    // The address represented either in Ipv4(uint32_t) or Ipv6(absl::uint128).
     IpType ip_{0};
     // Length of the cidr range.
     uint32_t length_{0};
@@ -434,7 +434,7 @@ private:
 
   private:
     /**
-     * Builds the Level Compresesed Trie, by first sorting the data, removing duplicated
+     * Builds the Level Compressed Trie, by first sorting the data, removing duplicated
      * prefixes and invoking buildRecursive() to build the trie.
      */
     void build(std::vector<IpPrefix<IpType>>& data) {
@@ -445,19 +445,13 @@ private:
       ip_prefixes_ = data;
       std::sort(ip_prefixes_.begin(), ip_prefixes_.end());
 
-      // In theory, the trie_ vector can have at most twice the number of ip_prefixes entries - 1.
-      // However, due to the fill factor a buffer is added to the size of the
-      // trie_. The buffer value(2000000) is reused from the reference implementation in
-      // http://www.csc.kth.se/~snilsson/software/router/C/trie.c.
-      // TODO(ccaraman): Define a better buffer value when resizing the trie_.
-      maximum_trie_node_size = 2 * ip_prefixes_.size() + 2000000;
-      trie_.resize(maximum_trie_node_size);
-
       // Build the trie_.
+      trie_.reserve(static_cast<size_t>(ip_prefixes_.size() / fill_factor_));
       uint32_t next_free_index = 1;
       buildRecursive(0u, 0u, ip_prefixes_.size(), 0u, next_free_index);
 
       // The value of next_free_index is the final size of the trie_.
+      ASSERT(next_free_index <= trie_.size());
       trie_.resize(next_free_index);
       trie_.shrink_to_fit();
     }
@@ -569,27 +563,29 @@ private:
      * Recursively build a trie for IP prefixes from position 'first' to 'first+n-1'.
      * @param prefix supplies the prefix to ignore when building the sub-trie.
      * @param first supplies the index into ip_prefixes_ for this sub-trie.
-     * @param n suppplies the number of entries for the sub-trie.
+     * @param n supplies the number of entries for the sub-trie.
      * @param position supplies the root for this sub-trie.
      * @param next_free_index supplies the next available index in the trie_.
      */
     void buildRecursive(uint32_t prefix, uint32_t first, uint32_t n, uint32_t position,
                         uint32_t& next_free_index) {
-      // Setting a leaf, the branch and skip are 0.
-      if (n == 1) {
+      if (position >= trie_.size()) {
         // There is no way to predictably determine the number of trie nodes required to build a
         // LC-Trie. If while building the trie the position that is being set exceeds the maximum
         // number of supported trie_ entries, throw an Envoy Exception.
-        if (position >= maximum_trie_node_size) {
+        if (position >= MaxLcTrieNodes) {
           // Adding 1 to the position to count how many nodes are trying to be set.
           throw EnvoyException(
               fmt::format("The number of internal nodes required for the LC-Trie "
                           "exceeded the maximum number of "
                           "supported nodes. Minimum number of internal nodes required: "
                           "'{0}'. Maximum number of supported nodes: '{1}'.",
-                          (position + 1), maximum_trie_node_size));
+                          (position + 1), MaxLcTrieNodes));
         }
-
+        trie_.resize(position + 1);
+      }
+      // Setting a leaf, the branch and skip are 0.
+      if (n == 1) {
         trie_[position].address_ = first;
         return;
       }
@@ -682,10 +678,6 @@ private:
       uint32_t address_ : 20; // If this 20-bit size changes, please change MaxLcTrieNodes too.
     };
 
-    // During build(), an estimate of the number of nodes required will be made and set this
-    // value. This is used to ensure no out_of_range exception is thrown.
-    uint32_t maximum_trie_node_size;
-
     // The CIDR range and data needs to be maintained separately from the LC-Trie. A LC-Trie skips
     // chunks of data while searching for a match. This means that the node found in the LC-Trie
     // is not guaranteed to have the IP address in range. The last step prior to returning
@@ -739,7 +731,7 @@ LcTrie<T>::LcTrieInternal<IpType, address_size>::getData(const IpType& ip_addres
   }
 
   // The path taken through the trie to match the ip_address may have contained skips,
-  // so it is necessary to check whether the the matched prefix really contains the
+  // so it is necessary to check whether the matched prefix really contains the
   // ip_address.
   const auto& prefix = ip_prefixes_[address];
   if (prefix.contains(ip_address)) {

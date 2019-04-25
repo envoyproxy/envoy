@@ -5,11 +5,11 @@
 #include <functional>
 #include <list>
 
+#include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
-#include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/dns.h"
@@ -18,6 +18,7 @@
 #include "envoy/ssl/context.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -29,6 +30,8 @@ public:
   MockDispatcher();
   ~MockDispatcher();
 
+  // Dispatcher
+  TimeSource& timeSource() override { return time_system_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {
@@ -60,7 +63,14 @@ public:
         createListener_(socket, cb, bind_to_port, hand_off_restored_destination_connections)};
   }
 
-  TimerPtr createTimer(TimerCb cb) override { return TimerPtr{createTimer_(cb)}; }
+  Network::ListenerPtr createUdpListener(Network::Socket& socket,
+                                         Network::UdpListenerCallbacks& cb) override {
+    return Network::ListenerPtr{createUdpListener_(socket, cb)};
+  }
+
+  Event::TimerPtr createTimer(Event::TimerCb cb) override {
+    return Event::TimerPtr{createTimer_(cb)};
+  }
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
     deferredDelete_(to_delete.get());
@@ -74,6 +84,7 @@ public:
   }
 
   // Event::Dispatcher
+  MOCK_METHOD2(initializeStats, void(Stats::Scope&, const std::string&));
   MOCK_METHOD0(clearDeferredDeleteList, void());
   MOCK_METHOD2(createServerConnection_,
                Network::Connection*(Network::ConnectionSocket* socket,
@@ -94,7 +105,9 @@ public:
                Network::Listener*(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                   bool bind_to_port,
                                   bool hand_off_restored_destination_connections));
-  MOCK_METHOD1(createTimer_, Timer*(TimerCb cb));
+  MOCK_METHOD2(createUdpListener_,
+               Network::Listener*(Network::Socket& socket, Network::UdpListenerCallbacks& cb));
+  MOCK_METHOD1(createTimer_, Timer*(Event::TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletable* to_delete));
   MOCK_METHOD0(exit, void());
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
@@ -102,6 +115,7 @@ public:
   MOCK_METHOD1(run, void(RunType type));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
 
+  GlobalTimeSystem time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;
 };
@@ -112,11 +126,21 @@ public:
   MockTimer(MockDispatcher* dispatcher);
   ~MockTimer();
 
-  // Event::Timer
+  void invokeCallback() {
+    EXPECT_TRUE(enabled_);
+    enabled_ = false;
+    callback_();
+  }
+
+  // Timer
   MOCK_METHOD0(disableTimer, void());
   MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
+  MOCK_METHOD0(enabled, bool());
 
-  TimerCb callback_;
+  bool enabled_{};
+  Event::TimerCb callback_; // TODO(mattklein123): This should be private and only called via
+                            // invoke callback to clear enabled_, but that will break too many
+                            // tests and can be done later.
 };
 
 class MockSignalEvent : public SignalEvent {

@@ -1,13 +1,12 @@
 #pragma once
 
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/stats_options_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "fmt/printf.h"
@@ -80,7 +79,8 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
   return HostSharedPtr{new HostImpl(
       cluster, "", Network::Utility::resolveUrl(url),
       envoy::api::v2::core::Metadata::default_instance(), weight, envoy::api::v2::core::Locality(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
@@ -89,7 +89,8 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
   return HostSharedPtr{
       new HostImpl(cluster, "", Network::Utility::resolveUrl(url), metadata, weight,
                    envoy::api::v2::core::Locality(),
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
+                   envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 inline HostSharedPtr
@@ -98,7 +99,8 @@ makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
              uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
                                     envoy::api::v2::core::Metadata::default_instance(), weight,
-                                    envoy::api::v2::core::Locality(), health_check_config)};
+                                    envoy::api::v2::core::Locality(), health_check_config, 0,
+                                    envoy::api::v2::core::HealthStatus::UNKNOWN)};
 }
 
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
@@ -107,13 +109,18 @@ inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSha
       cluster, "", Network::Utility::resolveUrl(url),
       envoy::api::v2::core::Metadata::default_instance(),
       envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance())};
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
 }
 
 inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& locality_hosts,
                                                       bool force_no_local_locality = false) {
   return std::make_shared<HostsPerLocalityImpl>(
       std::move(locality_hosts), !force_no_local_locality && !locality_hosts.empty());
+}
+
+inline LocalityWeightsSharedPtr
+makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
+  return std::make_shared<LocalityWeights>(locality_weights);
 }
 
 inline envoy::api::v2::core::HealthCheck

@@ -27,7 +27,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2alpha::CheckResponse>
+typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2::CheckResponse>
     ExtAuthzAsyncCallbacks;
 
 struct ConstantValues {
@@ -47,24 +47,25 @@ typedef ConstSingleton<ConstantValues> Constants;
  */
 class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
 public:
+  // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                 const absl::optional<std::chrono::milliseconds>& timeout, bool use_alpha);
   ~GrpcClientImpl();
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks,
-             const envoy::service::auth::v2alpha::CheckRequest& request,
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
              Tracing::Span& parent_span) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse>&& response,
+  void onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
 private:
+  static const Protobuf::MethodDescriptor& getMethodDescriptor(bool use_alpha);
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers);

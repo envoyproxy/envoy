@@ -1,3 +1,5 @@
+#include "common/protobuf/utility.h"
+
 #include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {
@@ -5,9 +7,9 @@ namespace {
 
 typedef HttpProtocolIntegrationTest BufferIntegrationTest;
 
-INSTANTIATE_TEST_CASE_P(Protocols, BufferIntegrationTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, BufferIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(BufferIntegrationTest, RouterNotFoundBodyBuffer) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
@@ -21,7 +23,7 @@ TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithGiantBodyBuffer) {
 
 TEST_P(BufferIntegrationTest, RouterHeaderOnlyRequestAndResponseBuffer) {
   config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
-  testRouterHeaderOnlyRequestAndResponse(true);
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(BufferIntegrationTest, RouterRequestAndResponseWithBodyBuffer) {
@@ -51,12 +53,12 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("413", response->headers().Status()->value().c_str());
+  EXPECT_EQ("413", response->headers().Status()->value().getStringView());
 }
 
 ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
   ProtobufWkt::Struct pfc;
-  RELEASE_ASSERT(Protobuf::util::JsonStringToMessage(json_config, &pfc).ok(), "");
+  MessageUtil::loadFromJson(json_config, pfc);
 
   return
       [pfc](
@@ -74,6 +76,7 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
   ConfigHelper::HttpModifierFunction mod = overrideConfig(R"EOF({"disabled": true})EOF");
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  config_helper_.setBufferLimits(1024, 1024);
 
   initialize();
 
@@ -91,13 +94,12 @@ TEST_P(BufferIntegrationTest, RouteDisabled) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(BufferIntegrationTest, RouteOverride) {
   ConfigHelper::HttpModifierFunction mod = overrideConfig(R"EOF({"buffer": {
-    "max_request_bytes": 5242880,
-    "max_request_time": {"seconds": 120}
+    "max_request_bytes": 5242880
   }})EOF");
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
@@ -118,7 +120,7 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
 
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 } // namespace

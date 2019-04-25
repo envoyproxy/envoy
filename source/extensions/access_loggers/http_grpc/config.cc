@@ -5,11 +5,13 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
+#include "extensions/access_loggers/http_grpc/grpc_access_log_proto_descriptors.h"
 #include "extensions/access_loggers/well_known_names.h"
 
 namespace Envoy {
@@ -24,12 +26,13 @@ AccessLog::InstanceSharedPtr
 HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
                                                   AccessLog::FilterPtr&& filter,
                                                   Server::Configuration::FactoryContext& context) {
+  RELEASE_ASSERT(validateProtoDescriptors(), "");
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig&>(config);
   std::shared_ptr<GrpcAccessLogStreamer> grpc_access_log_streamer =
       context.singletonManager().getTyped<GrpcAccessLogStreamer>(
           SINGLETON_MANAGER_REGISTERED_NAME(grpc_access_log_streamer),
-          [&context, grpc_service = proto_config.common_config().grpc_service() ] {
+          [&context, grpc_service = proto_config.common_config().grpc_service()] {
             return std::make_shared<GrpcAccessLogStreamerImpl>(
                 context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
                     grpc_service, context.scope(), false),
@@ -49,9 +52,7 @@ std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get(
 /**
  * Static registration for the HTTP gRPC access log. @see RegisterFactory.
  */
-static Registry::RegisterFactory<HttpGrpcAccessLogFactory,
-                                 Server::Configuration::AccessLogInstanceFactory>
-    register_;
+REGISTER_FACTORY(HttpGrpcAccessLogFactory, Server::Configuration::AccessLogInstanceFactory);
 
 } // namespace HttpGrpc
 } // namespace AccessLoggers

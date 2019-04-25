@@ -17,6 +17,7 @@ const std::list<std::regex> AsyncStreamImpl::NullCorsPolicy::allow_origin_regex_
 const absl::optional<bool> AsyncStreamImpl::NullCorsPolicy::allow_credentials_;
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>
     AsyncStreamImpl::NullRateLimitPolicy::rate_limit_policy_entry_;
+const AsyncStreamImpl::NullHedgePolicy AsyncStreamImpl::RouteEntryImpl::hedge_policy_;
 const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::RouteEntryImpl::rate_limit_policy_;
 const AsyncStreamImpl::NullRetryPolicy AsyncStreamImpl::RouteEntryImpl::retry_policy_;
 const AsyncStreamImpl::NullShadowPolicy AsyncStreamImpl::RouteEntryImpl::shadow_policy_;
@@ -25,18 +26,22 @@ const AsyncStreamImpl::NullRateLimitPolicy AsyncStreamImpl::NullVirtualHost::rat
 const AsyncStreamImpl::NullConfig AsyncStreamImpl::NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> AsyncStreamImpl::RouteEntryImpl::opaque_config_;
 const envoy::api::v2::core::Metadata AsyncStreamImpl::RouteEntryImpl::metadata_;
+const Config::TypedMetadataImpl<Envoy::Config::TypedMetadataFactory>
+    AsyncStreamImpl::RouteEntryImpl::typed_metadata_({});
 const AsyncStreamImpl::NullPathMatchCriterion
     AsyncStreamImpl::RouteEntryImpl::path_match_criterion_;
 const std::list<LowerCaseString> AsyncStreamImpl::NullConfig::internal_only_headers_;
 
-AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::Store& stats_store,
-                                 Event::Dispatcher& dispatcher,
+AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
+                                 Stats::Store& stats_store, Event::Dispatcher& dispatcher,
                                  const LocalInfo::LocalInfo& local_info,
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random,
-                                 Router::ShadowWriterPtr&& shadow_writer)
-    : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
-                                 std::move(shadow_writer), true, false, false),
+                                 Router::ShadowWriterPtr&& shadow_writer,
+                                 Http::Context& http_context)
+    : cluster_(cluster),
+      config_("http.async-client.", local_info, stats_store, cm, runtime, random,
+              std::move(shadow_writer), true, false, false, dispatcher.timeSource(), http_context),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -45,11 +50,10 @@ AsyncClientImpl::~AsyncClientImpl() {
   }
 }
 
-AsyncClient::Request*
-AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
-                      const absl::optional<std::chrono::milliseconds>& timeout) {
+AsyncClient::Request* AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
+                                            const AsyncClient::RequestOptions& options) {
   AsyncRequestImpl* async_request =
-      new AsyncRequestImpl(std::move(request), *this, callbacks, timeout);
+      new AsyncRequestImpl(std::move(request), *this, callbacks, options);
   async_request->initialize();
   std::unique_ptr<AsyncStreamImpl> new_request{async_request};
 
@@ -63,29 +67,26 @@ AsyncClientImpl::send(MessagePtr&& request, AsyncClient::Callbacks& callbacks,
   }
 }
 
-AsyncClient::Stream*
-AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
-                       const absl::optional<std::chrono::milliseconds>& timeout,
-                       bool buffer_body_for_retry) {
-  std::unique_ptr<AsyncStreamImpl> new_stream{
-      new AsyncStreamImpl(*this, callbacks, timeout, buffer_body_for_retry)};
+AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callbacks,
+                                            const AsyncClient::StreamOptions& options) {
+  std::unique_ptr<AsyncStreamImpl> new_stream{new AsyncStreamImpl(*this, callbacks, options)};
   new_stream->moveIntoList(std::move(new_stream), active_streams_);
   return active_streams_.front().get();
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
-                                 const absl::optional<std::chrono::milliseconds>& timeout,
-                                 bool buffer_body_for_retry)
+                                 const AsyncClient::StreamOptions& options)
     : parent_(parent), stream_callbacks_(callbacks), stream_id_(parent.config_.random_.random()),
-      router_(parent.config_), request_info_(Protocol::Http11),
+      router_(parent.config_), stream_info_(Protocol::Http11, parent.dispatcher().timeSource()),
       tracing_config_(Tracing::EgressConfig::get()),
-      route_(std::make_shared<RouteImpl>(parent_.cluster_.name(), timeout)) {
-  if (buffer_body_for_retry) {
-    buffered_body_.reset(new Buffer::OwnedImpl());
+      route_(std::make_shared<RouteImpl>(parent_.cluster_->name(), options.timeout)),
+      send_xff_(options.send_xff) {
+  if (options.buffer_body_for_retry) {
+    buffered_body_ = std::make_unique<Buffer::OwnedImpl>();
   }
 
   router_.setDecoderFilterCallbacks(*this);
-  // TODO(mattklein123): Correctly set protocol in request info when we support access logging.
+  // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }
 
 void AsyncStreamImpl::encodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
@@ -112,10 +113,16 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
+  if (Http::Headers::get().MethodValues.Head == headers.Method()->value().getStringView()) {
+    is_head_request_ = true;
+  }
+
   is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   headers.insertEnvoyInternalRequest().value().setReference(
       Headers::get().EnvoyInternalRequestValues.True);
-  Utility::appendXff(headers, *parent_.config_.local_info_.address());
+  if (send_xff_) {
+    Utility::appendXff(headers, *parent_.config_.local_info_.address());
+  }
   router_.decodeHeaders(headers, end_stream);
   closeLocal(end_stream);
 }
@@ -174,11 +181,9 @@ void AsyncStreamImpl::resetStream() {
 
 AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent,
                                    AsyncClient::Callbacks& callbacks,
-                                   const absl::optional<std::chrono::milliseconds>& timeout)
-    // We tell the underlying stream to not buffer because we already have the full request and
-    // and can handle any buffered body requests.
-    : AsyncStreamImpl(parent, *this, timeout, false), request_(std::move(request)),
-      callbacks_(callbacks) {}
+                                   const AsyncClient::RequestOptions& options)
+    : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
+}
 
 void AsyncRequestImpl::initialize() {
   sendHeaders(request_->headers(), !request_->body());
@@ -191,7 +196,7 @@ void AsyncRequestImpl::initialize() {
 void AsyncRequestImpl::onComplete() { callbacks_.onSuccess(std::move(response_)); }
 
 void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
-  response_.reset(new ResponseMessageImpl(std::move(headers)));
+  response_ = std::make_unique<ResponseMessageImpl>(std::move(headers));
 
   if (end_stream) {
     onComplete();
@@ -200,7 +205,7 @@ void AsyncRequestImpl::onHeaders(HeaderMapPtr&& headers, bool end_stream) {
 
 void AsyncRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
   if (!response_->body()) {
-    response_->body().reset(new Buffer::OwnedImpl());
+    response_->body() = std::make_unique<Buffer::OwnedImpl>();
   }
   response_->body()->move(data);
 

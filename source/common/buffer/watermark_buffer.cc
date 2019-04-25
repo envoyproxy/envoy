@@ -10,13 +10,23 @@ void WatermarkBuffer::add(const void* data, uint64_t size) {
   checkHighWatermark();
 }
 
-void WatermarkBuffer::add(const std::string& data) {
+void WatermarkBuffer::add(absl::string_view data) {
   OwnedImpl::add(data);
   checkHighWatermark();
 }
 
 void WatermarkBuffer::add(const Instance& data) {
   OwnedImpl::add(data);
+  checkHighWatermark();
+}
+
+void WatermarkBuffer::prepend(absl::string_view data) {
+  OwnedImpl::prepend(data);
+  checkHighWatermark();
+}
+
+void WatermarkBuffer::prepend(Instance& data) {
+  OwnedImpl::prepend(data);
   checkHighWatermark();
 }
 
@@ -40,8 +50,8 @@ void WatermarkBuffer::move(Instance& rhs, uint64_t length) {
   checkHighWatermark();
 }
 
-std::tuple<int, int> WatermarkBuffer::read(int fd, uint64_t max_length) {
-  std::tuple<int, int> result = OwnedImpl::read(fd, max_length);
+Api::IoCallUint64Result WatermarkBuffer::read(Network::IoHandle& io_handle, uint64_t max_length) {
+  Api::IoCallUint64Result result = OwnedImpl::read(io_handle, max_length);
   checkHighWatermark();
   return result;
 }
@@ -52,8 +62,8 @@ uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t nu
   return bytes_reserved;
 }
 
-std::tuple<int, int> WatermarkBuffer::write(int fd) {
-  std::tuple<int, int> result = OwnedImpl::write(fd);
+Api::IoCallUint64Result WatermarkBuffer::write(Network::IoHandle& io_handle) {
+  Api::IoCallUint64Result result = OwnedImpl::write(io_handle);
   checkLowWatermark();
   return result;
 }

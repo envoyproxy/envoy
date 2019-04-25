@@ -5,7 +5,7 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/filesystem/filesystem.h"
+#include "envoy/filesystem/watcher.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"

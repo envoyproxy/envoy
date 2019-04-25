@@ -6,6 +6,7 @@ load(
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -18,10 +19,12 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/upstream:cds_api_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:config_source_cc",
     ],
 )
 
@@ -32,15 +35,18 @@ envoy_cc_test(
         ":utility_lib",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/api:api_lib",
         "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:socket_option_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
-        "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
@@ -52,7 +58,22 @@ envoy_cc_test(
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "conn_pool_map_impl_test",
+    srcs = ["conn_pool_map_impl_test.cc"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+        "//source/common/upstream:conn_pool_map_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -71,8 +92,10 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -99,6 +122,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -153,11 +177,33 @@ envoy_cc_test(
         "//source/common/upstream:load_stats_reporter_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
         "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "hds_test",
+    srcs = ["hds_test.cc"],
+    deps = [
+        "//source/common/upstream:health_discovery_service_lib",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
+        "@envoy_api//envoy/service/discovery/v2:hds_cc",
     ],
 )
 
@@ -171,10 +217,12 @@ envoy_cc_test(
         "//source/common/upstream:logical_dns_cluster_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
@@ -193,8 +241,10 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/mocks:common_lib",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -216,6 +266,21 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "priority_conn_pool_map_impl_test",
+    srcs = ["priority_conn_pool_map_impl_test.cc"],
+    deps = [
+        "//include/envoy/http:conn_pool_interface",
+        "//source/common/upstream:priority_conn_pool_map_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:conn_pool_mocks",
+        "//test/mocks/upstream:host_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -223,8 +288,10 @@ envoy_cc_test(
     name = "resource_manager_impl_test",
     srcs = ["resource_manager_impl_test.cc"],
     deps = [
+        "//include/envoy/upstream:upstream_interface",
         "//source/common/upstream:resource_manager_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 
@@ -271,28 +338,6 @@ envoy_cc_binary(
 )
 
 envoy_cc_test(
-    name = "sds_test",
-    srcs = ["sds_test.cc"],
-    data = glob(["test_data/**"]),
-    deps = [
-        ":utility_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/filesystem:filesystem_lib",
-        "//source/common/http:message_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/upstream:eds_lib",
-        "//source/extensions/transport_sockets/raw_buffer:config",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/ssl:ssl_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-    ],
-)
-
-envoy_cc_test(
     name = "subset_lb_test",
     srcs = ["subset_lb_test.cc"],
     deps = [
@@ -326,12 +371,15 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -347,5 +395,37 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "cluster_factory_impl_test",
+    srcs = ["cluster_factory_impl_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/api:api_interface",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/upstream:cluster_factory_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/config:metadata_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/json:config_schemas_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/upstream:cluster_factory_lib",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
+        "//test/integration/clusters:custom_static_cluster",
+        "//test/mocks:common_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
     ],
 )

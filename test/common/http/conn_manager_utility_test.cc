@@ -18,14 +18,20 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
+using testing::Matcher;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Http {
+
+class MockInternalAddressConfig : public Http::InternalAddressConfig {
+public:
+  MOCK_CONST_METHOD1(isInternalAddress, bool(const Network::Address::Instance&));
+};
 
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
@@ -44,13 +50,20 @@ public:
   MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
   MOCK_METHOD0(generateRequestId, bool());
+  MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider&());
   MOCK_METHOD0(serverName, const std::string&());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return *internal_address_config_;
+  }
+  MOCK_METHOD0(unixSocketInternal, bool());
   MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
   MOCK_CONST_METHOD0(skipXffAppend, bool());
   MOCK_CONST_METHOD0(via, const std::string&());
@@ -63,6 +76,10 @@ public:
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
+  MOCK_CONST_METHOD0(shouldNormalizePath, bool());
+
+  std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
+      std::make_unique<DefaultInternalAddressConfig>();
 };
 
 class ConnectionManagerUtilityTest : public testing::Test {
@@ -70,7 +87,7 @@ public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
-    tracing_config_ = {Tracing::OperationName::Ingress, {}, 100, 10000, 100};
+    tracing_config_ = {Tracing::OperationName::Ingress, {}, 100, 10000, 100, false};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
@@ -88,11 +105,11 @@ public:
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
   // convoluted way to force tests to check both the final downstream address as well as whether
   // the request is internal/external, given the importance of these two pieces of data.
-  MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol protocol) {
+  MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol) {
     MutateRequestRet ret;
     ret.downstream_address_ =
-        ConnectionManagerUtility::mutateRequestHeaders(
-            headers, protocol, connection_, config_, route_config_, random_, runtime_, local_info_)
+        ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                       random_, runtime_, local_info_)
             ->asString();
     ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
     return ret;
@@ -110,6 +127,51 @@ public:
   std::string empty_node_;
   std::string via_;
 };
+
+// Tests for ConnectionManagerUtility::determineNextProtocol.
+TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
+    Buffer::OwnedImpl data("");
+    EXPECT_EQ("hello", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("");
+    EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("GET / HTTP/1.1");
+    EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("PRI * HTTP/2.0\r\n");
+    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("PRI * HTTP/2");
+    EXPECT_EQ("h2", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+
+  {
+    Network::MockConnection connection;
+    EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return(""));
+    Buffer::OwnedImpl data("PRI * HTTP/");
+    EXPECT_EQ("", ConnectionManagerUtility::determineNextProtocol(connection, data));
+  }
+}
 
 // Verify external request and XFF is set when we are using remote address and the address is
 // external.
@@ -137,7 +199,7 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
   EXPECT_FALSE(headers.has(Headers::get().ForwardedFor));
 }
 
-// Verify that we pass-thru XFF when skipAffAppend(), even if using remote
+// Verify that we pass-thru XFF when skipXffAppend(), even if using remote
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
@@ -147,7 +209,26 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
 
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_STREQ("198.51.100.1", headers.ForwardedFor()->value().c_str());
+  EXPECT_EQ("198.51.100.1", headers.ForwardedFor()->value().getStringView());
+}
+
+// Verify internal request and XFF is set when we are using remote address and the address is
+// internal according to user configuration.
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAddress) {
+  auto config = std::make_unique<NiceMock<MockInternalAddressConfig>>();
+  ON_CALL(*config, isInternalAddress).WillByDefault(Return(true));
+  config_.internal_address_config_ = std::move(config);
+
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+
+  TestHeaderMapImpl headers;
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("12.12.12.12", headers.get_(Headers::get().ForwardedFor));
 }
 
 // Verify internal request and XFF is set when we are using remote address the address is internal.
@@ -196,7 +277,7 @@ TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
   EXPECT_FALSE(request_headers.has(Headers::get().Via));
 
   TestHeaderMapImpl response_headers;
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, via_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, via_);
   EXPECT_FALSE(response_headers.has(Headers::get().Via));
 }
 
@@ -213,9 +294,9 @@ TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
 
   TestHeaderMapImpl response_headers;
   // Pretend we're doing a 100-continue transform here.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
   // The actual response header processing.
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, via_);
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, via_);
   EXPECT_EQ("foo", response_headers.get_(Headers::get().Via));
 }
 
@@ -293,7 +374,8 @@ TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownst
                               {"x-request-id", "will_be_regenerated"}};
     EXPECT_CALL(random_, uuid());
 
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", _)).Times(0);
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", Matcher<uint64_t>(_)))
+        .Times(0);
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
               callMutateRequestHeaders(headers, Protocol::Http2));
     EXPECT_FALSE(headers.has(Headers::get().EnvoyDownstreamServiceCluster));
@@ -438,6 +520,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   route_config_.internal_only_headers_.push_back(LowerCaseString("custom_header"));
   TestHeaderMapImpl headers{{"x-envoy-decorator-operation", "foo"},
                             {"x-envoy-downstream-service-cluster", "foo"},
+                            {"x-envoy-retriable-status-codes", "123,456"},
                             {"x-envoy-retry-on", "foo"},
                             {"x-envoy-retry-grpc-on", "foo"},
                             {"x-envoy-max-retries", "foo"},
@@ -446,6 +529,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
                             {"x-envoy-upstream-rq-timeout-ms", "foo"},
                             {"x-envoy-expected-rq-timeout-ms", "10"},
                             {"x-envoy-ip-tags", "bar"},
+                            {"x-envoy-original-url", "my_url"},
                             {"custom_header", "foo"}};
 
   EXPECT_EQ((MutateRequestRet{"50.0.0.1:0", false}),
@@ -453,6 +537,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_EQ("50.0.0.1", headers.get_("x-envoy-external-address"));
   EXPECT_FALSE(headers.has("x-envoy-decorator-operation"));
   EXPECT_FALSE(headers.has("x-envoy-downstream-service-cluster"));
+  EXPECT_FALSE(headers.has("x-envoy-retriable-status-codes"));
   EXPECT_FALSE(headers.has("x-envoy-retry-on"));
   EXPECT_FALSE(headers.has("x-envoy-retry-grpc-on"));
   EXPECT_FALSE(headers.has("x-envoy-max-retries"));
@@ -461,6 +546,7 @@ TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
   EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
   EXPECT_FALSE(headers.has("x-envoy-ip-tags"));
+  EXPECT_FALSE(headers.has("x-envoy-original-url"));
   EXPECT_FALSE(headers.has("custom_header"));
 }
 
@@ -498,7 +584,7 @@ TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest)
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_EQ("10.0.0.2, 10.0.0.1", headers.get_("x-forwarded-for"));
+  EXPECT_EQ("10.0.0.2,10.0.0.1", headers.get_("x-forwarded-for"));
 }
 
 // A request that is from an internal address and uses remote address should be an internal request.
@@ -536,23 +622,13 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketReque
   EXPECT_FALSE(headers.has("upgrade"));
 }
 
-// Make sure we remove connections headers for a WS request over h2.
-TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
-  TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
-
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
-            callMutateRequestHeaders(headers, Protocol::Http2));
-  EXPECT_FALSE(headers.has("connection"));
-  EXPECT_FALSE(headers.has("upgrade"));
-}
-
 // Test cleaning response headers.
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   TestHeaderMapImpl response_headers{
       {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "custom_value"}};
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
   EXPECT_EQ(1UL, response_headers.size());
   EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -567,7 +643,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRes
       {"connection", "upgrade"}, {"transfer-encoding", "foo"}, {"upgrade", "bar"}};
   EXPECT_TRUE(Utility::isUpgrade(request_headers));
   EXPECT_TRUE(Utility::isUpgrade(response_headers));
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
   EXPECT_EQ(2UL, response_headers.size()) << response_headers;
   EXPECT_EQ("upgrade", response_headers.get_("connection"));
@@ -582,7 +658,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
         {"connection", "foo"}, {"transfer-encoding", "bar"}, {"custom_header", "custom_value"}};
     EXPECT_FALSE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
     EXPECT_EQ(1UL, response_headers.size()) << response_headers;
     EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -597,7 +673,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
                                        {"custom_header", "custom_value"}};
     EXPECT_FALSE(Utility::isUpgrade(request_headers));
     EXPECT_TRUE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
     EXPECT_EQ(2UL, response_headers.size()) << response_headers;
     EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
@@ -610,7 +686,7 @@ TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
     TestHeaderMapImpl response_headers{{"transfer-encoding", "foo"}, {"upgrade", "bar"}};
     EXPECT_TRUE(Utility::isUpgrade(request_headers));
     EXPECT_FALSE(Utility::isUpgrade(response_headers));
-    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
     EXPECT_EQ(1UL, response_headers.size()) << response_headers;
     EXPECT_EQ("bar", response_headers.get_("upgrade"));
@@ -623,13 +699,13 @@ TEST_F(ConnectionManagerUtilityTest, MutateResponseHeadersReturnXRequestId) {
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
                                     {"x-envoy-force-trace", "true"}};
 
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
   EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
 }
 
 // Test full sanitization of x-forwarded-client-cert.
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
-  NiceMock<Ssl::MockConnection> ssl;
+  NiceMock<Ssl::MockConnectionInfo> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
@@ -645,7 +721,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeClientCert) {
 
 // Test that we sanitize and set x-forwarded-client-cert.
 TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
-  NiceMock<Ssl::MockConnection> ssl;
+  NiceMock<Ssl::MockConnectionInfo> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
@@ -662,14 +738,16 @@ TEST_F(ConnectionManagerUtilityTest, MtlsForwardOnlyClientCert) {
             headers.get_("x-forwarded-client-cert"));
 }
 
-// The server (local) dentity is foo.com/be. The client does not set XFCC.
+// The server (local) identity is foo.com/be. The client does not set XFCC.
 TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
-  NiceMock<Ssl::MockConnection> ssl;
+  NiceMock<Ssl::MockConnectionInfo> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("test://foo.com/fe"));
+  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
   std::vector<std::string> expected_dns = {"www.example.com"};
@@ -696,16 +774,18 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSetForwardClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
-  NiceMock<Ssl::MockConnection> ssl;
+  NiceMock<Ssl::MockConnectionInfo> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("test://foo.com/fe"));
+  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("%3D%3Dabc%0Ade%3D");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
   std::vector<std::string> expected_dns = {"www.example.com"};
@@ -732,16 +812,17 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
-  NiceMock<Ssl::MockConnection> ssl;
+  NiceMock<Ssl::MockConnectionInfo> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(""));
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(std::vector<std::string>()));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("test://foo.com/fe"));
+  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::AppendForward));
@@ -760,18 +841,20 @@ TEST_F(ConnectionManagerUtilityTest, MtlsAppendForwardClientCertLocalSanEmpty) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
-  NiceMock<Ssl::MockConnection> ssl;
+  NiceMock<Ssl::MockConnectionInfo> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   EXPECT_CALL(ssl, subjectPeerCertificate())
       .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("test://foo.com/fe"));
+  const std::vector<std::string> peer_uri_sans{"test://foo.com/fe"};
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(peer_uri_sans));
   std::string expected_pem("abcde=");
   EXPECT_CALL(ssl, urlEncodedPemEncodedPeerCertificate()).WillOnce(ReturnRef(expected_pem));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
@@ -795,18 +878,19 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCert) {
 }
 
 // This test assumes the following scenario:
-// The client identity is foo.com/fe, and the server (local) dentity is foo.com/be. The client
+// The client identity is foo.com/fe, and the server (local) identity is foo.com/be. The client
 // also sends the XFCC header with the authentication result of the previous hop, (bar.com/be
 // calling foo.com/fe).
 TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
-  NiceMock<Ssl::MockConnection> ssl;
+  NiceMock<Ssl::MockConnectionInfo> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(true));
-  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return("test://foo.com/be"));
+  const std::vector<std::string> local_uri_sans{"test://foo.com/be"};
+  EXPECT_CALL(ssl, uriSanLocalCertificate()).WillOnce(Return(local_uri_sans));
   std::string expected_sha("abcdefg");
   EXPECT_CALL(ssl, sha256PeerCertificateDigest()).WillOnce(ReturnRef(expected_sha));
   EXPECT_CALL(ssl, subjectPeerCertificate())
       .WillOnce(Return("/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=test.lyft.com"));
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(""));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(std::vector<std::string>()));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
       .WillByDefault(Return(Http::ForwardClientCertType::SanitizeSet));
@@ -827,7 +911,7 @@ TEST_F(ConnectionManagerUtilityTest, MtlsSanitizeSetClientCertPeerSanEmpty) {
 
 // forward_only, append_forward and sanitize_set are only effective in mTLS connection.
 TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
-  NiceMock<Ssl::MockConnection> ssl;
+  NiceMock<Ssl::MockConnectionInfo> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
@@ -843,7 +927,7 @@ TEST_F(ConnectionManagerUtilityTest, TlsSanitizeClientCertWhenForward) {
 
 // always_forward_only works regardless whether the connection is TLS/mTLS.
 TEST_F(ConnectionManagerUtilityTest, TlsAlwaysForwardOnlyClientCert) {
-  NiceMock<Ssl::MockConnection> ssl;
+  NiceMock<Ssl::MockConnectionInfo> ssl;
   ON_CALL(ssl, peerCertificatePresented()).WillByDefault(Return(false));
   ON_CALL(connection_, ssl()).WillByDefault(Return(&ssl));
   ON_CALL(config_, forwardClientCert())
@@ -1009,13 +1093,46 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestHeaderMapImpl request_headers{{}};
   Http::TestHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
                                            {"proxy-connection", "proxy-header"}};
-  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, "");
 
   EXPECT_EQ(UuidTraceStatus::NoTrace,
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
 
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
+}
+
+// maybeNormalizePath() does nothing by default.
+TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/../a"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(original_headers, header_map);
+}
+
+// maybeNormalizePath() leaves already normal paths alone.
+TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(original_headers, header_map);
+}
+
+// maybeNormalizePath() normalizes relative paths.
+TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
+  ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
+  HeaderMapImpl original_headers;
+  original_headers.insertPath().value(std::string("/xyz/../abc"));
+
+  HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
+  ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
+  EXPECT_EQ(header_map.Path()->value().getStringView(), "/abc");
 }
 
 } // namespace Http

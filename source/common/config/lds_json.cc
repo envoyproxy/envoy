@@ -1,5 +1,7 @@
 #include "common/config/lds_json.h"
 
+#include "envoy/stats/stats_options.h"
+
 #include "common/common/assert.h"
 #include "common/config/address_json.h"
 #include "common/config/json_utility.h"
@@ -7,6 +9,7 @@
 #include "common/config/utility.h"
 #include "common/json/config_schemas.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 
 #include "extensions/filters/network/well_known_names.h"
 
@@ -37,14 +40,12 @@ void LdsJson::translateListener(const Json::Object& json_listener,
     // Translate v1 name to v2 name.
     filter->set_name(Extensions::NetworkFilters::NetworkFilterNames::get().v1_converter_.getV2Name(
         json_filter->getString("name")));
-    JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
-    const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
-                                    json_filter->getObject("config")->asJsonString() + "}";
-
-    const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
+    const std::string json_config =
+        "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +
+        "}";
     // JSON schema has already validated that this is a valid JSON object.
-    ASSERT(status.ok());
+    MessageUtil::loadFromJson(json_config, *filter->mutable_config());
   }
 
   const std::string drain_type = json_listener.getString("drain_type", "default");

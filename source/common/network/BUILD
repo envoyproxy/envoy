@@ -12,9 +12,14 @@ envoy_package()
 envoy_cc_library(
     name = "address_lib",
     srcs = ["address_impl.cc"],
-    hdrs = ["address_impl.h"],
+    hdrs = [
+        "address_impl.h",
+        "io_socket_handle_impl.h",
+    ],
     deps = [
+        ":io_socket_handle_lib",
         "//include/envoy/network:address_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],
@@ -57,7 +62,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/event:libevent_lib",
         "//source/common/network:listen_socket_lib",
-        "//source/common/ssl:ssl_socket_lib",
+        "//source/common/stream_info:stream_info_lib",
     ],
 )
 
@@ -80,6 +85,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_lib",
     hdrs = ["filter_impl.h"],
+    deps = [
+        "//include/envoy/network:filter_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -91,6 +99,30 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
+    ],
+)
+
+envoy_cc_library(
+    name = "io_socket_error_lib",
+    srcs = ["io_socket_error_impl.cc"],
+    hdrs = ["io_socket_error_impl.h"],
+    deps = [
+        "//include/envoy/api:io_error_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "io_socket_handle_lib",
+    srcs = ["io_socket_handle_impl.cc"],
+    hdrs = ["io_socket_handle_impl.h"],
+    deps = [
+        ":io_socket_error_lib",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:io_handle_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:stack_array",
     ],
 )
 
@@ -112,29 +144,35 @@ envoy_cc_library(
     hdrs = ["listen_socket_impl.h"],
     deps = [
         ":address_lib",
+        ":io_socket_handle_lib",
         ":utility_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:assert_lib",
-        "//source/common/ssl:context_lib",
     ],
 )
 
 envoy_cc_library(
     name = "listener_lib",
     srcs = [
+        "base_listener_impl.cc",
         "listener_impl.cc",
+        "udp_listener_impl.cc",
     ],
     hdrs = [
+        "base_listener_impl.h",
         "listener_impl.h",
+        "udp_listener_impl.h",
     ],
     deps = [
         ":address_lib",
+        ":io_socket_handle_lib",
         ":listen_socket_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
         "//include/envoy/network:listener_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:stats_macros",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
@@ -181,6 +219,8 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
+        ":listen_socket_lib",
+        "//include/envoy/api:os_sys_calls_interface",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
@@ -228,9 +268,31 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:cleanup_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2/core:address_cc",
         "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "transport_socket_options_lib",
+    srcs = ["transport_socket_options_impl.cc"],
+    hdrs = ["transport_socket_options_impl.h"],
+    deps = [
+        "//include/envoy/network:transport_socket_interface",
+        "//source/common/common:scalar_to_byte_vector_lib",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "upstream_server_name_lib",
+    srcs = ["upstream_server_name.cc"],
+    hdrs = ["upstream_server_name.h"],
+    deps = [
+        "//include/envoy/stream_info:filter_state_interface",
+        "//source/common/common:macros",
     ],
 )

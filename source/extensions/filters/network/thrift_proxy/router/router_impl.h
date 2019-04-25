@@ -5,14 +5,19 @@
 #include <vector>
 
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/router/router.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "common/common/logger.h"
+#include "common/http/header_utility.h"
+#include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/router/router.h"
+#include "extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
+#include "extensions/filters/network/thrift_proxy/thrift_object.h"
 
 #include "absl/types/optional.h"
 
@@ -30,17 +35,59 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+    return metadata_match_criteria_.get();
+  }
+  const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
 
-  virtual RouteConstSharedPtr matches(const std::string& method_name) const PURE;
+  virtual RouteConstSharedPtr matches(const MessageMetadata& metadata,
+                                      uint64_t random_value) const PURE;
 
 protected:
-  RouteConstSharedPtr clusterEntry() const;
+  RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
+  bool headersMatch(const Http::HeaderMap& headers) const;
 
 private:
+  class WeightedClusterEntry : public RouteEntry, public Route {
+  public:
+    WeightedClusterEntry(
+        const RouteEntryImplBase& parent,
+        const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+            cluster);
+
+    uint64_t clusterWeight() const { return cluster_weight_; }
+
+    // Router::RouteEntry
+    const std::string& clusterName() const override { return cluster_name_; }
+    const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+      if (metadata_match_criteria_) {
+        return metadata_match_criteria_.get();
+      }
+
+      return parent_.metadataMatchCriteria();
+    }
+    const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
+
+    // Router::Route
+    const RouteEntry* routeEntry() const override { return this; }
+
+  private:
+    const RouteEntryImplBase& parent_;
+    const std::string cluster_name_;
+    const uint64_t cluster_weight_;
+    Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
+  };
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+
   const std::string cluster_name_;
+  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
+  std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  uint64_t total_cluster_weight_;
+  Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
+  const RateLimitPolicyImpl rate_limit_policy_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
@@ -52,47 +99,69 @@ public:
 
   const std::string& methodName() const { return method_name_; }
 
-  // RoutEntryImplBase
-  RouteConstSharedPtr matches(const std::string& method_name) const override;
+  // RouteEntryImplBase
+  RouteConstSharedPtr matches(const MessageMetadata& metadata,
+                              uint64_t random_value) const override;
 
 private:
   const std::string method_name_;
+  const bool invert_;
+};
+
+class ServiceNameRouteEntryImpl : public RouteEntryImplBase {
+public:
+  ServiceNameRouteEntryImpl(
+      const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route);
+
+  const std::string& serviceName() const { return service_name_; }
+
+  // RouteEntryImplBase
+  RouteConstSharedPtr matches(const MessageMetadata& metadata,
+                              uint64_t random_value) const override;
+
+private:
+  std::string service_name_;
+  const bool invert_;
 };
 
 class RouteMatcher {
 public:
   RouteMatcher(const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration&);
 
-  RouteConstSharedPtr route(const std::string& method_name) const;
+  RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
 private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
 };
 
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
-               public Upstream::LoadBalancerContext,
+               public Upstream::LoadBalancerContextBase,
                public ProtocolConverter,
+               public ThriftFilters::DecoderFilter,
                Logger::Loggable<Logger::Id::thrift> {
 public:
   Router(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
 
   ~Router() {}
 
-  // ProtocolConverter
+  // ThriftFilters::DecoderFilter
   void onDestroy() override;
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
-  void resetUpstreamConnection() override;
-  ThriftFilters::FilterStatus transportBegin(absl::optional<uint32_t> size) override;
-  ThriftFilters::FilterStatus transportEnd() override;
-  ThriftFilters::FilterStatus messageBegin(absl::string_view name, MessageType msg_type,
-                                           int32_t seq_id) override;
-  ThriftFilters::FilterStatus messageEnd() override;
+
+  // ProtocolConverter
+  FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
+  FilterStatus transportEnd() override;
+  FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+  FilterStatus messageEnd() override;
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
-  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
   const Network::Connection* downstreamConnection() const override;
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override {
+    if (route_entry_) {
+      return route_entry_->metadataMatchCriteria();
+    }
+    return nullptr;
+  }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
@@ -103,18 +172,20 @@ public:
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
     UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
-                    absl::string_view method_name, MessageType msg_type, int32_t seq_id);
+                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
+                    ProtocolType protocol_type);
     ~UpstreamRequest();
 
-    void start();
+    FilterStatus start();
     void resetStream();
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
-    void onPoolReady(Tcp::ConnectionPool::ConnectionData& conn,
+    void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
+    void onRequestStart(bool continue_decoding);
     void onRequestComplete();
     void onResponseComplete();
     void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
@@ -122,22 +193,22 @@ private:
 
     Router& parent_;
     Tcp::ConnectionPool::Instance& conn_pool_;
-    const std::string method_name_;
-    const MessageType msg_type_;
-    const int32_t seq_id_;
+    MessageMetadataSharedPtr metadata_;
 
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
-    Tcp::ConnectionPool::ConnectionData* conn_data_{};
+    Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
+    ThriftConnectionState* conn_state_{};
     TransportPtr transport_;
-    ProtocolType proto_type_{ProtocolType::Auto};
+    ProtocolPtr protocol_;
+    ThriftObjectPtr upgrade_response_;
 
     bool request_complete_ : 1;
     bool response_started_ : 1;
     bool response_complete_ : 1;
   };
 
-  void convertMessageBegin(const std::string& name, MessageType msg_type, int32_t seq_id);
+  void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
 
   Upstream::ClusterManager& cluster_manager_;

@@ -1,14 +1,17 @@
+#include "common/network/io_socket_handle_impl.h"
+
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
+#include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
-#include "test/test_common/tls_utility.h"
 
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
 
+using testing::_;
 using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
@@ -19,23 +22,26 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
+namespace {
 
 class TlsInspectorTest : public testing::Test {
 public:
-  TlsInspectorTest() : cfg_(std::make_shared<Config>(store_)) {}
+  TlsInspectorTest()
+      : cfg_(std::make_shared<Config>(store_)),
+        io_handle_(std::make_unique<Network::IoSocketHandleImpl>(42)) {}
+  ~TlsInspectorTest() { io_handle_->close(); }
 
   void init() {
-    timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     filter_ = std::make_unique<Filter>(cfg_);
+
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(42));
+    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
 
     EXPECT_CALL(dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge,
@@ -54,7 +60,7 @@ public:
   Network::MockConnectionSocket socket_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::FileReadyCb file_event_callback_;
-  Event::MockTimer* timer_{};
+  Network::IoHandlePtr io_handle_;
 };
 
 // Test that an exception is thrown for an invalid value for max_client_hello_size
@@ -71,20 +77,11 @@ TEST_F(TlsInspectorTest, ConnectionClosed) {
   EXPECT_EQ(1, cfg_->stats().connection_closed_.value());
 }
 
-// Test that the filter detects timeout and terminates.
-TEST_F(TlsInspectorTest, Timeout) {
-  init();
-  EXPECT_CALL(cb_, continueFilterChain(false));
-  timer_->callback_();
-  EXPECT_EQ(1, cfg_->stats().read_timeout_.value());
-}
-
 // Test that the filter detects detects read errors.
 TEST_F(TlsInspectorTest, ReadError) {
   init();
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-    errno = ENOTSUP;
-    return -1;
+    return Api::SysCallSizeResult{ssize_t(-1), ENOTSUP};
   }));
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
@@ -97,11 +94,12 @@ TEST_F(TlsInspectorTest, SniRegistered) {
   const std::string servername("example.com");
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername, "");
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke([&client_hello](int, void* buffer, size_t length, int) -> int {
-        ASSERT(length >= client_hello.size());
-        memcpy(buffer, client_hello.data(), client_hello.size());
-        return client_hello.size();
-      }));
+      .WillOnce(
+          Invoke([&client_hello](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }));
   EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
@@ -119,11 +117,12 @@ TEST_F(TlsInspectorTest, AlpnRegistered) {
                                                       absl::string_view("http/1.1")};
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("", "\x02h2\x08http/1.1");
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke([&client_hello](int, void* buffer, size_t length, int) -> int {
-        ASSERT(length >= client_hello.size());
-        memcpy(buffer, client_hello.data(), client_hello.size());
-        return client_hello.size();
-      }));
+      .WillOnce(
+          Invoke([&client_hello](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }));
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
@@ -142,17 +141,18 @@ TEST_F(TlsInspectorTest, MultipleReads) {
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(servername, "\x02h2");
   {
     InSequence s;
-    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() -> int {
-      errno = EAGAIN;
-      return -1;
-    }));
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+        .WillOnce(InvokeWithoutArgs([]() -> Api::SysCallSizeResult {
+          return Api::SysCallSizeResult{ssize_t(-1), EAGAIN};
+        }));
     for (size_t i = 1; i <= client_hello.size(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke([&client_hello, i](int, void* buffer, size_t length, int) -> int {
-            ASSERT(length >= client_hello.size());
-            memcpy(buffer, client_hello.data(), client_hello.size());
-            return i;
-          }));
+          .WillOnce(Invoke(
+              [&client_hello, i](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= client_hello.size());
+                memcpy(buffer, client_hello.data(), client_hello.size());
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
     }
   }
 
@@ -176,11 +176,12 @@ TEST_F(TlsInspectorTest, NoExtensions) {
   init();
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello("", "");
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke([&client_hello](int, void* buffer, size_t length, int) -> int {
-        ASSERT(length >= client_hello.size());
-        memcpy(buffer, client_hello.data(), client_hello.size());
-        return client_hello.size();
-      }));
+      .WillOnce(
+          Invoke([&client_hello](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length >= client_hello.size());
+            memcpy(buffer, client_hello.data(), client_hello.size());
+            return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+          }));
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
@@ -200,11 +201,12 @@ TEST_F(TlsInspectorTest, ClientHelloTooBig) {
   ASSERT(client_hello.size() > max_size);
   init();
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke([&client_hello](int, void* buffer, size_t length, int) -> int {
-        ASSERT(length == max_size);
-        memcpy(buffer, client_hello.data(), length);
-        return length;
-      }));
+      .WillOnce(
+          Invoke([&client_hello](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            ASSERT(length == max_size);
+            memcpy(buffer, client_hello.data(), length);
+            return Api::SysCallSizeResult{ssize_t(length), 0};
+          }));
   EXPECT_CALL(cb_, continueFilterChain(false));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
@@ -219,16 +221,17 @@ TEST_F(TlsInspectorTest, NotSsl) {
   data.resize(100);
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-      .WillOnce(Invoke([&data](int, void* buffer, size_t length, int) -> int {
+      .WillOnce(Invoke([&data](int, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
         ASSERT(length >= data.size());
         memcpy(buffer, data.data(), data.size());
-        return data.size();
+        return Api::SysCallSizeResult{ssize_t(data.size()), 0};
       }));
   EXPECT_CALL(cb_, continueFilterChain(true));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
 }
 
+} // namespace
 } // namespace TlsInspector
 } // namespace ListenerFilters
 } // namespace Extensions

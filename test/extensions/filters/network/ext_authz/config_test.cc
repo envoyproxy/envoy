@@ -1,4 +1,5 @@
 #include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
+#include "envoy/stats/scope.h"
 
 #include "extensions/filters/network/ext_authz/config.h"
 
@@ -7,8 +8,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::_;
+using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {

@@ -1,6 +1,10 @@
 syntax = "proto3";
 
 package envoy.service.load_stats.v2;
+
+option java_outer_classname = "LrsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.service.load_stats.v2";
 option go_package = "v2";
 option java_generic_services = true;
 
@@ -71,4 +75,8 @@ message LoadStatsResponse {
   //    of inobservability that might otherwise exists between the messages. New clusters are not
   //    subject to this consideration.
   google.protobuf.Duration load_reporting_interval = 2;
+
+  // Set to *true* if the management server supports endpoint granularity
+  // report.
+  bool report_endpoint_granularity = 3;
 }

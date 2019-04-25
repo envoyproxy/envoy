@@ -8,26 +8,19 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
 using testing::_;
+using testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
-
-TEST(BufferFilterFactoryTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(BufferFilterFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::http::buffer::v2::Buffer(), "stats", context),
-               ProtoValidationException);
-}
+namespace {
 
 TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
   std::string json_string = R"EOF(
   {
-    "max_request_bytes" : 1028,
-    "max_request_time_s" : 2
+    "max_request_bytes" : 1028
   }
   )EOF";
 
@@ -41,10 +34,10 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectJson) {
 }
 
 TEST(BufferFilterFactoryTest, BufferFilterIncorrectJson) {
+  // This is incorrect because the number is quote-wrapped
   std::string json_string = R"EOF(
   {
-    "max_request_bytes" : 1028,
-    "max_request_time_s" : "2"
+    "max_request_bytes" : "1028"
   }
   )EOF";
 
@@ -57,7 +50,6 @@ TEST(BufferFilterFactoryTest, BufferFilterIncorrectJson) {
 TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
   envoy::config::filter::http::buffer::v2::Buffer config{};
   config.mutable_max_request_bytes()->set_value(1028);
-  config.mutable_max_request_time()->set_seconds(2);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   BufferFilterFactory factory;
@@ -74,7 +66,6 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
           factory.createEmptyConfigProto().get());
 
   config.mutable_max_request_bytes()->set_value(1028);
-  config.mutable_max_request_time()->set_seconds(2);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
@@ -112,6 +103,7 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   EXPECT_TRUE(inflated);
 }
 
+} // namespace
 } // namespace BufferFilter
 } // namespace HttpFilters
 } // namespace Extensions

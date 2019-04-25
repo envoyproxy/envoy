@@ -6,8 +6,8 @@
 #include <unordered_map>
 
 #include "common/network/utility.h"
-#include "common/request_info/request_info_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/protobuf/utility.h"
+#include "common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -41,29 +41,29 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestHeaderMapImpl> headers, int ran
     : headers_(std::move(headers)), random_value_(random_value) {}
 
 // static
-RouterCheckTool RouterCheckTool::create(const std::string& router_config_json) {
+RouterCheckTool RouterCheckTool::create(const std::string& router_config_file) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(router_config_json);
   envoy::api::v2::RouteConfiguration route_config;
-  // TODO(ambuc): Add a CLI option to allow for a maxStatNameLength constraint
-  Stats::StatsOptionsImpl stats_options;
-  Config::RdsJson::translateRouteConfiguration(*loader, route_config, stats_options);
+  auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
+  auto api = Api::createApiForTest(*stats);
+  MessageUtil::loadFromFile(router_config_file, route_config, *api);
 
-  std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context(
-      std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>());
-  std::unique_ptr<Router::ConfigImpl> config(
-      new Router::ConfigImpl(route_config, *factory_context, false));
+  auto factory_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
+  auto config = std::make_unique<Router::ConfigImpl>(route_config, *factory_context, false);
 
-  return RouterCheckTool(std::move(factory_context), std::move(config));
+  return RouterCheckTool(std::move(factory_context), std::move(config), std::move(stats),
+                         std::move(api));
 }
 
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context,
-    std::unique_ptr<Router::ConfigImpl> config)
-    : factory_context_(std::move(factory_context)), config_(std::move(config)) {}
+    std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
+    Api::ApiPtr api)
+    : factory_context_(std::move(factory_context)), config_(std::move(config)),
+      stats_(std::move(stats)), api_(std::move(api)) {}
 
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json);
+  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
 
   bool no_failures = true;
@@ -77,42 +77,30 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
     }
     Json::ObjectSharedPtr validate = check_config->getObject("validate");
 
-    const std::unordered_map<std::string, std::function<bool(ToolConfig&, const std::string&)>>
-        checkers = {
-            {"cluster_name",
-             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
-               return compareCluster(tool_config, expected);
-             }},
-            {"virtual_cluster_name",
-             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
-               return compareVirtualCluster(tool_config, expected);
-             }},
-            {"virtual_host_name",
-             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
-               return compareVirtualHost(tool_config, expected);
-             }},
-            {"path_rewrite",
-             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
-               return compareRewritePath(tool_config, expected);
-             }},
-            {"host_rewrite",
-             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
-               return compareRewriteHost(tool_config, expected);
-             }},
-            {"path_redirect",
-             [this](ToolConfig& tool_config, const std::string& expected) -> bool {
-               return compareRedirectPath(tool_config, expected);
-             }},
-        };
+    using checkerFunc = std::function<bool(ToolConfig&, const std::string&)>;
+    const std::unordered_map<std::string, checkerFunc> checkers = {
+        {"cluster_name",
+         [this](auto&... params) -> bool { return this->compareCluster(params...); }},
+        {"virtual_cluster_name",
+         [this](auto&... params) -> bool { return this->compareVirtualCluster(params...); }},
+        {"virtual_host_name",
+         [this](auto&... params) -> bool { return this->compareVirtualHost(params...); }},
+        {"path_rewrite",
+         [this](auto&... params) -> bool { return this->compareRewritePath(params...); }},
+        {"host_rewrite",
+         [this](auto&... params) -> bool { return this->compareRewriteHost(params...); }},
+        {"path_redirect",
+         [this](auto&... params) -> bool { return this->compareRedirectPath(params...); }},
+    };
 
-    // Call appropriate function for each match case
-    for (std::pair<std::string, std::function<bool(ToolConfig&, std::string)>> test : checkers) {
+    // Call appropriate function for each match case.
+    for (const auto& test : checkers) {
       if (validate->hasObject(test.first)) {
-        std::string expected = validate->getString(test.first);
+        const std::string& expected = validate->getString(test.first);
         if (tool_config.route_ == nullptr) {
           compareResults("", expected, test.first);
         } else {
-          if (!test.second(tool_config, validate->getString(test.first))) {
+          if (!test.second(tool_config, expected)) {
             no_failures = false;
           }
         }
@@ -138,6 +126,7 @@ bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_jso
       }
     }
   }
+
   return no_failures;
 }
 
@@ -170,9 +159,10 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
     actual = tool_config.headers_->get_(Http::Headers::get().Path);
   }
@@ -181,9 +171,10 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSource());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
     actual = tool_config.headers_->get_(Http::Headers::get().Host);
   }
@@ -208,10 +199,11 @@ bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::str
 bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                                const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
-  request_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
+  Envoy::StreamInfo::StreamInfoImpl stream_info(Envoy::Http::Protocol::Http11,
+                                                factory_context_->dispatcher().timeSource());
+  stream_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
   if (tool_config.route_->routeEntry() != nullptr) {
-    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
+    tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, stream_info,
                                                              true);
     actual = tool_config.headers_->get_(field);
   }
@@ -226,7 +218,8 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
 
   // Output failure details to stdout if details_ flag is set to true
   if (details_) {
-    std::cout << expected << " " << actual << " " << test_type << std::endl;
+    std::cerr << "expected: [" << expected << "], actual: [" << actual
+              << "], test type: " << test_type << std::endl;
   }
   return false;
 }

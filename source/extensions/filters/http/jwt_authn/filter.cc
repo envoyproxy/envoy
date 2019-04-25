@@ -2,6 +2,8 @@
 
 #include "common/http/utility.h"
 
+#include "extensions/filters/http/well_known_names.h"
+
 using ::google::jwt_verify::Status;
 
 namespace Envoy {
@@ -9,28 +11,30 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-Filter::Filter(JwtAuthnFilterStats& stats, AuthenticatorPtr auth)
-    : stats_(stats), auth_(std::move(auth)) {}
+Filter::Filter(FilterConfigSharedPtr config) : stats_(config->stats()), config_(config) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
-  if (auth_) {
-    auth_->onDestroy();
+  if (context_) {
+    context_->cancel();
   }
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
 
-  // Remove headers configured to pass payload
-  auth_->sanitizePayloadHeaders(headers);
-
   state_ = Calling;
   stopped_ = false;
-
-  // TODO(qiwzhang): support per-route config.
   // Verify the JWT token, onComplete() will be called when completed.
-  auth_->verify(headers, this);
+  const auto* verifier =
+      config_->findVerifier(headers, decoder_callbacks_->streamInfo().filterState());
+  if (!verifier) {
+    onComplete(Status::Ok);
+  } else {
+    context_ = Verifier::createContext(headers, this);
+    verifier->verify(context_);
+  }
+
   if (state_ == Complete) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -39,23 +43,26 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   return Http::FilterHeadersStatus::StopIteration;
 }
 
+void Filter::setPayload(const ProtobufWkt::Struct& payload) {
+  decoder_callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().JwtAuthn, payload);
+}
+
 void Filter::onComplete(const Status& status) {
   ENVOY_LOG(debug, "Called Filter : check complete {}", int(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {
     return;
   }
-  if (status != Status::Ok) {
+  if (Status::Ok != status) {
     stats_.denied_.inc();
     state_ = Responded;
     // verification failed
     Http::Code code = Http::Code::Unauthorized;
     // return failure reason as message body
-    Http::Utility::sendLocalReply(false, *decoder_callbacks_, false, code,
-                                  ::google::jwt_verify::getStatusString(status));
+    decoder_callbacks_->sendLocalReply(code, ::google::jwt_verify::getStatusString(status), nullptr,
+                                       absl::nullopt);
     return;
   }
-
   stats_.allowed_.inc();
   state_ = Complete;
   if (stopped_) {

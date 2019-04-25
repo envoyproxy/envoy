@@ -2,12 +2,12 @@
 
 # Generates request and response fixtures for integration tests.
 
-# Usage: generate_fixture.sh <transport> <protocol> [multiplex-service] -- method [param...]
+# Usage: generate_fixture.sh <transport> <protocol> -s [multiplex-service] -H [headers] method [param...]
 
 set -e
 
 function usage() {
-    echo "Usage: $0 <mode> <transport> <protocol> [multiplex-service] -- method [param...]"
+    echo "Usage: $0 <mode> <transport> <protocol> -s [multiplex-service] -H [headers] method [param...]"
     echo "where mode is success, exception, or idl-exception"
     exit 1
 }
@@ -24,24 +24,37 @@ fi
 MODE="$1"
 TRANSPORT="$2"
 PROTOCOL="$3"
-MULTIPLEX="$4"
-if ! shift 4; then
+
+if ! shift 3; then
     usage
 fi
 
-if [[ -z "${MODE}" || -z "${TRANSPORT}" || -z "${PROTOCOL}" || -z "${MULTIPLEX}" ]]; then
+if [[ -z "${MODE}" || -z "${TRANSPORT}" || -z "${PROTOCOL}" ]]; then
     usage
 fi
 
-if [[ "${MULTIPLEX}" != "--" ]]; then
-    if [[ "$1" != "--" ]]; then
-        echo "expected -- after multiplex service name"
-        exit 1
-    fi
-    shift
-else
-    MULTIPLEX=""
-fi
+MULTIPLEX=
+HEADERS=
+while getopts ":s:H:" opt; do
+    case ${opt} in
+        s)
+            MULTIPLEX=$OPTARG
+            ;;
+        H)
+            HEADERS=$OPTARG
+            ;;
+
+        \?)
+            echo "Invalid Option: -$OPTARG" >&2
+            exit 1
+            ;;
+        :)
+            echo "Invalid Option: -$OPTARG requires an argument" >&2
+            exit 1
+            ;;
+    esac
+done
+shift $((OPTIND -1))
 
 METHOD="$1"
 if [[ "${METHOD}" == "" ]]; then
@@ -59,8 +72,8 @@ SERVICE_FLAGS=("--addr" "${SOCKET}"
                "--protocol" "${PROTOCOL}")
 
 if [[ -n "$MULTIPLEX" ]]; then
-    SERVICE_FLAGS[9]="--multiplex"
-    SERVICE_FLAGS[10]="${MULTIPLEX}"
+    SERVICE_FLAGS+=("--multiplex")
+    SERVICE_FLAGS+=("${MULTIPLEX}")
 
     REQUEST_FILE="${FIXTURE_DIR}/${TRANSPORT}-${PROTOCOL}-${MULTIPLEX}-${MODE}.request"
     RESPONSE_FILE="${FIXTURE_DIR}/${TRANSPORT}-${PROTOCOL}-${MULTIPLEX}-${MODE}.response"
@@ -83,6 +96,11 @@ while [[ ! -a "${SOCKET}" ]]; do
         exit 1
     fi
 done
+
+if [[ -n "$HEADERS" ]]; then
+    SERVICE_FLAGS+=("--headers")
+    SERVICE_FLAGS+=("$HEADERS")
+fi
 
 "${DRIVER_DIR}/client" "${SERVICE_FLAGS[@]}" \
                        --request "${REQUEST_FILE}" \

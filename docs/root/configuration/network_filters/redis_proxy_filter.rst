@@ -4,8 +4,8 @@ Redis proxy
 ===========
 
 * Redis :ref:`architecture overview <arch_overview_redis>`
-* :ref:`v1 API reference <config_network_filters_redis_proxy_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.redis_proxy.v2.RedisProxy>`
+* This filter should be configured with the name *envoy.redis_proxy*.
 
 .. _config_network_filters_redis_proxy_stats:
 
@@ -41,22 +41,25 @@ The Redis filter will gather statistics for the command splitter in the
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  invalid_request, Counter, "Number of requests with an incorrect number of arguments"
-  unsupported_command, Counter, "Number of commands issued which are not recognized by the
-  command splitter"
+  invalid_request, Counter, Number of requests with an incorrect number of arguments
+  unsupported_command, Counter, Number of commands issued which are not recognized by the command splitter
 
 Per command statistics
 ----------------------
 
 The Redis filter will gather statistics for commands in the
-*redis.<stat_prefix>.command.<command>.* namespace.
+*redis.<stat_prefix>.command.<command>.* namespace. By default latency stats are in milliseconds and can be
+changed to microseconds by setting the configuration parameter :ref:`latency_in_micros <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.latency_in_micros>` to true.
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
   total, Counter, Number of commands
-
+  success, Counter, Number of commands that were successful
+  error, Counter, Number of commands that returned a partial or complete error response
+  latency, Histogram, Command execution time in milliseconds
+  
 .. _config_network_filters_redis_proxy_per_command_stats:
 
 Runtime

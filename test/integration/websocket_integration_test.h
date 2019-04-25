@@ -1,41 +1,50 @@
 #pragma once
 
-#include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 
 #include "gtest/gtest.h"
 
 namespace Envoy {
 
-class WebsocketIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+struct WebsocketProtocolTestParams {
+  Network::Address::IpVersion version;
+  Http::CodecClient::Type downstream_protocol;
+  FakeHttpConnection::Type upstream_protocol;
+};
+
+class WebsocketIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override;
-  WebsocketIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
-  bool old_style_websockets_{std::get<1>(GetParam())};
 
 protected:
-  void validateInitialUpstreamData(const std::string& received_data);
-  void validateInitialDownstreamData(const std::string& received_data,
-                                     const std::string& expected_data);
-  void validateFinalDownstreamData(const std::string& received_data,
-                                   const std::string& expected_data);
-  void validateFinalUpstreamData(const std::string& received_data,
-                                 const std::string& expected_data);
+  void performUpgrade(const Http::TestHeaderMapImpl& upgrade_request_headers,
+                      const Http::TestHeaderMapImpl& upgrade_response_headers);
+  void sendBidirectionalData();
 
-  const std::string& downstreamRespStr() {
-    return old_style_websockets_ ? upgrade_resp_str_ : modified_upgrade_resp_str_;
+  void validateUpgradeRequestHeaders(const Http::HeaderMap& proxied_request_headers,
+                                     const Http::HeaderMap& original_request_headers);
+  void validateUpgradeResponseHeaders(const Http::HeaderMap& proxied_response_headers,
+                                      const Http::HeaderMap& original_response_headers);
+  void commonValidate(Http::HeaderMap& proxied_headers, const Http::HeaderMap& original_headers);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult waitForUpstreamDisconnectOrReset() {
+    if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
+      return upstream_request_->waitForReset();
+    } else {
+      return fake_upstream_connection_->waitForDisconnect();
+    }
   }
 
-  const std::string upgrade_req_str_ = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
-                                       "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
-  const std::string upgrade_resp_str_ =
-      "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n";
+  void waitForClientDisconnectOrReset() {
+    if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+      response_->waitForReset();
+    } else {
+      codec_client_->waitForDisconnect();
+    }
+  }
 
-  const std::string modified_upgrade_resp_str_ = "HTTP/1.1 101 Switching Protocols\r\nconnection: "
-                                                 "Upgrade\r\nupgrade: websocket\r\ncontent-length: "
-                                                 "0\r\n\r\n";
+  IntegrationStreamDecoderPtr response_;
 };
 
 } // namespace Envoy

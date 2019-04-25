@@ -1,7 +1,6 @@
 #pragma once
 
 #include <netinet/in.h>
-#include <netinet/ip.h>
 #include <sys/socket.h>
 
 #include "envoy/network/listen_socket.h"
@@ -28,6 +27,10 @@ public:
                  envoy::api::v2::core::SocketOption::SocketState state) const override;
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
+
+  absl::optional<Details>
+  getOptionDetails(const Socket& socket,
+                   envoy::api::v2::core::SocketOption::SocketState state) const override;
 
   /**
    * Set a socket option that applies at both IPv4 and IPv6 socket levels. When the underlying FD

@@ -3,11 +3,11 @@
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 
-#include "openssl/bytestring.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -22,7 +22,6 @@ namespace TlsInspector {
   COUNTER(connection_closed)                                                                       \
   COUNTER(client_hello_too_large)                                                                  \
   COUNTER(read_error)                                                                              \
-  COUNTER(read_timeout)                                                                            \
   COUNTER(tls_found)                                                                               \
   COUNTER(tls_not_found)                                                                           \
   COUNTER(alpn_found)                                                                              \
@@ -71,7 +70,6 @@ public:
 private:
   void parseClientHello(const void* data, size_t len);
   void onRead();
-  void onTimeout();
   void done(bool success);
   void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
@@ -79,7 +77,6 @@ private:
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_;
   Event::FileEventPtr file_event_;
-  Event::TimerPtr timer_;
 
   bssl::UniquePtr<SSL> ssl_;
   uint64_t read_{0};

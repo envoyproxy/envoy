@@ -2,22 +2,22 @@
 
 #include <unordered_set>
 
-#include "common/common/token_bucket_impl.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Config {
 
-GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
+GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         Runtime::RandomGenerator& random, MonotonicTimeSource& time_source)
-    : node_(node), async_client_(std::move(async_client)), service_method_(service_method),
-      random_(random), time_source_(time_source) {
-  retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
-  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
-                                                                RETRY_MAX_DELAY_MS, random_);
+                         Runtime::RandomGenerator& random, Stats::Scope& scope,
+                         const RateLimitSettings& rate_limit_settings)
+    : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
+                   rate_limit_settings),
+
+      local_info_(local_info) {
+  Config::Utility::checkLocalInfo("ads", local_info);
 }
 
 GrpcMuxImpl::~GrpcMuxImpl() {
@@ -28,41 +28,19 @@ GrpcMuxImpl::~GrpcMuxImpl() {
   }
 }
 
-void GrpcMuxImpl::start() { establishNewStream(); }
-
-void GrpcMuxImpl::setRetryTimer() {
-  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
-}
-
-void GrpcMuxImpl::establishNewStream() {
-  ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-  stream_ = async_client_->start(service_method_, *this);
-  if (stream_ == nullptr) {
-    ENVOY_LOG(warn, "Unable to establish new stream");
-    handleFailure();
-    return;
-  }
-
-  for (const auto type_url : subscriptions_) {
-    sendDiscoveryRequest(type_url);
-  }
-}
+void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
-  if (stream_ == nullptr) {
+  if (!grpc_stream_.grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url);
-    return;
+    return; // Drop this request; the reconnect will enqueue a new one.
   }
 
   ApiState& api_state = api_state_[type_url];
   if (api_state.paused_) {
     ENVOY_LOG(trace, "API {} paused during sendDiscoveryRequest(), setting pending.", type_url);
     api_state.pending_ = true;
-    return;
-  }
-
-  if (!api_state.limit_request_->consume() && api_state.limit_log_->consume()) {
-    ENVOY_LOG(warn, "{}", fmt::format("Too many sendDiscoveryRequest calls for {}", type_url));
+    return; // Drop this request; the unpause will enqueue a new one.
   }
 
   auto& request = api_state.request_;
@@ -80,7 +58,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
-  stream_->sendMessage(request, false);
+  grpc_stream_.sendMessage(request);
 
   // clear error_detail after the request is sent if it exists.
   if (api_state_[type_url].request_.has_error_detail()) {
@@ -88,17 +66,8 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   }
 }
 
-void GrpcMuxImpl::handleFailure() {
-  for (const auto& api_state : api_state_) {
-    for (auto watch : api_state.second.watches_) {
-      watch->callbacks_.onConfigUpdateFailed(nullptr);
-    }
-  }
-  setRetryTimer();
-}
-
 GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
-                                       const std::vector<std::string>& resources,
+                                       const std::set<std::string>& resources,
                                        GrpcMuxCallbacks& callbacks) {
   auto watch =
       std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
@@ -109,12 +78,8 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
   // Envoy's internal dependency ordering.
   // TODO(gsagula): move TokenBucketImpl params to a config.
   if (!api_state_[type_url].subscribed_) {
-    // Bucket contains 100 tokens maximum and refills at 5 tokens/sec.
-    api_state_[type_url].limit_request_ = std::make_unique<TokenBucketImpl>(100, 5, time_source_);
-    // Bucket contains 1 token maximum and refills 1 token on every ~5 seconds.
-    api_state_[type_url].limit_log_ = std::make_unique<TokenBucketImpl>(1, 0.2, time_source_);
     api_state_[type_url].request_.set_type_url(type_url);
-    api_state_[type_url].request_.mutable_node()->MergeFrom(node_);
+    api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
     subscriptions_.emplace_back(type_url);
   }
@@ -123,7 +88,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
   // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
   // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
   // only send a single RDS/EDS update after the CDS/LDS update.
-  sendDiscoveryRequest(type_url);
+  queueDiscoveryRequest(type_url);
 
   return watch;
 }
@@ -144,46 +109,37 @@ void GrpcMuxImpl::resume(const std::string& type_url) {
 
   if (api_state.pending_) {
     ASSERT(api_state.subscribed_);
-    sendDiscoveryRequest(type_url);
+    queueDiscoveryRequest(type_url);
     api_state.pending_ = false;
   }
 }
 
-void GrpcMuxImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
-  UNREFERENCED_PARAMETER(metadata);
-}
-
-void GrpcMuxImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
-  UNREFERENCED_PARAMETER(metadata);
-}
-
-void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
-  // Reset here so that it starts with fresh backoff interval on next disconnect.
-  backoff_strategy_->reset();
-
+void GrpcMuxImpl::onDiscoveryResponse(
+    std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (api_state_.count(type_url) == 0) {
-    ENVOY_LOG(warn, "Ignoring unknown type URL {}", type_url);
-    // TODO(yuval-k): This should never happen. consider dropping the stream as this is a protocol
-    // violation
+    ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
+              type_url);
+    // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
+    // protocol violation
     return;
   }
   if (api_state_[type_url].watches_.empty()) {
     // update the nonce as we are processing this response.
     api_state_[type_url].request_.set_response_nonce(message->nonce());
     if (message->resources().empty()) {
-      // No watches and no resources. This can happen when envoy unregisters from a resource
-      // that's removed from the server as well. For example, a deleted cluster triggers un-watching
-      // the ClusterLoadAssignment watch, and at the same time the xDS server sends an empty list of
-      // ClusterLoadAssignment resources. we'll accept this update. no need to send a discovery
-      // request, as we don't watch for anything.
+      // No watches and no resources. This can happen when envoy unregisters from a
+      // resource that's removed from the server as well. For example, a deleted cluster
+      // triggers un-watching the ClusterLoadAssignment watch, and at the same time the
+      // xDS server sends an empty list of ClusterLoadAssignment resources. we'll accept
+      // this update. no need to send a discovery request, as we don't watch for anything.
       api_state_[type_url].request_.set_version_info(message->version_info());
     } else {
-      // No watches and we have resources - this should not happen. send a NACK (by not updating
-      // the version).
+      // No watches and we have resources - this should not happen. send a NACK (by not
+      // updating the version).
       ENVOY_LOG(warn, "Ignoring unwatched type URL {}", type_url);
-      sendDiscoveryRequest(type_url);
+      queueDiscoveryRequest(type_url);
     }
     return;
   }
@@ -196,13 +152,16 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     GrpcMuxCallbacks& callbacks = api_state_[type_url].watches_.front()->callbacks_;
     for (const auto& resource : message->resources()) {
       if (type_url != resource.type_url()) {
-        throw EnvoyException(fmt::format("{} does not match {} type URL is DiscoveryResponse {}",
+        throw EnvoyException(fmt::format("{} does not match {} type URL in DiscoveryResponse {}",
                                          resource.type_url(), type_url, message->DebugString()));
       }
       const std::string resource_name = callbacks.resourceName(resource);
       resources.emplace(resource_name, resource);
     }
     for (auto watch : api_state_[type_url].watches_) {
+      // onConfigUpdate should be called in all cases for single watch xDS (Cluster and
+      // Listener) even if the message does not have resources so that update_empty stat
+      // is properly incremented and state-of-the-world semantics are maintained.
       if (watch->resources_.empty()) {
         watch->callbacks_.onConfigUpdate(message->resources(), message->version_info());
         continue;
@@ -214,13 +173,16 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
           found_resources.Add()->MergeFrom(it->second);
         }
       }
-      watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
+      // onConfigUpdate should be called only on watches(clusters/routes) that have
+      // updates in the message for EDS/RDS.
+      if (!found_resources.empty()) {
+        watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
+      }
     }
-    // TODO(mattklein123): In the future if we start tracking per-resource versions, we would do
-    // that tracking here.
+    // TODO(mattklein123): In the future if we start tracking per-resource versions, we
+    // would do that tracking here.
     api_state_[type_url].request_.set_version_info(message->version_info());
   } catch (const EnvoyException& e) {
-    ENVOY_LOG(warn, "gRPC config for {} update rejected: {}", message->type_url(), e.what());
     for (auto watch : api_state_[type_url].watches_) {
       watch->callbacks_.onConfigUpdateFailed(&e);
     }
@@ -229,17 +191,45 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     error_detail->set_message(e.what());
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
-  sendDiscoveryRequest(type_url);
+  queueDiscoveryRequest(type_url);
 }
 
-void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
-  UNREFERENCED_PARAMETER(metadata);
+void GrpcMuxImpl::onWriteable() { drainRequests(); }
+
+void GrpcMuxImpl::onStreamEstablished() {
+  for (const auto type_url : subscriptions_) {
+    queueDiscoveryRequest(type_url);
+  }
 }
 
-void GrpcMuxImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
-  stream_ = nullptr;
-  setRetryTimer();
+void GrpcMuxImpl::onEstablishmentFailure() {
+  for (const auto& api_state : api_state_) {
+    for (auto watch : api_state.second.watches_) {
+      watch->callbacks_.onConfigUpdateFailed(nullptr);
+    }
+  }
+}
+
+void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
+  request_queue_.push(queue_item);
+  drainRequests();
+}
+
+void GrpcMuxImpl::clearRequestQueue() {
+  grpc_stream_.maybeUpdateQueueSizeStat(0);
+  // TODO(fredlas) when we have C++17: request_queue_ = {};
+  while (!request_queue_.empty()) {
+    request_queue_.pop();
+  }
+}
+
+void GrpcMuxImpl::drainRequests() {
+  while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
+    // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
+    sendDiscoveryRequest(request_queue_.front());
+    request_queue_.pop();
+  }
+  grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
 }
 
 } // namespace Config

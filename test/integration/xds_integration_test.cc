@@ -7,8 +7,8 @@ namespace Envoy {
 namespace {
 
 // This is a minimal litmus test for the v2 xDS APIs.
-class XdsIntegrationTest : public HttpIntegrationTest,
-                           public testing::TestWithParam<Network::Address::IpVersion> {
+class XdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                           public HttpIntegrationTest {
 public:
   XdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
@@ -18,19 +18,19 @@ public:
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
     createApiTestServer(
         {
-            .bootstrap_path_ = "test/config/integration/server_xds.bootstrap.yaml",
-            .cds_path_ = "test/config/integration/server_xds.cds.yaml",
-            .eds_path_ = "test/config/integration/server_xds.eds.yaml",
-            .lds_path_ = "test/config/integration/server_xds.lds.yaml",
-            .rds_path_ = "test/config/integration/server_xds.rds.yaml",
+            "test/config/integration/server_xds.bootstrap.yaml",
+            "test/config/integration/server_xds.cds.yaml",
+            "test/config/integration/server_xds.eds.yaml",
+            "test/config/integration/server_xds.lds.yaml",
+            "test/config/integration/server_xds.rds.yaml",
         },
         {"http"});
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, XdsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, XdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(XdsIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);

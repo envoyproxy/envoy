@@ -4,12 +4,19 @@ gRPC-JSON transcoder
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v1 API reference <config_http_filters_grpc_json_transcoder_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.transcoder.v2.GrpcJsonTranscoder>`
+* This filter should be configured with the name *envoy.grpc_json_transcoder*.
 
 This is a filter which allows a RESTful JSON API client to send requests to Envoy over HTTP
 and get proxied to a gRPC service. The HTTP mapping for the gRPC service has to be defined by
 `custom options <https://cloud.google.com/service-management/reference/rpc/google.api#http>`_.
+
+JSON mapping
+------------
+
+The protobuf to JSON mapping is defined `here <https://developers.google.com/protocol-buffers/docs/proto3#json>`_. For
+gRPC stream request parameters, Envoy expects an array of messages, and it returns an array of messages for stream
+response parameters.
 
 .. _config_grpc_json_generate_proto_descriptor_set:
 
@@ -67,7 +74,7 @@ Sending arbitrary content
 -------------------------
 
 By default, when transcoding occurs, gRPC-JSON encodes the message output of a gRPC service method into
-JSON and sets the HTTP response `Content-Type` header to `application/json`. To send abritrary content,
+JSON and sets the HTTP response `Content-Type` header to `application/json`. To send arbitrary content,
 a gRPC service method can use
 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
 as its output message type. The implementation needs to set
@@ -75,3 +82,71 @@ as its output message type. The implementation needs to set
 (which sets the value of the HTTP response `Content-Type` header) and
 `data <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L71>`_
 (which sets the HTTP response body) accordingly.
+
+
+Sample Envoy configuration
+--------------------------
+
+Here's a sample Envoy configuration that proxies to a gRPC server running on localhost:50051. Port 51051 proxies
+gRPC requests and uses the gRPC-JSON transcoder filter to provide the RESTful JSON mapping. I.e., you can make either
+gRPC or RESTful JSON requests to localhost:51051.
+
+.. code-block:: yaml
+
+  admin:
+    access_log_path: /tmp/admin_access.log
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 9901 }
+
+  static_resources:
+    listeners:
+    - name: listener1
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 51051 }
+      filter_chains:
+      - filters:
+        - name: envoy.http_connection_manager
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+            stat_prefix: grpc_json
+            codec_type: AUTO
+            route_config:
+              name: local_route
+              virtual_hosts:
+              - name: local_service
+                domains: ["*"]
+                routes:
+                - match: { prefix: "/" }
+                  route: { cluster: grpc, timeout: { seconds: 60 } }
+            http_filters:
+            - name: envoy.grpc_json_transcoder
+              config:
+                proto_descriptor: "/tmp/envoy/proto.pb"
+                services: ["helloworld.Greeter"]
+                print_options:
+                  add_whitespace: true
+                  always_print_primitive_fields: true
+                  always_print_enums_as_ints: false
+                  preserve_proto_field_names: false
+            - name: envoy.router
+
+    clusters:
+    - name: grpc
+      connect_timeout: 1.25s
+      type: logical_dns
+      lb_policy: round_robin
+      dns_lookup_family: V4_ONLY
+      http2_protocol_options: {}
+      load_assignment:
+        cluster_name: grpc
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  # WARNING: "docker.for.mac.localhost" has been deprecated from Docker v18.03.0.
+                  # If you're running an older version of Docker, please use "docker.for.mac.localhost" instead.
+                  # Reference: https://docs.docker.com/docker-for-mac/release-notes/#docker-community-edition-18030-ce-mac59-2018-03-26
+                  address: host.docker.internal
+                  port_value: 50051
+

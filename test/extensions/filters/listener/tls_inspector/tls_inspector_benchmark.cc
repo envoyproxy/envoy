@@ -1,19 +1,21 @@
 #include <vector>
 
+#include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 
+#include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
-#include "test/test_common/tls_utility.h"
 
+#include "benchmark/benchmark.h"
 #include "gtest/gtest.h"
 #include "openssl/ssl.h"
-#include "testing/base/public/benchmark.h"
 
+using testing::_;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
@@ -21,7 +23,6 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -62,10 +63,10 @@ class FastMockOsSysCalls : public Api::MockOsSysCalls {
 public:
   FastMockOsSysCalls(const std::vector<uint8_t>& client_hello) : client_hello_(client_hello) {}
 
-  ssize_t recv(int, void* buffer, size_t length, int) override {
+  Api::SysCallSizeResult recv(int, void* buffer, size_t length, int) override {
     RELEASE_ASSERT(length >= client_hello_.size(), "");
     memcpy(buffer, client_hello_.data(), client_hello_.size());
-    return client_hello_.size();
+    return Api::SysCallSizeResult{ssize_t(client_hello_.size()), 0};
   }
 
   const std::vector<uint8_t> client_hello_;
@@ -77,7 +78,8 @@ static void BM_TlsInspector(benchmark::State& state) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
   NiceMock<Stats::MockStore> store;
   ConfigSharedPtr cfg(std::make_shared<Config>(store));
-  Network::ConnectionSocketImpl socket(-1, nullptr, nullptr);
+  Network::IoHandlePtr io_handle = std::make_unique<Network::IoSocketHandleImpl>();
+  Network::ConnectionSocketImpl socket(std::move(io_handle), nullptr, nullptr);
   NiceMock<FastMockDispatcher> dispatcher;
   FastMockListenerFilterCallbacks cb(socket, dispatcher);
 
@@ -106,8 +108,8 @@ BENCHMARK(BM_TlsInspector)->Unit(benchmark::kMicrosecond);
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
   Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Registry::initialize(spdlog::level::warn,
-                                      Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
+  Envoy::Logger::Context logging_context(spdlog::level::warn,
+                                         Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
 
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {

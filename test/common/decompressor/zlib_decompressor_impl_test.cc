@@ -66,15 +66,15 @@ protected:
 
   static void unitializedDecompressorTestHelper() {
     Buffer::OwnedImpl input_buffer;
-    Buffer::OwnedImpl ouput_buffer;
+    Buffer::OwnedImpl output_buffer;
     ZlibDecompressorImpl decompressor;
     TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
-    decompressor.decompress(input_buffer, ouput_buffer);
+    decompressor.decompress(input_buffer, output_buffer);
   }
 };
 
 // Exercises death by passing bad initialization params or by calling decompress before init.
-TEST_F(ZlibDecompressorImplDeathTest, DecompressorTestDeath) {
+TEST_F(ZlibDecompressorImplDeathTest, DecompressorDeathTest) {
   EXPECT_DEATH_LOG_TO_STDERR(decompressorBadInitTestHelper(100), "assert failure: result >= 0");
   EXPECT_DEATH_LOG_TO_STDERR(unitializedDecompressorTestHelper(), "assert failure: result == Z_OK");
 }

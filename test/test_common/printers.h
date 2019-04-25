@@ -3,7 +3,7 @@
 #include <iostream>
 #include <memory>
 
-#include "test/test_common/printers.h"
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Http {
@@ -35,4 +35,10 @@ void PrintTo(const Instance& buffer, std::ostream* os);
 class OwnedImpl;
 void PrintTo(const OwnedImpl& buffer, std::ostream* os);
 } // namespace Buffer
+
+namespace Network {
+namespace Address {
+void PrintTo(const Instance& address, std::ostream* os);
+}
+} // namespace Network
 } // namespace Envoy

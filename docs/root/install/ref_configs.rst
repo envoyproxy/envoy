@@ -24,9 +24,9 @@ we use at Lyft. We have also included three example configuration templates for 
 three scenarios.
 
 * Generator script: :repo:`configs/configgen.py`
-* Service to service template: :repo:`configs/envoy_service_to_service.template.json`
-* Front proxy template: :repo:`configs/envoy_front_proxy.template.json`
-* Double proxy template: :repo:`configs/envoy_double_proxy.template.json`
+* Service to service template: :repo:`configs/envoy_service_to_service_v2.template.yaml`
+* Front proxy template: :repo:`configs/envoy_front_proxy_v2.template.yaml`
+* Double proxy template: :repo:`configs/envoy_double_proxy_v2.template.yaml`
 
 To generate the example configurations run the following from the root of the repo:
 
@@ -42,13 +42,13 @@ information on how the different expansions work.
 
 A few notes about the example configurations:
 
-* An instance of :ref:`service discovery service <arch_overview_service_discovery_types_sds>` is assumed
+* An instance of :ref:`endpoint discovery service <arch_overview_service_discovery_types_eds>` is assumed
   to be running at `discovery.yourcompany.net`.
 * DNS for `yourcompany.net` is assumed to be setup for various things. Search the configuration
   templates for different instances of this.
-* Tracing is configured for `LightStep <http://lightstep.com/>`_. To
-  disable this or enable `Zipkin <http://zipkin.io>` tracing, delete or
-  change the :ref:`tracing configuration <config_tracing_v1>` accordingly.
+* Tracing is configured for `LightStep <https://lightstep.com/>`_. To
+  disable this or enable `Zipkin <https://zipkin.io>`_ or `Datadog <https://datadoghq.com>`_ tracing, delete or
+  change the :ref:`tracing configuration <envoy_api_file_envoy/config/trace/v2/trace.proto>` accordingly.
 * The configuration demonstrates the use of a :ref:`global rate limiting service
   <arch_overview_rate_limit>`. To disable this delete the :ref:`rate limit configuration
   <config_rate_limit_service>`.

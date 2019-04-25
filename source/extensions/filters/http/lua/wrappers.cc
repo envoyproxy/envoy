@@ -25,8 +25,10 @@ int HeaderMapIterator::luaPairsIterator(lua_State* state) {
     parent_.iterator_.reset();
     return 0;
   } else {
-    lua_pushstring(state, entries_[current_]->key().c_str());
-    lua_pushstring(state, entries_[current_]->value().c_str());
+    const absl::string_view key_view(entries_[current_]->key().getStringView());
+    lua_pushlstring(state, key_view.data(), key_view.length());
+    const absl::string_view value_view(entries_[current_]->value().getStringView());
+    lua_pushlstring(state, value_view.data(), value_view.length());
     current_++;
     return 2;
   }
@@ -45,7 +47,8 @@ int HeaderMapWrapper::luaGet(lua_State* state) {
   const char* key = luaL_checkstring(state, 2);
   const Http::HeaderEntry* entry = headers_.get(Http::LowerCaseString(key));
   if (entry != nullptr) {
-    lua_pushstring(state, entry->value().c_str());
+    lua_pushlstring(state, entry->value().getStringView().data(),
+                    entry->value().getStringView().length());
     return 1;
   } else {
     return 0;
@@ -104,12 +107,12 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
   }
 }
 
-int RequestInfoWrapper::luaProtocol(lua_State* state) {
-  lua_pushstring(state, Http::Utility::getProtocolString(request_info_.protocol().value()).c_str());
+int StreamInfoWrapper::luaProtocol(lua_State* state) {
+  lua_pushstring(state, Http::Utility::getProtocolString(stream_info_.protocol().value()).c_str());
   return 1;
 }
 
-int RequestInfoWrapper::luaDynamicMetadata(lua_State* state) {
+int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {
   if (dynamic_metadata_wrapper_.get() != nullptr) {
     dynamic_metadata_wrapper_.pushStack();
   } else {
@@ -119,13 +122,12 @@ int RequestInfoWrapper::luaDynamicMetadata(lua_State* state) {
 }
 
 DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent)
-    : parent_{parent}, current_{parent_.requestInfo().dynamicMetadata().filter_metadata().begin()} {
-}
+    : parent_{parent}, current_{parent_.streamInfo().dynamicMetadata().filter_metadata().begin()} {}
 
-RequestInfo::RequestInfo& DynamicMetadataMapWrapper::requestInfo() { return parent_.request_info_; }
+StreamInfo::StreamInfo& DynamicMetadataMapWrapper::streamInfo() { return parent_.stream_info_; }
 
 int DynamicMetadataMapIterator::luaPairsIterator(lua_State* state) {
-  if (current_ == parent_.requestInfo().dynamicMetadata().filter_metadata().end()) {
+  if (current_ == parent_.streamInfo().dynamicMetadata().filter_metadata().end()) {
     parent_.iterator_.reset();
     return 0;
   }
@@ -139,7 +141,7 @@ int DynamicMetadataMapIterator::luaPairsIterator(lua_State* state) {
 
 int DynamicMetadataMapWrapper::luaGet(lua_State* state) {
   const char* filter_name = luaL_checkstring(state, 2);
-  const auto& metadata = requestInfo().dynamicMetadata().filter_metadata();
+  const auto& metadata = streamInfo().dynamicMetadata().filter_metadata();
   const auto filter_it = metadata.find(filter_name);
   if (filter_it == metadata.end()) {
     return 0;
@@ -158,7 +160,7 @@ int DynamicMetadataMapWrapper::luaSet(lua_State* state) {
   const char* filter_name = luaL_checkstring(state, 2);
   const char* key = luaL_checkstring(state, 3);
   const char* value = luaL_checkstring(state, 4);
-  requestInfo().setDynamicMetadata(filter_name, MessageUtil::keyValueStruct(key, value));
+  streamInfo().setDynamicMetadata(filter_name, MessageUtil::keyValueStruct(key, value));
   return 0;
 }
 

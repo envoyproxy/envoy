@@ -8,7 +8,9 @@ In this mode, the goals of Envoy are to maintain availability and partition tole
 over consistency. This is the key point when comparing Envoy to `Redis Cluster
 <https://redis.io/topics/cluster-spec>`_. Envoy is designed as a best-effort cache,
 meaning that it will not try to reconcile inconsistent data or keep a globally consistent
-view of cluster membership.
+view of cluster membership. It also supports routing commands from different workload to
+different to different upstream clusters based on their access patterns, eviction, or isolation
+requirements.
 
 The Redis project offers a thorough reference on partitioning as it relates to Redis. See
 "`Partitioning: how to split data among multiple Redis instances
@@ -21,6 +23,8 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Ketama distribution.
 * Detailed command statistics.
 * Active and passive healthchecking.
+* Hash tagging.
+* Prefix routing.
 
 **Planned future enhancements**:
 
@@ -30,7 +34,6 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 * Replication.
 * Built-in retry.
 * Tracing.
-* Hash tagging.
 
 .. _arch_overview_redis_configuration:
 
@@ -41,7 +44,7 @@ For filter configuration details, see the Redis proxy filter
 :ref:`configuration reference <config_network_filters_redis_proxy>`.
 
 The corresponding cluster definition should be configured with
-:ref:`ring hash load balancing <config_cluster_manager_cluster_lb_type>`.
+:ref:`ring hash load balancing <envoy_api_field_Cluster.lb_policy>`.
 
 If :ref:`active health checking <arch_overview_health_checking>` is desired, the
 cluster should be configured with a :ref:`custom health check
@@ -49,7 +52,7 @@ cluster should be configured with a :ref:`custom health check
 :ref:`Redis health checker <config_health_checkers_redis>`.
 
 If passive healthchecking is desired, also configure
-:ref:`outlier detection <config_cluster_manager_cluster_outlier_detection_summary>`.
+:ref:`outlier detection <arch_overview_outlier_detection>`.
 
 For the purposes of passive healthchecking, connect timeouts, command timeouts, and connection
 close map to 5xx. All other responses from Redis are counted as a success.
@@ -148,6 +151,8 @@ For details on each command's usage see the official
   ZREVRANGEBYLEX, Sorted Set
   ZREVRANGEBYSCORE, Sorted Set
   ZREVRANK, Sorted Set
+  ZPOPMIN, Sorted Set
+  ZPOPMAX, Sorted Set
   ZSCAN, Sorted Set
   ZSCORE, Sorted Set
   APPEND, String

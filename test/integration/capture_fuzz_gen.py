@@ -5,6 +5,7 @@ test.integration.CaptureFuzzTestCase.
 
 Usage: capture_fuzz_gen.py <listener capture> [<cluster capture>]
 """
+from __future__ import print_function
 
 import functools
 import sys
@@ -14,6 +15,7 @@ from google.protobuf import text_format
 
 from envoy.data.tap.v2alpha import capture_pb2
 from test.integration import capture_fuzz_pb2
+
 
 # Collapse adjacent event in the trace that are of the same type.
 def Coalesce(trace):
@@ -29,6 +31,7 @@ def Coalesce(trace):
       events.append(event)
   return events
 
+
 # Convert from transport socket Event to test Event.
 def ToTestEvent(direction, event):
   test_event = capture_fuzz_pb2.Event()
@@ -38,11 +41,14 @@ def ToTestEvent(direction, event):
     getattr(test_event, '%s_recv_bytes' % direction).MergeFrom(empty_pb2.Empty())
   return test_event
 
+
 def ToDownstreamTestEvent(event):
   return ToTestEvent('downstream', event)
 
+
 def ToUpstreamTestEvent(event):
   return ToTestEvent('upstream', event)
+
 
 # Zip together the listener/cluster events to produce a single trace for replay.
 def TestCaseGen(listener_events, cluster_events):
@@ -64,6 +70,7 @@ def TestCaseGen(listener_events, cluster_events):
     test_case.events.extend([ToUpstreamTestEvent(cluster_events[0])])
     del cluster_events[0]
 
+
 def CaptureFuzzGen(listener_path, cluster_path=None):
   listener_trace = capture_pb2.Trace()
   with open(listener_path, 'r') as f:
@@ -76,11 +83,11 @@ def CaptureFuzzGen(listener_path, cluster_path=None):
       text_format.Merge(f.read(), cluster_trace)
     cluster_events = Coalesce(cluster_trace)
 
-  print TestCaseGen(listener_events, cluster_events)
+  print(TestCaseGen(listener_events, cluster_events))
 
 
 if __name__ == '__main__':
   if len(sys.argv) < 2 or len(sys.argv) > 3:
-    print 'Usage: %s <listener capture> [<cluster capture>]' % sys. argv[0]
+    print('Usage: %s <listener capture> [<cluster capture>]' % sys.argv[0])
     sys.exit(1)
   CaptureFuzzGen(*sys.argv[1:])

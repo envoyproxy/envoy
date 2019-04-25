@@ -30,7 +30,7 @@ Config::Config(const envoy::config::filter::http::header_to_metadata::v2::Config
 
 bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
                             HeaderToMetadataRules& vector) {
-  if (proto_rules.size() == 0) {
+  if (proto_rules.empty()) {
     ENVOY_LOG(debug, "no rules provided");
     return false;
   }
@@ -147,8 +147,8 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
 
     if (header_entry != nullptr && rule.has_on_header_present()) {
       const auto& keyval = rule.on_header_present();
-      absl::string_view value =
-          keyval.value().empty() ? header_entry->value().getStringView() : keyval.value();
+      absl::string_view value = keyval.value().empty() ? header_entry->value().getStringView()
+                                                       : absl::string_view(keyval.value());
 
       if (!value.empty()) {
         const auto& nspace = decideNamespace(keyval.metadata_namespace());
@@ -174,9 +174,9 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
   }
 
   // Any matching rules?
-  if (structs_by_namespace.size() > 0) {
+  if (!structs_by_namespace.empty()) {
     for (auto const& entry : structs_by_namespace) {
-      callbacks.requestInfo().setDynamicMetadata(entry.first, entry.second);
+      callbacks.streamInfo().setDynamicMetadata(entry.first, entry.second);
     }
   }
 }

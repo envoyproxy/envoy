@@ -45,7 +45,7 @@ public:
   virtual SystemTime lastUpdated() const PURE;
 };
 
-typedef std::shared_ptr<RouteConfigProvider> RouteConfigProviderSharedPtr;
+typedef std::unique_ptr<RouteConfigProvider> RouteConfigProviderPtr;
 
 } // namespace Router
 } // namespace Envoy

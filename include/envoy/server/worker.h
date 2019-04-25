@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "envoy/server/guarddog.h"
+#include "envoy/server/overload_manager.h"
 
 namespace Envoy {
 namespace Server {
@@ -41,6 +42,14 @@ public:
    * @param guard_dog supplies the guard dog to use for thread watching.
    */
   virtual void start(GuardDog& guard_dog) PURE;
+
+  /**
+   * Initialize stats for this worker's dispatcher, if available. The worker will output
+   * thread-specific stats under the given scope.
+   * @param scope the scope to contain the new per-dispatcher stats created here.
+   * @param prefix the stats prefix to identify this dispatcher.
+   */
+  virtual void initializeStats(Stats::Scope& scope, const std::string& prefix) PURE;
 
   /**
    * Stop the worker thread.
@@ -84,7 +93,7 @@ public:
   /**
    * @return WorkerPtr a new worker.
    */
-  virtual WorkerPtr createWorker() PURE;
+  virtual WorkerPtr createWorker(OverloadManager& overload_manager) PURE;
 };
 
 } // namespace Server

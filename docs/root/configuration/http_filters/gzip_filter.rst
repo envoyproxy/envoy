@@ -10,6 +10,7 @@ compromising the response time.
 Configuration
 -------------
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.gzip.v2.Gzip>`
+* This filter should be configured with the name *envoy.gzip*.
 
 .. attention::
 
@@ -55,13 +56,13 @@ By *default* compression will be *skipped* when:
 - Neither *content-length* nor *transfer-encoding* headers are present in
   the response.
 - Response size is smaller than 30 bytes (only applicable when *transfer-encoding*
-  is not chuncked).
+  is not chunked).
 
 When compression is *applied*:
 
 - The *content-length* is removed from response headers.
-- Response headers contain "*transfer-encoding: chunked*" and
-  "*content-encoding: gzip*".
+- Response headers contain "*transfer-encoding: chunked*" and do not contain
+  "*content-encoding*" header.
 - The "*vary: accept-encoding*" header is inserted on every response.
 
 .. _gzip-statistics:
@@ -86,4 +87,3 @@ Every configured Gzip filter has statistics rooted at <stat_prefix>.gzip.* with 
   total_compressed_bytes, Counter, The total compressed bytes of all the requests that were marked for compression.
   content_length_too_small, Counter, Number of requests that accepted gzip encoding but did not compress because the payload was too small.
   not_compressed_etag, Counter, Number of requests that were not compressed due to the etag header. *disable_on_etag_header* must be turned on for this to happen.
-  

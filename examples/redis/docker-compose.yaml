@@ -1,0 +1,33 @@
+version: "3.7"
+services:
+
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    volumes:
+      - ./envoy.yaml:/etc/envoy.yaml
+    networks:
+      - envoymesh
+    expose:
+      - "1999"
+      - "8001"
+    ports:
+      - "1999:1999"
+      - "8001:8001"
+
+  redis:
+    build:
+      context: .
+      dockerfile: Dockerfile-redis
+    networks:
+      envoymesh:
+        aliases:
+          - redis_server
+    expose:
+      - "6379"
+    ports:
+      - "6379:6379"
+
+networks:
+  envoymesh: {}

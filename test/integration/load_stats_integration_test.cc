@@ -15,12 +15,12 @@
 namespace Envoy {
 namespace {
 
-class LoadStatsIntegrationTest : public HttpIntegrationTest,
-                                 public testing::TestWithParam<Network::Address::IpVersion> {
+class LoadStatsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                 public HttpIntegrationTest {
 public:
   LoadStatsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
     // We rely on some fairly specific load balancing picks in this test, so
-    // determinizie the schedule.
+    // determinize the schedule.
     setDeterministic();
   }
 
@@ -51,7 +51,8 @@ public:
                                    const LocalityAssignment& p1_dragon_upstreams) {
     uint32_t num_endpoints = 0;
     envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
-    cluster_load_assignment.set_cluster_name("cluster_0");
+    // EDS service_name is set in cluster_0
+    cluster_load_assignment.set_cluster_name("service_name_0");
 
     auto* winter = cluster_load_assignment.add_endpoints();
     winter->mutable_locality()->set_region("some_region");
@@ -96,7 +97,8 @@ public:
   }
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
     load_report_upstream_ = fake_upstreams_.back().get();
     HttpIntegrationTest::createUpstreams();
   }
@@ -125,6 +127,7 @@ public:
       cluster_0->set_type(envoy::api::v2::Cluster::EDS);
       auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
       eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
+      eds_cluster_config->set_service_name("service_name_0");
       if (locality_weighted_lb_) {
         cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();
       }
@@ -147,8 +150,11 @@ public:
   }
 
   void waitForLoadStatsStream() {
-    fake_loadstats_connection_ = load_report_upstream_->waitForHttpConnection(*dispatcher_);
-    loadstats_stream_ = fake_loadstats_connection_->waitForNewStream(*dispatcher_);
+    AssertionResult result =
+        load_report_upstream_->waitForHttpConnection(*dispatcher_, fake_loadstats_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_loadstats_connection_->waitForNewStream(*dispatcher_, loadstats_stream_);
+    RELEASE_ASSERT(result, result.message());
   }
 
   void
@@ -161,6 +167,9 @@ public:
       return;
     } else if (loadstats_request.cluster_stats_size() == 0) {
       loadstats_request.CopyFrom(local_loadstats_request);
+      ASSERT_TRUE(loadstats_request.has_node());
+      ASSERT_FALSE(loadstats_request.node().id().empty());
+      ASSERT_FALSE(loadstats_request.node().cluster().empty());
       return;
     }
 
@@ -205,6 +214,8 @@ public:
     if (!expected_locality_stats.empty() || dropped != 0) {
       auto* cluster_stats = expected_cluster_stats.Add();
       cluster_stats->set_cluster_name("cluster_0");
+      // Verify the eds service_name is passed back.
+      cluster_stats->set_cluster_service_name("service_name_0");
       if (dropped > 0) {
         cluster_stats->set_total_dropped_requests(dropped);
       }
@@ -218,7 +229,9 @@ public:
     // merge until all the expected load has been reported.
     do {
       envoy::service::load_stats::v2::LoadStatsRequest local_loadstats_request;
-      loadstats_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
+      AssertionResult result =
+          loadstats_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
+      RELEASE_ASSERT(result, result.message());
       // Sanity check and clear the measured load report interval.
       for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
         const uint32_t actual_load_report_interval_ms =
@@ -235,19 +248,23 @@ public:
         ENVOY_LOG_MISC(debug, "HTD {}", loadstats_request.cluster_stats()[0].DebugString());
       }
 
-      EXPECT_STREQ("POST", loadstats_stream_->headers().Method()->value().c_str());
-      EXPECT_STREQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",
-                   loadstats_stream_->headers().Path()->value().c_str());
-      EXPECT_STREQ("application/grpc", loadstats_stream_->headers().ContentType()->value().c_str());
+      EXPECT_EQ("POST", loadstats_stream_->headers().Method()->value().getStringView());
+      EXPECT_EQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",
+                loadstats_stream_->headers().Path()->value().getStringView());
+      EXPECT_EQ("application/grpc",
+                loadstats_stream_->headers().ContentType()->value().getStringView());
     } while (!TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
                                                        loadstats_request.cluster_stats()));
   }
 
   void waitForUpstreamResponse(uint32_t endpoint_index, uint32_t response_code = 200) {
-    fake_upstream_connection_ =
-        service_upstream_[endpoint_index]->waitForHttpConnection(*dispatcher_);
-    upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-    upstream_request_->waitForEndStream(*dispatcher_);
+    AssertionResult result = service_upstream_[endpoint_index]->waitForHttpConnection(
+        *dispatcher_, fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = upstream_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
 
     upstream_request_->encodeHeaders(
         Http::TestHeaderMapImpl{{":status", std::to_string(response_code)}}, false);
@@ -258,8 +275,8 @@ public:
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
 
     ASSERT_TRUE(response_->complete());
-    EXPECT_STREQ(std::to_string(response_code).c_str(),
-                 response_->headers().Status()->value().c_str());
+    EXPECT_EQ(std::to_string(response_code),
+              response_->headers().Status()->value().getStringView());
     EXPECT_EQ(response_size_, response_->body().size());
   }
 
@@ -293,8 +310,10 @@ public:
 
   void cleanupLoadStatsConnection() {
     if (fake_loadstats_connection_ != nullptr) {
-      fake_loadstats_connection_->close();
-      fake_loadstats_connection_->waitForDisconnect();
+      AssertionResult result = fake_loadstats_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_loadstats_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 
@@ -321,9 +340,9 @@ public:
   const uint32_t load_report_interval_ms_ = 500;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, LoadStatsIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, LoadStatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // Validate the load reports for successful requests as cluster membership
 // changes.
@@ -565,7 +584,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   initiateClientConnection();
   response_->waitForEndStream();
   ASSERT_TRUE(response_->complete());
-  EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response_->headers().Status()->value().getStringView());
   cleanupUpstreamAndDownstream();
 
   waitForLoadStatsRequest({}, 1);

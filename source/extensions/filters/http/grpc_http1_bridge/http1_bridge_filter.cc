@@ -9,7 +9,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
-#include "common/http/filter_utility.h"
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 
@@ -23,14 +22,12 @@ void Http1BridgeFilter::chargeStat(const Http::HeaderMap& headers) {
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::HeaderMap& headers, bool) {
-  const Http::HeaderEntry* content_type = headers.ContentType();
-  const bool grpc_request =
-      content_type && content_type->value() == Http::Headers::get().ContentTypeValues.Grpc.c_str();
+  const bool grpc_request = Grpc::Common::hasGrpcContentType(headers);
   if (grpc_request) {
     setupStatTracking(headers);
   }
 
-  const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->requestInfo().protocol();
+  const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
   ASSERT(protocol);
   if (protocol.value() != Http::Protocol::Http2 && grpc_request) {
     do_bridging_ = true;
@@ -74,7 +71,9 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
     const Http::HeaderEntry* grpc_status_header = trailers.GrpcStatus();
     if (grpc_status_header) {
       uint64_t grpc_status_code;
-      if (!StringUtil::atoul(grpc_status_header->value().c_str(), grpc_status_code) ||
+      // TODO(dnoe): Migrate to pure string_view to eliminate std:string instance (#6580)
+      std::string grpc_status_code_string(grpc_status_header->value().getStringView());
+      if (!StringUtil::atoull(grpc_status_code_string.c_str(), grpc_status_code) ||
           grpc_status_code != 0) {
         response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
       }
@@ -98,7 +97,7 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::HeaderMap& tr
 }
 
 void Http1BridgeFilter::setupStatTracking(const Http::HeaderMap& headers) {
-  cluster_ = Http::FilterUtility::resolveClusterInfo(decoder_callbacks_, cm_);
+  cluster_ = decoder_callbacks_->clusterInfo();
   if (!cluster_) {
     return;
   }

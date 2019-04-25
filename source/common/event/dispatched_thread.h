@@ -4,6 +4,7 @@
 #include <memory>
 #include <utility>
 
+#include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
@@ -38,7 +39,7 @@ namespace Event {
  */
 class DispatchedThreadImpl : Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  DispatchedThreadImpl() : dispatcher_(new DispatcherImpl()) {}
+  DispatchedThreadImpl(Api::Api& api) : api_(api), dispatcher_(api_.allocateDispatcher()) {}
 
   /**
    * Start the thread.
@@ -57,6 +58,7 @@ public:
 private:
   void threadRoutine(Envoy::Server::GuardDog& guard_dog);
 
+  Api::Api& api_;
   DispatcherPtr dispatcher_;
   Thread::ThreadPtr thread_;
 };

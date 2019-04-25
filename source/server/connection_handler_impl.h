@@ -13,6 +13,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/common/linked_object.h"
@@ -29,6 +30,8 @@ namespace Server {
   COUNTER  (downstream_cx_destroy)                                                                 \
   GAUGE    (downstream_cx_active)                                                                  \
   HISTOGRAM(downstream_cx_length_ms)                                                               \
+  COUNTER  (downstream_pre_cx_timeout)                                                             \
+  GAUGE    (downstream_pre_cx_active)                                                              \
   COUNTER  (no_filter_chain_match)
 // clang-format on
 
@@ -53,6 +56,8 @@ public:
   void removeListeners(uint64_t listener_tag) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
+  void disableListeners() override;
+  void enableListeners() override;
 
   Network::Listener* findListenerByAddress(const Network::Address::Instance& address) override;
 
@@ -97,6 +102,7 @@ private:
     ListenerStats stats_;
     std::list<ActiveSocketPtr> sockets_;
     std::list<ActiveConnectionPtr> connections_;
+    const std::chrono::milliseconds listener_filters_timeout_;
     const uint64_t listener_tag_;
     Network::ListenerConfig& config_;
   };
@@ -109,7 +115,8 @@ private:
   struct ActiveConnection : LinkedObject<ActiveConnection>,
                             public Event::DeferredDeletable,
                             public Network::ConnectionCallbacks {
-    ActiveConnection(ActiveListener& listener, Network::ConnectionPtr&& new_connection);
+    ActiveConnection(ActiveListener& listener, Network::ConnectionPtr&& new_connection,
+                     TimeSource& time_system);
     ~ActiveConnection();
 
     // Network::ConnectionCallbacks
@@ -139,8 +146,17 @@ private:
                  bool hand_off_restored_destination_connections)
         : listener_(listener), socket_(std::move(socket)),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
-          iter_(accept_filters_.end()) {}
-    ~ActiveSocket() { accept_filters_.clear(); }
+          iter_(accept_filters_.end()) {
+      listener_.stats_.downstream_pre_cx_active_.inc();
+    }
+    ~ActiveSocket() {
+      accept_filters_.clear();
+      listener_.stats_.downstream_pre_cx_active_.dec();
+    }
+
+    void onTimeout();
+    void startTimer();
+    void unlink();
 
     // Network::ListenerFilterManager
     void addAcceptFilter(Network::ListenerFilterPtr&& filter) override {
@@ -157,6 +173,7 @@ private:
     const bool hand_off_restored_destination_connections_;
     std::list<Network::ListenerFilterPtr> accept_filters_;
     std::list<Network::ListenerFilterPtr>::iterator iter_;
+    Event::TimerPtr timer_;
   };
 
   static ListenerStats generateStats(Stats::Scope& scope);
@@ -165,7 +182,8 @@ private:
   Event::Dispatcher& dispatcher_;
   std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerPtr>> listeners_;
   std::atomic<uint64_t> num_connections_{};
+  bool disable_listeners_;
 };
 
-} // Server
+} // namespace Server
 } // namespace Envoy

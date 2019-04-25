@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
 #include "common/common/hex.h"
@@ -121,7 +122,7 @@ public:
   /**
    * Constructor that creates an annotation based on the given parameters.
    *
-   * @param timestamp A 64-bit integer containing the annotation timestasmp attribute.
+   * @param timestamp A 64-bit integer containing the annotation timestamp attribute.
    * @param value A string containing the annotation's value attribute. Valid values
    * appear on ZipkinCoreConstants. The most commonly used values are "cs", "cr", "ss" and "sr".
    * @param endpoint The endpoint object representing the annotation's endpoint attribute.
@@ -304,9 +305,9 @@ public:
   /**
    * Default constructor. Creates an empty span.
    */
-  Span()
+  explicit Span(TimeSource& time_source)
       : trace_id_(0), name_(), id_(0), debug_(false), sampled_(false), monotonic_start_time_(0),
-        tracer_(nullptr) {}
+        tracer_(nullptr), time_source_(time_source) {}
 
   /**
    * Sets the span's trace id attribute.
@@ -356,7 +357,7 @@ public:
   /**
    * Adds an annotation to the span (move semantics).
    */
-  void addAnnotation(const Annotation&& ann) { annotations_.push_back(ann); }
+  void addAnnotation(Annotation&& ann) { annotations_.emplace_back(std::move(ann)); }
 
   /**
    * Sets the span's binary annotations all at once.
@@ -371,7 +372,9 @@ public:
   /**
    * Adds a binary annotation to the span (move semantics).
    */
-  void addBinaryAnnotation(const BinaryAnnotation&& bann) { binary_annotations_.push_back(bann); }
+  void addBinaryAnnotation(BinaryAnnotation&& bann) {
+    binary_annotations_.emplace_back(std::move(bann));
+  }
 
   /**
    * Sets the span's debug attribute.
@@ -546,6 +549,14 @@ public:
    */
   void setTag(const std::string& name, const std::string& value);
 
+  /**
+   * Adds an annotation to the span
+   *
+   * @param timestamp The annotation's timestamp.
+   * @param event The annotation's value.
+   */
+  void log(SystemTime timestamp, const std::string& event);
+
 private:
   static const std::string EMPTY_HEX_STRING_;
   uint64_t trace_id_;
@@ -561,6 +572,7 @@ private:
   absl::optional<uint64_t> trace_id_high_;
   int64_t monotonic_start_time_;
   TracerInterface* tracer_;
+  TimeSource& time_source_;
 };
 
 } // namespace Zipkin

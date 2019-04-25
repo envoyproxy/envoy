@@ -5,12 +5,15 @@
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
+#include "test/test_common/test_time.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+namespace {
 
 TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   Endpoint ep;
@@ -31,9 +34,8 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   ep.setServiceName("my_service");
   EXPECT_EQ("my_service", ep.serviceName());
 
-  EXPECT_EQ(
-      R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
-      ep.toJson());
+  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
+            ep.toJson());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
@@ -48,9 +50,8 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
   ep.setAddress(addr);
 
-  EXPECT_EQ(
-      R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
-      ep.toJson());
+  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
+            ep.toJson());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
@@ -86,8 +87,9 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ("", ann.value());
   EXPECT_FALSE(ann.isSetEndpoint());
 
+  DangerousDeprecatedTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   ann.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, ann.timestamp());
@@ -144,8 +146,9 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
+  DangerousDeprecatedTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
 
@@ -168,8 +171,9 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
+  DangerousDeprecatedTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2(ann);
@@ -185,8 +189,9 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
+  DangerousDeprecatedTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2 = ann;
@@ -283,7 +288,8 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
-  Span span;
+  DangerousDeprecatedTestTime test_time;
+  Span span(test_time.timeSystem());
 
   EXPECT_EQ(0ULL, span.id());
   EXPECT_EQ(0ULL, span.traceId());
@@ -303,40 +309,40 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
             R"("annotations":[],"binaryAnnotations":[]})",
             span.toJson());
 
-  uint64_t id = Util::generateRandom64();
+  uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   EXPECT_EQ(id, span.id());
   EXPECT_EQ(id_hex, span.idAsHexString());
 
-  id = Util::generateRandom64();
+  id = Util::generateRandom64(test_time.timeSystem());
   id_hex = Hex::uint64ToHex(id);
   span.setParentId(id);
   EXPECT_EQ(id, span.parentId());
   EXPECT_EQ(id_hex, span.parentIdAsHexString());
   EXPECT_TRUE(span.isSetParentId());
 
-  id = Util::generateRandom64();
+  id = Util::generateRandom64(test_time.timeSystem());
   id_hex = Hex::uint64ToHex(id);
   span.setTraceId(id);
   EXPECT_EQ(id, span.traceId());
   EXPECT_EQ(id_hex, span.traceIdAsHexString());
 
-  id = Util::generateRandom64();
+  id = Util::generateRandom64(test_time.timeSystem());
   id_hex = Hex::uint64ToHex(id);
   span.setTraceIdHigh(id);
   EXPECT_EQ(id, span.traceIdHigh());
   EXPECT_TRUE(span.isSetTraceIdHigh());
 
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                          test_time.timeSystem().systemTime().time_since_epoch())
                           .count();
   span.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, span.timestamp());
   EXPECT_TRUE(span.isSetTimestamp());
 
   int64_t start_time = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
+                           test_time.timeSystem().monotonicTime().time_since_epoch())
                            .count();
   span.setStartTime(start_time);
   EXPECT_EQ(start_time, span.startTime());
@@ -378,19 +384,18 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   span.setBinaryAnnotations(binary_annotations);
   EXPECT_EQ(1ULL, span.binaryAnnotations().size());
 
-  EXPECT_EQ(
-      R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
-          span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-          R"(","timestamp":)" + std::to_string(span.timestamp()) +
-          R"(,"duration":3000,)"
-          R"("annotations":[)"
-          R"({"timestamp":)" +
-          std::to_string(span.timestamp()) +
-          R"(,"value":"cs","endpoint":)"
-          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}],)"
-          R"("binaryAnnotations":[{"key":"lc","value":"my_component_name","endpoint":)"
-          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})",
-      span.toJson());
+  EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
+                span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
+                R"(","timestamp":)" + std::to_string(span.timestamp()) +
+                R"(,"duration":3000,)"
+                R"("annotations":[)"
+                R"({"timestamp":)" +
+                std::to_string(span.timestamp()) +
+                R"(,"value":"cs","endpoint":)"
+                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}],)"
+                R"("binaryAnnotations":[{"key":"lc","value":"my_component_name","endpoint":)"
+                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})",
+            span.toJson());
 
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
 
@@ -445,7 +450,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 
   // Test setSourceServiceName and setDestinationServiceName
 
-  ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_RECV);
+  ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_RECV); // NOLINT(bugprone-use-after-move)
   span.addAnnotation(ann);
   span.setServiceName("NEW_SERVICE_NAME");
   EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
@@ -483,15 +488,16 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
-  Span span;
+  DangerousDeprecatedTestTime test_time;
+  Span span(test_time.timeSystem());
 
-  uint64_t id = Util::generateRandom64();
+  uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                          test_time.timeSystem().systemTime().time_since_epoch())
                           .count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
@@ -519,15 +525,16 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
-  Span span;
+  DangerousDeprecatedTestTime test_time;
+  Span span(test_time.timeSystem());
 
-  uint64_t id = Util::generateRandom64();
+  uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                          test_time.timeSystem().systemTime().time_since_epoch())
                           .count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
@@ -555,7 +562,8 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, setTag) {
-  Span span;
+  DangerousDeprecatedTestTime test_time;
+  Span span(test_time.timeSystem());
 
   span.setTag("key1", "value1");
   span.setTag("key2", "value2");
@@ -571,6 +579,7 @@ TEST(ZipkinCoreTypesSpanTest, setTag) {
   EXPECT_EQ("value2", bann.value());
 }
 
+} // namespace
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

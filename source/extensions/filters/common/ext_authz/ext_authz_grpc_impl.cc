@@ -13,12 +13,16 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+// Values used for selecting service paths.
+// TODO(gsagula): keep only V2 when V2Alpha gets deprecated.
+constexpr char V2[] = "envoy.service.auth.v2.Authorization.Check";
+constexpr char V2alpha[] = "envoy.service.auth.v2alpha.Authorization.Check";
+
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
-    : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          // TODO(dio): Define the following service method name as a constant value.
-          "envoy.service.auth.v2alpha.Authorization.Check")),
-      async_client_(std::move(async_client)), timeout_(timeout) {}
+                               const absl::optional<std::chrono::milliseconds>& timeout,
+                               bool use_alpha)
+    : service_method_(getMethodDescriptor(use_alpha)), async_client_(std::move(async_client)),
+      timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
@@ -29,7 +33,7 @@ void GrpcClientImpl::cancel() {
 }
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks,
-                           const envoy::service::auth::v2alpha::CheckRequest& request,
+                           const envoy::service::auth::v2::CheckRequest& request,
                            Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
@@ -37,11 +41,9 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
   request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
 }
 
-void GrpcClientImpl::onSuccess(
-    std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse>&& response, Tracing::Span& span) {
-  ASSERT(response->status().code() != Grpc::Status::GrpcStatus::Unknown);
+void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
+                               Tracing::Span& span) {
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
-
   if (response->status().code() == Grpc::Status::GrpcStatus::Ok) {
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
     authz_response->status = CheckStatus::OK;
@@ -68,9 +70,10 @@ void GrpcClientImpl::onSuccess(
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
-  ResponsePtr authz_response = std::make_unique<Response>(Response{});
-  authz_response->status = CheckStatus::Error;
-  callbacks_->onComplete(std::move(authz_response));
+  Response response{};
+  response.status = CheckStatus::Error;
+  response.status_code = Http::Code::Forbidden;
+  callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
 }
 
@@ -86,6 +89,14 @@ void GrpcClientImpl::toAuthzResponseHeader(
                                             header.header().value());
     }
   }
+}
+
+const Protobuf::MethodDescriptor& GrpcClientImpl::getMethodDescriptor(bool use_alpha) {
+  const auto* descriptor =
+      use_alpha ? Protobuf::DescriptorPool::generated_pool()->FindMethodByName(V2alpha)
+                : Protobuf::DescriptorPool::generated_pool()->FindMethodByName(V2);
+  ASSERT(descriptor != nullptr);
+  return *descriptor;
 }
 
 } // namespace ExtAuthz

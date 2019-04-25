@@ -6,13 +6,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::_;
+using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HealthCheck {
+namespace {
 
 TEST(HealthCheckFilterConfig, HealthCheckFilter) {
   std::string json_string = R"EOF(
@@ -238,6 +239,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
   testHealthCheckHeaderMatch(config, headers, false);
 }
 
+} // namespace
 } // namespace HealthCheck
 } // namespace HttpFilters
 } // namespace Extensions

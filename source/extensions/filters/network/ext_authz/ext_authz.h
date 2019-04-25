@@ -9,6 +9,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -110,9 +111,9 @@ private:
   FilterReturn filter_return_{FilterReturn::Stop};
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool calling_check_{};
-  envoy::service::auth::v2alpha::CheckRequest check_request_{};
+  envoy::service::auth::v2::CheckRequest check_request_{};
 };
-}
+} // namespace ExtAuthz
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

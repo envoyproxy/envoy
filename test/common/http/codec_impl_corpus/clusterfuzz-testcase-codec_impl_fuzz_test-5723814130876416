@@ -1,0 +1,54 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+      headers {
+        key: "expect"
+        value: "100-continue"
+      }
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+      }
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      continue_headers {
+      }
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}

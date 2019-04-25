@@ -19,35 +19,43 @@ The following is a YAML example of the above requirement.
     socket_address: { address: 127.0.0.1, port_value: 1234 }
   listener_filters:
   - name: "envoy.listener.tls_inspector"
-    config: {}
+    typed_config: {}
   filter_chains:
   - filter_chain_match:
-      server_names: "example.com"
+      server_names: ["example.com", "www.example.com"]
     tls_context:
       common_tls_context:
         tls_certificates:
-          - certificate_chain: { filename: "example_com_cert.pem" }
-            private_key: { filename: "example_com_key.pem" }
+        - certificate_chain: { filename: "example_com_cert.pem" }
+          private_key: { filename: "example_com_key.pem" }
     filters:
     - name: envoy.http_connection_manager
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+        stat_prefix: ingress_http
         route_config:
           virtual_hosts:
-          - routes:
+          - name: default
+            domains: "*"
+            routes:
             - match: { prefix: "/" }
               route: { cluster: service_foo }
   - filter_chain_match:
-      server_names: "www.example.com"
+      server_names: "api.example.com"
     tls_context:
       common_tls_context:
         tls_certificates:
-          - certificate_chain: { filename: "www_example_com_cert.pem" }
-            private_key: { filename: "www_example_com_key.pem" }
+        - certificate_chain: { filename: "api_example_com_cert.pem" }
+          private_key: { filename: "api_example_com_key.pem" }
     filters:
     - name: envoy.http_connection_manager
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+        stat_prefix: ingress_http
         route_config:
           virtual_hosts:
-          - routes:
+          - name: default
+            domains: "*"
+            routes:
             - match: { prefix: "/" }
               route: { cluster: service_foo }

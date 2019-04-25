@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package test.common.http;
+
+// Structured input for utility_fuzz_test.
+
+message CookiesKey {
+  repeated string cookies = 1;
+  string key = 2;
+}
+
+message GetLastAddressFromXff {
+  string xff = 1;
+  uint32 num_to_skip = 2;
+}
+
+message UtilityTestCase {
+  oneof utility_selector {
+    string parse_query_string = 1;
+    CookiesKey parse_cookie_value = 2;
+    CookiesKey has_set_cookie = 3;
+    GetLastAddressFromXff get_last_address_from_xff = 4;
+    string extract_host_path_from_uri = 5;
+  }
+}

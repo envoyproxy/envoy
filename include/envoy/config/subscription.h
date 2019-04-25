@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/stats/stats_macros.h"
@@ -12,11 +13,9 @@
 namespace Envoy {
 namespace Config {
 
-template <class ResourceType> class SubscriptionCallbacks {
+class SubscriptionCallbacks {
 public:
-  typedef Protobuf::RepeatedPtrField<ResourceType> ResourceVector;
-
-  virtual ~SubscriptionCallbacks() {}
+  virtual ~SubscriptionCallbacks() = default;
 
   /**
    * Called when a configuration update is received.
@@ -26,8 +25,24 @@ public:
    *        is accepted. Accepted configurations have their version_info reflected in subsequent
    *        requests.
    */
-  virtual void onConfigUpdate(const ResourceVector& resources,
+  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                               const std::string& version_info) PURE;
+
+  // TODO(fredlas) it is a HACK that there are two of these. After delta CDS is merged,
+  //               I intend to reimplement all state-of-the-world xDSes' use of onConfigUpdate
+  //               in terms of this delta-style one (and remove the original).
+  /**
+   * Called when a delta configuration update is received.
+   * @param added_resources resources newly added since the previous fetch.
+   * @param removed_resources names of resources that this fetch instructed to be removed.
+   * @param system_version_info aggregate response data "version", for debugging.
+   * @throw EnvoyException with reason if the config changes are rejected. Otherwise the changes
+   *        are accepted. Accepted changes have their version_info reflected in subsequent requests.
+   */
+  virtual void
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
@@ -45,28 +60,27 @@ public:
 
 /**
  * Common abstraction for subscribing to versioned config updates. This may be implemented via bidi
- * gRPC streams, periodic/long polling REST or inotify filesystem updates. ResourceType is expected
- * to be a protobuf serializable object.
+ * gRPC streams, periodic/long polling REST or inotify filesystem updates.
  */
-template <class ResourceType> class Subscription {
+class Subscription {
 public:
-  virtual ~Subscription() {}
+  virtual ~Subscription() = default;
 
   /**
    * Start a configuration subscription asynchronously. This should be called once and will continue
    * to fetch throughout the lifetime of the Subscription object.
-   * @param resources vector of resource names to fetch.
+   * @param resources set of resource names to fetch.
    * @param callbacks the callbacks to be notified of configuration updates. The callback must not
    *        result in the deletion of the Subscription object.
    */
-  virtual void start(const std::vector<std::string>& resources,
-                     SubscriptionCallbacks<ResourceType>& callbacks) PURE;
+  virtual void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) PURE;
 
   /**
    * Update the resources to fetch.
-   * @param resources vector of resource names to fetch.
+   * @param resources vector of resource names to fetch. It's a (not unordered_)set so that it can
+   * be passed to std::set_difference, which must be given sorted collections.
    */
-  virtual void updateResources(const std::vector<std::string>& resources) PURE;
+  virtual void updateResources(const std::set<std::string>& update_to_these_names) PURE;
 };
 
 /**

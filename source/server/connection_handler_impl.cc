@@ -3,6 +3,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/network/connection_impl.h"
@@ -14,10 +15,13 @@ namespace Envoy {
 namespace Server {
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(spdlog::logger& logger, Event::Dispatcher& dispatcher)
-    : logger_(logger), dispatcher_(dispatcher) {}
+    : logger_(logger), dispatcher_(dispatcher), disable_listeners_(false) {}
 
 void ConnectionHandlerImpl::addListener(Network::ListenerConfig& config) {
   ActiveListenerPtr l(new ActiveListener(*this, config));
+  if (disable_listeners_) {
+    l->listener_->disable();
+  }
   listeners_.emplace_back(config.socket().localAddress(), std::move(l));
 }
 
@@ -45,6 +49,20 @@ void ConnectionHandlerImpl::stopListeners() {
   }
 }
 
+void ConnectionHandlerImpl::disableListeners() {
+  disable_listeners_ = true;
+  for (auto& listener : listeners_) {
+    listener.second->listener_->disable();
+  }
+}
+
+void ConnectionHandlerImpl::enableListeners() {
+  disable_listeners_ = false;
+  for (auto& listener : listeners_) {
+    listener.second->listener_->enable();
+  }
+}
+
 void ConnectionHandlerImpl::ActiveListener::removeConnection(ActiveConnection& connection) {
   ENVOY_CONN_LOG_TO_LOGGER(parent_.logger_, debug, "adding to cleanup list",
                            *connection.connection_);
@@ -66,8 +84,9 @@ ConnectionHandlerImpl::ActiveListener::ActiveListener(ConnectionHandlerImpl& par
                                                       Network::ListenerPtr&& listener,
                                                       Network::ListenerConfig& config)
     : parent_(parent), listener_(std::move(listener)),
-      stats_(generateStats(config.listenerScope())), listener_tag_(config.listenerTag()),
-      config_(config) {}
+      stats_(generateStats(config.listenerScope())),
+      listener_filters_timeout_(config.listenerFiltersTimeout()),
+      listener_tag_(config.listenerTag()), config_(config) {}
 
 ConnectionHandlerImpl::ActiveListener::~ActiveListener() {
   // Purge sockets that have not progressed to connections. This should only happen when
@@ -119,6 +138,27 @@ ConnectionHandlerImpl::findActiveListenerByAddress(const Network::Address::Insta
   return (listener_it != listeners_.end()) ? listener_it->second.get() : nullptr;
 }
 
+void ConnectionHandlerImpl::ActiveSocket::onTimeout() {
+  listener_.stats_.downstream_pre_cx_timeout_.inc();
+  ASSERT(inserted());
+  unlink();
+}
+
+void ConnectionHandlerImpl::ActiveSocket::startTimer() {
+  if (listener_.listener_filters_timeout_.count() > 0) {
+    timer_ = listener_.parent_.dispatcher_.createTimer([this]() -> void { onTimeout(); });
+    timer_->enableTimer(listener_.listener_filters_timeout_);
+  }
+}
+
+void ConnectionHandlerImpl::ActiveSocket::unlink() {
+  ActiveSocketPtr removed = removeFromList(listener_.sockets_);
+  if (removed->timer_ != nullptr) {
+    removed->timer_->disableTimer();
+  }
+  listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
+}
+
 void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
   if (success) {
     if (iter_ == accept_filters_.end()) {
@@ -146,9 +186,10 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
     }
     if (new_listener != nullptr) {
       // Hands off connections redirected by iptables to the listener associated with the
-      // original destination address. Pass 'hand_off_restored_destionations' as false to
+      // original destination address. Pass 'hand_off_restored_destination_connections' as false to
       // prevent further redirection.
-      new_listener->onAccept(std::move(socket_), false);
+      new_listener->onAccept(std::move(socket_),
+                             false /* hand_off_restored_destination_connections */);
     } else {
       // Set default transport protocol if none of the listener filters did it.
       if (socket_->detectedTransportProtocol().empty()) {
@@ -162,14 +203,12 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
 
   // Filter execution concluded, unlink and delete this ActiveSocket if it was linked.
   if (inserted()) {
-    ActiveSocketPtr removed = removeFromList(listener_.sockets_);
-    listener_.parent_.dispatcher_.deferredDelete(std::move(removed));
+    unlink();
   }
 }
 
 void ConnectionHandlerImpl::ActiveListener::onAccept(
     Network::ConnectionSocketPtr&& socket, bool hand_off_restored_destination_connections) {
-  Network::Address::InstanceConstSharedPtr local_address = socket->localAddress();
   auto active_socket = std::make_unique<ActiveSocket>(*this, std::move(socket),
                                                       hand_off_restored_destination_connections);
 
@@ -180,6 +219,7 @@ void ConnectionHandlerImpl::ActiveListener::onAccept(
   // Move active_socket to the sockets_ list if filter iteration needs to continue later.
   // Otherwise we let active_socket be destructed when it goes out of scope.
   if (active_socket->iter_ != active_socket->accept_filters_.end()) {
+    active_socket->startTimer();
     active_socket->moveIntoListBack(std::move(active_socket), sockets_);
   }
 }
@@ -195,7 +235,7 @@ void ConnectionHandlerImpl::ActiveListener::newConnection(Network::ConnectionSoc
     return;
   }
 
-  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
+  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
   Network::ConnectionPtr new_connection =
       parent_.dispatcher_.createServerConnection(std::move(socket), std::move(transport_socket));
   new_connection->setBufferLimits(config_.perConnectionBufferLimitBytes());
@@ -218,16 +258,18 @@ void ConnectionHandlerImpl::ActiveListener::onNewConnection(
 
   // If the connection is already closed, we can just let this connection immediately die.
   if (new_connection->state() != Network::Connection::State::Closed) {
-    ActiveConnectionPtr active_connection(new ActiveConnection(*this, std::move(new_connection)));
+    ActiveConnectionPtr active_connection(
+        new ActiveConnection(*this, std::move(new_connection), parent_.dispatcher_.timeSource()));
     active_connection->moveIntoList(std::move(active_connection), connections_);
     parent_.num_connections_++;
   }
 }
 
 ConnectionHandlerImpl::ActiveConnection::ActiveConnection(ActiveListener& listener,
-                                                          Network::ConnectionPtr&& new_connection)
+                                                          Network::ConnectionPtr&& new_connection,
+                                                          TimeSource& time_source)
     : listener_(listener), connection_(std::move(new_connection)),
-      conn_length_(new Stats::Timespan(listener_.stats_.downstream_cx_length_ms_)) {
+      conn_length_(new Stats::Timespan(listener_.stats_.downstream_cx_length_ms_, time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);

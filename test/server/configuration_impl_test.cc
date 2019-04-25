@@ -2,6 +2,7 @@
 #include <list>
 #include <string>
 
+#include "common/api/api_impl.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/well_known_names.h"
 #include "common/json/json_loader.h"
@@ -28,6 +29,7 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Server {
 namespace Configuration {
+namespace {
 
 TEST(FilterChainUtility, buildFilterChain) {
   Network::MockConnection connection;
@@ -52,11 +54,14 @@ TEST(FilterChainUtility, buildFilterChainFailWithBadFilters) {
 class ConfigurationImplTest : public testing::Test {
 protected:
   ConfigurationImplTest()
-      : cluster_manager_factory_(server_.runtime(), server_.stats(), server_.threadLocal(),
-                                 server_.random(), server_.dnsResolver(),
-                                 server_.sslContextManager(), server_.dispatcher(),
-                                 server_.localInfo(), server_.secretManager()) {}
+      : api_(Api::createApiForTest()),
+        cluster_manager_factory_(
+            server_.admin(), server_.runtime(), server_.stats(), server_.threadLocal(),
+            server_.random(), server_.dnsResolver(), server_.sslContextManager(),
+            server_.dispatcher(), server_.localInfo(), server_.secretManager(), *api_,
+            server_.httpContext(), server_.accessLogManager(), server_.singletonManager()) {}
 
+  Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
 };
@@ -303,6 +308,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
                             "Provided name for static registration lookup was empty.");
 }
 
+} // namespace
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

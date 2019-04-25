@@ -1,6 +1,7 @@
 #include "common/http/http1/codec_impl.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
@@ -9,6 +10,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/stack_array.h"
 #include "common/common/utility.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
@@ -20,6 +22,12 @@ namespace Http1 {
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
+
+StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {
+  if (connection_.connection().aboveHighWatermark()) {
+    runHighWatermarkCallbacks();
+  }
+}
 
 void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const char* value,
                                      uint32_t value_size) {
@@ -34,6 +42,9 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
 }
+void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
+  this->encodeHeader(key.data(), key.size(), value.data(), value.size());
+}
 
 void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
@@ -46,11 +57,11 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
   bool saw_content_length = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        const char* key_to_use = header.key().c_str();
+        absl::string_view key_to_use = header.key().getStringView();
         uint32_t key_size_to_use = header.key().size();
         // Translate :authority -> host so that upper layers do not need to deal with this.
         if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-          key_to_use = Headers::get().HostLegacy.get().c_str();
+          key_to_use = absl::string_view(Headers::get().HostLegacy.get());
           key_size_to_use = Headers::get().HostLegacy.get().size();
         }
 
@@ -59,8 +70,8 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
           return HeaderMap::Iterate::Continue;
         }
 
-        static_cast<StreamEncoderImpl*>(context)->encodeHeader(
-            key_to_use, key_size_to_use, header.value().c_str(), header.value().size());
+        static_cast<StreamEncoderImpl*>(context)->encodeHeader(key_to_use,
+                                                               header.value().getStringView());
         return HeaderMap::Iterate::Continue;
       },
       this);
@@ -91,8 +102,12 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
     } else if (end_stream && !is_response_to_head_request_) {
       // If this is a headers-only stream, append an explicit "Content-Length: 0" unless it's a
       // response to a HEAD request.
-      encodeHeader(Headers::get().ContentLength.get().c_str(),
-                   Headers::get().ContentLength.get().size(), "0", 1);
+      // For 204s and 1xx where content length is disallowed, don't append the content length but
+      // also don't chunk encode.
+      if (is_content_length_allowed_) {
+        encodeHeader(Headers::get().ContentLength.get().c_str(),
+                     Headers::get().ContentLength.get().size(), "0", 1);
+      }
       chunk_encoding_ = false;
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
@@ -101,7 +116,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
                    Headers::get().TransferEncoding.get().size(),
                    Headers::get().TransferEncodingValues.Chunked.c_str(),
                    Headers::get().TransferEncodingValues.Chunked.size());
-      // We do not aply chunk encoding for HTTP upgrades.
+      // We do not apply chunk encoding for HTTP upgrades.
       // If there is a body in a WebSocket Upgrade response, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
       // extra chunk boundaries.
@@ -125,7 +140,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
 
 void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // end_stream may be indicated with a zero length data buffer. If that is the case, so not
-  // atually write the zero length buffer out.
+  // actually write the zero length buffer out.
   if (data.length() > 0) {
     if (chunk_encoding_) {
       connection_.buffer().add(fmt::format("{:x}\r\n", data.length()));
@@ -233,6 +248,15 @@ void ResponseStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
 
+  if (numeric_status == 204 || numeric_status < 200) {
+    // Per https://tools.ietf.org/html/rfc7230#section-3.3.2
+    setIsContentLengthAllowed(false);
+  } else {
+    // Make sure that if we encodeHeaders(100) then encodeHeaders(200) that we
+    // set is_content_length_allowed_ back to true.
+    setIsContentLengthAllowed(true);
+  }
+
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
 }
 
@@ -244,15 +268,14 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   if (!method || !path) {
     throw CodecClientException(":method and :path must be specified");
   }
-
-  if (method->value() == Headers::get().MethodValues.Head.c_str()) {
+  if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
   }
-
+  connection_.onEncodeHeaders(headers);
   connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
-  connection_.copyToBuffer(method->value().c_str(), method->value().size());
+  connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
-  connection_.copyToBuffer(path->value().c_str(), path->value().size());
+  connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
@@ -296,9 +319,11 @@ const ToLowerTable& ConnectionImpl::toLowerTable() {
   return *table;
 }
 
-ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type)
+ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type type,
+                               uint32_t max_headers_kb)
     : connection_(connection), output_buffer_([&]() -> void { this->onBelowLowWatermark(); },
-                                              [&]() -> void { this->onAboveHighWatermark(); }) {
+                                              [&]() -> void { this->onAboveHighWatermark(); }),
+      max_headers_kb_(max_headers_kb) {
   output_buffer_.setWatermarks(connection.bufferLimit());
   http_parser_init(&parser_, type);
   parser_.data = this;
@@ -306,7 +331,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
 
 void ConnectionImpl::completeLastHeader() {
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
-                 current_header_field_.c_str(), current_header_value_.c_str());
+                 current_header_field_.getStringView(), current_header_value_.getStringView());
   if (!current_header_field_.empty()) {
     toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
     current_header_map_->addViaMove(std::move(current_header_field_),
@@ -326,9 +351,9 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 
   ssize_t total_parsed = 0;
   uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  data.getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
+  STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+  data.getRawSlices(slices.begin(), num_slices);
+  for (const Buffer::RawSlice& slice : slices) {
     total_parsed += slice.len_;
     onBody(static_cast<const char*>(slice.mem_), slice.len_);
   }
@@ -350,9 +375,9 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ssize_t total_parsed = 0;
   if (data.length() > 0) {
     uint64_t num_slices = data.getRawSlices(nullptr, 0);
-    Buffer::RawSlice slices[num_slices];
-    data.getRawSlices(slices, num_slices);
-    for (Buffer::RawSlice& slice : slices) {
+    STACK_ARRAY(slices, Buffer::RawSlice, num_slices);
+    data.getRawSlices(slices.begin(), num_slices);
+    for (const Buffer::RawSlice& slice : slices) {
       total_parsed += dispatchSlice(static_cast<const char*>(slice.mem_), slice.len_);
     }
   } else {
@@ -396,9 +421,24 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     // Ignore trailers.
     return;
   }
+  // http-parser should filter for this
+  // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
+  // have an invariant that they must not contain embedded zero characters
+  // (NUL, ASCII 0x0).
+  if (absl::string_view(data, length).find('\0') != absl::string_view::npos) {
+    throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
+  }
 
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
+
+  const uint32_t total =
+      current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
+  if (total > (max_headers_kb_ * 1024)) {
+    error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
+    sendProtocolError();
+    throw CodecProtocolException("headers size exceeds limit");
+  }
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
@@ -438,7 +478,7 @@ void ConnectionImpl::onMessageCompleteBase() {
 void ConnectionImpl::onMessageBeginBase() {
   ENVOY_CONN_LOG(trace, "message begin", connection_);
   ASSERT(!current_header_map_);
-  current_header_map_.reset(new HeaderMapImpl());
+  current_header_map_ = std::make_unique<HeaderMapImpl>();
   header_parsing_state_ = HeaderParsingState::Field;
   onMessageBegin();
 }
@@ -451,8 +491,9 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            ServerConnectionCallbacks& callbacks,
-                                           Http1Settings settings)
-    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks), codec_settings_(settings) {}
+                                           Http1Settings settings, uint32_t max_request_headers_kb)
+    : ConnectionImpl(connection, HTTP_REQUEST, max_request_headers_kb), callbacks_(callbacks),
+      codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);
@@ -470,8 +511,9 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   bool is_connect = (method == HTTP_CONNECT);
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
-  if (active_request_->request_url_.c_str()[0] == '/' ||
-      ((method == HTTP_OPTIONS) && active_request_->request_url_.c_str()[0] == '*')) {
+  if (!active_request_->request_url_.getStringView().empty() &&
+      (active_request_->request_url_.getStringView()[0] == '/' ||
+       ((method == HTTP_OPTIONS) && active_request_->request_url_.getStringView()[0] == '*'))) {
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }
@@ -488,57 +530,22 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
     return;
   }
 
-  struct http_parser_url u;
-  http_parser_url_init(&u);
-  int result = http_parser_parse_url(active_request_->request_url_.buffer(),
-                                     active_request_->request_url_.size(), is_connect, &u);
-
-  if (result != 0) {
-    sendProtocolError();
-    throw CodecProtocolException(
-        "http/1.1 protocol error: invalid url in request line, parsed invalid");
-  } else {
-    if ((u.field_set & (1 << UF_HOST)) == (1 << UF_HOST) &&
-        (u.field_set & (1 << UF_SCHEMA)) == (1 << UF_SCHEMA)) {
-      // RFC7230#5.7
-      // When a proxy receives a request with an absolute-form of
-      // request-target, the proxy MUST ignore the received Host header field
-      // (if any) and instead replace it with the host information of the
-      // request-target. A proxy that forwards such a request MUST generate a
-      // new Host field-value based on the received request-target rather than
-      // forward the received Host field-value.
-
-      uint16_t authority_len = u.field_data[UF_HOST].len;
-
-      if ((u.field_set & (1 << UF_PORT)) == (1 << UF_PORT)) {
-        authority_len = authority_len + u.field_data[UF_PORT].len + 1;
-      }
-
-      // Insert the host header, this will later be converted to :authority
-      std::string new_host(active_request_->request_url_.c_str() + u.field_data[UF_HOST].off,
-                           authority_len);
-
-      headers.insertHost().value(new_host);
-
-      // RFC allows the absolute-uri to not end in /, but the absolute path form
-      // must start with /
-      if ((u.field_set & (1 << UF_PATH)) == (1 << UF_PATH) && u.field_data[UF_PATH].len > 0) {
-        HeaderString new_path;
-        new_path.setCopy(active_request_->request_url_.c_str() + u.field_data[UF_PATH].off,
-                         active_request_->request_url_.size() - u.field_data[UF_PATH].off);
-        headers.addViaMove(std::move(path), std::move(new_path));
-      } else {
-        HeaderString new_path;
-        new_path.setCopy("/", 1);
-        headers.addViaMove(std::move(path), std::move(new_path));
-      }
-
-      active_request_->request_url_.clear();
-      return;
-    }
+  Utility::Url absolute_url;
+  if (!absolute_url.initialize(active_request_->request_url_.getStringView())) {
     sendProtocolError();
     throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
   }
+  // RFC7230#5.7
+  // When a proxy receives a request with an absolute-form of
+  // request-target, the proxy MUST ignore the received Host header field
+  // (if any) and instead replace it with the host information of the
+  // request-target. A proxy that forwards such a request MUST generate a
+  // new Host field-value based on the received request-target rather than
+  // forward the received Host field-value.
+  headers.insertHost().value(std::string(absolute_url.host_and_port()));
+
+  headers.insertPath().value(std::string(absolute_url.path_and_query_params()));
+  active_request_->request_url_.clear();
 }
 
 int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
@@ -586,7 +593,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
 void ServerConnectionImpl::onMessageBegin() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_);
-    active_request_.reset(new ActiveRequest(*this));
+    active_request_ = std::make_unique<ActiveRequest>(*this);
     active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
   }
 }
@@ -658,11 +665,12 @@ void ServerConnectionImpl::onBelowLowWatermark() {
 }
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, ConnectionCallbacks&)
-    : ConnectionImpl(connection, HTTP_RESPONSE) {}
+    : ConnectionImpl(connection, HTTP_RESPONSE, MAX_RESPONSE_HEADERS_KB) {}
 
 bool ClientConnectionImpl::cannotHaveBody() {
   if ((!pending_responses_.empty() && pending_responses_.front().head_request_) ||
-      parser_.status_code == 204 || parser_.status_code == 304) {
+      parser_.status_code == 204 || parser_.status_code == 304 ||
+      (parser_.status_code >= 200 && parser_.content_length == 0)) {
     return true;
   } else {
     return false;
@@ -673,21 +681,20 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   if (resetStreamCalled()) {
     throw CodecClientException("cannot create new streams after calling reset");
   }
-  // Streams are responsible for unwinding any outstanding readDisable(true)
-  // calls done on the underlying connection as they are destroyed. As this is
-  // the only place a HTTP/1 stream is destroyed where the Network::Connection is
-  // reused, unwind any outstanding readDisable() calls here.
-  while (!connection_.readEnabled()) {
-    connection_.readDisable(false);
-  }
-  request_encoder_.reset(new RequestStreamEncoderImpl(*this));
+
+  // If reads were disabled due to flow control, we expect reads to always be enabled again before
+  // reusing this connection. This is done when the final pipeline response is received.
+  ASSERT(connection_.readEnabled());
+
+  request_encoder_ = std::make_unique<RequestStreamEncoderImpl>(*this);
   pending_responses_.emplace_back(&response_decoder);
   return *request_encoder_;
 }
 
-void ClientConnectionImpl::onEncodeComplete() {
-  // Transfer head request state into the pending response before we reuse the encoder.
-  pending_responses_.back().head_request_ = request_encoder_->headRequest();
+void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
+  if (headers.Method()->value() == Headers::get().MethodValues.Head.c_str()) {
+    pending_responses_.back().head_request_ = true;
+  }
 }
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
@@ -735,6 +742,18 @@ void ClientConnectionImpl::onMessageComplete() {
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
     PendingResponse response = pending_responses_.front();
     pending_responses_.pop_front();
+
+    // Streams are responsible for unwinding any outstanding readDisable(true)
+    // calls done on the underlying connection as they are destroyed. As this is
+    // the only place a HTTP/1 stream is destroyed where the Network::Connection is
+    // reused, unwind any outstanding readDisable() calls here. Only do this if there are no
+    // pipelined responses remaining. Also do this before we dispatch end_stream in case the caller
+    // immediately reuses the connection.
+    if (pending_responses_.empty()) {
+      while (!connection_.readEnabled()) {
+        connection_.readDisable(false);
+      }
+    }
 
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(std::move(deferred_end_stream_headers_), true);

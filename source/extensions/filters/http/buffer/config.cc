@@ -17,13 +17,11 @@ namespace HttpFilters {
 namespace BufferFilter {
 
 Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::buffer::v2::Buffer& proto_config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const envoy::config::filter::http::buffer::v2::Buffer& proto_config, const std::string&,
+    Server::Configuration::FactoryContext&) {
   ASSERT(proto_config.has_max_request_bytes());
-  ASSERT(proto_config.has_max_request_time());
 
-  BufferFilterConfigSharedPtr filter_config(
-      new BufferFilterConfig(proto_config, stats_prefix, context.scope()));
+  BufferFilterConfigSharedPtr filter_config(new BufferFilterConfig(proto_config));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BufferFilter>(filter_config));
   };
@@ -48,9 +46,7 @@ BufferFilterFactory::createRouteSpecificFilterConfigTyped(
 /**
  * Static registration for the buffer filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<BufferFilterFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(BufferFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace BufferFilter
 } // namespace HttpFilters

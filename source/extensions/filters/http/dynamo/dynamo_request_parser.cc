@@ -7,6 +7,8 @@
 
 #include "common/common/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -57,7 +59,7 @@ std::string RequestParser::parseOperation(const Http::HeaderMap& headerMap) {
   const Http::HeaderEntry* x_amz_target = headerMap.get(X_AMZ_TARGET);
   if (x_amz_target) {
     // Normally x-amz-target contains Version.Operation, e.g., DynamoDB_20160101.GetItem
-    auto version_and_operation = StringUtil::splitToken(x_amz_target->value().c_str(), ".");
+    auto version_and_operation = StringUtil::splitToken(x_amz_target->value().getStringView(), ".");
     if (version_and_operation.size() == 2) {
       operation = std::string{version_and_operation[1]};
     }
@@ -110,7 +112,7 @@ std::string RequestParser::parseErrorType(const Json::Object& json_data) {
   }
 
   for (const std::string& supported_error_type : SUPPORTED_ERROR_TYPES) {
-    if (StringUtil::endsWith(error_type, supported_error_type)) {
+    if (absl::EndsWith(error_type, supported_error_type)) {
       return supported_error_type;
     }
   }

@@ -7,13 +7,13 @@ namespace Envoy {
 
 std::string echo_config;
 
-class EchoIntegrationTest : public BaseIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class EchoIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                            public BaseIntegrationTest {
 public:
   EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     echo_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
@@ -42,9 +42,9 @@ public:
   }
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, EchoIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, EchoIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(EchoIntegrationTest, Hello) {
   Buffer::OwnedImpl buffer("hello");
@@ -118,10 +118,32 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   listener_removed.waitReady();
 
   // Now connect. This should fail.
-  RawConnectionDriver connection2(
-      new_listener_port, buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
-  connection2.run();
+  // Allow for a few attempts, in order to handle a race (likely due to lack of
+  // LEV_OPT_CLOSE_ON_FREE, which would break listener reuse)
+  //
+  // In order for this test to work, it must be tagged as "exclusive" in its
+  // build file. Otherwise, it's possible that when the listener is destroyed
+  // above, another test would start listening on the released port, and this
+  // connect would unexpectedly succeed.
+  bool connect_fail = false;
+  for (int i = 0; i < 10; ++i) {
+    RawConnectionDriver connection2(
+        new_listener_port, buffer,
+        [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
+    while (connection2.connecting()) {
+      // Don't busy loop, but macOS often needs a moment to decide this connection isn't happening.
+      timeSystem().sleep(std::chrono::milliseconds(10));
+
+      connection2.run(Event::Dispatcher::RunType::NonBlock);
+    }
+    if (connection2.connection().state() == Network::Connection::State::Closed) {
+      connect_fail = true;
+      break;
+    } else {
+      connection2.close();
+    }
+  }
+  ASSERT_TRUE(connect_fail);
 }
 
 } // namespace Envoy

@@ -16,6 +16,8 @@ public:
   const std::string Buffer = "envoy.buffer";
   // CORS filter
   const std::string Cors = "envoy.cors";
+  // CSRF filter
+  const std::string Csrf = "envoy.csrf";
   // Dynamo filter
   const std::string Dynamo = "envoy.http_dynamo_filter";
   // Fault filter
@@ -26,6 +28,8 @@ public:
   const std::string GrpcJsonTranscoder = "envoy.grpc_json_transcoder";
   // GRPC web filter
   const std::string GrpcWeb = "envoy.grpc_web";
+  // GRPC http1 reverse bridge filter
+  const std::string GrpcHttp1ReverseBridge = "envoy.filters.http.grpc_http1_reverse_bridge";
   // Gzip filter
   const std::string EnvoyGzip = "envoy.gzip";
   // IP tagging filter
@@ -48,6 +52,8 @@ public:
   const std::string JwtAuthn = "envoy.filters.http.jwt_authn";
   // Header to metadata filter
   const std::string HeaderToMetadata = "envoy.filters.http.header_to_metadata";
+  // Tap filter
+  const std::string Tap = "envoy.filters.http.tap";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;

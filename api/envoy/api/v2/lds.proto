@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+option java_outer_classname = "LdsProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.api.v2";
+
 option java_generic_services = true;
 
 import "envoy/api/v2/core/address.proto";
@@ -10,6 +14,7 @@ import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/listener/listener.proto";
 
 import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
@@ -36,6 +41,7 @@ service ListenerDiscoveryService {
   }
 }
 
+// [#comment:next free field: 16]
 message Listener {
   // The unique name by which this listener is known. If no name is provided,
   // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
@@ -86,7 +92,7 @@ message Listener {
 
   // [#not-implemented-hide:]
   message DeprecatedV1 {
-    // Whether the listener should bind to the port. A listener that doesn’t
+    // Whether the listener should bind to the port. A listener that doesn't
     // bind can only receive connections redirected from other listeners that
     // set use_original_dst parameter to true. Default is true.
     //
@@ -94,6 +100,8 @@ message Listener {
     // port. An additional filter chain must be created for every original
     // destination port this listener may redirect to in v2, with the original
     // port specified in the FilterChainMatch destination_port field.
+    //
+    // [#comment:TODO(PiotrSikora): Remove this once verified that we no longer need it.]
     google.protobuf.BoolValue bind_to_port = 1;
   }
 
@@ -119,6 +127,11 @@ message Listener {
   // filters are processed sequentially right after a socket has been accepted by the listener, and
   // before a connection is created.
   repeated listener.ListenerFilter listener_filters = 9 [(gogoproto.nullable) = false];
+
+  // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
+  // the accepted socket is closed without a connection being created. Specify 0 to disable the
+  // timeout. If not specified, a default timeout of 15s is used.
+  google.protobuf.Duration listener_filters_timeout = 15 [(gogoproto.stdduration) = true];
 
   // Whether the listener should be set as a transparent socket.
   // When this flag is set to true, connections can be redirected to the listener using an
@@ -163,4 +176,6 @@ message Listener {
   // On macOS, only values of 0, 1, and unset are valid; other values may result in an error.
   // To set the queue length on macOS, set the net.inet.tcp.fastopen_backlog kernel parameter.
   google.protobuf.UInt32Value tcp_fast_open_queue_length = 12;
+
+  reserved 14;
 }

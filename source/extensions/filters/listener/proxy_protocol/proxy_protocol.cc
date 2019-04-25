@@ -10,9 +10,10 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -32,13 +33,13 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_.get() == nullptr);
-  file_event_ =
-      cb.dispatcher().createFileEvent(socket.fd(),
-                                      [this](uint32_t events) {
-                                        ASSERT(events == Event::FileReadyType::Read);
-                                        onRead();
-                                      },
-                                      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  file_event_ = cb.dispatcher().createFileEvent(
+      socket.ioHandle().fd(),
+      [this](uint32_t events) {
+        ASSERT(events == Event::FileReadyType::Read);
+        onRead();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   cb_ = &cb;
   return Network::FilterStatus::StopIteration;
 }
@@ -55,8 +56,8 @@ void Filter::onRead() {
 void Filter::onReadWorker() {
   Network::ConnectionSocket& socket = cb_->socket();
 
-  if ((!proxy_protocol_header_.has_value() && !readProxyHeader(socket.fd())) ||
-      (proxy_protocol_header_.has_value() && !parseExtensions(socket.fd()))) {
+  if ((!proxy_protocol_header_.has_value() && !readProxyHeader(socket.ioHandle().fd())) ||
+      (proxy_protocol_header_.has_value() && !parseExtensions(socket.ioHandle().fd()))) {
     // We return if a) we do not yet have the header, or b) we have the header but not yet all
     // the extension data. In both cases we'll be called again when the socket is ready to read
     // and pick up where we left off.
@@ -83,7 +84,7 @@ void Filter::onReadWorker() {
 
     // Only set the local address if it really changed, and mark it as address being restored.
     if (*proxy_protocol_header_.value().local_address_ != *socket.localAddress()) {
-      socket.setLocalAddress(proxy_protocol_header_.value().local_address_, true);
+      socket.restoreLocalAddress(proxy_protocol_header_.value().local_address_);
     }
     socket.setRemoteAddress(proxy_protocol_header_.value().remote_address_);
   }
@@ -130,18 +131,18 @@ void Filter::parseV2Header(char* buf) {
 
   // Only do connections on behalf of another user, not internally-driven health-checks. If
   // its not on behalf of someone, or its not AF_INET{6} / STREAM/DGRAM, ignore and
-  /// use the real-remote info
+  // use the real-remote info
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_ONBEHALF_OF) {
     uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
     if (((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_STREAM) ||
         ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_DGRAM)) {
       if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET) {
-        typedef struct {
+        PACKED_STRUCT(struct pp_ipv4_addr {
           uint32_t src_addr;
           uint32_t dst_addr;
           uint16_t src_port;
           uint16_t dst_port;
-        } __attribute__((packed)) pp_ipv4_addr;
+        });
         pp_ipv4_addr* v4;
         v4 = reinterpret_cast<pp_ipv4_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in ra4, la4;
@@ -160,12 +161,12 @@ void Filter::parseV2Header(char* buf) {
                        std::make_shared<Network::Address::Ipv4Instance>(&la4)});
         return;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
-        typedef struct {
+        PACKED_STRUCT(struct pp_ipv6_addr {
           uint8_t src_addr[16];
           uint8_t dst_addr[16];
           uint16_t src_port;
           uint16_t dst_port;
-        } __attribute__((packed)) pp_ipv6_addr;
+        });
         pp_ipv6_addr* v6;
         v6 = reinterpret_cast<pp_ipv6_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in6 ra6, la6;
@@ -240,7 +241,7 @@ bool Filter::parseExtensions(int fd) {
     // buf_ is no longer in use so we re-use it to read/discard
     int bytes_avail;
     auto& os_syscalls = Api::OsSysCallsSingleton::get();
-    if (os_syscalls.ioctl(fd, FIONREAD, &bytes_avail) < 0) {
+    if (os_syscalls.ioctl(fd, FIONREAD, &bytes_avail).rc_ < 0) {
       throw EnvoyException("failed to read proxy protocol (no bytes avail)");
     }
     if (bytes_avail == 0) {
@@ -248,11 +249,11 @@ bool Filter::parseExtensions(int fd) {
     }
     bytes_avail = std::min(size_t(bytes_avail), sizeof(buf_));
     bytes_avail = std::min(size_t(bytes_avail), proxy_protocol_header_.value().extensions_length_);
-    ssize_t nread = os_syscalls.recv(fd, buf_, bytes_avail, 0);
-    if (nread != bytes_avail) {
+    const Api::SysCallSizeResult recv_result = os_syscalls.recv(fd, buf_, bytes_avail, 0);
+    if (recv_result.rc_ != bytes_avail) {
       throw EnvoyException("failed to read proxy protocol extension");
     }
-    proxy_protocol_header_.value().extensions_length_ -= nread;
+    proxy_protocol_header_.value().extensions_length_ -= recv_result.rc_;
   }
   return true;
 }
@@ -262,7 +263,7 @@ bool Filter::readProxyHeader(int fd) {
     int bytes_avail;
     auto& os_syscalls = Api::OsSysCallsSingleton::get();
 
-    if (os_syscalls.ioctl(fd, FIONREAD, &bytes_avail) < 0) {
+    if (os_syscalls.ioctl(fd, FIONREAD, &bytes_avail).rc_ < 0) {
       throw EnvoyException("failed to read proxy protocol (no bytes avail)");
     }
 
@@ -272,7 +273,9 @@ bool Filter::readProxyHeader(int fd) {
 
     bytes_avail = std::min(size_t(bytes_avail), MAX_PROXY_PROTO_LEN_V2 - buf_off_);
 
-    ssize_t nread = os_syscalls.recv(fd, buf_ + buf_off_, bytes_avail, MSG_PEEK);
+    const Api::SysCallSizeResult result =
+        os_syscalls.recv(fd, buf_ + buf_off_, bytes_avail, MSG_PEEK);
+    ssize_t nread = result.rc_;
 
     if (nread < 1) {
       throw EnvoyException("failed to read proxy protocol (no bytes read)");
@@ -294,14 +297,13 @@ bool Filter::readProxyHeader(int fd) {
         throw EnvoyException("Unsupported V2 proxy protocol version");
       }
       if (buf_off_ < PROXY_PROTO_V2_HEADER_LEN) {
-        ssize_t lread;
         ssize_t exp = PROXY_PROTO_V2_HEADER_LEN - buf_off_;
-        lread = os_syscalls.recv(fd, buf_ + buf_off_, exp, 0);
-        if (lread != exp) {
+        const Api::SysCallSizeResult read_result = os_syscalls.recv(fd, buf_ + buf_off_, exp, 0);
+        if (read_result.rc_ != exp) {
           throw EnvoyException("failed to read proxy protocol (remote closed)");
         }
-        buf_off_ += lread;
-        nread -= lread;
+        buf_off_ += read_result.rc_;
+        nread -= read_result.rc_;
       }
       ssize_t addr_len = lenV2Address(buf_);
       uint8_t upper_byte = buf_[PROXY_PROTO_V2_HEADER_LEN - 2];
@@ -311,19 +313,20 @@ bool Filter::readProxyHeader(int fd) {
         throw EnvoyException("failed to read proxy protocol (insufficient data)");
       }
       if (ssize_t(buf_off_) + nread >= PROXY_PROTO_V2_HEADER_LEN + addr_len) {
-        ssize_t lread;
         ssize_t missing = (PROXY_PROTO_V2_HEADER_LEN + addr_len) - buf_off_;
-        lread = os_syscalls.recv(fd, buf_ + buf_off_, missing, 0);
-        if (lread != missing) {
+        const Api::SysCallSizeResult read_result =
+            os_syscalls.recv(fd, buf_ + buf_off_, missing, 0);
+        if (read_result.rc_ != missing) {
           throw EnvoyException("failed to read proxy protocol (remote closed)");
         }
-        buf_off_ += lread;
+        buf_off_ += read_result.rc_;
         parseV2Header(buf_);
         // The TLV remain, they are read/discard in parseExtensions() which is called from the
         // parent (if needed).
         return true;
       } else {
-        nread = os_syscalls.recv(fd, buf_ + buf_off_, nread, 0);
+        const Api::SysCallSizeResult result = os_syscalls.recv(fd, buf_ + buf_off_, nread, 0);
+        nread = result.rc_;
         if (nread < 0) {
           throw EnvoyException("failed to read proxy protocol (remote closed)");
         }
@@ -355,7 +358,8 @@ bool Filter::readProxyHeader(int fd) {
         ntoread = search_index_ - buf_off_;
       }
 
-      nread = os_syscalls.recv(fd, buf_ + buf_off_, ntoread, 0);
+      const Api::SysCallSizeResult result = os_syscalls.recv(fd, buf_ + buf_off_, ntoread, 0);
+      nread = result.rc_;
       ASSERT(size_t(nread) == ntoread);
 
       buf_off_ += nread;

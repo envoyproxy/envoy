@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
+#include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"

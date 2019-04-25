@@ -19,12 +19,13 @@ namespace Http {
  */
 class ValidationAsyncClient : public AsyncClient {
 public:
+  ValidationAsyncClient(Api::Api& api, Event::TimeSystem& time_system);
+
   // Http::AsyncClient
   AsyncClient::Request* send(MessagePtr&& request, Callbacks& callbacks,
-                             const absl::optional<std::chrono::milliseconds>& timeout) override;
-  AsyncClient::Stream* start(StreamCallbacks& callbacks,
-                             const absl::optional<std::chrono::milliseconds>& timeout,
-                             bool buffer_body_for_retry) override;
+                             const RequestOptions&) override;
+  AsyncClient::Stream* start(StreamCallbacks& callbacks, const StreamOptions&) override;
+
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
 private:

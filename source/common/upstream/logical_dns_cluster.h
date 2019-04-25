@@ -5,10 +5,14 @@
 #include <functional>
 #include <string>
 
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"
+#include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "extensions/clusters/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -29,10 +33,9 @@ namespace Upstream {
 class LogicalDnsCluster : public ClusterImplBase {
 public:
   LogicalDnsCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                    Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    const LocalInfo::LocalInfo& local_info,
                     Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::SlotAllocator& tls,
-                    ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
+                    Server::Configuration::TransportSocketFactoryContext& factory_context,
+                    Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   ~LogicalDnsCluster();
 
@@ -46,13 +49,25 @@ private:
         : HostImpl(cluster, hostname, address, parent.lbEndpoint().metadata(),
                    parent.lbEndpoint().load_balancing_weight().value(),
                    parent.localityLbEndpoint().locality(),
-                   parent.lbEndpoint().endpoint().health_check_config()),
+                   parent.lbEndpoint().endpoint().health_check_config(),
+                   parent.localityLbEndpoint().priority(), parent.lbEndpoint().health_status()),
           parent_(parent) {}
 
     // Upstream::Host
-    CreateConnectionData
-    createConnection(Event::Dispatcher& dispatcher,
-                     const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
+    CreateConnectionData createConnection(
+        Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+        Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
+
+    // Upstream::HostDescription
+    // Override setting health check address, since for logical DNS the registered host has 0.0.0.0
+    // as its address (see @mattklein123's comment in logical_dns_cluster.cc why this is),
+    // while the health check address needs the resolved address to do the health checking, so we
+    // set it here.
+    void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
+      const auto& port_value = parent_.lbEndpoint().endpoint().health_check_config().port_value();
+      health_check_address_ =
+          port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
+    }
 
     LogicalDnsCluster& parent_;
   };
@@ -95,12 +110,15 @@ private:
     Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
       return health_check_address_;
     }
-    uint32_t priority() const { return locality_lb_endpoint_.priority(); }
+    // Setting health check address is usually done at initialization. This is NOP by default.
+    void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) override {}
+    uint32_t priority() const override { return locality_lb_endpoint_.priority(); }
+    void priority(uint32_t priority) override { locality_lb_endpoint_.set_priority(priority); }
     Network::Address::InstanceConstSharedPtr address_;
     HostConstSharedPtr logical_host_;
     const std::shared_ptr<envoy::api::v2::core::Metadata> metadata_;
     Network::Address::InstanceConstSharedPtr health_check_address_;
-    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint_;
+    envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint_;
   };
 
@@ -137,6 +155,18 @@ private:
   Network::ActiveDnsQuery* active_dns_query_{};
   const LocalInfo::LocalInfo& local_info_;
   const envoy::api::v2::ClusterLoadAssignment load_assignment_;
+};
+
+class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
+public:
+  LogicalDnsClusterFactory()
+      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().LogicalDns) {}
+
+private:
+  ClusterImplBaseSharedPtr
+  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream

@@ -6,39 +6,51 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/lock_guard.h"
+#include "common/common/thread.h"
 #include "common/event/file_event_impl.h"
+#include "common/event/libevent_scheduler.h"
 #include "common/event/signal_impl.h"
 #include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
 #include "common/network/listener_impl.h"
+#include "common/network/udp_listener_impl.h"
 
 #include "event2/event.h"
 
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl()
-    : DispatcherImpl(Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {
-  // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
-  RELEASE_ASSERT(Libevent::Global::initialized(), "");
-}
+DispatcherImpl::DispatcherImpl(Api::Api& api, Event::TimeSystem& time_system)
+    : DispatcherImpl(std::make_unique<Buffer::WatermarkBufferFactory>(), api, time_system) {}
 
-DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory)
-    : buffer_factory_(std::move(factory)), base_(event_base_new()),
+DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory, Api::Api& api,
+                               Event::TimeSystem& time_system)
+    : api_(api), buffer_factory_(std::move(factory)),
+      scheduler_(time_system.createScheduler(base_scheduler_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
-      current_to_delete_(&to_delete_1_) {
-  RELEASE_ASSERT(Libevent::Global::initialized(), "");
-}
+      current_to_delete_(&to_delete_1_) {}
 
 DispatcherImpl::~DispatcherImpl() {}
+
+void DispatcherImpl::initializeStats(Stats::Scope& scope, const std::string& prefix) {
+  // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
+  post([this, &scope, prefix] {
+    stats_prefix_ = prefix + "dispatcher";
+    stats_ = std::make_unique<DispatcherStats>(
+        DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
+    base_scheduler_.initializeStats(stats_.get());
+    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_->debugString());
+  });
+}
 
 void DispatcherImpl::clearDeferredDeleteList() {
   ASSERT(isThreadSafe());
@@ -115,9 +127,15 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
                                                         hand_off_restored_destination_connections)};
 }
 
+Network::ListenerPtr DispatcherImpl::createUdpListener(Network::Socket& socket,
+                                                       Network::UdpListenerCallbacks& cb) {
+  ASSERT(isThreadSafe());
+  return Network::ListenerPtr{new Network::UdpListenerImpl(*this, socket, cb)};
+}
+
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   ASSERT(isThreadSafe());
-  return TimerPtr{new TimerImpl(*this, cb)};
+  return scheduler_->createTimer(cb);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
@@ -129,7 +147,7 @@ void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {
   }
 }
 
-void DispatcherImpl::exit() { event_base_loopexit(base_.get(), nullptr); }
+void DispatcherImpl::exit() { base_scheduler_.loopExit(); }
 
 SignalEventPtr DispatcherImpl::listenForSignal(int signal_num, SignalCb cb) {
   ASSERT(isThreadSafe());
@@ -150,15 +168,14 @@ void DispatcherImpl::post(std::function<void()> callback) {
 }
 
 void DispatcherImpl::run(RunType type) {
-  run_tid_ = Thread::Thread::currentThreadId();
+  run_tid_ = api_.threadFactory().currentThreadId();
 
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
-  // not gaurantee that events are run in any particular order. So even if we post() and call
+  // not guarantee that events are run in any particular order. So even if we post() and call
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
-
-  event_base_loop(base_.get(), type == RunType::NonBlock ? EVLOOP_NONBLOCK : 0);
+  base_scheduler_.run(type);
 }
 
 void DispatcherImpl::runPostCallbacks() {

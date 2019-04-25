@@ -18,8 +18,7 @@ can be used to get a detailed picture of that particular network hop. Statistics
 mesh give a very detailed picture of each hop and overall network health. The statistics emitted are
 documented in detail in the operations guide.
 
-In the v1 API, Envoy only supports statsd as the statistics output format. Both TCP and UDP statsd
-are supported. As of the v2 API, Envoy has the ability to support custom, pluggable sinks. :ref:`A
+As of the v2 API, Envoy has the ability to support custom, pluggable sinks. :ref:`A
 few standard sink implementations<envoy_api_msg_config.metrics.v2.StatsSink>` are included in Envoy.
 Some sinks also support emitting statistics with tags/dimensions.
 
@@ -38,5 +37,4 @@ Internally, counters and gauges are batched and periodically flushed to improve 
 Histograms are written as they are received. Note: what were previously referred to as timers have
 become histograms as the only difference between the two representations was the units.
 
-* :ref:`v1 API reference <config_overview_v1>`.
 * :ref:`v2 API reference <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_sinks>`.

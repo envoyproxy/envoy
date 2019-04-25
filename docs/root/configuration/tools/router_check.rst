@@ -8,7 +8,7 @@ The route table check tool is a standalone binary that can be used to verify Env
 file.**
 
 The following specifies input to the route table check tool. The route table check tool checks if
-the route returned by a :ref:`router <config_http_conn_man_route_table>` matches what is expected.
+the route returned by a :ref:`router <envoy_api_msg_RouteConfiguration>` matches what is expected.
 The tool can be used to check cluster name, virtual cluster name,
 virtual host name, manual path rewrite, manual host rewrite, path redirect, and
 header field matches. Extensions for other test cases can be added. Details about installing the tool
@@ -137,7 +137,7 @@ input
 
 validate
   *(required, object)* The validate object specifies the returned route parameters to match. At least one
-  test parameter must be specificed. Use "" (empty string) to indicate that no return value is expected.
+  test parameter must be specified. Use "" (empty string) to indicate that no return value is expected.
   For example, to test that no cluster match is expected use {"cluster_name": ""}.
 
   cluster_name
@@ -161,7 +161,7 @@ validate
   header_fields
     *(optional, array)*  Match the listed header fields. Examples header fields include the ":path", "cookie",
     and "date" fields. The header fields are checked after all other test cases. Thus, the header fields checked
-    will be those of the redirected or rewriten routes when applicable.
+    will be those of the redirected or rewritten routes when applicable.
 
     field
       *(required, string)* The name of the header field to match.

@@ -5,6 +5,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -139,13 +140,16 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
 
 private:
   // TODO(gsagula): This is here temporarily and just to facilitate testing. Ideally all
-  // the logic in these private member functions would be availale in another class.
+  // the logic in these private member functions would be available in another class.
   friend class GzipFilterTest;
 
   bool hasCacheControlNoTransform(Http::HeaderMap& headers) const;

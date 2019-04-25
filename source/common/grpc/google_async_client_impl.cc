@@ -1,5 +1,7 @@
 #include "common/grpc/google_async_client_impl.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/empty_string.h"
 #include "common/common/lock_guard.h"
 #include "common/config/datasource.h"
@@ -11,8 +13,8 @@
 namespace Envoy {
 namespace Grpc {
 
-GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal()
-    : completion_thread_(new Thread::Thread([this] { completionThread(); })) {}
+GoogleAsyncClientThreadLocal::GoogleAsyncClientThreadLocal(Api::Api& api)
+    : completion_thread_(api.threadFactory().createThread([this] { completionThread(); })) {}
 
 GoogleAsyncClientThreadLocal::~GoogleAsyncClientThreadLocal() {
   // Force streams to shutdown and invoke TryCancel() to start the drain of
@@ -66,14 +68,15 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleAsyncClientThreadLocal& tls,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
-                                             const envoy::api::v2::core::GrpcService& config)
+                                             const envoy::api::v2::core::GrpcService& config,
+                                             Api::Api& api)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config);
+  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config, api);
   std::shared_ptr<grpc::Channel> channel = CreateChannel(config.google_grpc().target_uri(), creds);
   stub_ = stub_factory.createStub(channel);
   // Initialize client stats.
@@ -153,7 +156,8 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   initial_metadata.iterate(
       [](const Http::HeaderEntry& header, void* ctxt) {
         auto* client_context = static_cast<grpc::ClientContext*>(ctxt);
-        client_context->AddMetadata(header.key().c_str(), header.value().c_str());
+        client_context->AddMetadata(std::string(header.key().getStringView()),
+                                    std::string(header.value().getStringView()));
         return Http::HeaderMap::Iterate::Continue;
       },
       &ctxt_);
@@ -174,11 +178,16 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
 void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
                                               Http::HeaderMapPtr trailing_metadata,
                                               const std::string& message) {
-  if (grpc_status > Status::GrpcStatus::MaximumValid) {
-    grpc_status = Status::GrpcStatus::Unknown;
+  if (grpc_status > Status::GrpcStatus::MaximumValid || grpc_status < 0) {
+    ENVOY_LOG(error, "notifyRemoteClose invalid gRPC status code {}", grpc_status);
+    // Set the grpc_status as InvalidCode but increment the Unknown stream to avoid out-of-range
+    // crash..
+    grpc_status = Status::GrpcStatus::InvalidCode;
+    parent_.stats_.streams_closed_[Status::GrpcStatus::Unknown]->inc();
+  } else {
+    parent_.stats_.streams_closed_[grpc_status]->inc();
   }
   ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
-  parent_.stats_.streams_closed_[grpc_status]->inc();
   callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
                                                          : std::make_unique<Http::HeaderMapImpl>());
   callbacks_.onRemoteClose(grpc_status, message);
@@ -203,7 +212,8 @@ void GoogleAsyncStreamImpl::resetStream() {
 }
 
 void GoogleAsyncStreamImpl::writeQueued() {
-  if (!call_initialized_ || finish_pending_ || write_pending_ || write_pending_queue_.empty()) {
+  if (!call_initialized_ || finish_pending_ || write_pending_ || write_pending_queue_.empty() ||
+      draining_cq_) {
     return;
   }
   write_pending_ = true;
@@ -323,11 +333,8 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
     Http::HeaderMapPtr trailing_metadata = std::make_unique<Http::HeaderMapImpl>();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
-    const Status::GrpcStatus grpc_status =
-        status_.error_code() <= grpc::StatusCode::DATA_LOSS
-            ? static_cast<Status::GrpcStatus>(status_.error_code())
-            : Status::GrpcStatus::InvalidCode;
-    notifyRemoteClose(grpc_status, std::move(trailing_metadata), status_.error_message());
+    notifyRemoteClose(static_cast<Status::GrpcStatus>(status_.error_code()),
+                      std::move(trailing_metadata), status_.error_message());
     cleanup();
     break;
   }
@@ -385,9 +392,9 @@ GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
       callbacks_(callbacks) {
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.stat_prefix_ + " egress",
-                                         ProdSystemTimeSource::instance_.currentTime());
-  current_span_->setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, parent.stat_prefix_);
-  current_span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
+                                         parent.timeSource().systemTime());
+  current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.stat_prefix_);
+  current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 }
 
 void GoogleAsyncRequestImpl::initialize(bool buffer_body_for_retry) {
@@ -399,7 +406,7 @@ void GoogleAsyncRequestImpl::initialize(bool buffer_body_for_retry) {
 }
 
 void GoogleAsyncRequestImpl::cancel() {
-  current_span_->setTag(Tracing::Tags::get().STATUS, Tracing::Tags::get().CANCELED);
+  current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
   current_span_->finishSpan();
   this->resetStream();
 }
@@ -423,13 +430,13 @@ ProtobufTypes::MessagePtr GoogleAsyncRequestImpl::createEmptyResponse() {
 
 void GoogleAsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                            const std::string& message) {
-  current_span_->setTag(Tracing::Tags::get().GRPC_STATUS_CODE, std::to_string(status));
+  current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(status));
 
   if (status != Grpc::Status::GrpcStatus::Ok) {
-    current_span_->setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(status, message, *current_span_);
   } else if (response_ == nullptr) {
-    current_span_->setTag(Tracing::Tags::get().ERROR, Tracing::Tags::get().TRUE);
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
   } else {
     callbacks_.onSuccessUntyped(std::move(response_), *current_span_);

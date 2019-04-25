@@ -6,6 +6,7 @@
 #include <sys/un.h>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -18,6 +19,8 @@
 #include "common/common/lock_guard.h"
 #include "common/common/utility.h"
 #include "common/network/utility.h"
+#include "common/stats/raw_stat_data.h"
+#include "common/stats/stats_options_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -37,7 +40,7 @@ static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
   return hash_set_options;
 }
 
-SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options) {
+SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, const Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
   const uint64_t entry_size = Stats::RawStatData::structSizeWithOptions(options.statsOptions());
@@ -53,18 +56,21 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options
     os_sys_calls.shmUnlink(shmem_name.c_str());
   }
 
-  int shmem_fd = os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
-  if (shmem_fd == -1) {
-    PANIC(fmt::format("cannot open shared memory region {} check user permissions", shmem_name));
+  const Api::SysCallIntResult result =
+      os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
+  if (result.rc_ == -1) {
+    PANIC(fmt::format("cannot open shared memory region {} check user permissions. Error: {}",
+                      shmem_name, strerror(result.errno_)));
   }
 
   if (options.restartEpoch() == 0) {
-    int rc = os_sys_calls.ftruncate(shmem_fd, total_size);
-    RELEASE_ASSERT(rc != -1, "");
+    const Api::SysCallIntResult truncateRes = os_sys_calls.ftruncate(result.rc_, total_size);
+    RELEASE_ASSERT(truncateRes.rc_ != -1, "");
   }
 
-  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(
-      os_sys_calls.mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
+  const Api::SysCallPtrResult mmapRes =
+      os_sys_calls.mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, result.rc_, 0);
+  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(mmapRes.rc_);
   RELEASE_ASSERT(shmem != MAP_FAILED, "");
   RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(decltype(shmem))) == 0, "");
 
@@ -86,7 +92,8 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options
 
   // Stats::RawStatData must be naturally aligned for atomics to work properly.
   RELEASE_ASSERT(
-      (reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(RawStatDataSet)) == 0, "");
+      (reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(Stats::RawStatDataSet)) == 0,
+      "");
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
   // initialized. The startup logic is quite complicated, and it's not worth trying to handle this
@@ -115,19 +122,22 @@ std::string SharedMemory::version(uint64_t max_num_stats,
                      stats_options.maxNameLength());
 }
 
-HotRestartImpl::HotRestartImpl(Options& options)
+HotRestartImpl::HotRestartImpl(const Options& options, Stats::SymbolTable& symbol_table)
     : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(
-          RawStatDataSet::numBytes(stats_set_options_, options_.statsOptions()), options_)),
+          Stats::RawStatDataSet::numBytes(stats_set_options_, options_.statsOptions()), options_)),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   {
     // We must hold the stat lock when attaching to an existing memory segment
     // because it might be actively written to while we sanityCheck it.
     Thread::LockGuard lock(stat_lock_);
-    stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
-                                        shmem_.stats_set_data_, options_.statsOptions()));
+    stats_set_ =
+        std::make_unique<Stats::RawStatDataSet>(stats_set_options_, options.restartEpoch() == 0,
+                                                shmem_.stats_set_data_, options_.statsOptions());
   }
+  stats_allocator_ = std::make_unique<Stats::RawStatDataAllocator>(
+      stat_lock_, *stats_set_, options_.statsOptions(), symbol_table);
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
   initDomainSocketAddress(&parent_address_);
@@ -141,50 +151,18 @@ HotRestartImpl::HotRestartImpl(Options& options)
   RELEASE_ASSERT(rc != -1, "");
 }
 
-Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
-  // Try to find the existing slot in shared memory, otherwise allocate a new one.
-  Thread::LockGuard lock(stat_lock_);
-  absl::string_view key = name;
-  if (key.size() > options_.statsOptions().maxNameLength()) {
-    key.remove_suffix(key.size() - options_.statsOptions().maxNameLength());
-  }
-  auto value_created = stats_set_->insert(key);
-  Stats::RawStatData* data = value_created.first;
-  if (data == nullptr) {
-    return nullptr;
-  }
-  // For new entries (value-created.second==true), BlockMemoryHashSet calls Value::initialize()
-  // automatically, but on recycled entries (value-created.second==false) we need to bump the
-  // ref-count.
-  if (!value_created.second) {
-    ++data->ref_count_;
-  }
-  return data;
-}
-
-void HotRestartImpl::free(Stats::RawStatData& data) {
-  // We must hold the lock since the reference decrement can race with an initialize above.
-  Thread::LockGuard lock(stat_lock_);
-  ASSERT(data.ref_count_ > 0);
-  if (--data.ref_count_ > 0) {
-    return;
-  }
-  bool key_removed = stats_set_->remove(data.key());
-  ASSERT(key_removed);
-  memset(static_cast<void*>(&data), 0,
-         Stats::RawStatData::structSizeWithOptions(options_.statsOptions()));
-}
-
 int HotRestartImpl::bindDomainSocket(uint64_t id) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   // This actually creates the socket and binds it. We use the socket in datagram mode so we can
   // easily read single messages.
   int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK, 0);
   sockaddr_un address = createDomainSocketAddress(id);
-  int rc = os_sys_calls.bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
-  if (rc != 0) {
-    throw EnvoyException(
-        fmt::format("unable to bind domain socket with id={} (see --base-id option)", id));
+  Api::SysCallIntResult result =
+      os_sys_calls.bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address));
+  if (result.rc_ != 0) {
+    throw EnvoyException(fmt::format(
+        "unable to bind domain socket with id={}, (see --base-id option), address={}, errno={}: {}",
+        id, result.errno_, strerror(result.errno_)));
   }
 
   return fd;
@@ -269,13 +247,13 @@ void HotRestartImpl::getParentStats(GetParentStatsInfo& info) {
 }
 
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
-  socket_event_ =
-      dispatcher.createFileEvent(my_domain_socket_,
-                                 [this](uint32_t events) -> void {
-                                   ASSERT(events == Event::FileReadyType::Read);
-                                   onSocketEvent();
-                                 },
-                                 Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  socket_event_ = dispatcher.createFileEvent(
+      my_domain_socket_,
+      [this](uint32_t events) -> void {
+        ASSERT(events == Event::FileReadyType::Read);
+        onSocketEvent();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   server_ = &server;
 }
 
@@ -360,7 +338,7 @@ void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
       Network::Utility::resolveUrl(std::string(rpc.address_));
   for (const auto& listener : server_->listenerManager().listeners()) {
     if (*listener.get().socket().localAddress() == *addr) {
-      reply.fd_ = listener.get().socket().fd();
+      reply.fd_ = listener.get().socket().ioHandle().fd();
       break;
     }
   }
@@ -487,18 +465,18 @@ std::string HotRestartImpl::hotRestartVersion(uint64_t max_num_stats, uint64_t m
   stats_options.max_obj_name_length_ = max_stat_name_len - stats_options.maxStatSuffixLength();
 
   const BlockMemoryHashSetOptions hash_set_options = blockMemHashOptions(max_num_stats);
-  const uint64_t bytes = RawStatDataSet::numBytes(hash_set_options, stats_options);
+  const uint64_t bytes = Stats::RawStatDataSet::numBytes(hash_set_options, stats_options);
   std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
 
-  RawStatDataSet stats_set(hash_set_options, true /* init */, mem_buffer_for_dry_run_.get(),
-                           stats_options);
+  Stats::RawStatDataSet stats_set(hash_set_options, true /* init */, mem_buffer_for_dry_run_.get(),
+                                  stats_options);
 
   return versionHelper(max_num_stats, stats_options, stats_set);
 }
 
 std::string HotRestartImpl::versionHelper(uint64_t max_num_stats,
                                           const Stats::StatsOptions& stats_options,
-                                          RawStatDataSet& stats_set) {
+                                          Stats::RawStatDataSet& stats_set) {
   return SharedMemory::version(max_num_stats, stats_options) + "." +
          stats_set.version(stats_options);
 }

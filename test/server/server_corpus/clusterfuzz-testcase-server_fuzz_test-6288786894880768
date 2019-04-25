@@ -1,0 +1,39 @@
+node {
+  locality {
+  }
+}
+static_resources {
+  clusters {
+    name: "x"
+    type: STRICT_DNS
+    connect_timeout {
+      nanos: 250000000
+    }
+    lb_policy: RING_HASH
+    hosts {
+      socket_address {
+        address: "123.1.0.1"
+        named_port: "x"
+      }
+    }
+    hosts {
+      socket_address {
+        address: "127.0.0.2"
+        named_port: "3"
+      }
+    }
+    common_lb_config {
+      update_merge_window {
+        seconds: 281474976710656
+      }
+    }
+  }
+}
+admin {
+  access_log_path: "@-"
+  address {
+    pipe {
+      path: " "
+    }
+  }
+}

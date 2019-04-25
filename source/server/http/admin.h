@@ -15,6 +15,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -26,7 +27,7 @@
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "server/http/config_tracker_impl.h"
 
@@ -34,6 +35,10 @@
 
 namespace Envoy {
 namespace Server {
+
+class AdminInternalAddressConfig : public Http::InternalAddressConfig {
+  bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
+};
 
 /**
  * Implementation of Server::Admin.
@@ -45,23 +50,26 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
-            const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
-            Server::Instance& server, Stats::ScopePtr&& listener_scope);
+  AdminImpl(const std::string& profile_path, Server::Instance& server);
 
   Http::Code runCallback(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                          Buffer::Instance& response, AdminStream& admin_stream);
   const Network::Socket& socket() override { return *socket_; }
   Network::Socket& mutable_socket() { return *socket_; }
-  Network::ListenerConfig& listener() { return listener_; }
 
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
   // Wins would be no manual removeHandler() and code reuse.
+  //
+  // The prefix must start with "/" and contain at least one additional character.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
                   bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
+
+  void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
+                         Network::Address::InstanceConstSharedPtr address,
+                         Stats::ScopePtr&& listener_scope) override;
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -76,7 +84,8 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  bool createUpgradeFilterChain(absl::string_view, Http::FilterChainFactoryCallbacks&) override {
+  bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                Http::FilterChainFactoryCallbacks&) override {
     return false;
   }
 
@@ -90,12 +99,18 @@ public:
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
+  std::chrono::milliseconds requestTimeout() const override { return {}; }
+  std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return Http::DefaultServerString::get(); }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return internal_address_config_;
+  }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
@@ -108,12 +123,14 @@ public:
   const Network::Address::Instance& localAddress() override;
   const absl::optional<std::string>& userAgent() override { return user_agent_; }
   const Http::TracingConnectionManagerConfig* tracingConfig() override { return nullptr; }
-  Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
+  Http::ConnectionManagerListenerStats& listenerStats() override { return listener_->stats_; }
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  Http::Code request(absl::string_view path, const Http::Utility::QueryParams& params,
-                     absl::string_view method, Http::HeaderMap& response_headers,
-                     std::string& body) override;
+  bool shouldNormalizePath() const override { return true; }
+  Http::Code request(absl::string_view path_and_query, absl::string_view method,
+                     Http::HeaderMap& response_headers, std::string& body) override;
+  void closeSocket();
+  void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
 private:
   /**
@@ -131,16 +148,15 @@ private:
    * Implementation of RouteConfigProvider that returns a static null route config.
    */
   struct NullRouteConfigProvider : public Router::RouteConfigProvider {
-    NullRouteConfigProvider();
+    NullRouteConfigProvider(TimeSource& time_source);
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override {
-      return ProdSystemTimeSource::instance_.currentTime();
-    }
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
 
     Router::ConfigConstSharedPtr config_;
+    TimeSource& time_source_;
   };
 
   friend class AdminStatsTest;
@@ -163,9 +179,16 @@ private:
   void writeClustersAsJson(Buffer::Instance& response);
   void writeClustersAsText(Buffer::Instance& response);
 
+  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
+                               const absl::optional<std::regex>& regex) {
+    return ((!used_only || metric->used()) &&
+            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+  }
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool show_all, bool pretty_print = false);
+                                 bool used_only,
+                                 const absl::optional<std::regex> regex = absl::nullopt,
+                                 bool pretty_print = false);
   static std::string
   runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
@@ -183,8 +206,13 @@ private:
                              Buffer::Instance& response, AdminStream&);
   Http::Code handlerConfigDump(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&) const;
+  Http::Code handlerContention(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                               Buffer::Instance& response, AdminStream&);
   Http::Code handlerCpuProfiler(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                                 Buffer::Instance& response, AdminStream&);
+  Http::Code handlerHeapProfiler(absl::string_view path_and_query,
+                                 Http::HeaderMap& response_headers, Buffer::Instance& response,
+                                 AdminStream&);
   Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
                                     Http::HeaderMap& response_headers, Buffer::Instance& response,
                                     AdminStream&);
@@ -201,6 +229,8 @@ private:
                                  AdminStream&);
   Http::Code handlerLogging(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response, AdminStream&);
+  Http::Code handlerMemory(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                           Buffer::Instance& response, AdminStream&);
   Http::Code handlerMain(const std::string& path, Buffer::Instance& response, AdminStream&);
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,
@@ -231,9 +261,13 @@ private:
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
     Network::Socket& socket() override { return parent_.mutable_socket(); }
+    const Network::Socket& socket() const override { return parent_.mutable_socket(); }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
-    uint32_t perConnectionBufferLimitBytes() override { return 0; }
+    uint32_t perConnectionBufferLimitBytes() const override { return 0; }
+    std::chrono::milliseconds listenerFiltersTimeout() const override {
+      return std::chrono::milliseconds();
+    }
     Stats::Scope& listenerScope() override { return *scope_; }
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
@@ -243,6 +277,7 @@ private:
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
   };
+  using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
   class AdminFilterChain : public Network::FilterChain {
   public:
@@ -265,7 +300,6 @@ private:
   Server::Instance& server_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string profile_path_;
-  Network::SocketPtr socket_;
   Http::ConnectionManagerStats stats_;
   // Note: this is here to essentially blackhole the tracing stats since they aren't used in the
   // Admin case.
@@ -273,14 +307,17 @@ private:
   Http::ConnectionManagerTracingStats tracing_stats_;
   NullRouteConfigProvider route_config_provider_;
   std::list<UrlHandler> handlers_;
+  const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
-  AdminListener listener_;
   Http::Http1Settings http1_settings_;
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
+  Network::SocketPtr socket_;
+  AdminListenerPtr listener_;
+  const AdminInternalAddressConfig internal_address_config_;
 };
 
 /**
@@ -307,6 +344,7 @@ public:
   void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
   void addOnDestroyCallback(std::function<void()> cb) override;
   Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
+  const Buffer::Instance* getRequestBody() const override;
   const Http::HeaderMap& getRequestHeaders() const override;
 
 private:
@@ -339,7 +377,8 @@ public:
    */
   static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                    Buffer::Instance& response);
+                                    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                                    Buffer::Instance& response, const bool used_only);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.
@@ -355,6 +394,14 @@ private:
    * Take a string and sanitize it according to Prometheus conventions.
    */
   static std::string sanitizeName(const std::string& name);
+
+  /*
+   * Determine whether a metric has never been emitted and choose to
+   * not show it if we only wanted used metrics.
+   */
+  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only) {
+    return !used_only || metric->used();
+  }
 };
 
 } // namespace Server

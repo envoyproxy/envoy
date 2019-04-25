@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/decompressor/zlib_decompressor_impl.h"
 #include "common/protobuf/utility.h"
@@ -63,7 +65,7 @@ protected:
     envoy::config::filter::http::gzip::v2::Gzip gzip;
     MessageUtil::loadFromJson(json, gzip);
     config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
-    filter_.reset(new GzipFilter(config_));
+    filter_ = std::make_unique<GzipFilter>(config_);
   }
 
   void verifyCompressedData() {
@@ -91,7 +93,7 @@ protected:
 
   void doResponseCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(StringUtil::atoull(headers.get_("content-length").c_str(), content_length));
     feedBuffer(content_length);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
@@ -104,11 +106,13 @@ protected:
 
   void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoul(headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(StringUtil::atoull(headers.get_("content-length").c_str(), content_length));
     feedBuffer(content_length);
     Http::TestHeaderMapImpl continue_headers;
     EXPECT_EQ(Http::FilterHeadersStatus::Continue,
               filter_->encode100ContinueHeaders(continue_headers));
+    Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-encoding"));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
@@ -175,14 +179,14 @@ TEST_F(GzipFilterTest, hasCacheControlNoTransform) {
   }
 }
 
-// Verifies that compression is skipped when cache-control header has no-tranform value.
+// Verifies that compression is skipped when cache-control header has no-transform value.
 TEST_F(GzipFilterTest, hasCacheControlNoTransformNoCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip;q=0, deflate"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"cache-control", "no-transform"}});
 }
 
-// Verifies that compression is NOT skipped when cache-control header does NOT have no-tranform
+// Verifies that compression is NOT skipped when cache-control header does NOT have no-transform
 // value.
 TEST_F(GzipFilterTest, hasCacheControlNoTransformCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip, deflate"}}, true);
@@ -204,7 +208,7 @@ TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
   }
   {
     Http::TestHeaderMapImpl headers = {
-        {"accept-encoding", "\tdeflate\t, gzip\t ; q\t =\t 1.0,\t * ;q=0.5\n"}};
+        {"accept-encoding", "\tdeflate\t, gzip\t ; q\t =\t 1.0,\t * ;q=0.5"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
     EXPECT_EQ(3, stats_.counter("test.gzip.header_gzip").value());
   }
@@ -412,7 +416,7 @@ TEST_F(GzipFilterTest, isContentTypeAllowed) {
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
   {
-    Http::TestHeaderMapImpl headers = {{"content-type", "\ttext/html\t\n"}};
+    Http::TestHeaderMapImpl headers = {{"content-type", "\ttext/html\t"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
   }
 
@@ -584,7 +588,7 @@ TEST_F(GzipFilterTest, isTransferEncodingAllowed) {
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
   {
-    Http::TestHeaderMapImpl headers = {{"transfer-encoding", " gzip\t,  chunked\t\n"}};
+    Http::TestHeaderMapImpl headers = {{"transfer-encoding", " gzip\t,  chunked\t"}};
     EXPECT_FALSE(isTransferEncodingAllowed(headers));
   }
 }

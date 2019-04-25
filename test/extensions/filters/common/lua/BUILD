@@ -37,6 +37,7 @@ envoy_cc_test_library(
     name = "lua_wrappers_lib",
     hdrs = ["lua_wrappers.h"],
     deps = [
+        "//source/extensions/filters/common/lua:lua_lib",
         "//test/mocks/thread_local:thread_local_mocks",
     ],
 )

@@ -25,6 +25,7 @@ envoy_extension_cc_test(
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 
@@ -36,9 +37,11 @@ envoy_extension_cc_test(
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
+        "//source/common/stats:histogram_lib",
         "//source/extensions/stat_sinks/metrics_service:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     ],
 )

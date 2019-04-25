@@ -7,7 +7,6 @@
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
-#include "common/http/filter_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 
@@ -20,8 +19,8 @@ namespace GrpcWeb {
 const uint8_t GrpcWebFilter::GRPC_WEB_TRAILER = 0b10000000;
 
 // Supported gRPC-Web content-types.
-const std::unordered_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() const {
-  static const std::unordered_set<std::string>* types = new std::unordered_set<std::string>(
+const absl::flat_hash_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() const {
+  static const absl::flat_hash_set<std::string>* types = new absl::flat_hash_set<std::string>(
       {Http::Headers::get().ContentTypeValues.GrpcWeb,
        Http::Headers::get().ContentTypeValues.GrpcWebProto,
        Http::Headers::get().ContentTypeValues.GrpcWebText,
@@ -32,7 +31,7 @@ const std::unordered_set<std::string>& GrpcWebFilter::gRpcWebContentTypes() cons
 bool GrpcWebFilter::isGrpcWebRequest(const Http::HeaderMap& headers) {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type != nullptr) {
-    return gRpcWebContentTypes().count(content_type->value().c_str()) > 0;
+    return gRpcWebContentTypes().count(content_type->value().getStringView()) > 0;
   }
   return false;
 }
@@ -52,18 +51,20 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
   headers.removeContentLength();
   setupStatTracking(headers);
 
-  if (content_type != nullptr &&
-      (Http::Headers::get().ContentTypeValues.GrpcWebText == content_type->value().c_str() ||
-       Http::Headers::get().ContentTypeValues.GrpcWebTextProto == content_type->value().c_str())) {
+  if (content_type != nullptr && (Http::Headers::get().ContentTypeValues.GrpcWebText ==
+                                      content_type->value().getStringView() ||
+                                  Http::Headers::get().ContentTypeValues.GrpcWebTextProto ==
+                                      content_type->value().getStringView())) {
     // Checks whether gRPC-Web client is sending base64 encoded request.
     is_text_request_ = true;
   }
   headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
 
-  const Http::HeaderEntry* accept = headers.get(Http::Headers::get().Accept);
+  const Http::HeaderEntry* accept = headers.Accept();
   if (accept != nullptr &&
-      (Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().c_str() ||
-       Http::Headers::get().ContentTypeValues.GrpcWebTextProto == accept->value().c_str())) {
+      (Http::Headers::get().ContentTypeValues.GrpcWebText == accept->value().getStringView() ||
+       Http::Headers::get().ContentTypeValues.GrpcWebTextProto ==
+           accept->value().getStringView())) {
     // Checks whether gRPC-Web client is asking for base64 encoded response.
     is_text_response_ = true;
   }
@@ -95,7 +96,8 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
     if (available % 4 != 0) {
       // Client end stream with invalid base64. Note, base64 padding is mandatory.
       decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                         "Bad gRPC-web request, invalid base64 data.", nullptr);
+                                         "Bad gRPC-web request, invalid base64 data.", nullptr,
+                                         absl::nullopt);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   } else if (available < 4) {
@@ -111,7 +113,8 @@ Http::FilterDataStatus GrpcWebFilter::decodeData(Buffer::Instance& data, bool en
   if (decoded.empty()) {
     // Error happened when decoding base64.
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                       "Bad gRPC-web request, invalid base64 data.", nullptr);
+                                       "Bad gRPC-web request, invalid base64 data.", nullptr,
+                                       absl::nullopt);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -191,9 +194,9 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
   trailers.iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         Buffer::Instance* temp = static_cast<Buffer::Instance*>(context);
-        temp->add(header.key().c_str(), header.key().size());
+        temp->add(header.key().getStringView().data(), header.key().size());
         temp->add(":");
-        temp->add(header.value().c_str(), header.value().size());
+        temp->add(header.value().getStringView().data(), header.value().size());
         temp->add("\r\n");
         return Http::HeaderMap::Iterate::Continue;
       },
@@ -215,7 +218,7 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
 }
 
 void GrpcWebFilter::setupStatTracking(const Http::HeaderMap& headers) {
-  cluster_ = Http::FilterUtility::resolveClusterInfo(decoder_callbacks_, cm_);
+  cluster_ = decoder_callbacks_->clusterInfo();
   if (!cluster_) {
     return;
   }

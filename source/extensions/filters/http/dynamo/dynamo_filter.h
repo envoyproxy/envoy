@@ -5,7 +5,7 @@
 
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/json/json_loader.h"
 
@@ -24,8 +24,10 @@ namespace Dynamo {
  */
 class DynamoFilter : public Http::StreamFilter {
 public:
-  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Scope& scope)
-      : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), scope_(scope) {
+  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Scope& scope,
+               TimeSource& time_system)
+      : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), scope_(scope),
+        time_source_(time_system) {
     enabled_ = runtime_.snapshot().featureEnabled("dynamodb.filter_enabled", 100);
   }
 
@@ -47,6 +49,9 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override;
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   }
@@ -74,6 +79,7 @@ private:
   Http::HeaderMap* response_headers_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
+  TimeSource& time_source_;
 };
 
 } // namespace Dynamo

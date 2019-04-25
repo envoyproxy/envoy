@@ -5,8 +5,8 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-class Http2UpstreamIntegrationTest : public HttpIntegrationTest,
-                                     public testing::TestWithParam<Network::Address::IpVersion> {
+class Http2UpstreamIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                     public HttpIntegrationTest {
 public:
   Http2UpstreamIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}

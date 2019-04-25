@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 namespace Envoy {
 namespace Singleton {
 

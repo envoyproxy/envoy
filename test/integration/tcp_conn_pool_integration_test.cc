@@ -26,7 +26,7 @@ public:
     UNREFERENCED_PARAMETER(end_stream);
 
     Tcp::ConnectionPool::Instance* pool = cluster_manager_.tcpConnPoolForCluster(
-        "cluster_0", Upstream::ResourcePriority::Default, nullptr);
+        "cluster_0", Upstream::ResourcePriority::Default, nullptr, nullptr);
     ASSERT(pool != nullptr);
 
     requests_.emplace_back(*this, data);
@@ -52,9 +52,9 @@ private:
       ASSERT(false);
     }
 
-    void onPoolReady(Tcp::ConnectionPool::ConnectionData& conn,
+    void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr) override {
-      upstream_ = &conn;
+      upstream_ = std::move(conn);
 
       upstream_->addUpstreamCallbacks(*this);
       upstream_->connection().write(data_, false);
@@ -67,7 +67,7 @@ private:
       Network::Connection& downstream = parent_.read_callbacks_->connection();
       downstream.write(data, false);
 
-      upstream_->release();
+      upstream_.reset();
     }
     void onEvent(Network::ConnectionEvent) override {}
     void onAboveWriteBufferHighWatermark() override {}
@@ -75,7 +75,7 @@ private:
 
     TestFilter& parent_;
     Buffer::OwnedImpl data_;
-    Tcp::ConnectionPool::ConnectionData* upstream_;
+    Tcp::ConnectionPool::ConnectionDataPtr upstream_;
   };
 
   Upstream::ClusterManager& cluster_manager_;
@@ -111,14 +111,14 @@ public:
 
 } // namespace
 
-class TcpConnPoolIntegrationTest : public BaseIntegrationTest,
-                                   public testing::TestWithParam<Network::Address::IpVersion> {
+class TcpConnPoolIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                   public BaseIntegrationTest {
 public:
   TcpConnPoolIntegrationTest()
       : BaseIntegrationTest(GetParam(), tcp_conn_pool_config), filter_resolver_(config_factory_) {}
 
   // Called once by the gtest framework before any tests are run.
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     tcp_conn_pool_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       - filters:
@@ -141,9 +141,9 @@ private:
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> filter_resolver_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, TcpConnPoolIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, TcpConnPoolIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
   std::string request("request");
@@ -152,9 +152,10 @@ TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request);
 
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  fake_upstream_connection->waitForData(request.size());
-  fake_upstream_connection->write(response);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
+  ASSERT_TRUE(fake_upstream_connection->write(response));
 
   tcp_client->waitForData(response);
   tcp_client->close();
@@ -170,20 +171,25 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
 
   // send request 1
   tcp_client->write(request1);
-  FakeRawConnectionPtr fake_upstream_connection1 = fake_upstreams_[0]->waitForRawConnection();
-  EXPECT_EQ(request1, fake_upstream_connection1->waitForData(request1.size()));
+  FakeRawConnectionPtr fake_upstream_connection1;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection1->waitForData(request1.size(), &data));
+  EXPECT_EQ(request1, data);
 
   // send request 2
   tcp_client->write(request2);
-  FakeRawConnectionPtr fake_upstream_connection2 = fake_upstreams_[0]->waitForRawConnection();
-  EXPECT_EQ(request2, fake_upstream_connection2->waitForData(request2.size()));
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(request2.size(), &data));
+  EXPECT_EQ(request2, data);
 
   // send response 2
-  fake_upstream_connection2->write(response2);
+  ASSERT_TRUE(fake_upstream_connection2->write(response2));
   tcp_client->waitForData(response2);
 
   // send response 1
-  fake_upstream_connection1->write(response1);
+  ASSERT_TRUE(fake_upstream_connection1->write(response1));
   tcp_client->waitForData(response1, false);
 
   tcp_client->close();

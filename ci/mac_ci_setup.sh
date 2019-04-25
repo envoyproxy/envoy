@@ -1,7 +1,11 @@
 #!/bin/bash
 
-# Installs the dependencies required for a Mac OS build via homebrew.
+# Installs the dependencies required for a macOS build via homebrew.
 # Tools are not upgraded to new versions.
+
+# Setup bazelbuild tap
+brew tap bazelbuild/tap
+brew tap-pin bazelbuild/tap
 
 function is_installed {
     brew ls --versions "$1" >/dev/null
@@ -21,7 +25,7 @@ if ! brew update; then
     exit 1
 fi
 
-DEPS="automake bazel cmake coreutils go libtool wget ninja"
+DEPS="automake bazelbuild/tap/bazel cmake coreutils go libtool wget ninja"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"

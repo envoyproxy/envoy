@@ -8,10 +8,12 @@
 
 namespace Envoy {
 namespace Singleton {
+namespace {
 
 // Must be a dedicated function so that TID is within the death test.
 static void deathTestWorker() {
-  ManagerImpl manager;
+  ManagerImpl manager(Thread::threadFactoryForTest().currentThreadId());
+
   manager.get("foo", [] { return nullptr; });
 }
 
@@ -33,7 +35,7 @@ public:
 };
 
 TEST(SingletonManagerImplTest, Basic) {
-  ManagerImpl manager;
+  ManagerImpl manager(Thread::threadFactoryForTest().currentThreadId());
 
   std::shared_ptr<TestSingleton> singleton = std::make_shared<TestSingleton>();
   EXPECT_EQ(singleton, manager.get("test_singleton", [singleton] { return singleton; }));
@@ -44,5 +46,6 @@ TEST(SingletonManagerImplTest, Basic) {
   singleton.reset();
 }
 
+} // namespace
 } // namespace Singleton
 } // namespace Envoy

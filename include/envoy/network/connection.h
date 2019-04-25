@@ -11,6 +11,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Event {
@@ -63,7 +64,9 @@ public:
  */
 enum class ConnectionCloseType {
   FlushWrite, // Flush pending write data before raising ConnectionEvent::LocalClose
-  NoFlush     // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
+  NoFlush,    // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
+  FlushWriteAndDelay // Flush pending write data and delay raising a ConnectionEvent::LocalClose
+                     // until the delayed_close_timeout expires
 };
 
 /**
@@ -86,6 +89,8 @@ public:
     Stats::Gauge& write_current_;
     // Counter* as this is an optional counter. Bind errors will not be tracked if this is nullptr.
     Stats::Counter* bind_errors_;
+    // Optional counter. Delayed close timeouts will not be tracked if this is nullptr.
+    Stats::Counter* delayed_close_timeouts_;
   };
 
   virtual ~Connection() {}
@@ -124,7 +129,7 @@ public:
 
   /**
    * @return std::string the next protocol to use as selected by network level negotiation. (E.g.,
-   *         ALPN). If network level negotation is not supported by the connection or no protocol
+   *         ALPN). If network level negotiation is not supported by the connection or no protocol
    *         has been negotiated the empty string is returned.
    */
   virtual std::string nextProtocol() const PURE;
@@ -139,6 +144,12 @@ public:
    * enabled again if there is data still in the input buffer it will be redispatched through
    * the filter chain.
    * @param disable supplies TRUE is reads should be disabled, FALSE if they should be enabled.
+   *
+   * Note that this function reference counts calls. For example
+   * readDisable(true);  // Disables data
+   * readDisable(true);  // Notes the connection is blocked by two sources
+   * readDisable(false);  // Notes the connection is blocked by one source
+   * readDisable(false);  // Marks the connection as unblocked, so resumes reading.
    */
   virtual void readDisable(bool disable) PURE;
 
@@ -162,6 +173,30 @@ public:
   virtual const Network::Address::InstanceConstSharedPtr& remoteAddress() const PURE;
 
   /**
+   * Credentials of the peer of a socket as decided by SO_PEERCRED.
+   */
+  struct UnixDomainSocketPeerCredentials {
+    /**
+     * The process id of the peer.
+     */
+    int32_t pid;
+    /**
+     * The user id of the peer.
+     */
+    uint32_t uid;
+    /**
+     * The group id of the peer.
+     */
+    uint32_t gid;
+  };
+
+  /**
+   * @return The unix socket peer credentials of the the remote client. Note that this is only
+   * supported for unix socket connections.
+   */
+  virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
+
+  /**
    * @return the local address of the connection. For client connections, this is the origin
    * address. For server connections, this is the local destination address. For server connections
    * it can be different from the proxy address if the downstream connection has been redirected or
@@ -177,14 +212,10 @@ public:
   virtual void setConnectionStats(const ConnectionStats& stats) PURE;
 
   /**
-   * @return the SSL connection data if this is an SSL connection, or nullptr if it is not.
-   */
-  virtual Ssl::Connection* ssl() PURE;
-
-  /**
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
-  virtual const Ssl::Connection* ssl() const PURE;
+  // TODO(snowp): Remove this in favor of StreamInfo::downstreamSslConnection.
+  virtual const Ssl::ConnectionInfo* ssl() const PURE;
 
   /**
    * @return requested server name (e.g. SNI in TLS), if any.
@@ -238,6 +269,36 @@ public:
    * Get the socket options set on this connection.
    */
   virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
+
+  /**
+   * The StreamInfo object associated with this connection. This is typically
+   * used for logging purposes. Individual filters may add specific information
+   * via the FilterState object within the StreamInfo object. The StreamInfo
+   * object in this context is one per connection i.e. different than the one in
+   * the http ConnectionManager implementation which is one per request.
+   *
+   * @return StreamInfo object associated with this connection.
+   */
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+  /**
+   * Set the timeout for delayed connection close()s.
+   * This can only be called prior to issuing a close() on the connection.
+   * @param timeout The timeout value in milliseconds
+   */
+  virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
+
+  /**
+   * @return std::chrono::milliseconds The delayed close timeout value.
+   */
+  virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
+
+  /**
+   * @return std::string the failure reason of the underlying transport socket, if no failure
+   *         occurred an empty string is returned.
+   */
+  virtual absl::string_view transportFailureReason() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

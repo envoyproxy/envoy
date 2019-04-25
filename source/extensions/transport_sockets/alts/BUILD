@@ -1,6 +1,7 @@
 licenses(["notice"])  # Apache 2
 
-# TODO(lizan): Add link to docs when it is ready.
+# ALTS transport socket. This provides Google's ALTS protocol support in GCP to Envoy.
+# https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security/
 
 load(
     "//bazel:envoy_build_system.bzl",
@@ -25,6 +26,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "config",
+    srcs = [
+        "config.cc",
+    ],
+    hdrs = [
+        "config.h",
+    ],
+    deps = [
+        ":tsi_handshaker",
+        ":tsi_socket",
+        "//include/envoy/registry",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//source/extensions/transport_sockets:well_known_names",
+        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:alts_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "tsi_frame_protector",
     srcs = [
         "tsi_frame_protector.cc",
@@ -32,7 +51,6 @@ envoy_cc_library(
     hdrs = [
         "tsi_frame_protector.h",
     ],
-    repository = "@envoy",
     deps = [
         ":grpc_tsi_wrapper",
         "//source/common/buffer:buffer_lib",
@@ -51,5 +69,37 @@ envoy_cc_library(
         ":grpc_tsi_wrapper",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "tsi_socket",
+    srcs = [
+        "tsi_socket.cc",
+    ],
+    hdrs = [
+        "tsi_socket.h",
+    ],
+    deps = [
+        ":noop_transport_socket_callbacks_lib",
+        ":tsi_frame_protector",
+        ":tsi_handshaker",
+        "//include/envoy/network:io_handle_interface",
+        "//include/envoy/network:transport_socket_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:empty_string",
+        "//source/common/common:enum_to_int",
+        "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "noop_transport_socket_callbacks_lib",
+    hdrs = ["noop_transport_socket_callbacks.h"],
+    deps = [
+        "//include/envoy/network:io_handle_interface",
+        "//include/envoy/network:transport_socket_interface",
     ],
 )

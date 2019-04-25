@@ -39,9 +39,6 @@ void TlsContextJson::translateCommonTlsContext(
     common_tls_context.add_alpn_protocols(std::string{alpn_protocol});
   }
 
-  common_tls_context.mutable_deprecated_v1()->set_alt_alpn_protocols(
-      json_tls_context.getString("alt_alpn_protocols", ""));
-
   translateTlsCertificate(json_tls_context, *common_tls_context.mutable_tls_certificates()->Add());
 
   auto* validation_context = common_tls_context.mutable_validation_context();

@@ -1,11 +1,13 @@
 #pragma once
 
-#include <shared_mutex>
-
 #include "common/upstream/load_balancer_impl.h"
+
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Upstream {
+
+typedef std::vector<std::pair<HostConstSharedPtr, double>> NormalizedHostWeightVector;
 
 class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareLoadBalancer {
 public:
@@ -27,6 +29,11 @@ public:
   // Upstream::ThreadAwareLoadBalancer
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
   void initialize() override;
+
+  // Upstream::LoadBalancerBase
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
 protected:
   ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
@@ -52,7 +59,8 @@ private:
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
-    std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
+    std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
+    std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
@@ -64,16 +72,16 @@ private:
 
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
-    std::shared_timed_mutex mutex_;
-    // TOOD(mattklein123): Added GUARDED_BY(mutex_) to to the following variables. OSX clang
-    // seems to not like them with shared mutexes so we need to ifdef them out on OSX. I don't
-    // have time to do this right now.
-    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
-    // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriorirty can be reused.
-    std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
+    absl::Mutex mutex_;
+    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ GUARDED_BY(mutex_);
+    // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.
+    std::shared_ptr<HealthyLoad> healthy_per_priority_load_ GUARDED_BY(mutex_);
+    std::shared_ptr<DegradedLoad> degraded_per_priority_load_ GUARDED_BY(mutex_);
   };
 
-  virtual HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set) PURE;
+  virtual HashingLoadBalancerSharedPtr
+  createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
+                     double min_normalized_weight, double max_normalized_weight) PURE;
   void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;

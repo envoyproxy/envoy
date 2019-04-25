@@ -117,7 +117,6 @@ TEST(MetadataTest, MatchStringSuffixValue) {
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
   matcher.mutable_value()->mutable_string_match()->set_suffix("prod");
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  ;
 }
 
 TEST(MetadataTest, MatchBoolValue) {
@@ -160,6 +159,134 @@ TEST(MetadataTest, MatchPresentValue) {
   matcher.clear_path();
   matcher.add_path()->set_key("unknown");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+}
+
+// Helper function to retrieve the reference of an entry in a ListMatcher from a MetadataMatcher.
+envoy::type::matcher::ValueMatcher* listMatchEntry(envoy::type::matcher::MetadataMatcher* matcher) {
+  return matcher->mutable_value()->mutable_list_match()->mutable_one_of();
+}
+
+TEST(MetadataTest, MatchStringListValue) {
+  envoy::api::v2::core::Metadata metadata;
+  ProtobufWkt::Value& metadataValue =
+      Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
+  ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
+  values->add_values()->set_string_value("first");
+  values->add_values()->set_string_value("second");
+  values->add_values()->set_string_value("third");
+
+  envoy::type::matcher::MetadataMatcher matcher;
+  matcher.set_filter("envoy.filter.a");
+  matcher.add_path()->set_key("groups");
+
+  listMatchEntry(&matcher)->mutable_string_match()->set_exact("second");
+  EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  listMatchEntry(&matcher)->mutable_string_match()->set_prefix("fi");
+  EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  listMatchEntry(&matcher)->mutable_string_match()->set_suffix("rd");
+  EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  listMatchEntry(&matcher)->mutable_string_match()->set_exact("fourth");
+  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  listMatchEntry(&matcher)->mutable_string_match()->set_prefix("none");
+  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+
+  values->clear_values();
+  metadataValue.Clear();
+}
+
+TEST(MetadataTest, MatchBoolListValue) {
+  envoy::api::v2::core::Metadata metadata;
+  ProtobufWkt::Value& metadataValue =
+      Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
+  ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
+  values->add_values()->set_bool_value(false);
+  values->add_values()->set_bool_value(false);
+
+  envoy::type::matcher::MetadataMatcher matcher;
+  matcher.set_filter("envoy.filter.a");
+  matcher.add_path()->set_key("groups");
+
+  listMatchEntry(&matcher)->mutable_string_match()->set_exact("test");
+  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  listMatchEntry(&matcher)->set_bool_match(true);
+  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  listMatchEntry(&matcher)->set_bool_match(false);
+  EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+
+  values->clear_values();
+  metadataValue.Clear();
+}
+
+TEST(MetadataTest, MatchDoubleListValue) {
+  envoy::api::v2::core::Metadata metadata;
+  ProtobufWkt::Value& metadataValue =
+      Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
+  ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
+  values->add_values()->set_number_value(10);
+  values->add_values()->set_number_value(23);
+
+  envoy::type::matcher::MetadataMatcher matcher;
+  matcher.set_filter("envoy.filter.a");
+  matcher.add_path()->set_key("groups");
+
+  listMatchEntry(&matcher)->mutable_string_match()->set_exact("test");
+  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  listMatchEntry(&matcher)->set_bool_match(true);
+  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  listMatchEntry(&matcher)->mutable_double_match()->set_exact(9);
+  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+  listMatchEntry(&matcher)->mutable_double_match()->set_exact(10);
+  EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+
+  auto r = listMatchEntry(&matcher)->mutable_double_match()->mutable_range();
+  r->set_start(10);
+  r->set_end(15);
+  EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+
+  r = listMatchEntry(&matcher)->mutable_double_match()->mutable_range();
+  r->set_start(20);
+  r->set_end(24);
+  EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+
+  r = listMatchEntry(&matcher)->mutable_double_match()->mutable_range();
+  r->set_start(24);
+  r->set_end(26);
+  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
+
+  values->clear_values();
+  metadataValue.Clear();
+}
+
+TEST(LowerCaseStringMatcher, MatchExactValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_exact("Foo");
+
+  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo"));
+  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo"));
+}
+
+TEST(LowerCaseStringMatcher, MatchPrefixValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_prefix("Foo.");
+
+  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
+  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo."));
+}
+
+TEST(LowerCaseStringMatcher, MatchSuffixValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_suffix(".Bar");
+
+  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
+  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match(".Bar"));
+}
+
+TEST(LowerCaseStringMatcher, MatchRegexValue) {
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_regex("Foo.*");
+
+  EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
+  EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo.Bar"));
 }
 
 } // namespace

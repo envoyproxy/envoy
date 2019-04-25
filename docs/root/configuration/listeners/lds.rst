@@ -9,7 +9,7 @@ depending on what is required.
 
 The semantics of listener updates are as follows:
 
-* Every listener must have a unique :ref:`name <config_listeners_name>`. If a name is not
+* Every listener must have a unique :ref:`name <envoy_api_field_Listener.name>`. If a name is not
   provided, Envoy will create a UUID. Listeners that are to be dynamically updated should have a
   unique name supplied by the management server.
 * When a listener is added, it will be "warmed" before taking traffic. For example, if the listener
@@ -31,7 +31,6 @@ The semantics of listener updates are as follows:
 Configuration
 -------------
 
-* :ref:`v1 LDS API <config_listeners_lds_v1>`
 * :ref:`v2 LDS API <v2_grpc_streaming_endpoints>`
 
 Statistics
@@ -46,5 +45,7 @@ LDS has a statistics tree rooted at *listener_manager.lds.* with the following s
   config_reload, Counter, Total API fetches that resulted in a config reload due to a different config
   update_attempt, Counter, Total API fetches attempted
   update_success, Counter, Total API fetches completed successfully
-  update_failure, Counter, Total API fetches that failed (either network or schema errors)
+  update_failure, Counter, Total API fetches that failed because of network errors
+  update_rejected, Counter, Total API fetches that failed because of schema/validation errors
   version, Gauge, Hash of the contents from the last successful API fetch
+  control_plane.connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server

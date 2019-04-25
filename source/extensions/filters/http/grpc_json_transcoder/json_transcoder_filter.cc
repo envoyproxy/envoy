@@ -1,12 +1,15 @@
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
 
+#include <memory>
+#include <unordered_set>
+
 #include "envoy/common/exception.h"
 #include "envoy/http/filter.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
-#include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -76,13 +79,14 @@ private:
 } // namespace
 
 JsonTranscoderConfig::JsonTranscoderConfig(
-    const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config) {
+    const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
+    Api::Api& api) {
   FileDescriptorSet descriptor_set;
 
   switch (proto_config.descriptor_set_case()) {
   case envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder::kProtoDescriptor:
     if (!descriptor_set.ParseFromString(
-            Filesystem::fileReadToEnd(proto_config.proto_descriptor()))) {
+            api.fileSystem().fileReadToEnd(proto_config.proto_descriptor()))) {
       throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
     }
     break;
@@ -102,6 +106,10 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   }
 
   PathMatcherBuilder<const Protobuf::MethodDescriptor*> pmb;
+  std::unordered_set<ProtobufTypes::String> ignored_query_parameters;
+  for (const auto& query_param : proto_config.ignored_query_parameters()) {
+    ignored_query_parameters.insert(query_param);
+  }
 
   for (const auto& service_name : proto_config.services()) {
     auto service = descriptor_pool_.FindServiceByName(service_name);
@@ -111,8 +119,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
-      if (!PathMatcherUtility::RegisterByHttpRule(
-              pmb, method->options().GetExtension(google::api::http), method)) {
+      if (!PathMatcherUtility::RegisterByHttpRule(pmb,
+                                                  method->options().GetExtension(google::api::http),
+                                                  ignored_query_parameters, method)) {
         throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
                              "' to path matcher");
       }
@@ -121,9 +130,9 @@ JsonTranscoderConfig::JsonTranscoderConfig(
 
   path_matcher_ = pmb.Build();
 
-  type_helper_.reset(
-      new google::grpc::transcoding::TypeHelper(Protobuf::util::NewTypeResolverForDescriptorPool(
-          Grpc::Common::typeUrlPrefix(), &descriptor_pool_)));
+  type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
+      Protobuf::util::NewTypeResolverForDescriptorPool(Grpc::Common::typeUrlPrefix(),
+                                                       &descriptor_pool_));
 
   const auto print_config = proto_config.print_options();
   print_options_.add_whitespace = print_config.add_whitespace();
@@ -146,8 +155,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
   }
-  const ProtobufTypes::String method = headers.Method()->value().c_str();
-  ProtobufTypes::String path = headers.Path()->value().c_str();
+  const ProtobufTypes::String method(headers.Method()->value().getStringView());
+  ProtobufTypes::String path(headers.Path()->value().getStringView());
   ProtobufTypes::String args;
 
   const size_t pos = path.find('?');
@@ -192,8 +201,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
       type_helper_->Resolver(), response_type_url, method_descriptor->server_streaming(),
       &response_input, print_options_)};
 
-  transcoder.reset(
-      new TranscoderImpl(std::move(request_translator), std::move(response_translator)));
+  transcoder = std::make_unique<TranscoderImpl>(std::move(request_translator),
+                                                std::move(response_translator));
   return ProtobufUtil::Status();
 }
 
@@ -243,8 +252,10 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     if (!request_status.ok()) {
       ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
       error_ = true;
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, request_status.error_message(),
-                                         nullptr);
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                         absl::string_view(request_status.error_message().data(),
+                                                           request_status.error_message().size()),
+                                         nullptr, absl::nullopt);
 
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -279,8 +290,10 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   if (!request_status.ok()) {
     ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
     error_ = true;
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, request_status.error_message(),
-                                       nullptr);
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                       absl::string_view(request_status.error_message().data(),
+                                                         request_status.error_message().size()),
+                                       nullptr, absl::nullopt);
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
@@ -396,6 +409,12 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
   if (grpc_message_header) {
     response_headers_->insertGrpcMessage().value(*grpc_message_header);
+  }
+
+  // remove Trailer headers if the client connection was http/1
+  if (encoder_callbacks_->streamInfo().protocol() != Http::Protocol::Http2) {
+    static const Http::LowerCaseString trailer_key = Http::LowerCaseString("trailer");
+    response_headers_->remove(trailer_key);
   }
 
   response_headers_->insertContentLength().value(

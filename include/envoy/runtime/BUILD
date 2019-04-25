@@ -12,4 +12,9 @@ envoy_cc_library(
     name = "runtime_interface",
     hdrs = ["runtime.h"],
     external_deps = ["abseil_optional"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/singleton:threadsafe_singleton",
+        "@envoy_api//envoy/type:percent_cc",
+    ],
 )

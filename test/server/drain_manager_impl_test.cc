@@ -7,13 +7,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Return;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class DrainManagerImplTest : public testing::Test {
 public:
@@ -72,5 +73,6 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
   EXPECT_FALSE(drain_manager.drainClose());
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

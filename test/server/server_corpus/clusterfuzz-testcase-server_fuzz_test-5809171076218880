@@ -1,0 +1,11 @@
+admin {
+  access_log_path: "@"
+  address {
+    pipe {
+      path: "@"
+    }
+  }
+}
+hds_config {
+  cluster_names: "+"
+}

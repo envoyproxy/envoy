@@ -7,10 +7,14 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 
 namespace Envoy {
 namespace Http {
+
+// Legacy default value of 60K is safely under both codec default limits.
+static const uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
 
 class Stream;
 
@@ -28,7 +32,8 @@ public:
   virtual void encode100ContinueHeaders(const HeaderMap& headers) PURE;
 
   /**
-   * Encode headers, optionally indicating end of stream.
+   * Encode headers, optionally indicating end of stream. Response headers must
+   * have a valid :status set.
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request/response.
    */
@@ -51,6 +56,12 @@ public:
    * @return Stream& the backing stream.
    */
   virtual Stream& getStream() PURE;
+
+  /**
+   * Encode metadata.
+   * @param metadata_map_vector is the vector of metadata maps to encode.
+   */
+  virtual void encodeMetadata(const MetadataMapVector& metadata_map_vector) PURE;
 };
 
 /**
@@ -85,6 +96,12 @@ public:
    * @param trailers supplies the decoded trailers.
    */
   virtual void decodeTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
+   * Called with decoded METADATA.
+   * @param decoded METADATA.
+   */
+  virtual void decodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 };
 
 /**
@@ -117,8 +134,10 @@ public:
   /**
    * Fires when a stream has been remote reset.
    * @param reason supplies the reset reason.
+   * @param transport_failure_reason supplies underlying transport failure reason.
    */
-  virtual void onResetStream(StreamResetReason reason) PURE;
+  virtual void onResetStream(StreamResetReason reason,
+                             absl::string_view transport_failure_reason) PURE;
 
   /**
    * Fires when a stream, or the connection the stream is sending to, goes over its high watermark.
@@ -162,6 +181,12 @@ public:
    * Cessation of data may not be immediate. For example, for HTTP/2 this may stop further flow
    * control window updates which will result in the peer eventually stopping sending data.
    * @param disable informs if reads should be disabled (true) or re-enabled (false).
+   *
+   * Note that this function reference counts calls. For example
+   * readDisable(true);  // Disables data
+   * readDisable(true);  // Notes the stream is blocked by two sources
+   * readDisable(false);  // Notes the stream is blocked by one source
+   * readDisable(false);  // Marks the stream as unblocked, so resumes reading.
    */
   virtual void readDisable(bool disable) PURE;
 
@@ -190,7 +215,7 @@ public:
  * HTTP/1.* Codec settings
  */
 struct Http1Settings {
-  // Enable codec to parse absolute uris. This enables forward/explicit proxy support for non TLS
+  // Enable codec to parse absolute URIs. This enables forward/explicit proxy support for non TLS
   // traffic
   bool allow_absolute_url_{false};
   // Allow HTTP/1.0 from downstream.
@@ -208,6 +233,8 @@ struct Http2Settings {
   uint32_t max_concurrent_streams_{DEFAULT_MAX_CONCURRENT_STREAMS};
   uint32_t initial_stream_window_size_{DEFAULT_INITIAL_STREAM_WINDOW_SIZE};
   uint32_t initial_connection_window_size_{DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE};
+  bool allow_connect_{DEFAULT_ALLOW_CONNECT};
+  bool allow_metadata_{DEFAULT_ALLOW_METADATA};
 
   // disable HPACK compression
   static const uint32_t MIN_HPACK_TABLE_SIZE = 0;
@@ -241,6 +268,10 @@ struct Http2Settings {
   // our default connection-level window also equals to our stream-level
   static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 256 * 1024 * 1024;
   static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
+  // By default both nghttp2 and Envoy do not allow CONNECT over H2.
+  static const bool DEFAULT_ALLOW_CONNECT = false;
+  // By default Envoy does not allow METADATA support.
+  static const bool DEFAULT_ALLOW_METADATA = false;
 };
 
 /**
@@ -299,13 +330,19 @@ public:
   virtual ~DownstreamWatermarkCallbacks() {}
 
   /**
-   * Called when the downstream connection or stream goes over its high watermark.
+   * Called when the downstream connection or stream goes over its high watermark. Note that this
+   * may be called separately for both the stream going over and the connection going over. It
+   * is the responsibility of the DownstreamWatermarkCallbacks implementation to handle unwinding
+   * multiple high and low watermark calls.
    */
   virtual void onAboveWriteBufferHighWatermark() PURE;
 
   /**
    * Called when the downstream connection or stream goes from over its high watermark to under its
-   * low watermark.
+   * low watermark. As with onAboveWriteBufferHighWatermark above, this may be called independently
+   * when both the stream and the connection go under the low watermark limit, and the callee must
+   * ensure that the flow of data does not resume until all callers which were above their high
+   * watermarks have gone below.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
 };
@@ -319,9 +356,12 @@ public:
    * Invoked when a new request stream is initiated by the remote.
    * @param response_encoder supplies the encoder to use for creating the response. The request and
    *                         response are backed by the same Stream object.
+   * @param is_internally_created indicates if this stream was originated by a
+   *   client, or was created by Envoy, by example as part of an internal redirect.
    * @return StreamDecoder& supplies the decoder callbacks to fire into for stream decoding events.
    */
-  virtual StreamDecoder& newStream(StreamEncoder& response_encoder) PURE;
+  virtual StreamDecoder& newStream(StreamEncoder& response_encoder,
+                                   bool is_internally_created = false) PURE;
 };
 
 /**

@@ -18,7 +18,8 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:helloworld_proto",
+        "//test/proto:helloworld_proto_cc",
+        "//test/test_common:test_time_lib",
     ],
 )
 
@@ -26,6 +27,7 @@ envoy_cc_test(
     name = "async_client_manager_impl_test",
     srcs = ["async_client_manager_impl_test.cc"],
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
@@ -40,7 +42,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",
-        "//test/proto:helloworld_proto",
+        "//test/proto:helloworld_proto_cc",
     ],
 )
 
@@ -51,7 +53,7 @@ envoy_cc_test(
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:helloworld_proto",
+        "//test/proto:helloworld_proto_cc",
         "//test/test_common:utility_lib",
     ],
 )
@@ -60,20 +62,27 @@ envoy_cc_test(
     name = "google_async_client_impl_test",
     srcs = envoy_select_google_grpc(["google_async_client_impl_test.cc"]),
     deps = [
+        "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/tracing:http_tracer_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/tracing:tracing_mocks",
-        "//test/proto:helloworld_proto",
+        "//test/proto:helloworld_proto_cc",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
 
 envoy_cc_test(
     name = "google_grpc_creds_test",
     srcs = envoy_select_google_grpc(["google_grpc_creds_test.cc"]),
+    data = [":service_key.json"],
     deps = [
         ":utility_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_grpc_creds_lib"]),
 )
 
@@ -93,11 +102,16 @@ envoy_cc_test_library(
     deps = [
         ":grpc_client_integration_lib",
         ":utility_lib",
+        "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http2:conn_pool_lib",
         "//test/integration:integration_lib",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/proto:helloworld_proto",
+        "//test/mocks/server:server_mocks",
+        "//test/proto:helloworld_proto_cc",
+        "//test/test_common:global_lib",
+        "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

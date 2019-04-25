@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/common.h"
@@ -6,17 +8,20 @@
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::NiceMock;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Lua {
+namespace {
 
-class TestObject : public BaseLuaObject<TestObject> {
+// Setting large alignment requirement here so it fails the UBSAN tests if Lua allocated memory is
+// not aligned by Envoy. See https://github.com/envoyproxy/envoy/issues/5551 for details.
+class alignas(32) TestObject : public BaseLuaObject<TestObject> {
 public:
   ~TestObject() { onDestroy(); }
 
@@ -36,7 +41,7 @@ public:
   LuaTest() : yield_callback_([this]() { on_yield_.ready(); }) {}
 
   void setup(const std::string& code) {
-    state_.reset(new ThreadLocalState(code, tls_));
+    state_ = std::make_unique<ThreadLocalState>(code, tls_);
     state_->registerType<TestObject>();
   }
 
@@ -152,6 +157,7 @@ TEST_F(LuaTest, MarkDead) {
   lua_gc(cr1->luaState(), LUA_GCCOLLECT, 0);
 }
 
+} // namespace
 } // namespace Lua
 } // namespace Common
 } // namespace Filters

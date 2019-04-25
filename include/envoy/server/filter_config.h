@@ -4,15 +4,19 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/http/codes.h"
+#include "envoy/http/context.h"
 #include "envoy/http/filter.h"
-#include "envoy/init/init.h"
+#include "envoy/init/manager.h"
 #include "envoy/json/json_object.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
-#include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/lifecycle_notifier.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/singleton/manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -77,6 +81,11 @@ public:
   virtual Init::Manager& initManager() PURE;
 
   /**
+   * @return ServerLifecycleNotifier& the lifecycle notifier for the server.
+   */
+  virtual ServerLifecycleNotifier& lifecycleNotifier() PURE;
+
+  /**
    * @return information about the local environment the server is running in.
    */
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
@@ -85,12 +94,6 @@ public:
    * @return RandomGenerator& the random generator for the server.
    */
   virtual Envoy::Runtime::RandomGenerator& random() PURE;
-
-  /**
-   * @return a new ratelimit client. The implementation depends on the configuration of the server.
-   */
-  virtual RateLimit::ClientPtr
-  rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
 
   /**
    * @return Runtime::Loader& the singleton runtime loader for the server.
@@ -130,12 +133,27 @@ public:
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
 
   /**
-   * @return SystemTimeSource& a reference to the top-level SystemTime source.
+   * @return TimeSource& a reference to the time source.
    */
-  virtual SystemTimeSource& systemTimeSource() PURE;
+  virtual TimeSource& timeSource() PURE;
+
+  /**
+   * @return OverloadManager& the overload manager for the server.
+   */
+  virtual OverloadManager& overloadManager() PURE;
+
+  /**
+   * @return Http::Context& a reference to the http context.
+   */
+  virtual Http::Context& httpContext() PURE;
+
+  /**
+   * @return Api::Api& a reference to the api object.
+   */
+  virtual Api::Api& api() PURE;
 };
 
-class ListenerFactoryContext : public FactoryContext {
+class ListenerFactoryContext : public virtual FactoryContext {
 public:
   /**
    * Store socket options to be set on the listen socket before listening.
@@ -143,6 +161,11 @@ public:
   virtual void addListenSocketOption(const Network::Socket::OptionConstSharedPtr& option) PURE;
 
   virtual void addListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) PURE;
+
+  /**
+   * Give access to the listener configuration
+   */
+  virtual const Network::ListenerConfig& listenerConfig() const PURE;
 };
 
 /**
@@ -181,10 +204,38 @@ public:
 };
 
 /**
+ * Implemented by filter factories that require more options to process the protocol used by the
+ * upstream cluster.
+ */
+class ProtocolOptionsFactory {
+public:
+  virtual ~ProtocolOptionsFactory() {}
+
+  /**
+   * Create a particular filter's protocol specific options implementation. If the factory
+   * implementation is unable to produce a factory with the provided parameters, it should throw an
+   * EnvoyException.
+   * @param config supplies the protobuf configuration for the filter
+   * @return Upstream::ProtocolOptionsConfigConstSharedPtr the protocol options
+   */
+  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& config) {
+    UNREFERENCED_PARAMETER(config);
+    return nullptr;
+  }
+
+  /**
+   * @return ProtobufTypes::MessagePtr a newly created empty protocol specific options message or
+   *         nullptr if protocol specific options are not available.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return nullptr; }
+};
+
+/**
  * Implemented by each network filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class NamedNetworkFilterConfigFactory {
+class NamedNetworkFilterConfigFactory : public ProtocolOptionsFactory {
 public:
   virtual ~NamedNetworkFilterConfigFactory() {}
 
@@ -230,7 +281,7 @@ public:
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedHttpFilterConfigFactory {
+class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory {
 public:
   virtual ~NamedHttpFilterConfigFactory() {}
 

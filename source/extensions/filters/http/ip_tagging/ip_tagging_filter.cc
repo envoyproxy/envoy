@@ -28,7 +28,7 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::HeaderMap& header
   }
 
   std::vector<std::string> tags =
-      config_->trie().getData(callbacks_->requestInfo().downstreamRemoteAddress());
+      config_->trie().getData(callbacks_->streamInfo().downstreamRemoteAddress());
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");

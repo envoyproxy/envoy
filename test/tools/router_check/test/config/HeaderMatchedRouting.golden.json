@@ -1,7 +1,6 @@
 [
   {
-    "test_name": "Test_1",
-    "input": {
+    "test_name": "Test_1", "input": {
       ":authority": "www.lyft.com",
       ":path": "/"
     },
@@ -94,5 +93,37 @@
       ]
     },
     "validate": {"cluster_name": "local_service_without_headers"}
+  },
+  {
+    "test_name": "Test_8",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/",
+      "additional_headers": [
+        {
+          "field": "content-type",
+          "value": "application/grpc+proto"
+        }
+      ]
+    },
+    "validate": {"cluster_name": "local_service_with_grpc"}
+  },
+  {
+    "test_name": "Test_9",
+    "input": {
+      ":authority": "www.lyft.com",
+      ":path": "/",
+      "additional_headers": [
+        {
+          "field": "content-type",
+          "value": "application/grpc+proto"
+        },
+        {
+          "field": "test_header",
+          "value": "some_value"
+        }
+      ]
+    },
+    "validate": {"cluster_name": "local_service_with_grpc_and_other_header"}
   }
 ]

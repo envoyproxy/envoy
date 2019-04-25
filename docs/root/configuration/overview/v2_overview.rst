@@ -1,27 +1,26 @@
 .. _config_overview_v2:
 
-Overview (v2 API)
-=================
+Overview
+========
 
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
 <https://developers.google.com/protocol-buffers/>`_ in the `data plane API
-repository <https://github.com/envoyproxy/data-plane-api/tree/master/api>`_. They evolve the
-existing :ref:`v1 APIs and concepts <config_overview_v1>` to support:
+repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They support
 
-* Streaming delivery of `xDS <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_
-  API updates via gRPC. This reduces resource requirements and can lower the update latency.
+* Streaming delivery of :repo:`xDS <api/XDS_PROTOCOL.md>` API updates via gRPC. This reduces
+  resource requirements and can lower the update latency.
 * A new REST-JSON API in which the JSON/YAML formats are derived mechanically via the `proto3
   canonical JSON mapping
   <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
 * Delivery of updates via the filesystem, REST-JSON or gRPC endpoints.
 * Advanced load balancing through an extended endpoint assignment API and load
   and resource utilization reporting to management servers.
-* `Stronger consistency and ordering properties
-  <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md#eventual-consistency-considerations>`_
+* :repo:`Stronger consistency and ordering properties
+  <api/XDS_PROTOCOL.md#eventual-consistency-considerations>`
   when needed. The v2 APIs still maintain a baseline eventual consistency model.
 
-See the `xDS protocol description <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_ for
+See the :repo:`xDS protocol description <api/XDS_PROTOCOL.md>` for
 further details on aspects of v2 message exchange between Envoy and the management server.
 
 .. _config_overview_v2_bootstrap:
@@ -31,9 +30,8 @@ Bootstrap configuration
 
 To use the v2 API, it's necessary to supply a bootstrap configuration file. This
 provides static server configuration and configures Envoy to access :ref:`dynamic
-configuration if needed <arch_overview_dynamic_config>`. As with the v1
-JSON/YAML configuration, this is supplied on the command-line via the :option:`-c`
-flag, i.e.:
+configuration if needed <arch_overview_dynamic_config>`. This is supplied on the command-line via
+the :option:`-c` flag, i.e.:
 
 .. code-block:: console
 
@@ -43,7 +41,7 @@ where the extension reflects the underlying v2 config representation.
 
 The :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` message is the root of the
 configuration. A key concept in the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
-message is the distinction between static and dynamic resouces. Resources such
+message is the distinction between static and dynamic resources. Resources such
 as a :ref:`Listener <envoy_api_msg_Listener>` or :ref:`Cluster
 <envoy_api_msg_Cluster>` may be supplied either statically in
 :ref:`static_resources <envoy_api_field_config.bootstrap.v2.Bootstrap.static_resources>` or have
@@ -77,7 +75,8 @@ A minimal fully static bootstrap config is provided below:
       filter_chains:
       - filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -96,6 +95,7 @@ A minimal fully static bootstrap config is provided below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       load_assignment:
+        cluster_name: some_service
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -108,9 +108,9 @@ Mostly static with dynamic EDS
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A bootstrap config that continues from the above example with :ref:`dynamic endpoint
-discovery <arch_overview_dynamic_config_sds>` via an
+discovery <arch_overview_dynamic_config_eds>` via an
 :ref:`EDS<envoy_api_file_envoy/api/v2/eds.proto>` gRPC management server listening
-on 127.0.0.3:5678 is provided below:
+on 127.0.0.1:5678 is provided below:
 
 .. code-block:: yaml
 
@@ -127,7 +127,8 @@ on 127.0.0.3:5678 is provided below:
       filter_chains:
       - filters:
         - name: envoy.http_connection_manager
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             codec_type: AUTO
             route_config:
@@ -157,7 +158,12 @@ on 127.0.0.3:5678 is provided below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
+      upstream_connection_options:
+        # configure a TCP keep-alive to detect and reconnect to the admin
+        # server in the event of a TCP socket half open connection
+        tcp_keepalive: {}
       load_assignment:
+        cluster_name: xds_cluster
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -169,6 +175,10 @@ on 127.0.0.3:5678 is provided below:
 Notice above that *xds_cluster* is defined to point Envoy at the management server. Even in
 an otherwise completely dynamic configurations, some static resources need to
 be defined to point Envoy at its xDS management server(s).
+
+It's important to set appropriate :ref:`TCP Keep-Alive options <envoy_api_msg_core.TcpKeepalive>`
+in the `tcp_keepalive` block. This will help detect TCP half open connections to the xDS management
+server and re-establish a full connection.
 
 In the above example, the EDS management server could then return a proto encoding of a
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`:
@@ -189,8 +199,8 @@ In the above example, the EDS management server could then return a proto encodi
 
 
 The versioning and type URL scheme that appear above are explained in more
-detail in the `streaming gRPC subscription protocol
-<https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md#streaming-grpc-subscriptions>`_
+detail in the :repo:`streaming gRPC subscription protocol
+<api/XDS_PROTOCOL.md#streaming-grpc-subscriptions>`
 documentation.
 
 Dynamic
@@ -228,7 +238,12 @@ below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
+      upstream_connection_options:
+        # configure a TCP keep-alive to detect and reconnect to the admin
+        # server in the event of a TCP socket half open connection
+        tcp_keepalive: {}
       load_assignment:
+        cluster_name: xds_cluster
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -252,7 +267,8 @@ The management server could respond to LDS requests with:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: AUTO
           rds:
@@ -316,16 +332,7 @@ The management server could respond to EDS requests with:
               address: 127.0.0.2
               port_value: 1234
 
-Upgrading from v1 configuration
--------------------------------
-
-While new v2 bootstrap JSON/YAML can be written, it might be expedient to upgrade an existing
-:ref:`v1 JSON/YAML configuration <config_overview_v1>` to v2. To do this (in an Envoy source tree),
-you can run:
-
-.. code-block:: console
-
-  bazel run //tools:v1_to_bootstrap <path to v1 JSON/YAML configuration file>
+.. _config_overview_v2_management_server:
 
 Management server
 -----------------
@@ -334,7 +341,7 @@ A v2 xDS management server will implement the below endpoints as required for
 gRPC and/or REST serving. In both streaming gRPC and
 REST-JSON cases, a :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` is sent and a
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` received following the
-`xDS protocol <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_.
+:repo:`xDS protocol <api/XDS_PROTOCOL.md>`.
 
 .. _v2_grpc_streaming_endpoints:
 
@@ -343,9 +350,8 @@ gRPC streaming endpoints
 
 .. http:post:: /envoy.api.v2.ClusterDiscoveryService/StreamClusters
 
-See `cds.proto
-<https://github.com/envoyproxy/data-plane-api/blob/master/envoy/api/v2/cds.proto>`_
-for the service definition. This is used by Envoy as a client when
+See :repo:`cds.proto <api/envoy/api/v2/cds.proto>` for the service definition. This is used by Envoy
+as a client when
 
 .. code-block:: yaml
 
@@ -362,8 +368,8 @@ is set in the :ref:`dynamic_resources
 
 .. http:post:: /envoy.api.v2.EndpointDiscoveryService/StreamEndpoints
 
-See `eds.proto
-<https://github.com/envoyproxy/data-plane-api/blob/master/envoy/api/v2/eds.proto>`_
+See :repo:`eds.proto
+<api/envoy/api/v2/eds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -381,8 +387,8 @@ is set in the :ref:`eds_cluster_config
 
 .. http:post:: /envoy.api.v2.ListenerDiscoveryService/StreamListeners
 
-See `lds.proto
-<https://github.com/envoyproxy/data-plane-api/blob/master/envoy/api/v2/lds.proto>`_
+See :repo:`lds.proto
+<api/envoy/api/v2/lds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -400,8 +406,8 @@ is set in the :ref:`dynamic_resources
 
 .. http:post:: /envoy.api.v2.RouteDiscoveryService/StreamRoutes
 
-See `rds.proto
-<https://github.com/envoyproxy/data-plane-api/blob/master/envoy/api/v2/rds.proto>`_
+See :repo:`rds.proto
+<api/envoy/api/v2/rds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -423,8 +429,8 @@ REST endpoints
 
 .. http:post:: /v2/discovery:clusters
 
-See `cds.proto
-<https://github.com/envoyproxy/data-plane-api/blob/master/envoy/api/v2/cds.proto>`_
+See :repo:`cds.proto
+<api/envoy/api/v2/cds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -440,8 +446,8 @@ is set in the :ref:`dynamic_resources
 
 .. http:post:: /v2/discovery:endpoints
 
-See `eds.proto
-<https://github.com/envoyproxy/data-plane-api/blob/master/envoy/api/v2/eds.proto>`_
+See :repo:`eds.proto
+<api/envoy/api/v2/eds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -457,8 +463,8 @@ is set in the :ref:`eds_cluster_config
 
 .. http:post:: /v2/discovery:listeners
 
-See `lds.proto
-<https://github.com/envoyproxy/data-plane-api/blob/master/envoy/api/v2/lds.proto>`_
+See :repo:`lds.proto
+<api/envoy/api/v2/lds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -474,8 +480,8 @@ is set in the :ref:`dynamic_resources
 
 .. http:post:: /v2/discovery:routes
 
-See `rds.proto
-<https://github.com/envoyproxy/data-plane-api/blob/master/envoy/api/v2/rds.proto>`_
+See :repo:`rds.proto
+<api/envoy/api/v2/rds.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -504,7 +510,7 @@ the management of multiple streams and connections to distinct management
 servers.
 
 ADS will allow for hitless updates of configuration by appropriate sequencing.
-For example, suppose *foo.com* was mappped to cluster *X*. We wish to change the
+For example, suppose *foo.com* was mapped to cluster *X*. We wish to change the
 mapping in the route table to point *foo.com* at cluster *Y*. In order to do
 this, a CDS/EDS update must first be delivered containing both clusters *X* and
 *Y*.
@@ -518,14 +524,14 @@ synchronization to correctly sequence the update. With ADS, the management
 server would deliver the CDS, EDS and then RDS updates on a single stream.
 
 ADS is only available for gRPC streaming (not REST) and is described more fully
-in `this
-<https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md#aggregated-discovery-services-ads>`_
+in :repo:`this
+<api/XDS_PROTOCOL.md#aggregated-discovery-services-ads>`
 document. The gRPC endpoint is:
 
-.. http:post:: /envoy.api.v2.AggregatedDiscoveryService/StreamAggregatedResources
+.. http:post:: /envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources
 
-See `discovery.proto
-<https://github.com/envoyproxy/data-plane-api/blob/master/envoy/api/v2/discovery.proto>`_
+See :repo:`discovery.proto
+<api/envoy/api/v2/discovery.proto>`
 for the service definition. This is used by Envoy as a client when
 
 .. code-block:: yaml
@@ -571,8 +577,22 @@ connection with the management server.
 Envoy debug logs the fact that it is not able to establish a connection with the management server
 every time it attempts a connection.
 
-:ref:`upstream_cx_connect_fail <config_cluster_manager_cluster_stats>` a cluster level statistic
-of the cluster pointing to management server provides a signal for monitoring this behavior.
+:ref:`connected_state <management_server_stats>` statistic provides a signal for monitoring this behavior.
+
+.. _management_server_stats:
+
+Statistics
+----------
+
+Management Server has a statistics tree rooted at *control_plane.* with the following statistics:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   connected_state, Gauge, A boolean (1 for connected and 0 for disconnected) that indicates the current connection state with management server
+   rate_limit_enforced, Counter, Total number of times rate limit was enforced for management server requests
+   pending_requests, Gauge, Total number of pending requests when the rate limit was enforced
 
 .. _config_overview_v2_status:
 
@@ -590,8 +610,8 @@ means that we will not break wire format compatibility.
 manner that does not break `backwards compatibility
 <https://developers.google.com/protocol-buffers/docs/overview#how-do-they-work>`_.
 Fields in the above protos may be later deprecated, subject to the
-`breaking change policy
-<https://github.com/envoyproxy/envoy/blob/master//CONTRIBUTING.md#breaking-change-policy>`_,
+:repo:`breaking change policy
+<CONTRIBUTING.md#breaking-change-policy>`,
 when their related functionality is no longer required. While frozen APIs
 have their wire format compatibility preserved, we reserve the right to change
 proto namespaces, file locations and nesting relationships, which may cause
@@ -602,7 +622,7 @@ likely to be at least partially implemented in Envoy but may have wire format
 breaking changes made prior to freezing.
 
 Protos tagged *experimental*, have the same caveats as draft protos
-and may have have major changes made prior to Envoy implementation and freezing.
+and may have major changes made prior to Envoy implementation and freezing.
 
 The current open v2 API issues are tracked `here
 <https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3A%22v2+API%22>`_.

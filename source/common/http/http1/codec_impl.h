@@ -37,6 +37,7 @@ public:
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const HeaderMap& trailers) override;
+  void encodeMetadata(const MetadataMapVector&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stream& getStream() override { return *this; }
 
   // Http::Stream
@@ -49,12 +50,13 @@ public:
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
 
 protected:
-  StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}
+  StreamEncoderImpl(ConnectionImpl& connection);
 
   static const std::string CRLF;
   static const std::string LAST_CHUNK;
 
   ConnectionImpl& connection_;
+  void setIsContentLengthAllowed(bool value) { is_content_length_allowed_ = value; }
 
 private:
   /**
@@ -67,6 +69,13 @@ private:
   void encodeHeader(const char* key, uint32_t key_size, const char* value, uint32_t value_size);
 
   /**
+   * Called to encode an individual header.
+   * @param key supplies the header to encode as a string_view.
+   * @param value supplies the value to encode as a string_view.
+   */
+  void encodeHeader(absl::string_view key, absl::string_view value);
+
+  /**
    * Called to finalize a stream encode.
    */
   void endEncode();
@@ -74,6 +83,7 @@ private:
   bool chunk_encoding_{true};
   bool processing_100_continue_{false};
   bool is_response_to_head_request_{false};
+  bool is_content_length_allowed_{true};
 };
 
 /**
@@ -98,7 +108,6 @@ private:
 class RequestStreamEncoderImpl : public StreamEncoderImpl {
 public:
   RequestStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
-
   bool headRequest() { return head_request_; }
 
   // Http::StreamEncoder
@@ -122,6 +131,11 @@ public:
    * Called when the active encoder has completed encoding the outbound half of the stream.
    */
   virtual void onEncodeComplete() PURE;
+
+  /**
+   * Called when headers are encoded.
+   */
+  virtual void onEncodeHeaders(const HeaderMap& headers) PURE;
 
   /**
    * Called when resetStream() has been called on an active stream. In HTTP/1.1 the only
@@ -158,7 +172,8 @@ public:
   bool maybeDirectDispatch(Buffer::Instance& data);
 
 protected:
-  ConnectionImpl(Network::Connection& connection, http_parser_type type);
+  ConnectionImpl(Network::Connection& connection, http_parser_type type,
+                 uint32_t max_request_headers_kb);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -179,7 +194,7 @@ private:
   /**
    * Dispatch a memory span.
    * @param slice supplies the start address.
-   * @len supplies the lenght of the span.
+   * @len supplies the length of the span.
    */
   size_t dispatchSlice(const char* slice, size_t len);
 
@@ -193,7 +208,7 @@ private:
   /**
    * Called when URL data is received.
    * @param data supplies the start address.
-   * @param lenth supplies the length.
+   * @param length supplies the length.
    */
   virtual void onUrl(const char* data, size_t length) PURE;
 
@@ -212,7 +227,7 @@ private:
   void onHeaderValue(const char* data, size_t length);
 
   /**
-   * Called when headers are complete. A base routine happens first then a virtual disaptch is
+   * Called when headers are complete. A base routine happens first then a virtual dispatch is
    * invoked.
    * @return 0 if no error, 1 if there should be no body.
    */
@@ -266,6 +281,7 @@ private:
   Buffer::RawSlice reserved_iovec_;
   char* reserved_current_{};
   Protocol protocol_{Protocol::Http11};
+  const uint32_t max_headers_kb_;
 };
 
 /**
@@ -274,7 +290,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-                       Http1Settings settings);
+                       Http1Settings settings, uint32_t max_request_headers_kb);
 
   virtual bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 
@@ -293,7 +309,7 @@ private:
 
   /**
    * Manipulate the request's first line, parsing the url and converting to a relative path if
-   * neccessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
+   * necessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
    *
    * @param is_connect true if the request has the CONNECT method
    * @param headers the request's headers
@@ -303,6 +319,7 @@ private:
 
   // ConnectionImpl
   void onEncodeComplete() override;
+  void onEncodeHeaders(const HeaderMap&) override {}
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
@@ -339,7 +356,8 @@ private:
   bool cannotHaveBody();
 
   // ConnectionImpl
-  void onEncodeComplete() override;
+  void onEncodeComplete() override {}
+  void onEncodeHeaders(const HeaderMap& headers) override;
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
@@ -354,6 +372,9 @@ private:
   std::list<PendingResponse> pending_responses_;
   // Set true between receiving 100-Continue headers and receiving the spurious onMessageComplete.
   bool ignore_message_complete_for_100_continue_{};
+
+  // The default limit of 80 KiB is the vanilla http_parser behaviour.
+  static constexpr uint32_t MAX_RESPONSE_HEADERS_KB = 80;
 };
 
 } // namespace Http1

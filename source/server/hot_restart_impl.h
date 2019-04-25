@@ -8,17 +8,16 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/common/platform.h"
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
-#include "common/common/block_memory_hash_set.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/raw_stat_data.h"
 
 namespace Envoy {
 namespace Server {
-
-typedef BlockMemoryHashSet<Stats::RawStatData> RawStatDataSet;
 
 /**
  * Shared memory segment. This structure is laid directly into shared memory and is used amongst
@@ -40,7 +39,7 @@ private:
   };
 
   // Due to the flexible-array-length of stats_set_data_, c-style allocation
-  // and initialization are neccessary.
+  // and initialization are necessary.
   SharedMemory() = delete;
   ~SharedMemory() = delete;
 
@@ -48,7 +47,7 @@ private:
    * Initialize the shared memory segment, depending on whether we should be the first running
    * envoy, or a host restarted envoy process.
    */
-  static SharedMemory& initialize(uint64_t stats_set_size, Options& options);
+  static SharedMemory& initialize(uint64_t stats_set_size, const Options& options);
 
   /**
    * Initialize a pthread mutex for process shared locking.
@@ -113,11 +112,9 @@ private:
 /**
  * Implementation of HotRestart built for Linux.
  */
-class HotRestartImpl : public HotRestart,
-                       public Stats::RawStatDataAllocator,
-                       Logger::Loggable<Logger::Id::main> {
+class HotRestartImpl : public HotRestart, Logger::Loggable<Logger::Id::main> {
 public:
-  HotRestartImpl(Options& options);
+  HotRestartImpl(const Options& options, Stats::SymbolTable& symbol_table);
 
   // Server::HotRestart
   void drainParentListeners() override;
@@ -130,17 +127,13 @@ public:
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::StatDataAllocator& statsAllocator() override { return *this; }
+  Stats::RawStatDataAllocator& statsAllocator() override { return *stats_allocator_; }
 
   /**
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string
    * based on the configured options.
    */
   static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len);
-
-  // RawStatDataAllocator
-  Stats::RawStatData* alloc(const std::string& name) override;
-  void free(Stats::RawStatData& data) override;
 
 private:
   enum class RpcMessageType {
@@ -155,39 +148,46 @@ private:
     GetStatsReply = 9
   };
 
-  struct RpcBase {
+  PACKED_STRUCT(struct RpcBase {
     RpcBase(RpcMessageType type, uint64_t length = sizeof(RpcBase))
         : type_(type), length_(length) {}
 
     RpcMessageType type_;
     uint64_t length_;
-  } __attribute__((packed));
+  });
 
-  struct RpcGetListenSocketRequest : public RpcBase {
-    RpcGetListenSocketRequest() : RpcBase(RpcMessageType::GetListenSocketRequest, sizeof(*this)) {}
+  PACKED_STRUCT(struct RpcGetListenSocketRequest
+                : public RpcBase {
+                  RpcGetListenSocketRequest()
+                      : RpcBase(RpcMessageType::GetListenSocketRequest, sizeof(*this)) {}
 
-    char address_[256]{0};
-  } __attribute__((packed));
+                  char address_[256]{0};
+                });
 
-  struct RpcGetListenSocketReply : public RpcBase {
-    RpcGetListenSocketReply() : RpcBase(RpcMessageType::GetListenSocketReply, sizeof(*this)) {}
+  PACKED_STRUCT(struct RpcGetListenSocketReply
+                : public RpcBase {
+                  RpcGetListenSocketReply()
+                      : RpcBase(RpcMessageType::GetListenSocketReply, sizeof(*this)) {}
 
-    int fd_{0};
-  } __attribute__((packed));
+                  int fd_{0};
+                });
 
-  struct RpcShutdownAdminReply : public RpcBase {
-    RpcShutdownAdminReply() : RpcBase(RpcMessageType::ShutdownAdminReply, sizeof(*this)) {}
+  PACKED_STRUCT(struct RpcShutdownAdminReply
+                : public RpcBase {
+                  RpcShutdownAdminReply()
+                      : RpcBase(RpcMessageType::ShutdownAdminReply, sizeof(*this)) {}
 
-    uint64_t original_start_time_{0};
-  } __attribute__((packed));
+                  uint64_t original_start_time_{0};
+                });
 
-  struct RpcGetStatsReply : public RpcBase {
-    RpcGetStatsReply() : RpcBase(RpcMessageType::GetStatsReply, sizeof(*this)) {}
+  PACKED_STRUCT(struct RpcGetStatsReply
+                : public RpcBase {
+                  RpcGetStatsReply() : RpcBase(RpcMessageType::GetStatsReply, sizeof(*this)) {}
 
-    uint64_t memory_allocated_{0};
-    uint64_t num_connections_{0};
-    uint64_t unused_[16]{0};
-  } __attribute__((packed));
+                  uint64_t memory_allocated_{0};
+                  uint64_t num_connections_{0};
+                  uint64_t unused_[16]{0};
+                });
 
   template <class rpc_class, RpcMessageType rpc_type> rpc_class* receiveTypedRpc() {
     RpcBase* base_message = receiveRpc(true);
@@ -204,12 +204,13 @@ private:
   RpcBase* receiveRpc(bool block);
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
   static std::string versionHelper(uint64_t max_num_stats, const Stats::StatsOptions& stats_options,
-                                   RawStatDataSet& stats_set);
+                                   Stats::RawStatDataSet& stats_set);
 
-  Options& options_;
+  const Options& options_;
   BlockMemoryHashSetOptions stats_set_options_;
   SharedMemory& shmem_;
-  std::unique_ptr<RawStatDataSet> stats_set_ GUARDED_BY(stat_lock_);
+  std::unique_ptr<Stats::RawStatDataSet> stats_set_ GUARDED_BY(stat_lock_);
+  std::unique_ptr<Stats::RawStatDataAllocator> stats_allocator_;
   ProcessSharedMutex log_lock_;
   ProcessSharedMutex access_log_lock_;
   ProcessSharedMutex stat_lock_;

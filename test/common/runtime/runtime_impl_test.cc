@@ -2,9 +2,8 @@
 #include <string>
 
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -14,14 +13,15 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
-using testing::_;
 
 namespace Envoy {
 namespace Runtime {
+namespace {
 
 TEST(Random, DISABLED_benchmarkRandom) {
   Runtime::RandomGeneratorImpl random;
@@ -65,8 +65,10 @@ TEST(UUID, sanityCheckOfUniqueness) {
 }
 
 class DiskBackedLoaderImplTest : public testing::Test {
-public:
-  static void SetUpTestCase() {
+protected:
+  DiskBackedLoaderImplTest() : api_(Api::createApiForTest(store)) {}
+
+  static void SetUpTestSuite() {
     TestEnvironment::exec(
         {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
   }
@@ -74,27 +76,21 @@ public:
   void setup() {
     EXPECT_CALL(dispatcher, createFilesystemWatcher_())
         .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
-
-    os_sys_calls_ = new NiceMock<Api::MockOsSysCalls>;
-    ON_CALL(*os_sys_calls_, stat(_, _))
-        .WillByDefault(
-            Invoke([](const char* filename, struct stat* stat) { return ::stat(filename, stat); }));
   }
 
   void run(const std::string& primary_dir, const std::string& override_dir) {
-    Api::OsSysCallsPtr os_sys_calls(os_sys_calls_);
-    loader.reset(new DiskBackedLoaderImpl(dispatcher, tls,
-                                          TestEnvironment::temporaryPath(primary_dir), "envoy",
-                                          override_dir, store, generator, std::move(os_sys_calls)));
+    loader = std::make_unique<DiskBackedLoaderImpl>(dispatcher, tls,
+                                                    TestEnvironment::temporaryPath(primary_dir),
+                                                    "envoy", override_dir, store, generator, *api_);
   }
 
   Event::MockDispatcher dispatcher;
   NiceMock<ThreadLocal::MockInstance> tls;
-  NiceMock<Api::MockOsSysCalls>* os_sys_calls_{};
 
   Stats::IsolatedStoreImpl store;
   MockRandomGenerator generator;
   std::unique_ptr<LoaderImpl> loader;
+  Api::ApiPtr api_;
 };
 
 TEST_F(DiskBackedLoaderImplTest, All) {
@@ -111,6 +107,29 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_EQ(2UL, loader->snapshot().getInteger("file3", 1));
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file4", 1));
 
+  // Boolean getting.
+  bool value;
+  SnapshotImpl* snapshot = reinterpret_cast<SnapshotImpl*>(&loader->snapshot());
+
+  EXPECT_EQ(true, snapshot->getBoolean("file11", value));
+  EXPECT_EQ(true, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file12", value));
+  EXPECT_EQ(false, value);
+  EXPECT_EQ(true, snapshot->getBoolean("file13", value));
+  EXPECT_EQ(true, value);
+  // File1 is not a boolean.
+  EXPECT_EQ(false, snapshot->getBoolean("file1", value));
+
+  // Feature defaults.
+  // test_feature_true is explicitly set true in runtime_features.cc
+  EXPECT_EQ(true, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+  // test_feature_false is not in runtime_features.cc and so is false by default.
+  EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+
+  // Feature defaults via helper function.
+  EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+
   // Files with comments.
   EXPECT_EQ(123UL, loader->snapshot().getInteger("file5", 1));
   EXPECT_EQ("/home#about-us", loader->snapshot().get("file6"));
@@ -122,6 +141,37 @@ TEST_F(DiskBackedLoaderImplTest, All) {
 
   EXPECT_CALL(generator, random()).WillOnce(Return(2));
   EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1));
+
+  // Fractional percent feature enablement
+  envoy::type::FractionalPercent fractional_percent;
+  fractional_percent.set_numerator(5);
+  fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(50));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(60));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file8", fractional_percent)); // valid data
+
+  // We currently expect that runtime values represented as fractional percents that are provided as
+  // integers are parsed simply as percents (denominator of 100).
+  EXPECT_CALL(generator, random()).WillOnce(Return(53));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+  EXPECT_CALL(generator, random()).WillOnce(Return(51));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file10", fractional_percent)); // valid int data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(4));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(6));
+  EXPECT_FALSE(
+      loader->snapshot().featureEnabled("file9", fractional_percent)); // invalid proto data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(4));
+  EXPECT_TRUE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
+
+  EXPECT_CALL(generator, random()).WillOnce(Return(6));
+  EXPECT_FALSE(loader->snapshot().featureEnabled("file1", fractional_percent)); // invalid data
 
   // Check stable value
   EXPECT_TRUE(loader->snapshot().featureEnabled("file3", 1, 1));
@@ -140,8 +190,8 @@ TEST_F(DiskBackedLoaderImplTest, GetLayers) {
   run("test/common/runtime/test_data/current", "envoy_override");
   const auto& layers = loader->snapshot().getLayers();
   EXPECT_EQ(3, layers.size());
-  EXPECT_EQ("hello", layers[0]->values().find("file1")->second.string_value_);
-  EXPECT_EQ("hello override", layers[1]->values().find("file1")->second.string_value_);
+  EXPECT_EQ("hello", layers[0]->values().find("file1")->second.raw_string_value_);
+  EXPECT_EQ("hello override", layers[1]->values().find("file1")->second.raw_string_value_);
   // Admin should be last
   EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
   EXPECT_TRUE(layers[2]->values().empty());
@@ -149,7 +199,7 @@ TEST_F(DiskBackedLoaderImplTest, GetLayers) {
   loader->mergeValues({{"foo", "bar"}});
   // The old snapshot and its layers should have been invalidated. Refetch.
   const auto& new_layers = loader->snapshot().getLayers();
-  EXPECT_EQ("bar", new_layers[2]->values().find("foo")->second.string_value_);
+  EXPECT_EQ("bar", new_layers[2]->values().find("foo")->second.raw_string_value_);
 }
 
 TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
@@ -157,22 +207,53 @@ TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
   run("/baddir", "/baddir");
 }
 
-TEST_F(DiskBackedLoaderImplTest, BadStat) {
-  setup();
-  EXPECT_CALL(*os_sys_calls_, stat(_, _)).WillOnce(Return(-1));
-  run("test/common/runtime/test_data/current", "envoy_override");
-  EXPECT_EQ(store.counter("runtime.load_error").value(), 1);
-  // We should still have the admin layer
-  const auto& layers = loader->snapshot().getLayers();
-  EXPECT_EQ(1, layers.size());
-  EXPECT_NE(nullptr, dynamic_cast<const AdminLayer*>(layers.back().get()));
-}
-
 TEST_F(DiskBackedLoaderImplTest, OverrideFolderDoesNotExist) {
   setup();
   run("test/common/runtime/test_data/current", "envoy_override_does_not_exist");
 
   EXPECT_EQ("hello", loader->snapshot().get("file1"));
+}
+
+TEST_F(DiskBackedLoaderImplTest, PercentHandling) {
+  setup();
+  run("test/common/runtime/test_data/current", "envoy_override");
+
+  envoy::type::FractionalPercent default_value;
+
+  // Smoke test integer value of 0, should be interpreted as 0%
+  {
+    loader->mergeValues({{"foo", "0"}});
+
+    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 5));
+  }
+
+  // Smoke test integer value of 5, should be interpreted as 5%
+  {
+    loader->mergeValues({{"foo", "5"}});
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 4));
+    EXPECT_FALSE(loader->snapshot().featureEnabled("foo", default_value, 5));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 100));
+  }
+
+  // Verify uint64 -> uint32 conversion by using a runtime value with all 0s in
+  // the bottom 32 bits. If it were to be naively treated as a uint32_t then it
+  // would appear as 0%, but it should be 100% because we assume the
+  // denominator is 100
+  {
+    // NOTE: high_value has to have the property that the lowest 32 bits % 100
+    // is less than 100. If it's greater than 100 the test will pass whether or
+    // not the uint32 conversion is handled properly.
+    uint64_t high_value = 1UL << 60;
+    std::string high_value_str = std::to_string(high_value);
+    loader->mergeValues({{"foo", high_value_str}});
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 0));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 50));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 100));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 12389));
+    EXPECT_TRUE(loader->snapshot().featureEnabled("foo", default_value, 23859235));
+  }
 }
 
 void testNewOverrides(Loader& loader, Stats::Store& store) {
@@ -245,21 +326,39 @@ TEST(LoaderImplTest, All) {
   testNewOverrides(loader, store);
 }
 
-TEST(DiskLayer, IllegalPath) {
-  Api::MockOsSysCalls mock_os_syscalls;
-  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev", mock_os_syscalls), EnvoyException,
-                            "Invalid path: /dev");
+class DiskLayerTest : public testing::Test {
+protected:
+  DiskLayerTest() : api_(Api::createApiForTest()) {}
+
+  Api::ApiPtr api_;
+};
+
+TEST_F(DiskLayerTest, IllegalPath) {
+#ifdef WIN32
+  // no illegal paths on Windows at the moment
+  return;
+#endif
+  EXPECT_THROW_WITH_MESSAGE(DiskLayer("test", "/dev", *api_), EnvoyException, "Invalid path: /dev");
 }
 
 // Validate that we catch recursion that goes too deep in the runtime filesystem
 // walk.
-TEST(DiskLayer, Loop) {
-  Api::OsSysCallsImpl os_syscalls;
+TEST_F(DiskLayerTest, Loop) {
   EXPECT_THROW_WITH_MESSAGE(
       DiskLayer("test", TestEnvironment::temporaryPath("test/common/runtime/test_data/loop"),
-                os_syscalls),
-      EnvoyException, "Walk recursion depth exceded 16");
+                *api_),
+      EnvoyException, "Walk recursion depth exceeded 16");
 }
 
+TEST(NoRuntime, FeatureEnabled) {
+  // Make sure the registry is not set up.
+  ASSERT_TRUE(Runtime::LoaderSingleton::getExisting() == nullptr);
+
+  // Feature defaults should still work.
+  EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  EXPECT_EQ(true, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
+}
+
+} // namespace
 } // namespace Runtime
 } // namespace Envoy

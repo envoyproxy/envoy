@@ -16,10 +16,14 @@ public:
   const std::string ClientSslAuth = "envoy.client_ssl_auth";
   // Echo filter
   const std::string Echo = "envoy.echo";
+  // Dubbo proxy filter
+  const std::string DubboProxy = "envoy.filters.network.dubbo_proxy";
   // HTTP connection manager filter
   const std::string HttpConnectionManager = "envoy.http_connection_manager";
   // Mongo proxy filter
   const std::string MongoProxy = "envoy.mongo_proxy";
+  // MySQL proxy filter
+  const std::string MySQLProxy = "envoy.filters.network.mysql_proxy";
   // Rate limit filter
   const std::string RateLimit = "envoy.ratelimit";
   // Redis proxy filter
@@ -30,6 +34,12 @@ public:
   const std::string ExtAuthorization = "envoy.ext_authz";
   // Thrift proxy filter
   const std::string ThriftProxy = "envoy.filters.network.thrift_proxy";
+  // Role based access control filter
+  const std::string Rbac = "envoy.filters.network.rbac";
+  // SNI Cluster filter
+  const std::string SniCluster = "envoy.filters.network.sni_cluster";
+  // ZooKeeper proxy filter
+  const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;

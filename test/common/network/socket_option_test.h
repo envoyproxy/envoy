@@ -1,3 +1,5 @@
+#pragma once
+
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_impl.h"
 
@@ -8,10 +10,10 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Network {
@@ -23,7 +25,14 @@ public:
 
   NiceMock<MockListenSocket> socket_;
   Api::MockOsSysCalls os_sys_calls_;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{[this]() {
+    // Before injecting OsSysCallsImpl, make sure validateIpv{4,6}Supported is called so the static
+    // bool is initialized without requiring to mock ::socket and ::close.
+    std::make_unique<Address::Ipv4Instance>("1.2.3.4", 5678);
+    std::make_unique<Address::Ipv6Instance>("::1:2:3:4", 5678);
+    return &os_sys_calls_;
+  }()};
 
   void testSetSocketOptionSuccess(
       Socket::Option& socket_option, Network::SocketOptionName option_name, int option_val,
@@ -57,6 +66,16 @@ public:
       EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(0);
       EXPECT_TRUE(socket_option.setOption(socket_, state));
     }
+  }
+
+  Socket::Option::Details makeDetails(Network::SocketOptionName name, int value) {
+    absl::string_view value_as_bstr(reinterpret_cast<const char*>(&value), sizeof(value));
+
+    Socket::Option::Details expected_info;
+    expected_info.name_ = name;
+    expected_info.value_ = std::string(value_as_bstr);
+
+    return expected_info;
   }
 };
 

@@ -1,22 +1,23 @@
 #include "common/upstream/load_stats_reporter.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Upstream {
 
-LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::core::Node& node,
+LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::AsyncClientPtr async_client,
-                                     Event::Dispatcher& dispatcher,
-                                     MonotonicTimeSource& time_source)
+                                     Event::Dispatcher& dispatcher)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
-      time_source_(time_source) {
-  request_.mutable_node()->MergeFrom(node);
+      time_source_(dispatcher.timeSource()) {
+  request_.mutable_node()->MergeFrom(local_info.node());
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
@@ -52,10 +53,13 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
+    if (cluster.info()->eds_service_name().has_value()) {
+      cluster_stats->set_cluster_service_name(cluster.info()->eds_service_name().value());
+    }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
       for (auto& hosts : host_set->hostsPerLocality().get()) {
-        ASSERT(hosts.size() > 0);
+        ASSERT(!hosts.empty());
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
@@ -76,7 +80,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     }
     cluster_stats->set_total_dropped_requests(
         cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
-    const auto now = time_source_.currentTime().time_since_epoch();
+    const auto now = time_source_.monotonicTime().time_since_epoch();
     const auto measured_interval = now - cluster_name_and_timestamp.second;
     cluster_stats->mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
@@ -89,7 +93,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   stats_.responses_.inc();
   // When the connection is established, the message has not yet been read so we
   // will not have a load reporting period.
-  if (message_.get()) {
+  if (message_) {
     startLoadReportPeriod();
   }
 }
@@ -135,7 +139,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   for (const std::string& cluster_name : message_->clusters()) {
     clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
                                         ? existing_clusters[cluster_name]
-                                        : time_source_.currentTime().time_since_epoch());
+                                        : time_source_.monotonicTime().time_since_epoch());
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
     if (it == cluster_info_map.end()) {

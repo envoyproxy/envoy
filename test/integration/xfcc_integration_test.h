@@ -3,27 +3,31 @@
 #include <memory>
 #include <string>
 
+#include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/mocks.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Xfcc {
 
-class XfccIntegrationTest : public HttpIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class XfccIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                            public HttpIntegrationTest {
 public:
   const std::string previous_xfcc_ =
       "By=spiffe://lyft.com/frontend;Hash=123456;URI=spiffe://lyft.com/testclient";
   const std::string current_xfcc_by_hash_ =
       "By=spiffe://lyft.com/"
-      "backend-team;Hash=e0f3c8ce5e2ea305f0701ff512e36e2e97928284a228bcf77332d33930a1b6fd";
+      "backend-team;Hash=" +
+      absl::AsciiStrToLower(absl::StrReplaceAll(TEST_CLIENT_CERT_HASH, {{":", ""}}));
   const std::string client_subject_ =
       "Subject=\""
       "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,"
@@ -31,7 +35,9 @@ public:
   const std::string client_uri_san_ = "URI=spiffe://lyft.com/frontend-team";
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
-  XfccIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  XfccIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
 
   void initialize() override;
   void createUpstreams() override;
@@ -51,12 +57,11 @@ public:
   bool tls_ = true;
 
 private:
-  std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<Ssl::ContextManager> context_manager_;
   Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
   Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;
   Network::TransportSocketFactoryPtr upstream_ssl_ctx_;
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 } // namespace Xfcc
 } // namespace Envoy

@@ -9,6 +9,7 @@
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
@@ -66,7 +67,7 @@ public:
       ip_tag_pair.second = cidr_set;
       tag_data.emplace_back(ip_tag_pair);
     }
-    trie_.reset(new Network::LcTrie::LcTrie<std::string>(tag_data));
+    trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
   }
 
   Runtime::Loader& runtime() { return runtime_; }

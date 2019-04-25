@@ -1,25 +1,29 @@
+#include <memory>
+
 #include "common/api/os_sys_calls_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/common/hex.h"
 
 #include "server/hot_restart_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnRef;
 using testing::WithArg;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
+namespace {
 
 class HotRestartImplTest : public testing::Test {
 public:
@@ -28,19 +32,20 @@ public:
     EXPECT_CALL(os_sys_calls_, shmOpen(_, _, _));
     EXPECT_CALL(os_sys_calls_, ftruncate(_, _)).WillOnce(WithArg<1>(Invoke([this](off_t size) {
       buffer_.resize(size);
-      return 0;
+      return Api::SysCallIntResult{0, 0};
     })));
     EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).WillOnce(InvokeWithoutArgs([this]() {
-      return buffer_.data();
+      return Api::SysCallPtrResult{buffer_.data(), 0};
     }));
     EXPECT_CALL(os_sys_calls_, bind(_, _, _));
     EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
 
     // Test we match the correct stat with empty-slots before, after, or both.
-    hot_restart_.reset(new HotRestartImpl(options_));
+    hot_restart_ = std::make_unique<HotRestartImpl>(options_, symbol_table_);
     hot_restart_->drainParentListeners();
   }
 
+  Stats::FakeSymbolTableImpl symbol_table_;
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<MockOptions> options_;
@@ -88,49 +93,61 @@ TEST_F(HotRestartImplTest, versionString) {
   }
 }
 
+// Check consistency of internal raw stat representation by comparing hash of
+// memory contents against a previously recorded value.
+TEST_F(HotRestartImplTest, Consistency) {
+  setup();
+
+  // Generate a stat, encode it to hex, and take the hash of that hex string. We
+  // expect the hash to vary only when the internal representation of a stat has
+  // been intentionally changed, in which case SharedMemory::VERSION should be
+  // incremented as well.
+  const uint64_t expected_hash = 1874506077228772558;
+  const uint64_t max_name_length = stats_options_.maxNameLength();
+
+  const std::string name_1(max_name_length, 'A');
+  Stats::RawStatData* stat_1 = hot_restart_->statsAllocator().alloc(name_1);
+  const uint64_t stat_size = sizeof(Stats::RawStatData) + max_name_length;
+  const std::string stat_hex_dump_1 = Hex::encode(reinterpret_cast<uint8_t*>(stat_1), stat_size);
+  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
+  EXPECT_EQ(name_1, stat_1->key());
+  hot_restart_->statsAllocator().free(*stat_1);
+}
+
 TEST_F(HotRestartImplTest, crossAlloc) {
   setup();
 
-  Stats::RawStatData* stat1 = hot_restart_->alloc("stat1");
-  Stats::RawStatData* stat2 = hot_restart_->alloc("stat2");
-  Stats::RawStatData* stat3 = hot_restart_->alloc("stat3");
-  Stats::RawStatData* stat4 = hot_restart_->alloc("stat4");
-  Stats::RawStatData* stat5 = hot_restart_->alloc("stat5");
-  hot_restart_->free(*stat2);
-  hot_restart_->free(*stat4);
+  Stats::RawStatData* stat1 = hot_restart_->statsAllocator().alloc("stat1");
+  Stats::RawStatData* stat2 = hot_restart_->statsAllocator().alloc("stat2");
+  Stats::RawStatData* stat3 = hot_restart_->statsAllocator().alloc("stat3");
+  Stats::RawStatData* stat4 = hot_restart_->statsAllocator().alloc("stat4");
+  Stats::RawStatData* stat5 = hot_restart_->statsAllocator().alloc("stat5");
+  hot_restart_->statsAllocator().free(*stat2);
+  hot_restart_->statsAllocator().free(*stat4);
   stat2 = nullptr;
   stat4 = nullptr;
 
   EXPECT_CALL(options_, restartEpoch()).WillRepeatedly(Return(1));
   EXPECT_CALL(os_sys_calls_, shmOpen(_, _, _));
-  EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).WillOnce(Return(buffer_.data()));
+  EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _))
+      .WillOnce(Return(Api::SysCallPtrResult{buffer_.data(), 0}));
   EXPECT_CALL(os_sys_calls_, bind(_, _, _));
-  HotRestartImpl hot_restart2(options_);
-  Stats::RawStatData* stat1_prime = hot_restart2.alloc("stat1");
-  Stats::RawStatData* stat3_prime = hot_restart2.alloc("stat3");
-  Stats::RawStatData* stat5_prime = hot_restart2.alloc("stat5");
+  HotRestartImpl hot_restart2(options_, symbol_table_);
+  Stats::RawStatData* stat1_prime = hot_restart2.statsAllocator().alloc("stat1");
+  Stats::RawStatData* stat3_prime = hot_restart2.statsAllocator().alloc("stat3");
+  Stats::RawStatData* stat5_prime = hot_restart2.statsAllocator().alloc("stat5");
   EXPECT_EQ(stat1, stat1_prime);
   EXPECT_EQ(stat3, stat3_prime);
   EXPECT_EQ(stat5, stat5_prime);
-}
-
-TEST_F(HotRestartImplTest, truncateKey) {
-  setup();
-
-  std::string key1(options_.statsOptions().maxNameLength(), 'a');
-  Stats::RawStatData* stat1 = hot_restart_->alloc(key1);
-  std::string key2 = key1 + "a";
-  Stats::RawStatData* stat2 = hot_restart_->alloc(key2);
-  EXPECT_EQ(stat1, stat2);
 }
 
 TEST_F(HotRestartImplTest, allocFail) {
   EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(2));
   setup();
 
-  Stats::RawStatData* s1 = hot_restart_->alloc("1");
-  Stats::RawStatData* s2 = hot_restart_->alloc("2");
-  Stats::RawStatData* s3 = hot_restart_->alloc("3");
+  Stats::RawStatData* s1 = hot_restart_->statsAllocator().alloc("1");
+  Stats::RawStatData* s2 = hot_restart_->statsAllocator().alloc("2");
+  Stats::RawStatData* s3 = hot_restart_->statsAllocator().alloc("3");
   EXPECT_NE(s1, nullptr);
   EXPECT_NE(s2, nullptr);
   EXPECT_EQ(s3, nullptr);
@@ -161,7 +178,7 @@ TEST_P(HotRestartImplAlignmentTest, objectAlignment) {
 
   std::set<Stats::RawStatData*> used;
   for (uint64_t i = 0; i < num_stats_; i++) {
-    Stats::RawStatData* stat = hot_restart_->alloc(fmt::format("stat {}", i));
+    Stats::RawStatData* stat = hot_restart_->statsAllocator().alloc(fmt::format("stat {}", i));
     EXPECT_TRUE((reinterpret_cast<uintptr_t>(stat) % alignof(decltype(*stat))) == 0);
     EXPECT_TRUE(used.find(stat) == used.end());
     used.insert(stat);
@@ -184,7 +201,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
                                    i)
                            .substr(0, stats_options_.maxNameLength());
     TestStat ts;
-    ts.stat_ = hot_restart_->alloc(name);
+    ts.stat_ = hot_restart_->statsAllocator().alloc(name);
     ts.name_ = ts.stat_->name_;
     ts.index_ = i;
 
@@ -229,8 +246,9 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(HotRestartImplAlignmentTest, HotRestartImplAlignmentTest,
-                        testing::Range(0UL, alignof(Stats::RawStatData) + 1));
+INSTANTIATE_TEST_SUITE_P(HotRestartImplAlignmentTest, HotRestartImplAlignmentTest,
+                         testing::Range(0UL, alignof(Stats::RawStatData) + 1));
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

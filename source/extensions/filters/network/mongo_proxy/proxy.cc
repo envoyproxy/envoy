@@ -8,20 +8,36 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "extensions/filters/network/well_known_names.h"
+
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
-AccessLog::AccessLog(const std::string& file_name,
-                     Envoy::AccessLog::AccessLogManager& log_manager) {
+class DynamicMetadataKeys {
+public:
+  const std::string OperationInsert{"insert"};
+  const std::string OperationQuery{"query"};
+  // TODO: Parse out the delete/update operation from the commands
+  const std::string OperationUpdate{"update"};
+  const std::string OperationDelete{"delete"};
+};
+
+typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
+
+AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogManager& log_manager,
+                     TimeSource& time_source)
+    : time_source_(time_source) {
   file_ = log_manager.createAccessLog(file_name);
 }
 
@@ -30,7 +46,7 @@ void AccessLog::logMessage(const Message& message, bool full,
   static const std::string log_format =
       "{{\"time\": \"{}\", \"message\": {}, \"upstream_host\": \"{}\"}}\n";
 
-  SystemTime now = std::chrono::system_clock::now();
+  SystemTime now = time_source_.systemTime();
   std::string log_line =
       fmt::format(log_format, AccessLogDateTimeFormatter::fromTime(now), message.toString(full),
                   upstream_host ? upstream_host->address()->asString() : "-");
@@ -40,11 +56,13 @@ void AccessLog::logMessage(const Message& message, bool full,
 
 ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
-                         const FaultConfigSharedPtr& fault_config,
-                         const Network::DrainDecision& drain_decision)
+                         const Filters::Common::Fault::FaultDelayConfigSharedPtr& fault_config,
+                         const Network::DrainDecision& drain_decision, TimeSource& time_source,
+                         bool emit_dynamic_metadata)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
       runtime_(runtime), drain_decision_(drain_decision), access_log_(access_log),
-      fault_config_(fault_config) {
+      fault_config_(fault_config), time_source_(time_source),
+      emit_dynamic_metadata_(emit_dynamic_metadata) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
@@ -54,6 +72,21 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
 }
 
 ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
+
+void ProxyFilter::setDynamicMetadata(std::string operation, std::string resource) {
+  ProtobufWkt::Struct metadata(
+      (*read_callbacks_->connection()
+            .streamInfo()
+            .dynamicMetadata()
+            .mutable_filter_metadata())[NetworkFilterNames::get().MongoProxy]);
+  auto& fields = *metadata.mutable_fields();
+  // TODO(rshriram): reverse the resource string (table.db)
+  auto& operations = *fields[resource].mutable_list_value();
+  operations.add_values()->set_string_value(operation);
+
+  read_callbacks_->connection().streamInfo().setDynamicMetadata(
+      NetworkFilterNames::get().MongoProxy, metadata);
+}
 
 void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
   tryInjectDelay();
@@ -65,6 +98,11 @@ void ProxyFilter::decodeGetMore(GetMoreMessagePtr&& message) {
 
 void ProxyFilter::decodeInsert(InsertMessagePtr&& message) {
   tryInjectDelay();
+
+  if (emit_dynamic_metadata_) {
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationInsert,
+                       message->fullCollectionName());
+  }
 
   stats_.op_insert_.inc();
   logMessage(*message, true);
@@ -81,6 +119,11 @@ void ProxyFilter::decodeKillCursors(KillCursorsMessagePtr&& message) {
 
 void ProxyFilter::decodeQuery(QueryMessagePtr&& message) {
   tryInjectDelay();
+
+  if (emit_dynamic_metadata_) {
+    setDynamicMetadata(DynamicMetadataKeysSingleton::get().OperationQuery,
+                       message->fullCollectionName());
+  }
 
   stats_.op_query_.inc();
   logMessage(*message, true);
@@ -239,7 +282,7 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string&
   scope_.histogram(fmt::format("{}.reply_size", prefix)).recordValue(reply_documents_byte_size);
   scope_.histogram(fmt::format("{}.reply_time_ms", prefix))
       .recordValue(std::chrono::duration_cast<std::chrono::milliseconds>(
-                       std::chrono::steady_clock::now() - active_query.start_time_)
+                       time_source_.monotonicTime() - active_query.start_time_)
                        .count());
 }
 
@@ -250,6 +293,15 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
     // stats. This can be removed once we are more confident of this code.
     buffer.drain(buffer.length());
     return;
+  }
+
+  // Clear dynamic metadata
+  if (emit_dynamic_metadata_) {
+    auto& metadata = (*read_callbacks_->connection()
+                           .streamInfo()
+                           .dynamicMetadata()
+                           .mutable_filter_metadata())[NetworkFilterNames::get().MongoProxy];
+    metadata.mutable_fields()->clear();
   }
 
   if (!decoder_) {
@@ -312,23 +364,30 @@ DecoderPtr ProdProxyFilter::createDecoder(DecoderCallbacks& callbacks) {
   return DecoderPtr{new DecoderImpl(callbacks)};
 }
 
-absl::optional<uint64_t> ProxyFilter::delayDuration() {
-  absl::optional<uint64_t> result;
+absl::optional<std::chrono::milliseconds> ProxyFilter::delayDuration() {
+  absl::optional<std::chrono::milliseconds> result;
 
   if (!fault_config_) {
     return result;
   }
 
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().FixedDelayPercent,
-                                          fault_config_->delayPercent())) {
+                                          fault_config_->percentage())) {
     return result;
   }
 
-  const uint64_t duration = runtime_.snapshot().getInteger(
-      MongoRuntimeConfig::get().FixedDelayDurationMs, fault_config_->delayDuration());
+  // See if the delay provider has a default delay, if not there is no delay.
+  auto config_duration = fault_config_->duration(nullptr);
+  if (!config_duration.has_value()) {
+    return result;
+  }
+
+  const std::chrono::milliseconds duration =
+      std::chrono::milliseconds(runtime_.snapshot().getInteger(
+          MongoRuntimeConfig::get().FixedDelayDurationMs, config_duration.value().count()));
 
   // Delay only if the duration is > 0ms.
-  if (duration > 0) {
+  if (duration.count() > 0) {
     result = duration;
   }
 
@@ -349,12 +408,12 @@ void ProxyFilter::tryInjectDelay() {
     return;
   }
 
-  const absl::optional<uint64_t> delay_ms = delayDuration();
+  const absl::optional<std::chrono::milliseconds> delay = delayDuration();
 
-  if (delay_ms) {
+  if (delay) {
     delay_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { delayInjectionTimerCallback(); });
-    delay_timer_->enableTimer(std::chrono::milliseconds(delay_ms.value()));
+    delay_timer_->enableTimer(delay.value());
     stats_.delays_injected_.inc();
   }
 }

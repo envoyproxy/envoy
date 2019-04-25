@@ -1,38 +1,39 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import requests, sys
 import kv_pb2 as kv
 from struct import pack
 
-HOST    = "http://localhost:9001"
-HEADERS = {'content-type': 'application/grpc','Host':'grpc'}
-USAGE   = """
+HOST = "http://localhost:9001"
+HEADERS = {'content-type': 'application/grpc', 'Host': 'grpc'}
+USAGE = """
 
 envoy-python-client usage:
   ./client.py set <key> <value> - sets the <key> and <value>
   ./client.py get <key>         - gets the value for <key>
   """
 
+
 class KVClient():
 
-    def get(self, key):
-        r = kv.GetRequest(key=key)
+  def get(self, key):
+    r = kv.GetRequest(key=key)
 
-        # Build the gRPC frame
-        data = r.SerializeToString()
-        data = pack('!cI', b'\0', len(data)) + data
+    # Build the gRPC frame
+    data = r.SerializeToString()
+    data = pack('!cI', b'\0', len(data)) + data
 
-        resp = requests.post(HOST + "/kv.KV/Get", data=data, headers=HEADERS)
+    resp = requests.post(HOST + "/kv.KV/Get", data=data, headers=HEADERS)
 
-        return kv.GetResponse().FromString(resp.content[5:])
+    return kv.GetResponse().FromString(resp.content[5:])
 
+  def set(self, key, value):
+    r = kv.SetRequest(key=key, value=value)
+    data = r.SerializeToString()
+    data = pack('!cI', b'\0', len(data)) + data
 
-    def set(self, key, value):
-        r = kv.SetRequest(key=key, value=value)
-        data = r.SerializeToString()
-        data = pack('!cI', b'\0', len(data)) + data
+    return requests.post(HOST + "/kv.KV/Set", data=data, headers=HEADERS)
 
-        return requests.post(HOST + "/kv.KV/Set", data=data, headers=HEADERS)
 
 def run():
   if len(sys.argv) == 1:
@@ -73,6 +74,7 @@ def run():
     response = client.set(key, value)
 
     print("setf %s to %s" % (key, value))
+
 
 if __name__ == '__main__':
   run()

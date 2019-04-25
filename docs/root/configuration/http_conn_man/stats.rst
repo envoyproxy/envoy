@@ -13,7 +13,7 @@ statistics:
    downstream_cx_total, Counter, Total connections
    downstream_cx_ssl_total, Counter, Total TLS connections
    downstream_cx_http1_total, Counter, Total HTTP/1.1 connections
-   downstream_cx_websocket_total, Counter, Total WebSocket connections
+   downstream_cx_upgrades_total, Counter, Total successfully upgraded connections. These are also counted as total http1/http2 connections.
    downstream_cx_http2_total, Counter, Total HTTP/2 connections
    downstream_cx_destroy, Counter, Total connections destroyed
    downstream_cx_destroy_remote, Counter, Total connections destroyed due to remote close
@@ -24,7 +24,7 @@ statistics:
    downstream_cx_active, Gauge, Total active connections
    downstream_cx_ssl_active, Gauge, Total active TLS connections
    downstream_cx_http1_active, Gauge, Total active HTTP/1.1 connections
-   downstream_cx_websocket_active, Gauge, Total active WebSocket connections
+   downstream_cx_upgrades_active, Gauge, Total active upgraded connections. These are also counted as active http1/http2 connections.
    downstream_cx_http2_active, Gauge, Total active HTTP/2 connections
    downstream_cx_protocol_error, Counter, Total protocol errors
    downstream_cx_length_ms, Histogram, Connection length milliseconds
@@ -34,6 +34,7 @@ statistics:
    downstream_cx_tx_bytes_buffered, Gauge, Total sent bytes currently buffered
    downstream_cx_drain_close, Counter, Total connections closed due to draining
    downstream_cx_idle_timeout, Counter, Total connections closed due to idle timeout
+   downstream_cx_overload_disable_keepalive, Counter, Total connections for which HTTP 1.x keepalive has been disabled due to Envoy overload
    downstream_flow_control_paused_reading_total, Counter, Total number of times reads were disabled due to flow control
    downstream_flow_control_resumed_reading_total, Counter, Total number of times reads were enabled on the connection due to flow control
    downstream_rq_total, Counter, Total requests
@@ -45,14 +46,17 @@ statistics:
    downstream_rq_tx_reset, Counter, Total request resets sent
    downstream_rq_non_relative_path, Counter, Total requests with a non-relative HTTP path
    downstream_rq_too_large, Counter, Total requests resulting in a 413 due to buffering an overly large body
+   downstream_rq_completed, Counter, Total requests that resulted in a response (e.g. does not include aborted requests)
    downstream_rq_1xx, Counter, Total 1xx responses
    downstream_rq_2xx, Counter, Total 2xx responses
    downstream_rq_3xx, Counter, Total 3xx responses
    downstream_rq_4xx, Counter, Total 4xx responses
    downstream_rq_5xx, Counter, Total 5xx responses
    downstream_rq_ws_on_non_ws_route, Counter, Total WebSocket upgrade requests rejected by non WebSocket routes
-   downstream_rq_time, Histogram, Request time milliseconds
+   downstream_rq_time, Histogram, Total time for request and response (milliseconds)
    downstream_rq_idle_timeout, Counter, Total requests closed due to idle timeout
+   downstream_rq_timeout, Counter, Total requests closed due to a timeout on the request path
+   downstream_rq_overload_close, Counter, Total requests closed due to Envoy overload
    rs_too_large, Counter, Total response errors due to buffering an overly large body
 
 Per user agent statistics
@@ -82,6 +86,7 @@ following statistics:
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
+   downstream_rq_completed, Counter, Total responses
    downstream_rq_1xx, Counter, Total 1xx responses
    downstream_rq_2xx, Counter, Total 2xx responses
    downstream_rq_3xx, Counter, Total 3xx responses
@@ -104,7 +109,7 @@ All http2 statistics are rooted at *http2.*
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   header_overflow, Counter, Total number of connections reset due to the headers being larger than `Envoy::Http::Http2::ConnectionImpl::StreamImpl::MAX_HEADER_SIZE` (63k)
+   header_overflow, Counter, Total number of connections reset due to the headers being larger than the :ref:`configured value <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.max_request_headers_kb>`.
    headers_cb_no_stream, Counter, Total number of errors where a header callback is called without an associated stream. This tracks an unexpected occurrence due to an as yet undiagnosed bug
    rx_messaging_error, Counter, Total number of invalid received frames that violated `section 8 <https://tools.ietf.org/html/rfc7540#section-8>`_ of the HTTP/2 spec. This will result in a *tx_reset*
    rx_reset, Counter, Total number of reset stream frames received by Envoy
