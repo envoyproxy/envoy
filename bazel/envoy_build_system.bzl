@@ -449,6 +449,8 @@ def envoy_cc_test(
     test_lib_tags = []
     if coverage:
         test_lib_tags.append("coverage_test_lib")
+        tags = tags + ['coverage_test']
+
     envoy_cc_test_library(
         name = name + "_lib",
         srcs = srcs,
@@ -471,7 +473,7 @@ def envoy_cc_test(
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
         args = args + ["--gmock_default_mock_behavior=2"],
-        tags = tags + ["coverage_test"],
+        tags = tags,
         local = local,
         shard_count = shard_count,
         size = size,

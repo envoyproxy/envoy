@@ -18,7 +18,7 @@ set -x
   --instrumentation_filter=//source/...,//include/... \
   --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main \
   --combined_report=lcov \
-  --define ENVOY_CONFIG_COVERAGE=1 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --copt=-DNDEBUG
+  --define ENVOY_CONFIG_COVERAGE=1 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --copt=-DNDEBUG --test_tag_filters=coverage_test
 
 # Generate HTML
 declare -r COVERAGE_DIR="${SRCDIR}"/generated/coverage
