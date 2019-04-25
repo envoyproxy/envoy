@@ -24,8 +24,11 @@ Http::HeaderMap::Iterate fillHeaderList(const Http::HeaderEntry& header, void* c
 } // namespace
 
 HttpTapConfigImpl::HttpTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
-                                     Common::Tap::Sink* admin_streamer)
-    : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer) {}
+                                     Common::Tap::Sink* admin_streamer,
+                                     Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
+                                     const LocalInfo::LocalInfo& local_info)
+    : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer,
+                                   cluster_manager, scope, local_info) {}
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t stream_id) {
   return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), stream_id);

@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+import "envoy/api/v2/core/base.proto";
+import "envoy/data/tap/v2alpha/wrapper.proto";
+
+package envoy.service.tap.v2alpha;
+
+import "validate/validate.proto";
+
+option java_outer_classname = "CommonProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
+
+// [#protodoc-title: Common tap configuration]
+
+message StreamTapsRequest {
+  message Identifier {
+    // The node sending taps over the stream.
+    envoy.api.v2.core.Node node = 1 [(validate.rules).message.required = true];
+  }
+
+  // Identifier data effectively is a structured metadata. As a performance optimization this will
+  // only be sent in the first message on the stream.
+  Identifier identifier = 1;
+  uint64 trace_id = 2;
+  envoy.data.tap.v2alpha.TraceWrapper trace = 3;
+}
+
+message StreamTapsResponse {
+}
+
+service TapService {
+  rpc StreamTaps(stream StreamTapsRequest) returns (StreamTapsResponse) {
+  }
+}

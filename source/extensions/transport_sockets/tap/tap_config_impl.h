@@ -49,8 +49,12 @@ class SocketTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
                             public std::enable_shared_from_this<SocketTapConfigImpl> {
 public:
   SocketTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
-                      Extensions::Common::Tap::Sink* admin_streamer, TimeSource& time_system)
-      : Extensions::Common::Tap::TapConfigBaseImpl(std::move(proto_config), admin_streamer),
+                      Extensions::Common::Tap::Sink* admin_streamer, TimeSource& time_system,
+
+                      Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
+                      const LocalInfo::LocalInfo& local_info)
+      : Extensions::Common::Tap::TapConfigBaseImpl(std::move(proto_config), admin_streamer,
+                                                   cluster_manager, scope, local_info),
         time_source_(time_system) {}
 
   // SocketTapConfig

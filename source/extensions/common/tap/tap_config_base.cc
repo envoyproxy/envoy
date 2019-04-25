@@ -40,7 +40,9 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_body
 }
 
 TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
-                                     Common::Tap::Sink* admin_streamer)
+                                     Common::Tap::Sink* admin_streamer,
+                                     Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
+                                     const LocalInfo::LocalInfo& local_info)
     : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -64,6 +66,13 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
   case envoy::service::tap::v2alpha::OutputSink::kFilePerTap:
     sink_ =
         std::make_unique<FilePerTapSink>(proto_config.output_config().sinks()[0].file_per_tap());
+    sink_to_use_ = sink_.get();
+    break;
+  case envoy::service::tap::v2alpha::OutputSink::kGrpcService:
+    RELEASE_ASSERT(sink_format_ == envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY,
+                   "grpc output only supports PROTO_BINARY format");
+    sink_ = std::make_unique<GrpcTapSink>(proto_config.output_config().sinks()[0].grpc_service(),
+                                          cluster_manager, scope, local_info);
     sink_to_use_ = sink_.get();
     break;
   default:
@@ -192,6 +201,27 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+void GrpcTapSink::GrpcPerTapSinkHandle::submitTrace(
+    TraceWrapperPtr&& trace, envoy::service::tap::v2alpha::OutputSink::Format) {
+  envoy::service::tap::v2alpha::StreamTapsRequest message;
+
+  if (parent_.stream_ == nullptr) {
+    parent_.stream_ =
+        parent_.client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                                   "envoy.service.tap.v2alpha.TapService.StreamTaps"),
+                               parent_);
+    auto* identifier = message.mutable_identifier();
+    *identifier->mutable_node() = parent_.local_info_.node();
+  }
+  if (parent_.stream_ != nullptr) {
+    *message.mutable_trace() = std::move(*trace);
+    message.set_trace_id(trace_id_);
+    parent_.stream_->sendMessage(message, false);
+//    parent_.stream_-> resetStream();
+//    parent_.stream_ = nullptr;
   }
 }
 

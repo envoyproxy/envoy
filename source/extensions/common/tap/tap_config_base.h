@@ -3,7 +3,11 @@
 #include <fstream>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/grpc/async_client.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/service/tap/v2alpha/common.pb.h"
+#include "envoy/service/tap/v2alpha/tap.pb.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/common/tap/tap.h"
 #include "extensions/common/tap/tap_matcher.h"
@@ -95,7 +99,10 @@ public:
 
 protected:
   TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
-                    Common::Tap::Sink* admin_streamer);
+                    Common::Tap::Sink* admin_streamer,
+
+                    Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
+                    const LocalInfo::LocalInfo& local_info);
 
 private:
   // This is the default setting for both RX/TX max buffered bytes. (This means that per tap, the
@@ -138,6 +145,68 @@ private:
   };
 
   const envoy::service::tap::v2alpha::FilePerTapSink config_;
+};
+/**
+ * A tap sink that writes each tap trace to a discrete output file.
+ *
+add stat of inflight request
+success
+and failure
+
+ */
+class GrpcTapSink
+    : public Sink,
+      public Grpc::TypedAsyncStreamCallbacks<envoy::service::tap::v2alpha::StreamTapsResponse> {
+public:
+  GrpcTapSink(const envoy::api::v2::core::GrpcService& grpc_service,
+              Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
+              const LocalInfo::LocalInfo& local_info)
+      : local_info_(local_info) {
+    // get streaming client here and save it in tls slot? <- no need as it seems already run in a
+    // tls slot! create streaming client send a bunch of queries in submit
+    const auto async_client_factory =
+        cluster_manager.grpcAsyncClientManager().factoryForGrpcService(grpc_service, scope, true);
+    client_ = async_client_factory->create();
+  }
+
+  virtual ~GrpcTapSink() {
+    if (stream_ != nullptr) {
+      stream_->resetStream();
+      stream_ = nullptr;
+    }
+  }
+
+  // Sink
+  PerTapSinkHandlePtr createPerTapSinkHandle(uint64_t trace_id) override {
+
+    return std::make_unique<GrpcPerTapSinkHandle>(*this, trace_id);
+  }
+
+  // Grpc::TypedAsyncStreamCallbacks
+  void onCreateInitialMetadata(Http::HeaderMap&) override {}
+  void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
+  void
+  onReceiveMessage(std::unique_ptr<envoy::service::tap::v2alpha::StreamTapsResponse>&&) override {}
+  void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
+  void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override { stream_ = nullptr; };
+
+private:
+  struct GrpcPerTapSinkHandle : public PerTapSinkHandle {
+    GrpcPerTapSinkHandle(GrpcTapSink& parent, uint64_t trace_id)
+        : parent_(parent), trace_id_(trace_id) {}
+
+    // PerTapSinkHandle
+    void submitTrace(TraceWrapperPtr&& trace,
+                     envoy::service::tap::v2alpha::OutputSink::Format format) override;
+
+    GrpcTapSink& parent_;
+    const uint64_t trace_id_;
+    std::ofstream output_file_;
+  };
+
+  Grpc::AsyncStream* stream_{};
+  Grpc::AsyncClientPtr client_;
+  const LocalInfo::LocalInfo& local_info_;
 };
 
 } // namespace Tap

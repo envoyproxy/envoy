@@ -37,6 +37,7 @@ envoy_cc_library(
     deps = [
         "//source/common/http:header_utility_lib",
         "@envoy_api//envoy/service/tap/v2alpha:common_cc",
+        "@envoy_api//envoy/service/tap/v2alpha:tap_cc",
     ],
 )
 

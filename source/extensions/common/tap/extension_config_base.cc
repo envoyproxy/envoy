@@ -54,10 +54,21 @@ void ExtensionConfigBase::clearTapConfig() {
 
 void ExtensionConfigBase::newTapConfig(envoy::service::tap::v2alpha::TapConfig&& proto_config,
                                        Sink* admin_streamer) {
-  TapConfigSharedPtr new_config =
-      config_factory_->createConfigFromProto(std::move(proto_config), admin_streamer);
   tls_slot_->runOnAllThreads(
-      [this, new_config] { tls_slot_->getTyped<TlsFilterConfig>().config_ = new_config; });
+      [this, proto_config, admin_streamer] {
+        // clone the config for this thread, so we can move a copy.
+        auto cloned_proto_config = proto_config;
+        // Note(yuval-k): Now that createConfigFromProto will initialize a GRPC client, it must be 
+        // created and used in the same thread. This implementation moves the initialization to the 
+        // worker thread. This will mean that each worker thread will initialize a grpc stream to
+        // the tap receiver server.
+        // An alternative would be to start it in the main thread (as before), and dispatch the
+        // submitTrace events to the main thread - this is a relativly easy change, but we 
+        // have a risk of flooding the main thread.
+        TapConfigSharedPtr new_config =
+      config_factory_->createConfigFromProto(std::move(cloned_proto_config), admin_streamer);
+        tls_slot_->getTyped<TlsFilterConfig>().config_ = new_config; 
+      });
 }
 
 } // namespace Tap
