@@ -367,9 +367,18 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * Contains the backing store for a StatName and enough context so it can
  * self-delete through RAII. This works by augmenting StatNameStorage with a
  * reference to the SymbolTable&, so it has an extra 8 bytes of footprint. It
- * is intended to be used in tests or as a scoped temp in a function, rather
- * than stored in a larger structure such as a map, where the redundant copies
- * of the SymbolTable& would be costly in aggregate.
+ * is intended to be used in cases where simplicity of implementation is more
+ * important than byte-savings, for example:
+ *   - outside the stats system
+ *   - in tests
+ *   - as a scoped temp in a function
+ * Due to the extra 8 bytes per instance, scalability should be taken into
+ * account before using this as (say) a value or key in a map. In those
+ * scenarios, it would be better to store the SymbolTable reference once
+ * for the entire map.
+ *
+ * In the stat structures, we generally use StatNameStorage to avoid the
+ * per-stat overhead.
  */
 class StatNameManagedStorage : public StatNameStorage {
 public:
