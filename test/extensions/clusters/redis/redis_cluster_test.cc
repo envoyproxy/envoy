@@ -89,6 +89,33 @@ protected:
         });
   }
 
+  void setupFactoryFromV2Yaml(const std::string& yaml) {
+    NiceMock<Upstream::MockClusterManager> cm;
+    envoy::api::v2::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml);
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
+        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                              : cluster_config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        singleton_manager_, tls_, *api_);
+
+    envoy::config::cluster::redis::RedisClusterConfig config;
+    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
+                                           ProtobufWkt::Struct::default_instance(), config);
+
+    NiceMock<AccessLog::MockAccessLogManager> log_manager;
+    NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
+    NiceMock<Envoy::Api::MockApi> api;
+    Upstream::ClusterFactoryContextImpl cluster_factory_context(
+        cm, stats_store_, tls_, std::move(dns_resolver_), ssl_context_manager_, runtime_, random_,
+        dispatcher_, log_manager, local_info_, admin_, singleton_manager_,
+        std::move(outlier_event_logger), false, api);
+
+    RedisClusterFactory factory = RedisClusterFactory();
+    factory.createClusterWithConfig(cluster_config, config, cluster_factory_context,
+                                    factory_context, std::move(scope));
+  }
+
   void expectResolveDiscovery(Network::DnsLookupFamily dns_lookup_family,
                               const std::string& expected_address,
                               const std::list<std::string>& resolved_addresses) {
@@ -451,6 +478,48 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
   EXPECT_EQ(3U, cluster_->info()->stats().update_attempt_.value());
   EXPECT_EQ(2U, cluster_->info()->stats().update_failure_.value());
+}
+
+TEST_F(RedisClusterTest, FactoryInitNotRedisClusterTypeFailure) {
+  const std::string basic_yaml_hosts = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  dns_lookup_family: V4_ONLY
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 22120
+  cluster_type:
+    name: envoy.clusters.memcached
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        cluster_refresh_rate: 4s
+        cluster_refresh_timeout: 0.25s
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(setupFactoryFromV2Yaml(basic_yaml_hosts), EnvoyException,
+                            "Redis cluster can only created with redis cluster type");
+}
+
+TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {
+  const std::string basic_yaml_hosts = R"EOF(
+  name: name
+  connect_timeout: 0.25s
+  dns_lookup_family: V4_ONLY
+  hosts:
+  - socket_address:
+      address: foo.bar.com
+      port_value: 22120
+  cluster_type:
+    name: envoy.clusters.redis
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        cluster_refresh_rate: 4s
+        cluster_refresh_timeout: 0.25s
+  )EOF";
+  setupFactoryFromV2Yaml(basic_yaml_hosts);
 }
 
 } // namespace Redis

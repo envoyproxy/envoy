@@ -10,13 +10,13 @@ EXTENSIONS = {
     #
     # Clusters
     #
-    "envoy.clusters.redis": "//source/extensions/clusters/redis:redis_cluster",
+    "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
 
     #
     # gRPC Credentials Plugins
     #
 
-    "envoy.grpc_credentials.file_based_metadata":      "//source/extensions/grpc_credentials/file_based_metadata:config",
+    "envoy.grpc_credentials.file_based_metadata":       "//source/extensions/grpc_credentials/file_based_metadata:config",
 
     #
     # Health checkers

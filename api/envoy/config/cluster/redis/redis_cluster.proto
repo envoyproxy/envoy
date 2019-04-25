@@ -13,29 +13,16 @@ import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Redis Cluster Configuration]
-// This cluster adds support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_. Redis
-// Cluster is an extension of Redis which supports sharding and high availability (where a shard
-// that loses its master fails over to a replica, and designates it as the new master). However, as
-// their is no unified frontend or proxy service in front of Redis Cluster, the client (in this case
-// Envoy) must locally maintain the state of the Redis Cluster, specifically the topology. A random
-// node in the cluster can be queried for the topology using the `CLUSTER SLOTS command
-// <https://redis.io/commands/cluster-slots>`_. This results is then stored locally, and updated at
-// user-configured intervals.
+// This cluster adds support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_, as part
+// of :ref:`Envoy's support for Redis Cluster <arch_overview_redis>`.
 //
-// The user may be familiar with a system that sounds familiar called `Twemproxy
-// <https://github.com/twitter/twemproxy>`_. Twemproxy is also a proxy that interfaces with Redis.
-// However, it differs in several important ways. First, it does not support Redis Cluster. Second,
-// it acts as service in front of Redis, as opposed to being a sidecar proxy. Finally, it is
-// un-maintained. Why do we need a new system, aside from the last point?
-//
-// Beside the expected benefits of a sidecare proxy such as unified retries and so on, it allows us
-// to essentially build a common client for all services to talk to Redis. This is important because
-// while Redis non-cluster clients are performant and have feature parity across various languages,
-// Redis Cluster clients do not! Notably, support for spreading load across read replicas differs in
-// various client implementations- something very important if wants to scale a Redis fleet to
-// handle a large amount of load coming from services implemented in different languages. Hence,
-// these services can use a Redis non-cluster client and get all the benefits of Redis Cluster
-// without worrying about unexpected behaviors.
+// Redis Cluster is an extension of Redis which supports sharding and high availability (where a
+// shard that loses its master fails over to a replica, and designates it as the new master).
+// However, as there is no unified frontend or proxy service in front of Redis Cluster, the client
+// (in this case Envoy) must locally maintain the state of the Redis Cluster, specifically the
+// topology. A random node in the cluster is queried for the topology using the `CLUSTER SLOTS
+// command <https://redis.io/commands/cluster-slots>`_. This result is then stored locally, and
+// updated at user-configured intervals.
 //
 // Example:
 //
@@ -57,7 +44,6 @@ import "gogoproto/gogo.proto";
 //         cluster_refresh_timeout: 0.5s
 
 message RedisClusterConfig {
-
   // Interval between successive topology refresh requests. If not set, this defaults to 5s.
   google.protobuf.Duration cluster_refresh_rate = 1
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
