@@ -10,6 +10,7 @@ cc_library(
     hdrs = glob(["boringssl/include/openssl/*.h"]),
     defines = ["BORINGSSL_FIPS"],
     includes = ["boringssl/include"],
+    linkstatic = 1,
     visibility = ["//visibility:public"],
 )
 
@@ -20,6 +21,7 @@ cc_library(
     ],
     hdrs = glob(["boringssl/include/openssl/*.h"]),
     includes = ["boringssl/include"],
+    linkstatic = 1,
     visibility = ["//visibility:public"],
     deps = [":crypto"],
 )
