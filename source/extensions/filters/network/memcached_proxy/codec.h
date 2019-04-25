@@ -27,6 +27,7 @@ public:
   // Define some constants used in memcached messages encoding
   constexpr static uint8_t RequestV1 = 0x80;
   constexpr static uint8_t ResponseV1 = 0x81;
+  constexpr static uint8_t RawDataType = 0x00;
   constexpr static uint8_t HeaderSize = 24;
 };
 
@@ -37,11 +38,9 @@ class Request {
 public:
   virtual ~Request() = default;
 
-  virtual uint8_t dataType() const PURE;
   virtual uint8_t vbucketIdOrStatus() const PURE;
   virtual uint32_t opaque() const PURE;
   virtual uint64_t cas() const PURE;
-  virtual Message::OpCode opCode() const PURE;
 };
 
 typedef std::unique_ptr<Request> RequestPtr;

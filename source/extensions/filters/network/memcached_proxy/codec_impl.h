@@ -28,36 +28,32 @@ public:
 
 class RequestImpl : public virtual Request {
 public:
-  RequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas, Message::OpCode op_code) :
-    data_type_(data_type), vbucket_id_or_status_(vbucket_id_or_status), opaque_(opaque), cas_(cas), op_code_(op_code) {}
+  RequestImpl(uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    vbucket_id_or_status_(vbucket_id_or_status), opaque_(opaque), cas_(cas) {}
 
   virtual void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) PURE;
 
-  uint8_t dataType() const override { return data_type_; }
   uint8_t vbucketIdOrStatus() const override { return vbucket_id_or_status_; }
   uint32_t opaque() const override { return opaque_; }
   uint64_t cas() const override { return cas_; }
-  Message::OpCode opCode() const override { return op_code_; }
 private:
-  const uint8_t data_type_;
-  const uint8_t vbucket_id_or_status_;
-  const uint32_t opaque_;
-  const uint64_t cas_;
-  const Message::OpCode op_code_;
+  uint8_t vbucket_id_or_status_;
+  uint32_t opaque_;
+  uint64_t cas_;
 };
 
 class GetRequestImpl : public RequestImpl,
                        public GetRequest,
                        Logger::Loggable<Logger::Id::memcached> {
 public:
-  GetRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas, Message::OpCode op_code) : RequestImpl(data_type, vbucket_id_or_status, opaque, cas, op_code) {}
+  GetRequestImpl(uint8_t vbucket_id_or_status_, uint32_t opaque, uint64_t cas) : RequestImpl(vbucket_id_or_status_, opaque, cas) {}
 
   // RequestImpl
   void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
 
   // GetRequest
   bool operator==(const GetRequest& rhs) const override;
-  bool quiet() const override { return opCode() == Message::OpCode::OP_GETQ || opCode() == Message::OpCode::OP_GETKQ; }
+  bool quiet() const override { return false; }
   const std::string& key() const override { return key_; }
 
   void key(const std::string& key) { key_ = key; }
@@ -69,7 +65,7 @@ class SetRequestImpl : public RequestImpl,
                        public SetRequest,
                        Logger::Loggable<Logger::Id::memcached> {
 public:
-  SetRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas, Message::OpCode op_code) : RequestImpl(data_type, vbucket_id_or_status, opaque, cas, op_code) {}
+  SetRequestImpl(uint8_t vbucket_id_or_status_, uint32_t opaque, uint64_t cas) : RequestImpl(vbucket_id_or_status_, opaque, cas) {}
 
   // RequestImpl
   void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
@@ -121,7 +117,8 @@ private:
     uint16_t key_length,
     uint8_t extras_length,
     uint32_t body_length,
-    const Request& request);
+    const Request& request,
+    Message::OpCode op);
 
   Buffer::Instance& output_;
 };
