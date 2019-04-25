@@ -85,10 +85,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     retry_on_ |= parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView());
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
-    // TODO(dnoe): Migrate to pure string_view (#6580)
-    const std::string max_retries(request_headers.EnvoyMaxRetries()->value().getStringView());
     uint64_t temp;
-    if (StringUtil::atoull(max_retries.c_str(), temp)) {
+    if (absl::SimpleAtoi(request_headers.EnvoyMaxRetries()->value().getStringView(), &temp)) {
       // The max retries header takes precedence if set.
       retries_remaining_ = temp;
     }
@@ -97,7 +95,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
     for (const auto code : StringUtil::splitToken(
              request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
       uint64_t out;
-      if (StringUtil::atoull(std::string(code).c_str(), out)) {
+      if (absl::SimpleAtoi(code, &out)) {
         retriable_status_codes_.emplace_back(out);
       }
     }

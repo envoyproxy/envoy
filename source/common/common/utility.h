@@ -154,6 +154,9 @@ public:
 
   /**
    * Convert a string to an unsigned long, checking for error.
+   *
+   * Consider absl::SimpleAtoi instead if using base 10.
+   *
    * @param return true if successful, false otherwise.
    */
   static bool atoull(const char* str, uint64_t& out, int base = 10);
