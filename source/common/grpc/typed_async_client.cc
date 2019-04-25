@@ -8,50 +8,34 @@
 namespace Envoy {
 namespace Grpc {
 
-void UntypedAsyncStream::sendMessageUntyped(const Protobuf::Message& request, bool end_stream) {
-  stream_->sendMessage(Common::serializeMessage(request), end_stream);
+void SendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream) {
+  stream->sendMessageRaw(Common::serializeMessage(request), end_stream);
 }
 
-void UntypedAsyncRequestCallbacks::onSuccess(Buffer::InstancePtr&& response, Tracing::Span& span) {
-  ProtobufTypes::MessagePtr response_message = createEmptyResponse();
+ProtobufTypes::MessagePtr ParseMessageUntyped(ProtobufTypes::MessagePtr&& message,
+                                              Buffer::InstancePtr&& response) {
   // TODO(htuch): Need to add support for compressed responses as well here.
   if (response->length() > 0) {
     Buffer::ZeroCopyInputStreamImpl stream(std::move(response));
-    if (!response_message->ParseFromZeroCopyStream(&stream)) {
-      onFailure(Status::GrpcStatus::Internal, "", span);
-      return;
+    if (!message->ParseFromZeroCopyStream(&stream)) {
+      return nullptr;
     }
   }
-  onSuccessUntyped(std::move(response_message), span);
+  return std::move(message);
 }
 
-bool UntypedAsyncStreamCallbacks::onReceiveMessage(Buffer::InstancePtr&& response) {
-  ProtobufTypes::MessagePtr response_message = createEmptyResponse();
-  // TODO(htuch): Need to add support for compressed responses as well here.
-  if (response->length() > 0) {
-    Buffer::ZeroCopyInputStreamImpl stream(std::move(response));
-    if (!response_message->ParseFromZeroCopyStream(&stream)) {
-      return false;
-    }
-  }
-  onReceiveMessageUntyped(std::move(response_message));
-  return true;
+RawAsyncStream* StartUntyped(RawAsyncClient* client,
+                             const Protobuf::MethodDescriptor& service_method,
+                             RawAsyncStreamCallbacks& callbacks) {
+  return client->startRaw(service_method.service()->full_name(), service_method.name(), callbacks);
 }
 
-UntypedAsyncStream
-UntypedAsyncClient::startUntyped(const Protobuf::MethodDescriptor& service_method,
-                                 UntypedAsyncStreamCallbacks& callbacks) {
-  return UntypedAsyncStream(
-      client_->start(service_method.service()->full_name(), service_method.name(), callbacks));
-}
-
-AsyncRequest*
-UntypedAsyncClient::sendUntyped(const Protobuf::MethodDescriptor& service_method,
-                                const Protobuf::Message& request,
-                                UntypedAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                                const absl::optional<std::chrono::milliseconds>& timeout) {
-  return client_->send(service_method.service()->full_name(), service_method.name(),
-                       Common::serializeMessage(request), callbacks, parent_span, timeout);
+AsyncRequest* SendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
+                          const Protobuf::Message& request, RawAsyncRequestCallbacks& callbacks,
+                          Tracing::Span& parent_span,
+                          const absl::optional<std::chrono::milliseconds>& timeout) {
+  return client->sendRaw(service_method.service()->full_name(), service_method.name(),
+                         Common::serializeMessage(request), callbacks, parent_span, timeout);
 }
 
 } // namespace Grpc

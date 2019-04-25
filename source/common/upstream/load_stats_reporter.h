@@ -1,5 +1,3 @@
-#pragma once
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/load_stats/v2/lrs.pb.h"
 #include "envoy/stats/scope.h"
@@ -30,17 +28,17 @@ struct LoadReporterStats {
 };
 
 class LoadStatsReporter
-    : Grpc::TypedAsyncStreamCallbacks<envoy::service::load_stats::v2::LoadStatsResponse>,
+    : Grpc::AsyncStreamCallbacks<envoy::service::load_stats::v2::LoadStatsResponse>,
       Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
-                    Stats::Scope& scope, Grpc::AsyncClientPtr async_client,
+                    Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
                     Event::Dispatcher& dispatcher);
 
-  // Grpc::TypedAsyncStreamCallbacks
+  // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
-  void onReceiveMessageTyped(
+  void onReceiveMessage(
       std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
@@ -57,10 +55,10 @@ private:
 
   ClusterManager& cm_;
   LoadReporterStats stats_;
-  Grpc::TypedAsyncClient<envoy::service::load_stats::v2::LoadStatsRequest,
-                         envoy::service::load_stats::v2::LoadStatsResponse>
+  Grpc::AsyncClient<envoy::service::load_stats::v2::LoadStatsRequest,
+                    envoy::service::load_stats::v2::LoadStatsResponse>
       async_client_;
-  Grpc::TypedAsyncStream<envoy::service::load_stats::v2::LoadStatsRequest> stream_{};
+  Grpc::AsyncStream<envoy::service::load_stats::v2::LoadStatsRequest> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;

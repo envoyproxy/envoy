@@ -8,133 +8,106 @@ namespace Envoy {
 namespace Grpc {
 
 /**
+ * Forward declarations for helper functions.
+ */
+void SendMessageUntyped(RawAsyncStream* stream, const Protobuf::Message& request, bool end_stream);
+ProtobufTypes::MessagePtr ParseMessageUntyped(ProtobufTypes::MessagePtr&& message,
+                                              Buffer::InstancePtr&& response);
+RawAsyncStream* StartUntyped(RawAsyncClient* client,
+                             const Protobuf::MethodDescriptor& service_method,
+                             RawAsyncStreamCallbacks& callbacks);
+AsyncRequest* SendUntyped(RawAsyncClient* client, const Protobuf::MethodDescriptor& service_method,
+                          const Protobuf::Message& request, RawAsyncRequestCallbacks& callbacks,
+                          Tracing::Span& parent_span,
+                          const absl::optional<std::chrono::milliseconds>& timeout);
+
+/**
  * Convenience wrapper for an AsyncStream* providing typed protobuf support.
  */
-class UntypedAsyncStream {
+template <typename Request> class AsyncStream /* : public RawAsyncStream */ {
 public:
-  UntypedAsyncStream() {}
-  UntypedAsyncStream(AsyncStream* stream) : stream_(stream) {}
-  void sendMessage(Buffer::InstancePtr&& request, bool end_stream) {
-    stream_->sendMessage(std::move(request), end_stream);
+  AsyncStream() {}
+  AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
+  AsyncStream(const AsyncStream& other) = default;
+  void sendMessage(const Request& request, bool end_stream) {
+    SendMessageUntyped(stream_, std::move(request), end_stream);
   }
   void closeStream() { stream_->closeStream(); }
   void resetStream() { stream_->resetStream(); }
-  void sendMessageUntyped(const Protobuf::Message& request, bool end_stream);
-  UntypedAsyncStream* operator->() { return this; }
-  bool operator==(AsyncStream* stream) const { return stream_ == stream; }
-  bool operator!=(AsyncStream* stream) const { return stream_ != stream; }
-
-private:
-  template <typename Request> friend class TypedAsyncStream;
-  AsyncStream* stream_{};
-};
-
-template <typename Request> class TypedAsyncStream : public UntypedAsyncStream {
-public:
-  TypedAsyncStream() {}
-  TypedAsyncStream(AsyncStream* stream) : UntypedAsyncStream(stream) {}
-  TypedAsyncStream(UntypedAsyncStream&& other) : TypedAsyncStream(std::move(other.stream_)) {}
-  void sendMessageTyped(const Request& request, bool end_stream) {
-    sendMessageUntyped(request, end_stream);
-  }
-  TypedAsyncStream* operator->() { return this; }
-  TypedAsyncStream<Request> operator=(AsyncStream* stream) {
+  AsyncStream* operator->() { return this; }
+  AsyncStream<Request> operator=(RawAsyncStream* stream) {
     stream_ = stream;
     return *this;
   }
+  bool operator==(RawAsyncStream* stream) const { return stream_ == stream; }
+  bool operator!=(RawAsyncStream* stream) const { return stream_ != stream; }
+
+private:
+  RawAsyncStream* stream_{};
 };
 
 /**
  * Convenience subclasses for AsyncRequestCallbacks.
  */
-class UntypedAsyncRequestCallbacks : public AsyncRequestCallbacks {
+template <typename Response> class AsyncRequestCallbacks : public RawAsyncRequestCallbacks {
 public:
-  virtual ~UntypedAsyncRequestCallbacks() {}
-  virtual void onSuccessUntyped(ProtobufTypes::MessagePtr&& response, Tracing::Span& span) PURE;
-
-protected:
-  void onSuccess(Buffer::InstancePtr&& response, Tracing::Span& span) override;
-  virtual ProtobufTypes::MessagePtr createEmptyResponse() { NOT_REACHED_GCOVR_EXCL_LINE; }
-};
-
-template <typename Response>
-class TypedAsyncRequestCallbacks : public UntypedAsyncRequestCallbacks {
-public:
-  virtual ~TypedAsyncRequestCallbacks() {}
-  virtual void onSuccessTyped(std::unique_ptr<Response>&& response, Tracing::Span& span) PURE;
+  virtual ~AsyncRequestCallbacks() {}
+  virtual void onSuccess(std::unique_ptr<Response>&& response, Tracing::Span& span) PURE;
 
 private:
-  ProtobufTypes::MessagePtr createEmptyResponse() override { return std::make_unique<Response>(); }
-  void onSuccessUntyped(ProtobufTypes::MessagePtr&& response, Tracing::Span& span) override {
-    onSuccessTyped(std::unique_ptr<Response>(dynamic_cast<Response*>(response.release())), span);
+  void onSuccessRaw(Buffer::InstancePtr&& response, Tracing::Span& span) override {
+    auto message = std::unique_ptr<Response>(dynamic_cast<Response*>(
+        ParseMessageUntyped(std::make_unique<Response>(), std::move(response)).release()));
+    if (!message) {
+      onFailure(Status::GrpcStatus::Internal, "", span);
+      return;
+    }
+    onSuccess(std::move(message), span);
   }
 };
 
 /**
  * Convenience subclasses for AsyncStreamCallbacks.
  */
-class UntypedAsyncStreamCallbacks : public AsyncStreamCallbacks {
+template <typename Response> class AsyncStreamCallbacks : public RawAsyncStreamCallbacks {
 public:
-  virtual ~UntypedAsyncStreamCallbacks() {}
-  virtual void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& response) PURE;
-
-protected:
-  virtual ProtobufTypes::MessagePtr createEmptyResponse() { NOT_REACHED_GCOVR_EXCL_LINE; }
-  bool onReceiveMessage(Buffer::InstancePtr&& response) override;
-};
-
-template <typename Response> class TypedAsyncStreamCallbacks : public UntypedAsyncStreamCallbacks {
-public:
-  virtual ~TypedAsyncStreamCallbacks() {}
-  virtual void onReceiveMessageTyped(std::unique_ptr<Response>&& message) PURE;
+  virtual ~AsyncStreamCallbacks() {}
+  virtual void onReceiveMessage(std::unique_ptr<Response>&& message) PURE;
 
 private:
-  ProtobufTypes::MessagePtr createEmptyResponse() override { return std::make_unique<Response>(); }
-  void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& response) override {
-    onReceiveMessageTyped(std::unique_ptr<Response>(dynamic_cast<Response*>(response.release())));
+  bool onReceiveMessageRaw(Buffer::InstancePtr&& response) {
+    auto message = std::unique_ptr<Response>(dynamic_cast<Response*>(
+        ParseMessageUntyped(std::make_unique<Response>(), std::move(response)).release()));
+    if (!message) {
+      return false;
+    }
+    onReceiveMessage(std::move(message));
+    return true;
   }
 };
 
-class UntypedAsyncClient {
+template <typename Request, typename Response> class AsyncClient /* : public RawAsyncClient )*/ {
 public:
-  UntypedAsyncClient() {}
-  UntypedAsyncClient(AsyncClientPtr&& client) : client_(std::move(client)) {}
-  AsyncRequest* sendUntyped(const Protobuf::MethodDescriptor& service_method,
-                            const Protobuf::Message& request,
-                            UntypedAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                            const absl::optional<std::chrono::milliseconds>& timeout);
-  UntypedAsyncStream startUntyped(const Protobuf::MethodDescriptor& service_method,
-                                  UntypedAsyncStreamCallbacks& callbacks);
+  AsyncClient() {}
+  AsyncClient(RawAsyncClientPtr&& client) : client_(std::move(client)) {}
 
-  UntypedAsyncClient* operator->() { return this; }
-  void operator=(AsyncClientPtr&& client) { client_ = std::move(client); }
+  AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
+                     const Protobuf::Message& request, AsyncRequestCallbacks<Response>& callbacks,
+                     Tracing::Span& parent_span,
+                     const absl::optional<std::chrono::milliseconds>& timeout) {
+    return SendUntyped(client_.get(), service_method, request, callbacks, parent_span, timeout);
+  }
+  AsyncStream<Request> start(const Protobuf::MethodDescriptor& service_method,
+                             AsyncStreamCallbacks<Response>& callbacks) {
+    return AsyncStream<Request>(StartUntyped(client_.get(), service_method, callbacks));
+  }
+
+  AsyncClient* operator->() { return this; }
+  void operator=(RawAsyncClientPtr&& client) { client_ = std::move(client); }
   void reset() { client_.reset(); }
 
 private:
-  template <typename Request, typename Response> friend class TypedAsyncClient;
-  AsyncClientPtr client_{};
-};
-
-template <typename Request, typename Response> class TypedAsyncClient : public UntypedAsyncClient {
-public:
-  TypedAsyncClient() {}
-  TypedAsyncClient(AsyncClientPtr&& client) : UntypedAsyncClient(std::move(client)) {}
-  TypedAsyncClient(UntypedAsyncClient&& other) : UntypedAsyncClient(std::move(other.client_)) {}
-
-  AsyncRequest* sendTyped(const Protobuf::MethodDescriptor& service_method,
-                          const Protobuf::Message& request,
-                          TypedAsyncRequestCallbacks<Response>& callbacks,
-                          Tracing::Span& parent_span,
-                          const absl::optional<std::chrono::milliseconds>& timeout) {
-    return sendUntyped(service_method, request, callbacks, parent_span, timeout);
-  }
-  TypedAsyncStream<Request> startTyped(const Protobuf::MethodDescriptor& service_method,
-                                       TypedAsyncStreamCallbacks<Response>& callbacks) {
-    return TypedAsyncStream<Request>(startUntyped(service_method, callbacks));
-  }
-
-  TypedAsyncClient* operator->() { return this; }
-  void operator=(AsyncClientPtr&& client) { client_ = std::move(client); }
+  RawAsyncClientPtr client_{};
 };
 
 } // namespace Grpc

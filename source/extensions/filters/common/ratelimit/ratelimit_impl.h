@@ -27,7 +27,7 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>
+typedef Grpc::AsyncRequestCallbacks<envoy::service::ratelimit::v2::RateLimitResponse>
     RateLimitAsyncCallbacks;
 
 struct ConstantValues {
@@ -45,7 +45,7 @@ class GrpcClientImpl : public Client,
                        public RateLimitAsyncCallbacks,
                        public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
+  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl();
 
@@ -61,15 +61,15 @@ public:
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccessTyped(std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
-                      Tracing::Span& span) override;
+  void onSuccess(std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
+                 Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
 private:
   const Protobuf::MethodDescriptor& service_method_;
-  Grpc::TypedAsyncClient<envoy::service::ratelimit::v2::RateLimitRequest,
-                         envoy::service::ratelimit::v2::RateLimitResponse>
+  Grpc::AsyncClient<envoy::service::ratelimit::v2::RateLimitRequest,
+                    envoy::service::ratelimit::v2::RateLimitResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;

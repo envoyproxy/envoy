@@ -24,10 +24,11 @@ AsyncClientImpl::~AsyncClientImpl() {
   }
 }
 
-AsyncRequest* AsyncClientImpl::send(absl::string_view service_full_name,
-                                    absl::string_view method_name, Buffer::InstancePtr&& request,
-                                    AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                                    const absl::optional<std::chrono::milliseconds>& timeout) {
+AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
+                                       absl::string_view method_name, Buffer::InstancePtr&& request,
+                                       RawAsyncRequestCallbacks& callbacks,
+                                       Tracing::Span& parent_span,
+                                       const absl::optional<std::chrono::milliseconds>& timeout) {
   auto* const async_request = new AsyncRequestImpl(
       *this, service_full_name, method_name, std::move(request), callbacks, parent_span, timeout);
   std::unique_ptr<AsyncStreamImpl> grpc_stream{async_request};
@@ -41,9 +42,9 @@ AsyncRequest* AsyncClientImpl::send(absl::string_view service_full_name,
   return async_request;
 }
 
-AsyncStream* AsyncClientImpl::start(absl::string_view service_full_name,
-                                    absl::string_view method_name,
-                                    AsyncStreamCallbacks& callbacks) {
+RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
+                                          absl::string_view method_name,
+                                          RawAsyncStreamCallbacks& callbacks) {
   const absl::optional<std::chrono::milliseconds> no_timeout;
   auto grpc_stream = std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name,
                                                        callbacks, no_timeout);
@@ -58,7 +59,7 @@ AsyncStream* AsyncClientImpl::start(absl::string_view service_full_name,
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
-                                 absl::string_view method_name, AsyncStreamCallbacks& callbacks,
+                                 absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                                  const absl::optional<std::chrono::milliseconds>& timeout)
     : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
       callbacks_(callbacks), timeout_(timeout) {}
@@ -136,8 +137,8 @@ void AsyncStreamImpl::onData(Buffer::Instance& data, bool end_stream) {
       streamError(Status::GrpcStatus::Internal);
       return;
     }
-    if (!callbacks_.onReceiveMessage(frame.data_ ? std::move(frame.data_)
-                                                 : std::make_unique<Buffer::OwnedImpl>())) {
+    if (!callbacks_.onReceiveMessageRaw(frame.data_ ? std::move(frame.data_)
+                                                    : std::make_unique<Buffer::OwnedImpl>())) {
       streamError(Status::GrpcStatus::Internal);
       return;
     }
@@ -176,7 +177,7 @@ void AsyncStreamImpl::onReset() {
   streamError(Status::GrpcStatus::Internal);
 }
 
-void AsyncStreamImpl::sendMessage(Buffer::InstancePtr&& request, bool end_stream) {
+void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) {
   char header[5];
   header[0] = 0; // flags
   const uint32_t nsize = htonl(request->length());
@@ -208,7 +209,7 @@ void AsyncStreamImpl::cleanup() {
 
 AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                                    absl::string_view method_name, Buffer::InstancePtr&& request,
-                                   AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+                                   RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
                                    const absl::optional<std::chrono::milliseconds>& timeout)
     : AsyncStreamImpl(parent, service_full_name, method_name, *this, timeout),
       request_(std::move(request)), callbacks_(callbacks) {
@@ -225,7 +226,7 @@ void AsyncRequestImpl::initialize(bool buffer_body_for_retry) {
   if (this->hasResetStream()) {
     return;
   }
-  this->sendMessage(std::move(request_), true);
+  this->sendMessageRaw(std::move(request_), true);
 }
 
 void AsyncRequestImpl::cancel() {
@@ -241,7 +242,7 @@ void AsyncRequestImpl::onCreateInitialMetadata(Http::HeaderMap& metadata) {
 
 void AsyncRequestImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&&) {}
 
-bool AsyncRequestImpl::onReceiveMessage(Buffer::InstancePtr&& response) {
+bool AsyncRequestImpl::onReceiveMessageRaw(Buffer::InstancePtr&& response) {
   response_ = std::move(response);
   return true;
 }
@@ -258,7 +259,7 @@ void AsyncRequestImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std:
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     callbacks_.onFailure(Status::Internal, EMPTY_STRING, *current_span_);
   } else {
-    callbacks_.onSuccess(std::move(response_), *current_span_);
+    callbacks_.onSuccessRaw(std::move(response_), *current_span_);
   }
 
   current_span_->finishSpan();

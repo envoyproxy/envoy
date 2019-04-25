@@ -16,7 +16,7 @@ TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   startSubscription({"name1", "name2", "name3"});
 
   // Ignore these for now, although at the very end there is one we will care about.
-  EXPECT_CALL(async_stream_, sendMessage(_, _)).Times(AnyNumber());
+  EXPECT_CALL(async_stream_, sendMessageRaw(_, _)).Times(AnyNumber());
 
   // Semi-hack: we don't want the requests to actually get sent, since it would clear out the
   // request_ that we want to inspect. pause() does the trick!
@@ -68,7 +68,7 @@ TEST_F(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   // ...but our own map should remember our interest. In particular, losing interest in all 3 should
   // cause their names to appear in the resource_names_unsubscribe field of a DeltaDiscoveryRequest.
   subscription_->resume(); // now we do want the request to actually get sendMessage()'d.
-  EXPECT_CALL(async_stream_, sendMessage(_, _)).WillOnce([](Buffer::InstancePtr&& msg, bool) {
+  EXPECT_CALL(async_stream_, sendMessageRaw(_, _)).WillOnce([](Buffer::InstancePtr&& msg, bool) {
     envoy::api::v2::DeltaDiscoveryRequest sent_request;
     Buffer::ZeroCopyInputStreamImpl stream(std::move(msg));
     EXPECT_TRUE(sent_request.ParseFromZeroCopyStream(&stream));

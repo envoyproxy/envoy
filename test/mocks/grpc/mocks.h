@@ -24,40 +24,38 @@ public:
   MOCK_METHOD0(cancel, void());
 };
 
-class MockAsyncStream : public AsyncStream {
+class MockAsyncStream : public RawAsyncStream {
 public:
   MockAsyncStream();
   ~MockAsyncStream();
 
-  MOCK_METHOD2_T(sendMessage, void(Buffer::InstancePtr&& request, bool end_stream));
+  MOCK_METHOD2_T(sendMessageRaw, void(Buffer::InstancePtr&& request, bool end_stream));
   MOCK_METHOD0_T(closeStream, void());
   MOCK_METHOD0_T(resetStream, void());
   MOCK_METHOD0_T(isGrpcHeaderRequired, bool());
 };
 
 template <class ResponseType>
-class MockAsyncRequestCallbacks : public TypedAsyncRequestCallbacks<ResponseType> {
+class MockAsyncRequestCallbacks : public AsyncRequestCallbacks<ResponseType> {
 public:
-  void onSuccessTyped(std::unique_ptr<ResponseType>&& response, Tracing::Span& span) {
-    onSuccessTyped_(*response, span);
+  void onSuccess(std::unique_ptr<ResponseType>&& response, Tracing::Span& span) {
+    onSuccess_(*response, span);
   }
 
   MOCK_METHOD1_T(onCreateInitialMetadata, void(Http::HeaderMap& metadata));
-  MOCK_METHOD2_T(onSuccessTyped_, void(const ResponseType& response, Tracing::Span& span));
+  MOCK_METHOD2_T(onSuccess_, void(const ResponseType& response, Tracing::Span& span));
   MOCK_METHOD3_T(onFailure,
                  void(Status::GrpcStatus status, const std::string& message, Tracing::Span& span));
 };
 
 template <class ResponseType>
-class MockAsyncStreamCallbacks : public TypedAsyncStreamCallbacks<ResponseType> {
+class MockAsyncStreamCallbacks : public AsyncStreamCallbacks<ResponseType> {
 public:
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
     onReceiveInitialMetadata_(*metadata);
   }
 
-  void onReceiveMessageTyped(std::unique_ptr<ResponseType>&& message) {
-    onReceiveMessageTyped_(*message);
-  }
+  void onReceiveMessage(std::unique_ptr<ResponseType>&& message) { onReceiveMessage_(*message); }
 
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
     onReceiveTrailingMetadata_(*metadata);
@@ -65,20 +63,21 @@ public:
 
   MOCK_METHOD1_T(onCreateInitialMetadata, void(Http::HeaderMap& metadata));
   MOCK_METHOD1_T(onReceiveInitialMetadata_, void(const Http::HeaderMap& metadata));
-  MOCK_METHOD1_T(onReceiveMessageTyped_, void(const ResponseType& message));
+  MOCK_METHOD1_T(onReceiveMessage_, void(const ResponseType& message));
   MOCK_METHOD1_T(onReceiveTrailingMetadata_, void(const Http::HeaderMap& metadata));
   MOCK_METHOD2_T(onRemoteClose, void(Status::GrpcStatus status, const std::string& message));
 };
 
-class MockAsyncClient : public AsyncClient {
+class MockAsyncClient : public RawAsyncClient {
 public:
-  MOCK_METHOD6_T(send, AsyncRequest*(absl::string_view service_full_name,
-                                     absl::string_view method_name, Buffer::InstancePtr&& request,
-                                     AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                                     const absl::optional<std::chrono::milliseconds>& timeout));
-  MOCK_METHOD3_T(start,
-                 AsyncStream*(absl::string_view service_full_name, absl::string_view method_name,
-                              AsyncStreamCallbacks& callbacks));
+  MOCK_METHOD6_T(sendRaw,
+                 AsyncRequest*(absl::string_view service_full_name, absl::string_view method_name,
+                               Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
+                               Tracing::Span& parent_span,
+                               const absl::optional<std::chrono::milliseconds>& timeout));
+  MOCK_METHOD3_T(startRaw,
+                 RawAsyncStream*(absl::string_view service_full_name, absl::string_view method_name,
+                                 RawAsyncStreamCallbacks& callbacks));
   MOCK_METHOD0_T(isGrpcHeaderRequired, bool());
 };
 
@@ -87,7 +86,7 @@ public:
   MockAsyncClientFactory();
   ~MockAsyncClientFactory();
 
-  MOCK_METHOD0(create, AsyncClientPtr());
+  MOCK_METHOD0(create, RawAsyncClientPtr());
 };
 
 class MockAsyncClientManager : public AsyncClientManager {

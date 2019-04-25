@@ -32,9 +32,9 @@ public:
 /**
  * An in-flight gRPC stream.
  */
-class AsyncStream {
+class RawAsyncStream {
 public:
-  virtual ~AsyncStream() {}
+  virtual ~RawAsyncStream() {}
 
   /**
    * Send request message to the stream.
@@ -43,7 +43,7 @@ public:
    *                   object, but callbacks may still be received until the stream is closed
    *                   remotely.
    */
-  virtual void sendMessage(Buffer::InstancePtr&& request, bool end_stream) PURE;
+  virtual void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) PURE;
 
   /**
    * Close the stream locally and send an empty DATA frame to the remote. No further methods may be
@@ -64,9 +64,9 @@ public:
   virtual bool isGrpcHeaderRequired() PURE;
 };
 
-class AsyncRequestCallbacks {
+class RawAsyncRequestCallbacks {
 public:
-  virtual ~AsyncRequestCallbacks() {}
+  virtual ~RawAsyncRequestCallbacks() {}
 
   /**
    * Called when populating the headers to send with initial metadata.
@@ -79,7 +79,7 @@ public:
    * @param response the gRPC response bytes.
    * @param span a tracing span to fill with extra tags.
    */
-  virtual void onSuccess(Buffer::InstancePtr&& response, Tracing::Span& span) PURE;
+  virtual void onSuccessRaw(Buffer::InstancePtr&& response, Tracing::Span& span) PURE;
 
   /**
    * Called when the async gRPC request fails. No further callbacks will be invoked.
@@ -98,9 +98,9 @@ public:
  * to local stream is closed (onRemoteClose), and vice versa. Once the stream is closed remotely, no
  * further callbacks will be invoked.
  */
-class AsyncStreamCallbacks {
+class RawAsyncStreamCallbacks {
 public:
-  virtual ~AsyncStreamCallbacks() {}
+  virtual ~RawAsyncStreamCallbacks() {}
 
   /**
    * Called when populating the headers to send with initial metadata.
@@ -121,7 +121,7 @@ public:
    * @return bool which is true if the message well formed and false otherwise which will cause
               the stream to shutdown with an INTERNAL error.
    */
-  virtual bool onReceiveMessage(Buffer::InstancePtr&& response) PURE;
+  virtual bool onReceiveMessageRaw(Buffer::InstancePtr&& response) PURE;
 
   /**
    * Called when trailing metadata is received. This will also be called on non-Ok grpc-status
@@ -144,9 +144,9 @@ public:
  * Supports sending gRPC requests and receiving responses asynchronously. This can be used to
  * implement either plain gRPC or streaming gRPC calls.
  */
-class AsyncClient {
+class RawAsyncClient {
 public:
-  virtual ~AsyncClient() {}
+  virtual ~RawAsyncClient() {}
 
   /**
    * Start a gRPC unary RPC asynchronously.
@@ -160,10 +160,10 @@ public:
    *         onFailure() has already been called inline. The client owns the request and the
    *         handle should just be used to cancel.
    */
-  virtual AsyncRequest* send(absl::string_view service_full_name, absl::string_view method_name,
-                             Buffer::InstancePtr&& request, AsyncRequestCallbacks& callbacks,
-                             Tracing::Span& parent_span,
-                             const absl::optional<std::chrono::milliseconds>& timeout) PURE;
+  virtual AsyncRequest* sendRaw(absl::string_view service_full_name, absl::string_view method_name,
+                                Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
+                                Tracing::Span& parent_span,
+                                const absl::optional<std::chrono::milliseconds>& timeout) PURE;
 
   /**
    * Start a gRPC stream asynchronously.
@@ -177,11 +177,12 @@ public:
    *         closeStream() is invoked by the caller to notify the client that the stream resources
    *         may be reclaimed.
    */
-  virtual AsyncStream* start(absl::string_view service_full_name, absl::string_view method_name,
-                             AsyncStreamCallbacks& callbacks) PURE;
+  virtual RawAsyncStream* startRaw(absl::string_view service_full_name,
+                                   absl::string_view method_name,
+                                   RawAsyncStreamCallbacks& callbacks) PURE;
 };
 
-typedef std::unique_ptr<AsyncClient> AsyncClientPtr;
+typedef std::unique_ptr<RawAsyncClient> RawAsyncClientPtr;
 
 } // namespace Grpc
 } // namespace Envoy

@@ -76,22 +76,22 @@ private:
   /**
    * Per-thread stream state.
    */
-  struct ThreadLocalStream : public Grpc::TypedAsyncStreamCallbacks<
-                                 envoy::service::accesslog::v2::StreamAccessLogsResponse> {
+  struct ThreadLocalStream
+      : public Grpc::AsyncStreamCallbacks<envoy::service::accesslog::v2::StreamAccessLogsResponse> {
     ThreadLocalStream(ThreadLocalStreamer& parent, const std::string& log_name)
         : parent_(parent), log_name_(log_name) {}
 
-    // Grpc::TypedAsyncStreamCallbacks
+    // Grpc::AsyncStreamCallbacks
     void onCreateInitialMetadata(Http::HeaderMap&) override {}
     void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override {}
-    void onReceiveMessageTyped(
+    void onReceiveMessage(
         std::unique_ptr<envoy::service::accesslog::v2::StreamAccessLogsResponse>&&) override {}
     void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
     ThreadLocalStreamer& parent_;
     const std::string log_name_;
-    Grpc::TypedAsyncStream<envoy::service::accesslog::v2::StreamAccessLogsMessage> stream_{};
+    Grpc::AsyncStream<envoy::service::accesslog::v2::StreamAccessLogsMessage> stream_{};
   };
 
   /**
@@ -102,8 +102,8 @@ private:
     void send(envoy::service::accesslog::v2::StreamAccessLogsMessage& message,
               const std::string& log_name);
 
-    Grpc::TypedAsyncClient<envoy::service::accesslog::v2::StreamAccessLogsMessage,
-                           envoy::service::accesslog::v2::StreamAccessLogsResponse>
+    Grpc::AsyncClient<envoy::service::accesslog::v2::StreamAccessLogsMessage,
+                      envoy::service::accesslog::v2::StreamAccessLogsResponse>
         client_;
     std::unordered_map<std::string, ThreadLocalStream> stream_map_;
     SharedStateSharedPtr shared_state_;

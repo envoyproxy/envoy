@@ -57,14 +57,14 @@ TEST_F(SdsApiTest, BasicTest) {
                                server.stats(), server.clusterManager(), init_manager, config_source,
                                "abc.com", []() {}, *api_);
 
-  NiceMock<Grpc::MockAsyncClient>* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
+  Grpc::MockAsyncClient* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
   NiceMock<Grpc::MockAsyncClientFactory>* factory{new NiceMock<Grpc::MockAsyncClientFactory>()};
   EXPECT_CALL(server.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([factory](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return Grpc::AsyncClientFactoryPtr{factory};
       }));
   EXPECT_CALL(*factory, create()).WillOnce(Invoke([grpc_client] {
-    return Grpc::AsyncClientPtr{grpc_client};
+    return Grpc::RawAsyncClientPtr{grpc_client};
   }));
   EXPECT_CALL(init_watcher, ready());
   init_target_handle->initialize(init_watcher);

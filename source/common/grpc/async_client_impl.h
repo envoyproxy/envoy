@@ -13,19 +13,19 @@ namespace Grpc {
 class AsyncRequestImpl;
 class AsyncStreamImpl;
 
-class AsyncClientImpl final : public AsyncClient {
+class AsyncClientImpl final : public RawAsyncClient {
 public:
   AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::api::v2::core::GrpcService& config,
                   TimeSource& time_source);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient
-  AsyncRequest* send(absl::string_view service_full_name, absl::string_view method_name,
-                     Buffer::InstancePtr&& request, AsyncRequestCallbacks& callbacks,
-                     Tracing::Span& parent_span,
-                     const absl::optional<std::chrono::milliseconds>& timeout) override;
-  AsyncStream* start(absl::string_view service_full_name, absl::string_view method_name,
-                     AsyncStreamCallbacks& callbacks) override;
+  AsyncRequest* sendRaw(absl::string_view service_full_name, absl::string_view method_name,
+                        Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
+                        Tracing::Span& parent_span,
+                        const absl::optional<std::chrono::milliseconds>& timeout) override;
+  RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
+                           RawAsyncStreamCallbacks& callbacks) override;
 
 private:
   Upstream::ClusterManager& cm_;
@@ -38,13 +38,13 @@ private:
   friend class AsyncStreamImpl;
 };
 
-class AsyncStreamImpl : public AsyncStream,
+class AsyncStreamImpl : public RawAsyncStream,
                         Http::AsyncClient::StreamCallbacks,
                         public Event::DeferredDeletable,
                         LinkedObject<AsyncStreamImpl> {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
-                  absl::string_view method_name, AsyncStreamCallbacks& callbacks,
+                  absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
                   const absl::optional<std::chrono::milliseconds>& timeout);
 
   virtual void initialize(bool buffer_body_for_retry);
@@ -56,7 +56,7 @@ public:
   void onReset() override;
 
   // Grpc::AsyncStream
-  void sendMessage(Buffer::InstancePtr&& request, bool end_stream) override;
+  void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
   bool isGrpcHeaderRequired() override { return true; }
@@ -76,7 +76,7 @@ private:
   AsyncClientImpl& parent_;
   std::string service_full_name_;
   std::string method_name_;
-  AsyncStreamCallbacks& callbacks_;
+  RawAsyncStreamCallbacks& callbacks_;
   const absl::optional<std::chrono::milliseconds>& timeout_;
   bool http_reset_{};
   Http::AsyncClient::Stream* stream_{};
@@ -87,11 +87,11 @@ private:
   friend class AsyncClientImpl;
 };
 
-class AsyncRequestImpl : public AsyncRequest, public AsyncStreamImpl, AsyncStreamCallbacks {
+class AsyncRequestImpl : public AsyncRequest, public AsyncStreamImpl, RawAsyncStreamCallbacks {
 public:
   AsyncRequestImpl(AsyncClientImpl& parent, absl::string_view service_full_name,
                    absl::string_view method_name, Buffer::InstancePtr&& request,
-                   AsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+                   RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
                    const absl::optional<std::chrono::milliseconds>& timeout);
 
   void initialize(bool buffer_body_for_retry) override;
@@ -103,12 +103,12 @@ private:
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
-  bool onReceiveMessage(Buffer::InstancePtr&& response) override;
+  bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   Buffer::InstancePtr request_;
-  AsyncRequestCallbacks& callbacks_;
+  RawAsyncRequestCallbacks& callbacks_;
   Tracing::SpanPtr current_span_;
   Buffer::InstancePtr response_;
 };

@@ -48,7 +48,7 @@ public:
         rate_limit_settings_, init_fetch_timeout);
   }
 
-  ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
+  ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw(_, false)); }
 
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {
@@ -72,11 +72,11 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    EXPECT_CALL(async_stream_, sendMessage(Grpc::ProtoBufferEq(expected_request), false));
+    EXPECT_CALL(async_stream_, sendMessageRaw(Grpc::ProtoBufferEq(expected_request), false));
   }
 
   void startSubscription(const std::vector<std::string>& cluster_names) override {
-    EXPECT_CALL(*async_client_, start(_, _, _)).WillOnce(Return(&async_stream_));
+    EXPECT_CALL(*async_client_, startRaw(_, _, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "");
     subscription_->start(cluster_names, callbacks_);
@@ -115,7 +115,7 @@ public:
       expectSendMessage(last_cluster_names_, version_, Grpc::Status::GrpcStatus::Internal,
                         "bad config");
     }
-    subscription_->grpcMux().onReceiveMessageTyped(std::move(response));
+    subscription_->grpcMux().onReceiveMessage(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 

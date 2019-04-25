@@ -33,8 +33,8 @@ class DeltaSubscriptionImpl
       public GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
                         envoy::api::v2::DeltaDiscoveryResponse, ResourceNameDiff> {
 public:
-  DeltaSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
-                        Event::Dispatcher& dispatcher,
+  DeltaSubscriptionImpl(const LocalInfo::LocalInfo& local_info,
+                        Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                         const Protobuf::MethodDescriptor& service_method,
                         absl::string_view type_url, Runtime::RandomGenerator& random,
                         Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,

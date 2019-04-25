@@ -32,26 +32,27 @@ constexpr char V2Alpha[] = "envoy.service.auth.v2alpha.Authorization";
 
 class ExtAuthzGrpcClientTest : public testing::TestWithParam<bool> {
 public:
-  ExtAuthzGrpcClientTest() : async_client_(new NiceMock<Grpc::MockAsyncClient>()), timeout_(10) {}
+  ExtAuthzGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()), timeout_(10) {}
 
   void initialize(bool use_alpha) {
     use_alpha_ = use_alpha;
-    client_ =
-        std::make_unique<GrpcClientImpl>(Grpc::AsyncClientPtr{async_client_}, timeout_, use_alpha_);
+    client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_,
+                                               use_alpha_);
   }
 
   void expectCallSend(envoy::service::auth::v2::CheckRequest& request) {
     EXPECT_CALL(*async_client_,
-                send(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
-        .WillOnce(Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
-                                Buffer::InstancePtr&, Grpc::AsyncRequestCallbacks&, Tracing::Span&,
-                                const absl::optional<std::chrono::milliseconds>& timeout)
-                             -> Grpc::AsyncRequest* {
-          EXPECT_EQ(use_alpha_ ? V2Alpha : V2, service_full_name);
-          EXPECT_EQ("Check", method_name);
-          EXPECT_EQ(timeout_->count(), timeout->count());
-          return &async_request_;
-        }));
+                sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
+        .WillOnce(Invoke(
+            [this](
+                absl::string_view service_full_name, absl::string_view method_name,
+                Buffer::InstancePtr&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                const absl::optional<std::chrono::milliseconds>& timeout) -> Grpc::AsyncRequest* {
+              EXPECT_EQ(use_alpha_ ? V2Alpha : V2, service_full_name);
+              EXPECT_EQ("Check", method_name);
+              EXPECT_EQ(timeout_->count(), timeout->count());
+              return &async_request_;
+            }));
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -85,7 +86,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOk) {
   EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_ok"));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
-  client_->onSuccessTyped(std::move(check_response), span_);
+  client_->onSuccess(std::move(check_response), span_);
 }
 
 // Test the client when an ok response is received.
@@ -109,7 +110,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_ok"));
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-  client_->onSuccessTyped(std::move(check_response), span_);
+  client_->onSuccess(std::move(check_response), span_);
 }
 
 // Test the client when a denied response is received.
@@ -133,7 +134,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
 
-  client_->onSuccessTyped(std::move(check_response), span_);
+  client_->onSuccess(std::move(check_response), span_);
 }
 
 // Test the client when a denied response with additional HTTP attributes is received.
@@ -160,7 +161,7 @@ TEST_P(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
 
-  client_->onSuccessTyped(std::move(check_response), span_);
+  client_->onSuccess(std::move(check_response), span_);
 }
 
 // Test the client when an unknown error occurs.
@@ -181,7 +182,7 @@ TEST_P(ExtAuthzGrpcClientTest, CancelledAuthorizationRequest) {
   initialize(GetParam());
 
   envoy::service::auth::v2::CheckRequest request;
-  EXPECT_CALL(*async_client_, send(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
+  EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance());
 
   EXPECT_CALL(async_request_, cancel());

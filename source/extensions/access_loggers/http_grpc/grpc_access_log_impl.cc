@@ -47,9 +47,9 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
   auto& stream_entry = stream_it->second;
   if (stream_entry.stream_ == nullptr) {
     stream_entry.stream_ =
-        client_->startTyped(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                                "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs"),
-                            stream_entry);
+        client_->start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                           "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs"),
+                       stream_entry);
 
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = shared_state_->local_info_.node();
@@ -57,7 +57,7 @@ void GrpcAccessLogStreamerImpl::ThreadLocalStreamer::send(
   }
 
   if (stream_entry.stream_ != nullptr) {
-    stream_entry.stream_->sendMessageTyped(message, false);
+    stream_entry.stream_->sendMessage(message, false);
   } else {
     // Clear out the stream data due to stream creation failure.
     stream_map_.erase(stream_it);

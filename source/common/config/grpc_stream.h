@@ -17,10 +17,10 @@ namespace Config {
 // xDS variants). Reestablishes the gRPC channel when necessary, and provides rate limiting of
 // requests.
 template <class RequestProto, class ResponseProto, class RequestQueueItem>
-class GrpcStream : public Grpc::TypedAsyncStreamCallbacks<ResponseProto>,
+class GrpcStream : public Grpc::AsyncStreamCallbacks<ResponseProto>,
                    public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcStream(Grpc::AsyncClientPtr async_client, const Protobuf::MethodDescriptor& service_method,
+  GrpcStream(Grpc::RawAsyncClientPtr async_client, const Protobuf::MethodDescriptor& service_method,
              Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher, Stats::Scope& scope,
              const RateLimitSettings& rate_limit_settings)
       : async_client_(std::move(async_client)), service_method_(service_method),
@@ -60,7 +60,7 @@ public:
 
   void establishNewStream() {
     ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-    stream_ = async_client_->startTyped(service_method_, *this);
+    stream_ = async_client_->start(service_method_, *this);
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
       handleEstablishmentFailure();
@@ -73,7 +73,7 @@ public:
 
   bool grpcStreamAvailable() const { return stream_ != nullptr; }
 
-  void sendMessage(const RequestProto& request) { stream_->sendMessageTyped(request, false); }
+  void sendMessage(const RequestProto& request) { stream_->sendMessage(request, false); }
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override {
@@ -84,7 +84,7 @@ public:
     UNREFERENCED_PARAMETER(metadata);
   }
 
-  void onReceiveMessageTyped(std::unique_ptr<ResponseProto>&& message) override {
+  void onReceiveMessage(std::unique_ptr<ResponseProto>&& message) override {
     // Reset here so that it starts with fresh backoff interval on next disconnect.
     backoff_strategy_->reset();
     // Some times during hot restarts this stat's value becomes inconsistent and will continue to
@@ -151,8 +151,8 @@ private:
   const uint32_t RETRY_INITIAL_DELAY_MS = 500;
   const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
 
-  Grpc::TypedAsyncClient<RequestProto, ResponseProto> async_client_;
-  Grpc::TypedAsyncStream<RequestProto> stream_{};
+  Grpc::AsyncClient<RequestProto, ResponseProto> async_client_;
+  Grpc::AsyncStream<RequestProto> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   ControlPlaneStats control_plane_stats_;
 

@@ -96,7 +96,7 @@ public:
   void sendRequest(bool end_stream = false) {
     helloworld::HelloRequest request_msg;
     request_msg.set_name(HELLO_REQUEST);
-    grpc_stream_->sendMessageTyped(request_msg, end_stream);
+    grpc_stream_->sendMessage(request_msg, end_stream);
 
     helloworld::HelloRequest received_msg;
     AssertionResult result =
@@ -141,7 +141,7 @@ public:
   void sendReply() {
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
-    EXPECT_CALL(*this, onReceiveMessageTyped_(HelloworldReplyEq(HELLO_REPLY))).WillExitIfNeeded();
+    EXPECT_CALL(*this, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY))).WillExitIfNeeded();
     dispatcher_helper_.setStreamEventPending();
     fake_stream_->sendGrpcMessage<helloworld::HelloReply>(reply);
   }
@@ -189,7 +189,7 @@ public:
 
   DispatcherHelper& dispatcher_helper_;
   FakeStream* fake_stream_{};
-  TypedAsyncStream<helloworld::HelloRequest> grpc_stream_{};
+  AsyncStream<helloworld::HelloRequest> grpc_stream_{};
   const TestMetadata empty_metadata_;
 };
 
@@ -203,7 +203,7 @@ public:
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
     EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().GrpcStatusCode, "0"));
-    EXPECT_CALL(*this, onSuccessTyped_(HelloworldReplyEq(HELLO_REPLY), _)).WillExitIfNeeded();
+    EXPECT_CALL(*this, onSuccess_(HelloworldReplyEq(HELLO_REPLY), _)).WillExitIfNeeded();
     EXPECT_CALL(*child_span_, finishSpan());
     dispatcher_helper_.setStreamEventPending();
     fake_stream_->sendGrpcMessage(reply);
@@ -266,7 +266,7 @@ public:
 
   // Create a Grpc::AsyncClientImpl instance backed by enough fake/mock
   // infrastructure to initiate a loopback TCP connection to fake_upstream_.
-  AsyncClientPtr createAsyncClientImpl() {
+  RawAsyncClientPtr createAsyncClientImpl() {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
         *dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr);
@@ -305,7 +305,7 @@ public:
     return config;
   }
 
-  AsyncClientPtr createGoogleAsyncClientImpl() {
+  RawAsyncClientPtr createGoogleAsyncClientImpl() {
 #ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
@@ -355,8 +355,8 @@ public:
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
     request->grpc_request_ =
-        grpc_client_->sendTyped(*method_descriptor_, request_msg, *request, active_span,
-                                absl::optional<std::chrono::milliseconds>());
+        grpc_client_->send(*method_descriptor_, request_msg, *request, active_span,
+                           absl::optional<std::chrono::milliseconds>());
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {
@@ -390,7 +390,7 @@ public:
           }
         }));
 
-    stream->grpc_stream_ = grpc_client_->startTyped(*method_descriptor_, *stream);
+    stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {
@@ -425,7 +425,7 @@ public:
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
 #endif
-  TypedAsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
   Event::TimerPtr timeout_timer_;
   const TestMetadata empty_metadata_;
 
