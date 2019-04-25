@@ -276,8 +276,6 @@ HystrixSink::HystrixSink(Server::Instance& server, const uint64_t num_buckets)
                    MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
 }
 
-HystrixSink::~HystrixSink() { cluster_upstream_rq_time_.free(server_.stats().symbolTable()); }
-
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Http::HeaderMap& response_headers,
                                                   Buffer::Instance&,

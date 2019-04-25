@@ -71,7 +71,7 @@ public:
 
 private:
   std::string tag_extracted_name_;
-  std::unique_ptr<StatNameTempStorage> tag_extracted_stat_name_;
+  std::unique_ptr<StatNameManagedStorage> tag_extracted_stat_name_;
 };
 
 class MockCounter : public Counter, public MockMetric {

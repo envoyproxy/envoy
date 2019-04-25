@@ -49,7 +49,6 @@ typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
   HystrixSink(Server::Instance& server, uint64_t num_buckets);
-  ~HystrixSink() override;
   Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
   void flush(Stats::Source& source) override;
@@ -160,7 +159,7 @@ private:
   std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
 
   // Saved StatName for "cluster.upstream_rq_time" for fast comparisons in loop.
-  Stats::StatNameStorage cluster_upstream_rq_time_;
+  Stats::StatNameManagedStorage cluster_upstream_rq_time_;
 };
 
 typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;

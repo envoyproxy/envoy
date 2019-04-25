@@ -56,7 +56,7 @@ public:
   StatName statName() const override { return stat_name_storage_.statName(); }
 
 private:
-  StatNameTempStorage stat_name_storage_;
+  StatNameManagedStorage stat_name_storage_;
 };
 
 } // namespace Stats

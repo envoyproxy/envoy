@@ -59,7 +59,7 @@ public:
   ~HistogramImpl() {
     // We must explicitly free the StatName here using the SymbolTable reference
     // we access via parent_. A pure RAII alternative would be to use
-    // StatNameTempStorage rather than StatNameStorage, which will cost a total
+    // StatNameManagedStorage rather than StatNameStorage, which will cost a total
     // of 16 bytes per stat, counting the extra SymbolTable& reference here,
     // plus the extra SymbolTable& reference in MetricImpl.
     name_.free(symbolTable());

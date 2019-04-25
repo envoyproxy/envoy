@@ -251,7 +251,7 @@ private:
  * will fire to guard against symbol-table leaks.
  *
  * Thus this class is inconvenient to directly use as temp storage for building
- * a StatName from a string. Instead it should be used via StatNameTempStorage.
+ * a StatName from a string. Instead it should be used via StatNameManagedStorage.
  */
 class StatNameStorage {
 public:
@@ -371,18 +371,18 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * than stored in a larger structure such as a map, where the redundant copies
  * of the SymbolTable& would be costly in aggregate.
  */
-class StatNameTempStorage : public StatNameStorage {
+class StatNameManagedStorage : public StatNameStorage {
 public:
   // Basic constructor for when you have a name as a string, and need to
   // generate symbols for it.
-  StatNameTempStorage(absl::string_view name, SymbolTable& table)
+  StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
 
   // Obtains new backing storage for an already existing StatName.
-  StatNameTempStorage(StatName src, SymbolTable& table)
+  StatNameManagedStorage(StatName src, SymbolTable& table)
       : StatNameStorage(src, table), symbol_table_(table) {}
 
-  ~StatNameTempStorage() { free(symbol_table_); }
+  ~StatNameManagedStorage() { free(symbol_table_); }
 
   SymbolTable& symbolTable() { return symbol_table_; }
   const SymbolTable& symbolTable() const { return symbol_table_; }
@@ -511,7 +511,7 @@ struct HeterogeneousStatNameEqual {
 // easier at the call-sites in thread_local_store.cc to implement this an
 // explicit free() method, analogous to StatNameStorage::free(), compared to
 // storing a SymbolTable reference in the class and doing the free in the
-// destructor, like StatNameTempStorage.
+// destructor, like StatNameManagedStorage.
 class StatNameStorageSet {
 public:
   using HashSet =
