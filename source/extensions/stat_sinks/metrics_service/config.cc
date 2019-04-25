@@ -4,9 +4,11 @@
 #include "envoy/config/metrics/v2/metrics_service.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "common/common/assert.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/network/resolver_impl.h"
 
+#include "extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 #include "extensions/stat_sinks/well_known_names.h"
 
@@ -17,6 +19,7 @@ namespace MetricsService {
 
 Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                           Server::Instance& server) {
+  RELEASE_ASSERT(validateProtoDescriptors(), "");
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::MetricsServiceConfig&>(
           config);

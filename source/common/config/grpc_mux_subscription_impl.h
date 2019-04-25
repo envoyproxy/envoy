@@ -27,7 +27,7 @@ public:
         init_fetch_timeout_(init_fetch_timeout) {}
 
   // Config::Subscription
-  void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
+  void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) override {
     callbacks_ = &callbacks;
 
     if (init_fetch_timeout_.count() > 0) {
@@ -45,8 +45,12 @@ public:
     stats_.update_attempt_.inc();
   }
 
-  void updateResources(const std::vector<std::string>& resources) override {
-    watch_ = grpc_mux_.subscribe(type_url_, resources, *this);
+  void updateResources(const std::set<std::string>& update_to_these_names) override {
+    // First destroy the watch, so that this subscribe doesn't send a request for both the
+    // previously watched resources and the new ones (we may have lost interest in some of the
+    // previously watched ones).
+    watch_.reset();
+    watch_ = grpc_mux_.subscribe(type_url_, update_to_these_names, *this);
     stats_.update_attempt_.inc();
   }
 

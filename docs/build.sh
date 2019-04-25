@@ -32,6 +32,7 @@ else
 fi
 
 SCRIPT_DIR=$(dirname "$0")
+API_DIR=$(dirname "$dir")/api
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 [[ -z "${GENERATED_RST_DIR}" ]] && GENERATED_RST_DIR=generated/rst
@@ -91,6 +92,7 @@ PROTO_RST="
   /envoy/config/filter/accesslog/v2/accesslog/envoy/config/filter/accesslog/v2/accesslog.proto.rst
   /envoy/config/filter/fault/v2/fault/envoy/config/filter/fault/v2/fault.proto.rst
   /envoy/config/filter/http/buffer/v2/buffer/envoy/config/filter/http/buffer/v2/buffer.proto.rst
+  /envoy/config/filter/http/csrf/v2/csrf/envoy/config/filter/http/csrf/v2/csrf.proto.rst
   /envoy/config/filter/http/ext_authz/v2/ext_authz/envoy/config/filter/http/ext_authz/v2/ext_authz.proto.rst
   /envoy/config/filter/http/fault/v2/fault/envoy/config/filter/http/fault/v2/fault.proto.rst
   /envoy/config/filter/http/gzip/v2/gzip/envoy/config/filter/http/gzip/v2/gzip.proto.rst
@@ -159,6 +161,12 @@ do
   cp -f bazel-bin/external/envoy_api/"${p}" "$(dirname "${DEST}")"
   [ -n "${CPROFILE_ENABLED}" ] && cp -f bazel-bin/"${p}".profile "$(dirname "${DEST}")"
 done
+
+mkdir -p ${GENERATED_RST_DIR}/api-docs
+
+cp -f $API_DIR/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+
+rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 
 rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${GENERATED_RST_DIR}"
 

@@ -144,6 +144,12 @@ public:
    * enabled again if there is data still in the input buffer it will be redispatched through
    * the filter chain.
    * @param disable supplies TRUE is reads should be disabled, FALSE if they should be enabled.
+   *
+   * Note that this function reference counts calls. For example
+   * readDisable(true);  // Disables data
+   * readDisable(true);  // Notes the connection is blocked by two sources
+   * readDisable(false);  // Notes the connection is blocked by one source
+   * readDisable(false);  // Marks the connection as unblocked, so resumes reading.
    */
   virtual void readDisable(bool disable) PURE;
 
@@ -165,6 +171,30 @@ public:
    * @return The address of the remote client. Note that this method will never return nullptr.
    */
   virtual const Network::Address::InstanceConstSharedPtr& remoteAddress() const PURE;
+
+  /**
+   * Credentials of the peer of a socket as decided by SO_PEERCRED.
+   */
+  struct UnixDomainSocketPeerCredentials {
+    /**
+     * The process id of the peer.
+     */
+    int32_t pid;
+    /**
+     * The user id of the peer.
+     */
+    uint32_t uid;
+    /**
+     * The group id of the peer.
+     */
+    uint32_t gid;
+  };
+
+  /**
+   * @return The unix socket peer credentials of the the remote client. Note that this is only
+   * supported for unix socket connections.
+   */
+  virtual absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const PURE;
 
   /**
    * @return the local address of the connection. For client connections, this is the origin

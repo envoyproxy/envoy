@@ -129,9 +129,13 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/benchmark/archive/505be96ab23056580a3a2315abba048f4428b04e.tar.gz"],
     ),
     com_github_libevent_libevent = dict(
-        sha256 = "53d4bb49b837944893b7caf9ae8eb43e94690ee5babea6469cc4a928722f99b1",
-        strip_prefix = "libevent-c4fbae3ae6166dddfa126734edd63213afa14dce",
-        urls = ["https://github.com/libevent/libevent/archive/c4fbae3ae6166dddfa126734edd63213afa14dce.tar.gz"],
+        sha256 = "ab3af422b7e4c6d9276b3637d87edb6cf628fd91c9206260b759778c3a28b330",
+        # This SHA includes the new "prepare" and "check" watchers, used for event loop performance
+        # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
+        # in the watchers (see https://github.com/libevent/libevent/pull/802).
+        # TODO(mergeconflict): Update to v2.2 when it is released.
+        strip_prefix = "libevent-1cd8830de27c30c5324c75bfb6012c969c09ca2c",
+        urls = ["https://github.com/libevent/libevent/archive/1cd8830de27c30c5324c75bfb6012c969c09ca2c.tar.gz"],
     ),
     com_github_madler_zlib = dict(
         sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
@@ -219,10 +223,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.17.1/rules_go-0.17.1.tar.gz"],
     ),
     rules_foreign_cc = dict(
-        sha256 = "e1b67e1fda647c7713baac11752573bfd4c2d45ef09afb4d4de9eb9bd4e5ac76",
-        strip_prefix = "rules_foreign_cc-8648b0446092ef2a34d45b02c8dc4c35c3a8df79",
+        sha256 = "136470a38dcd00c7890230402b43004dc947bf1e3dd0289dd1bd2bfb1e0a3484",
+        strip_prefix = "rules_foreign_cc-e3f4b5e0bc9dac9cf036616c13de25e6cd5051a2",
         # 2019-02-14
-        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/8648b0446092ef2a34d45b02c8dc4c35c3a8df79.tar.gz"],
+        urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/e3f4b5e0bc9dac9cf036616c13de25e6cd5051a2.tar.gz"],
     ),
     six_archive = dict(
         sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
@@ -236,8 +240,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/subpar/archive/1.3.0.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/ba6354aa1b39f3d9788ead909ad3e678ac863938.tar.gz
-        sha256 = "4598537810c3d343c32333c5367fcb652638018118f7f4e844e080405d9e73bb",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/ba6354aa1b39f3d9788ead909ad3e678ac863938.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/840edb6d672931ff936004fc35a82ecac6060844.tar.gz
+        sha256 = "1aba26cec596e9f3b52d93fe40e1640c854e3a4c8949e362647f67eb8e2382e3",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/840edb6d672931ff936004fc35a82ecac6060844.tar.gz"],
     ),
 )

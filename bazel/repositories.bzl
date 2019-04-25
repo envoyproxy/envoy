@@ -319,6 +319,10 @@ def _com_github_madler_zlib():
     http_archive(
         name = "com_github_madler_zlib",
         build_file_content = BUILD_ALL_CONTENT,
+        # The patch is only needed due to https://github.com/madler/zlib/pull/420
+        # TODO(htuch): remove this when zlib #420 merges.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
         **location
     )
     native.bind(

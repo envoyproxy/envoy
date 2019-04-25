@@ -67,7 +67,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 }
 
 GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
-                                       const std::vector<std::string>& resources,
+                                       const std::set<std::string>& resources,
                                        GrpcMuxCallbacks& callbacks) {
   auto watch =
       std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));

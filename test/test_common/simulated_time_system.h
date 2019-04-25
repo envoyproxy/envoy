@@ -6,6 +6,7 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
+#include "test/test_common/only_one_thread.h"
 #include "test/test_common/test_time_system.h"
 
 namespace Envoy {
@@ -102,6 +103,7 @@ private:
   uint64_t index_ GUARDED_BY(mutex_);
   mutable Thread::MutexBasicLockable mutex_;
   std::atomic<uint32_t> pending_alarms_;
+  Thread::OnlyOneThread only_one_thread_;
 };
 
 // Represents a simulated time system, where time is advanced by calling

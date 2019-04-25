@@ -86,7 +86,7 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
   if (b3_span_id_entry && b3_trace_id_entry) {
     // Extract trace id - which can either be 128 or 64 bit. For 128 bit,
     // it needs to be divided into two 64 bit numbers (high and low).
-    const std::string tid = b3_trace_id_entry->value().c_str();
+    const std::string tid(b3_trace_id_entry->value().getStringView());
     if (b3_trace_id_entry->value().size() == 32) {
       const std::string high_tid = tid.substr(0, 16);
       const std::string low_tid = tid.substr(16, 16);
@@ -99,14 +99,14 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
       throw ExtractorException(fmt::format("Invalid trace_id {}", tid.c_str()));
     }
 
-    const std::string spid = b3_span_id_entry->value().c_str();
+    const std::string spid(b3_span_id_entry->value().getStringView());
     if (!StringUtil::atoull(spid.c_str(), span_id, 16)) {
       throw ExtractorException(fmt::format("Invalid span id {}", spid.c_str()));
     }
 
     auto b3_parent_id_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID);
     if (b3_parent_id_entry && !b3_parent_id_entry->value().empty()) {
-      const std::string pspid = b3_parent_id_entry->value().c_str();
+      const std::string pspid(b3_parent_id_entry->value().getStringView());
       if (!StringUtil::atoull(pspid.c_str(), parent_id, 16)) {
         throw ExtractorException(fmt::format("Invalid parent span id {}", pspid.c_str()));
       }
@@ -123,7 +123,7 @@ std::pair<SpanContext, bool>
 SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
   auto b3_head_entry = request_headers_.get(ZipkinCoreConstants::get().B3);
   ASSERT(b3_head_entry);
-  const std::string b3 = b3_head_entry->value().c_str();
+  const std::string b3(b3_head_entry->value().getStringView());
   if (!b3.length()) {
     throw ExtractorException("Invalid input: empty");
   }

@@ -65,6 +65,8 @@ public:
   MOCK_METHOD1(detectEarlyCloseWhenReadDisabled, void(bool));
   MOCK_CONST_METHOD0(readEnabled, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(unixSocketPeerCredentials,
+                     absl::optional<Connection::UnixDomainSocketPeerCredentials>());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
@@ -109,6 +111,8 @@ public:
   MOCK_METHOD1(detectEarlyCloseWhenReadDisabled, void(bool));
   MOCK_CONST_METHOD0(readEnabled, bool());
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
+  MOCK_CONST_METHOD0(unixSocketPeerCredentials,
+                     absl::optional<Connection::UnixDomainSocketPeerCredentials>());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_CONST_METHOD0(ssl, const Ssl::ConnectionInfo*());
