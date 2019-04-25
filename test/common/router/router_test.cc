@@ -2868,8 +2868,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header says false, expect false.
@@ -2877,8 +2876,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header says false, expect false.
@@ -2886,8 +2884,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header says true, expect true.
@@ -2895,8 +2892,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header is invalid, expect true.
@@ -2904,8 +2900,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header is invalid, expect false.
@@ -2913,8 +2908,7 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
 }
