@@ -75,9 +75,7 @@ envoy_cc_test_library(
 envoy_cc_test_library(
     name = "quic_platform_port_utils_impl_lib",
     srcs = ["quic_port_utils_impl.cc"],
-    hdrs = [
-        "quic_port_utils_impl.h",
-    ],
+    hdrs = ["quic_port_utils_impl.h"],
     deps = [
         "//source/common/network:utility_lib",
         "//test/test_common:environment_lib",
@@ -86,9 +84,7 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "quic_platform_thread_impl_lib",
-    hdrs = [
-        "quic_thread_impl.h",
-    ],
+    hdrs = ["quic_thread_impl.h"],
     deps = [
         "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
