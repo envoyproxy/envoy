@@ -13,8 +13,7 @@ namespace Grpc {
 class UntypedAsyncStream {
 public:
   UntypedAsyncStream() {}
-  UntypedAsyncStream(AsyncStream* stream, bool is_grpc_header_required)
-      : stream_(stream), is_grpc_header_required_(is_grpc_header_required) {}
+  UntypedAsyncStream(AsyncStream* stream) : stream_(stream) {}
   void sendMessage(Buffer::InstancePtr&& request, bool end_stream) {
     stream_->sendMessage(std::move(request), end_stream);
   }
@@ -28,16 +27,13 @@ public:
 private:
   template <typename Request> friend class TypedAsyncStream;
   AsyncStream* stream_{};
-  bool is_grpc_header_required_{};
 };
 
 template <typename Request> class TypedAsyncStream : public UntypedAsyncStream {
 public:
   TypedAsyncStream() {}
-  TypedAsyncStream(AsyncStream* stream, bool is_grpc_header_required)
-      : UntypedAsyncStream(stream, is_grpc_header_required) {}
-  TypedAsyncStream(UntypedAsyncStream&& other)
-      : TypedAsyncStream(std::move(other.stream_), other.is_grpc_header_required_) {}
+  TypedAsyncStream(AsyncStream* stream) : UntypedAsyncStream(stream) {}
+  TypedAsyncStream(UntypedAsyncStream&& other) : TypedAsyncStream(std::move(other.stream_)) {}
   void sendMessageTyped(const Request& request, bool end_stream) {
     sendMessageUntyped(request, end_stream);
   }

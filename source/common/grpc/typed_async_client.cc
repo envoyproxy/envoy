@@ -9,9 +9,7 @@ namespace Envoy {
 namespace Grpc {
 
 void UntypedAsyncStream::sendMessageUntyped(const Protobuf::Message& request, bool end_stream) {
-  stream_->sendMessage(stream_->isGrpcHeaderRequired() ? Common::serializeToGrpcFrame(request)
-                                                       : Common::serializeMessage(request),
-                       end_stream);
+  stream_->sendMessage(Common::serializeMessage(request), end_stream);
 }
 
 void UntypedAsyncRequestCallbacks::onSuccess(Buffer::InstancePtr&& response, Tracing::Span& span) {
@@ -44,8 +42,7 @@ UntypedAsyncStream
 UntypedAsyncClient::startUntyped(const Protobuf::MethodDescriptor& service_method,
                                  UntypedAsyncStreamCallbacks& callbacks) {
   return UntypedAsyncStream(
-      client_->start(service_method.service()->full_name(), service_method.name(), callbacks),
-      client_->isGrpcHeaderRequired());
+      client_->start(service_method.service()->full_name(), service_method.name(), callbacks));
 }
 
 AsyncRequest*
@@ -54,9 +51,7 @@ UntypedAsyncClient::sendUntyped(const Protobuf::MethodDescriptor& service_method
                                 UntypedAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
                                 const absl::optional<std::chrono::milliseconds>& timeout) {
   return client_->send(service_method.service()->full_name(), service_method.name(),
-                       client_->isGrpcHeaderRequired() ? Common::serializeToGrpcFrame(request)
-                                                       : Common::serializeMessage(request),
-                       callbacks, parent_span, timeout);
+                       Common::serializeMessage(request), callbacks, parent_span, timeout);
 }
 
 } // namespace Grpc

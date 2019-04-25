@@ -26,7 +26,6 @@ public:
                      const absl::optional<std::chrono::milliseconds>& timeout) override;
   AsyncStream* start(absl::string_view service_full_name, absl::string_view method_name,
                      AsyncStreamCallbacks& callbacks) override;
-  bool isGrpcHeaderRequired() override { return true; }
 
 private:
   Upstream::ClusterManager& cm_;

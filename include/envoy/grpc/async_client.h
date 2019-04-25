@@ -179,11 +179,6 @@ public:
    */
   virtual AsyncStream* start(absl::string_view service_full_name, absl::string_view method_name,
                              AsyncStreamCallbacks& callbacks) PURE;
-
-  /**
-   * @return true if the underlying protocol requires messages to be serialized with a gRPC header.
-   */
-  virtual bool isGrpcHeaderRequired() PURE;
 };
 
 typedef std::unique_ptr<AsyncClient> AsyncClientPtr;
