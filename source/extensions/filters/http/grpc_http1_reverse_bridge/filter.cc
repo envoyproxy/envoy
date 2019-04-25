@@ -98,7 +98,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
   if (enabled_) {
-    if(headers.ContentType() == nullptr) {
+    if (headers.ContentType() == nullptr) {
       // If the content-type is empty return a useful error message in grpc-message.
       const auto grpc_message = fmt::format("envoy reverse bridge: upstream responded with "
                                             "no content-type, status code {}",
