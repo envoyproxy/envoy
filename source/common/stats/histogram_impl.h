@@ -46,7 +46,10 @@ private:
 };
 
 /**
- * Parent histogram implementation, used in IsolatedStoreImpl.
+ * Parent histogram implementation, used in IsolatedStoreImpl. This is a trivial "parent" in the
+ * sense that it doesn't aggregate across threads like ThreadLocalParentHistogramImpl does. It
+ * just forwards values passed in `recordValue` directly to the stats sink. It also tracks only the
+ * sample count and sum in memory, rather than a full histogram.
  */
 class ParentHistogramImpl : public ParentHistogram, public MetricImpl {
 public:
