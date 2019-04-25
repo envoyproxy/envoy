@@ -153,14 +153,19 @@ cc_library(
 )
 
 cc_library(
-    name = "quic_platform_for_test",
+    name = "quic_platform_port_utils",
     testonly = 1,
-    hdrs = [
-        "quiche/quic/platform/api/quic_port_utils.h",
-        "quiche/quic/platform/api/quic_thread.h",
-    ],
+    hdrs = ["quiche/quic/platform/api/quic_port_utils.h"],
     visibility = ["//visibility:public"],
-    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_impl_for_test_lib"],
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
+)
+
+cc_library(
+    name = "quic_platform_thread",
+    testonly = 1,
+    hdrs = ["quiche/quic/platform/api/quic_thread.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_thread_impl_lib"],
 )
 
 cc_library(
