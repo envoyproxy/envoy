@@ -201,6 +201,12 @@ TEST(NullableArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
       NullableArrayDeserializer<std::string, StringDeserializer>>(value);
 }
 
+TEST(NullableArrayDeserializer, ShouldConsumeNullArray) {
+  const NullableArray<std::string> value = absl::nullopt;
+  serializeThenDeserializeAndCheckEquality<
+      NullableArrayDeserializer<std::string, StringDeserializer>>(value);
+}
+
 TEST(NullableArrayDeserializer, ShouldThrowOnInvalidLength) {
   // given
   NullableArrayDeserializer<std::string, StringDeserializer> testee;
