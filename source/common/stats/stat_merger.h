@@ -26,7 +26,8 @@ public:
 
   // Merge the values of stats_proto into stats_store. Counters are always straightforward
   // addition, while gauges default to addition but have exceptions.
-  void mergeStats(const Protobuf::Map<std::string, uint64_t>& counters,
+  void mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_values,
+                  const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                   const Protobuf::Map<std::string, uint64_t>& gauges);
 
   // TODO(fredlas) add void verifyCombineLogicSpecified(absl::string_view gauge_name), to
@@ -38,9 +39,9 @@ public:
   static absl::optional<StatMerger::CombineLogic> getCombineLogic(const std::string& gauge_name);
 
 private:
-  void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counters);
+  void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_values,
+                     const Protobuf::Map<std::string, uint64_t>& counter_deltas);
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges);
-  ConstCharStarHashMap<uint64_t> parent_counter_values_;
   ConstCharStarHashMap<uint64_t> parent_gauge_values_;
   Stats::Store& target_store_;
 };

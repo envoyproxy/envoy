@@ -38,10 +38,19 @@ message HotRestartMessage {
       uint64 memory_allocated = 1;
       uint64 num_connections = 2;
 
-      // The parent's current values for various stats in its stats store.
       // Keys are fully qualified stat names.
-      map<string, uint64> counters = 3;
-      map<string, uint64> gauges = 4;
+      //
+      // The parent's total accumulated value of the counter. The hot restart parent should only
+      // ever send a given counter in this field once. It is expected that there will also be an
+      // entry in counter_deltas for the same counter name. The value in counter_values should be
+      // counter.value() - (the value stored in counter_deltas, i.e. counter.latch()).
+      map<string, uint64> counter_values = 3;
+      // The amount added to the counter since the last time a message included the counter in this
+      // field. (The first time a counter is included in this field, it's the amount added since the
+      // final latch() before hot restart began).
+      map<string, uint64> counter_deltas = 4;
+      // The parent's current values for various gauges in its stats store.
+      map<string, uint64> gauges = 5;
     }
     oneof reply {
       // When this oneof is of the PassListenSocketReply type, there is a special

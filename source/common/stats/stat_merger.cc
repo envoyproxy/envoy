@@ -53,17 +53,13 @@ StatMerger::getCombineLogic(const std::string& gauge_name) {
   return absl::nullopt;
 }
 
-void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counters) {
-  for (const auto& counter : counters) {
-    uint64_t new_parent_value = counter.second;
-    const auto& found_value = parent_counter_values_.find(counter.first.c_str());
-    if (found_value == parent_counter_values_.end()) {
-      target_store_.counter(counter.first).stealthyAdd(new_parent_value);
-    } else {
-      uint64_t old_parent_value = found_value->second;
-      target_store_.counter(counter.first).add(new_parent_value - old_parent_value);
-    }
-    parent_counter_values_[counter.first.c_str()] = new_parent_value;
+void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_values,
+                               const Protobuf::Map<std::string, uint64_t>& counter_deltas) {
+  for (const auto& counter : counter_values) {
+    target_store_.counter(counter.first).stealthyAdd(counter.second);
+  }
+  for (const auto& counter : counter_deltas) {
+    target_store_.counter(counter.first).add(counter.second);
   }
 }
 
@@ -102,9 +98,10 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
   }
 }
 
-void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counters,
+void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_values,
+                            const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                             const Protobuf::Map<std::string, uint64_t>& gauges) {
-  mergeCounters(counters);
+  mergeCounters(counter_values, counter_deltas);
   mergeGauges(gauges);
 }
 
