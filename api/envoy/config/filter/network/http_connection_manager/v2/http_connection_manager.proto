@@ -452,6 +452,7 @@ message ScopedRoutes {
       //
       // .. code::
       //
+      //              <0> <1>   <-- index
       //    X-Header: a=b;c=d
       //    |         || |
       //    |         || \----> <element_separator>
@@ -468,19 +469,22 @@ message ScopedRoutes {
         string name = 1 [(validate.rules).string.min_bytes = 1];
 
         // The element separator (e.g., ';' separates 'a;b;c;d').
+        // Default: empty string. This causes the entirety of the header field to be extracted.
+        // If this field is set to an empty string and 'index' is used in the oneof below, 'index'
+        // must be set to 0.
         string element_separator = 2;
 
         // Specifies a header field's key value pair to match on.
         message KvElement {
           // The separator between key and value (e.g., '=' separates 'k=v;...').
-          string separator = 1;
+          string separator = 1 [(validate.rules).string.min_bytes = 1];
 
           // The key to match on.
-          string key = 2;
+          string key = 2 [(validate.rules).string.min_bytes = 1];
         }
 
         oneof extract_type {
-          // Specifies the index of the element to extract.
+          // Specifies the zero based index of the element to extract.
           uint32 index = 3;
 
           // Specifies the key value pair to extract the value from.

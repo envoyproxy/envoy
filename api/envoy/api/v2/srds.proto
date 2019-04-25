@@ -48,8 +48,9 @@ service ScopedRoutesDiscoveryService {
   }
 }
 
-// Specifies a routing scope, which associates a :ref:`envoy_api_msg_RouteConfiguration` (identified
-// by its resource name) to a :ref:`Key<envoy_api_msg_ScopedRouteConfiguration.Key>`.
+// Specifies a routing scope, which associates a
+// :ref:`Key<envoy_api_msg_ScopedRouteConfiguration.Key>` to a
+// :ref:`envoy_api_msg_RouteConfiguration` (identified by its resource name).
 //
 // The HTTP connection manager builds up a table consisting of these Key to RouteConfiguration
 // mappings, and looks up the RouteConfiguration to use per request according to the algorithm
@@ -64,14 +65,16 @@ service ScopedRoutesDiscoveryService {
 // .. code::
 //
 //   ...
-//   scope_key_builder:
-//     fragments:
-//       - header_element:
-//         name: X-Route-Selector
-//         element_separator: ,
-//         element:
-//           separator: =
-//           key: vip
+//   scoped_routes:
+//     name: foo-scoped-routes
+//     scope_key_builder:
+//       fragments:
+//         - header_value_extractor:
+//             name: X-Route-Selector
+//             element_separator: ,
+//             element:
+//               separator: =
+//               key: vip
 //
 // ScopedRouteConfiguration resources (specified statically via
 // :ref:`scoped_route_configurations_list<envoy_api_field_config.filter.network.http_connection_manager.v2.ScopedRoutes.scoped_route_configurations_list>`
