@@ -63,12 +63,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     if (withhold_grpc_frames_) {
       // Adjust the content-length header to account for us removing the gRPC frame header.
       adjustContentLength(headers, [](auto size) {
-            if (Grpc::GRPC_FRAME_HEADER_SIZE > size) {
-                return 0UL;
-            } else {
-                return size - Grpc::GRPC_FRAME_HEADER_SIZE;
-            }
-        });
+        if (Grpc::GRPC_FRAME_HEADER_SIZE > size) {
+          return 0UL;
+        } else {
+          return size - Grpc::GRPC_FRAME_HEADER_SIZE;
+        }
+      });
     }
 
     // Clear the route cache to recompute the cache. This provides additional
@@ -97,7 +97,20 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
-  if (enabled_ && headers.ContentType() && headers.Status()) {
+  if (enabled_) {
+    if(headers.ContentType() == nullptr) {
+      // If the content-type is empty return a useful error message in grpc-message.
+      const auto grpc_message = fmt::format("envoy reverse bridge: upstream responded with "
+                                            "no content-type, status code {}",
+                                            headers.Status()->value().getStringView());
+
+      headers.insertGrpcMessage().value(grpc_message);
+      headers.insertGrpcStatus().value(Envoy::Grpc::Status::GrpcStatus::Unknown);
+      headers.insertStatus().value(enumToInt(Http::Code::OK));
+
+      return Http::FilterHeadersStatus::ContinueAndEndStream;
+    }
+
     auto content_type = headers.ContentType();
 
     // If the response from upstream does not have the correct content-type,
@@ -111,6 +124,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
       headers.insertGrpcMessage().value(grpc_message);
       headers.insertGrpcStatus().value(Envoy::Grpc::Status::GrpcStatus::Unknown);
       headers.insertStatus().value(enumToInt(Http::Code::OK));
+
       content_type->value(content_type_);
 
       return Http::FilterHeadersStatus::ContinueAndEndStream;
@@ -122,13 +136,13 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
     if (withhold_grpc_frames_) {
       // Adjust content-length to account for the frame header that's added.
       adjustContentLength(headers, [](auto length) {
-                            uint64_t adjusted_length = length + Grpc::GRPC_FRAME_HEADER_SIZE;
-                            if (length > adjusted_length) {
-                                return length;
-                            } else {
-                                return adjusted_length;
-                            }
-                        });
+        const uint64_t adjusted_length = length + Grpc::GRPC_FRAME_HEADER_SIZE;
+        if (length > adjusted_length) {
+          return length;
+        } else {
+          return adjusted_length;
+        }
+      });
     }
     // We can only insert trailers at the end of data, so keep track of this value
     // until then.

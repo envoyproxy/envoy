@@ -43,6 +43,30 @@ protected:
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
 };
 
+// Verifies that an incoming request with a missing Content Type is rejected
+TEST_F(ReverseBridgeTest, InvalidGrcpRequestMissingContentType) {
+  initialize();
+  decoder_callbacks_.is_grpc_request_ = true;
+
+  {
+    EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+    Http::TestHeaderMapImpl headers({{"content-type", "application/grpc"},
+                                     {"content-length", "25"},
+                                     {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+    // Verify that headers are unmodified.
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
+    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().ContentLength, "20"));
+  }
+
+  {
+    Http::TestHeaderMapImpl headers({{"content-length", "25"}, {":status", "200"},
+                                     {":path", "/testing.ExampleService/SendData"}});
+    EXPECT_EQ(Http::FilterHeadersStatus::ContinueAndEndStream, filter_->encodeHeaders(headers, true));
+  }
+}
+
 // Verifies that an incoming request with too small a request body will immediately fail.
 TEST_F(ReverseBridgeTest, InvalidGrcpRequest) {
   initialize();
