@@ -28,13 +28,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "kafka_request_lib",
     srcs = [
+        "external/kafka_request_resolver.cc",
         "kafka_request_parser.cc",
-        "kafka_request_resolver.cc",
     ],
     hdrs = [
+        "external/requests.h",
         "kafka_request.h",
         "kafka_request_parser.h",
-        "requests.h",
     ],
     deps = [
         ":parser_lib",
@@ -50,12 +50,12 @@ genrule(
         "@kafka_source//:request_protocol_files",
     ],
     outs = [
-        "requests.h",
-        "kafka_request_resolver.cc",
+        "external/requests.h",
+        "external/kafka_request_resolver.cc",
     ],
     cmd = """
       ./$(location :kafka_code_generator) generate-source \
-        $(location requests.h) $(location kafka_request_resolver.cc) \
+        $(location external/requests.h) $(location external/kafka_request_resolver.cc) \
         $(SRCS)
     """,
     tools = [
@@ -94,8 +94,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "serialization_lib",
     hdrs = [
+        "external/serialization_composite.h",
         "serialization.h",
-        "serialization_composite.h",
     ],
     deps = [
         ":kafka_protocol_lib",
@@ -108,11 +108,11 @@ genrule(
     name = "serialization_composite_generated_source",
     srcs = [],
     outs = [
-        "serialization_composite.h",
+        "external/serialization_composite.h",
     ],
     cmd = """
       ./$(location :serialization_composite_generator) generate-source \
-      $(location serialization_composite.h)
+      $(location external/serialization_composite.h)
     """,
     tools = [
         ":serialization_composite_generator",

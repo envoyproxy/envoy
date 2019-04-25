@@ -2,9 +2,9 @@
 
 #include "envoy/common/exception.h"
 
+#include "extensions/filters/network/kafka/external/serialization_composite.h"
 #include "extensions/filters/network/kafka/message.h"
 #include "extensions/filters/network/kafka/serialization.h"
-#include "extensions/filters/network/kafka/serialization_composite.h"
 
 namespace Envoy {
 namespace Extensions {

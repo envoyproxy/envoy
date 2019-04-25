@@ -36,7 +36,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "serialization_composite_test",
-    srcs = ["serialization_composite_test.cc"],
+    srcs = ["external/serialization_composite_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
         ":serialization_utilities_lib",
@@ -48,10 +48,10 @@ envoy_extension_cc_test(
 genrule(
     name = "serialization_composite_test_generator",
     srcs = [],
-    outs = ["serialization_composite_test.cc"],
+    outs = ["external/serialization_composite_test.cc"],
     cmd = """
         ./$(location //source/extensions/filters/network/kafka:serialization_composite_generator) \
-        generate-test $(location serialization_composite_test.cc)
+        generate-test $(location external/serialization_composite_test.cc)
     """,
     tools = [
         "//source/extensions/filters/network/kafka:serialization_composite_generator",
@@ -92,7 +92,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "request_codec_request_test",
-    srcs = ["request_codec_request_test.cc"],
+    srcs = ["external/request_codec_request_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
         ":serialization_utilities_lib",
@@ -103,7 +103,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "requests_test",
-    srcs = ["requests_test.cc"],
+    srcs = ["external/requests_test.cc"],
     extension_name = "envoy.filters.network.kafka",
     deps = [
         "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
@@ -117,12 +117,12 @@ genrule(
         "@kafka_source//:request_protocol_files",
     ],
     outs = [
-        "requests_test.cc",
-        "request_codec_request_test.cc",
+        "external/requests_test.cc",
+        "external/request_codec_request_test.cc",
     ],
     cmd = """
         ./$(location //source/extensions/filters/network/kafka:kafka_code_generator) generate-test \
-        $(location requests_test.cc) $(location request_codec_request_test.cc) \
+        $(location external/requests_test.cc) $(location external/request_codec_request_test.cc) \
         $(SRCS)
     """,
     tools = [
