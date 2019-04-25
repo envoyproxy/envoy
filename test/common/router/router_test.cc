@@ -1375,6 +1375,9 @@ TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   EXPECT_EQ(1, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                    .counter("upstream_rq_hedge_abandoned")
                    .value());
+  EXPECT_EQ(1, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_attempted")
+                   .value());
 }
 
 // Three requests sent: 1) 5xx error, 2) per try timeout, 3) gets good response
@@ -1426,6 +1429,9 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                    .counter("upstream_rq_hedge_abandoned")
                    .value());
+  EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_attempted")
+                   .value());
 
   // Now trigger a per try timeout on the 2nd request, expect a 3rd
   router_.retry_state_->expectHedgedPerTryTimeoutRetry();
@@ -1450,6 +1456,9 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                    .counter("upstream_rq_hedge_abandoned")
                    .value());
+  EXPECT_EQ(1, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_attempted")
+                   .value());
 
   // Now write a 200 back. We expect the 2nd stream to be reset and stats to be
   // incremented properly.
@@ -1470,6 +1479,9 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   EXPECT_EQ(1, cm_.conn_pool_.host_->stats_store_.counter("rq_hedge_abandoned").value());
   EXPECT_EQ(1, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                    .counter("upstream_rq_hedge_abandoned")
+                   .value());
+  EXPECT_EQ(1, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_attempted")
                    .value());
 }
 
@@ -1665,6 +1677,9 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
   EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                    .counter("upstream_rq_hedge_abandoned")
                    .value());
+  EXPECT_EQ(1, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_attempted")
+                   .value());
 
   // Now trigger global timeout, expect everything to be reset
   EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(1);
@@ -1681,6 +1696,9 @@ TEST_F(RouterTest, HedgedPerTryTimeoutGlobalTimeout) {
   EXPECT_EQ(2, cm_.conn_pool_.host_->stats_store_.counter("rq_timeout").value());
   EXPECT_EQ(0, cm_.thread_local_cluster_.cluster_.info_->stats_store_
                    .counter("upstream_rq_hedge_abandoned")
+                   .value());
+  EXPECT_EQ(1, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                   .counter("upstream_rq_hedge_attempted")
                    .value());
   EXPECT_EQ(2, cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
                    .value());

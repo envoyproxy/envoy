@@ -618,6 +618,8 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
       // later if 1) we hit global timeout or 2) we get bad response headers
       // back.
       upstream_request.retried_ = true;
+
+      cluster_->stats().upstream_rq_hedge_attempted_.inc();
     } else if (retry_status == RetryStatus::NoOverflow) {
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     } else if (retry_status == RetryStatus::NoRetryLimitExceeded) {

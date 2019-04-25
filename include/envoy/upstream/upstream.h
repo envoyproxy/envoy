@@ -490,6 +490,7 @@ public:
   COUNTER  (upstream_cx_pool_overflow)                                                             \
   COUNTER  (upstream_rq_total)                                                                     \
   COUNTER  (upstream_rq_hedge_abandoned)                                                           \
+  COUNTER  (upstream_rq_hedge_attempted)                                                           \
   GAUGE    (upstream_rq_active)                                                                    \
   COUNTER  (upstream_rq_completed)                                                                 \
   COUNTER  (upstream_rq_pending_total)                                                             \
