@@ -119,7 +119,7 @@ envoy_directory_genrule(
     ],
     cmd = " ".join([
         "$(location corpus_from_config_impl_sh)",
-        "$(location //test/common/router:config_impl_static)",
+        "$(location //test/common/router:config_impl_test_static)",
     ]),
     tools = [":corpus_from_config_impl_sh"],
 )
