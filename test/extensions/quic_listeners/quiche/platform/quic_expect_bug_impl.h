@@ -6,8 +6,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "extensions/quic_listeners/quiche/platform/quic_logging_impl.h"
-#include "extensions/quic_listeners/quiche/platform/quic_mock_log_impl.h"
+#include "quiche/quic/platform/api/quic_logging.h"
+#include "quiche/quic/platform/api/quic_mock_log.h"
 
 #define EXPECT_QUIC_BUG_IMPL(statement, regex)                                                     \
   EXPECT_QUIC_DFATAL_IMPL(statement, testing::ContainsRegex(regex))

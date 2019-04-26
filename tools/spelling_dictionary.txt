@@ -34,6 +34,8 @@ CREAT
 CRL
 CRLFs
 CRT
+CSRF
+CSRFPOLICY
 CSS
 CSV
 CTX
@@ -222,6 +224,7 @@ SIGFPE
 SIGILL
 SIGSEGV
 SIGTERM
+SimpleAtoi
 SNI
 SPDY
 SPIFFE
@@ -428,6 +431,7 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
+evwatch
 exe
 execlp
 facto
