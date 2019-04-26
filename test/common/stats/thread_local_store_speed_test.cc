@@ -26,9 +26,16 @@ public:
       : heap_alloc_(symbol_table_), store_(options_, heap_alloc_),
         api_(Api::createApiForTest(store_, time_system_)) {
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
+
+    Stats::TestUtil::forEachSampleStat(1000, [this](absl::string_view name) {
+      stat_names_.push_back(std::make_unique<Stats::StatNameStorage>(name, symbol_table_));
+    });
   }
 
   ~ThreadLocalStorePerf() {
+    for (auto& stat_name_storage : stat_names_) {
+      stat_name_storage->free(symbol_table_);
+    }
     store_.shutdownThreading();
     if (tls_) {
       tls_->shutdownGlobalThreading();
@@ -36,8 +43,9 @@ public:
   }
 
   void accessCounters() {
-    Stats::TestUtil::forEachSampleStat(
-        1000, [this](absl::string_view name) { store_.counter(std::string(name)); });
+    for (auto& stat_name_storage : stat_names_) {
+      store_.counterFromStatName(stat_name_storage->statName());
+    }
   }
 
   void initThreading() {
@@ -56,6 +64,7 @@ private:
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   envoy::config::metrics::v2::StatsConfig stats_config_;
+  std::vector<std::unique_ptr<Stats::StatNameStorage>> stat_names_;
 };
 
 } // namespace Envoy
