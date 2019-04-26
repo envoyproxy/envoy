@@ -9,9 +9,13 @@ set -x
 
 # This is the target that will be run to generate coverage data. It can be overridden by consumer
 # projects that want to run coverage on a different/combined target.
-#[[ -z "${COVERAGE_TARGET}" ]] && COVERAGE_TARGET="//test/..."
+# TODO(htuch): Today we use a single test binary for performance reasons. This
+# should ideally be //test/... in the future for parallelization, but the trace
+# merger cost is too high today.
 [[ -z "${COVERAGE_TARGET}" ]] && COVERAGE_TARGET="//test/coverage:coverage_tests"
 
+# TODO(htuch): Nuke these lines and the test/coverage tree once we no longer
+# need a single test binary.
 # Make sure ${COVERAGE_TARGET} is up-to-date.
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 (BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh)
