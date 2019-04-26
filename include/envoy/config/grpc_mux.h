@@ -74,12 +74,7 @@ public:
   virtual ~GrpcMux() {}
 
   /**
-   * Initiate stream with management server.
-   */
-  virtual void start() PURE;
-
-  /**
-   * Start a configuration subscription asynchronously for some API type and resources.
+   * Start a configuration subscription asynchronously for some API type and resources. If the gRPC stream to the management server is not already up, starts it.
    * @param type_url type URL corresponding to xDS API, e.g.
    * type.googleapis.com/envoy.api.v2.Cluster.
    * @param resources vector of resource names to watch for. If this is empty, then all

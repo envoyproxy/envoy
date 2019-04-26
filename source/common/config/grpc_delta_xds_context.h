@@ -5,7 +5,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/subscription.h"
-#include "envoy/config/xds_context.h"
+#include "envoy/config/xds_grpc_context.h"
 
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
@@ -31,9 +31,9 @@ namespace Config {
 // non-aggregated case is handled by running the aggregated logic, and just happening to only have 1
 // xDS subscription type to "aggregate", i.e., GrpcDeltaXdsContext only has one
 // DeltaSubscriptionState entry in its map. The sole implementation difference: when the bootstrap
-// specifies ADS, the method string passed to gRPC is {Delta,Stream}AggregatedResources, as opposed
-// to e.g. {Delta,Stream}Clusters. This distinction is necessary for the server to know what
-// resources should be provided.
+// specifies ADS, the method string set on the gRPC client that the XdsGrpcContext holds is
+// {Delta,Stream}AggregatedResources, as opposed to e.g. {Delta,Stream}Clusters. This distinction is
+// necessary for the server to know what resources should be provided.
 //
 // DeltaSubscriptionState is what handles the conceptual/application-level protocol state of a given
 // resource type subscription, which may or may not be multiplexed with others. So,
@@ -49,7 +49,9 @@ namespace Config {
 // for both non- and aggregated: if non-aggregated, you'll be the only holder of that shared_ptr. By
 // those two mechanisms, the single class (TODO rename) DeltaSubscriptionImpl handles all 4
 // delta/SotW and non-/aggregated combinations.
-class GrpcDeltaXdsContext : public XdsGrpcContext, Logger::Loggable<Logger::Id::config> {
+class GrpcDeltaXdsContext : public XdsGrpcContext,
+                            public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,
+                            Logger::Loggable<Logger::Id::config> {
 public:
   GrpcDeltaXdsContext(Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                       const Protobuf::MethodDescriptor& service_method,
@@ -58,19 +60,16 @@ public:
                       const LocalInfo::LocalInfo& local_info)
       : local_info_(local_info), dispatcher_(dispatcher),
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                     rate_limit_settings,
-                     // callback for handling receipt of DiscoveryResponse protos.
-                     [this](std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) {
-                       handleDiscoveryResponse(std::move(message));
-                     }) {}
+                     rate_limit_settings) {}
 
   void addSubscription(const std::vector<std::string>& resources, const std::string& type_url,
                        SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
                        std::chrono::milliseconds init_fetch_timeout) override {
-    subscriptions_.emplace(
-        std::make_pair(type_url, DeltaSubscriptionState(type_url, resources, callbacks, local_info_,
-                                                        init_fetch_timeout, dispatcher_, stats)));
-    grpc_stream_.establishNewStream(); // (idempotent)
+    std::set<std::string> HACK_resources_as_set(resources.begin(), resources.end());
+    subscriptions_.emplace(std::make_pair(
+        type_url, DeltaSubscriptionState(type_url, HACK_resources_as_set, callbacks, local_info_,
+                                         init_fetch_timeout, dispatcher_, stats)));
+    grpc_stream_.establishStream(); // (idempotent)
   }
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
@@ -82,10 +81,11 @@ public:
       ENVOY_LOG(warn, "Not updating non-existent subscription {}.", type_url);
       return;
     }
-    ResourceNameDiff diff;
-    diff.type_url_ = type_url;
-    sub->second.updateResourceNamesAndBuildDiff(resources, diff);
-    queueDiscoveryRequest(diff);
+    std::set<std::string> HACK_resources_as_set(resources.begin(), resources.end());
+    if (sub->second.updateResourceInterest(
+            HACK_resources_as_set)) { // any changes worth mentioning?
+      kickOffDiscoveryRequest(type_url);
+    }
   }
 
   void removeSubscription(const std::string& type_url) override { subscriptions_.erase(type_url); }
@@ -105,98 +105,47 @@ public:
       ENVOY_LOG(warn, "Not resuming non-existent subscription {}.", type_url);
       return;
     }
-    absl::optional<ResourceNameDiff> to_send_if_any;
-    sub->second.resume(to_send_if_any);
-    if (to_send_if_any.has_value()) {
-      // Note that if some code pauses a certain type, then causes another discovery request to be
-      // queued up for it, then the newly queued request can *replace* other requests (of the same
-      // type) that were in the queue - that is, the new one will be sent upon unpause, while the
-      // others are just dropped.
-      queueDiscoveryRequest(to_send_if_any.value());
-    }
+    sub->second.resume();
+    trySendDiscoveryRequests();
   }
 
-  void sendDiscoveryRequest(const ResourceNameDiff& diff) {
-    auto sub = subscriptions_.find(diff.type_url_);
-    if (sub == subscriptions_.end()) {
-      ENVOY_LOG(warn, "Not sending DeltaDiscoveryRequest for non-existent subscription {}.",
-                diff.type_url_);
-      return;
-    }
-    if (!grpc_stream_.grpcStreamAvailable()) {
-      ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", diff.type_url_);
-      return; // Drop this request; the reconnect will enqueue a new one.
-    }
-    if (sub->second.checkPausedDuringSendAttempt(diff)) {
-      return;
-    }
-    const envoy::api::v2::DeltaDiscoveryRequest& request =
-        sub->second.populateRequestWithDiff(diff);
-    ENVOY_LOG(trace, "Sending DeltaDiscoveryRequest for {}: {}", diff.type_url_,
-              request.DebugString());
-    // NOTE: at this point we are beyond the rate-limiting logic. sendMessage() unconditionally
-    // sends its argument over the gRPC stream. So, it is safe to unconditionally
-    // set_first_request_of_new_stream(false).
-    grpc_stream_.sendMessage(request);
-    sub->second.set_first_request_of_new_stream(false);
-    sub->second.buildCleanRequest();
-  }
-
-  void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) {
+  void
+  onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override {
     ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
               message->system_version_info());
     auto sub = subscriptions_.find(message->type_url());
     if (sub == subscriptions_.end()) {
       ENVOY_LOG(warn,
-                "Dropping received DeltaDiscoveryResponse at version {} for non-existent "
+                "Dropping received DeltaDiscoveryResponse (with version {}) for non-existent "
                 "subscription {}.",
                 message->system_version_info(), message->type_url());
       return;
     }
-    sub->second.handleResponse(message.get());
-    // Queue up an ACK.
-    queueDiscoveryRequest(
-        ResourceNameDiff(message->type_url())); // no change to subscribed resources
+    kickOffDiscoveryRequestWithAck(message->type_url(), sub->second.handleResponse(message.get()));
   }
 
-  void handleStreamEstablished() override {
-    // Ensure that there's nothing leftover from previous streams in the request proto queue.
-    clearRequestQueue();
+  void onStreamEstablished() override {
     for (auto& sub : subscriptions_) {
       sub.second.set_first_request_of_new_stream(true);
-      // Due to the first_request_of_new_stream logic, this "empty" diff will actually become a
-      // request populated with all the resource names passed to the DeltaSubscriptionState's
-      // constructor.
-      queueDiscoveryRequest(ResourceNameDiff(sub.first));
+      kickOffDiscoveryRequest(sub.first);
     }
   }
 
-  void handleEstablishmentFailure() override {
+  void onEstablishmentFailure() override {
     for (auto& sub : subscriptions_) {
       sub.second.handleEstablishmentFailure();
     }
   }
 
-  // Request queue management logic.
-  void queueDiscoveryRequest(const ResourceNameDiff& queue_item) {
-    request_queue_.push(queue_item);
-    drainRequests();
+  void onWriteable() override { trySendDiscoveryRequests(); }
+
+  void kickOffDiscoveryRequest(const std::string& type_url) {
+    kickOffDiscoveryRequestWithAck(type_url, absl::nullopt);
   }
-  void clearRequestQueue() {
-    grpc_stream_.maybeUpdateQueueSizeStat(0);
-    // TODO(fredlas) when we have C++17: request_queue_ = {};
-    while (!request_queue_.empty()) {
-      request_queue_.pop();
-    }
-  }
-  void drainRequests() override {
-    ENVOY_LOG(trace, "draining discovery requests {}", request_queue_.size());
-    while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
-      // Process the request, if rate limiting is not enabled at all or if it is under rate limit.
-      sendDiscoveryRequest(request_queue_.front());
-      request_queue_.pop();
-    }
-    grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
+
+  void kickOffDiscoveryRequestWithAck(const std::string& type_url, absl::optional<UpdateAck> ack) {
+    request_queue_.push(PendingRequest(type_url, ack));
+    trySendDiscoveryRequests();
   }
 
   // TODO TODO remove, GrpcMux impersonation
@@ -204,18 +153,73 @@ public:
                                     GrpcMuxCallbacks&) override {
     return nullptr;
   }
-  virtual void start() override {}
+
+  GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>&
+  grpcStreamForTest() {
+    return grpc_stream_;
+  }
 
 private:
+  void trySendDiscoveryRequests() {
+    while (!request_queue_.empty()) {
+      const PendingRequest& pending_request = request_queue_.front();
+      auto sub = subscriptions_.find(pending_request.type_url_);
+      if (sub == subscriptions_.end()) {
+        ENVOY_LOG(warn, "Not sending queued request for non-existent subscription {}.",
+                  pending_request.type_url_);
+        request_queue_.pop();
+        continue;
+      }
+      if (shouldSendDiscoveryRequest(sub->first, &sub->second)) {
+        // TODO TODO hmm maybe should pass the ack into getNextRequest, to accomodate the
+        // templatization goal.
+        envoy::api::v2::DeltaDiscoveryRequest request = sub->second.getNextRequest();
+        if (pending_request.ack_.has_value()) {
+          const UpdateAck& ack = pending_request.ack_.value();
+          request.set_response_nonce(ack.nonce_);
+          request.mutable_error_detail()->CopyFrom(ack.error_detail_);
+        }
+        grpc_stream_.sendMessage(request);
+        request_queue_.pop();
+      } else {
+        break;
+      }
+    }
+    grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
+  }
+
+  bool shouldSendDiscoveryRequest(absl::string_view type_url, DeltaSubscriptionState* sub) {
+    if (sub->paused()) {
+      ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url);
+      return false;
+    } else if (!grpc_stream_.grpcStreamAvailable()) {
+      ENVOY_LOG(trace, "No stream available to send a DiscoveryRequest for {}.", type_url);
+      return false;
+    } else if (!grpc_stream_.checkRateLimitAllowsDrain()) {
+      ENVOY_LOG(trace, "{} DiscoveryRequest hit rate limit; will try later.", type_url);
+      return false;
+    }
+    return true;
+  }
+
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
 
   GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
       grpc_stream_;
 
-  // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
-  // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
-  std::queue<ResourceNameDiff> request_queue_;
+  struct PendingRequest {
+    PendingRequest(absl::string_view type_url, absl::optional<UpdateAck> ack)
+        : type_url_(type_url), ack_(ack) {}
+    const std::string type_url_;
+    const absl::optional<UpdateAck> ack_;
+  };
+
+  // Discovery requests we're waiting to send, stored in the order that they should be sent in. All
+  // of our different API types are mixed together in this queue. Those that are ACKs have the ack_
+  // field filled.
+  std::queue<PendingRequest> request_queue_;
+
   // Map from type_url strings to a DeltaSubscriptionState for that type.
   std::unordered_map<std::string, DeltaSubscriptionState> subscriptions_;
 };

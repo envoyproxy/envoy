@@ -120,6 +120,9 @@ envoy_cc_library(
     deps = [
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//source/common/common:hash_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:discovery_cc",
     ],
@@ -132,7 +135,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
-        "//include/envoy/config:xds_context_interface",
+        "//include/envoy/config:xds_grpc_context_interface",
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",

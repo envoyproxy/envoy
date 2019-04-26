@@ -11,7 +11,7 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
-#include "envoy/config/xds_context.h"
+#include "envoy/config/xds_grpc_context.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/conn_pool.h"

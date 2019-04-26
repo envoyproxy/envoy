@@ -11,10 +11,9 @@ load(
 envoy_package()
 
 envoy_cc_test(
-    name = "delta_subscription_impl_test",
-    srcs = ["delta_subscription_impl_test.cc"],
+    name = "delta_subscription_state_test",
+    srcs = ["delta_subscription_state_test.cc"],
     deps = [
-        ":delta_subscription_test_harness",
         "//source/common/config:delta_subscription_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",

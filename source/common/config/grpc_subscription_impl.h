@@ -30,7 +30,6 @@ public:
              Config::SubscriptionCallbacks& callbacks) override {
     // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
     grpc_mux_subscription_.start(resources, callbacks);
-    grpc_mux_->start();
   }
 
   void updateResources(const std::vector<std::string>& resources) override {

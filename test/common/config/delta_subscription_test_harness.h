@@ -104,7 +104,7 @@ public:
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
       expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config");
     }
-    subscription_->onReceiveMessage(std::move(response));
+    subscription_->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -144,7 +144,7 @@ public:
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
   envoy::api::v2::core::Node node_;
-  NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
+  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
 };
 
 } // namespace

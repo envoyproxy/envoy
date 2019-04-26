@@ -22,6 +22,7 @@ namespace Config {
  */
 class GrpcMuxImpl : public GrpcMux,
                     public XdsGrpcContext,
+                    public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                     public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
@@ -30,18 +31,20 @@ public:
               const RateLimitSettings& rate_limit_settings);
   ~GrpcMuxImpl();
 
-  void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
 
   void sendDiscoveryRequest(const std::string& type_url);
 
+  // Config::GrpcStreamCallbacks
+  void onStreamEstablished() override;
+  void onEstablishmentFailure() override;
+  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
+  void onWriteable() override;
+
   // XdsGrpcContext
-  void handleStreamEstablished() override;
-  void handleEstablishmentFailure() override;
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
-  void drainRequests() override;
   void addSubscription(const std::vector<std::string>&, const std::string&, SubscriptionCallbacks&,
                        SubscriptionStats&, std::chrono::milliseconds) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -50,9 +53,15 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void removeSubscription(const std::string&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
+
+  GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>&
+  grpcStreamForTest() {
+    return grpc_stream_;
+  }
 
 private:
-  void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
+  void drainRequests();
   void setRetryTimer();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
@@ -109,9 +118,9 @@ private:
   std::queue<std::string> request_queue_;
 };
 
-class NullGrpcMuxImpl : public XdsGrpcContext {
+class NullGrpcMuxImpl : public XdsGrpcContext,
+                        GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
-  void start() override {}
   GrpcMuxWatchPtr subscribe(const std::string&, const std::vector<std::string>&,
                             GrpcMuxCallbacks&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
@@ -128,9 +137,10 @@ public:
   }
 
   void removeSubscription(const std::string&) override {}
-  void drainRequests() override {}
-  void handleStreamEstablished() override {}
-  void handleEstablishmentFailure() override {}
+  void onWriteable() override {}
+  void onStreamEstablished() override {}
+  void onEstablishmentFailure() override {}
+  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&&) override {}
 };
 
 } // namespace Config

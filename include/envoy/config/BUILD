@@ -56,8 +56,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "xds_context_interface",
-    hdrs = ["xds_context.h"],
+    name = "xds_grpc_context_interface",
+    hdrs = ["xds_grpc_context.h"],
     deps = [
         ":subscription_interface",
         "//include/envoy/local_info:local_info_interface",

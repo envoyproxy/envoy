@@ -3,7 +3,7 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
-#include "envoy/config/xds_context.h"
+#include "envoy/config/xds_grpc_context.h"
 
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
