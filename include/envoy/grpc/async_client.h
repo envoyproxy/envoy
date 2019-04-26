@@ -57,11 +57,6 @@ public:
    * stream object and no further callbacks will be invoked.
    */
   virtual void resetStream() PURE;
-
-  /**
-   * @return true if the underlying protocol requires messages to be serialized with a gRPC header.
-   */
-  virtual bool isGrpcHeaderRequired() PURE;
 };
 
 class RawAsyncRequestCallbacks {

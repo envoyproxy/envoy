@@ -59,7 +59,6 @@ public:
   void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
-  bool isGrpcHeaderRequired() override { return true; }
 
   bool hasResetStream() const { return http_reset_; }
 

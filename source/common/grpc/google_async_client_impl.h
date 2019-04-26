@@ -207,7 +207,6 @@ public:
   void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
-  bool isGrpcHeaderRequired() override { return false; }
 
 protected:
   bool call_failed() const { return call_failed_; }
