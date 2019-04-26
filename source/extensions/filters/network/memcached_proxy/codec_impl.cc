@@ -29,7 +29,8 @@ void GetLikeRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t, Buff
 }
 
 bool GetLikeRequestImpl::equals(const GetLikeRequest& rhs) const {
-  return vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
+  return dataType() == rhs.dataType() &&
+    vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
     opaque() == rhs.opaque() &&
     cas() == rhs.cas() &&
     key() == rhs.key();
@@ -43,7 +44,8 @@ void SetLikeRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t body_
 }
 
 bool SetLikeRequestImpl::equals(const SetLikeRequest& rhs) const {
-  return vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
+  return dataType() == rhs.dataType() &&
+    vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
     opaque() == rhs.opaque() &&
     cas() == rhs.cas() &&
     key() == rhs.key() &&
