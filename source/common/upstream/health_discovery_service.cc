@@ -94,7 +94,7 @@ HdsDelegate::sendResponse() {
           } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
             endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
           } else {
-            NOT_REACHED_GCOVR_EXCL_LINE;
+            NOT_REACHED_LCOV_EXCL_LINE;
           }
         }
       }
@@ -218,7 +218,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
   initialize([] {});
 }
 
-ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
 
 ClusterInfoConstSharedPtr
 ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
@@ -262,7 +262,7 @@ void HdsCluster::initialize(std::function<void()> callback) {
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  NOT_IMPLEMENTED_LCOV_EXCL_LINE;
 }
 
 } // namespace Upstream

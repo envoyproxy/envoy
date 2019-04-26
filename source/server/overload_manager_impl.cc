@@ -50,7 +50,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadA
       trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold());
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
 
     if (!triggers_.insert(std::make_pair(trigger_config.name(), std::move(trigger))).second) {

@@ -23,7 +23,7 @@ Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
 
 Network::ListenerPtr ValidationDispatcher::createListener(Network::Socket&,
                                                           Network::ListenerCallbacks&, bool, bool) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  NOT_IMPLEMENTED_LCOV_EXCL_LINE;
 }
 
 } // namespace Event

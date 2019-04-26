@@ -188,7 +188,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   const auto& set_current_client_cert_details = config.set_current_client_cert_details();
@@ -225,7 +225,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
 
     for (const std::string& header : tracing_config.request_headers_for_tags()) {
@@ -268,7 +268,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     codec_type_ = CodecType::HTTP2;
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   const auto& filters = config.http_filters();
@@ -344,7 +344,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                                            http2_settings_, maxRequestHeadersKb());
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {

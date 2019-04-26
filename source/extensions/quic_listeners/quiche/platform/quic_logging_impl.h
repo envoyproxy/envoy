@@ -79,7 +79,7 @@
 #define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_LOG_IF_IMPL(severity, condition)
 #define QUIC_DLOG_INFO_IS_ON_IMPL() QUIC_LOG_INFO_IS_ON_IMPL()
 #define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_LOG_EVERY_N_IMPL(severity, n)
-#define QUIC_NOTREACHED_IMPL() NOT_REACHED_GCOVR_EXCL_LINE
+#define QUIC_NOTREACHED_IMPL() NOT_REACHED_LCOV_EXCL_LINE
 #endif
 
 #define DCHECK_GE(a, b) DCHECK((a) >= (b))

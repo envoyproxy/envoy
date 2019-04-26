@@ -501,7 +501,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     break;
 
   case LoadBalancerType::OriginalDst:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   triggerCallbacks();

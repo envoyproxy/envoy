@@ -116,7 +116,7 @@ void AdminHandler::AdminPerTapSinkHandle::submitTrace(
       output_string = MessageUtil::getJsonStringFromMessage(*trace, true, true);
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
 
     ENVOY_LOG(debug, "admin writing buffered trace to response");

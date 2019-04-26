@@ -50,7 +50,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
     return EgressOperation;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
@@ -78,7 +78,7 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
     return {Reason::NotTraceableRequestId, false};
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_info) {

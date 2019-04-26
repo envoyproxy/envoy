@@ -700,7 +700,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::ResponseFlag::UpstreamRemoteReset;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers,

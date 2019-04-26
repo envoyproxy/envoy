@@ -592,7 +592,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     lb_type_ = LoadBalancerType::Maglev;
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   if (config.lb_subset_config().locality_weight_aware() &&
@@ -890,7 +890,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
     priority_name = "high";
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   const std::string runtime_prefix =
@@ -1284,7 +1284,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     dns_lookup_family_ = Network::DnsLookupFamily::Auto;
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   const envoy::api::v2::ClusterLoadAssignment load_assignment(

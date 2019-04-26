@@ -321,7 +321,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Inst
   case ProtocolState::MessageEnd:
     return messageEnd(buffer);
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

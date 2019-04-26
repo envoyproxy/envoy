@@ -234,10 +234,10 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
   case envoy::api::v2::auth::TlsParameters::TLSv1_3:
     return TLS1_3_VERSION;
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_VERSION;

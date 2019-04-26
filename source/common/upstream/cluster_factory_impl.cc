@@ -49,7 +49,7 @@ ClusterSharedPtr ClusterFactoryImplBase::create(
       cluster_type = Extensions::Clusters::ClusterTypes::get().Eds;
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   } else {
     cluster_type = cluster.cluster_type().name();

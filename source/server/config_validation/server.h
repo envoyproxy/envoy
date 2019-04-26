@@ -71,12 +71,12 @@ public:
   Network::DnsResolverSharedPtr dnsResolver() override {
     return dispatcher().createDnsResolver({});
   }
-  void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void drainListeners() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
+  DrainManager& drainManager() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   AccessLog::AccessLogManager& accessLogManager() override { return access_log_manager_; }
-  void failHealthcheck(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  HotRestart& hotRestart() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void failHealthcheck(bool) override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
+  void getParentStats(HotRestart::GetParentStatsInfo&) override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
+  HotRestart& hotRestart() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   Init::Manager& initManager() override { return init_manager_; }
   ServerLifecycleNotifier& lifecycleNotifier() override { return *this; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
@@ -85,13 +85,13 @@ public:
   Runtime::Loader& runtime() override { return *runtime_loader_; }
   void shutdown() override;
   bool isShutdown() override { return false; }
-  void shutdownAdmin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void shutdownAdmin() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   Singleton::Manager& singletonManager() override { return *singleton_manager_; }
   OverloadManager& overloadManager() override { return *overload_manager_; }
-  bool healthCheckFailed() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  bool healthCheckFailed() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   const Options& options() override { return options_; }
-  time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
+  time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
   Http::Context& httpContext() override { return http_context_; }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }

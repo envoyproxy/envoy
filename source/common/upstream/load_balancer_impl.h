@@ -278,7 +278,7 @@ private:
     case HostAvailability::Degraded:
       return HostsSource::SourceType::LocalityDegradedHosts;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   }
 
@@ -289,7 +289,7 @@ private:
     case HostAvailability::Degraded:
       return HostsSource::SourceType::DegradedHosts;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   }
 

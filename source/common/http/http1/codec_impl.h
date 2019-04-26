@@ -37,7 +37,7 @@ public:
   void encodeHeaders(const HeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(const HeaderMap& trailers) override;
-  void encodeMetadata(const MetadataMapVector&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void encodeMetadata(const MetadataMapVector&) override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   Stream& getStream() override { return *this; }
 
   // Http::Stream
@@ -359,7 +359,7 @@ private:
   void onEncodeComplete() override {}
   void onEncodeHeaders(const HeaderMap& headers) override;
   void onMessageBegin() override {}
-  void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
   void onMessageComplete() override;

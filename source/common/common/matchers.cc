@@ -24,7 +24,7 @@ ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::Valu
   case envoy::type::matcher::ValueMatcher::kListMatch:
     return std::make_shared<const ListMatcher>(v.list_match());
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -52,7 +52,7 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
   case envoy::type::matcher::DoubleMatcher::kExact:
     return matcher_.exact() == v;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   };
 }
 
@@ -75,7 +75,7 @@ bool StringMatcher::match(const absl::string_view value) const {
   case envoy::type::matcher::StringMatcher::kRegex:
     return std::regex_match(value.begin(), value.end(), regex_);
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -104,7 +104,7 @@ LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::StringMatcher& m
     lowercase.set_suffix(StringUtil::toLower(matcher.suffix()));
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
   return lowercase;
 }

@@ -150,7 +150,7 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
   // path specifier is required.
   case RouteMatch::PathSpecifierCase::PATH_SPECIFIER_NOT_SET:
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

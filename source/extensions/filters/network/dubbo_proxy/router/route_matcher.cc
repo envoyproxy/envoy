@@ -75,7 +75,7 @@ bool ParameterRouteEntryImpl::matchParameter(const std::string& request_data,
            value >= config_data.range_.start() && value < config_data.range_.end();
   }
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

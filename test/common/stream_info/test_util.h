@@ -26,7 +26,7 @@ public:
   SystemTime startTime() const override { return start_time_; }
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
-  void addBytesReceived(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void addBytesReceived(uint64_t) override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   uint64_t bytesReceived() const override { return 1; }
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
@@ -37,7 +37,7 @@ public:
   void setResponseCodeDetails(absl::string_view rc_details) override {
     response_code_details_.emplace(rc_details);
   }
-  void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   uint64_t bytesSent() const override { return 2; }
   bool intersectResponseFlags(uint64_t response_flags) const override {
     return (response_flags_ & response_flags) != 0;

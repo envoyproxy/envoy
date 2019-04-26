@@ -896,7 +896,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
     ssl_requirements_ = SslRequirements::ALL;
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   // Retry and Hedge policies must be set before routes, since they may use them.

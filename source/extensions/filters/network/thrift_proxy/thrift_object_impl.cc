@@ -9,7 +9,7 @@ namespace {
 std::unique_ptr<ThriftValueBase> makeValue(ThriftBase* parent, FieldType type) {
   switch (type) {
   case FieldType::Stop:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
 
   case FieldType::List:
     return std::make_unique<ThriftListValueImpl>(parent);
@@ -335,7 +335,7 @@ const void* ThriftValueImpl::getValue() const {
   case FieldType::String:
     return &string_value_;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

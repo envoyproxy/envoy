@@ -416,7 +416,7 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
-  void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onGoAway() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

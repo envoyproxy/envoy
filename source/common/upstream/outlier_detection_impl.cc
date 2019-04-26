@@ -237,10 +237,10 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectio
                                               config_.enforcingSuccessRate());
   default:
     // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 void DetectorImpl::updateEnforcedEjectionStats(
@@ -258,7 +258,7 @@ void DetectorImpl::updateEnforcedEjectionStats(
     break;
   default:
     // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -359,7 +359,7 @@ void DetectorImpl::onConsecutiveErrorWorker(
     break;
   default:
     // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

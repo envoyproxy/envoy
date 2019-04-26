@@ -172,7 +172,7 @@ void Router::onEvent(Network::ConnectionEvent event) {
     break;
   default:
     // Connected is consumed by the connection pool.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -336,7 +336,7 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
         false);
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   if (parent_.filter_complete_ && !response_complete_) {

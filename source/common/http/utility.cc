@@ -401,7 +401,7 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
     return Headers::get().ProtocolStrings.Http2String;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
@@ -473,7 +473,7 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "remote refused stream reset";
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {

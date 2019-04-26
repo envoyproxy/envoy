@@ -260,7 +260,7 @@ public:
       EXPECT_EQ(FilterStatus::Continue, router_->stringValue(v));
     } break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   }
 
@@ -805,7 +805,7 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
     EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   EXPECT_CALL(*protocol_, writeFieldEnd(_));

@@ -19,7 +19,7 @@ std::string PayloadOptions::modeName() const {
   case DriverMode::Exception:
     return "exception";
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -32,7 +32,7 @@ std::string PayloadOptions::transportName() const {
   case TransportType::Header:
     return "header";
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -45,7 +45,7 @@ std::string PayloadOptions::protocolName() const {
   case ProtocolType::Twitter:
     return "finagle";
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

@@ -58,7 +58,7 @@ public:
   using LoadBalancerBase::percentageLoad;
 
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 };
 

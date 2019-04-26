@@ -39,7 +39,7 @@ std::string toString(Network::Address::SocketType socket_type) {
   case Network::Address::SocketType::Datagram:
     return "SocketType::Datagram";
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

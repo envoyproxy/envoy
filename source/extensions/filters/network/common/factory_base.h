@@ -19,7 +19,7 @@ public:
   Network::FilterFactoryCb createFilterFactory(const Json::Object&,
                                                Server::Configuration::FactoryContext&) override {
     // Only used in v1 filters.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 
   Network::FilterFactoryCb

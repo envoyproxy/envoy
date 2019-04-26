@@ -63,7 +63,7 @@ public:
   }
   void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 
   // Envoy::Config::SubscriptionCallbacks

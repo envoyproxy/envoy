@@ -90,7 +90,7 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
   default:
     throw EnvoyException(fmt::format("Unexpected sockaddr family: {}", ss.ss_family));
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 InstanceConstSharedPtr addressFromFd(int fd) {

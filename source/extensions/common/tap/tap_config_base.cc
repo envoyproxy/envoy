@@ -67,7 +67,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
     sink_to_use_ = sink_.get();
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   buildMatcher(proto_config.match_config(), matchers_);
@@ -135,7 +135,7 @@ void Utility::bodyBytesToString(envoy::data::tap::v2alpha::TraceWrapper& trace,
     break;
   }
   case envoy::data::tap::v2alpha::TraceWrapper::TRACE_NOT_SET:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -164,7 +164,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
       path += MessageUtil::FileExtensions::get().Json;
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
 
     ENVOY_LOG_MISC(debug, "Opening tap file for [id={}] to {}", trace_id_, path);
@@ -192,7 +192,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     output_file_ << MessageUtil::getJsonStringFromMessage(*trace, true, true);
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

@@ -77,7 +77,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::onMessageEnd(Buffer::Ins
     break;
   }
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   ENVOY_LOG(debug, "dubbo decoder: ends the deserialization of the message");
@@ -99,7 +99,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Inst
   case ProtocolState::OnTransportEnd:
     return onTransportEnd();
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

@@ -82,7 +82,7 @@ ExpectationSet expectValue(MockProtocol& proto, MockDecoderEventHandler& handler
     }
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
   return s;
 }
@@ -141,7 +141,7 @@ ExpectationSet expectContainerStart(MockProtocol& proto, MockDecoderEventHandler
              }));
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
   return s;
 }
@@ -171,7 +171,7 @@ ExpectationSet expectContainerEnd(MockProtocol& proto, MockDecoderEventHandler& 
     s += EXPECT_CALL(handler, setEnd()).WillOnce(Return(FilterStatus::Continue));
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
   return s;
 }

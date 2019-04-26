@@ -1947,14 +1947,14 @@ public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb createFilterFactory(const Json::Object&,
                                                Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
     return parent_.createEmptyProtocolOptionsProto();
   }
@@ -1974,21 +1974,21 @@ public:
   // NamedNetworkFilterConfigFactory
   Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
                                             Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message&,
                                   Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {

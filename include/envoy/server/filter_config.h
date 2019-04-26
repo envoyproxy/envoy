@@ -259,7 +259,7 @@ public:
                                                                 FactoryContext& context) {
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 
   /**
@@ -311,7 +311,7 @@ public:
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(stat_prefix);
     UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 
   /**

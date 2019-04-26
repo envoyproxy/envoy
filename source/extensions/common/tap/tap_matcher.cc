@@ -49,7 +49,7 @@ void buildMatcher(const envoy::service::tap::v2alpha::MatchPredicate& match_conf
         match_config.http_response_trailers_match(), matchers);
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 
   // Per above, move the matcher into its position.

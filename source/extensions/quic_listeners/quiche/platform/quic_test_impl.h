@@ -24,5 +24,5 @@ using QuicTestImpl = ::testing::Test;
 template <class T> using QuicTestWithParamImpl = ::testing::TestWithParam<T>;
 
 inline std::string QuicGetTestMemoryCachePathImpl() {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(mpwarres): implement
+  NOT_IMPLEMENTED_LCOV_EXCL_LINE; // TODO(mpwarres): implement
 }

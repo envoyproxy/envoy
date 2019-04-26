@@ -73,7 +73,7 @@ transportTypeToProto(TransportType transport_type) {
   case TransportType::Header:
     return envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::HEADER;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -85,7 +85,7 @@ protocolTypeToProto(ProtocolType protocol_type) {
   case ProtocolType::Compact:
     return envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::COMPACT;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

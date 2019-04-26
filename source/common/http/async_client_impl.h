@@ -310,8 +310,8 @@ private:
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
-  void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void continueDecoding() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
+  HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
   void addDecodedData(Buffer::Instance&, bool) override {
     // This should only be called if the user has set up buffering. The request is already fully
     // buffered. Note that this is only called via the async client's internal use of the router
@@ -319,11 +319,11 @@ private:
     ASSERT(buffered_body_ != nullptr);
   }
   void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
@@ -399,7 +399,7 @@ private:
   }
   const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 
   MessagePtr request_;

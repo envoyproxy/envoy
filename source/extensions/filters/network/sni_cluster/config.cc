@@ -14,7 +14,7 @@ Network::FilterFactoryCb
 SniClusterNetworkFilterConfigFactory::createFilterFactory(const Json::Object&,
                                                           Server::Configuration::FactoryContext&) {
   // Only used in v1 filters.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  NOT_IMPLEMENTED_LCOV_EXCL_LINE;
 }
 
 Network::FilterFactoryCb SniClusterNetworkFilterConfigFactory::createFilterFactoryFromProto(

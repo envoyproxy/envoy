@@ -46,7 +46,7 @@ public:
     case TransportType::Auto:
       return AUTO;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   }
 };
@@ -97,7 +97,7 @@ public:
     case ProtocolType::Auto:
       return AUTO;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   }
 };

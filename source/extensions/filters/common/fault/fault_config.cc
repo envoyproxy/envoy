@@ -19,7 +19,7 @@ FaultDelayConfig::FaultDelayConfig(const envoy::config::filter::fault::v2::Fault
     provider_ = std::make_unique<HeaderDelayProvider>();
     break;
   case envoy::config::filter::fault::v2::FaultDelay::FAULT_DELAY_SECIFIER_NOT_SET:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -49,7 +49,7 @@ FaultRateLimitConfig::FaultRateLimitConfig(
     provider_ = std::make_unique<HeaderRateLimitProvider>();
     break;
   case envoy::config::filter::fault::v2::FaultRateLimit::LIMIT_TYPE_NOT_SET:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

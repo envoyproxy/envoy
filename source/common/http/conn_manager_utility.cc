@@ -330,7 +330,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     request_headers.insertForwardedClientCert().value(client_cert_details_str);
   } else {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

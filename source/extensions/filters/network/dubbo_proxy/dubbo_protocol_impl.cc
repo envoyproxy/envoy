@@ -144,10 +144,10 @@ bool DubboProtocolImpl::encode(Buffer::Instance& buffer, int32_t body_size,
     return true;
   }
   case MessageType::Request: {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

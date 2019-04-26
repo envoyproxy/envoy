@@ -5341,7 +5341,7 @@ public:
 
     Http::FilterFactoryCb createFilter(const std::string&,
                                        Server::Configuration::FactoryContext&) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      NOT_IMPLEMENTED_LCOV_EXCL_LINE;
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
@@ -5360,7 +5360,7 @@ public:
 
     Http::FilterFactoryCb createFilter(const std::string&,
                                        Server::Configuration::FactoryContext&) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      NOT_IMPLEMENTED_LCOV_EXCL_LINE;
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};

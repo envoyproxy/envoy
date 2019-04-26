@@ -74,7 +74,7 @@ public:
             return true;
           }));
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   }
 
@@ -128,7 +128,7 @@ public:
       EXPECT_EQ("six", value.getValueTyped<std::string>());
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   }
 

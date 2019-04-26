@@ -87,7 +87,7 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcSe
     return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, google_tls_slot_.get(), scope,
                                                           config, api_);
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
   return nullptr;
 }

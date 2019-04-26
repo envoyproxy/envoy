@@ -29,7 +29,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permis
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kRequestedServerName:
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -52,7 +52,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Princi
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kNotId:
     return std::make_shared<const NotMatcher>(principal.not_id());
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 

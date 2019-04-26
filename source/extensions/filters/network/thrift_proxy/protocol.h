@@ -51,7 +51,7 @@ public:
    * (e.g. transport-level) information).
    * @param type ProtocolType to explicitly set
    */
-  virtual void setType(ProtocolType) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual void setType(ProtocolType) { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
 
   /**
    * Reads the start of a Thrift protocol message from the buffer and updates the metadata
@@ -419,7 +419,7 @@ public:
    *
    * @return a DecoderEventHandlerSharedPtr that decodes a downstream client's upgrade request
    */
-  virtual DecoderEventHandlerSharedPtr upgradeRequestDecoder() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual DecoderEventHandlerSharedPtr upgradeRequestDecoder() { NOT_IMPLEMENTED_LCOV_EXCL_LINE; }
 
   /**
    * Writes a response to a downstream client's upgrade request.
@@ -428,7 +428,7 @@ public:
    */
   virtual DirectResponsePtr upgradeResponse(const DecoderEventHandler& decoder) {
     UNREFERENCED_PARAMETER(decoder);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 
   /**
@@ -447,7 +447,7 @@ public:
     UNREFERENCED_PARAMETER(transport);
     UNREFERENCED_PARAMETER(state);
     UNREFERENCED_PARAMETER(buffer);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 
   /**
@@ -458,7 +458,7 @@ public:
   virtual void completeUpgrade(ThriftConnectionState& state, ThriftObject& response) {
     UNREFERENCED_PARAMETER(state);
     UNREFERENCED_PARAMETER(response);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    NOT_IMPLEMENTED_LCOV_EXCL_LINE;
   }
 };
 

@@ -38,7 +38,7 @@ std::string RespValue::toString() const {
     return std::to_string(asInteger());
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  NOT_REACHED_LCOV_EXCL_LINE;
 }
 
 std::vector<RespValue>& RespValue::asArray() {

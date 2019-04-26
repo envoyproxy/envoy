@@ -87,7 +87,7 @@ private:
     case envoy::config::filter::http::ip_tagging::v2::IPTagging_RequestType_EXTERNAL:
       return FilterRequestType::EXTERNAL;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   }
 

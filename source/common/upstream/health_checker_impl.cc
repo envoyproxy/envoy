@@ -79,7 +79,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& health_che
   }
   default:
     // Checked by schema.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    NOT_REACHED_LCOV_EXCL_LINE;
   }
 }
 
@@ -675,7 +675,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
       break;
     default:
       // Should not happen really, Protobuf should not parse undefined enums values.
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
       break;
     }
   }

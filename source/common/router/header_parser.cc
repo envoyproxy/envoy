@@ -192,7 +192,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       break;
 
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      NOT_REACHED_LCOV_EXCL_LINE;
     }
   } while (++pos < format.size());
 
