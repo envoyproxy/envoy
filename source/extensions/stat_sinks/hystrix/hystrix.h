@@ -49,7 +49,6 @@ typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
   HystrixSink(Server::Instance& server, uint64_t num_buckets);
-  ~HystrixSink() override;
   Http::Code handlerHystrixEventStream(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
   void flush(Stats::Source& source) override;
