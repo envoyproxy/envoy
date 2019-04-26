@@ -67,7 +67,11 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
   for (auto const& provider : providers) {
     Ssl::PrivateKeyOperationsPtr op =
         provider->getPrivateKeyOperations(ssl_.get(), *this, callbacks_->connection().dispatcher());
-    if (op && op->associateWithSsl(ssl_.get())) {
+    if (op) {
+      // We keep track of the private key operations for memory management purposes (the operations
+      // object if destroyed when the SslSocket is destroyed). The operations objects are unique
+      // because they need to associated with the SSL objects so that user data can be passed to the
+      // BoringSSL private key methods.
       ops_.emplace_back(std::move(op));
     }
   }

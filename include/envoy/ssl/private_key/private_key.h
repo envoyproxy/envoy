@@ -25,15 +25,6 @@ typedef std::shared_ptr<SSL_PRIVATE_KEY_METHOD> BoringSslPrivateKeyMethodSharedP
 class PrivateKeyOperations {
 public:
   virtual ~PrivateKeyOperations() {}
-
-  /**
-   * Associate the private key operations instance with a SSL connection.
-   * @param ssl a SSL connection object. The BoringSSL private key API
-   * doesn't allow passing user data to the asynchronous functions as a
-   * function parameter, so this enables the private key method provider
-   * to use SSL connection custom data fields instead.
-   */
-  virtual bool associateWithSsl(SSL* ssl) PURE;
 };
 
 typedef std::unique_ptr<PrivateKeyOperations> PrivateKeyOperationsPtr;
@@ -44,6 +35,7 @@ public:
 
   /**
    * Get a private key operations instance from the provider.
+   * @param ssl a SSL connection object.
    * @param cb a callbacks object, whose "complete" method will be invoked
    * when the asynchronous processing is complete.
    * @param dispatcher supplies the owning thread's dispatcher.
