@@ -26,6 +26,7 @@
 #include "common/config/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/router/config_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 
@@ -105,7 +106,8 @@ public:
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers), http_context_(http_context),
-        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {}
+        retry_("retry", scope_.symbolTable()), shadow_writer_(std::move(shadow_writer)),
+        time_source_(time_source) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -119,6 +121,8 @@ public:
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
+
+  ~FilterConfig() { retry_.free(scope_.symbolTable()); }
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
@@ -134,6 +138,7 @@ public:
   const bool suppress_envoy_headers_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
+  Stats::StatNameStorage retry_;
 
 private:
   ShadowWriterPtr shadow_writer_;

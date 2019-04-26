@@ -3,6 +3,7 @@
 #include <chrono>
 
 #include "envoy/stats/scope.h"
+#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Http {
@@ -115,7 +116,7 @@ public:
   /**
    * Charge a simple response stat to an upstream.
    */
-  virtual void chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
+  virtual void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
                                        Code response_code) const PURE;
 
   /**

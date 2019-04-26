@@ -236,13 +236,12 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     code_stats.chargeResponseStat(info);
 
     if (!alt_stat_prefix_.empty()) {
-      Http::CodeStats::ResponseStatInfo info{config_.scope_,   cluster_->statsScope(),
-                                             alt_stat_prefix_, response_status_code,
-                                             internal_request, EMPTY_STRING,
-                                             EMPTY_STRING,     zone_name,
-                                             upstream_zone,    is_canary};
-
-      code_stats.chargeResponseStat(info);
+      Http::CodeStats::ResponseStatInfo alt_info{config_.scope_,   cluster_->statsScope(),
+                                                 alt_stat_prefix_, response_status_code,
+                                                 internal_request, EMPTY_STRING,
+                                                 EMPTY_STRING,     zone_name,
+                                                 upstream_zone,    is_canary};
+      code_stats.chargeResponseStat(alt_info);
     }
 
     if (dropped) {
@@ -755,7 +754,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
         retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
     if (retry_status == RetryStatus::Yes && setupRetry(end_stream)) {
       Http::CodeStats& code_stats = httpContext().codeStats();
-      code_stats.chargeBasicResponseStat(cluster_->statsScope(), "retry.",
+      code_stats.chargeBasicResponseStat(cluster_->statsScope(), config_.retry_.statName(),
                                          static_cast<Http::Code>(response_code));
       upstream_host->stats().rq_error_.inc();
       return;

@@ -48,6 +48,8 @@ namespace {
 
 template <class T> class HttpFilterTestBase : public T {
 public:
+  HttpFilterTestBase() : http_context_(stats_store_.symbolTable()) {}
+
   void initialize(std::string&& yaml) {
     envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
     if (!yaml.empty()) {
@@ -68,7 +70,7 @@ public:
   Filters::Common::ExtAuthz::RequestCallbacks* request_callbacks_;
   Http::TestHeaderMapImpl request_headers_;
   Buffer::OwnedImpl data_;
-  Stats::IsolatedStoreImpl stats_store_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
@@ -83,7 +85,10 @@ public:
   }
 };
 
-class HttpFilterTest : public HttpFilterTestBase<testing::Test> {};
+class HttpFilterTest : public HttpFilterTestBase<testing::Test> {
+public:
+  HttpFilterTest() = default;
+};
 
 using CreateFilterConfigFunc = envoy::config::filter::http::ext_authz::v2::ExtAuthz();
 
@@ -153,6 +158,23 @@ TEST_F(HttpFilterTest, MergeConfig) {
   EXPECT_EQ("value", merged_extensions.at("merged_key"));
   EXPECT_EQ("value", merged_extensions.at("key"));
 }
+
+class HttpExtAuthzFilterTestBase : public HttpFilterTest {
+public:
+  void initConfig(envoy::config::filter::http::ext_authz::v2::ExtAuthz& proto_config) {
+    config_ = std::make_unique<FilterConfig>(proto_config, local_info_, stats_store_, runtime_,
+                                             http_context_);
+  }
+};
+
+class HttpExtAuthzFilterTest : public HttpExtAuthzFilterTestBase {
+public:
+  void initialize(const std::string yaml) {
+    envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
+    MessageUtil::loadFromYaml(yaml, proto_config);
+    initConfig(proto_config);
+  }
+};
 
 // Test when failure_mode_allow is NOT set and the response from the authorization service is Error
 // that the request is not allowed to continue.
