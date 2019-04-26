@@ -16,6 +16,8 @@ public:
   const std::string Buffer = "envoy.buffer";
   // CORS filter
   const std::string Cors = "envoy.cors";
+  // CSRF filter
+  const std::string Csrf = "envoy.csrf";
   // Dynamo filter
   const std::string Dynamo = "envoy.http_dynamo_filter";
   // Fault filter

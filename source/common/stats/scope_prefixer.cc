@@ -22,7 +22,7 @@ ScopePtr ScopePrefixer::createScopeFromStatName(StatName name) {
 }
 
 ScopePtr ScopePrefixer::createScope(const std::string& name) {
-  StatNameTempStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
   return createScopeFromStatName(stat_name_storage.statName());
 }
 

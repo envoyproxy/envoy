@@ -161,7 +161,7 @@ protected:
 
   Network::Address::IpVersion version_;
   testing::NiceMock<MockOptions> options_;
-  DefaultTestHooks hooks_;
+  DefaultListenerHooks hooks_;
   testing::NiceMock<MockHotRestart> restart_;
   std::unique_ptr<ThreadLocal::InstanceImpl> thread_local_;
   Stats::TestIsolatedStoreImpl stats_store_;

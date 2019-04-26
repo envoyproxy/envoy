@@ -86,6 +86,12 @@ def envoy_copts(repository, test = False):
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
            envoy_select_path_normalization_by_default(["-DENVOY_NORMALIZE_PATH_BY_DEFAULT"], repository)
 
+def envoy_linkstatic():
+    return select({
+        "@envoy//bazel:asan_build": 0,
+        "//conditions:default": 1,
+    })
+
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
         # TODO(PiotrSikora): statically link libc++ once that's possible.
@@ -335,7 +341,7 @@ def envoy_cc_library(
         ],
         include_prefix = envoy_include_prefix(native.package_name()),
         alwayslink = 1,
-        linkstatic = 1,
+        linkstatic = envoy_linkstatic(),
         linkstamp = select({
             repository + "//bazel:windows_x86_64": None,
             "//conditions:default": linkstamp,
@@ -462,7 +468,7 @@ def envoy_cc_test(
         name = name,
         copts = envoy_copts(repository, test = True),
         linkopts = envoy_test_linkopts(),
-        linkstatic = 1,
+        linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = [
             ":" + name + "_lib",
@@ -502,7 +508,7 @@ def envoy_cc_test_infrastructure_library(
         tags = tags,
         include_prefix = include_prefix,
         alwayslink = 1,
-        linkstatic = 1,
+        linkstatic = envoy_linkstatic(),
         visibility = ["//visibility:public"],
     )
 

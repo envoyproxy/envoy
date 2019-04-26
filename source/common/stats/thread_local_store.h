@@ -229,15 +229,15 @@ private:
     SymbolTable& symbolTable() override { return parent_.symbolTable(); }
 
     Counter& counter(const std::string& name) override {
-      StatNameTempStorage storage(name, symbolTable());
+      StatNameManagedStorage storage(name, symbolTable());
       return counterFromStatName(storage.statName());
     }
     Gauge& gauge(const std::string& name) override {
-      StatNameTempStorage storage(name, symbolTable());
+      StatNameManagedStorage storage(name, symbolTable());
       return gaugeFromStatName(storage.statName());
     }
     Histogram& histogram(const std::string& name) override {
-      StatNameTempStorage storage(name, symbolTable());
+      StatNameManagedStorage storage(name, symbolTable());
       return histogramFromStatName(storage.statName());
     }
 
@@ -267,7 +267,7 @@ private:
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     void extractTagsAndTruncate(StatName& name,
-                                std::unique_ptr<StatNameTempStorage>& truncated_name_storage,
+                                std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
                                 std::vector<Tag>& tags, std::string& tag_extracted_name);
 
     static std::atomic<uint64_t> next_scope_id_;

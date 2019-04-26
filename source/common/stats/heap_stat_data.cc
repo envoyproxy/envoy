@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "common/common/lock_guard.h"
+#include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 
@@ -25,7 +26,8 @@ void HeapStatData::free(SymbolTable& symbol_table) {
 }
 
 HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
-  std::unique_ptr<HeapStatData, std::function<void(HeapStatData * d)>> data_ptr(
+  using HeapStatDataFreeFn = std::function<void(HeapStatData * d)>;
+  std::unique_ptr<HeapStatData, HeapStatDataFreeFn> data_ptr(
       HeapStatData::alloc(name, symbolTable()),
       [this](HeapStatData* d) { d->free(symbolTable()); });
   Thread::ReleasableLockGuard lock(mutex_);
@@ -34,7 +36,6 @@ HeapStatData& HeapStatDataAllocator::alloc(StatName name) {
   lock.release();
 
   if (ret.second) {
-    // symbolTable().incRefCount(existing_data->statName());
     return *data_ptr.release();
   }
   ++existing_data->ref_count_;
@@ -60,9 +61,8 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
 void HeapStatDataAllocator::debugPrint() {
   Thread::LockGuard lock(mutex_);
   for (HeapStatData* heap_stat_data : stats_) {
-    std::cout << symbolTable().toString(heap_stat_data->statName()) << std::endl;
+    ENVOY_LOG_MISC(info, "{}", symbolTable().toString(heap_stat_data->statName()));
   }
-  std::cout << std::flush;
 }
 #endif
 

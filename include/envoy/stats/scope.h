@@ -49,7 +49,7 @@ public:
   virtual Counter& counterFromStatName(StatName name) PURE;
 
   /**
-   * TODO(jmarantz): this variant is deprecated: use counterFromStatName.
+   * TODO(#6667): this variant is deprecated: use counterFromStatName.
    * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
    */
@@ -62,7 +62,7 @@ public:
   virtual Gauge& gaugeFromStatName(StatName name) PURE;
 
   /**
-   * TODO(jmarantz): this variant is deprecated: use gaugeFromStatName.
+   * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
    * @param name The name, expressed as a string.
    * @return a gauge within the scope's namespace.
    */
@@ -80,7 +80,7 @@ public:
   virtual Histogram& histogramFromStatName(StatName name) PURE;
 
   /**
-   * TODO(jmarantz): this variant is deprecated: use histogramFromStatName.
+   * TODO(#6667): this variant is deprecated: use histogramFromStatName.
    * @param name The name, expressed as a string.
    * @return a histogram within the scope's namespace with a particular value type.
    */

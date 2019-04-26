@@ -160,7 +160,7 @@ private:
   std::unordered_map<std::string, ClusterStatsCachePtr> cluster_stats_cache_map_;
 
   // Saved StatName for "cluster.upstream_rq_time" for fast comparisons in loop.
-  Stats::StatNameStorage cluster_upstream_rq_time_;
+  Stats::StatNameManagedStorage cluster_upstream_rq_time_;
 };
 
 typedef std::unique_ptr<HystrixSink> HystrixSinkPtr;

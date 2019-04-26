@@ -57,7 +57,17 @@ public:
       : MetricImpl(tag_extracted_name, tags, parent.symbolTable()),
         name_(name, parent.symbolTable()), parent_(parent) {}
   ~HistogramImpl() {
+    // We must explicitly free the StatName here using the SymbolTable reference
+    // we access via parent_. A pure RAII alternative would be to use
+    // StatNameManagedStorage rather than StatNameStorage, which will cost a total
+    // of 16 bytes per stat, counting the extra SymbolTable& reference here,
+    // plus the extra SymbolTable& reference in MetricImpl.
     name_.free(symbolTable());
+
+    // We must explicitly free the StatName here in order to supply the
+    // SymbolTable reference. An RAII alternative would be to store a
+    // reference to the SymbolTable in MetricImpl, which would cost 8 bytes
+    // per stat.
     MetricImpl::clear();
   }
 
@@ -83,7 +93,13 @@ private:
 class NullHistogramImpl : public Histogram, NullMetricImpl {
 public:
   explicit NullHistogramImpl(SymbolTable& symbol_table) : NullMetricImpl(symbol_table) {}
-  ~NullHistogramImpl() { MetricImpl::clear(); }
+  ~NullHistogramImpl() {
+    // MetricImpl must be explicitly cleared() before destruction, otherwise it
+    // will not be able to access the SymbolTable& to free the symbols. An RAII
+    // alternative would be to store the SymbolTable reference in the
+    // MetricImpl, costing 8 bytes per stat.
+    MetricImpl::clear();
+  }
 
   void recordValue(uint64_t) override {}
 };

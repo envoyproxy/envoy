@@ -29,7 +29,7 @@ MockMetric::MetricName::~MetricName() {
 void MockMetric::setTagExtractedName(absl::string_view name) {
   tag_extracted_name_ = std::string(name);
   tag_extracted_stat_name_ =
-      std::make_unique<StatNameTempStorage>(tagExtractedName(), *symbol_table_);
+      std::make_unique<StatNameManagedStorage>(tagExtractedName(), *symbol_table_);
 }
 
 void MockMetric::MetricName::MetricName::operator=(absl::string_view name) {

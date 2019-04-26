@@ -98,33 +98,6 @@ TEST(StringUtil, atoull) {
   EXPECT_EQ(18446744073709551615U, out);
 }
 
-TEST(StringUtil, atoll) {
-  int64_t out;
-  EXPECT_FALSE(StringUtil::atoll("-123b", out));
-  EXPECT_FALSE(StringUtil::atoll("", out));
-  EXPECT_FALSE(StringUtil::atoll("b123", out));
-
-  EXPECT_TRUE(StringUtil::atoll("123", out));
-  EXPECT_EQ(123, out);
-  EXPECT_TRUE(StringUtil::atoll("-123", out));
-  EXPECT_EQ(-123, out);
-  EXPECT_TRUE(StringUtil::atoll("+123", out));
-  EXPECT_EQ(123, out);
-
-  EXPECT_TRUE(StringUtil::atoll("  456", out));
-  EXPECT_EQ(456, out);
-
-  EXPECT_TRUE(StringUtil::atoll("00789", out));
-  EXPECT_EQ(789, out);
-
-  // INT64_MAX + 1
-  EXPECT_FALSE(StringUtil::atoll("9223372036854775808", out));
-
-  // INT64_MIN
-  EXPECT_TRUE(StringUtil::atoll("-9223372036854775808", out));
-  EXPECT_EQ(INT64_MIN, out);
-}
-
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   DangerousDeprecatedTestTime test_time;

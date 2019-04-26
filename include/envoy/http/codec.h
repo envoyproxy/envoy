@@ -181,6 +181,12 @@ public:
    * Cessation of data may not be immediate. For example, for HTTP/2 this may stop further flow
    * control window updates which will result in the peer eventually stopping sending data.
    * @param disable informs if reads should be disabled (true) or re-enabled (false).
+   *
+   * Note that this function reference counts calls. For example
+   * readDisable(true);  // Disables data
+   * readDisable(true);  // Notes the stream is blocked by two sources
+   * readDisable(false);  // Notes the stream is blocked by one source
+   * readDisable(false);  // Marks the stream as unblocked, so resumes reading.
    */
   virtual void readDisable(bool disable) PURE;
 
@@ -324,13 +330,19 @@ public:
   virtual ~DownstreamWatermarkCallbacks() {}
 
   /**
-   * Called when the downstream connection or stream goes over its high watermark.
+   * Called when the downstream connection or stream goes over its high watermark. Note that this
+   * may be called separately for both the stream going over and the connection going over. It
+   * is the responsibility of the DownstreamWatermarkCallbacks implementation to handle unwinding
+   * multiple high and low watermark calls.
    */
   virtual void onAboveWriteBufferHighWatermark() PURE;
 
   /**
    * Called when the downstream connection or stream goes from over its high watermark to under its
-   * low watermark.
+   * low watermark. As with onAboveWriteBufferHighWatermark above, this may be called independently
+   * when both the stream and the connection go under the low watermark limit, and the callee must
+   * ensure that the flow of data does not resume until all callers which were above their high
+   * watermarks have gone below.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
 };

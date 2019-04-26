@@ -82,7 +82,7 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
 }
 
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
-  Stats::StatNameTempStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
+  Stats::StatNameManagedStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
   Stats::StatName prefix = prefix_storage.statName();
   Code code = static_cast<Code>(info.response_status_code_);
 
@@ -112,9 +112,9 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
-    Stats::StatNameTempStorage vhost_storage(info.request_vhost_name_, symbol_table_);
+    Stats::StatNameManagedStorage vhost_storage(info.request_vhost_name_, symbol_table_);
     Stats::StatName vhost_name = vhost_storage.statName();
-    Stats::StatNameTempStorage vcluster_storage(info.request_vcluster_name_, symbol_table_);
+    Stats::StatNameManagedStorage vcluster_storage(info.request_vcluster_name_, symbol_table_);
     Stats::StatName vcluster_name = vcluster_storage.statName();
 
     incCounter(info.global_scope_,
@@ -125,9 +125,9 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    Stats::StatNameTempStorage from_zone_storage(info.from_zone_, symbol_table_);
+    Stats::StatNameManagedStorage from_zone_storage(info.from_zone_, symbol_table_);
     Stats::StatName from_zone = from_zone_storage.statName();
-    Stats::StatNameTempStorage to_zone_storage(info.to_zone_, symbol_table_);
+    Stats::StatNameManagedStorage to_zone_storage(info.to_zone_, symbol_table_);
     Stats::StatName to_zone = to_zone_storage.statName();
 
     incCounter(info.cluster_scope_, {prefix, zone_, from_zone, to_zone, upstream_rq_completed_});
@@ -137,7 +137,7 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 }
 
 void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
-  Stats::StatNameTempStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
+  Stats::StatNameManagedStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
   Stats::StatName prefix = prefix_storage.statName();
 
   uint64_t count = info.response_time_.count();
@@ -153,9 +153,9 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   }
 
   if (!info.request_vcluster_name_.empty()) {
-    Stats::StatNameTempStorage vhost_storage(info.request_vhost_name_, symbol_table_);
+    Stats::StatNameManagedStorage vhost_storage(info.request_vhost_name_, symbol_table_);
     Stats::StatName vhost_name = vhost_storage.statName();
-    Stats::StatNameTempStorage vcluster_storage(info.request_vcluster_name_, symbol_table_);
+    Stats::StatNameManagedStorage vcluster_storage(info.request_vcluster_name_, symbol_table_);
     Stats::StatName vcluster_name = vcluster_storage.statName();
     recordHistogram(info.global_scope_,
                     {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_time_}, count);
@@ -163,9 +163,9 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    Stats::StatNameTempStorage from_zone_storage(info.from_zone_, symbol_table_);
+    Stats::StatNameManagedStorage from_zone_storage(info.from_zone_, symbol_table_);
     Stats::StatName from_zone = from_zone_storage.statName();
-    Stats::StatNameTempStorage to_zone_storage(info.to_zone_, symbol_table_);
+    Stats::StatNameManagedStorage to_zone_storage(info.to_zone_, symbol_table_);
     Stats::StatName to_zone = to_zone_storage.statName();
 
     recordHistogram(info.cluster_scope_, {prefix, zone_, from_zone, to_zone, upstream_rq_time_},
