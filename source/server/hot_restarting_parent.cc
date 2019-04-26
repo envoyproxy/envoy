@@ -96,6 +96,8 @@ void HotRestartingParent::exportStatsToChild(HotRestartMessage::Reply::Stats* st
     (*stats->mutable_gauges())[gauge->name()] = gauge->value();
   }
   for (const auto& counter : server_->stats().counters()) {
+    // The hot restart parent is expected to have stopped its normal stat exporting (and so
+    // latching) by the time it begins exporting to the hot restart child.
     (*stats->mutable_counter_deltas())[counter->name()] = counter->latch();
   }
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
