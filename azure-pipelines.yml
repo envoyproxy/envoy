@@ -1,5 +1,4 @@
 # Azure Pipelines
-
 trigger:
 - master
 
