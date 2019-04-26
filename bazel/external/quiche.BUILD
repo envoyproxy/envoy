@@ -379,7 +379,7 @@ envoy_cc_test_library(
     name = "quic_platform_test_mem_slice_vector_lib",
     hdrs = ["quiche/quic/platform/api/quic_test_mem_slice_vector.h"],
     repository = "@envoy",
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_test_mem_slice_vector_impl_lib"],
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_test_mem_slice_vector_impl_lib"],
 )
 
 envoy_cc_library(

@@ -174,13 +174,6 @@ envoy_cc_library(
     ]),
 )
 
-envoy_cc_test_library(
-    name = "quic_platform_test_mem_slice_vector_impl_lib",
-    hdrs = envoy_select_quiche(["quic_test_mem_slice_vector_impl.h"]),
-    include_prefix = "extensions/quic_listeners/quiche/platform",
-    deps = envoy_select_quiche(["//test/extensions/quic_listeners/quiche/platform:quic_platform_test_mem_slice_vector_test_impl_lib"]),
-)
-
 envoy_cc_library(
     name = "quic_platform_mem_slice_storage_impl_lib",
     srcs = envoy_select_quiche(["quic_mem_slice_storage_impl.cc"]),
