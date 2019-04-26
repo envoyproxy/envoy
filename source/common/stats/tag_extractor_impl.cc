@@ -62,11 +62,11 @@ TagExtractorPtr TagExtractorImpl::createTagExtractor(const std::string& name,
   return TagExtractorPtr{new TagExtractorImpl(name, regex, substr)};
 }
 
-bool TagExtractorImpl::substrMismatch(const std::string& stat_name) const {
-  return !substr_.empty() && stat_name.find(substr_) == std::string::npos;
+bool TagExtractorImpl::substrMismatch(absl::string_view stat_name) const {
+  return !substr_.empty() && stat_name.find(substr_) == absl::string_view::npos;
 }
 
-bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>& tags,
+bool TagExtractorImpl::extractTag(absl::string_view stat_name, std::vector<Tag>& tags,
                                   IntervalSet<size_t>& remove_characters) const {
   PERF_OPERATION(perf);
 
@@ -75,9 +75,11 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
     return false;
   }
 
-  std::smatch match;
+  std::match_results<absl::string_view::iterator> match;
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  if (std::regex_search(stat_name, match, regex_) && match.size() > 1) {
+  if (std::regex_search<absl::string_view::iterator>(stat_name.begin(), stat_name.end(), match,
+                                                     regex_) &&
+      match.size() > 1) {
     // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
     const auto& remove_subexpr = match[1];
 

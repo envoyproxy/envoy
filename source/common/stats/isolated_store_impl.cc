@@ -24,19 +24,17 @@ IsolatedStoreImpl::IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table
 
 IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
     : StoreImpl(symbol_table), alloc_(symbol_table),
-      counters_([this](const std::string& name) -> CounterSharedPtr {
-        std::string tag_extracted_name = name;
-        std::vector<Tag> tags;
-        return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
+      counters_([this](StatName name) -> CounterSharedPtr {
+        return alloc_.makeCounter(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
       }),
-      gauges_([this](const std::string& name) -> GaugeSharedPtr {
-        std::string tag_extracted_name = name;
-        std::vector<Tag> tags;
-        return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
+      gauges_([this](StatName name) -> GaugeSharedPtr {
+        return alloc_.makeGauge(name, alloc_.symbolTable().toString(name), std::vector<Tag>());
       }),
-      histograms_([this](const std::string& name) -> HistogramSharedPtr {
-        return std::make_shared<HistogramImpl>(name, *this, std::string(name), std::vector<Tag>());
-      }) {}
+      histograms_([this](StatName name) -> HistogramSharedPtr {
+        return std::make_shared<HistogramImpl>(name, *this, alloc_.symbolTable().toString(name),
+                                               std::vector<Tag>());
+      }),
+      null_gauge_(symbol_table) {}
 
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);
