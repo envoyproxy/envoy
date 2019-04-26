@@ -37,23 +37,23 @@ public:
 
 TEST_F(MemcachedCodecImplTest, GetEquality) {
   {
-    GetRequestImpl g1(1, 1, 1);
-    GetRequestImpl g2(2, 2, 2);
+    GetRequestImpl g1(1, 1, 1, 1);
+    GetRequestImpl g2(2, 2, 2, 2);
     EXPECT_FALSE(g1 == g2);
   }
 
   {
-    GetRequestImpl g1(1, 1, 1);
+    GetRequestImpl g1(1, 1, 1, 1);
     g1.key("foo");
-    GetRequestImpl g2(1, 1, 1);
+    GetRequestImpl g2(1, 1, 1, 1);
     g2.key("bar");
     EXPECT_FALSE(g1 == g2);
   }
 
   {
-    GetRequestImpl g1(1, 1, 1);
+    GetRequestImpl g1(1, 1, 1, 1);
     g1.key("foo");
-    GetRequestImpl g2(1, 1, 1);
+    GetRequestImpl g2(1, 1, 1, 1);
     g2.key("foo");
     EXPECT_TRUE(g1 == g2);
   }
@@ -61,49 +61,49 @@ TEST_F(MemcachedCodecImplTest, GetEquality) {
 
 TEST_F(MemcachedCodecImplTest, SetEquality) {
   {
-    SetRequestImpl s1(1, 1, 1);
-    SetRequestImpl s2(2, 2, 2);
+    SetRequestImpl s1(1, 1, 1, 1);
+    SetRequestImpl s2(2, 2, 2, 2);
     EXPECT_FALSE(s1 == s2);
   }
 
   {
-    SetRequestImpl s1(1, 1, 1);
+    SetRequestImpl s1(1, 1, 1, 1);
     s1.key("foo");
-    SetRequestImpl s2(1, 1, 1);
+    SetRequestImpl s2(1, 1, 1, 1);
     s2.key("bar");
     EXPECT_FALSE(s1 == s2);
   }
 
   {
-    SetRequestImpl s1(1, 1, 1);
+    SetRequestImpl s1(1, 1, 1, 1);
     s1.body("foo");
-    SetRequestImpl s2(1, 1, 1);
+    SetRequestImpl s2(1, 1, 1, 1);
     s2.body("bar");
     EXPECT_FALSE(s1 == s2);
   }
 
   {
-    SetRequestImpl s1(1, 1, 1);
+    SetRequestImpl s1(1, 1, 1, 1);
     s1.expiration(1);
-    SetRequestImpl s2(1, 1, 1);
+    SetRequestImpl s2(1, 1, 1, 1);
     s2.expiration(2);
     EXPECT_FALSE(s1 == s2);
   }
 
   {
-    SetRequestImpl s1(1, 1, 1);
+    SetRequestImpl s1(1, 1, 1, 1);
     s1.flags(1);
-    SetRequestImpl s2(1, 1, 1);
+    SetRequestImpl s2(1, 1, 1, 1);
     s2.flags(2);
     EXPECT_FALSE(s1 == s2);
   }
 
   {
-    SetRequestImpl s1(1, 1, 1);
+    SetRequestImpl s1(1, 1, 1, 1);
     s1.body("foo");
     s1.expiration(1336);
     s1.flags(1337);
-    SetRequestImpl s2(1, 1, 1);
+    SetRequestImpl s2(1, 1, 1, 1);
     s2.body("foo");
     s2.expiration(1336);
     s2.flags(1337);
@@ -112,7 +112,7 @@ TEST_F(MemcachedCodecImplTest, SetEquality) {
 }
 
 TEST_F(MemcachedCodecImplTest, GetRoundTrip) {
-  GetRequestImpl get(3, 3, 3);
+  GetRequestImpl get(3, 3, 3, 3);
   get.key("foo");
 
   encoder_.encodeGet(get);
@@ -121,7 +121,7 @@ TEST_F(MemcachedCodecImplTest, GetRoundTrip) {
 }
 
 TEST_F(MemcachedCodecImplTest, SetRoundTrip) {
-  SetRequestImpl set(3, 3, 3);
+  SetRequestImpl set(3, 3, 3, 3);
   set.key("foo");
   set.body("bar");
 

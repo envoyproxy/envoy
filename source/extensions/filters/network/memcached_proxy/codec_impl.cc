@@ -55,11 +55,10 @@ bool SetRequestImpl::operator==(const SetRequest& rhs) const {
 }
 
 bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
-  auto raw_op_code = data.drainBEInt<uint8_t>();
-  auto op_code = static_cast<Message::OpCode>(raw_op_code);
+  auto op_code = static_cast<Message::OpCode>(data.drainBEInt<uint8_t>());
   auto key_length = data.drainBEInt<uint16_t>();
   auto extras_length = data.drainBEInt<uint8_t>();
-  data.drainBEInt<uint8_t>(); // skip data_type as it's always 0x00.
+  auto data_type = data.drainBEInt<uint8_t>();
   auto vbucket_id_or_status = data.drainBEInt<uint16_t>();
   auto body_length = data.drainBEInt<uint32_t>();
   auto opaque = data.drainBEInt<uint32_t>();
@@ -71,7 +70,7 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
   case Message::OpCode::OP_GETK:
   case Message::OpCode::OP_GETKQ: {
     // TODO: quiet, w/ key.
-    auto message = std::make_unique<GetRequestImpl>(vbucket_id_or_status, opaque, cas);
+    auto message = std::make_unique<GetRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
     message->fromBuffer(key_length, extras_length, body_length, data);
     callbacks_.decodeGet(std::move(message));
     break;
@@ -79,7 +78,7 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
 
   case Message::OpCode::OP_SET:
   case Message::OpCode::OP_SETQ: {
-    auto message = std::make_unique<SetRequestImpl>(vbucket_id_or_status, opaque, cas);
+    auto message = std::make_unique<SetRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
     message->fromBuffer(key_length, extras_length, body_length, data);
     callbacks_.decodeSet(std::move(message));
     break;
@@ -134,7 +133,7 @@ void EncoderImpl::encodeRequestHeader(
   output_.writeByte(op_code);
   output_.writeBEInt<uint16_t>(key_length);
   output_.writeByte(extras_length);
-  output_.writeByte(Message::RawDataType);
+  output_.writeByte(request.dataType());
   output_.writeBEInt<uint16_t>(request.vbucketIdOrStatus());
   output_.writeBEInt<uint32_t>(body_length);
   output_.writeBEInt<uint32_t>(request.opaque());

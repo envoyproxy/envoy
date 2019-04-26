@@ -28,25 +28,27 @@ public:
 
 class RequestImpl : public virtual Request {
 public:
-  RequestImpl(uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
-    vbucket_id_or_status_(vbucket_id_or_status), opaque_(opaque), cas_(cas) {}
+  RequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    data_type_(data_type), vbucket_id_or_status_(vbucket_id_or_status), opaque_(opaque), cas_(cas) {}
 
   virtual void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) PURE;
 
+  uint8_t dataType() const override { return data_type_; }
   uint8_t vbucketIdOrStatus() const override { return vbucket_id_or_status_; }
   uint32_t opaque() const override { return opaque_; }
   uint64_t cas() const override { return cas_; }
 private:
-  uint8_t vbucket_id_or_status_;
-  uint32_t opaque_;
-  uint64_t cas_;
+  const uint8_t data_type_;
+  const uint8_t vbucket_id_or_status_;
+  const uint32_t opaque_;
+  const uint64_t cas_;
 };
 
 class GetRequestImpl : public RequestImpl,
                        public GetRequest,
                        Logger::Loggable<Logger::Id::memcached> {
 public:
-  GetRequestImpl(uint8_t vbucket_id_or_status_, uint32_t opaque, uint64_t cas) : RequestImpl(vbucket_id_or_status_, opaque, cas) {}
+  GetRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) : RequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
 
   // RequestImpl
   void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
@@ -65,7 +67,7 @@ class SetRequestImpl : public RequestImpl,
                        public SetRequest,
                        Logger::Loggable<Logger::Id::memcached> {
 public:
-  SetRequestImpl(uint8_t vbucket_id_or_status_, uint32_t opaque, uint64_t cas) : RequestImpl(vbucket_id_or_status_, opaque, cas) {}
+  SetRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) : RequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
 
   // RequestImpl
   void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
