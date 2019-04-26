@@ -91,12 +91,13 @@ OpenTracingSpan::OpenTracingSpan(OpenTracingDriver& driver,
 
 void OpenTracingSpan::finishSpan() { span_->FinishWithOptions(finish_options_); }
 
-void OpenTracingSpan::setOperation(const std::string& operation) {
-  span_->SetOperationName(operation);
+void OpenTracingSpan::setOperation(absl::string_view operation) {
+  span_->SetOperationName({operation.data(), operation.length()});
 }
 
-void OpenTracingSpan::setTag(const std::string& name, const std::string& value) {
-  span_->SetTag(name, value);
+void OpenTracingSpan::setTag(absl::string_view name, absl::string_view value) {
+  span_->SetTag({name.data(), name.length()},
+                opentracing::v2::string_view{value.data(), value.length()});
 }
 
 void OpenTracingSpan::log(SystemTime timestamp, const std::string& event) {
