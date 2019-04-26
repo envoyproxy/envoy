@@ -38,7 +38,7 @@ public:
   /**
    * @return private key method provider.
    */
-  virtual Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr privateKeyMethod() const PURE;
+  virtual Envoy::Ssl::PrivateKeyMethodProviderSharedPtr privateKeyMethod() const PURE;
 
   /**
    * @return a string of password.

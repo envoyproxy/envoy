@@ -42,7 +42,7 @@ enum class InitialState { Client, Server };
 
 class SslSocket : public Network::TransportSocket,
                   public Envoy::Ssl::ConnectionInfo,
-                  public Envoy::Ssl::PrivateKeyOperationsCallbacks,
+                  public Envoy::Ssl::PrivateKeyConnectionCallbacks,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
@@ -74,8 +74,8 @@ public:
   void onConnected() override;
   const Ssl::ConnectionInfo* ssl() const override { return this; }
 
-  // Ssl::PrivateKeyOperationsCallbacks
-  void complete(Envoy::Ssl::PrivateKeyOperationStatus status) override;
+  // Ssl::PrivateKeyConnectionCallbacks
+  void complete(Envoy::Ssl::PrivateKeyMethodStatus status) override;
 
   SSL* rawSslForTest() const { return ssl_.get(); }
 
@@ -94,7 +94,7 @@ private:
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
-  std::vector<Envoy::Ssl::PrivateKeyOperationsPtr> ops_;
+  std::vector<Envoy::Ssl::PrivateKeyConnectionPtr> pk_connections_;
   bool async_handshake_in_progress_{};
 };
 

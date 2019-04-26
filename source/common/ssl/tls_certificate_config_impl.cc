@@ -46,8 +46,8 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
   if (config.has_private_key_method()) {
     private_key_method_ =
         factory_context.sslContextManager()
-            .privateKeyOperationsManager()
-            .createPrivateKeyOperationsProvider(config.private_key_method(), factory_context);
+            .privateKeyMethodManager()
+            .createPrivateKeyMethodProvider(config.private_key_method(), factory_context);
   }
   if (certificate_chain_.empty() || (private_key_.empty() && private_key_method_ == nullptr)) {
     throw EnvoyException(fmt::format("Failed to load incomplete certificate from {}, {}",

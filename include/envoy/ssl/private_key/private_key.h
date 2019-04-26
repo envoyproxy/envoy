@@ -22,16 +22,16 @@ namespace Ssl {
 
 typedef std::shared_ptr<SSL_PRIVATE_KEY_METHOD> BoringSslPrivateKeyMethodSharedPtr;
 
-class PrivateKeyOperations {
+class PrivateKeyConnection {
 public:
-  virtual ~PrivateKeyOperations() {}
+  virtual ~PrivateKeyConnection() {}
 };
 
-typedef std::unique_ptr<PrivateKeyOperations> PrivateKeyOperationsPtr;
+typedef std::unique_ptr<PrivateKeyConnection> PrivateKeyConnectionPtr;
 
-class PrivateKeyOperationsProvider {
+class PrivateKeyMethodProvider {
 public:
-  virtual ~PrivateKeyOperationsProvider() {}
+  virtual ~PrivateKeyMethodProvider() {}
 
   /**
    * Get a private key operations instance from the provider.
@@ -41,8 +41,8 @@ public:
    * @param dispatcher supplies the owning thread's dispatcher.
    * @return the private key operations instance.
    */
-  virtual PrivateKeyOperationsPtr getPrivateKeyOperations(SSL* ssl,
-                                                          PrivateKeyOperationsCallbacks& cb,
+  virtual PrivateKeyConnectionPtr getPrivateKeyConnection(SSL* ssl,
+                                                          PrivateKeyConnectionCallbacks& cb,
                                                           Event::Dispatcher& dispatcher) PURE;
 
   /**
@@ -53,30 +53,30 @@ public:
   virtual BoringSslPrivateKeyMethodSharedPtr getBoringSslPrivateKeyMethod() PURE;
 };
 
-typedef std::shared_ptr<PrivateKeyOperationsProvider> PrivateKeyOperationsProviderSharedPtr;
+typedef std::shared_ptr<PrivateKeyMethodProvider> PrivateKeyMethodProviderSharedPtr;
 
 /**
  * A manager for finding correct user-provided functions for handling BoringSSL private key
  * operations.
  */
-class PrivateKeyOperationsManager {
+class PrivateKeyMethodManager {
 public:
-  virtual ~PrivateKeyOperationsManager() {}
+  virtual ~PrivateKeyMethodManager() {}
 
   /**
    * Finds and returns a private key operations provider for BoringSSL.
    *
    * @param message a protobuf message object containing a
    * PrivateKeyMethod message.
-   * @param private_key_provider_context context that provides components for creating and
+   * @param private_key_method_provider_context context that provides components for creating and
    * initializing connections for keyless TLS etc.
-   * @return PrivateKeyOperationsProvider the private key operations provider, or nullptr if
+   * @return PrivateKeyMethodProvider the private key operations provider, or nullptr if
    * no provider can be used with the context configuration.
    */
-  virtual PrivateKeyOperationsProviderSharedPtr
-  createPrivateKeyOperationsProvider(const envoy::api::v2::auth::PrivateKeyMethod& message,
-                                     Envoy::Server::Configuration::TransportSocketFactoryContext&
-                                         private_key_provider_context) PURE;
+  virtual PrivateKeyMethodProviderSharedPtr
+  createPrivateKeyMethodProvider(const envoy::api::v2::auth::PrivateKeyMethod& message,
+                                 Envoy::Server::Configuration::TransportSocketFactoryContext&
+                                     private_key_method_provider_context) PURE;
 };
 
 } // namespace Ssl

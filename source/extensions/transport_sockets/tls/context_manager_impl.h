@@ -36,7 +36,7 @@ public:
                          const std::vector<std::string>& server_names) override;
   size_t daysUntilFirstCertExpires() const override;
   void iterateContexts(std::function<void(const Envoy::Ssl::Context&)> callback) override;
-  Ssl::PrivateKeyOperationsManager& privateKeyOperationsManager() override {
+  Ssl::PrivateKeyMethodManager& privateKeyMethodManager() override {
     return private_key_operations_manager_;
   };
 
@@ -44,7 +44,7 @@ private:
   void removeEmptyContexts();
   TimeSource& time_source_;
   std::list<std::weak_ptr<Envoy::Ssl::Context>> contexts_;
-  PrivateKeyOperationsManagerImpl private_key_operations_manager_{};
+  PrivateKeyMethodManagerImpl private_key_operations_manager_{};
 };
 
 } // namespace Tls

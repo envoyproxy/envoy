@@ -9,12 +9,13 @@ namespace Ssl {
 
 // Base class which the private key operation provider implementations can register.
 
-class PrivateKeyOperationsProviderInstanceFactory {
+class PrivateKeyMethodProviderInstanceFactory {
 public:
-  virtual ~PrivateKeyOperationsProviderInstanceFactory() {}
-  virtual PrivateKeyOperationsProviderSharedPtr createPrivateKeyOperationsProviderInstance(
-      const envoy::api::v2::auth::PrivateKeyMethod& message,
-      Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) PURE;
+  virtual ~PrivateKeyMethodProviderInstanceFactory() {}
+  virtual PrivateKeyMethodProviderSharedPtr
+  createPrivateKeyMethodProviderInstance(const envoy::api::v2::auth::PrivateKeyMethod& message,
+                                         Server::Configuration::TransportSocketFactoryContext&
+                                             private_key_method_provider_context) PURE;
   virtual std::string name() const PURE;
 };
 

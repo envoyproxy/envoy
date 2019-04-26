@@ -302,16 +302,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 #endif
     }
 
-    Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr private_key_ops_provider =
+    Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider =
         tls_certificate.privateKeyMethod();
     // We either have a private key or a BoringSSL private key method provider.
-    if (private_key_ops_provider) {
-      ctx.private_key_provider_ = private_key_ops_provider;
-      // Set the ops provider to this CTX user data, so that we can get it later in ssl_socket.cc.
-      // The provider has a reference to the private key methods for the context lifetime.
-
+    if (private_key_method_provider) {
+      ctx.private_key_method_provider_ = private_key_method_provider;
+      // The provider has a reference to the private key method for the context lifetime.
       Ssl::BoringSslPrivateKeyMethodSharedPtr private_key_method =
-          private_key_ops_provider->getBoringSslPrivateKeyMethod();
+          private_key_method_provider->getBoringSslPrivateKeyMethod();
       if (private_key_method == nullptr) {
         throw EnvoyException(
             fmt::format("Failed to get BoringSsl private key method from provider"));
@@ -495,13 +493,12 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   }
 }
 
-std::vector<Ssl::PrivateKeyOperationsProviderSharedPtr>
-ContextImpl::getPrivateKeyMethodProviders() {
-  std::vector<Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr> providers;
+std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {
+  std::vector<Envoy::Ssl::PrivateKeyMethodProviderSharedPtr> providers;
 
   for (uint i = 0; i < tls_contexts_.size(); i++) {
-    Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr provider =
-        tls_contexts_[i].getPrivateKeyOperationsProvider();
+    Envoy::Ssl::PrivateKeyMethodProviderSharedPtr provider =
+        tls_contexts_[i].getPrivateKeyMethodProvider();
     if (provider) {
       providers.push_back(provider);
     }

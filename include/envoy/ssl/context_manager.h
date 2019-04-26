@@ -44,7 +44,7 @@ public:
    * Access the private key operations manager, which is part of SSL
    * context manager.
    */
-  virtual PrivateKeyOperationsManager& privateKeyOperationsManager() PURE;
+  virtual PrivateKeyMethodManager& privateKeyMethodManager() PURE;
 };
 
 } // namespace Ssl

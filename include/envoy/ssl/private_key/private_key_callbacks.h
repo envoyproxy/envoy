@@ -8,14 +8,14 @@
 namespace Envoy {
 namespace Ssl {
 
-enum class PrivateKeyOperationStatus {
+enum class PrivateKeyMethodStatus {
   Success,
   Failure,
 };
 
-class PrivateKeyOperationsCallbacks {
+class PrivateKeyConnectionCallbacks {
 public:
-  virtual ~PrivateKeyOperationsCallbacks() {}
+  virtual ~PrivateKeyConnectionCallbacks() {}
 
   /**
    * Callback function which is called when the asynchronous private key
@@ -23,7 +23,7 @@ public:
    * @param status is "Success" or "Failure" depending on whether the private key operation was
    * successful or not.
    */
-  virtual void complete(PrivateKeyOperationStatus status) PURE;
+  virtual void complete(PrivateKeyMethodStatus status) PURE;
 };
 
 } // namespace Ssl

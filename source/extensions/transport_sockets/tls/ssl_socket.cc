@@ -62,17 +62,17 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
 
   // Associate this SSL connection with all the certificates (with their potentially different
   // private key methods).
-  std::vector<Ssl::PrivateKeyOperationsProviderSharedPtr> providers =
+  std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> providers =
       ctx_->getPrivateKeyMethodProviders();
   for (auto const& provider : providers) {
-    Ssl::PrivateKeyOperationsPtr op =
-        provider->getPrivateKeyOperations(ssl_.get(), *this, callbacks_->connection().dispatcher());
-    if (op) {
+    Ssl::PrivateKeyConnectionPtr pk_connection =
+        provider->getPrivateKeyConnection(ssl_.get(), *this, callbacks_->connection().dispatcher());
+    if (pk_connection) {
       // We keep track of the private key operations for memory management purposes (the operations
       // object if destroyed when the SslSocket is destroyed). The operations objects are unique
       // because they need to associated with the SSL objects so that user data can be passed to the
       // BoringSSL private key methods.
-      ops_.emplace_back(std::move(op));
+      pk_connections_.emplace_back(std::move(pk_connection));
     }
   }
 
@@ -140,11 +140,11 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   return {action, bytes_read, end_stream};
 }
 
-void SslSocket::complete(Envoy::Ssl::PrivateKeyOperationStatus status) {
+void SslSocket::complete(Envoy::Ssl::PrivateKeyMethodStatus status) {
   ASSERT(async_handshake_in_progress_);
   async_handshake_in_progress_ = false;
 
-  if (status == Envoy::Ssl::PrivateKeyOperationStatus::Success) {
+  if (status == Envoy::Ssl::PrivateKeyMethodStatus::Success) {
     ENVOY_CONN_LOG(debug, "async handshake complete", callbacks_->connection());
     if (!handshake_complete_) {
       // It's possible that the async call comes in later, but the handshare has been retried from

@@ -22,7 +22,7 @@ public:
   const std::string& certificateChainPath() const override { return certificate_chain_path_; }
   const std::string& privateKey() const override { return private_key_; }
   const std::string& privateKeyPath() const override { return private_key_path_; }
-  Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr privateKeyMethod() const override {
+  Envoy::Ssl::PrivateKeyMethodProviderSharedPtr privateKeyMethod() const override {
     return private_key_method_;
   }
   const std::string& password() const override { return password_; }
@@ -34,7 +34,7 @@ private:
   const std::string certificate_chain_path_;
   const std::string private_key_;
   const std::string private_key_path_;
-  Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr private_key_method_{};
+  Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_{};
   const std::string password_;
   const std::string password_path_;
 };

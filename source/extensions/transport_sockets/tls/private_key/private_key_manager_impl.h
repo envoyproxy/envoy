@@ -9,12 +9,13 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-class PrivateKeyOperationsManagerImpl : public virtual Ssl::PrivateKeyOperationsManager {
+class PrivateKeyMethodManagerImpl : public virtual Ssl::PrivateKeyMethodManager {
 public:
-  // Ssl::PrivateKeyOperationsManager
-  Ssl::PrivateKeyOperationsProviderSharedPtr createPrivateKeyOperationsProvider(
-      const envoy::api::v2::auth::PrivateKeyMethod& message,
-      Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) override;
+  // Ssl::PrivateKeyMethodManager
+  Ssl::PrivateKeyMethodProviderSharedPtr
+  createPrivateKeyMethodProvider(const envoy::api::v2::auth::PrivateKeyMethod& message,
+                                 Server::Configuration::TransportSocketFactoryContext&
+                                     private_key_method_provider_context) override;
 };
 
 } // namespace Tls

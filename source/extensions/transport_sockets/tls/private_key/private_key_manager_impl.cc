@@ -7,19 +7,19 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-Envoy::Ssl::PrivateKeyOperationsProviderSharedPtr
-PrivateKeyOperationsManagerImpl::createPrivateKeyOperationsProvider(
+Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
+PrivateKeyMethodManagerImpl::createPrivateKeyMethodProvider(
     const envoy::api::v2::auth::PrivateKeyMethod& message,
-    Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) {
+    Server::Configuration::TransportSocketFactoryContext& private_key_method_provider_context) {
 
-  Ssl::PrivateKeyOperationsProviderInstanceFactory* factory =
-      Registry::FactoryRegistry<Ssl::PrivateKeyOperationsProviderInstanceFactory>::getFactory(
+  Ssl::PrivateKeyMethodProviderInstanceFactory* factory =
+      Registry::FactoryRegistry<Ssl::PrivateKeyMethodProviderInstanceFactory>::getFactory(
           message.provider_name());
 
   // Create a new provider instance with the configuration.
   if (factory) {
-    return factory->createPrivateKeyOperationsProviderInstance(message,
-                                                               private_key_provider_context);
+    return factory->createPrivateKeyMethodProviderInstance(message,
+                                                           private_key_method_provider_context);
   }
 
   return nullptr;
