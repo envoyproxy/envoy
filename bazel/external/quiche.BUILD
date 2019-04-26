@@ -193,6 +193,14 @@ cc_library(
 )
 
 cc_library(
+    name = "quic_platform_system_event_loop",
+    testonly = 1,
+    hdrs = ["quiche/quic/platform/api/quic_system_event_loop.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_system_event_loop_impl_lib"],
+)
+
+cc_library(
     name = "quic_platform_base",
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
