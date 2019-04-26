@@ -16,12 +16,15 @@ class Message {
 public:
   enum class OpCode {
     OP_GET = 0x00,
-    OP_SET = 0x01,
     OP_GETQ = 0x09,
-    OP_SETQ = 0x11,
     OP_GETK = 0x0c,
     OP_GETKQ = 0x0d,
-
+    OP_SET = 0x01,
+    OP_SETQ = 0x11,
+    OP_ADD = 0x02,
+    OP_ADDQ = 0x12,
+    OP_REPLACE = 0x03,
+    OP_REPLACEQ = 0x13,
   };
 
   // Define some constants used in memcached messages encoding
@@ -45,14 +48,15 @@ public:
 
 typedef std::unique_ptr<Request> RequestPtr;
 
+/**
+ * Base class for all get like requests (GET, GETK)
+ */
 class GetLikeRequest : public virtual Request {
 public:
   virtual ~GetLikeRequest() = default;
 
   virtual bool quiet() const PURE;
   virtual const std::string& key() const PURE;
-protected:
-  virtual bool equals(const GetLikeRequest& rhs) const PURE;
 };
 
 /**
@@ -78,13 +82,11 @@ public:
 typedef std::unique_ptr<GetkRequest> GetkRequestPtr;
 
 /**
- * Memcached OP_SET message.
+ * Base class for all set like requests (SET, ADD, REPLACE)
  */
-class SetRequest : public virtual Request {
+class SetLikeRequest : public virtual Request {
 public:
-  virtual ~SetRequest() = default;
-
-  virtual bool operator==(const SetRequest& rhs) const PURE;
+  virtual ~SetLikeRequest() = default;
   virtual bool quiet() const PURE;
   virtual const std::string& key() const PURE;
   virtual const std::string& body() const PURE;
@@ -92,7 +94,38 @@ public:
   virtual uint32_t expiration() const PURE;
 };
 
+/**
+ * Memcached OP_SET message.
+ */
+class SetRequest : public virtual SetLikeRequest {
+public:
+  virtual ~SetRequest() = default;
+  virtual bool operator==(const SetRequest& rhs) const PURE;
+};
+
 typedef std::unique_ptr<SetRequest> SetRequestPtr;
+
+/**
+ * Memcached OP_ADD message.
+ */
+class AddRequest : public virtual SetLikeRequest {
+public:
+  virtual ~AddRequest() = default;
+  virtual bool operator==(const AddRequest& rhs) const PURE;
+};
+
+typedef std::unique_ptr<AddRequest> AddRequestPtr;
+
+/**
+ * Memcached OP_REPLACE message.
+ */
+class ReplaceRequest : public virtual SetLikeRequest {
+public:
+  virtual ~ReplaceRequest() = default;
+  virtual bool operator==(const ReplaceRequest& rhs) const PURE;
+};
+
+typedef std::unique_ptr<ReplaceRequest> ReplaceRequestPtr;
 
 /**
  * General callbacks for dispatching decoded memcached messages to a sink.
@@ -104,6 +137,8 @@ public:
   virtual void decodeGet(GetRequestPtr&& message) PURE;
   virtual void decodeGetk(GetkRequestPtr&& message) PURE;
   virtual void decodeSet(SetRequestPtr&& message) PURE;
+  virtual void decodeAdd(AddRequestPtr&& message) PURE;
+  virtual void decodeReplace(ReplaceRequestPtr&& message) PURE;
 };
 
 /**
@@ -128,6 +163,8 @@ public:
   virtual void encodeGet(const GetRequest& message) PURE;
   virtual void encodeGetk(const GetkRequest& message) PURE;
   virtual void encodeSet(const SetRequest& message) PURE;
+  virtual void encodeAdd(const AddRequest& message) PURE;
+  virtual void encodeReplace(const ReplaceRequest& message) PURE;
 };
 
 } // MemcachedProxy

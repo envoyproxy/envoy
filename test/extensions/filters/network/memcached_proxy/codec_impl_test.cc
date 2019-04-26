@@ -23,10 +23,14 @@ public:
   void decodeGet(GetRequestPtr&& message) override { decodeGet_(message); }
   void decodeGetk(GetkRequestPtr&& message) override { decodeGetk_(message); }
   void decodeSet(SetRequestPtr&& message) override { decodeSet_(message); }
+  void decodeAdd(AddRequestPtr&& message) override { decodeAdd_(message); }
+  void decodeReplace(ReplaceRequestPtr&& message) override { decodeReplace_(message); }
 
   MOCK_METHOD1(decodeGet_, void(GetRequestPtr& message));
   MOCK_METHOD1(decodeGetk_, void(GetkRequestPtr& message));
   MOCK_METHOD1(decodeSet_, void(SetRequestPtr& message));
+  MOCK_METHOD1(decodeAdd_, void(AddRequestPtr& message));
+  MOCK_METHOD1(decodeReplace_, void(ReplaceRequestPtr& message));
 };
 
 class MemcachedCodecImplTest : public testing::Test {
@@ -37,7 +41,7 @@ public:
   DecoderImpl decoder_{callbacks_};
 };
 
-TEST_F(MemcachedCodecImplTest, GetEquality) {
+TEST_F(MemcachedCodecImplTest, GetLikeEquality) {
   {
     GetRequestImpl g1(1, 1, 1, 1);
     GetRequestImpl g2(2, 2, 2, 2);
@@ -61,7 +65,7 @@ TEST_F(MemcachedCodecImplTest, GetEquality) {
   }
 }
 
-TEST_F(MemcachedCodecImplTest, SetEquality) {
+TEST_F(MemcachedCodecImplTest, SetLikeEquality) {
   {
     SetRequestImpl s1(1, 1, 1, 1);
     SetRequestImpl s2(2, 2, 2, 2);
@@ -138,6 +142,26 @@ TEST_F(MemcachedCodecImplTest, SetRoundTrip) {
 
   encoder_.encodeSet(set);
   EXPECT_CALL(callbacks_, decodeSet_(Pointee(Eq(set))));
+  decoder_.onData(output_);
+}
+
+TEST_F(MemcachedCodecImplTest, AddRoundTrip) {
+  AddRequestImpl add(3, 3, 3, 3);
+  add.key("foo");
+  add.body("bar");
+
+  encoder_.encodeAdd(add);
+  EXPECT_CALL(callbacks_, decodeAdd_(Pointee(Eq(add))));
+  decoder_.onData(output_);
+}
+
+TEST_F(MemcachedCodecImplTest, ReplaceRoundTrip) {
+  ReplaceRequestImpl replace(3, 3, 3, 3);
+  replace.key("foo");
+  replace.body("bar");
+
+  encoder_.encodeReplace(replace);
+  EXPECT_CALL(callbacks_, decodeReplace_(Pointee(Eq(replace))));
   decoder_.onData(output_);
 }
 

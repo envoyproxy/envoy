@@ -35,14 +35,14 @@ bool GetLikeRequestImpl::equals(const GetLikeRequest& rhs) const {
     key() == rhs.key();
 }
 
-void SetRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t body_length, Buffer::Instance& data) {
+void SetLikeRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t body_length, Buffer::Instance& data) {
   flags_ = data.drainBEInt<uint32_t>();
   expiration_ = data.drainBEInt<uint32_t>();
   key_ = BufferHelper::drainString(data, key_length);
   body_ = BufferHelper::drainString(data, body_length);
 }
 
-bool SetRequestImpl::operator==(const SetRequest& rhs) const {
+bool SetLikeRequestImpl::equals(const SetLikeRequest& rhs) const {
   return vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
     opaque() == rhs.opaque() &&
     cas() == rhs.cas() &&
@@ -62,6 +62,7 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
   auto opaque = data.drainBEInt<uint32_t>();
   auto cas = data.drainBEInt<uint64_t>();
 
+  // TODO: quiet flag.
   switch (op_code) {
   case Message::OpCode::OP_GET:
   case Message::OpCode::OP_GETQ: {
@@ -86,6 +87,24 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
     message->fromBuffer(key_length, extras_length, body_length, data);
     ENVOY_LOG(trace, "decoded `SET` key={}, body={}", message->key(), message->body());
     callbacks_.decodeSet(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_ADD:
+  case Message::OpCode::OP_ADDQ: {
+    auto message = std::make_unique<AddRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `ADD` key={}, body={}", message->key(), message->body());
+    callbacks_.decodeAdd(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_REPLACE:
+  case Message::OpCode::OP_REPLACEQ: {
+    auto message = std::make_unique<ReplaceRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `REPLACE` key={}, body={}", message->key(), message->body());
+    callbacks_.decodeReplace(std::move(message));
     break;
   }
 
@@ -159,13 +178,19 @@ void EncoderImpl::encodeGetLike(const GetLikeRequest& request, Message::OpCode o
 }
 
 void EncoderImpl::encodeSet(const SetRequest& request) {
-  encodeRequestHeader(
-    request.key().length(),
-    8,
-    request.body().length(),
-    request,
-    request.quiet() ? Message::OpCode::OP_SETQ : Message::OpCode::OP_SET);
+  encodeSetLike(request, request.quiet() ? Message::OpCode::OP_SETQ : Message::OpCode::OP_SET);
+}
 
+void EncoderImpl::encodeAdd(const AddRequest& request) {
+  encodeSetLike(request, request.quiet() ? Message::OpCode::OP_ADDQ : Message::OpCode::OP_ADD);
+}
+
+void EncoderImpl::encodeReplace(const ReplaceRequest& request) {
+  encodeSetLike(request, request.quiet() ? Message::OpCode::OP_REPLACEQ : Message::OpCode::OP_REPLACE);
+}
+
+void EncoderImpl::encodeSetLike(const SetLikeRequest& request, Message::OpCode op_code) {
+  encodeRequestHeader(request.key().length(), 8, request.body().length(), request, op_code);
   output_.writeBEInt<uint32_t>(request.flags());
   output_.writeBEInt<uint32_t>(request.expiration());
   output_.add(request.key());
