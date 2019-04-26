@@ -63,7 +63,7 @@ public:
     return it == data_.end() ? nullptr : it->second.get();
   }
 
- protected:
+protected:
   /* Attempt to run each of the registered factories for TypedMetadata, to
    * populate the data_ map.
    */
