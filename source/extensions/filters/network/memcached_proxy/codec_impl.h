@@ -83,6 +83,16 @@ public:
   bool operator==(const GetkRequest& rhs) const override { return equals(rhs); }
 };
 
+class DeleteRequestImpl : public GetLikeRequestImpl,
+                          public DeleteRequest {
+public:
+  DeleteRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    GetLikeRequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+
+  // DeleteRequest
+  bool operator==(const DeleteRequest& rhs) const override { return equals(rhs); }
+};
+
 class SetLikeRequestImpl : public RequestImpl,
                            public virtual SetLikeRequest {
 public:
@@ -163,6 +173,7 @@ public:
   // Memcached::Encoder
   void encodeGet(const GetRequest& message) override;
   void encodeGetk(const GetkRequest& message) override;
+  void encodeDelete(const DeleteRequest& message) override;
   void encodeSet(const SetRequest& message) override;
   void encodeAdd(const AddRequest& message) override;
   void encodeReplace(const ReplaceRequest& message) override;

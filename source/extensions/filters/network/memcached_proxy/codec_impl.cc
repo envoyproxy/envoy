@@ -74,12 +74,22 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
     callbacks_.decodeGet(std::move(message));
     break;
   }
+
   case Message::OpCode::OP_GETK:
   case Message::OpCode::OP_GETKQ: {
     auto message = std::make_unique<GetkRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
     message->fromBuffer(key_length, extras_length, body_length, data);
     ENVOY_LOG(trace, "decoded `GETK` key={}", message->key());
     callbacks_.decodeGetk(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_DELETE:
+  case Message::OpCode::OP_DELETEQ: {
+    auto message = std::make_unique<DeleteRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `DELETE` key={}", message->key());
+    callbacks_.decodeDelete(std::move(message));
     break;
   }
 
@@ -172,6 +182,10 @@ void EncoderImpl::encodeGet(const GetRequest& request) {
 
 void EncoderImpl::encodeGetk(const GetkRequest& request) {
   encodeGetLike(request, request.quiet() ? Message::OpCode::OP_GETKQ : Message::OpCode::OP_GETK);
+}
+
+void EncoderImpl::encodeDelete(const DeleteRequest& request) {
+  encodeGetLike(request, request.quiet() ? Message::OpCode::OP_DELETEQ : Message::OpCode::OP_DELETE);
 }
 
 void EncoderImpl::encodeGetLike(const GetLikeRequest& request, Message::OpCode op_code) {

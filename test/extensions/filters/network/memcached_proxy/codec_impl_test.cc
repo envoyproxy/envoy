@@ -22,12 +22,14 @@ class TestDecoderCallbacks : public DecoderCallbacks {
 public:
   void decodeGet(GetRequestPtr&& message) override { decodeGet_(message); }
   void decodeGetk(GetkRequestPtr&& message) override { decodeGetk_(message); }
+  void decodeDelete(DeleteRequestPtr&& message) override { decodeDelete_(message); }
   void decodeSet(SetRequestPtr&& message) override { decodeSet_(message); }
   void decodeAdd(AddRequestPtr&& message) override { decodeAdd_(message); }
   void decodeReplace(ReplaceRequestPtr&& message) override { decodeReplace_(message); }
 
   MOCK_METHOD1(decodeGet_, void(GetRequestPtr& message));
   MOCK_METHOD1(decodeGetk_, void(GetkRequestPtr& message));
+  MOCK_METHOD1(decodeDelete_, void(DeleteRequestPtr& message));
   MOCK_METHOD1(decodeSet_, void(SetRequestPtr& message));
   MOCK_METHOD1(decodeAdd_, void(AddRequestPtr& message));
   MOCK_METHOD1(decodeReplace_, void(ReplaceRequestPtr& message));
@@ -132,6 +134,15 @@ TEST_F(MemcachedCodecImplTest, GetkRoundTrip) {
 
   encoder_.encodeGetk(getk);
   EXPECT_CALL(callbacks_, decodeGetk_(Pointee(Eq(getk))));
+  decoder_.onData(output_);
+}
+
+TEST_F(MemcachedCodecImplTest, DeleteRoundTrip) {
+  DeleteRequestImpl del(3, 3, 3, 3);
+  del.key("foo");
+
+  encoder_.encodeDelete(del);
+  EXPECT_CALL(callbacks_, decodeDelete_(Pointee(Eq(del))));
   decoder_.onData(output_);
 }
 

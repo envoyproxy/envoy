@@ -19,6 +19,8 @@ public:
     OP_GETQ = 0x09,
     OP_GETK = 0x0c,
     OP_GETKQ = 0x0d,
+    OP_DELETE = 0x04,
+    OP_DELETEQ = 0x14,
     OP_SET = 0x01,
     OP_SETQ = 0x11,
     OP_ADD = 0x02,
@@ -82,6 +84,17 @@ public:
 typedef std::unique_ptr<GetkRequest> GetkRequestPtr;
 
 /**
+ * Memcached OP_DELETE message.
+ */
+class DeleteRequest : public virtual GetLikeRequest {
+public:
+  virtual ~DeleteRequest() = default;
+  virtual bool operator==(const DeleteRequest& rhs) const PURE;
+};
+
+typedef std::unique_ptr<DeleteRequest> DeleteRequestPtr;
+
+/**
  * Base class for all set like requests (SET, ADD, REPLACE)
  */
 class SetLikeRequest : public virtual Request {
@@ -136,6 +149,7 @@ public:
 
   virtual void decodeGet(GetRequestPtr&& message) PURE;
   virtual void decodeGetk(GetkRequestPtr&& message) PURE;
+  virtual void decodeDelete(DeleteRequestPtr&& message) PURE;
   virtual void decodeSet(SetRequestPtr&& message) PURE;
   virtual void decodeAdd(AddRequestPtr&& message) PURE;
   virtual void decodeReplace(ReplaceRequestPtr&& message) PURE;
@@ -162,6 +176,7 @@ public:
 
   virtual void encodeGet(const GetRequest& message) PURE;
   virtual void encodeGetk(const GetkRequest& message) PURE;
+  virtual void encodeDelete(const DeleteRequest& message) PURE;
   virtual void encodeSet(const SetRequest& message) PURE;
   virtual void encodeAdd(const AddRequest& message) PURE;
   virtual void encodeReplace(const ReplaceRequest& message) PURE;
