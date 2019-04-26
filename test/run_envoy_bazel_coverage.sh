@@ -35,7 +35,7 @@ genhtml bazel-out/_coverage/_coverage_report.dat --output-directory="${COVERAGE_
 
 if [ "$VALIDATE_COVERAGE" == "true" ]
 then
-  COVERAGE_VALUE=$(grep -Po 'lines: \K(\d|\.)*' "${COVERAGE_SUMMARY}")
+  COVERAGE_VALUE=$(grep -Po 'lines\.*: \K(\d|\.)*' "${COVERAGE_SUMMARY}")
   COVERAGE_THRESHOLD=97.5
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if test ${COVERAGE_FAILED} -eq 1; then
