@@ -99,6 +99,29 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "epoll_server_platform_impl_lib",
+    hdrs = [
+        "epoll_address_test_utils_impl.h",
+        "epoll_bug_impl.h",
+        "epoll_expect_bug_impl.h",
+        "epoll_export_impl.h",
+        "epoll_logging_impl.h",
+        "epoll_ptr_util_impl.h",
+        "epoll_test_impl.h",
+        "epoll_thread_impl.h",
+        "epoll_time_impl.h",
+    ],
+    external_deps = ["abseil_time"],
+    deps = [
+        ":quic_platform_expect_bug_impl_lib",
+        ":quic_platform_thread_impl_lib",
+        "//include/envoy/network:address_interface",
+        "//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "quic_platform_test_output_impl_lib",
     srcs = ["quic_test_output_impl.cc"],
     hdrs = ["quic_test_output_impl.h"],
