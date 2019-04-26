@@ -14,7 +14,8 @@ Gauge::CombineLogic StatMerger::getCombineLogic(Gauge& gauge, const std::string&
   }
 
   // Gauge name *substrings*, and special logic to use for combining those gauges' values.
-  static const std::vector<std::pair<std::regex, Gauge::CombineLogic>> nonstandard_combine_logic{
+  static const auto* nonstandard_combine_logic = new std::vector<
+      std::pair<std::regex, Gauge::CombineLogic>>{
       // Any .version is either a static property of the binary, or an opaque identifier for
       // resources that are not passed across hot restart.
       {std::regex(".*\\.version$"), Gauge::CombineLogic::NoImport},
@@ -52,7 +53,7 @@ Gauge::CombineLogic StatMerger::getCombineLogic(Gauge& gauge, const std::string&
       {std::regex("^runtime.admin_overrides_active$"), Gauge::CombineLogic::NoImport},
       {std::regex("^runtime.num_keys$"), Gauge::CombineLogic::NoImport},
   };
-  for (const auto& exception : nonstandard_combine_logic) {
+  for (const auto& exception : *nonstandard_combine_logic) {
     std::smatch match;
     if (std::regex_match(gauge_name, match, exception.first)) {
       gauge.setCombineLogic(exception.second);
