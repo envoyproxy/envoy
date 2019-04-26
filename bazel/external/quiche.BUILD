@@ -201,6 +201,14 @@ cc_library(
 )
 
 cc_library(
+    name = "quic_platform_thread",
+    testonly = 1,
+    hdrs = ["quiche/quic/platform/api/quic_thread.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_thread_impl_lib"],
+)
+
+cc_library(
     name = "quic_platform_base",
     hdrs = [
         "quiche/quic/platform/api/quic_aligned.h",
@@ -243,7 +251,6 @@ cc_library(
             "quiche/quic/platform/api/quic_stack_trace.h",
             "quiche/quic/platform/api/quic_string_utils.h",
             "quiche/quic/platform/api/quic_text_utils.h",
-            "quiche/quic/platform/api/quic_thread.h",
         ],
         "@envoy",
     ),

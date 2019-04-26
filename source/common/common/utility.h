@@ -162,12 +162,6 @@ public:
   static bool atoull(const char* str, uint64_t& out, int base = 10);
 
   /**
-   * Convert a string to a long, checking for error.
-   * @param return true if successful, false otherwise.
-   */
-  static bool atoll(const char* str, int64_t& out, int base = 10);
-
-  /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
    * @param out supplies the string to fill.
    * @param out_len supplies the length of the output buffer. Must be >= MIN_ITOA_OUT_LEN.
@@ -345,6 +339,8 @@ public:
    * @return true if strings are semantically the same and false otherwise.
    */
   struct CaseInsensitiveCompare {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void;
     bool operator()(absl::string_view lhs, absl::string_view rhs) const;
   };
 
@@ -354,13 +350,15 @@ public:
    * @return uint64_t hash representation of the supplied string view.
    */
   struct CaseInsensitiveHash {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void;
     uint64_t operator()(absl::string_view key) const;
   };
 
   /**
    * Definition of unordered set of case-insensitive std::string.
    */
-  typedef std::unordered_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>
+  typedef absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>
       CaseUnorderedSet;
 
   /**
