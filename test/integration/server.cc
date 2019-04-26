@@ -142,22 +142,6 @@ void IntegrationTestServer::serverReady() {
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version));
-
-  /*
-  // TODO(jmarantz): Sadly, we use a mock symbol table here, as plumbing the
-  // real symbol table through the mocking hierarchy -- which generally
-  // constructs hierarchies of objects with no context, is too daunting. I think
-  // the right thing to do is to avoid mocks in integration tests.
-  Test::Global<Stats::SymbolTable> symbol_table;
-  Server::HotRestartNopImpl restarter(*symbol_table);
-  Thread::MutexBasicLockable lock;
-
-  ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator(*symbol_table);
-  Stats::StatsOptionsImpl stats_options;
-  Stats::ThreadLocalStoreImpl stats_store(stats_options, stats_allocator);
-  stat_store_ = &stats_store;
-  */
   Thread::MutexBasicLockable lock;
 
   Runtime::RandomGeneratorPtr random_generator;
