@@ -40,7 +40,6 @@ public:
   void startSubscription(const std::set<std::string>& cluster_names) override {
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
-    expectSendMessage({}, "");
     expectSendMessage(last_cluster_names_, "");
     subscription_->start(cluster_names, callbacks_);
   }
@@ -48,12 +47,13 @@ public:
   void expectSendMessage(const std::set<std::string>& cluster_names,
                          const std::string& version) override {
     UNREFERENCED_PARAMETER(version);
-    expectSendMessage(cluster_names, {}, Grpc::Status::GrpcStatus::Ok, "");
+    expectSendMessage(cluster_names, {}, Grpc::Status::GrpcStatus::Ok, "", {});
   }
 
   void expectSendMessage(const std::set<std::string>& subscribe,
                          const std::set<std::string>& unsubscribe, const Protobuf::int32 error_code,
-                         const std::string& error_message) {
+                         const std::string& error_message,
+                         std::map<std::string, std::string> initial_resource_versions) {
     envoy::api::v2::DeltaDiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
     std::copy(
@@ -64,6 +64,10 @@ public:
         Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_unsubscribe()));
     expected_request.set_response_nonce(last_response_nonce_);
     expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+
+    for (auto const& resource : initial_resource_versions) {
+      (*expected_request.mutable_initial_resource_versions())[resource.first] = resource.second;
+    }
 
     if (error_code != Grpc::Status::GrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
@@ -100,7 +104,7 @@ public:
       expectSendMessage({}, version);
     } else {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
-      expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config");
+      expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Internal, "bad config", {});
     }
     subscription_->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
@@ -116,7 +120,7 @@ public:
                         cluster_names.begin(), cluster_names.end(),
                         std::inserter(unsub, unsub.begin()));
 
-    expectSendMessage(sub, unsub, Grpc::Status::GrpcStatus::Ok, "");
+    expectSendMessage(sub, unsub, Grpc::Status::GrpcStatus::Ok, "", {});
     subscription_->updateResources(cluster_names);
     last_cluster_names_ = cluster_names;
   }
