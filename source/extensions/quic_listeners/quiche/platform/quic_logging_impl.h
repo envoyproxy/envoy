@@ -59,6 +59,13 @@
 #define CHECK(condition)                                                                           \
   QUIC_LOG_IF_IMPL(FATAL, ABSL_PREDICT_FALSE(!(condition))) << "CHECK failed: " #condition "."
 
+#define CHECK_GT(a, b) CHECK((a) > (b))
+#define CHECK_GE(a, b) CHECK((a) >= (b))
+#define CHECK_LT(a, b) CHECK((a) < (b))
+#define CHECK_LE(a, b) CHECK((a) <= (b))
+#define CHECK_NE(a, b) CHECK((a) != (b))
+#define CHECK_EQ(a, b) CHECK((a) == (b))
+
 #ifdef NDEBUG
 // Release build
 #define DCHECK(condition) QUIC_COMPILED_OUT_LOG()

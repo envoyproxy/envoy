@@ -29,6 +29,7 @@ load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_external_dep_path",
     "envoy_select_quiche",
 )
 
@@ -49,6 +50,26 @@ genrule(
 )
 
 cc_library(
+    name = "http2_platform_reconstruct_object",
+    testonly = 1,
+    hdrs = ["quiche/http2/platform/api/http2_reconstruct_object.h"],
+    visibility = ["//visibility:public"],
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:http2_platform_reconstruct_object_impl_lib"],
+)
+
+cc_library(
+    name = "http2_test_tools_random",
+    testonly = 1,
+    srcs = ["quiche/http2/test_tools/http2_random.cc"],
+    hdrs = ["quiche/http2/test_tools/http2_random.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":http2_platform",
+        envoy_external_dep_path("ssl"),
+    ],
+)
+
+cc_library(
     name = "http2_platform",
     hdrs = [
         "quiche/http2/platform/api/http2_arraysize.h",
@@ -63,7 +84,6 @@ cc_library(
         "quiche/http2/platform/api/http2_string_piece.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/http2/platform/api/http2_flags.h",
-        # "quiche/http2/platform/api/http2_reconstruct_object.h",
         # "quiche/http2/platform/api/http2_test_helpers.h",
     ] + envoy_select_quiche(
         [
@@ -277,12 +297,15 @@ cc_library(
 
 envoy_cc_test(
     name = "http2_platform_api_test",
-    srcs = envoy_select_quiche(
-        ["quiche/http2/platform/api/http2_string_utils_test.cc"],
-        "@envoy",
-    ),
+    srcs = [
+        "quiche/http2/platform/api/http2_string_utils_test.cc",
+        "quiche/http2/test_tools/http2_random_test.cc",
+    ],
     repository = "@envoy",
-    deps = [":http2_platform"],
+    deps = [
+        ":http2_platform",
+        ":http2_test_tools_random",
+    ],
 )
 
 envoy_cc_test(
