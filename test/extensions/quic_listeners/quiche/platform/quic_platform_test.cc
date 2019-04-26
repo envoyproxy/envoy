@@ -12,8 +12,6 @@
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 
-#include "exe/platform_impl.h"
-
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -254,14 +252,10 @@ TEST_F(QuicPlatformTest, QuicStringPiece) {
 }
 
 TEST_F(QuicPlatformTest, QuicThread) {
-  Envoy::PlatformImpl platform_impl;
-
   class AdderThread : public QuicThread {
   public:
-    AdderThread(int* value, int increment, Envoy::Thread::ThreadFactory& thread_factory)
-        : QuicThread("adder_thread"), value_(value), increment_(increment) {
-      setThreadFactory(thread_factory);
-    }
+    AdderThread(int* value, int increment)
+        : QuicThread("adder_thread"), value_(value), increment_(increment) {}
 
     ~AdderThread() override = default;
 
@@ -276,19 +270,19 @@ TEST_F(QuicPlatformTest, QuicThread) {
   int value = 0;
 
   // A QuicThread that is never started, which is ok.
-  { AdderThread t0(&value, 1, platform_impl.threadFactory()); }
+  { AdderThread t0(&value, 1); }
   EXPECT_EQ(0, value);
 
   // A QuicThread that is started and joined as usual.
   {
-    AdderThread t1(&value, 1, platform_impl.threadFactory());
+    AdderThread t1(&value, 1);
     t1.Start();
     t1.Join();
   }
   EXPECT_EQ(1, value);
 
   // QuicThread will panic if it's started but not joined.
-  EXPECT_DEATH_LOG_TO_STDERR({ AdderThread(&value, 2, platform_impl.threadFactory()).Start(); },
+  EXPECT_DEATH_LOG_TO_STDERR({ AdderThread(&value, 2).Start(); },
                              "QuicThread should be joined before destruction");
 }
 
