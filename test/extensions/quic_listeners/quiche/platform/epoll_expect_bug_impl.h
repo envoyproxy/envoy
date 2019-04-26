@@ -6,6 +6,6 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "extensions/quic_listeners/quiche/platform/quic_expect_bug_impl.h"
+#include "test/extensions/quic_listeners/quiche/platform/quic_expect_bug_impl.h"
 
 #define EXPECT_EPOLL_BUG_IMPL EXPECT_QUIC_BUG_IMPL

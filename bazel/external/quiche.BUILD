@@ -154,6 +154,13 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "quic_platform_expect_bug",
+    hdrs = ["quiche/quic/platform/api/quic_expect_bug.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_expect_bug_impl_lib"],
+)
+
 envoy_cc_library(
     name = "quic_platform_export",
     hdrs = ["quiche/quic/platform/api/quic_export.h"],
@@ -163,10 +170,38 @@ envoy_cc_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_platform_mock_log",
+    hdrs = ["quiche/quic/platform/api/quic_mock_log.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_mock_log_impl_lib"],
+)
+
+envoy_cc_test_library(
     name = "quic_platform_port_utils",
     hdrs = ["quiche/quic/platform/api/quic_port_utils.h"],
     repository = "@envoy",
     deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_test",
+    hdrs = ["quiche/quic/platform/api/quic_test.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_test_impl_lib"],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_test_output",
+    hdrs = ["quiche/quic/platform/api/quic_test_output.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_test_output_impl_lib"],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_thread",
+    hdrs = ["quiche/quic/platform/api/quic_thread.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_thread_impl_lib"],
 )
 
 envoy_cc_library(
@@ -189,7 +224,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_server_stats.h",
         "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
         "quiche/quic/platform/api/quic_string_piece.h",
-        "quiche/quic/platform/api/quic_test_output.h",
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/quic/platform/api/quic_clock.h",
@@ -209,14 +243,10 @@ envoy_cc_library(
     ] + envoy_select_quiche(
         [
             "quiche/quic/platform/api/quic_bug_tracker.h",
-            "quiche/quic/platform/api/quic_expect_bug.h",
-            "quiche/quic/platform/api/quic_mock_log.h",
             "quiche/quic/platform/api/quic_logging.h",
             "quiche/quic/platform/api/quic_stack_trace.h",
             "quiche/quic/platform/api/quic_string_utils.h",
-            "quiche/quic/platform/api/quic_test.h",
             "quiche/quic/platform/api/quic_text_utils.h",
-            "quiche/quic/platform/api/quic_thread.h",
         ],
         "@envoy",
     ),
@@ -301,7 +331,7 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "http2_platform_test",
+    name = "http2_platform_api_test",
     srcs = envoy_select_quiche(
         ["quiche/http2/platform/api/http2_string_utils_test.cc"],
         "@envoy",
@@ -311,7 +341,7 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "spdy_platform_test",
+    name = "spdy_platform_api_test",
     srcs = envoy_select_quiche(
         ["quiche/spdy/platform/api/spdy_string_utils_test.cc"],
         "@envoy",
@@ -321,7 +351,7 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "quic_platform_test",
+    name = "quic_platform_api_test",
     srcs = envoy_select_quiche(
         [
             "quiche/quic/platform/api/quic_endian_test.cc",
@@ -332,5 +362,8 @@ envoy_cc_test(
         "@envoy",
     ),
     repository = "@envoy",
-    deps = [":quic_platform"],
+    deps = [
+        ":quic_platform",
+        ":quic_platform_test",
+    ],
 )

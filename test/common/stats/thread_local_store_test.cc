@@ -312,7 +312,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(TestUtility::findByName(store_->source().cachedCounters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
-  EXPECT_CALL(tls_, runOnAllThreads(_));
+  EXPECT_CALL(tls_, runOnAllThreads(_, _));
   scope1.reset();
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(2UL, store_->source().cachedCounters().size());
@@ -447,11 +447,13 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   // The stats did not overflow yet.
   EXPECT_EQ(0UL, store_->counter("stats.overflow").value());
 
-  // The name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  // Truncation occurs in the underlying representation, but the by-name lookups
+  // are all based on the untruncated name.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+  // Outside the stats system, no Envoy code can see the truncated view, so
+  // lookups for truncated names will fail.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
 
   // The same should be true with heap allocation, which occurs when the default
   // allocator fails.
@@ -459,11 +461,11 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   EXPECT_CALL(*alloc_, alloc(_)).WillOnce(Return(nullptr));
   store_->counter(name_2);
 
-  // Same deal: the name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  // Same deal: the name will be truncated, but we find it with the entire name.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+  // But we can't find it based on the truncation -- that name is not visible at the API.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
 
   // Now the stats have overflowed.
   EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
@@ -928,7 +930,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
+  EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
 }
 
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
@@ -951,7 +953,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 31 * million); // actual value: 30482576 as of Oct 29, 2018
+  EXPECT_LT(end_mem - start_mem, 23 * million); // actual value: 22880912 as of March 14, 2019
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
