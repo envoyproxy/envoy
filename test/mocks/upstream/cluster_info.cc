@@ -2,11 +2,11 @@
 
 #include <limits>
 
+#include "envoy/upstream/upstream.h"
+
 #include "common/config/metadata.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/upstream/upstream_impl.h"
-
-#include "include/envoy/upstream/upstream.h"
 
 using testing::_;
 using testing::Invoke;
