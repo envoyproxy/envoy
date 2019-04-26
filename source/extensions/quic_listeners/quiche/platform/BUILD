@@ -66,13 +66,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
 )
 
-envoy_cc_test_library(
-    name = "quic_platform_port_utils_impl_lib",
-    hdrs = ["quic_port_utils_impl.h"],
-    include_prefix = "extensions/quic_listeners/quiche/platform",
-    deps = ["//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_test_impl_lib"],
-)
-
 envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = ["quic_logging_impl.cc"],
@@ -86,7 +79,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform_base_impl_lib",
-    srcs = envoy_select_quiche(["quic_mem_slice_impl.cc"]),
+    srcs = ["quic_flags_impl.cc"] + envoy_select_quiche(["quic_mem_slice_impl.cc"]),
     hdrs = [
         "quic_aligned_impl.h",
         "quic_arraysize_impl.h",
@@ -109,13 +102,9 @@ envoy_cc_library(
         "quic_stream_buffer_allocator_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
-        "quic_expect_bug_impl.h",
         "quic_logging_impl.h",
         "quic_mem_slice_impl.h",
-        "quic_mock_log_impl.h",
         "quic_stack_trace_impl.h",
-        "quic_test_impl.h",
-        "quic_thread_impl.h",
     ]),
     external_deps = [
         "abseil_base",
@@ -133,7 +122,6 @@ envoy_cc_library(
         "@com_googlesource_quiche//:quic_platform_ip_address_family",
     ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
-        "//include/envoy/thread:thread_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:byte_order_lib",
@@ -146,7 +134,6 @@ envoy_cc_library(
     srcs = ["quic_cert_utils_impl.cc"] + envoy_select_quiche([
         "quic_file_utils_impl.cc",
         "quic_hostname_utils_impl.cc",
-        "quic_test_output_impl.cc",
     ]),
     hdrs = [
         "quic_cert_utils_impl.h",
@@ -156,7 +143,6 @@ envoy_cc_library(
         "quic_file_utils_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_string_utils_impl.h",
-        "quic_test_output_impl.h",
         "quic_text_utils_impl.h",
     ]),
     external_deps = [

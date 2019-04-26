@@ -3,7 +3,6 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
-    "envoy_cc_platform_dep",
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
@@ -27,9 +26,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_platform_test",
     srcs = envoy_select_quiche(["quic_platform_test.cc"]),
-    data = [
-        "//test/extensions/transport_sockets/tls/test_data:certs",
-    ],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     external_deps = ["quiche_quic_platform"],
     deps = [
         "//source/common/memory:stats_lib",
@@ -40,9 +37,14 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@com_googlesource_quiche//:quic_buffer_allocator_lib",
+        "@com_googlesource_quiche//:quic_platform_expect_bug",
+        "@com_googlesource_quiche//:quic_platform_mock_log",
         "@com_googlesource_quiche//:quic_platform_port_utils",
         "@com_googlesource_quiche//:quic_platform_sleep",
-    ] + envoy_cc_platform_dep("//source/exe:platform_impl_lib"),
+        "@com_googlesource_quiche//:quic_platform_test",
+        "@com_googlesource_quiche//:quic_platform_test_output",
+        "@com_googlesource_quiche//:quic_platform_thread",
+    ],
 )
 
 envoy_cc_test(
@@ -56,9 +58,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
-    name = "quic_platform_port_utils_test_impl_lib",
-    srcs = ["quic_port_utils_test_impl.cc"],
-    hdrs = ["quic_port_utils_test_impl.h"],
+    name = "quic_platform_expect_bug_impl_lib",
+    hdrs = ["quic_expect_bug_impl.h"],
+    deps = [
+        "@com_googlesource_quiche//:quic_platform_base",
+        "@com_googlesource_quiche//:quic_platform_mock_log",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_mock_log_impl_lib",
+    hdrs = ["quic_mock_log_impl.h"],
+    deps = ["@com_googlesource_quiche//:quic_platform_base"],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_port_utils_impl_lib",
+    srcs = ["quic_port_utils_impl.cc"],
+    hdrs = ["quic_port_utils_impl.h"],
     deps = [
         "//source/common/network:utility_lib",
         "//test/test_common:environment_lib",
@@ -72,4 +89,53 @@ envoy_cc_test_library(
         "@com_googlesource_quiche//:quic_platform_mem_slice_span_lib",
         "//include/envoy/buffer:buffer_interface",
     ]),
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_thread_impl_lib",
+    hdrs = ["quic_thread_impl.h"],
+    deps = [
+        "//include/envoy/thread:thread_interface",
+        "//source/common/common:assert_lib",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_test_impl_lib",
+    hdrs = ["quic_test_impl.h"],
+    deps = ["//source/common/common:assert_lib"],
+)
+
+envoy_cc_test_library(
+    name = "epoll_server_platform_impl_lib",
+    hdrs = [
+        "epoll_address_test_utils_impl.h",
+        "epoll_bug_impl.h",
+        "epoll_expect_bug_impl.h",
+        "epoll_export_impl.h",
+        "epoll_logging_impl.h",
+        "epoll_ptr_util_impl.h",
+        "epoll_test_impl.h",
+        "epoll_thread_impl.h",
+        "epoll_time_impl.h",
+    ],
+    external_deps = ["abseil_time"],
+    deps = [
+        ":quic_platform_expect_bug_impl_lib",
+        ":quic_platform_thread_impl_lib",
+        "//include/envoy/network:address_interface",
+        "//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_test_output_impl_lib",
+    srcs = ["quic_test_output_impl.cc"],
+    hdrs = ["quic_test_output_impl.h"],
+    deps = [
+        "//source/common/filesystem:filesystem_lib",
+        "@com_googlesource_quiche//:quic_platform_base",
+    ],
 )

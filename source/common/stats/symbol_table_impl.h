@@ -251,7 +251,7 @@ private:
  * will fire to guard against symbol-table leaks.
  *
  * Thus this class is inconvenient to directly use as temp storage for building
- * a StatName from a string. Instead it should be used via StatNameTempStorage.
+ * a StatName from a string. Instead it should be used via StatNameManagedStorage.
  */
 class StatNameStorage {
 public:
@@ -367,22 +367,34 @@ StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
  * Contains the backing store for a StatName and enough context so it can
  * self-delete through RAII. This works by augmenting StatNameStorage with a
  * reference to the SymbolTable&, so it has an extra 8 bytes of footprint. It
- * is intended to be used in tests or as a scoped temp in a function, rather
- * than stored in a larger structure such as a map, where the redundant copies
- * of the SymbolTable& would be costly in aggregate.
+ * is intended to be used in cases where simplicity of implementation is more
+ * important than byte-savings, for example:
+ *   - outside the stats system
+ *   - in tests
+ *   - as a scoped temp in a function
+ * Due to the extra 8 bytes per instance, scalability should be taken into
+ * account before using this as (say) a value or key in a map. In those
+ * scenarios, it would be better to store the SymbolTable reference once
+ * for the entire map.
+ *
+ * In the stat structures, we generally use StatNameStorage to avoid the
+ * per-stat overhead.
  */
-class StatNameTempStorage : public StatNameStorage {
+class StatNameManagedStorage : public StatNameStorage {
 public:
   // Basic constructor for when you have a name as a string, and need to
   // generate symbols for it.
-  StatNameTempStorage(absl::string_view name, SymbolTable& table)
+  StatNameManagedStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(name, table), symbol_table_(table) {}
 
   // Obtains new backing storage for an already existing StatName.
-  StatNameTempStorage(StatName src, SymbolTable& table)
+  StatNameManagedStorage(StatName src, SymbolTable& table)
       : StatNameStorage(src, table), symbol_table_(table) {}
 
-  ~StatNameTempStorage() { free(symbol_table_); }
+  ~StatNameManagedStorage() { free(symbol_table_); }
+
+  SymbolTable& symbolTable() { return symbol_table_; }
+  const SymbolTable& symbolTable() const { return symbol_table_; }
 
 private:
   SymbolTable& symbol_table_;
@@ -508,7 +520,7 @@ struct HeterogeneousStatNameEqual {
 // easier at the call-sites in thread_local_store.cc to implement this an
 // explicit free() method, analogous to StatNameStorage::free(), compared to
 // storing a SymbolTable reference in the class and doing the free in the
-// destructor, like StatNameTempStorage.
+// destructor, like StatNameManagedStorage.
 class StatNameStorageSet {
 public:
   using HashSet =
