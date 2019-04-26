@@ -341,8 +341,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     return null_stat;
   } else {
     TagExtraction extraction(parent_, name);
-    // std::shared_ptr<StatType> stat = make_stat(parent_.alloc_, extraction.truncatedStatName(),
-    // extraction.tagExtractedName(), extraction.tags());
     std::shared_ptr<StatType> stat =
         make_stat(parent_.alloc_, name, extraction.tagExtractedName(), extraction.tags());
     if (stat == nullptr) {
