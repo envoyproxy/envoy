@@ -95,17 +95,56 @@ struct RawStatData {
 
 using RawStatDataSet = BlockMemoryHashSet<Stats::RawStatData>;
 
+template <class Stat> class RawStat : public Stat {
+public:
+  RawStat(StatName stat_name, RawStatData& data, StatDataAllocatorImpl<RawStatData>& alloc,
+          absl::string_view tag_extracted_name, const std::vector<Tag>& tags)
+      : Stat(data, alloc, tag_extracted_name, tags),
+        stat_name_storage_(stat_name, alloc.symbolTable()) {}
+  ~RawStat() { stat_name_storage_.free(this->symbolTable()); }
+
+  StatName statName() const override { return stat_name_storage_.statName(); }
+
+private:
+  StatNameStorage stat_name_storage_;
+};
+
 class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
   RawStatDataAllocator(Thread::BasicLockable& mutex, RawStatDataSet& stats_set,
                        const StatsOptions& options, SymbolTable& symbol_table)
       : StatDataAllocatorImpl(symbol_table), mutex_(mutex), stats_set_(stats_set),
         options_(options) {}
+  ~RawStatDataAllocator();
+
+  virtual RawStatData* alloc(absl::string_view name); // Virtual only for mocking.
+  void free(Stats::RawStatData& data) override;
+  RawStatData* allocStatName(StatName stat_name) {
+    return alloc(symbolTable().toString(stat_name));
+  }
 
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return true; }
-  Stats::RawStatData* alloc(absl::string_view name) override;
-  void free(Stats::RawStatData& data) override;
+
+  template <class Stat>
+  std::shared_ptr<Stat> makeStat(StatName name, absl::string_view tag_extracted_name,
+                                 const std::vector<Tag>& tags) {
+    RawStatData* raw_stat_data = allocStatName(name);
+    if (raw_stat_data == nullptr) {
+      return nullptr;
+    }
+    return std::make_shared<RawStat<Stat>>(name, *raw_stat_data, *this, tag_extracted_name, tags);
+  }
+
+  CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
+                               const std::vector<Tag>& tags) override {
+    return makeStat<CounterImpl<RawStatData>>(name, tag_extracted_name, tags);
+  }
+
+  GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
+                           const std::vector<Tag>& tags) override {
+    return makeStat<GaugeImpl<RawStatData>>(name, tag_extracted_name, tags);
+  }
 
 private:
   Thread::BasicLockable& mutex_;

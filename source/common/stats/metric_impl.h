@@ -3,10 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/tag.h"
 
 #include "common/common/assert.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -20,11 +22,14 @@ namespace Stats {
  */
 class MetricImpl : public virtual Metric {
 public:
-  MetricImpl(std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
+  MetricImpl(absl::string_view tag_extracted_name, const std::vector<Tag>& tags,
+             SymbolTable& symbol_table);
+  ~MetricImpl();
 
-  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
-  const std::vector<Tag>& tags() const override { return tags_; }
+  std::string name() const override { return symbolTable().toString(statName()); }
+  std::string tagExtractedName() const override;
+  std::vector<Tag> tags() const override;
+  StatName tagExtractedStatName() const override;
 
 protected:
   /**
@@ -34,9 +39,24 @@ protected:
     static const uint8_t Used = 0x1;
   };
 
+  void clear();
+
 private:
-  const std::string tag_extracted_name_;
-  const std::vector<Tag> tags_;
+  StatNameList stat_names_;
+};
+
+class NullMetricImpl : public MetricImpl {
+public:
+  explicit NullMetricImpl(SymbolTable& symbol_table)
+      : MetricImpl("", std::vector<Tag>(), symbol_table), stat_name_storage_("", symbol_table) {}
+
+  const SymbolTable& symbolTable() const override { return stat_name_storage_.symbolTable(); }
+  SymbolTable& symbolTable() override { return stat_name_storage_.symbolTable(); }
+  bool used() const override { return false; }
+  StatName statName() const override { return stat_name_storage_.statName(); }
+
+private:
+  StatNameManagedStorage stat_name_storage_;
 };
 
 } // namespace Stats

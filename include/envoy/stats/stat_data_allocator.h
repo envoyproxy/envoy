@@ -35,8 +35,8 @@ public:
    * @return CounterSharedPtr a counter, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
-                                       std::vector<Tag>&& tags) PURE;
+  virtual CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
+                                       const std::vector<Tag>& tags) PURE;
 
   /**
    * @param name the full name of the stat.
@@ -45,8 +45,8 @@ public:
    * @return GaugeSharedPtr a gauge, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
-                                   std::vector<Tag>&& tags) PURE;
+  virtual GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
+                                   const std::vector<Tag>& tags) PURE;
 
   /**
    * Determines whether this stats allocator requires bounded stat-name size.
