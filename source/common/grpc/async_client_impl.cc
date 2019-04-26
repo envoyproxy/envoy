@@ -1,7 +1,5 @@
 #include "common/grpc/async_client_impl.h"
 
-#include <arpa/inet.h>
-
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
@@ -178,11 +176,7 @@ void AsyncStreamImpl::onReset() {
 }
 
 void AsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) {
-  char header[5];
-  header[0] = 0; // flags
-  const uint32_t nsize = htonl(request->length());
-  std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
-  request->prepend(absl::string_view(header, 5));
+  Common::PrependGrpcFrameHeader(request.get());
   stream_->sendData(*request, end_stream);
 }
 

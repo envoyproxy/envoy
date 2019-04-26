@@ -163,11 +163,17 @@ public:
   static grpc::ByteBuffer makeByteBuffer(Buffer::InstancePtr bufferInstance);
 
   /**
-   * BUild Buffer::Instance which aliases the data in a grpc::ByteBuffer.
+   * Build Buffer::Instance which aliases the data in a grpc::ByteBuffer.
    * @param byteBuffer source data container.
    * @param Buffer::InstancePtr target container aliased to the data in grpc::ByteBuffer.
    */
   static Buffer::InstancePtr makeBufferInstance(const grpc::ByteBuffer& byteBuffer);
+
+  /**
+   * Prepend a gRPC frame header to a Buffer::Instance containing a single gRPC frame.
+   * @param bufferInstance containing the frame data which will be modified.
+   */
+  static void PrependGrpcFrameHeader(Buffer::Instance* buffer);
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);

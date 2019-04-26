@@ -371,5 +371,13 @@ Buffer::InstancePtr Common::makeBufferInstance(const grpc::ByteBuffer& byteBuffe
   return buffer;
 }
 
+void Common::PrependGrpcFrameHeader(Buffer::Instance* buffer) {
+  char header[5];
+  header[0] = 0; // flags
+  const uint32_t nsize = htonl(buffer->length());
+  std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  buffer->prepend(absl::string_view(header, 5));
+}
+
 } // namespace Grpc
 } // namespace Envoy
