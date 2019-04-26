@@ -55,10 +55,10 @@ bool SetLikeRequestImpl::equals(const SetLikeRequest& rhs) const {
 }
 
 void CounterLikeRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t, Buffer::Instance& data) {
-  key_ = BufferHelper::drainString(data, key_length);
   amount_ = data.drainBEInt<uint64_t>();
   initial_value_ = data.drainBEInt<uint64_t>();
   expiration_ = data.drainBEInt<uint32_t>();
+  key_ = BufferHelper::drainString(data, key_length);
 }
 
 bool CounterLikeRequestImpl::equals(const CounterLikeRequest& rhs) const {
@@ -70,6 +70,20 @@ bool CounterLikeRequestImpl::equals(const CounterLikeRequest& rhs) const {
     amount() == rhs.amount() &&
     initialValue() == rhs.initialValue() &&
     expiration() == rhs.expiration();
+}
+
+void AppendLikeRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t body_length, Buffer::Instance& data) {
+  key_ = BufferHelper::drainString(data, key_length);
+  body_ = BufferHelper::drainString(data, body_length);
+}
+
+bool AppendLikeRequestImpl::equals(const AppendLikeRequest& rhs) const {
+  return dataType() == rhs.dataType() &&
+    vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
+    opaque() == rhs.opaque() &&
+    cas() == rhs.cas() &&
+    key() == rhs.key() &&
+    body() == rhs.body();
 }
 
 bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
@@ -153,6 +167,24 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
     message->fromBuffer(key_length, extras_length, body_length, data);
     ENVOY_LOG(trace, "decoded `DECREMENT` key={}, amount={}, initial_value={}", message->key(), message->amount(), message->initialValue());
     callbacks_.decodeDecrement(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_APPEND:
+  case Message::OpCode::OP_APPENDQ: {
+    auto message = std::make_unique<AppendRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `APPEND` key={}, body={}", message->key(), message->body());
+    callbacks_.decodeAppend(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_PREPEND:
+  case Message::OpCode::OP_PREPENDQ: {
+    auto message = std::make_unique<PrependRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `PREPEND` key={}, body={}", message->key(), message->body());
+    callbacks_.decodePrepend(std::move(message));
     break;
   }
 
@@ -259,10 +291,24 @@ void EncoderImpl::encodeDecrement(const DecrementRequest& request) {
 
 void EncoderImpl::encodeCounterLike(const CounterLikeRequest& request, Message::OpCode op_code) {
   encodeRequestHeader(request.key().length(), 8, 0, request, op_code);
-  output_.add(request.key());
   output_.writeBEInt<uint64_t>(request.amount());
   output_.writeBEInt<uint64_t>(request.initialValue());
   output_.writeBEInt<uint32_t>(request.expiration());
+  output_.add(request.key());
+}
+
+void EncoderImpl::encodeAppend(const AppendRequest& request) {
+  encodeAppendLike(request, request.quiet() ? Message::OpCode::OP_APPENDQ : Message::OpCode::OP_APPEND);
+}
+
+void EncoderImpl::encodePrepend(const PrependRequest& request) {
+  encodeAppendLike(request, request.quiet() ? Message::OpCode::OP_PREPENDQ : Message::OpCode::OP_PREPEND);
+}
+
+void EncoderImpl::encodeAppendLike(const AppendLikeRequest& request, Message::OpCode op_code) {
+  encodeRequestHeader(request.key().length(), 0, request.body().length(), request, op_code);
+  output_.add(request.key());
+  output_.add(request.body());
 }
 
 }

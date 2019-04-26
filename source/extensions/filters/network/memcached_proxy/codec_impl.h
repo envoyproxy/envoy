@@ -214,6 +214,48 @@ private:
   DecoderCallbacks& callbacks_;
 };
 
+class AppendLikeRequestImpl : public RequestImpl,
+                              public virtual AppendLikeRequest {
+public:
+  AppendLikeRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) : RequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+
+  // RequestImpl
+  void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
+
+  // AppendLikeRequest
+  bool quiet() const override { return false; }
+  const std::string& key() const override { return key_; }
+  const std::string& body() const override { return body_; }
+
+  void key(const std::string& key) { key_ = key; }
+  void body(const std::string& body) { body_ = body; }
+protected:
+  bool equals(const AppendLikeRequest& rhs) const;
+private:
+  std::string key_;
+  std::string body_;
+};
+
+class AppendRequestImpl : public AppendLikeRequestImpl,
+                          public AppendRequest {
+public:
+  AppendRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    AppendLikeRequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+
+  // AppendRequest
+  bool operator==(const AppendRequest& rhs) const override { return equals(rhs); }
+};
+
+class PrependRequestImpl : public AppendLikeRequestImpl,
+                           public PrependRequest {
+public:
+  PrependRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    AppendLikeRequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+
+  // PrependRequest
+  bool operator==(const PrependRequest& rhs) const override { return equals(rhs); }
+};
+
 class EncoderImpl : public Encoder, Logger::Loggable<Logger::Id::memcached> {
 public:
   EncoderImpl(Buffer::Instance& output) : output_(output) {}
@@ -227,10 +269,13 @@ public:
   void encodeReplace(const ReplaceRequest& message) override;
   void encodeIncrement(const IncrementRequest& message) override;
   void encodeDecrement(const DecrementRequest& message) override;
+  void encodeAppend(const AppendRequest& message) override;
+  void encodePrepend(const PrependRequest& message) override;
 private:
   void encodeGetLike(const GetLikeRequest& request, Message::OpCode op_code);
   void encodeSetLike(const SetLikeRequest& request, Message::OpCode op_code);
   void encodeCounterLike(const CounterLikeRequest& request, Message::OpCode op_code);
+  void encodeAppendLike(const AppendLikeRequest& request, Message::OpCode op_code);
   void encodeRequestHeader(
     uint16_t key_length,
     uint8_t extras_length,

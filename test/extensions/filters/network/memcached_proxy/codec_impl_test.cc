@@ -28,6 +28,8 @@ public:
   void decodeReplace(ReplaceRequestPtr&& message) override { decodeReplace_(message); }
   void decodeIncrement(IncrementRequestPtr&& message) override { decodeIncrement_(message); }
   void decodeDecrement(DecrementRequestPtr&& message) override { decodeDecrement_(message); }
+  void decodeAppend(AppendRequestPtr&& message) override { decodeAppend_(message); }
+  void decodePrepend(PrependRequestPtr&& message) override { decodePrepend_(message); }
 
   MOCK_METHOD1(decodeGet_, void(GetRequestPtr& message));
   MOCK_METHOD1(decodeGetk_, void(GetkRequestPtr& message));
@@ -37,6 +39,8 @@ public:
   MOCK_METHOD1(decodeReplace_, void(ReplaceRequestPtr& message));
   MOCK_METHOD1(decodeIncrement_, void(IncrementRequestPtr& message));
   MOCK_METHOD1(decodeDecrement_, void(DecrementRequestPtr& message));
+  MOCK_METHOD1(decodeAppend_, void(AppendRequestPtr& message));
+  MOCK_METHOD1(decodePrepend_, void(PrependRequestPtr& message));
 };
 
 class MemcachedCodecImplTest : public testing::Test {
@@ -177,6 +181,40 @@ TEST_F(MemcachedCodecImplTest, CounterLikeEquality) {
   }
 }
 
+TEST_F(MemcachedCodecImplTest, AppendLikeEquality) {
+  {
+    AppendRequestImpl s1(1, 1, 1, 1);
+    AppendRequestImpl s2(2, 2, 2, 2);
+    EXPECT_FALSE(s1 == s2);
+  }
+
+  {
+    AppendRequestImpl s1(1, 1, 1, 1);
+    s1.key("foo");
+    AppendRequestImpl s2(1, 1, 1, 1);
+    s2.key("bar");
+    EXPECT_FALSE(s1 == s2);
+  }
+
+  {
+    AppendRequestImpl s1(1, 1, 1, 1);
+    s1.body("foo");
+    AppendRequestImpl s2(1, 1, 1, 1);
+    s2.body("bar");
+    EXPECT_FALSE(s1 == s2);
+  }
+
+  {
+    AppendRequestImpl s1(1, 1, 1, 1);
+    s1.key("foo");
+    s1.body("bar");
+    AppendRequestImpl s2(1, 1, 1, 1);
+    s2.key("foo");
+    s2.body("bar");
+    EXPECT_TRUE(s1 == s2);
+  }
+}
+
 TEST_F(MemcachedCodecImplTest, GetRoundTrip) {
   GetRequestImpl get(3, 3, 3, 3);
   get.key("foo");
@@ -255,6 +293,26 @@ TEST_F(MemcachedCodecImplTest, DecrementRoundTrip) {
 
   encoder_.encodeDecrement(decr);
   EXPECT_CALL(callbacks_, decodeDecrement_(Pointee(Eq(decr))));
+  decoder_.onData(output_);
+}
+
+TEST_F(MemcachedCodecImplTest, AppendRoundTrip) {
+  AppendRequestImpl append(3, 3, 3, 3);
+  append.key("foo");
+  append.body("bar");
+
+  encoder_.encodeAppend(append);
+  EXPECT_CALL(callbacks_, decodeAppend_(Pointee(Eq(append))));
+  decoder_.onData(output_);
+}
+
+TEST_F(MemcachedCodecImplTest, PrependRoundTrip) {
+  PrependRequestImpl prepend(3, 3, 3, 3);
+  prepend.key("foo");
+  prepend.body("bar");
+
+  encoder_.encodePrepend(prepend);
+  EXPECT_CALL(callbacks_, decodePrepend_(Pointee(Eq(prepend))));
   decoder_.onData(output_);
 }
 

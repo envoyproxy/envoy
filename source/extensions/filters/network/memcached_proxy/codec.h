@@ -31,6 +31,10 @@ public:
     OP_INCREMENTQ = 0x15,
     OP_DECREMENT = 0x06,
     OP_DECREMENTQ = 0x16,
+    OP_APPEND = 0x0e,
+    OP_APPENDQ = 0x19,
+    OP_PREPEND = 0x0f,
+    OP_PREPENDQ = 0x1a,
   };
 
   // Define some constants used in memcached messages encoding
@@ -180,6 +184,39 @@ public:
 typedef std::unique_ptr<DecrementRequest> DecrementRequestPtr;
 
 /**
+ * Base class for all append like requests (APPEND, PREPEND)
+ */
+class AppendLikeRequest : public virtual Request {
+public:
+  virtual ~AppendLikeRequest() = default;
+  virtual bool quiet() const PURE;
+  virtual const std::string& key() const PURE;
+  virtual const std::string& body() const PURE;
+};
+
+/**
+ * Memcached OP_APPEND message.
+ */
+class AppendRequest : public virtual AppendLikeRequest {
+public:
+  virtual ~AppendRequest() = default;
+  virtual bool operator==(const AppendRequest& rhs) const PURE;
+};
+
+typedef std::unique_ptr<AppendRequest> AppendRequestPtr;
+
+/**
+ * Memcached OP_PREPEND message.
+ */
+class PrependRequest : public virtual AppendLikeRequest {
+public:
+  virtual ~PrependRequest() = default;
+  virtual bool operator==(const PrependRequest& rhs) const PURE;
+};
+
+typedef std::unique_ptr<PrependRequest> PrependRequestPtr;
+
+/**
  * General callbacks for dispatching decoded memcached messages to a sink.
  */
 class DecoderCallbacks {
@@ -194,6 +231,8 @@ public:
   virtual void decodeReplace(ReplaceRequestPtr&& message) PURE;
   virtual void decodeIncrement(IncrementRequestPtr&& message) PURE;
   virtual void decodeDecrement(DecrementRequestPtr&& message) PURE;
+  virtual void decodeAppend(AppendRequestPtr&& message) PURE;
+  virtual void decodePrepend(PrependRequestPtr&& message) PURE;
 };
 
 /**
@@ -223,6 +262,8 @@ public:
   virtual void encodeReplace(const ReplaceRequest& message) PURE;
   virtual void encodeIncrement(const IncrementRequest& message) PURE;
   virtual void encodeDecrement(const DecrementRequest& message) PURE;
+  virtual void encodeAppend(const AppendRequest& message) PURE;
+  virtual void encodePrepend(const PrependRequest& message) PURE;
 };
 
 } // MemcachedProxy
