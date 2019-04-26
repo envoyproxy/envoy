@@ -27,7 +27,7 @@ void ZipkinSpan::setOperation(absl::string_view operation) {
 }
 
 void ZipkinSpan::setTag(absl::string_view name, absl::string_view value) {
-  span_.setTag(std::string(name), std::string(value));
+  span_.setTag(name, value);
 }
 
 void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
