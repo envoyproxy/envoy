@@ -97,7 +97,7 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : parent_(parent), dispatcher_(parent.dispatcher_),
       resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolve(); })),
-      client_factory_(client_factory) {}
+      client_factory_(client_factory), buffer_timeout_(0) {}
 
 namespace {
 Network::Address::InstanceConstSharedPtr

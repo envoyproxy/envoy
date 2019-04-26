@@ -209,6 +209,8 @@ private:
     }
     bool enableHashtagging() const override { return false; }
     bool enableRedirection() const override { return false; }
+    uint32_t maxBufferSizeBeforeFlush() const override { return 0; }
+    std::chrono::milliseconds bufferFlushTimeoutInMs() const override { return buffer_timeout_; }
 
     // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
@@ -231,6 +233,7 @@ private:
     Upstream::HostMap all_hosts_;
     Event::TimerPtr resolve_timer_;
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
+    const std::chrono::milliseconds buffer_timeout_;
   };
 
   Upstream::ClusterManager& cluster_manager_;
