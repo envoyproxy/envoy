@@ -21,9 +21,11 @@ namespace MemcachedProxy {
 class TestDecoderCallbacks : public DecoderCallbacks {
 public:
   void decodeGet(GetRequestPtr&& message) override { decodeGet_(message); }
+  void decodeGetk(GetkRequestPtr&& message) override { decodeGetk_(message); }
   void decodeSet(SetRequestPtr&& message) override { decodeSet_(message); }
 
   MOCK_METHOD1(decodeGet_, void(GetRequestPtr& message));
+  MOCK_METHOD1(decodeGetk_, void(GetkRequestPtr& message));
   MOCK_METHOD1(decodeSet_, void(SetRequestPtr& message));
 };
 
@@ -117,6 +119,15 @@ TEST_F(MemcachedCodecImplTest, GetRoundTrip) {
 
   encoder_.encodeGet(get);
   EXPECT_CALL(callbacks_, decodeGet_(Pointee(Eq(get))));
+  decoder_.onData(output_);
+}
+
+TEST_F(MemcachedCodecImplTest, GetkRoundTrip) {
+  GetkRequestImpl getk(3, 3, 3, 3);
+  getk.key("foo");
+
+  encoder_.encodeGetk(getk);
+  EXPECT_CALL(callbacks_, decodeGetk_(Pointee(Eq(getk))));
   decoder_.onData(output_);
 }
 

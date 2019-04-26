@@ -24,12 +24,11 @@ std::string BufferHelper::drainString(Buffer::Instance& data, uint32_t length) {
   return ret;
 }
 
-void GetRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t, Buffer::Instance& data) {
+void GetLikeRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t, Buffer::Instance& data) {
   key_ = BufferHelper::drainString(data, key_length);
-  ENVOY_LOG(trace, "decoded `GET` key={}", key_);
 }
 
-bool GetRequestImpl::operator==(const GetRequest& rhs) const {
+bool GetLikeRequestImpl::equals(const GetLikeRequest& rhs) const {
   return vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
     opaque() == rhs.opaque() &&
     cas() == rhs.cas() &&
@@ -41,7 +40,6 @@ void SetRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t body_leng
   expiration_ = data.drainBEInt<uint32_t>();
   key_ = BufferHelper::drainString(data, key_length);
   body_ = BufferHelper::drainString(data, body_length);
-  ENVOY_LOG(trace, "decoded `SET` key={}, body={}", key_, body_);
 }
 
 bool SetRequestImpl::operator==(const SetRequest& rhs) const {
@@ -66,13 +64,19 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
 
   switch (op_code) {
   case Message::OpCode::OP_GET:
-  case Message::OpCode::OP_GETQ:
-  case Message::OpCode::OP_GETK:
-  case Message::OpCode::OP_GETKQ: {
-    // TODO: quiet, w/ key.
+  case Message::OpCode::OP_GETQ: {
     auto message = std::make_unique<GetRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
     message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `GET` key={}", message->key());
     callbacks_.decodeGet(std::move(message));
+    break;
+  }
+  case Message::OpCode::OP_GETK:
+  case Message::OpCode::OP_GETKQ: {
+    auto message = std::make_unique<GetkRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `GETK` key={}", message->key());
+    callbacks_.decodeGetk(std::move(message));
     break;
   }
 
@@ -80,6 +84,7 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
   case Message::OpCode::OP_SETQ: {
     auto message = std::make_unique<SetRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
     message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `SET` key={}, body={}", message->key(), message->body());
     callbacks_.decodeSet(std::move(message));
     break;
   }
@@ -141,13 +146,15 @@ void EncoderImpl::encodeRequestHeader(
 }
 
 void EncoderImpl::encodeGet(const GetRequest& request) {
-  encodeRequestHeader(
-    request.key().length(),
-    0,
-    0,
-    request,
-    request.quiet() ? Message::OpCode::OP_GETQ : Message::OpCode::OP_GET);
+  encodeGetLike(request, request.quiet() ? Message::OpCode::OP_GETQ : Message::OpCode::OP_GET);
+}
 
+void EncoderImpl::encodeGetk(const GetkRequest& request) {
+  encodeGetLike(request, request.quiet() ? Message::OpCode::OP_GETKQ : Message::OpCode::OP_GETK);
+}
+
+void EncoderImpl::encodeGetLike(const GetLikeRequest& request, Message::OpCode op_code) {
+  encodeRequestHeader(request.key().length(), 0, 0, request, op_code);
   output_.add(request.key());
 }
 

@@ -45,19 +45,37 @@ public:
 
 typedef std::unique_ptr<Request> RequestPtr;
 
+class GetLikeRequest : public virtual Request {
+public:
+  virtual ~GetLikeRequest() = default;
+
+  virtual bool quiet() const PURE;
+  virtual const std::string& key() const PURE;
+protected:
+  virtual bool equals(const GetLikeRequest& rhs) const PURE;
+};
+
 /**
  * Memcached OP_GET message.
  */
-class GetRequest : public virtual Request {
+class GetRequest : public virtual GetLikeRequest {
 public:
   virtual ~GetRequest() = default;
-
   virtual bool operator==(const GetRequest& rhs) const PURE;
-  virtual bool quiet() const PURE;
-  virtual const std::string& key() const PURE;
 };
 
 typedef std::unique_ptr<GetRequest> GetRequestPtr;
+
+/**
+ * Memcached OP_GETK message.
+ */
+class GetkRequest : public virtual GetLikeRequest {
+public:
+  virtual ~GetkRequest() = default;
+  virtual bool operator==(const GetkRequest& rhs) const PURE;
+};
+
+typedef std::unique_ptr<GetkRequest> GetkRequestPtr;
 
 /**
  * Memcached OP_SET message.
@@ -84,6 +102,7 @@ public:
   virtual ~DecoderCallbacks() = default;
 
   virtual void decodeGet(GetRequestPtr&& message) PURE;
+  virtual void decodeGetk(GetkRequestPtr&& message) PURE;
   virtual void decodeSet(SetRequestPtr&& message) PURE;
 };
 
@@ -107,6 +126,7 @@ public:
   virtual ~Encoder() = default;
 
   virtual void encodeGet(const GetRequest& message) PURE;
+  virtual void encodeGetk(const GetkRequest& message) PURE;
   virtual void encodeSet(const SetRequest& message) PURE;
 };
 

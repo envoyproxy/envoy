@@ -44,28 +44,47 @@ private:
   const uint64_t cas_;
 };
 
-class GetRequestImpl : public RequestImpl,
-                       public GetRequest,
-                       Logger::Loggable<Logger::Id::memcached> {
+class GetLikeRequestImpl : public RequestImpl,
+                           public virtual GetLikeRequest {
 public:
-  GetRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) : RequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+  GetLikeRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) : RequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
 
   // RequestImpl
   void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
 
-  // GetRequest
-  bool operator==(const GetRequest& rhs) const override;
+  // GetLikeRequest
   bool quiet() const override { return false; }
   const std::string& key() const override { return key_; }
 
   void key(const std::string& key) { key_ = key; }
+protected:
+  bool equals(const GetLikeRequest& rhs) const override;
 private:
   std::string key_;
 };
 
+class GetRequestImpl : public GetLikeRequestImpl,
+                       public GetRequest {
+public:
+  GetRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    GetLikeRequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+
+  // GetRequest
+  bool operator==(const GetRequest& rhs) const override { return equals(rhs); }
+};
+
+class GetkRequestImpl : public GetLikeRequestImpl,
+                        public GetkRequest {
+public:
+  GetkRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    GetLikeRequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+
+  // GetkRequest
+  bool operator==(const GetkRequest& rhs) const override { return equals(rhs); }
+};
+
 class SetRequestImpl : public RequestImpl,
-                       public SetRequest,
-                       Logger::Loggable<Logger::Id::memcached> {
+                       public SetRequest {
 public:
   SetRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) : RequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
 
@@ -112,9 +131,11 @@ public:
 
   // Memcached::Encoder
   void encodeGet(const GetRequest& message) override;
+  void encodeGetk(const GetkRequest& message) override;
   void encodeSet(const SetRequest& message) override;
 
 private:
+  void encodeGetLike(const GetLikeRequest& request, Message::OpCode op);
   void encodeRequestHeader(
     uint16_t key_length,
     uint8_t extras_length,
