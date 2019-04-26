@@ -17,9 +17,27 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Stats {
 
+MockMetric::MockMetric() : name_(*this) {}
+MockMetric::~MockMetric() {}
+
+MockMetric::MetricName::~MetricName() {
+  if (stat_name_storage_ != nullptr) {
+    stat_name_storage_->free(*mock_metric_.symbol_table_);
+  }
+}
+
+void MockMetric::setTagExtractedName(absl::string_view name) {
+  tag_extracted_name_ = std::string(name);
+  tag_extracted_stat_name_ =
+      std::make_unique<StatNameManagedStorage>(tagExtractedName(), *symbol_table_);
+}
+
+void MockMetric::MetricName::MetricName::operator=(absl::string_view name) {
+  name_ = std::string(name);
+  stat_name_storage_ = std::make_unique<StatNameStorage>(name, mock_metric_.symbolTable());
+}
+
 MockCounter::MockCounter() {
-  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
   ON_CALL(*this, latch()).WillByDefault(ReturnPointee(&latch_));
@@ -27,8 +45,6 @@ MockCounter::MockCounter() {
 MockCounter::~MockCounter() {}
 
 MockGauge::MockGauge() {
-  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
   ON_CALL(*this, value()).WillByDefault(ReturnPointee(&value_));
 }
@@ -40,10 +56,7 @@ MockHistogram::MockHistogram() {
       store_->deliverHistogramToSinks(*this, value);
     }
   }));
-  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
 }
-
 MockHistogram::~MockHistogram() {}
 
 MockParentHistogram::MockParentHistogram() {
@@ -52,13 +65,10 @@ MockParentHistogram::MockParentHistogram() {
       store_->deliverHistogramToSinks(*this, value);
     }
   }));
-  ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
-  ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
   ON_CALL(*this, intervalStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
   ON_CALL(*this, cumulativeStatistics()).WillByDefault(ReturnRef(*histogram_stats_));
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
 }
-
 MockParentHistogram::~MockParentHistogram() {}
 
 MockSource::MockSource() {
@@ -75,7 +85,7 @@ MockSink::~MockSink() {}
 MockStore::MockStore() : StoreImpl(*fake_symbol_table_) {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, histogram(_)).WillByDefault(Invoke([this](const std::string& name) -> Histogram& {
-    auto* histogram = new NiceMock<MockHistogram>;
+    auto* histogram = new NiceMock<MockHistogram>(); // symbol_table_);
     histogram->name_ = name;
     histogram->store_ = this;
     histograms_.emplace_back(histogram);

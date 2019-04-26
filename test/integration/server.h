@@ -94,15 +94,15 @@ public:
   }
 
   Counter& counter(const std::string& name) override {
-    StatNameTempStorage storage(name, symbolTable());
+    StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
   Gauge& gauge(const std::string& name) override {
-    StatNameTempStorage storage(name, symbolTable());
+    StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName());
   }
   Histogram& histogram(const std::string& name) override {
-    StatNameTempStorage storage(name, symbolTable());
+    StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName());
   }
 

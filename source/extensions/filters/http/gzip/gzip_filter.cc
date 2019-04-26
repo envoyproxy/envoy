@@ -211,9 +211,8 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
 bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_type = headers.ContentType();
   if (content_type && !config_->contentTypeValues().empty()) {
-    // TODO(dnoe): Eliminate std:string construction with Swiss table (#6580)
-    const std::string value{
-        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"))};
+    const absl::string_view value =
+        StringUtil::trim(StringUtil::cropRight(content_type->value().getStringView(), ";"));
     return config_->contentTypeValues().find(value) != config_->contentTypeValues().end();
   }
 

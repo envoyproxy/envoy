@@ -289,7 +289,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(TestUtility::findByName(store_->source().cachedCounters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
-  EXPECT_CALL(tls_, runOnAllThreads(_));
+  EXPECT_CALL(tls_, runOnAllThreads(_, _));
   scope1.reset();
   EXPECT_EQ(0UL, store_->counters().size());
   EXPECT_EQ(1UL, store_->source().cachedCounters().size());
@@ -804,7 +804,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
+  EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
 
   // HACK: doesn't like shutting down without threading having started.
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
@@ -839,7 +839,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 31 * million); // actual value: 30482576 as of Oct 29, 2018
+  EXPECT_LT(end_mem - start_mem, 23 * million); // actual value: 22880912 as of March 14, 2019
   store->shutdownThreading();
   tls.shutdownThread();
 }

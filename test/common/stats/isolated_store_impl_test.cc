@@ -54,7 +54,7 @@ TEST_F(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ("g1", g1.tagExtractedName());
   EXPECT_EQ("scope1.g2", g2.tagExtractedName());
   EXPECT_EQ(0, g1.tags().size());
-  EXPECT_EQ(0, g1.tags().size());
+  EXPECT_EQ(0, g2.tags().size());
 
   Histogram& h1 = store_.histogram("h1");
   Histogram& h2 = scope1->histogram("h2");
