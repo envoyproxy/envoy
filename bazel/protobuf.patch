@@ -1,0 +1,34 @@
+diff --git a/src/google/protobuf/stubs/strutil.cc b/src/google/protobuf/stubs/strutil.cc
+index 1d34870deb..3844fa6b8b 100644
+--- a/src/google/protobuf/stubs/strutil.cc
++++ b/src/google/protobuf/stubs/strutil.cc
+@@ -1116,10 +1116,12 @@ char* FastUInt64ToBufferLeft(uint64 u64, char* buffer) {
+ }
+ 
+ char* FastInt64ToBufferLeft(int64 i, char* buffer) {
+-  uint64 u = i;
++  uint64 u = 0;
+   if (i < 0) {
+     *buffer++ = '-';
+-    u = -i;
++    u -= i;
++  } else {
++    u = i;
+   }
+   return FastUInt64ToBufferLeft(u, buffer);
+ }
+diff --git a/src/google/protobuf/text_format.cc b/src/google/protobuf/text_format.cc
+index ba0c3028ee..801a8e3786 100644
+--- a/src/google/protobuf/text_format.cc
++++ b/src/google/protobuf/text_format.cc
+@@ -1315,7 +1315,9 @@ class TextFormat::Printer::TextGenerator
+     while (size > buffer_size_) {
+       // Data exceeds space in the buffer. Write what we can and request a new
+       // buffer.
+-      memset(buffer_, ' ', buffer_size_);
++      if (buffer_size_ > 0) {
++        memset(buffer_, ' ', buffer_size_);
++      }
+       size -= buffer_size_;
+       void* void_buffer;
+       failed_ = !output_->Next(&void_buffer, &buffer_size_);

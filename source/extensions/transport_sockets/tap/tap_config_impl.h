@@ -28,9 +28,8 @@ private:
       buffered_trace_->mutable_socket_buffered_trace()->set_trace_id(connection_.id());
     }
   }
-  Extensions::Common::Tap::TraceWrapperSharedPtr makeTraceSegment() {
-    Extensions::Common::Tap::TraceWrapperSharedPtr trace =
-        Extensions::Common::Tap::makeTraceWrapper();
+  Extensions::Common::Tap::TraceWrapperPtr makeTraceSegment() {
+    Extensions::Common::Tap::TraceWrapperPtr trace = Extensions::Common::Tap::makeTraceWrapper();
     trace->mutable_socket_streamed_trace_segment()->set_trace_id(connection_.id());
     return trace;
   }
@@ -40,7 +39,7 @@ private:
   const Network::Connection& connection_;
   Extensions::Common::Tap::Matcher::MatchStatusVector statuses_;
   // Must be a shared_ptr because of submitTrace().
-  Extensions::Common::Tap::TraceWrapperSharedPtr buffered_trace_;
+  Extensions::Common::Tap::TraceWrapperPtr buffered_trace_;
   uint32_t rx_bytes_buffered_{};
   uint32_t tx_bytes_buffered_{};
 };
