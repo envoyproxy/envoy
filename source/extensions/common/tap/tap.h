@@ -14,7 +14,6 @@ namespace Extensions {
 namespace Common {
 namespace Tap {
 
-using TraceWrapper = envoy::data::tap::v2alpha::TraceWrapper;
 using TraceWrapperPtr = std::unique_ptr<envoy::data::tap::v2alpha::TraceWrapper>;
 inline TraceWrapperPtr makeTraceWrapper() {
   return std::make_unique<envoy::data::tap::v2alpha::TraceWrapper>();
