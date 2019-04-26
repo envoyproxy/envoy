@@ -169,7 +169,7 @@ void RedisCluster::RedisDiscoverySession::startResolve() {
   current_host_address_ = host->address()->asString();
   RedisDiscoveryClientPtr& client = client_map_[current_host_address_];
   if (!client) {
-    client.reset(new RedisDiscoveryClient(*this));
+    client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
     client->client_ = client_factory_.create(host, dispatcher_, *this);
     client->client_->addConnectionCallbacks(*client);
