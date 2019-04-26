@@ -151,6 +151,54 @@ public:
   bool operator==(const ReplaceRequest& rhs) const override { return equals(rhs); }
 };
 
+class CounterLikeRequestImpl : public RequestImpl,
+                               public virtual CounterLikeRequest {
+public:
+  CounterLikeRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) : RequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+
+  // RequestImpl
+  void fromBuffer(uint16_t key_length, uint8_t extras_length, uint32_t body_length, Buffer::Instance& data) override;
+
+  // CounterLikeRequest
+  bool quiet() const override { return false; }
+  const std::string& key() const override { return key_; }
+  uint64_t amount() const override { return amount_; }
+  uint64_t initialValue() const override { return initial_value_; }
+  uint32_t expiration() const override { return expiration_; }
+
+  void key(const std::string& key) { key_ = key; }
+  void amount(uint64_t amount) { amount_ = amount; }
+  void initialValue(uint64_t initial_value) { initial_value_ = initial_value; }
+  void expiration(uint32_t expiration) { expiration_ = expiration; }
+protected:
+  bool equals(const CounterLikeRequest& rhs) const;
+private:
+  std::string key_;
+  uint64_t amount_;
+  uint64_t initial_value_;
+  uint32_t expiration_;
+};
+
+class IncrementRequestImpl : public CounterLikeRequestImpl,
+                             public IncrementRequest {
+public:
+  IncrementRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    CounterLikeRequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+
+  // IncrementRequest
+  bool operator==(const IncrementRequest& rhs) const override { return equals(rhs); }
+};
+
+class DecrementRequestImpl : public CounterLikeRequestImpl,
+                             public DecrementRequest {
+public:
+  DecrementRequestImpl(uint8_t data_type, uint8_t vbucket_id_or_status, uint32_t opaque, uint64_t cas) :
+    CounterLikeRequestImpl(data_type, vbucket_id_or_status, opaque, cas) {}
+
+  // DecrementRequest
+  bool operator==(const DecrementRequest& rhs) const override { return equals(rhs); }
+};
+
 class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::memcached> {
 public:
   DecoderImpl(DecoderCallbacks& callbacks) : callbacks_(callbacks) {}
@@ -177,9 +225,12 @@ public:
   void encodeSet(const SetRequest& message) override;
   void encodeAdd(const AddRequest& message) override;
   void encodeReplace(const ReplaceRequest& message) override;
+  void encodeIncrement(const IncrementRequest& message) override;
+  void encodeDecrement(const DecrementRequest& message) override;
 private:
   void encodeGetLike(const GetLikeRequest& request, Message::OpCode op_code);
   void encodeSetLike(const SetLikeRequest& request, Message::OpCode op_code);
+  void encodeCounterLike(const CounterLikeRequest& request, Message::OpCode op_code);
   void encodeRequestHeader(
     uint16_t key_length,
     uint8_t extras_length,

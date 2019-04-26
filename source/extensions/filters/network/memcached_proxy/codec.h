@@ -27,6 +27,10 @@ public:
     OP_ADDQ = 0x12,
     OP_REPLACE = 0x03,
     OP_REPLACEQ = 0x13,
+    OP_INCREMENT = 0x05,
+    OP_INCREMENTQ = 0x15,
+    OP_DECREMENT = 0x06,
+    OP_DECREMENTQ = 0x16,
   };
 
   // Define some constants used in memcached messages encoding
@@ -141,6 +145,41 @@ public:
 typedef std::unique_ptr<ReplaceRequest> ReplaceRequestPtr;
 
 /**
+ * Base class for all counter like requests (INCREMENT, DECREMENT)
+ */
+class CounterLikeRequest : public virtual Request {
+public:
+  virtual ~CounterLikeRequest() = default;
+  virtual bool quiet() const PURE;
+  virtual const std::string& key() const PURE;
+  virtual uint64_t amount() const PURE;
+  virtual uint64_t initialValue() const PURE;
+  virtual uint32_t expiration() const PURE;
+};
+
+/**
+ * Memcached OP_INCREMENT message.
+ */
+class IncrementRequest : public virtual CounterLikeRequest {
+public:
+  virtual ~IncrementRequest() = default;
+  virtual bool operator==(const IncrementRequest& rhs) const PURE;
+};
+
+typedef std::unique_ptr<IncrementRequest> IncrementRequestPtr;
+
+/**
+ * Memcached OP_DECREMENT message.
+ */
+class DecrementRequest : public virtual CounterLikeRequest {
+public:
+  virtual ~DecrementRequest() = default;
+  virtual bool operator==(const DecrementRequest& rhs) const PURE;
+};
+
+typedef std::unique_ptr<DecrementRequest> DecrementRequestPtr;
+
+/**
  * General callbacks for dispatching decoded memcached messages to a sink.
  */
 class DecoderCallbacks {
@@ -153,6 +192,8 @@ public:
   virtual void decodeSet(SetRequestPtr&& message) PURE;
   virtual void decodeAdd(AddRequestPtr&& message) PURE;
   virtual void decodeReplace(ReplaceRequestPtr&& message) PURE;
+  virtual void decodeIncrement(IncrementRequestPtr&& message) PURE;
+  virtual void decodeDecrement(DecrementRequestPtr&& message) PURE;
 };
 
 /**
@@ -180,6 +221,8 @@ public:
   virtual void encodeSet(const SetRequest& message) PURE;
   virtual void encodeAdd(const AddRequest& message) PURE;
   virtual void encodeReplace(const ReplaceRequest& message) PURE;
+  virtual void encodeIncrement(const IncrementRequest& message) PURE;
+  virtual void encodeDecrement(const DecrementRequest& message) PURE;
 };
 
 } // MemcachedProxy

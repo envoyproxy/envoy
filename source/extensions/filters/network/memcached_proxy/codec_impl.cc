@@ -54,6 +54,24 @@ bool SetLikeRequestImpl::equals(const SetLikeRequest& rhs) const {
     flags() == rhs.flags();
 }
 
+void CounterLikeRequestImpl::fromBuffer(uint16_t key_length, uint8_t, uint32_t, Buffer::Instance& data) {
+  key_ = BufferHelper::drainString(data, key_length);
+  amount_ = data.drainBEInt<uint64_t>();
+  initial_value_ = data.drainBEInt<uint64_t>();
+  expiration_ = data.drainBEInt<uint32_t>();
+}
+
+bool CounterLikeRequestImpl::equals(const CounterLikeRequest& rhs) const {
+  return dataType() == rhs.dataType() &&
+    vbucketIdOrStatus() == rhs.vbucketIdOrStatus() &&
+    opaque() == rhs.opaque() &&
+    cas() == rhs.cas() &&
+    key() == rhs.key() &&
+    amount() == rhs.amount() &&
+    initialValue() == rhs.initialValue() &&
+    expiration() == rhs.expiration();
+}
+
 bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
   auto op_code = static_cast<Message::OpCode>(data.drainBEInt<uint8_t>());
   auto key_length = data.drainBEInt<uint16_t>();
@@ -117,6 +135,24 @@ bool DecoderImpl::decodeRequest(Buffer::Instance& data) {
     message->fromBuffer(key_length, extras_length, body_length, data);
     ENVOY_LOG(trace, "decoded `REPLACE` key={}, body={}", message->key(), message->body());
     callbacks_.decodeReplace(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_INCREMENT:
+  case Message::OpCode::OP_INCREMENTQ: {
+    auto message = std::make_unique<IncrementRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `INCREMENT` key={}, amount={}, initial_value={}", message->key(), message->amount(), message->initialValue());
+    callbacks_.decodeIncrement(std::move(message));
+    break;
+  }
+
+  case Message::OpCode::OP_DECREMENT:
+  case Message::OpCode::OP_DECREMENTQ: {
+    auto message = std::make_unique<DecrementRequestImpl>(data_type, vbucket_id_or_status, opaque, cas);
+    message->fromBuffer(key_length, extras_length, body_length, data);
+    ENVOY_LOG(trace, "decoded `DECREMENT` key={}, amount={}, initial_value={}", message->key(), message->amount(), message->initialValue());
+    callbacks_.decodeDecrement(std::move(message));
     break;
   }
 
@@ -211,6 +247,22 @@ void EncoderImpl::encodeSetLike(const SetLikeRequest& request, Message::OpCode o
   output_.writeBEInt<uint32_t>(request.expiration());
   output_.add(request.key());
   output_.add(request.body());
+}
+
+void EncoderImpl::encodeIncrement(const IncrementRequest& request) {
+  encodeCounterLike(request, request.quiet() ? Message::OpCode::OP_INCREMENTQ : Message::OpCode::OP_INCREMENT);
+}
+
+void EncoderImpl::encodeDecrement(const DecrementRequest& request) {
+  encodeCounterLike(request, request.quiet() ? Message::OpCode::OP_DECREMENTQ : Message::OpCode::OP_DECREMENT);
+}
+
+void EncoderImpl::encodeCounterLike(const CounterLikeRequest& request, Message::OpCode op_code) {
+  encodeRequestHeader(request.key().length(), 8, 0, request, op_code);
+  output_.add(request.key());
+  output_.writeBEInt<uint64_t>(request.amount());
+  output_.writeBEInt<uint64_t>(request.initialValue());
+  output_.writeBEInt<uint32_t>(request.expiration());
 }
 
 }
