@@ -29,6 +29,9 @@ cat <<EOF >sed_commands
 # Rewrite include directives for platform impl files.
 /^#include/ s!net/(http2|spdy|quic)/platform/impl/!extensions/quic_listeners/quiche/platform/!
 
+# Rewrite include directives for epoll_server platform impl files.
+/^#include/ s!net/tools/epoll_server/platform/impl!test/extensions/quic_listeners/quiche/platform/!
+
 # Strip "net/third_party" from include directives to other QUICHE files.
 /^#include/ s!net/third_party/quiche/src/!quiche/!
 
