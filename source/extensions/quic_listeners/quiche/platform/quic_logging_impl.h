@@ -68,14 +68,15 @@
 
 #ifdef NDEBUG
 // Release build
-#define DCHECK(condition) QUIC_COMPILED_OUT_LOG()
-#define QUIC_COMPILED_OUT_LOG() QUIC_LOG_IMPL_INTERNAL(false, quic::NullLogStream().stream())
-#define QUIC_DVLOG_IMPL(verbosity) QUIC_COMPILED_OUT_LOG()
-#define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_COMPILED_OUT_LOG()
-#define QUIC_DLOG_IMPL(severity) QUIC_COMPILED_OUT_LOG()
-#define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_COMPILED_OUT_LOG()
+#define DCHECK(condition) QUIC_COMPILED_OUT_LOG(condition)
+#define QUIC_COMPILED_OUT_LOG(condition)                                                           \
+  QUIC_LOG_IMPL_INTERNAL(false && (condition), quic::NullLogStream().stream())
+#define QUIC_DVLOG_IMPL(verbosity) QUIC_COMPILED_OUT_LOG(false)
+#define QUIC_DVLOG_IF_IMPL(verbosity, condition) QUIC_COMPILED_OUT_LOG(condition)
+#define QUIC_DLOG_IMPL(severity) QUIC_COMPILED_OUT_LOG(false)
+#define QUIC_DLOG_IF_IMPL(severity, condition) QUIC_COMPILED_OUT_LOG(condition)
 #define QUIC_DLOG_INFO_IS_ON_IMPL() 0
-#define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_COMPILED_OUT_LOG()
+#define QUIC_DLOG_EVERY_N_IMPL(severity, n) QUIC_COMPILED_OUT_LOG(false)
 #define QUIC_NOTREACHED_IMPL()
 #else
 // Debug build
@@ -90,6 +91,11 @@
 #endif
 
 #define DCHECK_GE(a, b) DCHECK((a) >= (b))
+#define DCHECK_GT(a, b) DCHECK((a) > (b))
+#define DCHECK_LT(a, b) DCHECK((a) < (b))
+#define DCHECK_LE(a, b) DCHECK((a) <= (b))
+#define DCHECK_NE(a, b) DCHECK((a) != (b))
+#define DCHECK_EQ(a, b) DCHECK((a) == (b))
 
 #define QUIC_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
 
