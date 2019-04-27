@@ -31,7 +31,6 @@ load(
     "envoy_cc_library",
     "envoy_cc_test",
     "envoy_cc_test_library",
-    "envoy_external_dep_path",
     "envoy_select_quiche",
 )
 
@@ -64,11 +63,9 @@ envoy_cc_test_library(
     name = "http2_test_tools_random",
     srcs = ["quiche/http2/test_tools/http2_random.cc"],
     hdrs = ["quiche/http2/test_tools/http2_random.h"],
+    external_deps = ["ssl"],
     repository = "@envoy",
-    deps = [
-        ":http2_platform",
-        envoy_external_dep_path("ssl"),
-    ],
+    deps = [":http2_platform"],
 )
 
 envoy_cc_library(
