@@ -28,6 +28,7 @@ envoy_cc_library(
     hdrs = ["async_client_manager_impl.h"],
     deps = [
         ":async_client_lib",
+        ":common_lib",
         "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
@@ -61,7 +62,10 @@ envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
-    external_deps = ["abseil_optional"],
+    external_deps = [
+        "abseil_optional",
+        "grpc",
+    ],
     deps = [
         "//include/envoy/http:header_map_interface",
         "//include/envoy/http:message_interface",
@@ -91,6 +95,8 @@ envoy_cc_library(
         "grpc",
     ],
     deps = [
+        ":async_client_lib",
+        ":common_lib",
         ":google_grpc_creds_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/grpc:google_grpc_creds_interface",

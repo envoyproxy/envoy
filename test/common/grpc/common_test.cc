@@ -1,3 +1,5 @@
+#include <arpa/inet.h>
+
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -347,6 +349,79 @@ TEST(GrpcCommonTest, ValidateResponse) {
         {":status", "200"}, {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
     EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
   }
+}
+
+TEST(GrpcCommonTest, MakeBufferInstanceEmpty) {
+  grpc::ByteBuffer byteBuffer;
+  Common::makeBufferInstance(byteBuffer);
+}
+
+TEST(GrpcCommonTest, MakeByteBufferEmpty) {
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  Common::makeByteBuffer(std::move(buffer));
+}
+
+TEST(GrpcCommonTest, MakeBufferInstance1) {
+  grpc::Slice slice("test");
+  grpc::ByteBuffer byteBuffer(&slice, 1);
+  auto bufferInstance = Common::makeBufferInstance(byteBuffer);
+  EXPECT_EQ(bufferInstance->toString(), "test");
+}
+
+TEST(GrpcCommonTest, MakeBufferInstance3) {
+  grpc::Slice slices[3] = {{"test"}, {" "}, {"this"}};
+  grpc::ByteBuffer byteBuffer(slices, 3);
+  auto bufferInstance = Common::makeBufferInstance(byteBuffer);
+  EXPECT_EQ(bufferInstance->toString(), "test this");
+}
+
+TEST(GrpcCommonTest, MakeByteBuffer1) {
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  buffer->add("test", 4);
+  auto byteBuffer = Common::makeByteBuffer(std::move(buffer));
+  std::vector<grpc::Slice> slices;
+  byteBuffer.Dump(&slices);
+  std::string str;
+  for (auto& s : slices) {
+    str.append(std::string(reinterpret_cast<const char*>(s.begin()), s.size()));
+  }
+  EXPECT_EQ(str, "test");
+}
+
+TEST(GrpcCommonTest, MakeByteBuffer3) {
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  buffer->add("test", 4);
+  buffer->add(" ", 1);
+  buffer->add("this", 4);
+  auto byteBuffer = Common::makeByteBuffer(std::move(buffer));
+  std::vector<grpc::Slice> slices;
+  byteBuffer.Dump(&slices);
+  std::string str;
+  for (auto& s : slices) {
+    str.append(std::string(reinterpret_cast<const char*>(s.begin()), s.size()));
+  }
+  EXPECT_EQ(str, "test this");
+}
+
+TEST(GrpcCommonTest, ByteBufferInstanceRoundTrip) {
+  grpc::Slice slices[3] = {{"test"}, {" "}, {"this"}};
+  grpc::ByteBuffer byteBuffer1(slices, 3);
+  auto bufferInstance1 = Common::makeBufferInstance(byteBuffer1);
+  auto byteBuffer2 = Common::makeByteBuffer(std::move(bufferInstance1));
+  auto bufferInstance2 = Common::makeBufferInstance(byteBuffer2);
+  EXPECT_EQ(bufferInstance2->toString(), "test this");
+}
+
+TEST(GrpcCommonTest, PreependGrpcFrameHeader) {
+  auto buffer = std::make_unique<Buffer::OwnedImpl>();
+  buffer->add("test", 4);
+  char expected_header[5];
+  expected_header[0] = 0; // flags
+  const uint32_t nsize = htonl(4);
+  std::memcpy(&expected_header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
+  std::string header_string(expected_header, 5);
+  Common::PrependGrpcFrameHeader(buffer.get());
+  EXPECT_EQ(buffer->toString(), header_string + "test");
 }
 
 } // namespace Grpc
