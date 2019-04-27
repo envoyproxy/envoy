@@ -400,6 +400,22 @@ private:
   SymbolTable& symbol_table_;
 };
 
+class StatNameManagedContainer {
+public:
+  explicit StatNameManagedContainer(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~StatNameManagedContainer();
+
+  /**
+   * @param name the name to add the container.
+   * @return the StatName held in the container for this name.
+   */
+  StatName add(absl::string_view name);
+
+private:
+  SymbolTable& symbol_table_;
+  std::vector<StatNameStorage> storage_vector_;
+};
+
 // Represents an ordered container of StatNames. The encoding for each StatName
 // is byte-packed together, so this carries less overhead than allocating the
 // storage separately. The tradeoff is there is no random access; you can only

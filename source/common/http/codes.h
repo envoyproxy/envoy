@@ -16,7 +16,6 @@ namespace Http {
 class CodeStatsImpl : public CodeStats {
 public:
   explicit CodeStatsImpl(Stats::SymbolTable& symbol_table);
-  ~CodeStatsImpl() override;
 
   // CodeStats
   void chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
@@ -59,19 +58,10 @@ private:
   };
 
   static absl::string_view stripTrailingDot(absl::string_view prefix);
-  Stats::StatName makeStatName(absl::string_view name);
+  Stats::StatName makeStatName(absl::string_view name) { return storage_.add(name); }
   Stats::StatName upstreamRqGroup(Code response_code) const;
 
-  // We have to actively free the StatNameStorage with the symbol_table_, so
-  // it's easiest to accumulate the StatNameStorage objects in a vector, in
-  // addition to having discrete member variables. That saves having to
-  // enumerate the stat-names in both the member-variables listed below
-  // and the destructor.
-  //
-  // TODO(jmarantz): consider a new variant in stats_macros.h to enumerate stats
-  // names and manage their storage.
-  std::vector<Stats::StatNameStorage> storage_;
-
+  Stats::StatNameManagedContainer storage_;
   Stats::SymbolTable& symbol_table_;
 
   Stats::StatName canary_;

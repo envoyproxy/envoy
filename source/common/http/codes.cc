@@ -19,7 +19,7 @@ namespace Envoy {
 namespace Http {
 
 CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
-    : symbol_table_(symbol_table), canary_(makeStatName("canary")),
+    : storage_(symbol_table), symbol_table_(symbol_table), canary_(makeStatName("canary")),
       canary_upstream_rq_time_(makeStatName("canary.upstream_rq_time")),
       external_(makeStatName("external")),
       external_rq_time_(makeStatName("external.upstream_rq_time")),
@@ -39,17 +39,6 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
       canary_upstream_rq_("canary_upstream_rq_", *this),
       external_upstream_rq_("external_upstream_rq_", *this),
       internal_upstream_rq_("internal_upstream_rq_", *this), upstream_rq_("upstream_rq_", *this) {}
-
-CodeStatsImpl::~CodeStatsImpl() {
-  for (Stats::StatNameStorage& stat_name_storage : storage_) {
-    stat_name_storage.free(symbol_table_);
-  }
-}
-
-Stats::StatName CodeStatsImpl::makeStatName(absl::string_view name) {
-  storage_.push_back(Stats::StatNameStorage(name, symbol_table_));
-  return storage_.back().statName();
-}
 
 void CodeStatsImpl::incCounter(Stats::Scope& scope,
                                const std::vector<Stats::StatName>& names) const {
