@@ -47,8 +47,7 @@ public:
    * locks. This is used then in thread-local cache lookup, so that once warm,
    * no locks are taken when looking up stats.
    */
-  using StorageElement = uint8_t;
-  using Storage = StorageElement[];
+  using Storage = uint8_t[];
   using StoragePtr = std::unique_ptr<Storage>;
 
   virtual ~SymbolTable() = default;

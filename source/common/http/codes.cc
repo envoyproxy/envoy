@@ -192,7 +192,7 @@ Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
   // Take a lock only if we've never seen this response-code before.
   uint32_t rc_int = static_cast<uint32_t>(response_code);
   RELEASE_ASSERT(rc_int < NumHttpCodes, absl::StrCat("Unexpected http code: ", rc_int));
-  std::atomic<Stats::SymbolTable::StorageElement*>& atomic_ref = rc_stat_names_[rc_int];
+  std::atomic<uint8_t*>& atomic_ref = rc_stat_names_[rc_int];
   if (atomic_ref.load() == nullptr) {
     absl::MutexLock lock(&mutex_);
 

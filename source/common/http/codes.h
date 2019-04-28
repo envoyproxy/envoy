@@ -50,11 +50,12 @@ private:
     //
     // We don't allocate these all up front during construction because
     // SymbolTable greedily encodes the first 128 names it discovers in one
-    // byte. We want those high-value single-byte codes to go to enumerating
-    // various prefixes combined with HTTP codes that are seldom used.
+    // byte. We don't want those high-value single-byte codes to go to fully
+    // enumerating the 4 prefixes combined with HTTP codes that are seldom used,
+    // so we allocate these on demand.
 
     static constexpr uint32_t NumHttpCodes = 1000;
-    std::atomic<Stats::SymbolTable::StorageElement*> rc_stat_names_[NumHttpCodes];
+    std::atomic<uint8_t*> rc_stat_names_[NumHttpCodes];
 
     CodeStatsImpl& code_stats_;
     std::string prefix_;

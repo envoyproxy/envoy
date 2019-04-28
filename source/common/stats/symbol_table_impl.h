@@ -355,7 +355,7 @@ public:
 #endif
 
   /**
-   * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
+   * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
 
@@ -415,9 +415,10 @@ public:
 
   /**
    * @param name the name to add the container.
-   * @return the StatNameStorage object held in the container for this name.
+   * @return a pointer to the bytes held in the container for this name, suitable for
+   *         using to construct a StatName.
    */
-  SymbolTable::StorageElement* addReturningStorage(absl::string_view name);
+  uint8_t* addReturningStorage(absl::string_view name);
 
 private:
   SymbolTable& symbol_table_;
