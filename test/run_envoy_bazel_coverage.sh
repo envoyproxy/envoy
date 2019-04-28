@@ -29,7 +29,8 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
   --combined_report=lcov \
   --profile=/tmp/bazel-prof \
   --cache_test_results=no \
-  --run_under=./profile.sh \
+  --strategy=Genrule=standalone --spawn_strategy=standalone \
+  --coverage_support=//coverage_support \
   --define ENVOY_CONFIG_COVERAGE=1 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --copt=-DNDEBUG --test_timeout=6000
 
 # Generate HTML
