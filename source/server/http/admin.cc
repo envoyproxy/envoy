@@ -535,11 +535,11 @@ Http::Code AdminImpl::handlerHeapProfiler(absl::string_view url, Http::HeaderMap
       response.add("Fail to start heap profiler: already started");
       res = Http::Code::BadRequest;
     } else if (!Profiler::Heap::startProfiler(profile_path_)) {
-      // GCOVR_EXCL_START
+      // LCOV_EXCL_START
       // TODO(silentdai) remove the GCOVR when startProfiler is better implemented
       response.add("Fail to start the heap profiler");
       res = Http::Code::InternalServerError;
-      // GCOVR_EXCL_END
+      // LCOV_EXCL_END
     } else {
       response.add("Starting heap profiler");
       res = Http::Code::OK;

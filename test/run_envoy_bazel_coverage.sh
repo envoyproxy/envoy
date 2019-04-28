@@ -27,6 +27,9 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
   --instrumentation_filter=//source/...,//include/... \
   --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main \
   --combined_report=lcov \
+  --profile=/tmp/bazel-prof \
+  --cache_test_results=no \
+  --run_under=./profile.sh \
   --define ENVOY_CONFIG_COVERAGE=1 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --copt=-DNDEBUG --test_timeout=6000
 
 # Generate HTML
