@@ -117,7 +117,7 @@ public:
      * @param array destination memory to receive the encoded bytes.
      * @return uint64_t the number of bytes transferred.
      */
-    uint64_t moveToStorage(SymbolTable::Storage array);
+    uint64_t moveToStorage(SymbolTable::StorageArray array);
 
   private:
     std::vector<uint8_t> vec_;
@@ -316,7 +316,7 @@ public:
   // Constructs a StatName object with new storage, which must be of size
   // src.size(). This is used in the a flow where we first construct a StatName
   // for lookup in a cache, and then on a miss need to store the data directly.
-  StatName(const StatName& src, SymbolTable::Storage memory);
+  StatName(const StatName& src, SymbolTable::StorageArray memory);
 
   /**
    * Note that this hash function will return a different hash than that of
@@ -418,7 +418,7 @@ public:
    * @param name the name to add the container.
    * @return the StatNameStorage object held in the container for this name.
    */
-  SymbolTable::Storage addReturningStorage(absl::string_view name);
+  SymbolTable::StorageElement* addReturningStorage(absl::string_view name);
 
 private:
   SymbolTable& symbol_table_;

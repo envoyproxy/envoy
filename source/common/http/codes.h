@@ -54,7 +54,7 @@ private:
     // various prefixes combined with HTTP codes that are seldom used.
 
     static constexpr uint32_t NumHttpCodes = 1000;
-    std::atomic<Stats::SymbolTable::Storage> rc_stat_names_[NumHttpCodes];
+    std::atomic<Stats::SymbolTable::StorageElement*> rc_stat_names_[NumHttpCodes];
 
     CodeStatsImpl& code_stats_;
     std::string prefix_;

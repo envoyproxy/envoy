@@ -16,7 +16,7 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
-StatName::StatName(const StatName& src, SymbolTable::Storage memory) : size_and_data_(memory) {
+StatName::StatName(const StatName& src, SymbolTable::StorageArray memory) : size_and_data_(memory) {
   memcpy(memory, src.size_and_data_, src.size());
 }
 
