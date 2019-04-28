@@ -34,6 +34,7 @@ rm -f /tmp/coverage.perf.data
   --coverage_support=//coverage_support \
   --test_env=CC_CODE_COVERAGE_SCRIPT=coverage_support/collect_coverage.sh \
   --test_output=all \
+  --run_under=$PWD/test_timer.sh \
   --define ENVOY_CONFIG_COVERAGE=1 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --copt=-DNDEBUG --test_timeout=6000
 
 # Generate HTML
