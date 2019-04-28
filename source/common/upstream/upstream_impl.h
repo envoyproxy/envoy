@@ -224,6 +224,10 @@ public:
   void weight(uint32_t new_weight) override;
   bool used() const override { return used_; }
   void used(bool new_used) override { used_ = new_used; }
+  bool warmed() const override {
+    return !(healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) &&
+             getActiveHealthFailureType() == ActiveHealthFailureType::UNKNOWN);
+  }
 
 protected:
   static Network::ClientConnectionPtr
@@ -277,12 +281,13 @@ private:
  */
 class HostSetImpl : public HostSet {
 public:
-  HostSetImpl(uint32_t priority, absl::optional<uint32_t> overprovisioning_factor)
+  HostSetImpl(uint32_t priority, uint32_t warmed_host_count,
+              absl::optional<uint32_t> overprovisioning_factor)
       : priority_(priority), overprovisioning_factor_(overprovisioning_factor.has_value()
                                                           ? overprovisioning_factor.value()
                                                           : kDefaultOverProvisioningFactor),
-        hosts_(new HostVector()), healthy_hosts_(new HealthyHostVector()),
-        degraded_hosts_(new DegradedHostVector()) {}
+        warmed_host_count_(warmed_host_count), hosts_(new HostVector()),
+        healthy_hosts_(new HealthyHostVector()), degraded_hosts_(new DegradedHostVector()) {}
 
   /**
    * Install a callback that will be invoked when the host set membership changes.
@@ -309,6 +314,7 @@ public:
   absl::optional<uint32_t> chooseDegradedLocality() override;
   uint32_t priority() const override { return priority_; }
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
+  uint32_t warmedHostCount() const override { return warmed_host_count_; }
 
   // Utility methods for creating UpdateHostsParams.
   static PrioritySet::UpdateHostsParams
@@ -331,7 +337,7 @@ public:
 
   void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
+                   const HostVector& hosts_removed, uint32_t warmed_host_count,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
@@ -344,18 +350,20 @@ private:
   // locality.
   static double effectiveLocalityWeight(uint32_t index,
                                         const HostsPerLocality& eligible_hosts_per_locality,
-                                        const HostsPerLocality& all_hosts_per_locality,
+                                        const std::vector<uint32_t>& warmed_counts_per_locality,
                                         const LocalityWeights& locality_weights,
                                         uint32_t overprovisioning_factor);
 
   uint32_t priority_;
   uint32_t overprovisioning_factor_;
+  uint32_t warmed_host_count_;
   HostVectorConstSharedPtr hosts_;
   HealthyHostVectorConstSharedPtr healthy_hosts_;
   DegradedHostVectorConstSharedPtr degraded_hosts_;
   HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_{HostsPerLocalityImpl::empty()};
+  std::shared_ptr<const std::vector<uint32_t>> warmed_counts_per_locality_{};
   // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       member_update_cb_helper_;
@@ -387,6 +395,7 @@ private:
       std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
       const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
       HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+      std::shared_ptr<const std::vector<uint32_t>> warmed_counts_per_locality,
       LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
 
   static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
@@ -422,7 +431,7 @@ public:
 
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
+                   const HostVector& hosts_removed, uint32_t warmed_host_count,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
@@ -431,7 +440,7 @@ protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
   virtual HostSetImplPtr createHostSet(uint32_t priority,
                                        absl::optional<uint32_t> overprovisioning_factor) {
-    return std::make_unique<HostSetImpl>(priority, overprovisioning_factor);
+    return std::make_unique<HostSetImpl>(priority, 0, overprovisioning_factor);
   }
 
 protected:
@@ -469,6 +478,7 @@ private:
                              PrioritySet::UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
+                             uint32_t warmed_host_count,
                              absl::optional<uint32_t> overprovisioning_factor) override;
 
     std::unordered_set<HostSharedPtr> all_hosts_added_;

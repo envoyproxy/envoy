@@ -258,7 +258,7 @@ void HdsCluster::initialize(std::function<void()> callback) {
 
   priority_set_.updateHosts(
       0, HostSetImpl::partitionHosts(initial_hosts_, HostsPerLocalityImpl::empty()), {},
-      *initial_hosts_, {}, absl::nullopt);
+      *initial_hosts_, {}, initial_hosts_->size(), absl::nullopt);
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {

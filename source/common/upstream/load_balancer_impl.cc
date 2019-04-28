@@ -136,7 +136,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // by the overprovisioning factor.
   HostSet& host_set = *priority_set.hostSetsPerPriority()[priority];
   per_priority_health.get()[priority] = 0;
-  if (!host_set.hosts().empty()) {
+  if (!host_set.hosts().empty() && host_set.warmedHostCount() > 0) {
     // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
     // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
     // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
@@ -144,12 +144,12 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     // capped at 100%).
     per_priority_health.get()[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
-                                 host_set.healthyHosts().size() / host_set.hosts().size()));
+                                 host_set.healthyHosts().size() / host_set.warmedHostCount()));
 
     // We perform the same computation for degraded hosts.
     per_priority_degraded.get()[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
-                                 host_set.degradedHosts().size() / host_set.hosts().size()));
+                                 host_set.degradedHosts().size() / host_set.warmedHostCount()));
   }
 
   // Now that we've updated health for the changed priority level, we need to calculate percentage

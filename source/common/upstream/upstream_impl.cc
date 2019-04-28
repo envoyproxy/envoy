@@ -312,6 +312,7 @@ std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
 void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                               LocalityWeightsConstSharedPtr locality_weights,
                               const HostVector& hosts_added, const HostVector& hosts_removed,
+                              uint32_t warmed_host_count,
                               absl::optional<uint32_t> overprovisioning_factor) {
   if (overprovisioning_factor.has_value()) {
     ASSERT(overprovisioning_factor.value() > 0);
@@ -323,14 +324,18 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
   hosts_per_locality_ = std::move(update_hosts_params.hosts_per_locality);
   healthy_hosts_per_locality_ = std::move(update_hosts_params.healthy_hosts_per_locality);
   degraded_hosts_per_locality_ = std::move(update_hosts_params.degraded_hosts_per_locality);
+  warmed_counts_per_locality_ = std::move(update_hosts_params.warmed_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
+  warmed_host_count_ = warmed_host_count;
 
   rebuildLocalityScheduler(healthy_locality_scheduler_, healthy_locality_entries_,
                            *healthy_hosts_per_locality_, healthy_hosts_->get(), hosts_per_locality_,
-                           locality_weights_, overprovisioning_factor_);
+                           warmed_counts_per_locality_, locality_weights_,
+                           overprovisioning_factor_);
   rebuildLocalityScheduler(degraded_locality_scheduler_, degraded_locality_entries_,
                            *degraded_hosts_per_locality_, degraded_hosts_->get(),
-                           hosts_per_locality_, locality_weights_, overprovisioning_factor_);
+                           hosts_per_locality_, warmed_counts_per_locality_, locality_weights_,
+                           overprovisioning_factor_);
 
   runUpdateCallbacks(hosts_added, hosts_removed);
 }
@@ -340,7 +345,9 @@ void HostSetImpl::rebuildLocalityScheduler(
     std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
     const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
     HostsPerLocalityConstSharedPtr all_hosts_per_locality,
+    std::shared_ptr<const std::vector<uint32_t>> warmed_counts_per_locality,
     LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor) {
+  ASSERT((all_hosts_per_locality == nullptr) == (warmed_counts_per_locality == nullptr));
   // Rebuild the locality scheduler by computing the effective weight of each
   // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
   // locality weights (i.e. using EDS) and there is at least one eligible host in this priority.
@@ -363,7 +370,7 @@ void HostSetImpl::rebuildLocalityScheduler(
     locality_entries.clear();
     for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
       const double effective_weight =
-          effectiveLocalityWeight(i, eligible_hosts_per_locality, *all_hosts_per_locality,
+          effectiveLocalityWeight(i, eligible_hosts_per_locality, *warmed_counts_per_locality,
                                   *locality_weights, overprovisioning_factor);
       if (effective_weight > 0) {
         locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
@@ -412,6 +419,7 @@ HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr hosts_per_locality,
                                HealthyHostVectorConstSharedPtr healthy_hosts,
                                HostsPerLocalityConstSharedPtr healthy_hosts_per_locality) {
+
   return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
                            std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
                            std::make_shared<const DegradedHostVector>(),
@@ -425,12 +433,20 @@ HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                                DegradedHostVectorConstSharedPtr degraded_hosts,
                                HostsPerLocalityConstSharedPtr degraded_hosts_per_locality) {
+  auto warmed_counts_per_locality = std::make_shared<std::vector<uint32_t>>();
+
+  for (const auto& hosts : hosts_per_locality->get()) {
+    warmed_counts_per_locality->emplace_back(
+        std::count_if(hosts.begin(), hosts.end(), [](const auto& host) { return host->warmed(); }));
+  }
+
   return PrioritySet::UpdateHostsParams{std::move(hosts),
                                         std::move(healthy_hosts),
                                         std::move(degraded_hosts),
                                         std::move(hosts_per_locality),
                                         std::move(healthy_hosts_per_locality),
-                                        std::move(degraded_hosts_per_locality)};
+                                        std::move(degraded_hosts_per_locality),
+                                        std::move(warmed_counts_per_locality)};
 }
 
 PrioritySet::UpdateHostsParams
@@ -449,16 +465,15 @@ HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
 
 double HostSetImpl::effectiveLocalityWeight(uint32_t index,
                                             const HostsPerLocality& eligible_hosts_per_locality,
-                                            const HostsPerLocality& all_hosts_per_locality,
+                                            const std::vector<uint32_t>& warmed_count_per_locality,
                                             const LocalityWeights& locality_weights,
                                             uint32_t overprovisioning_factor) {
-  const auto& locality_hosts = all_hosts_per_locality.get()[index];
   const auto& locality_eligible_hosts = eligible_hosts_per_locality.get()[index];
-  if (locality_hosts.empty()) {
+  const auto warmed_count = warmed_count_per_locality[index];
+  if (warmed_count == 0) {
     return 0.0;
   }
-  const double locality_availability_ratio =
-      1.0 * locality_eligible_hosts.size() / locality_hosts.size();
+  const double locality_availability_ratio = 1.0 * locality_eligible_hosts.size() / warmed_count;
   const uint32_t weight = locality_weights[index];
   // Availability ranges from 0-1.0, and is the ratio of eligible hosts to total hosts, modified by
   // the overprovisioning factor.
@@ -486,12 +501,13 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
 void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                   LocalityWeightsConstSharedPtr locality_weights,
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
+                                  uint32_t warmed_host_count,
                                   absl::optional<uint32_t> overprovisioning_factor) {
   // Ensure that we have a HostSet for the given priority.
   getOrCreateHostSet(priority, overprovisioning_factor);
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
-                    hosts_removed, overprovisioning_factor);
+                    hosts_removed, warmed_host_count, overprovisioning_factor);
 
   if (!batch_update_) {
     runUpdateCallbacks(hosts_added, hosts_removed);
@@ -514,7 +530,8 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
 void PrioritySetImpl::BatchUpdateScope::updateHosts(
     uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor) {
+    const HostVector& hosts_removed, uint32_t warmed_host_count,
+    absl::optional<uint32_t> overprovisioning_factor) {
   // We assume that each call updates a different priority.
   ASSERT(priorities_.find(priority) == priorities_.end());
   priorities_.insert(priority);
@@ -528,7 +545,7 @@ void PrioritySetImpl::BatchUpdateScope::updateHosts(
   }
 
   parent_.updateHosts(priority, std::move(update_hosts_params), locality_weights, hosts_added,
-                      hosts_removed, overprovisioning_factor);
+                      hosts_removed, warmed_host_count, overprovisioning_factor);
 }
 
 ClusterStats ClusterInfoImpl::generateStats(Stats::Scope& scope) {
@@ -828,10 +845,18 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
     const auto& host_set = host_sets[priority];
     // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
     HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
+
+    uint32_t warmed_hosts_count = host_set->hosts().size();
+    if (health_checker_ != nullptr) {
+      warmed_hosts_count -=
+          std::count_if(host_set->hosts().begin(), host_set->hosts().end(), [](const auto& host) {
+            return host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN;
+          });
+    }
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
-    prioritySet().updateHosts(priority,
-                              HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-                              host_set->localityWeights(), {}, {}, absl::nullopt);
+    prioritySet().updateHosts(
+        priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+        host_set->localityWeights(), {}, {}, warmed_hosts_count, absl::nullopt);
   }
 }
 
@@ -991,7 +1016,13 @@ void PriorityStateManager::updateClusterPrioritySet(
   // We use std::map to guarantee a stable ordering for zone aware routing.
   std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
 
+  uint32_t warmed_host_count = hosts->size();
+
   for (const HostSharedPtr& host : *hosts) {
+    if (parent_.healthChecker() != nullptr &&
+        host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
+      warmed_host_count--;
+    }
     // Take into consideration when a non-EDS cluster has active health checking, i.e. to mark all
     // the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and then fire
     // update callbacks to start the health checking process.
@@ -1034,12 +1065,13 @@ void PriorityStateManager::updateClusterPrioritySet(
   if (update_cb_ != nullptr) {
     update_cb_->updateHosts(priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
                             std::move(locality_weights), hosts_added.value_or(*hosts),
-                            hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
+                            hosts_removed.value_or<HostVector>({}), warmed_host_count,
+                            overprovisioning_factor);
   } else {
     parent_.prioritySet().updateHosts(
         priority, HostSetImpl::partitionHosts(hosts, per_locality_shared),
         std::move(locality_weights), hosts_added.value_or(*hosts),
-        hosts_removed.value_or<HostVector>({}), overprovisioning_factor);
+        hosts_removed.value_or<HostVector>({}), warmed_host_count, overprovisioning_factor);
   }
 }
 

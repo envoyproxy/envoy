@@ -36,6 +36,7 @@ MockHostSet::MockHostSet(uint32_t priority, uint32_t overprovisioning_factor)
   ON_CALL(*this, localityWeights()).WillByDefault(Invoke([this]() -> LocalityWeightsConstSharedPtr {
     return locality_weights_;
   }));
+  ON_CALL(*this, warmedHostCount()).WillByDefault(Invoke([this]() { return hosts_.size(); }));
 }
 
 MockHostSet::~MockHostSet() = default;

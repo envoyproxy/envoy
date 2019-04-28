@@ -190,6 +190,8 @@ public:
    * @param new_used supplies the new value of host being in use to be stored.
    */
   virtual void used(bool new_used) PURE;
+
+  virtual bool warmed() const PURE;
 };
 
 typedef std::shared_ptr<const Host> HostConstSharedPtr;
@@ -326,6 +328,12 @@ public:
    * @return uint32_t the overprovisioning factor of this host set.
    */
   virtual uint32_t overprovisioningFactor() const PURE;
+
+  /**
+   * @return uint32_t the number of warmed hosts in this host set. A host is considered warming
+   * if active health checking is enabled and the host has yet to be health checked for the first time.
+   */
+  virtual uint32_t warmedHostCount() const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;
@@ -381,6 +389,7 @@ public:
     HostsPerLocalityConstSharedPtr hosts_per_locality;
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
+    std::shared_ptr<const std::vector<uint32_t>> warmed_hosts_per_locality;
   };
 
   /**
@@ -396,6 +405,7 @@ public:
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
+                           uint32_t warmed_host_count,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;
 
   /**
@@ -417,6 +427,7 @@ public:
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
+                             uint32_t warmed_host_count,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 
