@@ -13,6 +13,32 @@
 namespace Envoy {
 namespace Http {
 
+struct CodeStats::ResponseStatInfo {
+  Stats::Scope& global_scope_;
+  Stats::Scope& cluster_scope_;
+  Stats::StatName prefix_;
+  uint64_t response_status_code_;
+  bool internal_request_;
+  const std::string& request_vhost_name_;
+  const std::string& request_vcluster_name_;
+  const std::string& from_zone_;
+  const std::string& to_zone_;
+  bool upstream_canary_;
+};
+
+struct CodeStats::ResponseTimingInfo {
+  Stats::Scope& global_scope_;
+  Stats::Scope& cluster_scope_;
+  Stats::StatName prefix_;
+  std::chrono::milliseconds response_time_;
+  bool upstream_canary_;
+  bool internal_request_;
+  const std::string& request_vhost_name_;
+  const std::string& request_vcluster_name_;
+  const std::string& from_zone_;
+  const std::string& to_zone_;
+};
+
 class CodeStatsImpl : public CodeStats {
 public:
   explicit CodeStatsImpl(Stats::SymbolTable& symbol_table);

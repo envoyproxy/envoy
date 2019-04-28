@@ -420,7 +420,7 @@ private:
   RouteConstSharedPtr route_;
   const RouteEntry* route_entry_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  std::string alt_stat_prefix_;
+  std::unique_ptr<Stats::StatNameManagedStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_;
   Event::TimerPtr response_timeout_;
   FilterUtility::TimeoutData timeout_;

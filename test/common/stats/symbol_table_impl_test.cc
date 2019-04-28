@@ -89,6 +89,12 @@ TEST_P(StatNameTest, TestArbitrarySymbolRoundtrip) {
   }
 }
 
+TEST_P(StatNameTest, TestEmpty) {
+  EXPECT_TRUE(stat_name_storage_->add("").empty());
+  EXPECT_FALSE(stat_name_storage_->add("x").empty());
+  EXPECT_TRUE(StatName().empty());
+}
+
 TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
   for (int i = 0; i < 100 * 1000; ++i) {
     const std::string stat_name = absl::StrCat("symbol_", i);

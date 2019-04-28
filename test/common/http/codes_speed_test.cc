@@ -21,16 +21,24 @@ namespace Http {
 class CodeUtilitySpeedTest {
 public:
   CodeUtilitySpeedTest()
-      : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_) {}
+      : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_),
+        prefix_("prefix", symbol_table_) {}
 
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
-    Http::CodeStats::ResponseStatInfo info{
-        global_store_,      cluster_scope_,        "prefix.", code,  internal_request,
-        request_vhost_name, request_vcluster_name, from_az,   to_az, canary};
+    Http::CodeStats::ResponseStatInfo info{global_store_,
+                                           cluster_scope_,
+                                           prefix_.statName(),
+                                           code,
+                                           internal_request,
+                                           request_vhost_name,
+                                           request_vcluster_name,
+                                           from_az,
+                                           to_az,
+                                           canary};
 
     code_stats_.chargeResponseStat(info);
   }
@@ -49,8 +57,8 @@ public:
 
   void responseTiming() {
     Http::CodeStats::ResponseTimingInfo info{
-        global_store_, cluster_scope_, "prefix.",    std::chrono::milliseconds(5),
-        true,          true,           "vhost_name", "req_vcluster_name",
+        global_store_, cluster_scope_, prefix_.statName(), std::chrono::milliseconds(5),
+        true,          true,           "vhost_name",       "req_vcluster_name",
         "from_az",     "to_az"};
     code_stats_.chargeResponseTiming(info);
   }
@@ -59,6 +67,7 @@ public:
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
+  Stats::StatNameManagedStorage prefix_;
 };
 
 } // namespace Http

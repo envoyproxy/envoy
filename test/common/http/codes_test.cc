@@ -33,9 +33,10 @@ public:
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
+    Stats::StatNameManagedStorage prefix("prefix", *symbol_table_);
     Http::CodeStats::ResponseStatInfo info{
-        global_store_,      cluster_scope_,        "prefix.", code,  internal_request,
-        request_vhost_name, request_vcluster_name, from_az,   to_az, canary};
+        global_store_,      cluster_scope_,        prefix.statName(), code,  internal_request,
+        request_vhost_name, request_vcluster_name, from_az,           to_az, canary};
 
     code_stats_.chargeResponseStat(info);
   }
@@ -44,7 +45,6 @@ public:
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
-  std::vector<Stats::StatNameStorage> stat_name_storage_;
 };
 
 TEST_F(CodeUtilityTest, GroupStrings) {
@@ -207,9 +207,10 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
   Stats::MockStore global_store;
   Stats::MockStore cluster_scope;
 
+  Stats::StatNameManagedStorage prefix("prefix", *symbol_table_);
   Http::CodeStats::ResponseTimingInfo info{
-      global_store, cluster_scope, "prefix.",    std::chrono::milliseconds(5),
-      true,         true,          "vhost_name", "req_vcluster_name",
+      global_store, cluster_scope, prefix.statName(), std::chrono::milliseconds(5),
+      true,         true,          "vhost_name",      "req_vcluster_name",
       "from_az",    "to_az"};
 
   EXPECT_CALL(cluster_scope, histogram("prefix.upstream_rq_time"));

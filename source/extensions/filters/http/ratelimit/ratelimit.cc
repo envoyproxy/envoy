@@ -133,7 +133,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counter("ratelimit.over_limit").inc();
     Http::CodeStats::ResponseStatInfo info{config_->scope(),
                                            cluster_->statsScope(),
-                                           EMPTY_STRING,
+                                           Stats::StatName(),
                                            enumToInt(Http::Code::TooManyRequests),
                                            true,
                                            EMPTY_STRING,

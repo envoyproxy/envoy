@@ -222,7 +222,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
 
     Http::CodeStats::ResponseStatInfo info{config_.scope_,
                                            cluster_->statsScope(),
-                                           EMPTY_STRING,
+                                           Stats::StatName(),
                                            response_status_code,
                                            internal_request,
                                            route_entry_->virtualHost().name(),
@@ -235,12 +235,17 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
     Http::CodeStats& code_stats = httpContext().codeStats();
     code_stats.chargeResponseStat(info);
 
-    if (!alt_stat_prefix_.empty()) {
-      Http::CodeStats::ResponseStatInfo alt_info{config_.scope_,   cluster_->statsScope(),
-                                                 alt_stat_prefix_, response_status_code,
-                                                 internal_request, EMPTY_STRING,
-                                                 EMPTY_STRING,     zone_name,
-                                                 upstream_zone,    is_canary};
+    if (alt_stat_prefix_ != nullptr) {
+      Http::CodeStats::ResponseStatInfo alt_info{config_.scope_,
+                                                 cluster_->statsScope(),
+                                                 alt_stat_prefix_->statName(),
+                                                 response_status_code,
+                                                 internal_request,
+                                                 EMPTY_STRING,
+                                                 EMPTY_STRING,
+                                                 zone_name,
+                                                 upstream_zone,
+                                                 is_canary};
       code_stats.chargeResponseStat(alt_info);
     }
 
@@ -330,7 +335,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   const Http::HeaderEntry* request_alt_name = headers.EnvoyUpstreamAltStatName();
   if (request_alt_name) {
-    alt_stat_prefix_ = std::string(request_alt_name->value().getStringView()) + ".";
+    // NOTE: Note that converting this header value into a StatName requires taking
+    // a global symbol-table lock. Is this scenario common enough to raise concern?
+    // Or is this effectively a test hook?
+    alt_stat_prefix_ = std::make_unique<Stats::StatNameManagedStorage>(
+        request_alt_name->value().getStringView(), config_.scope_.symbolTable());
     headers.removeEnvoyUpstreamAltStatName();
   }
 
@@ -874,7 +883,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     Http::CodeStats& code_stats = httpContext().codeStats();
     Http::CodeStats::ResponseTimingInfo info{config_.scope_,
                                              cluster_->statsScope(),
-                                             EMPTY_STRING,
+                                             Stats::StatName(),
                                              response_time,
                                              upstream_request.upstream_canary_,
                                              internal_request,
@@ -886,10 +895,10 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 
     code_stats.chargeResponseTiming(info);
 
-    if (!alt_stat_prefix_.empty()) {
+    if (alt_stat_prefix_ != nullptr) {
       Http::CodeStats::ResponseTimingInfo info{config_.scope_,
                                                cluster_->statsScope(),
-                                               alt_stat_prefix_,
+                                               alt_stat_prefix_->statName(),
                                                response_time,
                                                upstream_request.upstream_canary_,
                                                internal_request,

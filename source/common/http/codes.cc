@@ -69,19 +69,19 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
 
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
   Stats::StatNameManagedContainer stat_name_storage(symbol_table_);
-  Stats::StatName prefix = stat_name_storage.add(stripTrailingDot(info.prefix_));
+  // Stats::StatName prefix = stat_name_storage.add(stripTrailingDot(info.prefix_));
   Code code = static_cast<Code>(info.response_status_code_);
 
   ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
-  chargeBasicResponseStat(info.cluster_scope_, prefix, code);
+  chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code);
 
   Stats::StatName rq_group = upstreamRqGroup(code);
   Stats::StatName rq_code = upstream_rq_.statName(code);
 
-  auto write_category = [this, prefix, rq_group, rq_code, &info](Stats::StatName category) {
-    incCounter(info.cluster_scope_, {prefix, category, upstream_rq_completed_});
-    incCounter(info.cluster_scope_, {prefix, category, rq_group});
-    incCounter(info.cluster_scope_, {prefix, category, rq_code});
+  auto write_category = [this, rq_group, rq_code, &info](Stats::StatName category) {
+    incCounter(info.cluster_scope_, {info.prefix_, category, upstream_rq_completed_});
+    incCounter(info.cluster_scope_, {info.prefix_, category, rq_group});
+    incCounter(info.cluster_scope_, {info.prefix_, category, rq_code});
   };
 
   // If the response is from a canary, also create canary stats.
@@ -112,26 +112,27 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
     Stats::StatName from_zone = stat_name_storage.add(info.from_zone_);
     Stats::StatName to_zone = stat_name_storage.add(info.to_zone_);
 
-    incCounter(info.cluster_scope_, {prefix, zone_, from_zone, to_zone, upstream_rq_completed_});
-    incCounter(info.cluster_scope_, {prefix, zone_, from_zone, to_zone, rq_group});
-    incCounter(info.cluster_scope_, {prefix, zone_, from_zone, to_zone, rq_code});
+    incCounter(info.cluster_scope_,
+               {info.prefix_, zone_, from_zone, to_zone, upstream_rq_completed_});
+    incCounter(info.cluster_scope_, {info.prefix_, zone_, from_zone, to_zone, rq_group});
+    incCounter(info.cluster_scope_, {info.prefix_, zone_, from_zone, to_zone, rq_code});
   }
 }
 
 void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   Stats::StatNameManagedContainer stat_name_storage(symbol_table_);
-  Stats::StatName prefix = stat_name_storage.add(stripTrailingDot(info.prefix_));
+  // Stats::StatName prefix = stat_name_storage.add(stripTrailingDot(info.prefix_));
 
   uint64_t count = info.response_time_.count();
-  recordHistogram(info.cluster_scope_, {prefix, upstream_rq_time_}, count);
+  recordHistogram(info.cluster_scope_, {info.prefix_, upstream_rq_time_}, count);
   if (info.upstream_canary_) {
-    recordHistogram(info.cluster_scope_, {prefix, canary_upstream_rq_time_}, count);
+    recordHistogram(info.cluster_scope_, {info.prefix_, canary_upstream_rq_time_}, count);
   }
 
   if (info.internal_request_) {
-    recordHistogram(info.cluster_scope_, {prefix, internal_upstream_rq_time_}, count);
+    recordHistogram(info.cluster_scope_, {info.prefix_, internal_upstream_rq_time_}, count);
   } else {
-    recordHistogram(info.cluster_scope_, {prefix, external_upstream_rq_time_}, count);
+    recordHistogram(info.cluster_scope_, {info.prefix_, external_upstream_rq_time_}, count);
   }
 
   if (!info.request_vcluster_name_.empty()) {
@@ -146,8 +147,8 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
     Stats::StatName from_zone = stat_name_storage.add(info.from_zone_);
     Stats::StatName to_zone = stat_name_storage.add(info.to_zone_);
 
-    recordHistogram(info.cluster_scope_, {prefix, zone_, from_zone, to_zone, upstream_rq_time_},
-                    count);
+    recordHistogram(info.cluster_scope_,
+                    {info.prefix_, zone_, from_zone, to_zone, upstream_rq_time_}, count);
   }
 }
 

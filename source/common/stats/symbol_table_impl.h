@@ -359,6 +359,11 @@ public:
    */
   const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
 
+  /**
+   * @return whether this is empty.
+   */
+  bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
+
 private:
   const uint8_t* size_and_data_;
 };
