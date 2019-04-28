@@ -20,8 +20,10 @@ set -x
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 (BAZEL_BIN="${BAZEL_COVERAGE}" "${SCRIPT_DIR}"/coverage/gen_build.sh)
 
+rm -f /tmp/coverage.perf.data
+
 # Generate coverage data.
-"${BAZEL_COVERAGE}" coverage ${BAZEL_TEST_OPTIONS} \
+"${BAZEL_COVERAGE}" coverage -s ${BAZEL_TEST_OPTIONS} \
   "${COVERAGE_TARGET}"  \
   --experimental_cc_coverage \
   --instrumentation_filter=//source/...,//include/... \
@@ -29,8 +31,9 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
   --combined_report=lcov \
   --profile=/tmp/bazel-prof \
   --cache_test_results=no \
-  --strategy=Genrule=standalone --spawn_strategy=standalone \
   --coverage_support=//coverage_support \
+  --test_env=CC_CODE_COVERAGE_SCRIPT=coverage_support/collect_coverage.sh \
+  --test_output=all \
   --define ENVOY_CONFIG_COVERAGE=1 --cxxopt="-DENVOY_CONFIG_COVERAGE=1" --copt=-DNDEBUG --test_timeout=6000
 
 # Generate HTML

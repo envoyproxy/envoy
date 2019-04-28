@@ -1,6 +1,5 @@
 #!/bin/bash
 
-sdf
-shift
-exit 1
-perf record -g -o /tmp/coverage.perf.data ./real_collect_coverage.sh $@
+set -x
+
+perf record -F 99 -g -a -o /tmp/coverage.perf.data coverage_support/collect_cc_coverage.sh $@
