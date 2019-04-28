@@ -97,7 +97,7 @@ public:
     /**
      * Decodes a uint8_t array into a SymbolVec.
      */
-    static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
+    static SymbolVec decodeSymbols(const SymbolTable::StorageArray array, uint64_t size);
 
     /**
      * Returns the number of bytes required to represent StatName as a uint8_t
@@ -287,6 +287,8 @@ public:
    */
   inline StatName statName() const;
 
+  uint8_t* bytes() { return bytes_.get(); }
+
 private:
   SymbolTable::StoragePtr bytes_;
 };
@@ -305,7 +307,8 @@ class StatName {
 public:
   // Constructs a StatName object directly referencing the storage of another
   // StatName.
-  explicit StatName(const SymbolTable::Storage size_and_data) : size_and_data_(size_and_data) {}
+  explicit StatName(const SymbolTable::StorageArray size_and_data)
+      : size_and_data_(size_and_data) {}
 
   // Constructs an empty StatName object.
   StatName() : size_and_data_(nullptr) {}
@@ -346,7 +349,7 @@ public:
    */
   uint64_t size() const { return dataSize() + StatNameSizeEncodingBytes; }
 
-  void copyToStorage(SymbolTable::Storage storage) { memcpy(storage, size_and_data_, size()); }
+  void copyToStorage(SymbolTable::StorageArray storage) { memcpy(storage, size_and_data_, size()); }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
@@ -410,6 +413,12 @@ public:
    * @return the StatName held in the container for this name.
    */
   StatName add(absl::string_view name);
+
+  /**
+   * @param name the name to add the container.
+   * @return the StatNameStorage object held in the container for this name.
+   */
+  SymbolTable::Storage addReturningStorage(absl::string_view name);
 
 private:
   SymbolTable& symbol_table_;

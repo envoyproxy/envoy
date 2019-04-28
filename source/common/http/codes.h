@@ -34,7 +34,6 @@ private:
   class RequestCodeGroup {
   public:
     RequestCodeGroup(absl::string_view prefix, CodeStatsImpl& code_stats);
-    ~RequestCodeGroup();
 
     Stats::StatName statName(Code response_code);
 
@@ -48,13 +47,19 @@ private:
     // fine-grained controls. Another option would be to use a lock per
     // stat-name, which might have similar performance to atomics with default
     // barrier policy.
+    //
+    // We don't allocate these all up front during construction because
+    // SymbolTable greedily encodes the first 128 names it discovers in one
+    // byte. We want those high-value single-byte codes to go to enumerating
+    // various prefixes combined with HTTP codes that are seldom used.
 
     static constexpr uint32_t NumHttpCodes = 1000;
-    std::atomic<Stats::StatNameStorage*> rc_stat_names_[NumHttpCodes];
+    std::atomic<Stats::SymbolTable::Storage> rc_stat_names_[NumHttpCodes];
 
     CodeStatsImpl& code_stats_;
     std::string prefix_;
     absl::Mutex mutex_;
+    Stats::StatNameManagedContainer stat_name_storage_ GUARDED_BY(mutex_);
   };
 
   static absl::string_view stripTrailingDot(absl::string_view prefix);

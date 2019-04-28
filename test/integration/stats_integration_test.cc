@@ -210,7 +210,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithStats) {
   // 2019/04/12  6477     59576               Implementing Endpoint lease...
   // 2019/04/23  6659     59512               Reintroduce dispatcher stats...
   // 2019/04/24  6161     49415               Pack tags and tag extracted names
-  // 2019/04/24  ????     49431               Use SymbolTable API for HTTP codes
+  // 2019/04/27  6733     49431               Use SymbolTable API for HTTP codes
 
   EXPECT_EQ(m_per_cluster, 49431);
 }

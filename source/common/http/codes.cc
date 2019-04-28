@@ -62,17 +62,14 @@ void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
   // Build a dynamic stat for the response code and increment it.
-  // incCounter(scope, {prefix, upstream_rq_completed_});
-  // incCounter(scope, {prefix, upstreamRqGroup(response_code)});
-  // incCounter(scope, {prefix, upstream_rq_.statName(response_code)});
   incCounter(scope, prefix, upstream_rq_completed_);
   incCounter(scope, prefix, upstreamRqGroup(response_code));
   incCounter(scope, prefix, upstream_rq_.statName(response_code));
 }
 
 void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
-  Stats::StatNameManagedStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
-  Stats::StatName prefix = prefix_storage.statName();
+  Stats::StatNameManagedContainer stat_name_storage(symbol_table_);
+  Stats::StatName prefix = stat_name_storage.add(stripTrailingDot(info.prefix_));
   Code code = static_cast<Code>(info.response_status_code_);
 
   ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
@@ -101,10 +98,8 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
-    Stats::StatNameManagedStorage vhost_storage(info.request_vhost_name_, symbol_table_);
-    Stats::StatName vhost_name = vhost_storage.statName();
-    Stats::StatNameManagedStorage vcluster_storage(info.request_vcluster_name_, symbol_table_);
-    Stats::StatName vcluster_name = vcluster_storage.statName();
+    Stats::StatName vhost_name = stat_name_storage.add(info.request_vhost_name_);
+    Stats::StatName vcluster_name = stat_name_storage.add(info.request_vcluster_name_);
 
     incCounter(info.global_scope_,
                {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_completed_});
@@ -114,10 +109,8 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    Stats::StatNameManagedStorage from_zone_storage(info.from_zone_, symbol_table_);
-    Stats::StatName from_zone = from_zone_storage.statName();
-    Stats::StatNameManagedStorage to_zone_storage(info.to_zone_, symbol_table_);
-    Stats::StatName to_zone = to_zone_storage.statName();
+    Stats::StatName from_zone = stat_name_storage.add(info.from_zone_);
+    Stats::StatName to_zone = stat_name_storage.add(info.to_zone_);
 
     incCounter(info.cluster_scope_, {prefix, zone_, from_zone, to_zone, upstream_rq_completed_});
     incCounter(info.cluster_scope_, {prefix, zone_, from_zone, to_zone, rq_group});
@@ -126,8 +119,8 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 }
 
 void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
-  Stats::StatNameManagedStorage prefix_storage(stripTrailingDot(info.prefix_), symbol_table_);
-  Stats::StatName prefix = prefix_storage.statName();
+  Stats::StatNameManagedContainer stat_name_storage(symbol_table_);
+  Stats::StatName prefix = stat_name_storage.add(stripTrailingDot(info.prefix_));
 
   uint64_t count = info.response_time_.count();
   recordHistogram(info.cluster_scope_, {prefix, upstream_rq_time_}, count);
@@ -142,20 +135,16 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   }
 
   if (!info.request_vcluster_name_.empty()) {
-    Stats::StatNameManagedStorage vhost_storage(info.request_vhost_name_, symbol_table_);
-    Stats::StatName vhost_name = vhost_storage.statName();
-    Stats::StatNameManagedStorage vcluster_storage(info.request_vcluster_name_, symbol_table_);
-    Stats::StatName vcluster_name = vcluster_storage.statName();
+    Stats::StatName vhost_name = stat_name_storage.add(info.request_vhost_name_);
+    Stats::StatName vcluster_name = stat_name_storage.add(info.request_vcluster_name_);
     recordHistogram(info.global_scope_,
                     {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_time_}, count);
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    Stats::StatNameManagedStorage from_zone_storage(info.from_zone_, symbol_table_);
-    Stats::StatName from_zone = from_zone_storage.statName();
-    Stats::StatNameManagedStorage to_zone_storage(info.to_zone_, symbol_table_);
-    Stats::StatName to_zone = to_zone_storage.statName();
+    Stats::StatName from_zone = stat_name_storage.add(info.from_zone_);
+    Stats::StatName to_zone = stat_name_storage.add(info.to_zone_);
 
     recordHistogram(info.cluster_scope_, {prefix, zone_, from_zone, to_zone, upstream_rq_time_},
                     count);
@@ -187,7 +176,8 @@ Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
 
 CodeStatsImpl::RequestCodeGroup::RequestCodeGroup(absl::string_view prefix,
                                                   CodeStatsImpl& code_stats)
-    : code_stats_(code_stats), prefix_(std::string(prefix)) {
+    : code_stats_(code_stats), prefix_(std::string(prefix)),
+      stat_name_storage_(code_stats_.symbol_table_) {
   for (uint32_t i = 0; i < NumHttpCodes; ++i) {
     rc_stat_names_[i] = nullptr;
   }
@@ -198,32 +188,22 @@ CodeStatsImpl::RequestCodeGroup::RequestCodeGroup(absl::string_view prefix,
   statName(Code::ServiceUnavailable);
 }
 
-CodeStatsImpl::RequestCodeGroup::~RequestCodeGroup() {
-  for (uint32_t i = 0; i < NumHttpCodes; ++i) {
-    Stats::StatNameStorage* storage = rc_stat_names_[i];
-    if (storage != nullptr) {
-      storage->free(code_stats_.symbol_table_);
-      delete storage;
-    }
-  }
-}
-
 Stats::StatName CodeStatsImpl::RequestCodeGroup::statName(Code response_code) {
   // Take a lock only if we've never seen this response-code before.
   uint32_t rc_int = static_cast<uint32_t>(response_code);
   RELEASE_ASSERT(rc_int < NumHttpCodes, absl::StrCat("Unexpected http code: ", rc_int));
-  std::atomic<Stats::StatNameStorage*>& atomic_ref = rc_stat_names_[rc_int];
+  std::atomic<Stats::SymbolTable::Storage>& atomic_ref = rc_stat_names_[rc_int];
   if (atomic_ref.load() == nullptr) {
     absl::MutexLock lock(&mutex_);
 
     // Check again under lock as two threads might have raced to add a StatName
     // for the same code.
     if (atomic_ref.load() == nullptr) {
-      atomic_ref = new Stats::StatNameStorage(absl::StrCat(prefix_, enumToInt(response_code)),
-                                              code_stats_.symbol_table_);
+      atomic_ref =
+          stat_name_storage_.addReturningStorage(absl::StrCat(prefix_, enumToInt(response_code)));
     }
   }
-  return atomic_ref.load()->statName();
+  return Stats::StatName(atomic_ref.load());
 }
 
 std::string CodeUtility::groupStringForResponseCode(Code response_code) {

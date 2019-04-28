@@ -40,7 +40,7 @@ public:
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
   std::atomic<uint16_t> ref_count_{1};
-  SymbolTable::Storage symbol_storage_;
+  SymbolTable::StorageArray symbol_storage_;
 };
 
 template <class Stat> class HeapStat : public Stat {
