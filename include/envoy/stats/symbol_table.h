@@ -48,8 +48,8 @@ public:
    * no locks are taken when looking up stats.
    */
   using StorageElement = uint8_t;
-  using StorageArray = StorageElement[];
-  using StoragePtr = std::unique_ptr<StorageArray>;
+  using Storage = StorageElement[];
+  using StoragePtr = std::unique_ptr<Storage>;
 
   virtual ~SymbolTable() = default;
 

@@ -75,7 +75,7 @@ public:
 
     // Now allocate the exact number of bytes required and move the encodings
     // into storage.
-    auto storage = std::make_unique<StorageArray>(total_size_bytes);
+    auto storage = std::make_unique<Storage>(total_size_bytes);
     uint8_t* p = &storage[0];
     *p++ = num_names;
     for (uint32_t i = 0; i < num_names; ++i) {
@@ -132,7 +132,7 @@ private:
   }
 
   StoragePtr encodeHelper(absl::string_view name) const {
-    auto bytes = std::make_unique<StorageArray>(name.size() + StatNameSizeEncodingBytes);
+    auto bytes = std::make_unique<Storage>(name.size() + StatNameSizeEncodingBytes);
     uint8_t* buffer = SymbolTableImpl::writeLengthReturningNext(name.size(), bytes.get());
     memcpy(buffer, name.data(), name.size());
     return bytes;

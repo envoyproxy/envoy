@@ -97,7 +97,7 @@ public:
     /**
      * Decodes a uint8_t array into a SymbolVec.
      */
-    static SymbolVec decodeSymbols(const SymbolTable::StorageArray array, uint64_t size);
+    static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
 
     /**
      * Returns the number of bytes required to represent StatName as a uint8_t
@@ -117,7 +117,7 @@ public:
      * @param array destination memory to receive the encoded bytes.
      * @return uint64_t the number of bytes transferred.
      */
-    uint64_t moveToStorage(SymbolTable::StorageArray array);
+    uint64_t moveToStorage(SymbolTable::Storage array);
 
   private:
     std::vector<uint8_t> vec_;
@@ -307,8 +307,7 @@ class StatName {
 public:
   // Constructs a StatName object directly referencing the storage of another
   // StatName.
-  explicit StatName(const SymbolTable::StorageArray size_and_data)
-      : size_and_data_(size_and_data) {}
+  explicit StatName(const SymbolTable::Storage size_and_data) : size_and_data_(size_and_data) {}
 
   // Constructs an empty StatName object.
   StatName() : size_and_data_(nullptr) {}
@@ -316,7 +315,7 @@ public:
   // Constructs a StatName object with new storage, which must be of size
   // src.size(). This is used in the a flow where we first construct a StatName
   // for lookup in a cache, and then on a miss need to store the data directly.
-  StatName(const StatName& src, SymbolTable::StorageArray memory);
+  StatName(const StatName& src, SymbolTable::Storage memory);
 
   /**
    * Note that this hash function will return a different hash than that of
@@ -349,7 +348,7 @@ public:
    */
   uint64_t size() const { return dataSize() + StatNameSizeEncodingBytes; }
 
-  void copyToStorage(SymbolTable::StorageArray storage) { memcpy(storage, size_and_data_, size()); }
+  void copyToStorage(SymbolTable::Storage storage) { memcpy(storage, size_and_data_, size()); }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();

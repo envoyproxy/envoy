@@ -16,7 +16,7 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
-StatName::StatName(const StatName& src, SymbolTable::StorageArray memory) : size_and_data_(memory) {
+StatName::StatName(const StatName& src, SymbolTable::Storage memory) : size_and_data_(memory) {
   memcpy(memory, src.size_and_data_, src.size());
 }
 
@@ -64,7 +64,7 @@ void SymbolTableImpl::Encoding::addSymbol(Symbol symbol) {
   } while (symbol != 0);
 }
 
-SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::StorageArray array,
+SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array,
                                                    uint64_t size) {
   SymbolVec symbol_vec;
   Symbol symbol = 0;
@@ -86,7 +86,7 @@ SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::StorageArr
   return symbol_vec;
 }
 
-uint64_t SymbolTableImpl::Encoding::moveToStorage(SymbolTable::StorageArray symbol_array) {
+uint64_t SymbolTableImpl::Encoding::moveToStorage(SymbolTable::Storage symbol_array) {
   uint64_t sz = dataBytesRequired();
   symbol_array = writeLengthReturningNext(sz, symbol_array);
   if (sz != 0) {
@@ -289,7 +289,7 @@ void SymbolTableImpl::debugPrint() const {
 SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
   Encoding encoding;
   addTokensToEncoding(name, encoding);
-  auto bytes = std::make_unique<StorageArray>(encoding.bytesRequired());
+  auto bytes = std::make_unique<Storage>(encoding.bytesRequired());
   encoding.moveToStorage(bytes.get());
   return bytes;
 }
@@ -299,7 +299,7 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   uint64_t size = src.size();
-  bytes_ = std::make_unique<SymbolTable::StorageArray>(size);
+  bytes_ = std::make_unique<SymbolTable::Storage>(size);
   src.copyToStorage(bytes_.get());
   table.incRefCount(statName());
 }
@@ -367,7 +367,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
   }
-  auto bytes = std::make_unique<StorageArray>(num_bytes + StatNameSizeEncodingBytes);
+  auto bytes = std::make_unique<Storage>(num_bytes + StatNameSizeEncodingBytes);
   uint8_t* p = writeLengthReturningNext(num_bytes, bytes.get());
   for (StatName stat_name : stat_names) {
     num_bytes = stat_name.dataSize();
@@ -393,7 +393,7 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
 
   // Now allocate the exact number of bytes required and move the encodings
   // into storage.
-  auto storage = std::make_unique<StorageArray>(total_size_bytes);
+  auto storage = std::make_unique<Storage>(total_size_bytes);
   uint8_t* p = &storage[0];
   *p++ = num_names;
   for (auto& encoding : encodings) {
