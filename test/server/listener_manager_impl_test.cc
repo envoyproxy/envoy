@@ -420,7 +420,7 @@ test: a
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
-               EnvoyException, "test: Cannot find field");
+                          EnvoyException, "test: Cannot find field");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
@@ -437,7 +437,7 @@ filter_chains:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
-               EnvoyException, "foo: Cannot find field");
+                          EnvoyException, "foo: Cannot find field");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterName) {
@@ -465,8 +465,9 @@ public:
     return commonFilterFactory(context);
   }
 
-  Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
-                                                        Configuration::FactoryContext& context) override {
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Configuration::FactoryContext& context) override {
     return commonFilterFactory(context);
   }
 
@@ -583,8 +584,8 @@ drain_type: modify_only
       expectListenerCreate(false, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_different_address_yaml), "",
-                                    true),
+      manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_different_address_yaml),
+                                    "", true),
       EnvoyException,
       "error updating listener: 'foo' has a different address "
       "'127.0.0.1:1235' from existing listener");
