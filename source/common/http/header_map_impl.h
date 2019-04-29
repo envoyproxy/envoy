@@ -138,7 +138,9 @@ protected:
   public:
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
-    template <class Key> bool isPseudoHeader(const Key& key) { return key.c_str()[0] == ':'; }
+    template <class Key> bool isPseudoHeader(const Key& key) {
+      return !key.getStringView().empty() && key.getStringView()[0] == ':';
+    }
 
     template <class Key, class... Value>
     std::list<HeaderEntryImpl>::iterator insert(Key&& key, Value&&... value) {
@@ -189,7 +191,7 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
-  HeaderEntryImpl* getExistingInline(const char* key);
+  HeaderEntryImpl* getExistingInline(absl::string_view key);
 
   void removeInline(HeaderEntryImpl** entry);
 

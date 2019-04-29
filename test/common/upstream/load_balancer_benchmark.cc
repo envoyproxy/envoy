@@ -29,8 +29,11 @@ public:
     }
     HostVectorConstSharedPtr updated_hosts{new HostVector(hosts)};
     priority_set_.updateHosts(
-        0, HostSetImpl::updateHostsParams(updated_hosts, nullptr, updated_hosts, nullptr), {},
-        hosts, {}, absl::nullopt);
+        0,
+        HostSetImpl::updateHostsParams(updated_hosts, nullptr,
+                                       std::make_shared<const HealthyHostVector>(*updated_hosts),
+                                       nullptr),
+        {}, hosts, {}, absl::nullopt);
   }
 
   PrioritySetImpl priority_set_;

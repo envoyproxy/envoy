@@ -34,6 +34,8 @@ CREAT
 CRL
 CRLFs
 CRT
+CSRF
+CSRFPOLICY
 CSS
 CSV
 CTX
@@ -160,8 +162,10 @@ NUL
 Nilsson
 OCSP
 OK
+OOB
 OOM
 OOMs
+ORCA
 OS
 OSI
 OSS
@@ -181,6 +185,7 @@ POSTs
 PREBIND
 PRNG
 PROT
+QPS
 QUIC
 RAII
 RANLUX
@@ -218,12 +223,14 @@ SIGFPE
 SIGILL
 SIGSEGV
 SIGTERM
+SimpleAtoi
 SNI
 SPDY
 SPIFFE
 SPKI
 SQL
 SR
+SRDS
 SRV
 SS
 SSL
@@ -268,6 +275,7 @@ WS
 Welford's
 Werror
 XDS
+vip
 xDSes
 XFCC
 XFF
@@ -285,6 +293,7 @@ accessors
 acls
 addr
 agg
+alignof
 alloc
 alloca
 allocator
@@ -423,6 +432,7 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
+evwatch
 exe
 execlp
 facto
@@ -755,6 +765,7 @@ unterminated
 untruncated
 untrusted
 untyped
+unwatched
 unweighted
 unzigzag
 upstreams

@@ -240,21 +240,6 @@ bool StringUtil::atoull(const char* str, uint64_t& out, int base) {
   }
 }
 
-bool StringUtil::atoll(const char* str, int64_t& out, int base) {
-  if (strlen(str) == 0) {
-    return false;
-  }
-
-  char* end_ptr;
-  errno = 0;
-  out = std::strtoll(str, &end_ptr, base);
-  if (*end_ptr != '\0' || ((out == LLONG_MAX || out == LLONG_MIN) && errno == ERANGE)) {
-    return false;
-  } else {
-    return true;
-  }
-}
-
 absl::string_view StringUtil::ltrim(absl::string_view source) {
   const absl::string_view::size_type pos = source.find_first_not_of(WhitespaceChars);
   if (pos != absl::string_view::npos) {

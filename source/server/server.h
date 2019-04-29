@@ -29,9 +29,9 @@
 
 #include "server/configuration_impl.h"
 #include "server/http/admin.h"
+#include "server/listener_hooks.h"
 #include "server/listener_manager_impl.h"
 #include "server/overload_manager_impl.h"
-#include "server/test_hooks.h"
 #include "server/worker_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -145,7 +145,7 @@ public:
    * @throw EnvoyException if initialization fails.
    */
   InstanceImpl(const Options& options, Event::TimeSystem& time_system,
-               Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+               Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls,
@@ -202,7 +202,7 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStats();
   void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                  ComponentFactory& component_factory, TestHooks& hooks);
+                  ComponentFactory& component_factory, ListenerHooks& hooks);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   uint64_t numConnections();
   void startWorkers();

@@ -83,13 +83,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
 )
 
-envoy_cc_test_library(
-    name = "quic_platform_port_utils_impl_lib",
-    hdrs = ["quic_port_utils_impl.h"],
-    include_prefix = "extensions/quic_listeners/quiche/platform",
-    deps = ["//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_test_impl_lib"],
-)
-
 envoy_cc_library(
     name = "quic_platform_logging_impl_lib",
     srcs = ["quic_logging_impl.cc"],
@@ -123,12 +116,8 @@ envoy_cc_library(
         "quic_stream_buffer_allocator_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
-        "quic_expect_bug_impl.h",
         "quic_logging_impl.h",
-        "quic_mock_log_impl.h",
         "quic_stack_trace_impl.h",
-        "quic_test_impl.h",
-        "quic_thread_impl.h",
     ]),
     external_deps = [
         "abseil_base",
@@ -146,8 +135,8 @@ envoy_cc_library(
         ":flags_impl_lib",
     ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
-        "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:byte_order_lib",
         "//source/server:backtrace_lib",
     ]),
 )
@@ -157,7 +146,6 @@ envoy_cc_library(
     srcs = ["quic_cert_utils_impl.cc"] + envoy_select_quiche([
         "quic_file_utils_impl.cc",
         "quic_hostname_utils_impl.cc",
-        "quic_test_output_impl.cc",
     ]),
     hdrs = [
         "quic_cert_utils_impl.h",
@@ -167,7 +155,6 @@ envoy_cc_library(
         "quic_file_utils_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_string_utils_impl.h",
-        "quic_test_output_impl.h",
         "quic_text_utils_impl.h",
     ]),
     external_deps = [
@@ -209,7 +196,6 @@ envoy_cc_library(
         "spdy_string_piece_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
-        "spdy_unsafe_arena_impl.h",
     ] + envoy_select_quiche([
         "spdy_bug_tracker_impl.h",
         "spdy_logging_impl.h",
@@ -229,5 +215,16 @@ envoy_cc_library(
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
+    ]),
+)
+
+envoy_cc_library(
+    name = "spdy_platform_unsafe_arena_impl_lib",
+    hdrs = [
+        "spdy_unsafe_arena_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = envoy_select_quiche([
+        "@com_googlesource_quiche//:spdy_simple_arena_lib",
     ]),
 )
