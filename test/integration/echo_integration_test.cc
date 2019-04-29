@@ -96,6 +96,7 @@ filter_chains:
                                    .localAddress()
                                    ->ip()
                                    ->port();
+
   Buffer::OwnedImpl buffer("hello");
   std::string response;
   RawConnectionDriver connection(
