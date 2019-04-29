@@ -722,8 +722,7 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
 
 void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
                                           UpstreamRequest& upstream_request) {
-  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
-  chargeUpstreamCode(response_code, *headers, upstream_request.upstream_host_, false);
+  chargeUpstreamCode(100, *headers, upstream_request.upstream_host_, false);
   ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
 
   downstream_response_started_ = true;
