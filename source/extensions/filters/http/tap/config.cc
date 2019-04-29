@@ -21,7 +21,9 @@ public:
   Extensions::Common::Tap::TapConfigSharedPtr
   createConfigFromProto(envoy::service::tap::v2alpha::TapConfig&& proto_config,
                         Extensions::Common::Tap::Sink* admin_streamer) override {
-    return std::make_shared<HttpTapConfigImpl>(std::move(proto_config), admin_streamer,
+    return std::make_shared<HttpTapConfigImpl>(std::move(proto_config),
+                                               context_.runtime(),
+                                               admin_streamer,
                                                context_.clusterManager(), context_.scope(),
                                                context_.localInfo());
   }
@@ -37,7 +39,7 @@ Http::FilterFactoryCb TapFilterFactory::createFilterFactoryFromProtoTyped(
       proto_config, stats_prefix, std::make_unique<HttpTapConfigFactoryImpl>(context),
       context.scope(), context.admin(), context.singletonManager(), context.threadLocal(),
       context.dispatcher()));
-  return [&clusterManager = context.clusterManager(), filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [/* tap_config_provider_manager,*/&clusterManager = context.clusterManager(), filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(clusterManager, filter_config);
     callbacks.addStreamFilter(filter);
     callbacks.addAccessLogHandler(filter);

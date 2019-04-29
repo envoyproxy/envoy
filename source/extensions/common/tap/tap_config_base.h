@@ -2,6 +2,7 @@
 
 #include <fstream>
 
+#include "absl/types/optional.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
@@ -87,7 +88,10 @@ public:
 
   // TapConfig
   PerTapSinkHandleManagerPtr createPerTapSinkHandleManager(uint64_t trace_id) override {
-    return std::make_unique<PerTapSinkHandleManagerImpl>(*this, trace_id);
+    if (enabled(trace_id)) {
+      return std::make_unique<PerTapSinkHandleManagerImpl>(*this, trace_id);
+    }
+    return {};
   }
   uint32_t maxBufferedRxBytes() const override { return max_buffered_rx_bytes_; }
   uint32_t maxBufferedTxBytes() const override { return max_buffered_tx_bytes_; }
@@ -99,8 +103,8 @@ public:
 
 protected:
   TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+                    Runtime::Loader& loader,
                     Common::Tap::Sink* admin_streamer,
-
                     Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                     const LocalInfo::LocalInfo& local_info);
 
@@ -109,11 +113,16 @@ private:
   // maximum amount that can be buffered is 2x this value).
   static constexpr uint32_t DefaultMaxBufferedBytes = 1024;
 
+  bool enabled(uint64_t random_value) const;
+
+  Runtime::Loader& loader_;
+
   const uint32_t max_buffered_rx_bytes_;
   const uint32_t max_buffered_tx_bytes_;
   const bool streaming_;
   Sink* sink_to_use_;
   SinkPtr sink_;
+  absl::optional<envoy::api::v2::core::RuntimeFractionalPercent> filter_enabled_;
   envoy::service::tap::v2alpha::OutputSink::Format sink_format_;
   std::vector<MatcherPtr> matchers_;
 };
@@ -202,7 +211,6 @@ private:
     const uint64_t trace_id_;
     std::ofstream output_file_;
   };
-
   const LocalInfo::LocalInfo& local_info_;
   std::string tap_id_;
   Grpc::AsyncClientPtr client_;

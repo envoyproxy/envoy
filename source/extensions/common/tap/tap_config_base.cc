@@ -40,10 +40,11 @@ bool Utility::addBufferToProtoBytes(envoy::data::tap::v2alpha::Body& output_body
 }
 
 TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+                                     Runtime::Loader& loader,
                                      Common::Tap::Sink* admin_streamer,
                                      Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
                                      const LocalInfo::LocalInfo& local_info)
-    : max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+    : loader_(loader), max_buffered_rx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_rx_bytes, DefaultMaxBufferedBytes)),
       max_buffered_tx_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           proto_config.output_config(), max_buffered_tx_bytes, DefaultMaxBufferedBytes)),
@@ -82,6 +83,18 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
   }
 
   buildMatcher(proto_config.match_config(), matchers_);
+  if (proto_config.has_filter_enabled()) {
+    filter_enabled_ = proto_config.filter_enabled();
+  }
+}
+
+bool TapConfigBaseImpl::enabled(uint64_t random_value) const {
+    if (filter_enabled_) {
+      const auto& filter_enabled = filter_enabled_.value();
+      return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
+                                               filter_enabled.default_value(), random_value);
+    }
+    return true;
 }
 
 const Matcher& TapConfigBaseImpl::rootMatcher() const {
