@@ -15,6 +15,10 @@ namespace quiche {
 
 class Flag;
 
+// TODO: modify flags implementation to be backed by
+// Runtime::runtimeFeatureEnabled(), which is the canonical Envoy way of
+// enabling and disabling features.
+
 // Registry of QUICHE flags. Can be used to reset all flags to default values,
 // and to look up and set flags by name.
 class FlagRegistry {
