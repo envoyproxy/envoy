@@ -21,7 +21,6 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
-#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/genfiles/external/com_googlesource_quiche/quiche/quic/core/quic_types.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"

@@ -165,9 +165,7 @@ envoy_cc_library(
     name = "quic_platform_mem_slice_span_impl_lib",
     srcs = envoy_select_quiche(["quic_mem_slice_span_impl.cc"]),
     hdrs = envoy_select_quiche(["quic_mem_slice_span_impl.h"]),
-    copts = [
-        "-Wno-unused-parameter",
-    ],
+    copts = ["-Wno-unused-parameter"],
     visibility = ["//visibility:public"],
     deps = [
         "@com_googlesource_quiche//:quic_platform_base",
