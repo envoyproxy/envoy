@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/api/v2/lds.pb.h"
 
 #include "common/protobuf/utility.h"
 

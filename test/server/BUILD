@@ -232,7 +232,7 @@ envoy_cc_test_library(
     hdrs = ["utility.h"],
     deps = [
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/listener:listener_cc",
+        "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
 
