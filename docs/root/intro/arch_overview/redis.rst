@@ -61,15 +61,8 @@ Redis Cluster Support (Experimental)
 ----------------------------------------
 
 Envoy currently offers experimental support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
-This requires Envoy to track the topology of the cluster- which nodes exist, and which are the current 
-masters for each shard, and which shards and nodes enter or leave the cluster.
 
-The user may be familiar with `Twemproxy <https://github.com/twitter/twemproxy>`_, another proxy
-that interfaces with Redis. However, Twemproxy support for Redis differs in several important ways 
-from Envoy's. First, it does not support Redis Cluster. Second, it acts as service in front of 
-Redis, as opposed to being a sidecar proxy. Finally, it is un-maintained. 
-
-Why do we need a new system, aside from the last point? Beside the expected benefits of a sidecar 
+Why do we need a new system? Beside the expected benefits of a sidecar
 proxy such as unified retries and so on, it allows us to essentially build a common client for 
 all services to talk to Redis. This is important because while Redis non-cluster clients are 
 performant and have feature parity across various implementations, Redis Cluster clients do not! 
@@ -78,6 +71,12 @@ something very important if one wants to scale a Redis fleet to handle heavy rea
 from services implemented in different languages, each with their own redis client. Hence, these 
 services can use a Redis non-cluster client and get all the benefits of Redis Cluster without 
 worrying about different or unexpected behaviors due to client differences.
+
+Envoy will track the topology of the cluster through periodic cluster slots commands to get following:
+
+* List of known nodes.
+* The masters for each shard.
+* Nodes enter or leave the cluster.
 
 For topology configuration details, see the Redis Cluster
 :ref:`v2 API reference <envoy_api_msg_config.cluster.redis.RedisClusterConfig>`

@@ -77,12 +77,12 @@ namespace Redis {
  * the `CLUSTER SLOTS command <https://redis.io/commands/cluster-slots>`_, and the responses and
  * failure cases.
  *
- * The topology is stored in cluster_slots_map_. The present implementation uses std::array(), which
- * is a flexible approach for handling the slot mapping, but it will use a decent amount of memory
- * (16384 std::string's) and CPU cycles (as seen here in the copying of 16384 strings over all
- * cluster members) for a map that will generally scale as O(n) where n is the number of cluster
- * nodes. This is expected to change when we implement read from replica, each slot will store a
- * pointer to a structure with master and slave information.
+ * The topology is stored in cluster_slots_map_. According to the
+ * `Redis Cluster Spec <https://redis.io/topics/cluster-spec#keys-distribution-model`_, the key
+ * space is split into a fixed size 16384 slots. The current implementation uses a fixed size
+ * std::array() of shared_ptr pointing to the master host. This has a fixed cpu and memory cost and
+ * provide a fast lookup constant time lookup similar to Maglev. This will be used by the redis
+ * proxy filter for load balancing purpose.
  */
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
@@ -217,6 +217,7 @@ private:
     void onFailure() override;
     // Note: Below callback isn't used in topology updates
     bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) override { return true; }
+    void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
 
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;
@@ -226,7 +227,7 @@ private:
 
     std::list<Network::Address::InstanceConstSharedPtr> discovery_address_list_;
     // the slot to master node map
-    std::array<std::string, 16384> cluster_slots_map_;
+    std::array<Upstream::HostSharedPtr, 16384> cluster_slots_map_;
 
     Upstream::HostVector hosts_;
     const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;

@@ -1,5 +1,7 @@
 #include "redis_cluster.h"
 
+#include <err.h>
+
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -21,14 +23,13 @@ RedisCluster::RedisCluster(
       cluster_refresh_timeout_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redisCluster, cluster_refresh_timeout, 3000))),
       dispatcher_(factory_context.dispatcher()), dns_resolver_(std::move(dns_resolver)),
+      dns_lookup_family_(Upstream::getDnsLookupFamilyFromCluster(cluster)),
       load_assignment_(cluster.has_load_assignment()
                            ? cluster.load_assignment()
                            : Config::Utility::translateClusterHosts(cluster.hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
       redis_discovery_session_(
           std::make_unique<RedisDiscoverySession>(*this, redis_client_factory)) {
-
-  dns_lookup_family_ = Upstream::getDnsLookupFamilyFromCluster(cluster);
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -100,17 +101,26 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
       client_factory_(client_factory), buffer_timeout_(0) {}
 
 namespace {
+// Convert the cluster slot IP/Port response to and address, return null if the response does not
+// match the expected type
 Network::Address::InstanceConstSharedPtr
 ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
-  ASSERT(value.type() == NetworkFilters::Common::Redis::RespType::Array);
-  ASSERT(value.asArray().size() >= 2);
-  std::string address = value.asArray()[0].asString();
+  if (value.type() != NetworkFilters::Common::Redis::RespType::Array) {
+    return nullptr;
+  }
+  auto& array = value.asArray();
+
+  if (array.size() < 2 || array[0].type() != NetworkFilters::Common::Redis::RespType::BulkString ||
+      array[1].type() != NetworkFilters::Common::Redis::RespType::Integer) {
+    return nullptr;
+  }
+
+  std::string address = array[0].asString();
   bool ipv6 = (address.find(":") != std::string::npos);
   if (ipv6) {
-    return std::make_shared<Network::Address::Ipv6Instance>(address,
-                                                            value.asArray()[1].asInteger());
+    return std::make_shared<Network::Address::Ipv6Instance>(address, array[1].asInteger());
   }
-  return std::make_shared<Network::Address::Ipv4Instance>(address, value.asArray()[1].asInteger());
+  return std::make_shared<Network::Address::Ipv4Instance>(address, array[1].asInteger());
 }
 } // namespace
 
@@ -183,34 +193,39 @@ void RedisCluster::RedisDiscoverySession::onResponse(
   current_request_ = nullptr;
 
   if (value->type() != NetworkFilters::Common::Redis::RespType::Array) {
-    ENVOY_LOG(warn, "Unexpected response to cluster slot command: {}", value->toString());
-    parent_.info_->stats().update_no_rebuild_.inc();
+    onUnexpectedResponse(value);
     return;
   }
 
   Upstream::HostVector new_hosts;
-  std::array<std::string, 16384> slots_;
+  std::array<Upstream::HostSharedPtr, 16384> slots_;
 
+  // loop through the cluster slot response and error checks for each field
   for (const NetworkFilters::Common::Redis::RespValue& part : value->asArray()) {
+    if (part.type() != NetworkFilters::Common::Redis::RespType::Array) {
+      onUnexpectedResponse(value);
+      return;
+    }
     const std::vector<NetworkFilters::Common::Redis::RespValue>& slot_range = part.asArray();
-    ASSERT(slot_range.size() >= 3);
-
-    // Field 0: Start slot range
-    auto start_field = slot_range[0].asInteger();
-
-    // Field 1: End slot range
-    auto end_field = slot_range[1].asInteger();
+    if (slot_range.size() < 3 ||
+        slot_range[0].type() !=
+            NetworkFilters::Common::Redis::RespType::Integer || // start slot range as an integer
+        slot_range[1].type() !=
+            NetworkFilters::Common::Redis::RespType::Integer || // end slot range as an integer
+        slot_range[2].type() !=
+            NetworkFilters::Common::Redis::RespType::Array) { // master ip and port pair as an array
+      onUnexpectedResponse(value);
+      return;
+    }
 
     // Field 2: Master address for slot range
     // TODO(hyang): For now we're only adding the master node for each slot. When we're ready to
     //  send requests to replica nodes, we need to add subsequent address in the response as
     //  replica nodes.
     auto master_address = ProcessCluster(slot_range[2]);
-    // Add to the slot
-    for (auto i = start_field; i <= end_field; ++i) {
-      slots_[i] = master_address->asString();
-      // TODO: Investigate performance of alternative implementations, as this will be O(n)
-      // where n is number of shards.
+    if (!master_address) {
+      onUnexpectedResponse(value);
+      return;
     }
     new_hosts.emplace_back(
         new RedisHost(parent_.info(), "", std::move(master_address), parent_, true));
@@ -229,6 +244,26 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     parent_.info_->stats().update_no_rebuild_.inc();
   }
 
+  // build the slot lookup array in a second pass, so that it can referenced the updated_hosts.
+  for (const NetworkFilters::Common::Redis::RespValue& part : value->asArray()) {
+    const std::vector<NetworkFilters::Common::Redis::RespValue>& slot_range = part.asArray();
+
+    // Field 0: Start slot range
+    auto start_field = slot_range[0].asInteger();
+
+    // Field 1: End slot range
+    auto end_field = slot_range[1].asInteger();
+
+    // Field 2: Master address for slot range
+    auto master_address = ProcessCluster(slot_range[2]);
+    auto host = updated_hosts.find(master_address->asString());
+    ASSERT(host != updated_hosts.end(), "we expect all address to be found in the updated_hosts");
+    // Add to the slot
+    for (auto i = start_field; i <= end_field; ++i) {
+      slots_[i] = host->second;
+    }
+  }
+
   all_hosts_ = std::move(updated_hosts);
   cluster_slots_map_.swap(slots_);
 
@@ -237,6 +272,13 @@ void RedisCluster::RedisDiscoverySession::onResponse(
   // DNS resolution completes. This is not perfect but is easier to code and it is unclear
   // if the extra complexity is needed so will start with this.
   parent_.onPreInitComplete();
+  resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+}
+
+void RedisCluster::RedisDiscoverySession::onUnexpectedResponse(
+    const NetworkFilters::Common::Redis::RespValuePtr& value) {
+  ENVOY_LOG(warn, "Unexpected response to cluster slot command: {}", value->toString());
+  this->parent_.info_->stats().update_failure_.inc();
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 

@@ -522,6 +522,86 @@ TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {
   setupFactoryFromV2Yaml(basic_yaml_hosts);
 }
 
+TEST_F(RedisClusterTest, RedisErrorResponse) {
+
+  const std::string basic_yaml_hosts = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    dns_lookup_family: V4_ONLY
+    hosts:
+    - socket_address:
+        address: foo.bar.com
+        port_value: 22120
+    cluster_type:
+      name: envoy.clusters.redis
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+        value:
+          cluster_refresh_rate: 4s
+          cluster_refresh_timeout: 0.25s
+    )EOF";
+  setupFromV2Yaml(basic_yaml_hosts);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectRedisResolve(true);
+
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  // initialization will wait til the redis cluster succeed
+  std::vector<NetworkFilters::Common::Redis::RespValue> hello_world(2);
+  hello_world[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  hello_world[0].asString() = "hello";
+  hello_world[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  hello_world[1].asString() = "world";
+
+  NetworkFilters::Common::Redis::RespValuePtr hello_world_response(
+      new NetworkFilters::Common::Redis::RespValue());
+  hello_world_response->type(NetworkFilters::Common::Redis::RespType::Array);
+  hello_world_response->asArray().swap(hello_world);
+
+  expectClusterSlotResponse(std::move(hello_world_response));
+  EXPECT_EQ(1U, cluster_->info()->stats().update_attempt_.value());
+  EXPECT_EQ(1U, cluster_->info()->stats().update_failure_.value());
+
+  expectRedisResolve();
+  resolve_timer_->callback_();
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+
+  // expect no change if resolve failed
+  std::vector<NetworkFilters::Common::Redis::RespValue> master_1(2);
+  master_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  master_1[0].asString() = "wrong_ip";
+  master_1[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  master_1[1].asString() = "wrong_port";
+
+  std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(3);
+  slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
+  slot_1[0].asInteger() = 0;
+  slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
+  slot_1[1].asInteger() = 16383;
+  slot_1[2].type(NetworkFilters::Common::Redis::RespType::Array);
+  slot_1[2].asArray().swap(master_1);
+
+  std::vector<NetworkFilters::Common::Redis::RespValue> slots(1);
+  slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
+  slots[0].asArray().swap(slot_1);
+
+  NetworkFilters::Common::Redis::RespValuePtr response_with_wrong_ip(
+      new NetworkFilters::Common::Redis::RespValue());
+  response_with_wrong_ip->type(NetworkFilters::Common::Redis::RespType::Array);
+  response_with_wrong_ip->asArray().swap(slots);
+
+  expectRedisResolve();
+  resolve_timer_->callback_();
+  expectClusterSlotResponse(std::move(response_with_wrong_ip));
+  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+  EXPECT_EQ(3U, cluster_->info()->stats().update_attempt_.value());
+  EXPECT_EQ(2U, cluster_->info()->stats().update_failure_.value());
+}
+
 } // namespace Redis
 } // namespace Clusters
 } // namespace Extensions
