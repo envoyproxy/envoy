@@ -144,3 +144,24 @@ api_go_grpc_library(
         "//envoy/api/v2/route:route_go_proto",
     ],
 )
+
+api_proto_library_internal(
+    name = "srds",
+    srcs = ["srds.proto"],
+    has_services = 1,
+    visibility = [":friends"],
+    deps = [
+        ":discovery",
+        "//envoy/api/v2/core:base",
+        "//envoy/api/v2/route",
+    ],
+)
+
+api_go_grpc_library(
+    name = "srds",
+    proto = ":srds",
+    deps = [
+        ":discovery_go_proto",
+        "//envoy/api/v2/core:base_go_proto",
+    ],
+)
