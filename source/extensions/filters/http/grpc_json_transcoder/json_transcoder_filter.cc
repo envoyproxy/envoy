@@ -127,9 +127,8 @@ JsonTranscoderConfig::JsonTranscoderConfig(
         http_rule.set_body("*");
       }
 
-      if (!PathMatcherUtility::RegisterByHttpRule(pmb,
-                                                  http_rule,
-                                                  ignored_query_parameters, method)) {
+      if (!PathMatcherUtility::RegisterByHttpRule(pmb, http_rule, ignored_query_parameters,
+                                                  method)) {
         throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
                              "' to path matcher");
       }
