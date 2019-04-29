@@ -121,25 +121,8 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     ENVOY_LOG(debug, "DNS request timed out {} times", timeouts);
   }
 
-  if (completed_) {
-    if (!cancelled_) {
-      try {
-        callback_(std::move(address_list));
-      } catch (const EnvoyException& e) {
-        ENVOY_LOG(critical, "EnvoyException in c-ares callback");
-        dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (const std::exception& e) {
-        ENVOY_LOG(critical, "std::exception in c-ares callback");
-        dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (...) {
-        ENVOY_LOG(critical, "Unknown exception in c-ares callback");
-        dispatcher_.post([] { throw EnvoyException("unknown"); });
-      }
-    }
-    if (owned_) {
-      delete this;
-      return;
-    }
+  if (fireCallback(callback_, std::move(address_list))) {
+    return;
   }
 
   if (!completed_ && fallback_if_failed_) {
@@ -312,35 +295,17 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvFinishCallback(
     completed_ = true;
   }
 
-  if (completed_) {
-    if (!cancelled_) {
-      try {
-        callback_(std::move(srv_records));
-      } catch (const EnvoyException& e) {
-        ENVOY_LOG(critical, "EnvoyException in c-ares callback for SRV records");
-        dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (const std::exception& e) {
-        ENVOY_LOG(critical, "std::exception in c-ares callback for SRV records");
-        dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
-      } catch (...) {
-        ENVOY_LOG(critical, "Unknown exception in c-ares callback for SRV records");
-        dispatcher_.post([] { throw EnvoyException("unknown"); });
-      }
-    }
-    if (owned_) {
-      delete this;
-      return;
-    }
-  }
+  fireCallback(callback_, std::move(srv_records));
 }
 
 void DnsResolverImpl::PendingSrvResolution::getSrvByName() {
-  ares_query(channel_, dns_name_.c_str(), ns_c_in, ns_t_srv,
-             [](void* arg, int status, int timeouts, unsigned char* abuf, int alen) {
-               static_cast<PendingSrvResolution*>(arg)->onAresSrvStartCallback(status, timeouts,
-                                                                               abuf, alen);
-             },
-             this);
+  ares_query(
+      channel_, dns_name_.c_str(), ns_c_in, ns_t_srv,
+      [](void* arg, int status, int timeouts, unsigned char* abuf, int alen) {
+        static_cast<PendingSrvResolution*>(arg)->onAresSrvStartCallback(status, timeouts, abuf,
+                                                                        alen);
+      },
+      this);
 }
 
 } // namespace Network
