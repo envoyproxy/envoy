@@ -2936,7 +2936,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers;
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
   }
@@ -2944,7 +2944,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -2955,7 +2955,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "bad"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -2967,7 +2967,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "15"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -2980,7 +2980,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -2990,10 +2990,37 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
+    Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
+                                    {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, true);
+    EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
+    EXPECT_EQ("15", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, maxGrpcTimeout())
+        .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
+    Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
+                                    {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, true);
+    EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
+    EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
+    EXPECT_FALSE(headers.has("x-envoy-upstream-rq-per-try-timeout-ms"));
+    EXPECT_EQ("15", headers.get_("x-envoy-expected-rq-timeout-ms"));
+    EXPECT_EQ("15m", headers.get_("grpc-timeout"));
+  }
+  {
+    NiceMock<MockRouteEntry> route;
     route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(7), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3007,7 +3034,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3020,7 +3047,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, maxGrpcTimeout())
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("grpc-timeout"));
@@ -3030,7 +3057,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, maxGrpcTimeout()).WillRepeatedly(Return(absl::nullopt));
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("grpc-timeout"));
@@ -3041,7 +3068,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(1000), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_EQ("1000m", headers.get_("grpc-timeout"));
@@ -3052,7 +3079,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(999)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(999), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_EQ("999m", headers.get_("grpc-timeout"));
@@ -3062,7 +3089,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, maxGrpcTimeout())
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(999)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "0m"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(999), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_EQ("999m", headers.get_("grpc-timeout"));
@@ -3074,7 +3101,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, grpcTimeoutOffset())
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "100m"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(90), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
   }
@@ -3085,7 +3112,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     EXPECT_CALL(route, grpcTimeoutOffset())
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(10)));
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"}, {"grpc-timeout", "1m"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(1), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
   }
@@ -3096,7 +3123,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3110,7 +3137,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "bad"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(1000), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3125,7 +3152,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "15"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3141,7 +3168,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3157,7 +3184,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     Http::TestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(7), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3174,7 +3201,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
                                     {"grpc-timeout", "1000m"},
                                     {"x-envoy-upstream-rq-timeout-ms", "15"},
                                     {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(5), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));
@@ -3189,7 +3216,7 @@ TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"}};
-    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false);
+    FilterUtility::TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false);
     EXPECT_EQ(std::chrono::milliseconds(15), timeout.global_timeout_);
     EXPECT_EQ(std::chrono::milliseconds(0), timeout.per_try_timeout_);
     EXPECT_FALSE(headers.has("x-envoy-upstream-rq-timeout-ms"));

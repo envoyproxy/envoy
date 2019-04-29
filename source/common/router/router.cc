@@ -115,7 +115,8 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
 
 FilterUtility::TimeoutData
 FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_headers,
-                            bool insert_envoy_expected_request_timeout_ms, bool grpc_request) {
+                            bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
+                            bool per_try_timeout_hedging_enabled) {
   // See if there is a user supplied timeout in a request header. If there is we take that.
   // Otherwise if the request is gRPC and a maximum gRPC timeout is configured we use the timeout
   // in the gRPC headers (or infinity when gRPC headers have no timeout), but cap that timeout to
@@ -173,7 +174,10 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
 
   // See if there is any timeout to write in the expected timeout header.
   uint64_t expected_timeout = timeout.per_try_timeout_.count();
-  if (expected_timeout == 0) {
+  // Use the global timeout if no per try timeout was specified or if we're
+  // doing hedging when there are per try timeouts. Either of these scenarios
+  // mean that the upstream server can use the full global timeout.
+  if (per_try_timeout_hedging_enabled || expected_timeout == 0) {
     expected_timeout = timeout.global_timeout_.count();
   }
 
@@ -382,8 +386,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
+
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,
-                                         grpc_request_);
+                                         grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
 
   // If this header is set with any value, use an alternate response code on timeout
   if (headers.EnvoyUpstreamRequestTimeoutAltResponse()) {
@@ -405,8 +411,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   // Ensure an http transport scheme is selected before continuing with decoding.
   ASSERT(headers.Scheme());
-
-  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
 
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
