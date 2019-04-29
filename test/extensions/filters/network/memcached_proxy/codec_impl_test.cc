@@ -46,7 +46,7 @@ public:
 class MemcachedCodecImplTest : public testing::Test {
 public:
   Buffer::OwnedImpl output_;
-  EncoderImpl encoder_{output_};
+  EncoderImpl encoder_;
   NiceMock<TestDecoderCallbacks> callbacks_;
   DecoderImpl decoder_{callbacks_};
 };
@@ -219,7 +219,7 @@ TEST_F(MemcachedCodecImplTest, GetRoundTrip) {
   GetRequestImpl get(3, 3, 3, 3);
   get.key("foo");
 
-  encoder_.encodeGet(get);
+  encoder_.encodeGet(get, output_);
   EXPECT_CALL(callbacks_, decodeGet_(Pointee(Eq(get))));
   decoder_.onData(output_);
 }
@@ -228,7 +228,7 @@ TEST_F(MemcachedCodecImplTest, GetkRoundTrip) {
   GetkRequestImpl getk(3, 3, 3, 3);
   getk.key("foo");
 
-  encoder_.encodeGetk(getk);
+  encoder_.encodeGetk(getk, output_);
   EXPECT_CALL(callbacks_, decodeGetk_(Pointee(Eq(getk))));
   decoder_.onData(output_);
 }
@@ -237,7 +237,7 @@ TEST_F(MemcachedCodecImplTest, DeleteRoundTrip) {
   DeleteRequestImpl del(3, 3, 3, 3);
   del.key("foo");
 
-  encoder_.encodeDelete(del);
+  encoder_.encodeDelete(del, output_);
   EXPECT_CALL(callbacks_, decodeDelete_(Pointee(Eq(del))));
   decoder_.onData(output_);
 }
@@ -247,7 +247,7 @@ TEST_F(MemcachedCodecImplTest, SetRoundTrip) {
   set.key("foo");
   set.body("bar");
 
-  encoder_.encodeSet(set);
+  encoder_.encodeSet(set, output_);
   EXPECT_CALL(callbacks_, decodeSet_(Pointee(Eq(set))));
   decoder_.onData(output_);
 }
@@ -257,7 +257,7 @@ TEST_F(MemcachedCodecImplTest, AddRoundTrip) {
   add.key("foo");
   add.body("bar");
 
-  encoder_.encodeAdd(add);
+  encoder_.encodeAdd(add, output_);
   EXPECT_CALL(callbacks_, decodeAdd_(Pointee(Eq(add))));
   decoder_.onData(output_);
 }
@@ -267,7 +267,7 @@ TEST_F(MemcachedCodecImplTest, ReplaceRoundTrip) {
   replace.key("foo");
   replace.body("bar");
 
-  encoder_.encodeReplace(replace);
+  encoder_.encodeReplace(replace, output_);
   EXPECT_CALL(callbacks_, decodeReplace_(Pointee(Eq(replace))));
   decoder_.onData(output_);
 }
@@ -279,7 +279,7 @@ TEST_F(MemcachedCodecImplTest, IncrementRoundTrip) {
   incr.initialValue(0);
   incr.initialValue(123);
 
-  encoder_.encodeIncrement(incr);
+  encoder_.encodeIncrement(incr, output_);
   EXPECT_CALL(callbacks_, decodeIncrement_(Pointee(Eq(incr))));
   decoder_.onData(output_);
 }
@@ -291,7 +291,7 @@ TEST_F(MemcachedCodecImplTest, DecrementRoundTrip) {
   decr.initialValue(0);
   decr.initialValue(123);
 
-  encoder_.encodeDecrement(decr);
+  encoder_.encodeDecrement(decr, output_);
   EXPECT_CALL(callbacks_, decodeDecrement_(Pointee(Eq(decr))));
   decoder_.onData(output_);
 }
@@ -301,7 +301,7 @@ TEST_F(MemcachedCodecImplTest, AppendRoundTrip) {
   append.key("foo");
   append.body("bar");
 
-  encoder_.encodeAppend(append);
+  encoder_.encodeAppend(append, output_);
   EXPECT_CALL(callbacks_, decodeAppend_(Pointee(Eq(append))));
   decoder_.onData(output_);
 }
@@ -311,7 +311,7 @@ TEST_F(MemcachedCodecImplTest, PrependRoundTrip) {
   prepend.key("foo");
   prepend.body("bar");
 
-  encoder_.encodePrepend(prepend);
+  encoder_.encodePrepend(prepend, output_);
   EXPECT_CALL(callbacks_, decodePrepend_(Pointee(Eq(prepend))));
   decoder_.onData(output_);
 }

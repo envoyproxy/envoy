@@ -28,6 +28,8 @@ public:
   const std::string RateLimit = "envoy.ratelimit";
   // Redis proxy filter
   const std::string RedisProxy = "envoy.redis_proxy";
+  // Memcached proxy filter
+  const std::string MemcachedProxy = "envoy.filters.network.memcached_proxy";
   // IP tagging filter
   const std::string TcpProxy = "envoy.tcp_proxy";
   // Authorization filter

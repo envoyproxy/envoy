@@ -231,84 +231,85 @@ void EncoderImpl::encodeRequestHeader(
   uint8_t extras_length,
   uint32_t body_length,
   const Request& request,
-  Message::OpCode op_code) {
+  Message::OpCode op_code,
+  Buffer::Instance& out) {
 
-  output_.writeByte(Message::RequestV1);
-  output_.writeByte(op_code);
-  output_.writeBEInt<uint16_t>(key_length);
-  output_.writeByte(extras_length);
-  output_.writeByte(request.dataType());
-  output_.writeBEInt<uint16_t>(request.vbucketIdOrStatus());
-  output_.writeBEInt<uint32_t>(body_length);
-  output_.writeBEInt<uint32_t>(request.opaque());
-  output_.writeBEInt<uint64_t>(request.cas());
+  out.writeByte(Message::RequestV1);
+  out.writeByte(op_code);
+  out.writeBEInt<uint16_t>(key_length);
+  out.writeByte(extras_length);
+  out.writeByte(request.dataType());
+  out.writeBEInt<uint16_t>(request.vbucketIdOrStatus());
+  out.writeBEInt<uint32_t>(body_length);
+  out.writeBEInt<uint32_t>(request.opaque());
+  out.writeBEInt<uint64_t>(request.cas());
 }
 
-void EncoderImpl::encodeGet(const GetRequest& request) {
-  encodeGetLike(request, request.quiet() ? Message::OpCode::OP_GETQ : Message::OpCode::OP_GET);
+void EncoderImpl::encodeGet(const GetRequest& request, Buffer::Instance& out) {
+  encodeGetLike(request, request.quiet() ? Message::OpCode::OP_GETQ : Message::OpCode::OP_GET, out);
 }
 
-void EncoderImpl::encodeGetk(const GetkRequest& request) {
-  encodeGetLike(request, request.quiet() ? Message::OpCode::OP_GETKQ : Message::OpCode::OP_GETK);
+void EncoderImpl::encodeGetk(const GetkRequest& request, Buffer::Instance& out) {
+  encodeGetLike(request, request.quiet() ? Message::OpCode::OP_GETKQ : Message::OpCode::OP_GETK, out);
 }
 
-void EncoderImpl::encodeDelete(const DeleteRequest& request) {
-  encodeGetLike(request, request.quiet() ? Message::OpCode::OP_DELETEQ : Message::OpCode::OP_DELETE);
+void EncoderImpl::encodeDelete(const DeleteRequest& request, Buffer::Instance& out) {
+  encodeGetLike(request, request.quiet() ? Message::OpCode::OP_DELETEQ : Message::OpCode::OP_DELETE, out);
 }
 
-void EncoderImpl::encodeGetLike(const GetLikeRequest& request, Message::OpCode op_code) {
-  encodeRequestHeader(request.key().length(), 0, 0, request, op_code);
-  output_.add(request.key());
+void EncoderImpl::encodeGetLike(const GetLikeRequest& request, Message::OpCode op_code, Buffer::Instance& out) {
+  encodeRequestHeader(request.key().length(), 0, 0, request, op_code, out);
+  out.add(request.key());
 }
 
-void EncoderImpl::encodeSet(const SetRequest& request) {
-  encodeSetLike(request, request.quiet() ? Message::OpCode::OP_SETQ : Message::OpCode::OP_SET);
+void EncoderImpl::encodeSet(const SetRequest& request, Buffer::Instance& out) {
+  encodeSetLike(request, request.quiet() ? Message::OpCode::OP_SETQ : Message::OpCode::OP_SET, out);
 }
 
-void EncoderImpl::encodeAdd(const AddRequest& request) {
-  encodeSetLike(request, request.quiet() ? Message::OpCode::OP_ADDQ : Message::OpCode::OP_ADD);
+void EncoderImpl::encodeAdd(const AddRequest& request, Buffer::Instance& out) {
+  encodeSetLike(request, request.quiet() ? Message::OpCode::OP_ADDQ : Message::OpCode::OP_ADD, out);
 }
 
-void EncoderImpl::encodeReplace(const ReplaceRequest& request) {
-  encodeSetLike(request, request.quiet() ? Message::OpCode::OP_REPLACEQ : Message::OpCode::OP_REPLACE);
+void EncoderImpl::encodeReplace(const ReplaceRequest& request, Buffer::Instance& out) {
+  encodeSetLike(request, request.quiet() ? Message::OpCode::OP_REPLACEQ : Message::OpCode::OP_REPLACE, out);
 }
 
-void EncoderImpl::encodeSetLike(const SetLikeRequest& request, Message::OpCode op_code) {
-  encodeRequestHeader(request.key().length(), 8, request.body().length(), request, op_code);
-  output_.writeBEInt<uint32_t>(request.flags());
-  output_.writeBEInt<uint32_t>(request.expiration());
-  output_.add(request.key());
-  output_.add(request.body());
+void EncoderImpl::encodeSetLike(const SetLikeRequest& request, Message::OpCode op_code, Buffer::Instance& out) {
+  encodeRequestHeader(request.key().length(), 8, request.body().length(), request, op_code, out);
+  out.writeBEInt<uint32_t>(request.flags());
+  out.writeBEInt<uint32_t>(request.expiration());
+  out.add(request.key());
+  out.add(request.body());
 }
 
-void EncoderImpl::encodeIncrement(const IncrementRequest& request) {
-  encodeCounterLike(request, request.quiet() ? Message::OpCode::OP_INCREMENTQ : Message::OpCode::OP_INCREMENT);
+void EncoderImpl::encodeIncrement(const IncrementRequest& request, Buffer::Instance& out) {
+  encodeCounterLike(request, request.quiet() ? Message::OpCode::OP_INCREMENTQ : Message::OpCode::OP_INCREMENT, out);
 }
 
-void EncoderImpl::encodeDecrement(const DecrementRequest& request) {
-  encodeCounterLike(request, request.quiet() ? Message::OpCode::OP_DECREMENTQ : Message::OpCode::OP_DECREMENT);
+void EncoderImpl::encodeDecrement(const DecrementRequest& request, Buffer::Instance& out) {
+  encodeCounterLike(request, request.quiet() ? Message::OpCode::OP_DECREMENTQ : Message::OpCode::OP_DECREMENT, out);
 }
 
-void EncoderImpl::encodeCounterLike(const CounterLikeRequest& request, Message::OpCode op_code) {
-  encodeRequestHeader(request.key().length(), 8, 0, request, op_code);
-  output_.writeBEInt<uint64_t>(request.amount());
-  output_.writeBEInt<uint64_t>(request.initialValue());
-  output_.writeBEInt<uint32_t>(request.expiration());
-  output_.add(request.key());
+void EncoderImpl::encodeCounterLike(const CounterLikeRequest& request, Message::OpCode op_code, Buffer::Instance& out) {
+  encodeRequestHeader(request.key().length(), 8, 0, request, op_code, out);
+  out.writeBEInt<uint64_t>(request.amount());
+  out.writeBEInt<uint64_t>(request.initialValue());
+  out.writeBEInt<uint32_t>(request.expiration());
+  out.add(request.key());
 }
 
-void EncoderImpl::encodeAppend(const AppendRequest& request) {
-  encodeAppendLike(request, request.quiet() ? Message::OpCode::OP_APPENDQ : Message::OpCode::OP_APPEND);
+void EncoderImpl::encodeAppend(const AppendRequest& request, Buffer::Instance& out) {
+  encodeAppendLike(request, request.quiet() ? Message::OpCode::OP_APPENDQ : Message::OpCode::OP_APPEND, out);
 }
 
-void EncoderImpl::encodePrepend(const PrependRequest& request) {
-  encodeAppendLike(request, request.quiet() ? Message::OpCode::OP_PREPENDQ : Message::OpCode::OP_PREPEND);
+void EncoderImpl::encodePrepend(const PrependRequest& request, Buffer::Instance& out) {
+  encodeAppendLike(request, request.quiet() ? Message::OpCode::OP_PREPENDQ : Message::OpCode::OP_PREPEND, out);
 }
 
-void EncoderImpl::encodeAppendLike(const AppendLikeRequest& request, Message::OpCode op_code) {
-  encodeRequestHeader(request.key().length(), 0, request.body().length(), request, op_code);
-  output_.add(request.key());
-  output_.add(request.body());
+void EncoderImpl::encodeAppendLike(const AppendLikeRequest& request, Message::OpCode op_code, Buffer::Instance& out) {
+  encodeRequestHeader(request.key().length(), 0, request.body().length(), request, op_code, out);
+  out.add(request.key());
+  out.add(request.body());
 }
 
 }

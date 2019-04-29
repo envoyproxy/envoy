@@ -214,6 +214,14 @@ private:
   DecoderCallbacks& callbacks_;
 };
 
+class DecoderFactoryImpl : public DecoderFactory {
+public:
+  // DecoderFactory
+  DecoderPtr create(DecoderCallbacks& callbacks) override {
+    return std::make_unique<DecoderImpl>(callbacks);
+  }
+};
+
 class AppendLikeRequestImpl : public RequestImpl,
                               public virtual AppendLikeRequest {
 public:
@@ -258,32 +266,31 @@ public:
 
 class EncoderImpl : public Encoder, Logger::Loggable<Logger::Id::memcached> {
 public:
-  EncoderImpl(Buffer::Instance& output) : output_(output) {}
+  EncoderImpl() {}
 
   // Memcached::Encoder
-  void encodeGet(const GetRequest& message) override;
-  void encodeGetk(const GetkRequest& message) override;
-  void encodeDelete(const DeleteRequest& message) override;
-  void encodeSet(const SetRequest& message) override;
-  void encodeAdd(const AddRequest& message) override;
-  void encodeReplace(const ReplaceRequest& message) override;
-  void encodeIncrement(const IncrementRequest& message) override;
-  void encodeDecrement(const DecrementRequest& message) override;
-  void encodeAppend(const AppendRequest& message) override;
-  void encodePrepend(const PrependRequest& message) override;
+  void encodeGet(const GetRequest& request, Buffer::Instance& out) override;
+  void encodeGetk(const GetkRequest& request, Buffer::Instance& out) override;
+  void encodeDelete(const DeleteRequest& request, Buffer::Instance& out) override;
+  void encodeSet(const SetRequest& request, Buffer::Instance& out) override;
+  void encodeAdd(const AddRequest& request, Buffer::Instance& out) override;
+  void encodeReplace(const ReplaceRequest& request, Buffer::Instance& out) override;
+  void encodeIncrement(const IncrementRequest& request, Buffer::Instance& out) override;
+  void encodeDecrement(const DecrementRequest& request, Buffer::Instance& out) override;
+  void encodeAppend(const AppendRequest& request, Buffer::Instance& out) override;
+  void encodePrepend(const PrependRequest& request, Buffer::Instance& out) override;
 private:
-  void encodeGetLike(const GetLikeRequest& request, Message::OpCode op_code);
-  void encodeSetLike(const SetLikeRequest& request, Message::OpCode op_code);
-  void encodeCounterLike(const CounterLikeRequest& request, Message::OpCode op_code);
-  void encodeAppendLike(const AppendLikeRequest& request, Message::OpCode op_code);
+  void encodeGetLike(const GetLikeRequest& request, Message::OpCode op_code, Buffer::Instance& out);
+  void encodeSetLike(const SetLikeRequest& request, Message::OpCode op_code, Buffer::Instance& out);
+  void encodeCounterLike(const CounterLikeRequest& request, Message::OpCode op_code, Buffer::Instance& out);
+  void encodeAppendLike(const AppendLikeRequest& request, Message::OpCode op_code, Buffer::Instance& out);
   void encodeRequestHeader(
     uint16_t key_length,
     uint8_t extras_length,
     uint32_t body_length,
     const Request& request,
-    Message::OpCode op);
-
-  Buffer::Instance& output_;
+    Message::OpCode op,
+    Buffer::Instance& out);
 };
 
 }

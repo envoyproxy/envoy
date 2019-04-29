@@ -248,23 +248,38 @@ public:
 typedef std::unique_ptr<Decoder> DecoderPtr;
 
 /**
+ * A factory for a memcached decoder.
+ */
+class DecoderFactory {
+public:
+  virtual ~DecoderFactory() {}
+
+  /**
+   * Create a decoder given a set of decoder callbacks.
+   */
+  virtual DecoderPtr create(DecoderCallbacks& callbacks) PURE;
+};
+
+/**
  * Memcached message encoder.
  */
 class Encoder {
 public:
   virtual ~Encoder() = default;
 
-  virtual void encodeGet(const GetRequest& message) PURE;
-  virtual void encodeGetk(const GetkRequest& message) PURE;
-  virtual void encodeDelete(const DeleteRequest& message) PURE;
-  virtual void encodeSet(const SetRequest& message) PURE;
-  virtual void encodeAdd(const AddRequest& message) PURE;
-  virtual void encodeReplace(const ReplaceRequest& message) PURE;
-  virtual void encodeIncrement(const IncrementRequest& message) PURE;
-  virtual void encodeDecrement(const DecrementRequest& message) PURE;
-  virtual void encodeAppend(const AppendRequest& message) PURE;
-  virtual void encodePrepend(const PrependRequest& message) PURE;
+  virtual void encodeGet(const GetRequest& request, Buffer::Instance& out) PURE;
+  virtual void encodeGetk(const GetkRequest& request, Buffer::Instance& out) PURE;
+  virtual void encodeDelete(const DeleteRequest& request, Buffer::Instance& out) PURE;
+  virtual void encodeSet(const SetRequest& request, Buffer::Instance& out) PURE;
+  virtual void encodeAdd(const AddRequest& request, Buffer::Instance& out) PURE;
+  virtual void encodeReplace(const ReplaceRequest& request, Buffer::Instance& out) PURE;
+  virtual void encodeIncrement(const IncrementRequest& request, Buffer::Instance& out) PURE;
+  virtual void encodeDecrement(const DecrementRequest& request, Buffer::Instance& out) PURE;
+  virtual void encodeAppend(const AppendRequest& request, Buffer::Instance& out) PURE;
+  virtual void encodePrepend(const PrependRequest& request, Buffer::Instance& out) PURE;
 };
+
+typedef std::unique_ptr<Encoder> EncoderPtr;
 
 } // MemcachedProxy
 } // NetworkFilters

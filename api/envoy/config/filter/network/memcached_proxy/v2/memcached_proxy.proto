@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.memcached_proxy.v2;
+
+option java_outer_classname = "MemcachedProxyProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.filter.network.memcached_proxy.v2";
+option go_package = "v2";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Memcached proxy]
+
+message MemcachedProxy {
+  // The human readable prefix to use when emitting :ref:`statistics
+  // <config_network_filters_mongo_proxy_stats>`.
+  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+}
