@@ -29,9 +29,8 @@ public:
   // switch from the combination logic table to requiring the stat macro declarations themselves
   // to indicate the logic.
 
-  // Looks up gauge_name in our nonstandard combine logic rules, and returns the result (nullopt
-  // meaning not nonstandard, implying Accumulate).
-  static Gauge::CombineLogic getCombineLogic(Gauge& gauge, const std::string& gauge_name);
+  // Returns true if the parent's value can be added in, false if we should do nothing.
+  static bool shouldImport(Gauge& gauge, const std::string& gauge_name);
 
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas);

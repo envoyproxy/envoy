@@ -148,21 +148,19 @@ public:
   uint64_t value() const override { return data_.value_; }
   bool used() const override { return data_.flags_ & Flags::Used; }
 
-  absl::optional<CombineLogic> cachedCombineLogic() const override {
+  // Returns true if values should be added, false if no import.
+  absl::optional<bool> cachedCombineLogic() const override {
     if ((data_.flags_ & Flags::LogicKnown) == 0) {
       return absl::nullopt;
     }
-    return CombineLogic(data_.flags_ & Flags::LogicKnown);
+    return (data_.flags_ & Flags::LogicAccumulate) != 0;
   }
 
-  void setCombineLogic(CombineLogic logic) override {
-    switch (logic) {
-    case CombineLogic::Accumulate:
+  void setCombineLogic(bool should_import) override {
+    if (should_import) {
       data_.flags_ |= Flags::LogicAccumulate;
-      break;
-    case CombineLogic::NoImport:
+    } else {
       data_.flags_ |= Flags::LogicNeverImport;
-      break;
     }
   }
 
@@ -196,8 +194,8 @@ public:
   void set(uint64_t) override {}
   void sub(uint64_t) override {}
   uint64_t value() const override { return 0; }
-  absl::optional<CombineLogic> cachedCombineLogic() const override { return absl::nullopt; }
-  void setCombineLogic(CombineLogic) override {}
+  absl::optional<bool> cachedCombineLogic() const override { return absl::nullopt; }
+  void setCombineLogic(bool) override {}
 };
 
 } // namespace Stats

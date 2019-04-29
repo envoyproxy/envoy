@@ -115,24 +115,15 @@ public:
   virtual void sub(uint64_t amount) PURE;
   virtual uint64_t value() const PURE;
 
-  // Different approaches to importing a parent's stat value. Only used for gauges; all counters
-  // simply bring in the periodic deltas.
-  enum class CombineLogic {
-    // The default; the merged result is old+new.
-    Accumulate = Flags::LogicAccumulate,
-    // Ignore parent entirely; child stat is undefined until it sets its own value.
-    NoImport = Flags::LogicNeverImport,
-  };
-
   /**
    * Returns the stat's combine logic, if known.
    */
-  virtual absl::optional<CombineLogic> cachedCombineLogic() const PURE;
+  virtual absl::optional<bool> cachedCombineLogic() const PURE;
 
   /**
    * Sets the value to be returned by cachedCombineLogic().
    */
-  virtual void setCombineLogic(CombineLogic logic) PURE;
+  virtual void setCombineLogic(bool should_import) PURE;
 };
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;
