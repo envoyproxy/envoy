@@ -38,7 +38,8 @@ public:
   }
 
   ~DeltaSubscriptionTestHarness() {
-    ASSERT(nonce_acks_required_ == nonce_acks_sent_, "Not all nonces were ACKd!");
+    ASSERT(nonce_acks_required_ == nonce_acks_sent_,
+           "Not all nonces were ACKd, or there were unexpected ACKs!");
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
