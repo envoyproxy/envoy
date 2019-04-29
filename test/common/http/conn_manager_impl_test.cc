@@ -590,7 +590,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
 
   EXPECT_CALL(*filter, encodeHeaders(_, true));
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([filter](const HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.Status()->value().getStringView());
         EXPECT_EQ("path_normalization_failed",
                   filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
@@ -1369,7 +1369,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
 
   // 408 direct response after timeout.
   EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
-      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
         EXPECT_EQ("408", headers.Status()->value().getStringView());
       }));
   std::string response_body;

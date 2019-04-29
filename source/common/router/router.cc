@@ -690,7 +690,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
-  std::string details = absl::StrCat(
+  const std::string details = absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
       transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}");
   onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped, details);
