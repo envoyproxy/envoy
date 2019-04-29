@@ -159,11 +159,10 @@ class GrpcTapSink
       public Grpc::TypedAsyncStreamCallbacks<envoy::service::tap::v2alpha::StreamTapsResponse> {
 public:
   GrpcTapSink(const envoy::api::v2::core::GrpcService& grpc_service,
+              std::string tap_id,
               Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
               const LocalInfo::LocalInfo& local_info)
-      : local_info_(local_info) {
-    // get streaming client here and save it in tls slot? <- no need as it seems already run in a
-    // tls slot! create streaming client send a bunch of queries in submit
+      : local_info_(local_info), tap_id_(std::move(tap_id)) {
     const auto async_client_factory =
         cluster_manager.grpcAsyncClientManager().factoryForGrpcService(grpc_service, scope, true);
     client_ = async_client_factory->create();
@@ -204,9 +203,10 @@ private:
     std::ofstream output_file_;
   };
 
-  Grpc::AsyncStream* stream_{};
-  Grpc::AsyncClientPtr client_;
   const LocalInfo::LocalInfo& local_info_;
+  std::string tap_id_;
+  Grpc::AsyncClientPtr client_;
+  Grpc::AsyncStream* stream_{};
 };
 
 } // namespace Tap

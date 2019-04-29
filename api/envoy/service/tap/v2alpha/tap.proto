@@ -17,11 +17,14 @@ message StreamTapsRequest {
   message Identifier {
     // The node sending taps over the stream.
     envoy.api.v2.core.Node node = 1 [(validate.rules).message.required = true];
+    // The opaque identifier that was set in the output config.
+    string tap_id = 2;
   }
 
   // Identifier data effectively is a structured metadata. As a performance optimization this will
   // only be sent in the first message on the stream.
   Identifier identifier = 1;
+  // The trace id. this can be used to merge together a streaming trace.
   uint64 trace_id = 2;
   envoy.data.tap.v2alpha.TraceWrapper trace = 3;
 }

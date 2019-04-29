@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "envoy/api/v2/route/route.proto";
+import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -25,6 +26,7 @@ message TapConfig {
   // a tap will occur and the data will be written to the configured output.
   OutputConfig output_config = 2 [(validate.rules).message.required = true];
 
+  envoy.api.v2.core.RuntimeFractionalPercent runtime_fraction = 3;
   // [#comment:TODO(mattklein123): Rate limiting]
 }
 
@@ -160,8 +162,8 @@ message OutputSink {
     // Tap output will be written to a file per tap sink.
     FilePerTapSink file_per_tap = 3;
 
-    // GrpcService to send data to.
-    envoy.api.v2.core.GrpcService grpc_service = 4;
+    // GrpcService to send data to. format argument must be PROTO_BINARY grpc_service output stream.
+    StreamingGrpcSink streaming_grpc = 4;
   }
 }
 
@@ -175,4 +177,12 @@ message FilePerTapSink {
   // identifier distinguishing the recorded trace for stream instances (the Envoy
   // connection ID, HTTP stream ID, etc.).
   string path_prefix = 1 [(validate.rules).string.min_bytes = 1];
+}
+
+message StreamingGrpcSink {
+  // GrpcService to send data to. format argument must be PROTO_BINARY grpc_service output stream.
+  envoy.api.v2.core.GrpcService grpc_service = 1 [(validate.rules).message.required = true];
+
+  // Opaque identifier, that will be sent back to the streaming grpc server.
+  string tap_id = 2;
 }

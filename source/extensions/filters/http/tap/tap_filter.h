@@ -74,7 +74,7 @@ private:
  */
 class Filter : public Http::StreamFilter, public AccessLog::Instance {
 public:
-  Filter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
+  Filter(Upstream::ClusterManager& cluster_manager, FilterConfigSharedPtr config) : cluster_manager_(cluster_manager), config_(std::move(config)) {}
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
@@ -86,6 +86,7 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
     HttpTapConfigSharedPtr config = config_->currentConfig();
     tapper_ = config ? config->createPerRequestTapper(callbacks.streamId()) : nullptr;
   }
@@ -100,7 +101,9 @@ public:
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
     return Http::FilterMetadataStatus::Continue;
   }
-  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
+    encoder_callbacks_ = &callbacks;
+  }
 
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
@@ -108,6 +111,9 @@ public:
            const StreamInfo::StreamInfo& stream_info) override;
 
 private:
+  Upstream::ClusterManager& cluster_manager_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   FilterConfigSharedPtr config_;
   HttpPerRequestTapperPtr tapper_;
 };

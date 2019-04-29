@@ -1,4 +1,5 @@
 #include "extensions/filters/http/tap/tap_config_impl.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "envoy/data/tap/v2alpha/http.pb.h"
 
@@ -36,10 +37,17 @@ HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t strea
 
 void HttpPerRequestTapperImpl::streamRequestHeaders() {
   TapCommon::TraceWrapperPtr trace = makeTraceSegment();
+  setConnectionMetadata(trace);
+
   request_headers_->iterate(
       fillHeaderList,
       trace->mutable_http_streamed_trace_segment()->mutable_request_headers()->mutable_headers());
   sink_handle_->submitTrace(std::move(trace));
+}
+
+void HttpPerRequestTapperImpl::onConnectionMetadataKnown(const Network::Address::InstanceConstSharedPtr& remote_address, const Upstream::ClusterInfoConstSharedPtr& destination_cluster) {
+  destination_cluster_ = destination_cluster;
+  remote_address_ = remote_address;
 }
 
 void HttpPerRequestTapperImpl::onRequestHeaders(const Http::HeaderMap& headers) {
@@ -90,8 +98,14 @@ void HttpPerRequestTapperImpl::onRequestTrailers(const Http::HeaderMap& trailers
   }
 }
 
+void HttpPerRequestTapperImpl::onDestinationHostKnown(const Upstream::HostDescriptionConstSharedPtr& destination_host) {
+  destination_host_ = destination_host;
+}
+
 void HttpPerRequestTapperImpl::streamResponseHeaders() {
   TapCommon::TraceWrapperPtr trace = makeTraceSegment();
+  setDestinationHost(trace);
+
   response_headers_->iterate(
       fillHeaderList,
       trace->mutable_http_streamed_trace_segment()->mutable_response_headers()->mutable_headers());
@@ -169,6 +183,8 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
     response_trailers_->iterate(fillHeaderList, http_trace.mutable_response()->mutable_trailers());
   }
 
+  setConnectionMetadata(buffered_full_trace_);
+  setDestinationHost(buffered_full_trace_);
   ENVOY_LOG(debug, "submitting buffered trace sink");
   // move is safe as onDestroyLog is the last method called.
   sink_handle_->submitTrace(std::move(buffered_full_trace_));
@@ -211,6 +227,43 @@ void HttpPerRequestTapperImpl::onBody(
     ASSERT(body.as_bytes().size() <= maxBufferedBytes);
     TapCommon::Utility::addBufferToProtoBytes(body, maxBufferedBytes - body.as_bytes().size(), data,
                                               0, data.length());
+  }
+}
+
+void HttpPerRequestTapperImpl::setConnectionMetadata(TapCommon::TraceWrapperPtr& trace) {
+if (destination_cluster_) {
+    auto* destination = trace->mutable_destination();
+    destination->set_cluster_name(destination_cluster_->name());
+    auto&& metadata = destination_cluster_->metadata();
+    auto&& filter_meta = metadata.filter_metadata();
+    const auto& filter_it = filter_meta.find(HttpFilterNames::get().Tap);
+    if (filter_it != filter_meta.end()) {
+      *destination->mutable_cluster_metadata() = filter_it->second;
+    }
+    destination_cluster_.reset();
+  }
+
+  if (remote_address_) {
+    trace->set_source_address(remote_address_->asString());
+    remote_address_.reset();
+  }
+}
+
+void HttpPerRequestTapperImpl::setDestinationHost(TapCommon::TraceWrapperPtr& trace) {
+if (destination_host_) {
+    auto* destination = trace->mutable_destination();
+    destination->set_host_address(destination_host_->address()->asString());
+
+    auto&& metadata = destination_host_->metadata();
+    if (metadata) {
+      auto&& filter_meta = metadata->filter_metadata();
+      const auto& filter_it = filter_meta.find(HttpFilterNames::get().Tap);
+      if (filter_it != filter_meta.end()) {
+        *destination->mutable_host_metadata() = filter_it->second;
+      }
+    }
+
+    destination_host_.reset();
   }
 }
 

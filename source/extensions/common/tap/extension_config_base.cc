@@ -5,6 +5,33 @@ namespace Extensions {
 namespace Common {
 namespace Tap {
 
+/*
+Plan:
+Create TapConfigProviderManagerImpl that:
+Has a function
+
+ExtensionConfigBase::ExtensionConfigBase(){
+case grpc:
+
+// we might not even need manager................. as we don't have more than one name per tap filter!
+  //
+  TapSub tsb := new_subscribe(config_source, name, *this...)
+  // save sub inside us
+}
+
+in TapSub::onConfgUpdate() {
+  extension_config_.newTapConfig(theprotowejustgot, nullptr)
+}
+
+// edge case: filter is more than one filter chain (likely)
+solution: implement manager :\
+
+
+*/
+SINGLETON_MANAGER_REGISTRATION(tap_config_provider_manager);
+
+
+// This is my RdsRouteConfigProviderImpl
 ExtensionConfigBase::ExtensionConfigBase(
     const envoy::config::common::tap::v2alpha::CommonExtensionConfig proto_config,
     TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
@@ -28,6 +55,22 @@ ExtensionConfigBase::ExtensionConfigBase(
     newTapConfig(envoy::service::tap::v2alpha::TapConfig(proto_config_.static_config()), nullptr);
     ENVOY_LOG(debug, "initializing tap extension with static config");
     break;
+  }
+  case envoy::config::common::tap::v2alpha::CommonExtensionConfig::kTdsConfig: {
+/*
+  std::shared_ptr<TapConfigProviderManager> tap_config_provider_manager =
+      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(tap_config_provider_manager), [&context] {
+            
+      //       factory_context.localInfo(), factory_context.dispatcher(),
+      // factory_context.clusterManager(), factory_context.random()
+      // `factory_context.api(), factory_context.initManager()
+            
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context);
+          });
+
+          subscription_ = tap_config_provider_manager->subscribe(config_source, name, *this...)
+*/
   }
   default: {
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -63,8 +106,8 @@ void ExtensionConfigBase::newTapConfig(envoy::service::tap::v2alpha::TapConfig&&
         // worker thread. This will mean that each worker thread will initialize a grpc stream to
         // the tap receiver server.
         // An alternative would be to start it in the main thread (as before), and dispatch the
-        // submitTrace events to the main thread - this is a relativly easy change, but we 
-        // have a risk of flooding the main thread.
+        // submitTrace events to the main thread - this is a relativly easy change, with the tradoff
+        // of risking flooding the main thread.
         TapConfigSharedPtr new_config =
       config_factory_->createConfigFromProto(std::move(cloned_proto_config), admin_streamer);
         tls_slot_->getTyped<TlsFilterConfig>().config_ = new_config; 

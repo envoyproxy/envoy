@@ -35,9 +35,11 @@ public:
   }
 
   // TapFilter::HttpPerRequestTapper
+  void onConnectionMetadataKnown(const Network::Address::InstanceConstSharedPtr& remote_address, const Upstream::ClusterInfoConstSharedPtr& destination_cluster) override;
   void onRequestHeaders(const Http::HeaderMap& headers) override;
   void onRequestBody(const Buffer::Instance& data) override;
   void onRequestTrailers(const Http::HeaderMap& headers) override;
+  void onDestinationHostKnown(const Upstream::HostDescriptionConstSharedPtr& destination_host) override;
   void onResponseHeaders(const Http::HeaderMap& headers) override;
   void onResponseBody(const Buffer::Instance& data) override;
   void onResponseTrailers(const Http::HeaderMap& headers) override;
@@ -72,6 +74,9 @@ private:
   void streamResponseHeaders();
   void streamBufferedResponseBody();
 
+  void setConnectionMetadata(Extensions::Common::Tap::TraceWrapperPtr& trace);
+  void setDestinationHost(Extensions::Common::Tap::TraceWrapperPtr& trace);
+
   HttpTapConfigSharedPtr config_;
   const uint64_t stream_id_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
@@ -85,6 +90,10 @@ private:
   Extensions::Common::Tap::TraceWrapperPtr buffered_streamed_request_body_;
   Extensions::Common::Tap::TraceWrapperPtr buffered_streamed_response_body_;
   Extensions::Common::Tap::TraceWrapperPtr buffered_full_trace_;
+  
+  Upstream::ClusterInfoConstSharedPtr destination_cluster_;
+  Network::Address::InstanceConstSharedPtr remote_address_;
+  Upstream::HostDescriptionConstSharedPtr destination_host_;
 };
 
 } // namespace TapFilter

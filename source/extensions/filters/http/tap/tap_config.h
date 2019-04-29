@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
+#include "envoy/upstream/upstream.h"
 #include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "extensions/common/tap/tap.h"
@@ -19,6 +20,8 @@ namespace TapFilter {
 class HttpPerRequestTapper {
 public:
   virtual ~HttpPerRequestTapper() = default;
+// if called, must be called before onRequestHeaders
+  virtual void onConnectionMetadataKnown(const Network::Address::InstanceConstSharedPtr& remote_address, const Upstream::ClusterInfoConstSharedPtr& destination_cluster) PURE;
 
   /**
    * Called when request headers are received.
@@ -34,6 +37,8 @@ public:
    * Called when request trailers are received.
    */
   virtual void onRequestTrailers(const Http::HeaderMap& trailers) PURE;
+
+  virtual void onDestinationHostKnown(const Upstream::HostDescriptionConstSharedPtr& destination_host) PURE;
 
   /**
    * Called when response headers are received.

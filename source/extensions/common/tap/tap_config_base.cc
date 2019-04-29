@@ -68,13 +68,15 @@ TapConfigBaseImpl::TapConfigBaseImpl(envoy::service::tap::v2alpha::TapConfig&& p
         std::make_unique<FilePerTapSink>(proto_config.output_config().sinks()[0].file_per_tap());
     sink_to_use_ = sink_.get();
     break;
-  case envoy::service::tap::v2alpha::OutputSink::kGrpcService:
+  case envoy::service::tap::v2alpha::OutputSink::kStreamingGrpc: {
     RELEASE_ASSERT(sink_format_ == envoy::service::tap::v2alpha::OutputSink::PROTO_BINARY,
                    "grpc output only supports PROTO_BINARY format");
-    sink_ = std::make_unique<GrpcTapSink>(proto_config.output_config().sinks()[0].grpc_service(),
+    auto&& streaming_grpc = proto_config.output_config().sinks()[0].streaming_grpc();
+    sink_ = std::make_unique<GrpcTapSink>(streaming_grpc.grpc_service(), streaming_grpc.tap_id(),
                                           cluster_manager, scope, local_info);
     sink_to_use_ = sink_.get();
     break;
+  }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -215,13 +217,12 @@ void GrpcTapSink::GrpcPerTapSinkHandle::submitTrace(
                                parent_);
     auto* identifier = message.mutable_identifier();
     *identifier->mutable_node() = parent_.local_info_.node();
+    identifier->set_tap_id(parent_.tap_id_);
   }
   if (parent_.stream_ != nullptr) {
     *message.mutable_trace() = std::move(*trace);
     message.set_trace_id(trace_id_);
     parent_.stream_->sendMessage(message, false);
-//    parent_.stream_-> resetStream();
-//    parent_.stream_ = nullptr;
   }
 }
 

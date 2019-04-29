@@ -1,9 +1,12 @@
+#include "envoy/upstream/cluster_manager.h"
+
 #include "extensions/filters/http/tap/tap_filter.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace TapFilter {
+
 
 FilterConfigImpl::FilterConfigImpl(
     const envoy::config::filter::http::tap::v2alpha::Tap& proto_config,
@@ -26,7 +29,22 @@ FilterStats Filter::generateStats(const std::string& prefix, Stats::Scope& scope
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
+  Upstream::ClusterInfoConstSharedPtr destination_cluster;
   if (tapper_ != nullptr) {
+    auto&& route = decoder_callbacks_->route();
+    if (route != nullptr) {
+        const Router::RouteEntry *route_entry = route->routeEntry();
+        if (route_entry != nullptr){
+          auto&& cluster_name = route_entry->clusterName();
+            if (!cluster_name.empty()) {
+              auto *cluster = cluster_manager_.get(cluster_name);
+              if (cluster != nullptr){
+                destination_cluster = cluster->info();
+              }
+            }
+        }
+    }
+    tapper_->onConnectionMetadataKnown(decoder_callbacks_->connection()->remoteAddress(), destination_cluster);
     tapper_->onRequestHeaders(headers);
   }
   return Http::FilterHeadersStatus::Continue;
@@ -48,6 +66,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::HeaderMap& trailers) {
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
   if (tapper_ != nullptr) {
+    tapper_->onDestinationHostKnown(encoder_callbacks_->streamInfo().upstreamHost());
     tapper_->onResponseHeaders(headers);
   }
   return Http::FilterHeadersStatus::Continue;
