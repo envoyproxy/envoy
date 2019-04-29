@@ -231,9 +231,8 @@ envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
     deps = [
-        "//source/common/config:lds_json_lib",
-        "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2:lds_cc",
     ],
 )
 
