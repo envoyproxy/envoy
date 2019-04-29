@@ -164,6 +164,9 @@ private:
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
 
+  // Write data to the connection bypassing filter chain (optionally).
+  void write(Buffer::Instance& data, bool end_stream, bool through_filter_chain);
+
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
@@ -189,6 +192,20 @@ private:
     CloseAfterFlushAndWait
   };
   DelayedCloseState delayed_close_state_{DelayedCloseState::None};
+
+  class FilterManagerCallbacksImpl : public FilterManagerCallbacks {
+  public:
+    FilterManagerCallbacksImpl(ConnectionImpl& connection) : connection_(connection) {}
+    ~FilterManagerCallbacksImpl() {}
+    // Write data to the connection bypassing filter chain.
+    void write(Buffer::Instance& data, bool end_stream) override {
+      connection_.write(data, end_stream, false);
+    }
+
+  private:
+    ConnectionImpl& connection_;
+  };
+  FilterManagerCallbacksImpl filter_manager_callbacks_{*this};
 
   Event::Dispatcher& dispatcher_;
   const uint64_t id_;

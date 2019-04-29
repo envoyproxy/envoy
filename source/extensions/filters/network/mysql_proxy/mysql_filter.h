@@ -84,6 +84,7 @@ public:
 
   // Network::WriteFilter
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
+  void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks&) override {};
 
   // MySQLProxy::DecoderCallback
   void onProtocolError() override;

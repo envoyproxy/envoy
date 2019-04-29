@@ -47,10 +47,10 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      filter_manager_(*this, *this), stream_info_(dispatcher.timeSource()),
-      write_buffer_(
-          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
-                                                  [this]() -> void { this->onHighWatermark(); })),
+      filter_manager_(*this, *this, filter_manager_callbacks_),
+      stream_info_(dispatcher.timeSource()), write_buffer_(dispatcher.getWatermarkFactory().create(
+                                                 [this]() -> void { this->onLowWatermark(); },
+                                                 [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -357,6 +357,10 @@ void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
 }
 
 void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
+  write(data, end_stream, true);
+}
+
+void ConnectionImpl::write(Buffer::Instance& data, bool end_stream, bool through_filter_chain) {
   ASSERT(!end_stream || enable_half_close_);
 
   if (write_end_stream_) {
@@ -368,16 +372,18 @@ void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {
     return;
   }
 
-  // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
-  //       path, so we just pass around the buffer passed to us in this function. If we ever support
-  //       buffer/restart/continue on the write path this needs to get more complicated.
-  current_write_buffer_ = &data;
-  current_write_end_stream_ = end_stream;
-  FilterStatus status = filter_manager_.onWrite();
-  current_write_buffer_ = nullptr;
+  if (through_filter_chain) {
+    // NOTE: This is kind of a hack, but currently we don't support restart/continue on the write
+    //       path, so we just pass around the buffer passed to us in this function. If we ever
+    //       support buffer/restart/continue on the write path this needs to get more complicated.
+    current_write_buffer_ = &data;
+    current_write_end_stream_ = end_stream;
+    FilterStatus status = filter_manager_.onWrite();
+    current_write_buffer_ = nullptr;
 
-  if (FilterStatus::StopIteration == status) {
-    return;
+    if (FilterStatus::StopIteration == status) {
+      return;
+    }
   }
 
   write_end_stream_ = end_stream;
