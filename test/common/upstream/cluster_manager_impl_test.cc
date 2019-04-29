@@ -13,6 +13,7 @@
 #include "common/network/socket_option_impl.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
+#include "common/protobuf/utility.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
@@ -288,6 +289,12 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string
   return bootstrap;
 }
 
+envoy::config::bootstrap::v2::Bootstrap parseV2BootstrapFromJson(const std::string& json_string) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  MessageUtil::loadFromJson(json_string, bootstrap);
+  return bootstrap;
+}
+
 TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -359,15 +366,19 @@ dynamic_warming_clusters:
 TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   const std::string json = R"EOF(
   {
-    "outlier_detection": {
-      "event_log_path": "foo"
+    "cluster_manager": {
+      "outlier_detection": {
+        "event_log_path": "foo"
+      }
     },
-    "clusters": []
+    "static_resources": {
+      "clusters": []
+    }
   }
   )EOF";
 
   EXPECT_CALL(log_manager_, createAccessLog("foo"));
-  create(parseBootstrapFromJson(json));
+  create(parseV2BootstrapFromJson(json));
 }
 
 TEST_F(ClusterManagerImplTest, NoSdsConfig) {
@@ -379,17 +390,19 @@ TEST_F(ClusterManagerImplTest, NoSdsConfig) {
 TEST_F(ClusterManagerImplTest, UnknownClusterType) {
   const std::string json = R"EOF(
   {
-    "clusters": [
-    {
-      "name": "cluster_1",
-      "connect_timeout_ms": 250,
-      "type": "foo",
-      "lb_type": "round_robin"
-    }]
-  }
+    "static_resources": {
+      "clusters": [
+        {
+          "name": "cluster_1",
+          "connect_timeout": "0.250s",
+          "type": "foo",
+          "lb_policy": "round_robin"
+        }]
+      }
+    }
   )EOF";
 
-  EXPECT_THROW(create(parseBootstrapFromJson(json)), EnvoyException);
+  EXPECT_THROW_WITH_REGEX(create(parseV2BootstrapFromJson(json)), EnvoyException, "invalid value \"foo\" for type TYPE_ENUM");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
@@ -408,15 +421,19 @@ TEST_F(ClusterManagerImplTest, LocalClusterNotDefined) {
 TEST_F(ClusterManagerImplTest, BadClusterManagerConfig) {
   const std::string json = R"EOF(
   {
-    "outlier_detection": {
-      "event_log_path": "foo"
+    "cluster_manager": {
+      "outlier_detection": {
+        "event_log_path": "foo"
+      },
+      "fake_property" : "fake_property"
     },
-    "clusters": [],
-    "fake_property" : "fake_property"
+    "static_resources": {
+      "clusters": []
+    }
   }
   )EOF";
 
-  EXPECT_THROW(create(parseBootstrapFromJson(json)), Json::Exception);
+  EXPECT_THROW_WITH_REGEX(create(parseV2BootstrapFromJson(json)), EnvoyException, "fake_property: Cannot find field");
 }
 
 TEST_F(ClusterManagerImplTest, LocalClusterDefined) {
