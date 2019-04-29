@@ -312,8 +312,7 @@ public:
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
    *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
-   *         is deprecated.
+   *         JSON and then parsed into this empty proto.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
