@@ -160,9 +160,6 @@ public:
     case CombineLogic::Accumulate:
       data_.flags_ |= Flags::LogicAccumulate;
       break;
-    case CombineLogic::OnlyImportWhenUnusedInChild:
-      data_.flags_ |= Flags::LogicUnusedOnly;
-      break;
     case CombineLogic::NoImport:
       data_.flags_ |= Flags::LogicNeverImport;
       break;

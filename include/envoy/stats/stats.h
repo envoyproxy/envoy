@@ -73,10 +73,12 @@ public:
    */
   struct Flags {
     static const uint8_t Used = 0x01;
+    // TODO(fredlas) these logic flags should be removed if we move to indicating combine logic in
+    // the stat declaration macros themselves. (Now that stats no longer use shared memory, it's
+    // safe to mess with what these flag bits mean whenever we want).
     static const uint8_t LogicAccumulate = 0x02;
-    static const uint8_t LogicUnusedOnly = 0x04;
-    static const uint8_t LogicNeverImport = 0x08;
-    static const uint8_t LogicKnown = LogicAccumulate | LogicUnusedOnly | LogicNeverImport;
+    static const uint8_t LogicNeverImport = 0x04;
+    static const uint8_t LogicKnown = LogicAccumulate | LogicNeverImport;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& symbolTable() const PURE;
@@ -116,11 +118,9 @@ public:
   // Different approaches to importing a parent's stat value. Only used for gauges; all counters
   // simply bring in the periodic deltas.
   enum class CombineLogic {
-    // the default; the merged result is old+new.
+    // The default; the merged result is old+new.
     Accumulate = Flags::LogicAccumulate,
-    // import parent value only if child stat is undefined. (So, just once.)
-    OnlyImportWhenUnusedInChild = Flags::LogicUnusedOnly,
-    // ignore parent entirely; child stat is undefined until it sets its own value.
+    // Ignore parent entirely; child stat is undefined until it sets its own value.
     NoImport = Flags::LogicNeverImport,
   };
 

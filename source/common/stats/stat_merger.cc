@@ -27,22 +27,13 @@ Gauge::CombineLogic StatMerger::getCombineLogic(Gauge& gauge, const std::string&
       // last value should be a relatively accurate starting point, and then the child can update
       // from there when appropriate. (All of these exceptional stats used with set() rather than
       // add()/sub(), so the child's new value will in fact overwrite.)
-      {std::regex("^cluster_manager.active_clusters$"),
-       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^cluster_manager.warming_clusters$"),
-       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^cluster\\..*\\.membership_total$"),
-       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^cluster\\..*\\.membership_healthy$"),
-       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^cluster\\..*\\.membership_degraded$"),
-       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^cluster\\..*\\.max_host_weight$"),
-       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex(".*\\.total_principals$"), Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^listener_manager.total_listeners_active$"),
-       Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
-      {std::regex("^overload\\..*\\.pressure$"), Gauge::CombineLogic::OnlyImportWhenUnusedInChild},
+      {std::regex("^cluster_manager.active_clusters$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^cluster_manager.warming_clusters$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^cluster\\..*\\.membership_.*$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^cluster\\..*\\.max_host_weight$"), Gauge::CombineLogic::NoImport},
+      {std::regex(".*\\.total_principals$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^listener_manager.total_listeners_active$"), Gauge::CombineLogic::NoImport},
+      {std::regex("^overload\\..*\\.pressure$"), Gauge::CombineLogic::NoImport},
       // Due to the fd passing, the parent's view of whether its listeners are in transitive states
       // is not useful.
       {std::regex("^listener_manager.total_listeners_draining$"), Gauge::CombineLogic::NoImport},
@@ -88,9 +79,6 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
       continue;
     }
     switch (combine_logic) {
-    case Gauge::CombineLogic::OnlyImportWhenUnusedInChild:
-      // Already set above; nothing left to do.
-      break;
     case Gauge::CombineLogic::NoImport:
       break;
     case Gauge::CombineLogic::Accumulate:

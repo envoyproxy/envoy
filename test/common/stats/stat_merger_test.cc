@@ -119,9 +119,20 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   gauges["runtime.admin_overrides_active"] = 111;
   gauges["runtime.num_keys"] = 111;
   gauges["listener_manager.total_listeners_draining"] = 111;
+  gauges["listener_manager.total_listeners_warming"] = 111;
   gauges["server.hot_restart_epoch"] = 111;
   gauges["server.live"] = 1;
+  gauges["server.concurrency"] = 1;
   gauges["some.control_plane.connected_state"] = 1;
+  gauges["cluster_manager.active_clusters"] = 33;
+  gauges["cluster_manager.warming_clusters"] = 33;
+  gauges["cluster.rds.membership_total"] = 33;
+  gauges["cluster.rds.membership_healthy"] = 33;
+  gauges["cluster.rds.membership_degraded"] = 33;
+  gauges["cluster.rds.max_host_weight"] = 33;
+  gauges["anything.total_principals"] = 33;
+  gauges["listener_manager.total_listeners_active"] = 33;
+  gauges["overload.something.pressure"] = 33;
 
   stat_merger_.mergeStats(empty_counter_deltas_, gauges);
   EXPECT_FALSE(store_.gauge("child.doesnt.have.this.version").used());
@@ -132,52 +143,16 @@ TEST_F(StatMergerTest, exclusionsNotImported) {
   EXPECT_FALSE(store_.gauge("server.hot_restart_epoch").used());
   EXPECT_FALSE(store_.gauge("server.live").used());
   EXPECT_FALSE(store_.gauge("server.concurrency").used());
-  EXPECT_FALSE(store_.gauge("some.connected_state").used());
-}
-
-// The OnlyImportWhenUnusedInChild logic should overwrite an undefined gauge, but not a defined one.
-TEST_F(StatMergerTest, onlyImportWhenUnused) {
-  Protobuf::Map<std::string, uint64_t> gauges;
-  gauges["cluster_manager.active_clusters"] = 33;
-  gauges["cluster_manager.warming_clusters"] = 33;
-  gauges["cluster.rds.membership_total"] = 33;
-  gauges["cluster.rds.membership_healthy"] = 33;
-  gauges["cluster.rds.membership_degraded"] = 33;
-  gauges["cluster.rds.max_host_weight"] = 33;
-  gauges["anything.total_principals"] = 33;
-  gauges["listener_manager.total_listeners_active"] = 33;
-  gauges["some_sort_of_pressure"] = 33;
-  // 33 is stored into the child's until-now-undefined gauges
-  stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_EQ(33, store_.gauge("cluster_manager.active_clusters").value());
-  EXPECT_EQ(33, store_.gauge("cluster_manager.warming_clusters").value());
-  EXPECT_EQ(33, store_.gauge("cluster.rds.membership_total").value());
-  EXPECT_EQ(33, store_.gauge("cluster.rds.membership_healthy").value());
-  EXPECT_EQ(33, store_.gauge("cluster.rds.membership_degraded").value());
-  EXPECT_EQ(33, store_.gauge("cluster.rds.max_host_weight").value());
-  EXPECT_EQ(33, store_.gauge("anything.total_principals").value());
-  EXPECT_EQ(33, store_.gauge("listener_manager.total_listeners_active").value());
-  EXPECT_EQ(33, store_.gauge("some_sort_of_pressure").value());
-  store_.gauge("cluster_manager.active_clusters").set(88);
-  store_.gauge("cluster_manager.warming_clusters").set(88);
-  store_.gauge("cluster.rds.membership_total").set(88);
-  store_.gauge("cluster.rds.membership_healthy").set(88);
-  store_.gauge("cluster.rds.membership_degraded").set(88);
-  store_.gauge("cluster.rds.max_host_weight").set(88);
-  store_.gauge("anything.total_principals").set(88);
-  store_.gauge("listener_manager.total_listeners_active").set(88);
-  store_.gauge("some_sort_of_pressure").set(88);
-  // Now that the child's gauges have been set to 88, merging the "33" values will make no change.
-  stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_EQ(88, store_.gauge("cluster_manager.active_clusters").value());
-  EXPECT_EQ(88, store_.gauge("cluster_manager.warming_clusters").value());
-  EXPECT_EQ(88, store_.gauge("cluster.rds.membership_total").value());
-  EXPECT_EQ(88, store_.gauge("cluster.rds.membership_healthy").value());
-  EXPECT_EQ(88, store_.gauge("cluster.rds.membership_degraded").value());
-  EXPECT_EQ(88, store_.gauge("cluster.rds.max_host_weight").value());
-  EXPECT_EQ(88, store_.gauge("anything.total_principals").value());
-  EXPECT_EQ(88, store_.gauge("listener_manager.total_listeners_active").value());
-  EXPECT_EQ(88, store_.gauge("some_sort_of_pressure").value());
+  EXPECT_FALSE(store_.gauge("some.control_plane.connected_state").used());
+  EXPECT_FALSE(store_.gauge("cluster_manager.active_clusters").used());
+  EXPECT_FALSE(store_.gauge("cluster_manager.warming_clusters").used());
+  EXPECT_FALSE(store_.gauge("cluster.rds.membership_total").used());
+  EXPECT_FALSE(store_.gauge("cluster.rds.membership_healthy").used());
+  EXPECT_FALSE(store_.gauge("cluster.rds.membership_degraded").used());
+  EXPECT_FALSE(store_.gauge("cluster.rds.max_host_weight").used());
+  EXPECT_FALSE(store_.gauge("anything.total_principals").used());
+  EXPECT_FALSE(store_.gauge("listener_manager.total_listeners_active").used());
+  EXPECT_FALSE(store_.gauge("overload.something.pressure").used());
 }
 
 } // namespace
