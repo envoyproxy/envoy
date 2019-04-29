@@ -98,6 +98,7 @@ message GrpcJsonTranscoder {
   // Example :
   //
   // .. code-block:: proto
+  //
   //     package bookstore;
   //
   //     service Bookstore {
