@@ -37,6 +37,10 @@ public:
         rate_limit_settings_, stats_, init_fetch_timeout);
   }
 
+  ~DeltaSubscriptionTestHarness() {
+    ASSERT(nonce_acks_required_ == nonce_acks_sent_, "Not all nonces were ACKd!");
+  }
+
   void startSubscription(const std::set<std::string>& cluster_names) override {
     EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
     last_cluster_names_ = cluster_names;
@@ -62,7 +66,7 @@ public:
     std::copy(
         unsubscribe.begin(), unsubscribe.end(),
         Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_unsubscribe()));
-    expected_request.set_response_nonce(last_response_nonce_);
+    nonce_acks_required_.insert(last_response_nonce_);
     expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
     for (auto const& resource : initial_resource_versions) {
@@ -74,7 +78,12 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
+    EXPECT_CALL(async_stream_,
+                sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false))
+        .WillOnce([this](const google::protobuf::Message& message, bool) {
+          nonce_acks_sent_.insert(
+              static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce());
+        });
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
@@ -153,6 +162,10 @@ public:
   Event::MockTimer* init_timeout_timer_;
   envoy::api::v2::core::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
+
+private:
+  std::set<std::string> nonce_acks_required_;
+  std::set<std::string> nonce_acks_sent_;
 };
 
 } // namespace

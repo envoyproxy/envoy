@@ -119,7 +119,10 @@ private:
       if (ack_queue_.front().has_value()) {
         const UpdateAck& ack = ack_queue_.front().value();
         request.set_response_nonce(ack.nonce_);
-        request.mutable_error_detail()->CopyFrom(ack.error_detail_);
+        if (ack.error_detail_.code() != Grpc::Status::GrpcStatus::Ok) {
+          // Don't needlessly make the field present-but-empty if status is ok.
+          request.mutable_error_detail()->CopyFrom(ack.error_detail_);
+        }
       }
       ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request.DebugString());
 
