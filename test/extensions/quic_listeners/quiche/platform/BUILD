@@ -15,17 +15,19 @@ envoy_package()
 
 envoy_cc_test(
     name = "http2_platform_test",
-    srcs = envoy_select_quiche(["http2_platform_test.cc"]),
+    srcs = ["http2_platform_test.cc"],
     external_deps = ["quiche_http2_platform"],
     deps = [
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@com_googlesource_quiche//:http2_platform_reconstruct_object",
+        "@com_googlesource_quiche//:http2_test_tools_random",
     ],
 )
 
 envoy_cc_test(
     name = "quic_platform_test",
-    srcs = envoy_select_quiche(["quic_platform_test.cc"]),
+    srcs = ["quic_platform_test.cc"],
     data = [
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
@@ -55,6 +57,11 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "http2_platform_reconstruct_object_impl_lib",
+    hdrs = ["http2_reconstruct_object_impl.h"],
 )
 
 envoy_cc_test_library(

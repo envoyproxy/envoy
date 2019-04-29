@@ -52,6 +52,22 @@ genrule(
 
 quiche_copt = ["-Wno-unused-parameter"]
 
+envoy_cc_test_library(
+    name = "http2_platform_reconstruct_object",
+    hdrs = ["quiche/http2/platform/api/http2_reconstruct_object.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:http2_platform_reconstruct_object_impl_lib"],
+)
+
+envoy_cc_test_library(
+    name = "http2_test_tools_random",
+    srcs = ["quiche/http2/test_tools/http2_random.cc"],
+    hdrs = ["quiche/http2/test_tools/http2_random.h"],
+    external_deps = ["ssl"],
+    repository = "@envoy",
+    deps = [":http2_platform"],
+)
+
 envoy_cc_library(
     name = "http2_platform",
     hdrs = [
@@ -67,7 +83,6 @@ envoy_cc_library(
         "quiche/http2/platform/api/http2_string_piece.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/http2/platform/api/http2_flags.h",
-        # "quiche/http2/platform/api/http2_reconstruct_object.h",
         # "quiche/http2/platform/api/http2_test_helpers.h",
     ] + envoy_select_quiche(
         [
@@ -332,12 +347,15 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "http2_platform_api_test",
-    srcs = envoy_select_quiche(
-        ["quiche/http2/platform/api/http2_string_utils_test.cc"],
-        "@envoy",
-    ),
+    srcs = [
+        "quiche/http2/platform/api/http2_string_utils_test.cc",
+        "quiche/http2/test_tools/http2_random_test.cc",
+    ],
     repository = "@envoy",
-    deps = [":http2_platform"],
+    deps = [
+        ":http2_platform",
+        ":http2_test_tools_random",
+    ],
 )
 
 envoy_cc_test(

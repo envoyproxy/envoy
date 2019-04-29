@@ -19,6 +19,7 @@ src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath quic/core/quic_constant
 # sed commands to apply to each source file.
 cat <<EOF >sed_commands
 # Rewrite include directives for testonly platform impl files.
+/^#include/ s!net/http2/platform/impl/http2_reconstruct_object_impl.h!test/extensions/quic_listeners/quiche/platform/http2_reconstruct_object_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_expect_bug_impl.h!test/extensions/quic_listeners/quiche/platform/quic_expect_bug_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_mock_log_impl.h!test/extensions/quic_listeners/quiche/platform/quic_mock_log_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_port_utils_impl.h!test/extensions/quic_listeners/quiche/platform/quic_port_utils_impl.h!
@@ -35,7 +36,8 @@ cat <<EOF >sed_commands
 # Strip "net/third_party" from include directives to other QUICHE files.
 /^#include/ s!net/third_party/quiche/src/!quiche/!
 
-# Rewrite gtest includes.
+# Rewrite gmock & gtest includes.
+/^#include/ s!testing/gmock/include/gmock/!gmock/!
 /^#include/ s!testing/gtest/include/gtest/!gtest/!
 
 # Rewrite third_party includes.
