@@ -10,6 +10,7 @@ option go_package = "v2";
 import "envoy/api/v2/core/config_source.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/rds.proto";
+import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
 
@@ -24,7 +25,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 31]
+// [#comment:next free field: 32]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -61,6 +62,11 @@ message HttpConnectionManager {
 
     // The route table for the connection manager is static and is specified in this property.
     envoy.api.v2.RouteConfiguration route_config = 4;
+
+    // A route table will be dynamically assigned to each request based on request attributes
+    // (e.g., the value of a header). The "routing scopes" (i.e., route tables) and "scope keys" are
+    // specified in this message.
+    ScopedRoutes scoped_routes = 31;
   }
 
   // A list of individual HTTP filters that make up the filter chain for
@@ -417,6 +423,119 @@ message Rds {
   // associated HTTP connection manager filters) to use different route
   // configurations.
   string route_config_name = 2 [(validate.rules).string.min_bytes = 1];
+}
+
+// This message is used to work around the limitations with 'oneof' and repeated fields.
+message ScopedRouteConfigurationsList {
+  repeated envoy.api.v2.ScopedRouteConfiguration scoped_route_configurations = 1
+      [(validate.rules).repeated .min_items = 1];
+}
+
+message ScopedRoutes {
+  // The name assigned to the scoped routing configuration.
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
+  // keys are matched against a set of :ref:`Key<envoy_api_msg_ScopedRouteConfiguration.Key>`
+  // objects assembled from :ref:`ScopedRouteConfiguration<envoy_api_msg_ScopedRouteConfiguration>`
+  // messages distributed via SRDS (the Scoped Route Discovery Service) or assigned statically via
+  // :ref:`scoped_route_configurations_list<envoy_api_field_config.filter.network.http_connection_manager.v2.ScopedRoutes.scoped_route_configurations_list>`.
+  //
+  // Upon receiving a request's headers, the Router will build a key using the algorithm specified
+  // by this message. This key will be used to look up the routing table (i.e., the
+  // :ref:`RouteConfiguration<envoy_api_msg_RouteConfiguration>`) to use for the request.
+  message ScopeKeyBuilder {
+    // Specifies the mechanism for constructing key fragments which are composed into scope keys.
+    message FragmentBuilder {
+      // Specifies how the value of a header should be extracted.
+      // The following example maps the structure of a header to the fields in this message.
+      //
+      // .. code::
+      //
+      //              <0> <1>   <-- index
+      //    X-Header: a=b;c=d
+      //    |         || |
+      //    |         || \----> <element_separator>
+      //    |         ||
+      //    |         |\----> <element.separator>
+      //    |         |
+      //    |         \----> <element.key>
+      //    |
+      //    \----> <name>
+      //
+      //    Each 'a=b' key-value pair constitutes an 'element' of the header field.
+      message HeaderValueExtractor {
+        // The name of the header field to extract the value from.
+        string name = 1 [(validate.rules).string.min_bytes = 1];
+
+        // The element separator (e.g., ';' separates 'a;b;c;d').
+        // Default: empty string. This causes the entirety of the header field to be extracted.
+        // If this field is set to an empty string and 'index' is used in the oneof below, 'index'
+        // must be set to 0.
+        string element_separator = 2;
+
+        // Specifies a header field's key value pair to match on.
+        message KvElement {
+          // The separator between key and value (e.g., '=' separates 'k=v;...').
+          string separator = 1 [(validate.rules).string.min_bytes = 1];
+
+          // The key to match on.
+          string key = 2 [(validate.rules).string.min_bytes = 1];
+        }
+
+        oneof extract_type {
+          // Specifies the zero based index of the element to extract.
+          uint32 index = 3;
+
+          // Specifies the key value pair to extract the value from.
+          KvElement element = 4;
+        }
+      }
+
+      oneof type {
+        option (validate.required) = true;
+
+        // Specifies how a header field's value should be extracted.
+        HeaderValueExtractor header_value_extractor = 1;
+      }
+    }
+
+    // The final scope key consists of the ordered union of these fragments.
+    repeated FragmentBuilder fragments = 1 [(validate.rules).repeated .min_items = 1];
+  }
+
+  // The algorithm to use for constructing a scope key for each request.
+  ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message.required = true];
+
+  // Configuration source specifier for RDS.
+  // This config source is used to subscribe to RouteConfiguration resources specified in
+  // ScopedRouteConfiguration messages.
+  envoy.api.v2.core.ConfigSource rds_config_source = 3
+      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+
+  oneof config_specifier {
+    option (validate.required) = true;
+
+    // The set of routing scopes corresponding to the HCM. A scope is assigned to a request by
+    // matching a key constructed from the request's attributes according to the algorithm specified
+    // by the
+    // :ref:`ScopeKeyBuilder<envoy_api_msg_config.filter.network.http_connection_manager.v2.ScopedRoutes.ScopeKeyBuilder>`
+    // in this message.
+    ScopedRouteConfigurationsList scoped_route_configurations_list = 4;
+
+    // The set of routing scopes associated with the HCM will be dynamically loaded via the SRDS
+    // API. A scope is assigned to a request by matching a key constructed from the request's
+    // attributes according to the algorithm specified by the
+    // :ref:`ScopeKeyBuilder<envoy_api_msg_config.filter.network.http_connection_manager.v2.ScopedRoutes.ScopeKeyBuilder>`
+    // in this message.
+    ScopedRds scoped_rds = 5;
+  }
+}
+
+message ScopedRds {
+  // Configuration source specifier for scoped RDS.
+  envoy.api.v2.core.ConfigSource scoped_rds_config_source = 1
+      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 }
 
 message HttpFilter {

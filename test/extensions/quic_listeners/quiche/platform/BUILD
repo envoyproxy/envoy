@@ -15,17 +15,19 @@ envoy_package()
 
 envoy_cc_test(
     name = "http2_platform_test",
-    srcs = envoy_select_quiche(["http2_platform_test.cc"]),
+    srcs = ["http2_platform_test.cc"],
     external_deps = ["quiche_http2_platform"],
     deps = [
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@com_googlesource_quiche//:http2_platform_reconstruct_object",
+        "@com_googlesource_quiche//:http2_test_tools_random",
     ],
 )
 
 envoy_cc_test(
     name = "quic_platform_test",
-    srcs = envoy_select_quiche(["quic_platform_test.cc"]),
+    srcs = ["quic_platform_test.cc"],
     data = [
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
@@ -55,6 +57,11 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "http2_platform_reconstruct_object_impl_lib",
+    hdrs = ["http2_reconstruct_object_impl.h"],
 )
 
 envoy_cc_test_library(
@@ -96,6 +103,29 @@ envoy_cc_test_library(
     name = "quic_platform_test_impl_lib",
     hdrs = ["quic_test_impl.h"],
     deps = ["//source/common/common:assert_lib"],
+)
+
+envoy_cc_test_library(
+    name = "epoll_server_platform_impl_lib",
+    hdrs = [
+        "epoll_address_test_utils_impl.h",
+        "epoll_bug_impl.h",
+        "epoll_expect_bug_impl.h",
+        "epoll_export_impl.h",
+        "epoll_logging_impl.h",
+        "epoll_ptr_util_impl.h",
+        "epoll_test_impl.h",
+        "epoll_thread_impl.h",
+        "epoll_time_impl.h",
+    ],
+    external_deps = ["abseil_time"],
+    deps = [
+        ":quic_platform_expect_bug_impl_lib",
+        ":quic_platform_thread_impl_lib",
+        "//include/envoy/network:address_interface",
+        "//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
+        "//test/test_common:environment_lib",
+    ],
 )
 
 envoy_cc_test_library(

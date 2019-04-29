@@ -231,6 +231,7 @@ SPIFFE
 SPKI
 SQL
 SR
+SRDS
 SRV
 SS
 SSL
@@ -275,6 +276,7 @@ WS
 Welford's
 Werror
 XDS
+vip
 xDSes
 XFCC
 XFF
