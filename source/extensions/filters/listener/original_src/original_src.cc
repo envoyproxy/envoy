@@ -7,7 +7,7 @@
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 
-#include "extensions/filters/listener/original_src/original_src_socket_option.h"
+#include "extensions/filters/common/original_src/original_src_socket_option.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -36,7 +36,8 @@ Network::FilterStatus OriginalSrcFilter::onAccept(Network::ListenerFilterCallbac
   // into the upstream connection later.
   auto options_to_add = std::make_shared<Network::Socket::Options>();
   options_to_add->emplace_back(
-      std::make_shared<OriginalSrcSocketOption>(std::move(address_without_port)));
+      std::make_shared<Filters::Common::OriginalSrc::OriginalSrcSocketOption>(
+          std::move(address_without_port)));
 
   if (config_.mark() != 0) {
     auto mark_options = Network::SocketOptionFactory::buildSocketMarkOptions(config_.mark());
