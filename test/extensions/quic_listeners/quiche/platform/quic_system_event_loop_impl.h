@@ -6,6 +6,8 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include <string>
+
 inline void QuicRunSystemEventLoopIterationImpl() {
   // No-op.
 }
