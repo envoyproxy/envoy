@@ -30,7 +30,7 @@ void StatName::debugPrint() {
     for (uint64_t i = 0; i < nbytes; ++i) {
       absl::StrAppend(&msg, " ", static_cast<uint64_t>(data()[i]));
     }
-    SymbolVec encoding = SymbolEncoding::decodeSymbols(data(), dataSize());
+    SymbolVec encoding = SymbolTableImpl::Encoding::decodeSymbols(data(), dataSize());
     absl::StrAppend(&msg, ", numSymbols=", encoding.size(), ":");
     for (Symbol symbol : encoding) {
       absl::StrAppend(&msg, " ", symbol);
@@ -40,9 +40,13 @@ void StatName::debugPrint() {
 }
 #endif
 
-SymbolEncoding::~SymbolEncoding() { ASSERT(vec_.empty()); }
+SymbolTableImpl::Encoding::~Encoding() {
+  // Verifies that moveToStorage() was called on this encoding. Failure
+  // to call moveToStorage() will result in leaks symbols.
+  ASSERT(vec_.empty());
+}
 
-void SymbolEncoding::addSymbol(Symbol symbol) {
+void SymbolTableImpl::Encoding::addSymbol(Symbol symbol) {
   // UTF-8-like encoding where a value 127 or less gets written as a single
   // byte. For higher values we write the low-order 7 bits with a 1 in
   // the high-order bit. Then we right-shift 7 bits and keep adding more bytes
@@ -60,14 +64,8 @@ void SymbolEncoding::addSymbol(Symbol symbol) {
   } while (symbol != 0);
 }
 
-void SymbolEncoding::addStringForFakeSymbolTable(absl::string_view str) {
-  if (!str.empty()) {
-    vec_.resize(str.size());
-    memcpy(&vec_[0], str.data(), str.size());
-  }
-}
-
-SymbolVec SymbolEncoding::decodeSymbols(const SymbolTable::Storage array, uint64_t size) {
+SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array,
+                                                   uint64_t size) {
   SymbolVec symbol_vec;
   Symbol symbol = 0;
   for (uint32_t shift = 0; size > 0; --size, ++array) {
@@ -88,19 +86,9 @@ SymbolVec SymbolEncoding::decodeSymbols(const SymbolTable::Storage array, uint64
   return symbol_vec;
 }
 
-// Saves the specified length into the byte array, returning the next byte.
-// There is no guarantee that bytes will be aligned, so we can't cast to a
-// uint16_t* and assign, but must individually copy the bytes.
-static inline uint8_t* saveLengthToBytesReturningNext(uint64_t length, uint8_t* bytes) {
-  ASSERT(length < StatNameMaxSize);
-  *bytes++ = length & 0xff;
-  *bytes++ = length >> 8;
-  return bytes;
-}
-
-uint64_t SymbolEncoding::moveToStorage(SymbolTable::Storage symbol_array) {
-  uint64_t sz = size();
-  symbol_array = saveLengthToBytesReturningNext(sz, symbol_array);
+uint64_t SymbolTableImpl::Encoding::moveToStorage(SymbolTable::Storage symbol_array) {
+  uint64_t sz = dataBytesRequired();
+  symbol_array = writeLengthReturningNext(sz, symbol_array);
   if (sz != 0) {
     memcpy(symbol_array, vec_.data(), sz * sizeof(uint8_t));
   }
@@ -123,11 +111,9 @@ SymbolTableImpl::~SymbolTableImpl() {
 // TODO(ambuc): There is a possible performance optimization here for avoiding
 // the encoding of IPs / numbers if they appear in stat names. We don't want to
 // waste time symbolizing an integer as an integer, if we can help it.
-SymbolEncoding SymbolTableImpl::encode(const absl::string_view name) {
-  SymbolEncoding encoding;
-
+void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding& encoding) {
   if (name.empty()) {
-    return encoding;
+    return;
   }
 
   // We want to hold the lock for the minimum amount of time, so we do the
@@ -149,7 +135,6 @@ SymbolEncoding SymbolTableImpl::encode(const absl::string_view name) {
   for (Symbol symbol : symbols) {
     encoding.addSymbol(symbol);
   }
-  return encoding;
 }
 
 uint64_t SymbolTableImpl::numSymbols() const {
@@ -159,7 +144,12 @@ uint64_t SymbolTableImpl::numSymbols() const {
 }
 
 std::string SymbolTableImpl::toString(const StatName& stat_name) const {
-  return decodeSymbolVec(SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
+  return decodeSymbolVec(Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
+}
+
+void SymbolTableImpl::callWithStringView(StatName stat_name,
+                                         const std::function<void(absl::string_view)>& fn) const {
+  fn(toString(stat_name));
 }
 
 std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
@@ -177,7 +167,7 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
 
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+  SymbolVec symbols = Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
@@ -193,7 +183,7 @@ void SymbolTableImpl::incRefCount(const StatName& stat_name) {
 
 void SymbolTableImpl::free(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
-  SymbolVec symbols = SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+  SymbolVec symbols = Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
 
   Thread::LockGuard lock(lock_);
   for (Symbol symbol : symbols) {
@@ -265,8 +255,8 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
   // If this becomes a performance bottleneck (e.g. during sorting), we could
   // provide an iterator-like interface for incrementally decoding the symbols
   // without allocating memory.
-  SymbolVec av = SymbolEncoding::decodeSymbols(a.data(), a.dataSize());
-  SymbolVec bv = SymbolEncoding::decodeSymbols(b.data(), b.dataSize());
+  SymbolVec av = Encoding::decodeSymbols(a.data(), a.dataSize());
+  SymbolVec bv = Encoding::decodeSymbols(b.data(), b.dataSize());
 
   // Calling fromSymbol requires holding the lock, as it needs read-access to
   // the maps that are written when adding new symbols.
@@ -296,15 +286,20 @@ void SymbolTableImpl::debugPrint() const {
 }
 #endif
 
-StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table) {
-  SymbolEncoding encoding = table.encode(name);
-  bytes_ = std::make_unique<uint8_t[]>(encoding.bytesRequired());
-  encoding.moveToStorage(bytes_.get());
+SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
+  Encoding encoding;
+  addTokensToEncoding(name, encoding);
+  auto bytes = std::make_unique<Storage>(encoding.bytesRequired());
+  encoding.moveToStorage(bytes.get());
+  return bytes;
 }
+
+StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
+    : bytes_(table.encode(name)) {}
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   uint64_t size = src.size();
-  bytes_ = std::make_unique<uint8_t[]>(size);
+  bytes_ = std::make_unique<SymbolTable::Storage>(size);
   src.copyToStorage(bytes_.get());
   table.incRefCount(statName());
 }
@@ -322,13 +317,43 @@ void StatNameStorage::free(SymbolTable& table) {
   bytes_.reset();
 }
 
+StatNameStorageSet::~StatNameStorageSet() {
+  // free() must be called before destructing StatNameStorageSet to decrement
+  // references to all symbols.
+  ASSERT(hash_set_.empty());
+}
+
+void StatNameStorageSet::free(SymbolTable& symbol_table) {
+  // We must free() all symbols referenced in the set, otherwise the symbols
+  // will leak when the flat_hash_map superclass is destructed. They cannot
+  // self-destruct without an explicit free() as each individual StatNameStorage
+  // object does not have a reference to the symbol table, which would waste 8
+  // bytes per stat-name. The easiest way to safely free all the contents of the
+  // symbol table set is to use flat_hash_map::extract(), which removes and
+  // returns an element from the set without destructing the element
+  // immediately. This gives us a chance to call free() on each one before they
+  // are destroyed.
+  //
+  // There's a performance risk here, if removing elements via
+  // flat_hash_set::begin() is inefficient to use in a loop like this. One can
+  // imagine a hash-table implementation where the performance of this
+  // usage-model would be poor. However, tests with 100k elements appeared to
+  // run quickly when compiled for optimization, so at present this is not a
+  // performance issue.
+
+  while (!hash_set_.empty()) {
+    auto storage = hash_set_.extract(hash_set_.begin());
+    storage.value().free(symbol_table);
+  }
+}
+
 SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_names) const {
   uint64_t num_bytes = 0;
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
   }
-  auto bytes = std::make_unique<uint8_t[]>(num_bytes + StatNameSizeEncodingBytes);
-  uint8_t* p = saveLengthToBytesReturningNext(num_bytes, bytes.get());
+  auto bytes = std::make_unique<Storage>(num_bytes + StatNameSizeEncodingBytes);
+  uint8_t* p = writeLengthReturningNext(num_bytes, bytes.get());
   for (StatName stat_name : stat_names) {
     num_bytes = stat_name.dataSize();
     memcpy(p, stat_name.data(), num_bytes);
@@ -337,33 +362,38 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const std::vector<StatName>& stat_
   return bytes;
 }
 
-StatNameList::~StatNameList() { ASSERT(!populated()); }
-
-void StatNameList::populate(const std::vector<absl::string_view>& names,
-                            SymbolTable& symbol_table) {
-  RELEASE_ASSERT(names.size() < 256, "Maximum number elements in a StatNameList exceeded");
+void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_names,
+                                   StatNameList& list) {
+  RELEASE_ASSERT(num_names < 256, "Maximum number elements in a StatNameList exceeded");
 
   // First encode all the names.
   size_t total_size_bytes = 1; /* one byte for holding the number of names */
-  std::vector<SymbolEncoding> encodings;
-  encodings.resize(names.size());
-  int index = 0;
-  for (auto& name : names) {
-    SymbolEncoding encoding = symbol_table.encode(name);
+
+  STACK_ARRAY(encodings, Encoding, num_names);
+  for (uint32_t i = 0; i < num_names; ++i) {
+    Encoding& encoding = encodings[i];
+    addTokensToEncoding(names[i], encoding);
     total_size_bytes += encoding.bytesRequired();
-    encodings[index++].swap(encoding);
   }
 
   // Now allocate the exact number of bytes required and move the encodings
   // into storage.
-  storage_ = std::make_unique<uint8_t[]>(total_size_bytes);
-  uint8_t* p = &storage_[0];
-  *p++ = encodings.size();
+  auto storage = std::make_unique<Storage>(total_size_bytes);
+  uint8_t* p = &storage[0];
+  *p++ = num_names;
   for (auto& encoding : encodings) {
     p += encoding.moveToStorage(p);
   }
-  ASSERT(p == &storage_[0] + total_size_bytes);
+
+  // This assertion double-checks the arithmetic where we computed
+  // total_size_bytes. After appending all the encoded data into the
+  // allocated byte array, we should wind up with a pointer difference of
+  // total_size_bytes from the beginning of the allocation.
+  ASSERT(p == &storage[0] + total_size_bytes);
+  list.moveStorageIntoList(std::move(storage));
 }
+
+StatNameList::~StatNameList() { ASSERT(!populated()); }
 
 void StatNameList::iterate(const std::function<bool(StatName)>& f) const {
   uint8_t* p = &storage_[0];

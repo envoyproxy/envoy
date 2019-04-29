@@ -38,6 +38,9 @@ AppException::ResponseType AppException::encode(MessageMetadata& metadata,
   return DirectResponse::ResponseType::Exception;
 }
 
+DownstreamConnectionCloseException::DownstreamConnectionCloseException(const std::string& what)
+    : EnvoyException(what) {}
+
 } // namespace DubboProxy
 } // namespace NetworkFilters
 } // namespace Extensions

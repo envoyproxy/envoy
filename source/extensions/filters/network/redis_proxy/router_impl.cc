@@ -35,10 +35,7 @@ PrefixRoutes::PrefixRoutes(
   }
 }
 
-Common::Redis::Client::PoolRequest*
-PrefixRoutes::makeRequest(const std::string& key, const Common::Redis::RespValue& request,
-                          Common::Redis::Client::PoolCallbacks& callbacks) {
-
+ConnPool::InstanceSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
   PrefixPtr value = nullptr;
   if (case_insensitive_) {
     std::string copy(key);
@@ -49,17 +46,13 @@ PrefixRoutes::makeRequest(const std::string& key, const Common::Redis::RespValue
   }
 
   if (value != nullptr) {
-    absl::string_view view(key);
     if (value->remove_prefix) {
-      view.remove_prefix(value->prefix.length());
+      key.erase(0, value->prefix.length());
     }
-    std::string str(view);
-    value->upstream->makeRequest(str, request, callbacks);
-  } else if (catch_all_upstream_ != nullptr) {
-    catch_all_upstream_.value()->makeRequest(key, request, callbacks);
+    return value->upstream;
   }
 
-  return nullptr;
+  return catch_all_upstream_;
 }
 
 } // namespace RedisProxy

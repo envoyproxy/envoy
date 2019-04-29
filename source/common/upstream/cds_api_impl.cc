@@ -34,23 +34,26 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
                          envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
   const std::string grpc_method = is_delta ? "envoy.api.v2.ClusterDiscoveryService.DeltaClusters"
                                            : "envoy.api.v2.ClusterDiscoveryService.StreamClusters";
-  subscription_ =
-      Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Cluster>(
-          cds_config, local_info, dispatcher, cm, random, *scope_,
-          "envoy.api.v2.ClusterDiscoveryService.FetchClusters", grpc_method, api);
+  subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource(
+      cds_config, local_info, dispatcher, cm, random, *scope_,
+      "envoy.api.v2.ClusterDiscoveryService.FetchClusters", grpc_method,
+      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()), api);
 }
 
-void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
+void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                const std::string& version_info) {
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
-  for (const auto& cluster : resources) {
-    clusters_to_remove.erase(cluster.name());
+  std::vector<envoy::api::v2::Cluster> clusters;
+  for (const auto& cluster_blob : resources) {
+    clusters.push_back(MessageUtil::anyConvert<envoy::api::v2::Cluster>(cluster_blob));
+    clusters_to_remove.erase(clusters.back().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& cluster : clusters_to_remove) {
     *to_remove_repeated.Add() = cluster.first;
   }
   Protobuf::RepeatedPtrField<envoy::api::v2::Resource> to_add_repeated;
-  for (const auto& cluster : resources) {
+  for (const auto& cluster : clusters) {
     envoy::api::v2::Resource* to_add = to_add_repeated.Add();
     to_add->set_name(cluster.name());
     to_add->set_version(version_info);

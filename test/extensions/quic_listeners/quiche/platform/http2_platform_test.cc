@@ -1,3 +1,9 @@
+// NOLINT(namespace-envoy)
+
+// This file is part of the QUICHE platform implementation, and is not to be
+// consumed or referenced directly by other Envoy code. It serves purely as a
+// porting layer for QUICHE.
+
 #include <memory>
 
 #include "test/test_common/logging.h"
@@ -8,10 +14,13 @@
 #include "quiche/http2/platform/api/http2_containers.h"
 #include "quiche/http2/platform/api/http2_estimate_memory_usage.h"
 #include "quiche/http2/platform/api/http2_logging.h"
+#include "quiche/http2/platform/api/http2_macros.h"
 #include "quiche/http2/platform/api/http2_optional.h"
 #include "quiche/http2/platform/api/http2_ptr_util.h"
+#include "quiche/http2/platform/api/http2_reconstruct_object.h"
 #include "quiche/http2/platform/api/http2_string.h"
 #include "quiche/http2/platform/api/http2_string_piece.h"
+#include "quiche/http2/test_tools/http2_random.h"
 
 // Basic tests to validate functioning of the QUICHE http2 platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -19,10 +28,7 @@
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
-namespace Envoy {
-namespace Extensions {
-namespace QuicListeners {
-namespace Quiche {
+namespace http2 {
 namespace {
 
 TEST(Http2PlatformTest, Http2Arraysize) {
@@ -73,6 +79,11 @@ TEST(Http2PlatformTest, Http2Log) {
   HTTP2_DLOG_EVERY_N(ERROR, 2) << "DLOG_EVERY_N(ERROR, 2)";
 }
 
+TEST(Http2PlatformTest, Http2MakeUnique) {
+  auto p = http2::Http2MakeUnique<int>(4);
+  EXPECT_EQ(4, *p);
+}
+
 TEST(Http2PlatformTest, Http2Optional) {
   http2::Http2Optional<int> opt;
   EXPECT_FALSE(opt.has_value());
@@ -80,9 +91,18 @@ TEST(Http2PlatformTest, Http2Optional) {
   EXPECT_TRUE(opt.has_value());
 }
 
-TEST(Http2PlatformTest, Http2MakeUnique) {
-  auto p = http2::Http2MakeUnique<int>(4);
-  EXPECT_EQ(4, *p);
+TEST(Http2PlatformTest, Http2ReconstructObject) {
+  http2::test::Http2Random rng;
+  std::string s;
+
+  http2::test::Http2ReconstructObject(&s, &rng, "123");
+  EXPECT_EQ("123", s);
+
+  http2::test::Http2ReconstructObject(&s, &rng, "456");
+  EXPECT_EQ("456", s);
+
+  http2::test::Http2DefaultReconstructObject(&s, &rng);
+  EXPECT_EQ("", s);
 }
 
 TEST(Http2PlatformTest, Http2String) {
@@ -96,8 +116,10 @@ TEST(Http2PlatformTest, Http2StringPiece) {
   EXPECT_EQ('b', sp[0]);
 }
 
+TEST(Http2PlatformTest, Http2Macro) {
+  EXPECT_DEBUG_DEATH(HTTP2_UNREACHABLE(), "");
+  EXPECT_DEATH(HTTP2_DIE_IF_NULL(nullptr), "");
+}
+
 } // namespace
-} // namespace Quiche
-} // namespace QuicListeners
-} // namespace Extensions
-} // namespace Envoy
+} // namespace http2

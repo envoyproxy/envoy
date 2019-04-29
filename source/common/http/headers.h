@@ -36,6 +36,7 @@ public:
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
   const LowerCaseString EnvoyAttemptCount{"x-envoy-attempt-count"};
+  const LowerCaseString EnvoyAuthPartialBody{"x-envoy-auth-partial-body"};
   const LowerCaseString EnvoyDegraded{"x-envoy-degraded"};
   const LowerCaseString EnvoyDownstreamServiceCluster{"x-envoy-downstream-service-cluster"};
   const LowerCaseString EnvoyDownstreamServiceNode{"x-envoy-downstream-service-node"};
@@ -170,10 +171,13 @@ public:
 
   struct {
     const std::string Connect{"CONNECT"};
+    const std::string Delete{"DELETE"};
     const std::string Get{"GET"};
     const std::string Head{"HEAD"};
     const std::string Post{"POST"};
+    const std::string Put{"PUT"};
     const std::string Options{"OPTIONS"};
+    const std::string Trace{"TRACE"};
   } MethodValues;
 
   struct {

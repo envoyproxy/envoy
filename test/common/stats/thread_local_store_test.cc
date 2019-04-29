@@ -312,7 +312,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_EQ(TestUtility::findByName(store_->source().cachedCounters(), "scope1.c1"), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
-  EXPECT_CALL(tls_, runOnAllThreads(_));
+  EXPECT_CALL(tls_, runOnAllThreads(_, _));
   scope1.reset();
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(2UL, store_->source().cachedCounters().size());
@@ -447,11 +447,13 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   // The stats did not overflow yet.
   EXPECT_EQ(0UL, store_->counter("stats.overflow").value());
 
-  // The name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  // Truncation occurs in the underlying representation, but the by-name lookups
+  // are all based on the untruncated name.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+  // Outside the stats system, no Envoy code can see the truncated view, so
+  // lookups for truncated names will fail.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
 
   // The same should be true with heap allocation, which occurs when the default
   // allocator fails.
@@ -459,11 +461,11 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   EXPECT_CALL(*alloc_, alloc(_)).WillOnce(Return(nullptr));
   store_->counter(name_2);
 
-  // Same deal: the name will be truncated, so we won't be able to find it with the entire name.
-  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+  // Same deal: the name will be truncated, but we find it with the entire name.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1).get());
 
-  // But we can find it based on the expected truncation.
-  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+  // But we can't find it based on the truncation -- that name is not visible at the API.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
 
   // Now the stats have overflowed.
   EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
@@ -474,6 +476,81 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   // Includes overflow, and the first raw-allocated stat, but not the failsafe stat which we
   // allocated from the heap.
   EXPECT_CALL(*alloc_, free(_)).Times(2);
+}
+
+class LookupWithStatNameTest : public testing::Test {
+public:
+  LookupWithStatNameTest() : alloc_(symbol_table_), store_(options_, alloc_) {}
+  ~LookupWithStatNameTest() override {
+    store_.shutdownThreading();
+    clearStorage();
+  }
+
+  void clearStorage() {
+    for (auto& stat_name_storage : stat_name_storage_) {
+      stat_name_storage.free(store_.symbolTable());
+    }
+    stat_name_storage_.clear();
+    EXPECT_EQ(0, store_.symbolTable().numSymbols());
+  }
+
+  StatName makeStatName(absl::string_view name) {
+    stat_name_storage_.emplace_back(makeStatStorage(name));
+    return stat_name_storage_.back().statName();
+  }
+
+  StatNameStorage makeStatStorage(absl::string_view name) {
+    return StatNameStorage(name, store_.symbolTable());
+  }
+
+  Stats::FakeSymbolTableImpl symbol_table_;
+  HeapStatDataAllocator alloc_;
+  StatsOptionsImpl options_;
+  ThreadLocalStoreImpl store_;
+  std::vector<StatNameStorage> stat_name_storage_;
+};
+
+TEST_F(LookupWithStatNameTest, All) {
+  ScopePtr scope1 = store_.createScope("scope1.");
+  Counter& c1 = store_.counterFromStatName(makeStatName("c1"));
+  Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
+  EXPECT_EQ("c1", c1.name());
+  EXPECT_EQ("scope1.c2", c2.name());
+  EXPECT_EQ("c1", c1.tagExtractedName());
+  EXPECT_EQ("scope1.c2", c2.tagExtractedName());
+  EXPECT_EQ(0, c1.tags().size());
+  EXPECT_EQ(0, c1.tags().size());
+
+  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"));
+  Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"));
+  EXPECT_EQ("g1", g1.name());
+  EXPECT_EQ("scope1.g2", g2.name());
+  EXPECT_EQ("g1", g1.tagExtractedName());
+  EXPECT_EQ("scope1.g2", g2.tagExtractedName());
+  EXPECT_EQ(0, g1.tags().size());
+  EXPECT_EQ(0, g1.tags().size());
+
+  Histogram& h1 = store_.histogramFromStatName(makeStatName("h1"));
+  Histogram& h2 = scope1->histogramFromStatName(makeStatName("h2"));
+  scope1->deliverHistogramToSinks(h2, 0);
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("scope1.h2", h2.name());
+  EXPECT_EQ("h1", h1.tagExtractedName());
+  EXPECT_EQ("scope1.h2", h2.tagExtractedName());
+  EXPECT_EQ(0, h1.tags().size());
+  EXPECT_EQ(0, h2.tags().size());
+  h1.recordValue(200);
+  h2.recordValue(200);
+
+  ScopePtr scope2 = scope1->createScope("foo.");
+  EXPECT_EQ("scope1.foo.bar", scope2->counterFromStatName(makeStatName("bar")).name());
+
+  // Validate that we sanitize away bad characters in the stats prefix.
+  ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
+  EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
+
+  EXPECT_EQ(5UL, store_.counters().size()); // The 4 objects created plus stats.overflow.
+  EXPECT_EQ(2UL, store_.gauges().size());
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
@@ -853,7 +930,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithoutTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 28 * million); // actual value: 27203216 as of Oct 29, 2018
+  EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
 }
 
 TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
@@ -876,7 +953,7 @@ TEST_F(HeapStatsThreadLocalStoreTest, MemoryWithTls) {
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-  EXPECT_LT(end_mem - start_mem, 31 * million); // actual value: 30482576 as of Oct 29, 2018
+  EXPECT_LT(end_mem - start_mem, 23 * million); // actual value: 22880912 as of March 14, 2019
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

@@ -4,17 +4,22 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-<<<<<<< HEAD
-#include "extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
-#include "extensions/quic_listeners/quiche/platform/quiche_fake_epoll_impl.h"
-=======
+#include <netinet/in.h>
+
 #include <fstream>
 #include <unordered_set>
->>>>>>> master
 
+#include "common/memory/stats.h"
+#include "common/network/utility.h"
+
+#include "test/common/stats/stat_test_utility.h"
+#include "test/extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
+#include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/network_utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -35,16 +40,16 @@
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
+#include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
+#include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
-
-using testing::HasSubstr;
 
 // Basic tests to validate functioning of the QUICHE quic platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -52,19 +57,40 @@ using testing::HasSubstr;
 // minimal, and serve primarily to verify the APIs compile and link without
 // issue.
 
+using testing::_;
+using testing::HasSubstr;
+using testing::Return;
+
 namespace quic {
 namespace {
 
-TEST(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
+class QuicPlatformTest : public testing::Test {
+protected:
+  QuicPlatformTest()
+      : log_level_(GetLogger().level()), verbosity_log_threshold_(GetVerbosityLogThreshold()) {
+    SetVerbosityLogThreshold(0);
+    GetLogger().set_level(ERROR);
+  }
 
-TEST(QuicPlatformTest, QuicArraysize) {
+  ~QuicPlatformTest() {
+    SetVerbosityLogThreshold(verbosity_log_threshold_);
+    GetLogger().set_level(log_level_);
+  }
+
+  const QuicLogLevel log_level_;
+  const int verbosity_log_threshold_;
+};
+
+TEST_F(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
+
+TEST_F(QuicPlatformTest, QuicArraysize) {
   int array[] = {0, 1, 2, 3, 4};
   EXPECT_EQ(5, QUIC_ARRAYSIZE(array));
 }
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
-TEST(QuicPlatformTest, QuicBugTracker) {
+TEST_F(QuicPlatformTest, QuicBugTracker) {
   EXPECT_DEBUG_DEATH(QUIC_BUG << "Here is a bug,", " bug");
   EXPECT_DEBUG_DEATH(QUIC_BUG_IF(true) << "There is a bug,", " bug");
   EXPECT_LOG_NOT_CONTAINS("error", "", QUIC_BUG_IF(false) << "A feature is not a bug.");
@@ -74,7 +100,7 @@ TEST(QuicPlatformTest, QuicBugTracker) {
   EXPECT_LOG_NOT_CONTAINS("error", "", QUIC_PEER_BUG_IF(false) << "But not there.");
 }
 
-TEST(QuicPlatformTest, QuicClientStats) {
+TEST_F(QuicPlatformTest, QuicClientStats) {
   // Just make sure they compile.
   QUIC_CLIENT_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
   QUIC_CLIENT_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
@@ -83,11 +109,9 @@ TEST(QuicPlatformTest, QuicClientStats) {
                               100, "doc");
   QUIC_CLIENT_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
   QuicClientSparseHistogram("my.sparse.histogram", 345);
-<<<<<<< HEAD
-=======
 }
 
-TEST(QuicPlatformTest, QuicExpectBug) {
+TEST_F(QuicPlatformTest, QuicExpectBug) {
   auto bug = [](const char* error_message) { QUIC_BUG << error_message; };
 
   auto peer_bug = [](const char* error_message) { QUIC_PEER_BUG << error_message; };
@@ -97,10 +121,9 @@ TEST(QuicPlatformTest, QuicExpectBug) {
 
   EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_1 is expected"), "peer_bug_1");
   EXPECT_QUIC_PEER_BUG(peer_bug("peer_bug_2 is expected"), "peer_bug_2");
->>>>>>> master
 }
 
-TEST(QuicPlatformTest, QuicExportedStats) {
+TEST_F(QuicPlatformTest, QuicExportedStats) {
   // Just make sure they compile.
   QUIC_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
   QUIC_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
@@ -110,7 +133,7 @@ TEST(QuicPlatformTest, QuicExportedStats) {
   QUIC_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
 }
 
-TEST(QuicPlatformTest, QuicHostnameUtils) {
+TEST_F(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("!!"));
   EXPECT_FALSE(QuicHostnameUtils::IsValidSNI("envoyproxy"));
   EXPECT_TRUE(QuicHostnameUtils::IsValidSNI("www.envoyproxy.io"));
@@ -119,48 +142,48 @@ TEST(QuicPlatformTest, QuicHostnameUtils) {
   EXPECT_EQ("quicwg.org", QuicHostnameUtils::NormalizeHostname("QUICWG.ORG"));
 }
 
-TEST(QuicPlatformTest, QuicUnorderedMap) {
+TEST_F(QuicPlatformTest, QuicUnorderedMap) {
   QuicUnorderedMap<std::string, int> umap;
   umap.insert({"foo", 2});
   EXPECT_EQ(2, umap["foo"]);
 }
 
-TEST(QuicPlatformTest, QuicUnorderedSet) {
+TEST_F(QuicPlatformTest, QuicUnorderedSet) {
   QuicUnorderedSet<std::string> uset({"foo", "bar"});
   EXPECT_EQ(1, uset.count("bar"));
   EXPECT_EQ(0, uset.count("qux"));
 }
 
-TEST(QuicPlatformTest, QuicQueue) {
+TEST_F(QuicPlatformTest, QuicQueue) {
   QuicQueue<int> queue;
   queue.push(10);
   EXPECT_EQ(10, queue.back());
 }
 
-TEST(QuicPlatformTest, QuicDeque) {
+TEST_F(QuicPlatformTest, QuicDeque) {
   QuicDeque<int> deque;
   deque.push_back(10);
   EXPECT_EQ(10, deque.back());
 }
 
-TEST(QuicPlatformTest, QuicInlinedVector) {
+TEST_F(QuicPlatformTest, QuicInlinedVector) {
   QuicInlinedVector<int, 5> vec;
   vec.push_back(3);
   EXPECT_EQ(3, vec[0]);
 }
 
-TEST(QuicPlatformTest, QuicEndian) {
+TEST_F(QuicPlatformTest, QuicEndian) {
   EXPECT_EQ(0x1234, QuicEndian::NetToHost16(QuicEndian::HostToNet16(0x1234)));
   EXPECT_EQ(0x12345678, QuicEndian::NetToHost32(QuicEndian::HostToNet32(0x12345678)));
 }
 
-TEST(QuicPlatformTest, QuicEstimateMemoryUsage) {
+TEST_F(QuicPlatformTest, QuicEstimateMemoryUsage) {
   std::string s = "foo";
   // Stubbed out to always return 0.
   EXPECT_EQ(0, QuicEstimateMemoryUsage(s));
 }
 
-TEST(QuicPlatformTest, QuicMapUtil) {
+TEST_F(QuicPlatformTest, QuicMapUtil) {
   std::map<std::string, int> stdmap = {{"one", 1}, {"two", 2}, {"three", 3}};
   EXPECT_TRUE(QuicContainsKey(stdmap, "one"));
   EXPECT_FALSE(QuicContainsKey(stdmap, "zero"));
@@ -178,7 +201,7 @@ TEST(QuicPlatformTest, QuicMapUtil) {
   EXPECT_FALSE(QuicContainsValue(stdvec, 0));
 }
 
-TEST(QuicPlatformTest, QuicMockLog) {
+TEST_F(QuicPlatformTest, QuicMockLog) {
   ASSERT_EQ(ERROR, GetLogger().level());
 
   {
@@ -207,7 +230,7 @@ TEST(QuicPlatformTest, QuicMockLog) {
   QUIC_LOG(ERROR) << "Outer log message should be captured.";
 }
 
-TEST(QuicPlatformTest, QuicServerStats) {
+TEST_F(QuicPlatformTest, QuicServerStats) {
   // Just make sure they compile.
   QUIC_SERVER_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
   QUIC_SERVER_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
@@ -217,19 +240,19 @@ TEST(QuicPlatformTest, QuicServerStats) {
   QUIC_SERVER_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
 }
 
-TEST(QuicPlatformTest, QuicStackTraceTest) {
+TEST_F(QuicPlatformTest, QuicStackTraceTest) {
   EXPECT_THAT(QuicStackTrace(), HasSubstr("QuicStackTraceTest"));
 }
 
-TEST(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
+TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
 
-TEST(QuicPlatformTest, QuicStringPiece) {
+TEST_F(QuicPlatformTest, QuicStringPiece) {
   std::string s = "bar";
   QuicStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
 }
 
-TEST(QuicPlatformTest, QuicThread) {
+TEST_F(QuicPlatformTest, QuicThread) {
   class AdderThread : public QuicThread {
   public:
     AdderThread(int* value, int increment)
@@ -260,17 +283,17 @@ TEST(QuicPlatformTest, QuicThread) {
   EXPECT_EQ(1, value);
 
   // QuicThread will panic if it's started but not joined.
-  EXPECT_DEATH({ AdderThread(&value, 2).Start(); },
-               "QuicThread should be joined before destruction");
+  EXPECT_DEATH_LOG_TO_STDERR({ AdderThread(&value, 2).Start(); },
+                             "QuicThread should be joined before destruction");
 }
 
-TEST(QuicPlatformTest, QuicUint128) {
+TEST_F(QuicPlatformTest, QuicUint128) {
   QuicUint128 i = MakeQuicUint128(16777216, 315);
   EXPECT_EQ(315, QuicUint128Low64(i));
   EXPECT_EQ(16777216, QuicUint128High64(i));
 }
 
-TEST(QuicPlatformTest, QuicPtrUtil) {
+TEST_F(QuicPlatformTest, QuicPtrUtil) {
   auto p = QuicMakeUnique<std::string>("abc");
   EXPECT_EQ("abc", *p);
 
@@ -278,28 +301,7 @@ TEST(QuicPlatformTest, QuicPtrUtil) {
   EXPECT_EQ("aaa", *p);
 }
 
-namespace {
-
-class QuicLogThresholdSaver {
-public:
-  QuicLogThresholdSaver()
-      : level_(GetLogger().level()), verbosity_threshold_(GetVerbosityLogThreshold()) {}
-
-  ~QuicLogThresholdSaver() {
-    SetVerbosityLogThreshold(verbosity_threshold_);
-    GetLogger().set_level(level_);
-  }
-
-private:
-  const QuicLogLevel level_;
-  const int verbosity_threshold_;
-};
-
-} // namespace
-
-TEST(QuicPlatformTest, QuicLog) {
-  QuicLogThresholdSaver saver;
-
+TEST_F(QuicPlatformTest, QuicLog) {
   // By default, tests emit logs at level ERROR or higher.
   ASSERT_EQ(ERROR, GetLogger().level());
 
@@ -343,9 +345,7 @@ TEST(QuicPlatformTest, QuicLog) {
 #define VALUE_BY_COMPILE_MODE(debug_mode_value, release_mode_value) debug_mode_value
 #endif
 
-TEST(QuicPlatformTest, QuicDLog) {
-  QuicLogThresholdSaver saver;
-
+TEST_F(QuicPlatformTest, QuicDLog) {
   int i = 0;
 
   GetLogger().set_level(ERROR);
@@ -383,7 +383,7 @@ TEST(QuicPlatformTest, QuicDLog) {
 
 #undef VALUE_BY_COMPILE_MODE
 
-TEST(QuicPlatformTest, QuicCHECK) {
+TEST_F(QuicPlatformTest, QuicCHECK) {
   CHECK(1 == 1);
   CHECK(1 == 1) << " 1 == 1 is forever true.";
 
@@ -391,31 +391,31 @@ TEST(QuicPlatformTest, QuicCHECK) {
                      "CHECK failed:.* Supposed to fail in debug mode.");
   EXPECT_DEBUG_DEATH({ DCHECK(false); }, "CHECK failed");
 
-  EXPECT_DEATH({ CHECK(false) << " Supposed to fail in all modes."; },
-               "CHECK failed:.* Supposed to fail in all modes.");
-  EXPECT_DEATH({ CHECK(false); }, "CHECK failed");
+  EXPECT_DEATH_LOG_TO_STDERR({ CHECK(false) << " Supposed to fail in all modes."; },
+                             "CHECK failed:.* Supposed to fail in all modes.");
+  EXPECT_DEATH_LOG_TO_STDERR({ CHECK(false); }, "CHECK failed");
 }
 
 // Test the behaviors of the cross products of
 //
 //   {QUIC_LOG, QUIC_DLOG} x {FATAL, DFATAL} x {debug, release}
-TEST(QuicPlatformTest, QuicFatalLog) {
+TEST_F(QuicPlatformTest, QuicFatalLog) {
 #ifdef NDEBUG
   // Release build
-  EXPECT_DEATH(QUIC_LOG(FATAL) << "Should abort 0", "Should abort 0");
+  EXPECT_DEATH_LOG_TO_STDERR(QUIC_LOG(FATAL) << "Should abort 0", "Should abort 0");
   QUIC_LOG(DFATAL) << "Should not abort";
   QUIC_DLOG(FATAL) << "Should compile out";
   QUIC_DLOG(DFATAL) << "Should compile out";
 #else
   // Debug build
-  EXPECT_DEATH(QUIC_LOG(FATAL) << "Should abort 1", "Should abort 1");
-  EXPECT_DEATH(QUIC_LOG(DFATAL) << "Should abort 2", "Should abort 2");
-  EXPECT_DEATH(QUIC_DLOG(FATAL) << "Should abort 3", "Should abort 3");
-  EXPECT_DEATH(QUIC_DLOG(DFATAL) << "Should abort 4", "Should abort 4");
+  EXPECT_DEATH_LOG_TO_STDERR(QUIC_LOG(FATAL) << "Should abort 1", "Should abort 1");
+  EXPECT_DEATH_LOG_TO_STDERR(QUIC_LOG(DFATAL) << "Should abort 2", "Should abort 2");
+  EXPECT_DEATH_LOG_TO_STDERR(QUIC_DLOG(FATAL) << "Should abort 3", "Should abort 3");
+  EXPECT_DEATH_LOG_TO_STDERR(QUIC_DLOG(DFATAL) << "Should abort 4", "Should abort 4");
 #endif
 }
 
-TEST(QuicPlatformTest, QuicBranchPrediction) {
+TEST_F(QuicPlatformTest, QuicBranchPrediction) {
   GetLogger().set_level(INFO);
 
   if (QUIC_PREDICT_FALSE(rand() % RAND_MAX == 123456789)) {
@@ -425,15 +425,15 @@ TEST(QuicPlatformTest, QuicBranchPrediction) {
   }
 }
 
-TEST(QuicPlatformTest, QuicNotReached) {
+TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
   QUIC_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH(QUIC_NOTREACHED(), "not reached");
+  EXPECT_DEATH_LOG_TO_STDERR(QUIC_NOTREACHED(), "not reached");
 #endif
 }
 
-TEST(QuicPlatformTest, QuicMutex) {
+TEST_F(QuicPlatformTest, QuicMutex) {
   QuicMutex mu;
 
   QuicWriterMutexLock wmu(&mu);
@@ -446,7 +446,7 @@ TEST(QuicPlatformTest, QuicMutex) {
   mu.WriterLock();
 }
 
-TEST(QuicPlatformTest, QuicNotification) {
+TEST_F(QuicPlatformTest, QuicNotification) {
   QuicNotification notification;
   EXPECT_FALSE(notification.HasBeenNotified());
   notification.Notify();
@@ -454,7 +454,7 @@ TEST(QuicPlatformTest, QuicNotification) {
   EXPECT_TRUE(notification.HasBeenNotified());
 }
 
-TEST(QuicPlatformTest, QuicCertUtils) {
+TEST_F(QuicPlatformTest, QuicCertUtils) {
   bssl::UniquePtr<X509> x509_cert =
       Envoy::Extensions::TransportSockets::Tls::readCertFromFile(Envoy::TestEnvironment::substitute(
           "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
@@ -475,9 +475,7 @@ TEST(QuicPlatformTest, QuicCertUtils) {
   OPENSSL_free(static_cast<void*>(der));
 }
 
-TEST(QuicPlatformTest, QuicTestOutput) {
-  QuicLogThresholdSaver saver;
-
+TEST_F(QuicPlatformTest, QuicTestOutput) {
   Envoy::TestEnvironment::setEnvVar("QUIC_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
 
   // Set log level to INFO to see the test output path in log.
@@ -555,7 +553,7 @@ TEST(QuicEpollClockTest, MonotonicityWithFakeEpollClock) {
 
 class FileUtilsTest : public testing::Test {
 public:
-  FileUtilsTest() : dir_path_(Envoy::TestEnvironment::temporaryPath("envoy_test")) {
+  FileUtilsTest() : dir_path_(Envoy::TestEnvironment::temporaryPath("quic_file_util_test")) {
     files_to_remove_.push(dir_path_);
   }
 
@@ -607,6 +605,52 @@ TEST_F(FileUtilsTest, ReadFileContents) {
   std::string output;
   ReadFileContents(file_path, &output);
   EXPECT_EQ(data, output);
+}
+
+TEST_F(QuicPlatformTest, PickUnsedPort) {
+  int port = QuicPickUnusedPortOrDie();
+  std::vector<Envoy::Network::Address::IpVersion> supported_versions =
+      Envoy::TestEnvironment::getIpVersionsForTest();
+  for (auto ip_version : supported_versions) {
+    Envoy::Network::Address::InstanceConstSharedPtr addr =
+        Envoy::Network::Test::getCanonicalLoopbackAddress(ip_version);
+    Envoy::Network::Address::InstanceConstSharedPtr addr_with_port =
+        Envoy::Network::Utility::getAddressWithPort(*addr, port);
+    Envoy::Network::IoHandlePtr io_handle =
+        addr_with_port->socket(Envoy::Network::Address::SocketType::Datagram);
+    // binding of given port should success.
+    EXPECT_EQ(0, addr_with_port->bind(io_handle->fd()).rc_);
+  }
+}
+
+TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
+  Envoy::Api::MockOsSysCalls os_sys_calls;
+  Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  // Actually create sockets.
+  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillRepeatedly([](int domain, int type, int protocol) {
+    int fd = ::socket(domain, type, protocol);
+    return Envoy::Api::SysCallIntResult{fd, errno};
+  });
+  // Fail bind call's to mimic port exhaustion.
+  EXPECT_CALL(os_sys_calls, bind(_, _, _))
+      .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
+  EXPECT_DEATH_LOG_TO_STDERR(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
+}
+
+TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
+  bool deterministic_stats = Envoy::Stats::TestUtil::hasDeterministicMallocStats();
+  const size_t start_mem = Envoy::Memory::Stats::totalCurrentlyAllocated();
+  QuicStreamBufferAllocator allocator;
+  char* p = allocator.New(1024);
+  if (deterministic_stats) {
+    EXPECT_LT(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
+  }
+  EXPECT_NE(nullptr, p);
+  memset(p, 'a', 1024);
+  allocator.Delete(p);
+  if (deterministic_stats) {
+    EXPECT_EQ(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
+  }
 }
 
 } // namespace

@@ -1,5 +1,6 @@
 #include <string>
 
+#include "common/common/macros.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/fake_symbol_table_impl.h"
@@ -39,7 +40,9 @@ protected:
       break;
     }
     case SymbolTableType::Fake:
-      table_ = std::make_unique<FakeSymbolTableImpl>();
+      auto table = std::make_unique<FakeSymbolTableImpl>();
+      fake_symbol_table_ = table.get();
+      table_ = std::move(table);
       break;
     }
   }
@@ -54,7 +57,7 @@ protected:
   }
 
   SymbolVec getSymbols(StatName stat_name) {
-    return SymbolEncoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
+    return SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
   }
   std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
     return real_symbol_table_->decodeSymbolVec(symbol_vec);
@@ -71,6 +74,7 @@ protected:
     return stat_name_storage_.back().statName();
   }
 
+  FakeSymbolTableImpl* fake_symbol_table_{nullptr};
   SymbolTableImpl* real_symbol_table_{nullptr};
   std::unique_ptr<SymbolTable> table_;
 
@@ -268,10 +272,10 @@ TEST_P(StatNameTest, TestShrinkingExpectation) {
 // you don't free all the StatNames you've allocated bytes for. StatNameList
 // provides this capability.
 TEST_P(StatNameTest, List) {
-  std::vector<absl::string_view> names{"hello.world", "goodbye.world"};
+  absl::string_view names[] = {"hello.world", "goodbye.world"};
   StatNameList name_list;
   EXPECT_FALSE(name_list.populated());
-  name_list.populate(names, *table_);
+  table_->populateList(names, ARRAY_SIZE(names), name_list);
   EXPECT_TRUE(name_list.populated());
 
   // First, decode only the first name.
@@ -392,11 +396,11 @@ TEST_P(StatNameTest, RacingSymbolCreation) {
           // Block each thread on waking up a common condition variable,
           // so we make it likely to race on creation.
           creation.wait();
-          StatNameTempStorage initial(stat_name_string, *table_);
+          StatNameManagedStorage initial(stat_name_string, *table_);
           creates.DecrementCount();
 
           access.wait();
-          StatNameTempStorage second(stat_name_string, *table_);
+          StatNameManagedStorage second(stat_name_string, *table_);
           accesses.DecrementCount();
 
           wait.wait();
@@ -458,11 +462,11 @@ TEST_P(StatNameTest, MutexContentionOnExistingSymbols) {
           // Block each thread on waking up a common condition variable,
           // so we make it likely to race on creation.
           creation.wait();
-          StatNameTempStorage initial(stat_name_string, *table_);
+          StatNameManagedStorage initial(stat_name_string, *table_);
           creates.DecrementCount();
 
           access.wait();
-          StatNameTempStorage second(stat_name_string, *table_);
+          StatNameManagedStorage second(stat_name_string, *table_);
           accesses.DecrementCount();
 
           wait.wait();
@@ -501,6 +505,33 @@ TEST_P(StatNameTest, MutexContentionOnExistingSymbols) {
   for (auto& thread : threads) {
     thread->join();
   }
+}
+
+TEST_P(StatNameTest, SharedStatNameStorageSetInsertAndFind) {
+  StatNameStorageSet set;
+  const int iters = 10;
+  for (int i = 0; i < iters; ++i) {
+    std::string foo = absl::StrCat("foo", i);
+    auto insertion = set.insert(StatNameStorage(foo, *table_));
+    StatNameManagedStorage temp_foo(foo, *table_);
+    auto found = set.find(temp_foo.statName());
+    EXPECT_EQ(found->statName().data(), insertion.first->statName().data());
+  }
+  StatNameManagedStorage bar("bar", *table_);
+  EXPECT_EQ(set.end(), set.find(bar.statName()));
+  EXPECT_EQ(iters, set.size());
+  set.free(*table_);
+}
+
+TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
+  StatNameStorageSet set1, set2;
+  set1.insert(StatNameStorage("foo", *table_));
+  EXPECT_EQ(1, set1.size());
+  EXPECT_EQ(0, set2.size());
+  set1.swap(set2);
+  EXPECT_EQ(0, set1.size());
+  EXPECT_EQ(1, set2.size());
+  set2.free(*table_);
 }
 
 // Tests the memory savings realized from using symbol tables with 1k

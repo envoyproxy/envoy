@@ -10,7 +10,15 @@ namespace Client {
 ConfigImpl::ConfigImpl(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
     : op_timeout_(PROTOBUF_GET_MS_REQUIRED(config, op_timeout)),
-      enable_hashtagging_(config.enable_hashtagging()) {}
+      enable_hashtagging_(config.enable_hashtagging()),
+      enable_redirection_(config.enable_redirection()),
+      max_buffer_size_before_flush_(
+          config.max_buffer_size_before_flush()), // This is a scalar, so default is zero.
+      buffer_flush_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
+          config, buffer_flush_timeout,
+          3)) // Default timeout is 3ms. If max_buffer_size_before_flush is zero, this is not used
+              // as the buffer is flushed on each request immediately.
+{}
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
@@ -30,7 +38,8 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
-      connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })) {
+      connect_or_op_timer_(dispatcher.createTimer([this]() -> void { onConnectOrOpTimeout(); })),
+      flush_timer_(dispatcher.createTimer([this]() -> void { flushBufferAndResetTimer(); })) {
   host->cluster().stats().upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
   host->cluster().stats().upstream_cx_active_.inc();
@@ -47,12 +56,27 @@ ClientImpl::~ClientImpl() {
 
 void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
 
+void ClientImpl::flushBufferAndResetTimer() {
+  if (flush_timer_->enabled()) {
+    flush_timer_->disableTimer();
+  }
+  connection_->write(encoder_buffer_, false);
+}
+
 PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
+  const bool empty_buffer = encoder_buffer_.length() == 0;
+
   pending_requests_.emplace_back(*this, callbacks);
   encoder_->encode(request, encoder_buffer_);
-  connection_->write(encoder_buffer_, false);
+
+  // If buffer is full, flush. If the the buffer was empty before the request, start the timer.
+  if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
+    flushBufferAndResetTimer();
+  } else if (empty_buffer) {
+    flush_timer_->enableTimer(std::chrono::milliseconds(config_.bufferFlushTimeoutInMs()));
+  }
 
   // Only boost the op timeout if:
   // - We are not already connected. Otherwise, we are governed by the connect timeout and the timer
@@ -137,15 +161,34 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
 void ClientImpl::onRespValue(RespValuePtr&& value) {
   ASSERT(!pending_requests_.empty());
   PendingRequest& request = pending_requests_.front();
-  if (!request.canceled_) {
-    request.callbacks_.onResponse(std::move(value));
-  } else {
+
+  if (request.canceled_) {
     host_->cluster().stats().upstream_rq_cancelled_.inc();
+  } else if (config_.enableRedirection() && (value->type() == Common::Redis::RespType::Error)) {
+    std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
+    bool redirected = false;
+    if (err.size() == 3) {
+      if (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK) {
+        redirected = request.callbacks_.onRedirection(*value);
+        if (redirected) {
+          host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
+        } else {
+          host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
+        }
+      }
+    }
+    if (!redirected) {
+      request.callbacks_.onResponse(std::move(value));
+    }
+  } else {
+    request.callbacks_.onResponse(std::move(value));
   }
+
   pending_requests_.pop_front();
 
   // If there are no remaining ops in the pipeline we need to disable the timer.
-  // Otherwise we boost the timer since we are receiving responses and there are more to flush out.
+  // Otherwise we boost the timer since we are receiving responses and there are more to flush
+  // out.
   if (pending_requests_.empty()) {
     connect_or_op_timer_->disableTimer();
   } else {

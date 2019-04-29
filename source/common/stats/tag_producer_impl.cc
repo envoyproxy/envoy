@@ -63,12 +63,12 @@ void TagProducerImpl::addExtractor(TagExtractorPtr extractor) {
 }
 
 void TagProducerImpl::forEachExtractorMatching(
-    const std::string& stat_name, std::function<void(const TagExtractorPtr&)> f) const {
+    absl::string_view stat_name, std::function<void(const TagExtractorPtr&)> f) const {
   IntervalSetImpl<size_t> remove_characters;
   for (const TagExtractorPtr& tag_extractor : tag_extractors_without_prefix_) {
     f(tag_extractor);
   }
-  const std::string::size_type dot = stat_name.find('.');
+  const absl::string_view::size_type dot = stat_name.find('.');
   if (dot != std::string::npos) {
     const absl::string_view token = absl::string_view(stat_name.data(), dot);
     const auto iter = tag_extractor_prefix_map_.find(token);
@@ -80,7 +80,7 @@ void TagProducerImpl::forEachExtractorMatching(
   }
 }
 
-std::string TagProducerImpl::produceTags(const std::string& metric_name,
+std::string TagProducerImpl::produceTags(absl::string_view metric_name,
                                          std::vector<Tag>& tags) const {
   tags.insert(tags.end(), default_tags_.begin(), default_tags_.end());
   IntervalSetImpl<size_t> remove_characters;

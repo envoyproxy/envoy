@@ -53,7 +53,7 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
-  CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(*value, request);
+  CommandSplitter::SplitRequestPtr split = splitter_.makeRequest(std::move(value), request);
   if (split) {
     // The splitter can immediately respond and destroy the pending request. Only store the handle
     // if the request is still alive.

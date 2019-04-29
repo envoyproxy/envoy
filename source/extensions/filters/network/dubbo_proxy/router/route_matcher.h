@@ -107,7 +107,7 @@ public:
                               uint64_t random_value) const override;
 
 private:
-  bool matchParameter(const std::string& request_data, const ParameterData& config_data) const;
+  bool matchParameter(absl::string_view request_data, const ParameterData& config_data) const;
 
   std::vector<ParameterData> parameter_data_list_;
 };

@@ -172,6 +172,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "http_timeout_integration_test",
+    srcs = [
+        "http_timeout_integration_test.cc",
+        "http_timeout_integration_test.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "protocol_integration_test",
     srcs = [
         "protocol_integration_test.cc",
@@ -251,6 +262,9 @@ envoy_cc_test_library(
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
+        "//test/integration/filters:call_decodedata_once_filter_config_lib",
+        "//test/integration/filters:decode_headers_return_stop_all_filter_config_lib",
+        "//test/integration/filters:encode_headers_return_stop_all_filter_config_lib",
         "//test/integration/filters:headers_only_filter_config_lib",
         "//test/integration/filters:modify_buffer_filter_config_lib",
         "//test/integration/filters:passthrough_filter_config_lib",
@@ -343,13 +357,14 @@ envoy_cc_test_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tap:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/server:connection_handler_lib",
         "//source/server:hot_restart_nop_lib",
+        "//source/server:listener_hooks_lib",
         "//source/server:server_lib",
-        "//source/server:test_hooks_lib",
         "//test/common/runtime:utility_lib",
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
@@ -377,7 +392,6 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",

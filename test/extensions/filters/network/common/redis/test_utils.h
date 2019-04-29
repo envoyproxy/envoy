@@ -16,10 +16,12 @@ namespace Redis {
 namespace Client {
 
 inline envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings
-createConnPoolSettings() {
+createConnPoolSettings(int64_t millis = 20, bool hashtagging = true,
+                       bool redirection_support = true) {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings setting{};
-  setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(20));
-  setting.set_enable_hashtagging(true);
+  setting.mutable_op_timeout()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(millis));
+  setting.set_enable_hashtagging(hashtagging);
+  setting.set_enable_redirection(redirection_support);
   return setting;
 }
 

@@ -29,7 +29,8 @@ SdsApi::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispat
   init_manager.add(init_target_);
 }
 
-void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&) {
+void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                            const std::string&) {
   if (resources.empty()) {
     throw EnvoyException(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
@@ -37,7 +38,7 @@ void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&)
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected SDS secrets length: {}", resources.size()));
   }
-  const auto& secret = resources[0];
+  auto secret = MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resources[0]);
   MessageUtil::validate(secret);
 
   // Wrap sds_config_name_ in string_view to deal with proto string/std::string incompatibility
@@ -64,11 +65,11 @@ void SdsApi::onConfigUpdateFailed(const EnvoyException*) {
 }
 
 void SdsApi::initialize() {
-  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
-      envoy::api::v2::auth::Secret>(
+  subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource(
       sds_config_, local_info_, dispatcher_, cluster_manager_, random_, stats_,
       "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets",
-      "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets", api_);
+      "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets",
+      Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), api_);
   subscription_->start({sds_config_name_}, *this);
 }
 

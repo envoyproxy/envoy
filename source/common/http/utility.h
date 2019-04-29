@@ -24,19 +24,19 @@ namespace Utility {
 
 /**
  * Given a fully qualified URL, splits the string_view provided into scheme,
- * host and path components.
+ * host and path with query parameters components.
  */
 class Url {
 public:
   bool initialize(absl::string_view absolute_url);
   absl::string_view scheme() { return scheme_; }
   absl::string_view host_and_port() { return host_and_port_; }
-  absl::string_view path() { return path_; }
+  absl::string_view path_and_query_params() { return path_and_query_params_; }
 
 private:
   absl::string_view scheme_;
   absl::string_view host_and_port_;
-  absl::string_view path_;
+  absl::string_view path_and_query_params_;
 };
 
 /**
@@ -70,10 +70,11 @@ QueryParams parseQueryString(absl::string_view url);
 /**
  * Finds the start of the query string in a path
  * @param path supplies a HeaderString& to search for the query string
- * @return const char* a pointer to the beginning of the query string, or the end of the
- *         path if there is no query
+ * @return absl::string_view starting at the beginning of the query string,
+ *         or a string_view starting at the end of the path if there was
+ *         no query string.
  */
-const char* findQueryStringStart(const HeaderString& path);
+absl::string_view findQueryStringStart(const HeaderString& path);
 
 /**
  * Parse a particular value out of a cookie
