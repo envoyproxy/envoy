@@ -24,6 +24,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
@@ -490,7 +491,7 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
 }
 
 TEST(QuicEpollClockTest, ApproximateNowInUsec) {
-  quiche::FakeEpollServer epoll_server;
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
   epoll_server.set_now_in_usec(1000000);
@@ -509,7 +510,7 @@ TEST(QuicEpollClockTest, ApproximateNowInUsec) {
 }
 
 TEST(QuicEpollClockTest, NowInUsec) {
-  quiche::FakeEpollServer epoll_server;
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
   epoll_server.set_now_in_usec(1000000);
@@ -520,8 +521,7 @@ TEST(QuicEpollClockTest, NowInUsec) {
 }
 
 TEST(QuicEpollClockTest, MonotonicityWithRealEpollClock) {
-  SetQuicReloadableFlag(quic_monotonic_epoll_clock, true);
-  quiche::EpollServer epoll_server;
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
   quic::QuicTime last_now = clock.Now();
@@ -535,7 +535,7 @@ TEST(QuicEpollClockTest, MonotonicityWithRealEpollClock) {
 }
 
 TEST(QuicEpollClockTest, MonotonicityWithFakeEpollClock) {
-  quiche::FakeEpollServer epoll_server;
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
   epoll_server.set_now_in_usec(100);
@@ -544,11 +544,7 @@ TEST(QuicEpollClockTest, MonotonicityWithFakeEpollClock) {
   epoll_server.set_now_in_usec(90);
   quic::QuicTime now = clock.Now();
 
-  if (GetQuicReloadableFlag(quic_monotonic_epoll_clock)) {
-    ASSERT_EQ(last_now, now);
-  } else {
-    ASSERT_GT(last_now, now);
-  }
+  ASSERT_EQ(last_now, now);
 }
 
 class FileUtilsTest : public testing::Test {

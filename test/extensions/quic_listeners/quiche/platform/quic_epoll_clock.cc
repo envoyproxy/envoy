@@ -4,20 +4,7 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
-
-// #include "quiche/quic/platform/api/quic_flags.h"
-// #include "quiche/quic/platform/api/quic_flag_utils.h"
-// TODO(danzh) remove dummy implementation once quic_flags.h and
-// quic_flag_utils.h are implemented.
-#define GetQuicReloadableFlag(flag) ({ flag; })
-#define SetQuicReloadableFlag(flag, value)                                                         \
-  do {                                                                                             \
-    flag = value;                                                                                  \
-  } while (0)
-#define QUIC_RELOADABLE_FLAG_COUNT(flag)                                                           \
-  do {                                                                                             \
-  } while (0)
+#include "test/extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
 
 namespace quic {
 
@@ -32,14 +19,8 @@ QuicTime QuicEpollClock::ApproximateNow() const {
 
 QuicTime QuicEpollClock::Now() const {
   QuicTime now = CreateTimeFromMicroseconds(epoll_server_->NowInUsec());
-  if (!GetQuicReloadableFlag(quic_monotonic_epoll_clock)) {
-    return now;
-  }
 
   if (now <= largest_time_) {
-    if (now < largest_time_) {
-      QUIC_RELOADABLE_FLAG_COUNT(quic_monotonic_epoll_clock);
-    }
     // Time not increasing, return |largest_time_|.
     return largest_time_;
   }

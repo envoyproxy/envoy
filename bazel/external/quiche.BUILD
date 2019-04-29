@@ -225,7 +225,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_aligned.h",
         "quiche/quic/platform/api/quic_arraysize.h",
         "quiche/quic/platform/api/quic_client_stats.h",
-        "quiche/quic/platform/api/quic_clock.h",
         "quiche/quic/platform/api/quic_containers.h",
         "quiche/quic/platform/api/quic_endian.h",
         "quiche/quic/platform/api/quic_estimate_memory_usage.h",
@@ -291,11 +290,12 @@ envoy_cc_library(
 )
 
 envoy_cc_test_library(
-    name = "quic_clock_lib",
+    name = "quic_platform_clock_lib",
     srcs = ["quiche/quic/platform/api/quic_clock.cc"],
     hdrs = ["quiche/quic/platform/api/quic_clock.h"],
+    repository = "@envoy",
     deps = [":quic_time_lib"],
-    )
+)
 
 envoy_cc_library(
     name = "quic_buffer_allocator_lib",
@@ -342,6 +342,13 @@ envoy_cc_test_library(
     copts = quiche_copt,
     repository = "@envoy",
     deps = [":epoll_server_platform"],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_epoll_lib",
+    hdrs = ["quiche/quic/platform/api/quic_epoll.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_epoll_impl_lib"],
 )
 
 envoy_cc_test(
