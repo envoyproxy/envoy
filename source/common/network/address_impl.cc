@@ -386,15 +386,10 @@ Api::SysCallIntResult PipeInstance::connect(int fd) const {
 
 IoHandlePtr PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
 
-SrvInstanceImpl::SrvInstanceImpl(InstanceConstSharedPtr instance, uint32_t priority,
-                                 uint32_t weight)
-    : instance_(instance), priority_(priority), weight_(weight) {
-  friendly_name_ = fmt::format("{} {} {}", instance->asString(), priority, weight);
-}
+SrvInstanceImpl::SrvInstanceImpl(InstanceConstSharedPtr instance) : instance_(instance) {}
 
 bool SrvInstanceImpl::operator==(const SrvInstance& rhs) const {
-  return instance_.get() == rhs.address().get() && priority() == rhs.priority() &&
-         weight() == rhs.weight();
+  return instance_.get() == rhs.address().get();
 }
 
 } // namespace Address

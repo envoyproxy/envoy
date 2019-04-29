@@ -275,21 +275,21 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
       size_t total = 0, finished = 0;
       for (ares_srv_reply* current_reply = srv_reply; current_reply != NULL;
            current_reply = current_reply->next, ++total) {
-        resolver_->resolve(current_reply->host, this->dns_lookup_family_,
-                           [=, &finished, &srv_records](
-                               const std::list<Address::InstanceConstSharedPtr>&& address_list) {
-                             for (auto instance = address_list.begin();
-                                  instance != address_list.end(); ++instance) {
-                               Address::InstanceConstSharedPtr inst_with_port(
-                                   Utility::copyInternetAddressAndSetPort(*instance->get()->ip(),
-                                                                          current_reply->port));
-                               srv_records.emplace_back(new Address::SrvInstanceImpl(
-                                   inst_with_port, current_reply->priority, current_reply->weight));
-                             }
-                             if (++finished == total) {
-                               this->onAresSrvFinishCallback(std::move(srv_records));
-                             }
-                           });
+        resolver_->resolve(
+            current_reply->host, this->dns_lookup_family_,
+            [=, &finished,
+             &srv_records](const std::list<Address::InstanceConstSharedPtr>&& address_list) {
+              for (auto instance = address_list.begin(); instance != address_list.end();
+                   ++instance) {
+                Address::InstanceConstSharedPtr inst_with_port(
+                    Utility::copyInternetAddressAndSetPort(*instance->get()->ip(),
+                                                           current_reply->port));
+                srv_records.emplace_back(new Address::SrvInstanceImpl(inst_with_port));
+              }
+              if (++finished == total) {
+                this->onAresSrvFinishCallback(std::move(srv_records));
+              }
+            });
       }
       replies_parsed = true;
     }

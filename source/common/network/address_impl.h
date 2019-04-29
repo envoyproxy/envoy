@@ -265,24 +265,17 @@ private:
 class SrvInstanceImpl : public SrvInstance {
 public:
   /**
-   * Construct from an InstanceConstSharedPtr, priority and weight.
+   * Construct from an InstanceConstSharedPtr.
    */
-  explicit SrvInstanceImpl(InstanceConstSharedPtr instance, uint32_t priority, uint32_t weight);
+  explicit SrvInstanceImpl(InstanceConstSharedPtr instance);
 
   // Network::Address::SrvInstance
   bool operator==(const SrvInstance& rhs) const override;
   InstanceConstSharedPtr address() const override { return instance_; }
-  uint32_t priority() const override { return priority_; }
-  uint32_t weight() const override { return weight_; }
-  const std::string& asString() const override { return friendly_name_; }
-
-protected:
-  std::string friendly_name_;
+  const std::string& asString() const override { return instance_->asString(); }
 
 private:
   InstanceConstSharedPtr instance_;
-  uint32_t priority_{0};
-  uint32_t weight_{0};
 };
 
 } // namespace Address

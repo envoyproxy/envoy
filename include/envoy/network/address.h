@@ -175,20 +175,12 @@ public:
   virtual bool operator==(const SrvInstance& rhs) const PURE;
   bool operator!=(const SrvInstance& rhs) const { return !operator==(rhs); }
 
+  // TODO(venilnoronha): leverage priority and weight information from SRV records.
+
   /**
    * @return the address instance for the SRV record.
    */
   virtual InstanceConstSharedPtr address() const PURE;
-
-  /**
-   * @return the priority of the SRV record.
-   */
-  virtual uint32_t priority() const PURE;
-
-  /**
-   * @return the weight of the SRV record.
-   */
-  virtual uint32_t weight() const PURE;
 
   /**
    * @return a human readable string for the SRV record.
