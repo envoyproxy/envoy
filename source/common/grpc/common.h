@@ -155,7 +155,7 @@ public:
   static std::string typeUrl(const std::string& qualified_name);
 
   /**
-   * BUild grpc::ByteBuffer which aliases the data in a Buffer::InstancePtr.
+   * Build grpc::ByteBuffer which aliases the data in a Buffer::InstancePtr.
    * @param bufferInstance source data container.
    * @return byteBuffer target container aliased to the data in Buffer::Instance and owning the
    * Buffer::Instance.
