@@ -21,6 +21,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "/usr/local/google/home/danzh/.cache/bazel/_bazel_danzh/3af5f831530d3ae92cc2833051a9b35d/execroot/envoy/bazel-out/k8-fastbuild/genfiles/external/com_googlesource_quiche/quiche/quic/core/quic_types.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
@@ -504,6 +505,7 @@ TEST_F(QuicPlatformTest, ConstructMemSliceFromBuffer) {
   Envoy::Buffer::OwnedImpl buffer;
   EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
+  // str2 is copied.
   buffer.add(str2);
   EXPECT_EQ(1u, buffer.getRawSlices(nullptr, 0));
   buffer.addBufferFragment(fragment);
@@ -511,9 +513,12 @@ TEST_F(QuicPlatformTest, ConstructMemSliceFromBuffer) {
   quic::QuicMemSlice slice1{quic::QuicMemSliceImpl(buffer, str2.length())};
   EXPECT_EQ(str.length(), buffer.length());
   EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
+  std::string str2_old = str2;
+  // slice1 is released, but str2 should not be affected.
   slice1.Reset();
   EXPECT_TRUE(slice1.empty());
   EXPECT_EQ(nullptr, slice1.data());
+  EXPECT_EQ(str2_old, str2);
 
   quic::QuicMemSlice slice2{quic::QuicMemSliceImpl(buffer, str.length())};
   EXPECT_EQ(0, buffer.length());

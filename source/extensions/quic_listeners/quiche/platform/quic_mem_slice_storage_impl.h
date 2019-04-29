@@ -8,6 +8,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "quiche/quic/core/quic_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_iovec.h"
 #include "quiche/quic/platform/api/quic_mem_slice_span.h"
 
