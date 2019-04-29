@@ -80,7 +80,7 @@ public:
     }
     EXPECT_CALL(async_stream_,
                 sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false))
-        .WillOnce([this](const google::protobuf::Message& message, bool) {
+        .WillOnce([this](const Protobuf::Message& message, bool) {
           nonce_acks_sent_.insert(
               static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(message).response_nonce());
         });
