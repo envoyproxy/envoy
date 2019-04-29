@@ -91,6 +91,10 @@ void HotRestartingParent::onSocketEvent() {
   }
 }
 
+// TODO(fredlas) if there are enough stats for stat name length to become an issue, this current
+// implementation can negate the benefit of symbolized stat names by periodically reaching the
+// magnitude of memory usage that they are meant to avoid, since this map holds full-string
+// names. The problem can be solved by splitting the export up over many chunks.
 void HotRestartingParent::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
   for (const auto& gauge : server_->stats().gauges()) {
     (*stats->mutable_gauges())[gauge->name()] = gauge->value();
