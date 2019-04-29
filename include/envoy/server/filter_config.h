@@ -251,8 +251,7 @@ public:
                                                        FactoryContext& context) PURE;
 
   /**
-   * v2 variant of createFilterFactory(..), where filter configs are specified as proto. This may be
-   * optionally implemented today, but will in the future become compulsory once v1 is deprecated.
+   * v2 variant of createFilterFactory(..), where filter configs are specified as proto.
    */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 FactoryContext& context) {
@@ -264,8 +263,7 @@ public:
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
    *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
-   *         is deprecated.
+   *         JSON and then parsed into this empty proto.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
@@ -300,9 +298,7 @@ public:
                                                     FactoryContext& context) PURE;
 
   /**
-   * v2 API variant of createFilterFactory(..), where filter configs are specified as proto. This
-   * may be optionally implemented today, but will in the future become compulsory once v1 is
-   * deprecated.
+   * v2 API variant of createFilterFactory(..), where filter configs are specified as proto.
    */
   virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                              const std::string& stat_prefix,
