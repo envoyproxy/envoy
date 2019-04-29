@@ -1,9 +1,10 @@
 #pragma once
 
-#include "common/config/lds_json.h"
-#include "common/json/json_loader.h"
+#include <string>
+
+#include "envoy/api/v2/listener/listener.pb.h"
+
 #include "common/protobuf/utility.h"
-#include "common/stats/stats_options_impl.h"
 
 namespace Envoy {
 namespace Server {
