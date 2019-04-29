@@ -118,12 +118,12 @@ public:
   /**
    * Returns the stat's combine logic, if known.
    */
-  virtual absl::optional<bool> cachedCombineLogic() const PURE;
+  virtual absl::optional<bool> cachedShouldImport() const PURE;
 
   /**
    * Sets the value to be returned by cachedCombineLogic().
    */
-  virtual void setCombineLogic(bool should_import) PURE;
+  virtual void setShouldImport(bool should_import) PURE;
 };
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;

@@ -8,9 +8,9 @@ namespace Stats {
 StatMerger::StatMerger(Stats::Store& target_store) : target_store_(target_store) {}
 
 bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
-  absl::optional<bool> cached_logic = gauge.cachedCombineLogic();
-  if (cached_logic.has_value()) {
-    return cached_logic.value();
+  absl::optional<bool> should_import = gauge.cachedShouldImport();
+  if (should_import.has_value()) {
+    return should_import.value();
   }
 
   // Gauge name *substrings*, and special logic to use for combining those gauges' values.
@@ -46,11 +46,11 @@ bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
   for (const auto& exception : *nonstandard_combine_logic) {
     std::smatch match;
     if (std::regex_match(gauge_name, match, exception)) {
-      gauge.setCombineLogic(false);
+      gauge.setShouldImport(false);
       return false;
     }
   }
-  gauge.setCombineLogic(true);
+  gauge.setShouldImport(true);
   return true;
 }
 
