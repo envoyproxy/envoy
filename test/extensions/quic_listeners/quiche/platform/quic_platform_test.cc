@@ -490,7 +490,7 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
                       QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
 }
 
-TEST(QuicEpollClockTest, ApproximateNowInUsec) {
+TEST_F(QuicPlatformTest, ApproximateNowInUsec) {
   epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
@@ -509,7 +509,7 @@ TEST(QuicEpollClockTest, ApproximateNowInUsec) {
   EXPECT_EQ(11000005u, clock.WallNow().ToUNIXMicroseconds());
 }
 
-TEST(QuicEpollClockTest, NowInUsec) {
+TEST_F(QuicPlatformTest, NowInUsec) {
   epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
@@ -520,7 +520,7 @@ TEST(QuicEpollClockTest, NowInUsec) {
   EXPECT_EQ(1000005, (clock.Now() - QuicTime::Zero()).ToMicroseconds());
 }
 
-TEST(QuicEpollClockTest, MonotonicityWithRealEpollClock) {
+TEST_F(QuicPlatformTest, MonotonicityWithRealEpollClock) {
   epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
@@ -534,7 +534,7 @@ TEST(QuicEpollClockTest, MonotonicityWithRealEpollClock) {
   }
 }
 
-TEST(QuicEpollClockTest, MonotonicityWithFakeEpollClock) {
+TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
   epoll_server::test::FakeSimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
