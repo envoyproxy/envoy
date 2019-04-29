@@ -318,7 +318,7 @@ grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr bufferInstance) {
     return {&oneSlice, 1};
   }
   STACK_ARRAY(manyRawSlices, Buffer::RawSlice, nSlices);
-  bufferInstance->getRawSlices(manyRawSlices.begin(), nSlices);
+  container->buffer_->getRawSlices(manyRawSlices.begin(), nSlices);
   std::vector<grpc::Slice> slices;
   slices.reserve(nSlices);
   for (int i = 0; i < nSlices; i++) {
