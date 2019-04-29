@@ -692,6 +692,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                              Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
   }
+  if (!state_.saw_connection_close_ && request_headers_->ProxyConnection() &&
+      absl::EqualsIgnoreCase(request_headers_->ProxyConnection()->value().getStringView(),
+                             Http::Headers::get().ConnectionValues.Close)) {
+    state_.saw_connection_close_ = true;
+  }
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
