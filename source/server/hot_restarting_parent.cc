@@ -98,7 +98,10 @@ void HotRestartingParent::exportStatsToChild(HotRestartMessage::Reply::Stats* st
   for (const auto& counter : server_->stats().counters()) {
     // The hot restart parent is expected to have stopped its normal stat exporting (and so
     // latching) by the time it begins exporting to the hot restart child.
-    (*stats->mutable_counter_deltas())[counter->name()] = counter->latch();
+    int latched_value = counter->latch();
+    if (latched_value > 0) {
+      (*stats->mutable_counter_deltas())[counter->name()] = latched_value;
+    }
   }
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
   stats->set_num_connections(server_->listenerManager().numConnections());

@@ -79,6 +79,12 @@ void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges)
   }
 }
 
+// TODO(fredlas) the current implementation can "leak" obsolete parent stats into the child.
+// That is, the parent had stat "foo", the child doesn't care about "foo" and back in the
+// shared memory implementation would have dropped it, but the import causes it to be made into
+// a real stat that stays around forever. The initial mini-consensus approach will be to
+// track which stats are actually getting used by the child, and drop those that aren't when
+// the hot restart completes.
 void StatMerger::mergeStats(const Protobuf::Map<std::string, uint64_t>& counter_deltas,
                             const Protobuf::Map<std::string, uint64_t>& gauges) {
   mergeCounters(counter_deltas);
