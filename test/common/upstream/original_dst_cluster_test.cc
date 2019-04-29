@@ -76,7 +76,7 @@ public:
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
+        admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, runtime_, stats_store_,
         singleton_manager_, tls_, *api_);
     cluster_.reset(
         new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));

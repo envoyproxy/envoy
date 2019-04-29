@@ -16,11 +16,12 @@ public:
                                     Stats::Scope& stats_scope, Upstream::ClusterManager& cm,
                                     const LocalInfo::LocalInfo& local_info,
                                     Event::Dispatcher& dispatcher,
-                                    Envoy::Runtime::RandomGenerator& random, Stats::Store& stats,
+                                    Envoy::Runtime::RandomGenerator& random, Envoy::Runtime::Loader& runtime, Stats::Store& stats,
                                     Singleton::Manager& singleton_manager,
                                     ThreadLocal::SlotAllocator& tls, Api::Api& api)
       : admin_(admin), context_manager_(context_manager), stats_scope_(stats_scope),
         cluster_manager_(cm), local_info_(local_info), dispatcher_(dispatcher), random_(random),
+        runtime_(runtime),
         stats_(stats), singleton_manager_(singleton_manager), tls_(tls), api_(api) {}
 
   // TransportSocketFactoryContext
@@ -34,6 +35,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
+  Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Store& stats() override { return stats_; }
   void setInitManager(Init::Manager& init_manager) override { init_manager_ = &init_manager; }
   Init::Manager* initManager() override { return init_manager_; }
@@ -50,6 +52,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
   Envoy::Runtime::RandomGenerator& random_;
+  Envoy::Runtime::Loader& runtime_;
   Stats::Store& stats_;
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;

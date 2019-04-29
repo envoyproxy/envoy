@@ -68,6 +68,11 @@ public:
   virtual Envoy::Runtime::RandomGenerator& random() PURE;
 
   /**
+   * @return Runtime::Loader& the singleton runtime loader for the server.
+   */
+  virtual Envoy::Runtime::Loader& runtime() PURE;
+
+  /**
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;
