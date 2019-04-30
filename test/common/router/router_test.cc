@@ -259,6 +259,7 @@ TEST_F(RouterTest, RouteNotFound) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1UL, stats_store_.counter("test.no_route").value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(callbacks_.details_, "route_not_found");
 }
 
 TEST_F(RouterTest, ClusterNotFound) {
@@ -271,6 +272,7 @@ TEST_F(RouterTest, ClusterNotFound) {
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1UL, stats_store_.counter("test.no_cluster").value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(callbacks_.details_, "cluster_not_found");
 }
 
 TEST_F(RouterTest, PoolFailureWithPriority) {
@@ -301,6 +303,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  EXPECT_EQ(callbacks_.details_, "upstream_reset_before_response_started{connection failure}");
 }
 
 TEST_F(RouterTest, Http1Upstream) {
@@ -500,6 +503,8 @@ TEST_F(RouterTest, AddCookie) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
 
+  absl::string_view rc_details2 = "via_upstream";
+  EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details2));
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
   // When the router filter gets reset we should cancel the pool request.
@@ -696,6 +701,7 @@ TEST_F(RouterTest, NoHost) {
                     .counter("upstream_rq_maintenance_mode")
                     .value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(callbacks_.details_, "no_healthy_upstream");
 }
 
 TEST_F(RouterTest, MaintenanceMode) {
@@ -720,6 +726,7 @@ TEST_F(RouterTest, MaintenanceMode) {
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
                     .counter("upstream_rq_dropped")
                     .value());
+  EXPECT_EQ(callbacks_.details_, "maintenance_mode");
 }
 
 // Validate that we don't set x-envoy-overloaded when Envoy header suppression
@@ -1555,6 +1562,8 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), false);
+  absl::string_view rc_details2 = "upstream_reset_after_response_started{remote reset}";
+  EXPECT_CALL(callbacks_.stream_info_, setResponseCodeDetails(rc_details2));
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   // For normal HTTP, once we have a 200 we consider this a success, even if a
@@ -3111,6 +3120,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   // This should not trigger a retry as the retry state has been deleted.
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+  EXPECT_EQ(callbacks_.details_, "upstream_reset_before_response_started{remote reset}");
 }
 
 class RouterTestChildSpan : public RouterTestBase {
