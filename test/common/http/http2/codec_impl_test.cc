@@ -847,6 +847,9 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
       ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
                         Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
+// Make sure we have coverage for high and low values for various  combinations and permutations
+// of HTTP settings in at least one test fixture.
+// Use with caution as any test using this runs 255 times.
 typedef Http2CodecImplTest Http2CodecImplTestAll;
 
 INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
@@ -1006,6 +1009,8 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtMaxConfigurable) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
+// Note this is Http2CodecImplTestAll not Http2CodecImplTest, to test
+// compression with min and max HPACK table size.
 TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
   initialize();
 
