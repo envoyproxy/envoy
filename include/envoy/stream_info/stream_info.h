@@ -120,7 +120,7 @@ struct ResponseCodeDetailValues {
   // The upstream connection was reset before a response was started. This
   // will generally be accompanied by details about why the reset occurred.
   const std::string EarlyUpstreamReset = "upstream_reset_before_response_started";
-  // The upstream connection was reset before a response was started. This
+  // The upstream connection was reset after a response was started. This
   // will generally be accompanied by details about why the reset occurred but
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
