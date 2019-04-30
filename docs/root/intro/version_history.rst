@@ -28,6 +28,8 @@ Version history
   it in a future update. This is a mechanism to work around a race condition in which an EDS
   implementation may remove a host before it has stopped passing active HC, thus causing the host
   to become stranded until a future update.
+* grpc-json: added support for :ref:`auto mapping
+  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
 
 1.10.0 (Apr 5, 2019)
 ====================
