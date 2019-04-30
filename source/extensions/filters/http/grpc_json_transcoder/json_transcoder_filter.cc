@@ -121,7 +121,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
 
-      HttpRule(http_rule);
+      HttpRule http_rule;
       if (method->options().HasExtension(google::api::http)) {
         http_rule = method->options().GetExtension(google::api::http);
       } else if (proto_config.auto_mapping()) {
