@@ -136,7 +136,7 @@ Buffer::InstancePtr Common::serializeToGrpcFrame(const Protobuf::Message& messag
 }
 
 Buffer::InstancePtr Common::serializeMessage(const Protobuf::Message& message) {
-  Buffer::InstancePtr body(new Buffer::OwnedImpl());
+  auto body = std::make_unique<Buffer::OwnedImpl>();
   const uint32_t size = message.ByteSize();
   Buffer::RawSlice iovec;
   body->reserve(size, &iovec, 1);
@@ -289,17 +289,18 @@ std::string Common::typeUrl(const std::string& qualified_name) {
 struct BufferInstanceContainer {
   BufferInstanceContainer(int ref_count, Buffer::InstancePtr buffer)
       : ref_count_(ref_count), buffer_(std::move(buffer)) {}
-  std::atomic<int> ref_count_;
+  std::atomic<int> ref_count_; // In case gPRC dereferences in a different threads.
   Buffer::InstancePtr buffer_;
-};
 
-static void derefBufferInstanceContainer(void* container_ptr) {
-  auto container = reinterpret_cast<BufferInstanceContainer*>(container_ptr);
-  container->ref_count_--;
-  if (container->ref_count_ <= 0) {
-    delete container;
+  static void derefBufferInstanceContainer(void* container_ptr) {
+    auto container = reinterpret_cast<BufferInstanceContainer*>(container_ptr);
+    container->ref_count_--;
+    // This is safe because the ref_count_ is never incremented.
+    if (container->ref_count_ <= 0) {
+      delete container;
+    }
   }
-}
+};
 
 grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr&& buffer_instance) {
   if (!buffer_instance) {
@@ -313,8 +314,8 @@ grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr&& buffer_instance) {
   }
   auto container = new BufferInstanceContainer{n_slices, std::move(buffer_instance)};
   if (n_slices == 1) {
-    grpc::Slice oneSlice(on_raw_slice.mem_, on_raw_slice.len_, &derefBufferInstanceContainer,
-                         container);
+    grpc::Slice oneSlice(on_raw_slice.mem_, on_raw_slice.len_,
+                         &BufferInstanceContainer::derefBufferInstanceContainer, container);
     return {&oneSlice, 1};
   }
   STACK_ARRAY(manyRawSlices, Buffer::RawSlice, n_slices);
@@ -322,8 +323,8 @@ grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr&& buffer_instance) {
   std::vector<grpc::Slice> slices;
   slices.reserve(n_slices);
   for (int i = 0; i < n_slices; i++) {
-    slices.emplace_back(manyRawSlices[i].mem_, manyRawSlices[i].len_, &derefBufferInstanceContainer,
-                        container);
+    slices.emplace_back(manyRawSlices[i].mem_, manyRawSlices[i].len_,
+                        &BufferInstanceContainer::derefBufferInstanceContainer, container);
   }
   return {&slices[0], slices.size()};
 }
@@ -331,8 +332,8 @@ grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr&& buffer_instance) {
 struct ByteBufferContainer {
   ByteBufferContainer(int ref_count) : ref_count_(ref_count) {}
   ~ByteBufferContainer() { ::free(fragments_); }
-  std::atomic<int> ref_count_;
-  Buffer::BufferFragmentImpl* fragments_ = nullptr;
+  std::atomic<int> ref_count_; // In case gPRC dereferences in a different threads.
+  Buffer::BufferFragmentImpl* fragments_ = 0;
   std::vector<grpc::Slice> slices_;
 };
 
@@ -348,7 +349,7 @@ Buffer::InstancePtr Common::makeBufferInstance(const grpc::ByteBuffer& byte_buff
   if (slices.size() == 0) {
     return buffer;
   }
-  auto container = new ByteBufferContainer(static_cast<int>(slices.size()));
+  auto* container = new ByteBufferContainer(static_cast<int>(slices.size()));
   std::function<void(const void*, size_t, const Buffer::BufferFragmentImpl*)> releaser =
       [container](const void*, size_t, const Buffer::BufferFragmentImpl*) {
         container->ref_count_--;

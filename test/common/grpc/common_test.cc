@@ -368,6 +368,7 @@ TEST(GrpcCommonTest, MakeBufferInstance1) {
   EXPECT_EQ(bufferInstance->toString(), "test");
 }
 
+// Test building a Buffer::Instance from 3 grpc::Slice(s).
 TEST(GrpcCommonTest, MakeBufferInstance3) {
   grpc::Slice slices[3] = {{"test"}, {" "}, {"this"}};
   grpc::ByteBuffer byteBuffer(slices, 3);
@@ -388,6 +389,7 @@ TEST(GrpcCommonTest, MakeByteBuffer1) {
   EXPECT_EQ(str, "test");
 }
 
+// Test building a grpc::ByteBuffer from a Bufffer::Instance with 3 slices.
 TEST(GrpcCommonTest, MakeByteBuffer3) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add("test", 4);
@@ -403,6 +405,7 @@ TEST(GrpcCommonTest, MakeByteBuffer3) {
   EXPECT_EQ(str, "test this");
 }
 
+// Test building a Buffer::Instance from a grpc::ByteBuffer from a Bufffer::Instance with 3 slices.
 TEST(GrpcCommonTest, ByteBufferInstanceRoundTrip) {
   grpc::Slice slices[3] = {{"test"}, {" "}, {"this"}};
   grpc::ByteBuffer byteBuffer1(slices, 3);
@@ -412,6 +415,7 @@ TEST(GrpcCommonTest, ByteBufferInstanceRoundTrip) {
   EXPECT_EQ(bufferInstance2->toString(), "test this");
 }
 
+// Ensure that the correct gPRC header is constructed for a Buffer::Instance.
 TEST(GrpcCommonTest, PrependGrpcFrameHeader) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add("test", 4);
