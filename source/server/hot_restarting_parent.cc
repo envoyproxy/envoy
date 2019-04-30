@@ -18,7 +18,7 @@ HotRestartingParent::HotRestartingParent(int base_id, int restart_epoch)
 
 void HotRestartingParent::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   socket_event_ = dispatcher.createFileEvent(
-      my_domain_socket(),
+      myDomainSocket(),
       [this](uint32_t events) -> void {
         ASSERT(events == Event::FileReadyType::Read);
         onSocketEvent();

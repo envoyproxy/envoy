@@ -78,7 +78,7 @@ public:
     // safe to mess with what these flag bits mean whenever we want).
     static const uint8_t LogicAccumulate = 0x02;
     static const uint8_t LogicNeverImport = 0x04;
-    static const uint8_t LogicKnown = LogicAccumulate | LogicNeverImport;
+    static const uint8_t LogicCached = LogicAccumulate | LogicNeverImport;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& symbolTable() const PURE;

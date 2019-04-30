@@ -2,7 +2,6 @@
 
 #include "envoy/stats/store.h"
 
-#include "common/common/hash.h"
 #include "common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -35,7 +34,7 @@ public:
 private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas);
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges);
-  ConstCharStarHashMap<uint64_t> parent_gauge_values_;
+  absl::flat_hash_map<std::string, uint64_t> parent_gauge_values_;
   Stats::Store& target_store_;
 };
 

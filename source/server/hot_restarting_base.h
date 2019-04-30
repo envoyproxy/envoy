@@ -28,7 +28,7 @@ protected:
   void initDomainSocketAddress(sockaddr_un* address);
   sockaddr_un createDomainSocketAddress(uint64_t id, const std::string& role);
   void bindDomainSocket(uint64_t id, const std::string& role);
-  int my_domain_socket() const { return my_domain_socket_; }
+  int myDomainSocket() const { return my_domain_socket_; }
 
   // Protocol description:
   //

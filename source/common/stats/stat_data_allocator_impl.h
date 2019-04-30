@@ -150,7 +150,7 @@ public:
 
   // Returns true if values should be added, false if no import.
   absl::optional<bool> cachedShouldImport() const override {
-    if ((data_.flags_ & Flags::LogicKnown) == 0) {
+    if ((data_.flags_ & Flags::LogicCached) == 0) {
       return absl::nullopt;
     }
     return (data_.flags_ & Flags::LogicAccumulate) != 0;
