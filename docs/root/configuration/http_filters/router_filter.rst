@@ -229,6 +229,10 @@ in flight.
 
 The value of the header should be "true" or "false", and is ignored if invalid.
 
+Hedging cannot be enabled by this header unless :ref:`allow_request_hedging
+<envoy_api_field_cluster.allow_request_hedging>` has been enabled for the
+cluster the request is destined for.
+
 .. _config_http_filters_router_x-envoy-immediate-health-check-fail:
 
 x-envoy-immediate-health-check-fail
