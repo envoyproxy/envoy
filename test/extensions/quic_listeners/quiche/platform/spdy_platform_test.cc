@@ -12,6 +12,7 @@
 #include "quiche/spdy/platform/api/spdy_ptr_util.h"
 #include "quiche/spdy/platform/api/spdy_string.h"
 #include "quiche/spdy/platform/api/spdy_string_piece.h"
+#include "quiche/spdy/platform/api/spdy_test_helpers.h"
 
 // Basic tests to validate functioning of the QUICHE spdy platform
 // implementation. For platform APIs in which the implementation is a simple
@@ -103,6 +104,13 @@ TEST(SpdyPlatformTest, SpdyStringPiece) {
   spdy::SpdyString s = "bar";
   spdy::SpdyStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
+}
+
+TEST(SpdyPlatformTest, SpdyTestHelpers) {
+  auto bug = [](const char* error_message) { SPDY_BUG << error_message; };
+
+  EXPECT_SPDY_BUG(bug("bug one is expected"), "bug one");
+  EXPECT_SPDY_BUG(bug("bug two is expected"), "bug two");
 }
 
 } // namespace
