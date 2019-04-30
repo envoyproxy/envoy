@@ -220,6 +220,13 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_platform_system_event_loop",
+    hdrs = ["quiche/quic/platform/api/quic_system_event_loop.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_system_event_loop_impl_lib"],
+)
+
+envoy_cc_test_library(
     name = "quic_platform_thread",
     hdrs = ["quiche/quic/platform/api/quic_thread.h"],
     repository = "@envoy",

@@ -44,6 +44,7 @@ envoy_cc_test(
         "@com_googlesource_quiche//:quic_platform_mock_log",
         "@com_googlesource_quiche//:quic_platform_port_utils",
         "@com_googlesource_quiche//:quic_platform_sleep",
+        "@com_googlesource_quiche//:quic_platform_system_event_loop",
         "@com_googlesource_quiche//:quic_platform_test_output",
         "@com_googlesource_quiche//:quic_platform_thread",
     ],
@@ -111,6 +112,11 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//test/test_common:environment_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_system_event_loop_impl_lib",
+    hdrs = ["quic_system_event_loop_impl.h"],
 )
 
 envoy_cc_test_library(
