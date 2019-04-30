@@ -521,7 +521,7 @@ TEST_F(QuicPlatformTest, NowInUsec) {
 }
 
 TEST_F(QuicPlatformTest, MonotonicityWithRealEpollClock) {
-  epoll_server::test::FakeSimpleEpollServer epoll_server;
+  epoll_server::SimpleEpollServer epoll_server;
   QuicEpollClock clock(&epoll_server);
 
   quic::QuicTime last_now = clock.Now();

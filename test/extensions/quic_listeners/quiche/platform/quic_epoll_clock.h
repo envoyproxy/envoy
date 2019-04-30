@@ -11,10 +11,9 @@
 #include "quiche/quic/platform/api/quic_clock.h"
 
 namespace quic {
-extern bool quic_monotonic_epoll_clock;
 
 // Clock to efficiently retrieve an approximately accurate time from an
-// net::EpollServer.
+// epoll_server::SimpleEpollServer.
 class QuicEpollClock : public QuicClock {
 public:
   explicit QuicEpollClock(epoll_server::SimpleEpollServer* epoll_server);

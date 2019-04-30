@@ -8,8 +8,6 @@
 
 namespace quic {
 
-bool quic_monotonic_epoll_clock = false;
-
 QuicEpollClock::QuicEpollClock(epoll_server::SimpleEpollServer* epoll_server)
     : epoll_server_(epoll_server), largest_time_(QuicTime::Zero()) {}
 

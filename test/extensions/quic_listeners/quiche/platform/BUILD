@@ -93,12 +93,8 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "quic_platform_epoll_clock_lib",
-    srcs = [
-        "quic_epoll_clock.cc",
-    ],
-    hdrs = [
-        "quic_epoll_clock.h",
-    ],
+    srcs = ["quic_epoll_clock.cc"],
+    hdrs = ["quic_epoll_clock.h"],
     deps = [
         "@com_googlesource_quiche//:quic_platform_clock_lib",
         "@com_googlesource_quiche//:quic_platform_epoll_lib",

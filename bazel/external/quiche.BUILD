@@ -296,11 +296,12 @@ envoy_cc_library(
     deps = [":quic_platform"],
 )
 
-envoy_cc_test_library(
+envoy_cc_library(
     name = "quic_platform_clock_lib",
     srcs = ["quiche/quic/platform/api/quic_clock.cc"],
     hdrs = ["quiche/quic/platform/api/quic_clock.h"],
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [":quic_time_lib"],
 )
 
