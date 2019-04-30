@@ -114,16 +114,6 @@ public:
   static Address::InstanceConstSharedPtr copyInternetAddressAndPort(const Address::Ip& ip);
 
   /**
-   * Parse an internet host address (IPv4 or IPv6), create an Instance from it AND set the port.
-   * Throws EnvoyException if unable to parse the address. This is needed when a shared pointer is
-   * needed but only a raw instance is available.
-   * @param Address::Ip& to be copied to the new instance.
-   * @return pointer to the Instance.
-   */
-  static Address::InstanceConstSharedPtr copyInternetAddressAndSetPort(const Address::Ip& ip,
-                                                                       const uint32_t port);
-
-  /**
    * Create a new Instance from an internet host address (IPv4 or IPv6) and port.
    * @param ip_addr string to be parsed as an internet address and port. Examples:
    *        - "1.2.3.4:80"

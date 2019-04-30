@@ -183,15 +183,10 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
 }
 
 Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Address::Ip& ip) {
-  return copyInternetAddressAndSetPort(ip, ip.port());
-}
-
-Address::InstanceConstSharedPtr Utility::copyInternetAddressAndSetPort(const Address::Ip& ip,
-                                                                       const uint32_t port) {
   if (ip.version() == Address::IpVersion::v4) {
-    return std::make_shared<Address::Ipv4Instance>(ip.addressAsString(), port);
+    return std::make_shared<Address::Ipv4Instance>(ip.addressAsString(), ip.port());
   }
-  return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), port);
+  return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), ip.port());
 }
 
 void Utility::throwWithMalformedIp(const std::string& ip_address) {

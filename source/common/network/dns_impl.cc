@@ -265,8 +265,7 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
               for (auto instance = address_list.begin(); instance != address_list.end();
                    ++instance) {
                 Address::InstanceConstSharedPtr inst_with_port(
-                    Utility::copyInternetAddressAndSetPort(*instance->get()->ip(),
-                                                           current_reply->port));
+                    Utility::getAddressWithPort(*instance->get(), current_reply->port));
                 srv_records.emplace_back(new Address::SrvInstanceImpl(inst_with_port));
               }
               if (++finished == total) {
