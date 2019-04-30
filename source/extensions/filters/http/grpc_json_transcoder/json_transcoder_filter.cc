@@ -28,6 +28,7 @@ using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
 using Envoy::ProtobufUtil::Status;
 using Envoy::ProtobufUtil::error::Code;
+using google::api::HttpRule;
 using google::grpc::transcoding::JsonRequestTranslator;
 using google::grpc::transcoding::PathMatcherBuilder;
 using google::grpc::transcoding::PathMatcherUtility;
@@ -119,9 +120,11 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
-      auto http_rule = method->options().GetExtension(google::api::http);
 
-      if (!method->options().HasExtension(google::api::http) && proto_config.auto_mapping()) {
+      HttpRule(http_rule);
+      if (method->options().HasExtension(google::api::http)) {
+        http_rule = method->options().GetExtension(google::api::http);
+      } else if (proto_config.auto_mapping()) {
         auto post = "/" + service->full_name() + "/" + method->name();
         http_rule.set_post(post);
         http_rule.set_body("*");
