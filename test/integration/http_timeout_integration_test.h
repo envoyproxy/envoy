@@ -18,8 +18,9 @@ public:
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-       bootstrap.mutable_static_resources()->mutable_clusters()[0][0].set_allow_request_hedging(true);
-     });
+      bootstrap.mutable_static_resources()->mutable_clusters()[0][0].set_allow_request_hedging(
+          true);
+    });
   }
 
   void testRouterRequestAndResponseWithHedgedPerTryTimeout(uint64_t request_size,

@@ -2860,7 +2860,8 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    FilterUtility::HedgingParams hedgingParams =
+        FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header says true, cluster does not allow it, expect true.
@@ -2869,7 +2870,8 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(false));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    FilterUtility::HedgingParams hedgingParams =
+        FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header says false, expect false.
@@ -2878,7 +2880,8 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    FilterUtility::HedgingParams hedgingParams =
+        FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header says false, expect false.
@@ -2887,7 +2890,8 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    FilterUtility::HedgingParams hedgingParams =
+        FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header says true, expect true.
@@ -2896,7 +2900,8 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    FilterUtility::HedgingParams hedgingParams =
+        FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header says true, cluster does not allow it, expect false.
@@ -2905,7 +2910,8 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(false));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    FilterUtility::HedgingParams hedgingParams =
+        FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header is invalid, expect true.
@@ -2914,7 +2920,8 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
     EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    FilterUtility::HedgingParams hedgingParams =
+        FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header is invalid, expect false.
@@ -2923,7 +2930,8 @@ TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
     EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    FilterUtility::HedgingParams hedgingParams =
+        FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
 }

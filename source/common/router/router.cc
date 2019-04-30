@@ -197,9 +197,9 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   return timeout;
 }
 
-FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
-                                                               Http::HeaderMap& request_headers,
-                                                               const Upstream::ClusterInfo& cluster) {
+FilterUtility::HedgingParams
+FilterUtility::finalHedgingParams(const RouteEntry& route, Http::HeaderMap& request_headers,
+                                  const Upstream::ClusterInfo& cluster) {
   HedgingParams hedgingParams;
   if (!cluster.allowRequestHedging()) {
     return hedgingParams;

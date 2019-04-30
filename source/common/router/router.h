@@ -102,8 +102,7 @@ public:
    * @param cluster supplies the cluster info the request is destined for.
    * @return HedgingParams the final parameters to use for request hedging.
    */
-  static HedgingParams finalHedgingParams(const RouteEntry& route,
-                                          Http::HeaderMap& request_headers,
+  static HedgingParams finalHedgingParams(const RouteEntry& route, Http::HeaderMap& request_headers,
                                           const Upstream::ClusterInfo& cluster);
 };
 

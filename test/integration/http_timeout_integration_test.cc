@@ -162,22 +162,26 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutWithBodyNoBufferSecondRequ
   testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 512, false);
 }
 
-TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestFirstRequestWins) {
+TEST_P(HttpTimeoutIntegrationTest,
+       HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestFirstRequestWins) {
   config_helper_.setBufferLimits(1024, 1024 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024, true);
 }
 
-TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestSecondRequestWins) {
+TEST_P(HttpTimeoutIntegrationTest,
+       HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestSecondRequestWins) {
   config_helper_.setBufferLimits(1024, 1024 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024, false);
 }
 
-TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseFirstRequestWins) {
+TEST_P(HttpTimeoutIntegrationTest,
+       HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseFirstRequestWins) {
   config_helper_.setBufferLimits(1024 * 1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024, true);
 }
 
-TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseSecondRequestWins) {
+TEST_P(HttpTimeoutIntegrationTest,
+       HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseSecondRequestWins) {
   config_helper_.setBufferLimits(1024 * 1024, 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024, false);
 }
