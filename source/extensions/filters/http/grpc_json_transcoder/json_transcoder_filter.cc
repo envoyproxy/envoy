@@ -122,7 +122,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       auto http_rule = method->options().GetExtension(google::api::http);
 
       if (!http_rule.pattern_case() && proto_config.auto_mapping()) {
-        auto post = "/" + service->file()->package() + "." + service->name() + "/" + method->name();
+        auto post = "/" + service->full_name() + "/" + method->name();
         http_rule.set_post(post);
         http_rule.set_body("*");
       }
