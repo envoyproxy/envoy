@@ -2826,68 +2826,104 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
 
 TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {
   Http::TestHeaderMapImpl empty_headers;
-  { // route says true, header not present, expect true.
+  std::shared_ptr<Upstream::MockClusterInfo> cluster{new Upstream::MockClusterInfo()};
+  { // route says true, header not present, cluster allows it, expect true.
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, empty_headers);
+        FilterUtility::finalHedgingParams(route, empty_headers, *cluster);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
+  }
+  { // route says true, header not present, cluster does not allow it, expect false.
+    NiceMock<MockRouteEntry> route;
+    route.hedge_policy_.hedge_on_per_try_timeout_ = true;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(false));
+    EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
+    FilterUtility::HedgingParams hedgingParams =
+        FilterUtility::finalHedgingParams(route, empty_headers, *cluster);
+    EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header not present, expect false.
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
     FilterUtility::HedgingParams hedgingParams =
-        FilterUtility::finalHedgingParams(route, empty_headers);
+        FilterUtility::finalHedgingParams(route, empty_headers, *cluster);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header says true, expect true.
     Http::TestHeaderMapImpl headers{{"x-envoy-hedge-on-per-try-timeout", "true"}};
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
+  }
+  { // route says false, header says true, cluster does not allow it, expect true.
+    Http::TestHeaderMapImpl headers{{"x-envoy-hedge-on-per-try-timeout", "true"}};
+    NiceMock<MockRouteEntry> route;
+    route.hedge_policy_.hedge_on_per_try_timeout_ = false;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(false));
+    EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header says false, expect false.
     Http::TestHeaderMapImpl headers{{"x-envoy-hedge-on-per-try-timeout", "false"}};
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header says false, expect false.
     Http::TestHeaderMapImpl headers{{"x-envoy-hedge-on-per-try-timeout", "false"}};
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header says true, expect true.
     Http::TestHeaderMapImpl headers{{"x-envoy-hedge-on-per-try-timeout", "true"}};
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
+  }
+  { // route says true, header says true, cluster does not allow it, expect false.
+    Http::TestHeaderMapImpl headers{{"x-envoy-hedge-on-per-try-timeout", "true"}};
+    NiceMock<MockRouteEntry> route;
+    route.hedge_policy_.hedge_on_per_try_timeout_ = true;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(false));
+    EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
+    EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says true, header is invalid, expect true.
     Http::TestHeaderMapImpl headers{{"x-envoy-hedge-on-per-try-timeout", "bad"}};
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = true;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_TRUE(hedgingParams.hedge_on_per_try_timeout_);
   }
   { // route says false, header is invalid, expect false.
     Http::TestHeaderMapImpl headers{{"x-envoy-hedge-on-per-try-timeout", "bad"}};
     NiceMock<MockRouteEntry> route;
     route.hedge_policy_.hedge_on_per_try_timeout_ = false;
+    EXPECT_CALL(*cluster, allowRequestHedging).WillRepeatedly(Return(true));
     EXPECT_CALL(route, hedgePolicy).WillRepeatedly(ReturnRef(route.hedge_policy_));
-    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers);
+    FilterUtility::HedgingParams hedgingParams = FilterUtility::finalHedgingParams(route, headers, *cluster);
     EXPECT_FALSE(hedgingParams.hedge_on_per_try_timeout_);
   }
 }

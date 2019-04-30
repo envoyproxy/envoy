@@ -99,10 +99,12 @@ public:
    * Determine the final hedging settings after applying randomized behavior.
    * @param route supplies the request route.
    * @param request_headers supplies the request headers.
-   * @return HedgingParams the final parameters to use for request hedging
+   * @param cluster supplies the cluster info the request is destined for.
+   * @return HedgingParams the final parameters to use for request hedging.
    */
   static HedgingParams finalHedgingParams(const RouteEntry& route,
-                                          Http::HeaderMap& request_headers);
+                                          Http::HeaderMap& request_headers,
+                                          const Upstream::ClusterInfo& cluster);
 };
 
 /**

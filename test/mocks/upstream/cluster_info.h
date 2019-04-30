@@ -85,6 +85,7 @@ public:
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
+  MOCK_CONST_METHOD0(allowRequestHedging, bool());
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;

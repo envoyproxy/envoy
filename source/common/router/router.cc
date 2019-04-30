@@ -198,8 +198,13 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
 }
 
 FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry& route,
-                                                               Http::HeaderMap& request_headers) {
+                                                               Http::HeaderMap& request_headers,
+                                                               const Upstream::ClusterInfo& cluster) {
   HedgingParams hedgingParams;
+  if (!cluster.allowRequestHedging()) {
+    return hedgingParams;
+  }
+
   hedgingParams.hedge_on_per_try_timeout_ = route.hedgePolicy().hedgeOnPerTryTimeout();
 
   Http::HeaderEntry* hedge_on_per_try_timeout_entry = request_headers.EnvoyHedgeOnPerTryTimeout();
@@ -386,7 +391,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
+  hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers, *cluster_);
 
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,
                                          grpc_request_, hedging_params_.hedge_on_per_try_timeout_);

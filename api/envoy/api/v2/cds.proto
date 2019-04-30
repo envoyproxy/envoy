@@ -51,7 +51,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 39]
+// [#comment:next free field: 40]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -581,6 +581,10 @@ message Cluster {
   // If this flag is not set to true, Envoy will wait until the hosts fail active health
   // checking before removing it from the cluster.
   bool drain_connections_on_host_removal = 32;
+
+  // If enabled, allow HTTP/gRPC requests to this cluster to use a hedging
+  // strategy in which multiple upstream requests may be sent simultaneously.
+  bool allow_request_hedging = 39;
 }
 
 // An extensible structure containing the address Envoy should bind to when
