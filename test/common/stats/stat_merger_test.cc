@@ -53,6 +53,7 @@ TEST_F(StatMergerTest, counterMerge) {
 }
 
 // It should be fine for the parent to send us stats we haven't ourselves instantiated.
+// TODO(6756) This is how things currently work, but this is actually what 6756 is looking to avoid.
 TEST_F(StatMergerTest, newStatFromParent) {
   Protobuf::Map<std::string, uint64_t> counter_values;
   Protobuf::Map<std::string, uint64_t> counter_deltas;
@@ -76,29 +77,37 @@ TEST_F(StatMergerTest, basicDefaultAccumulationImport) {
 }
 
 TEST_F(StatMergerTest, multipleImportsWithAccumulationLogic) {
-  Protobuf::Map<std::string, uint64_t> gauges;
-  gauges["whywassixafraidofseven"] = 100;
-  stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  // Initial combined values: 678+100 and 1+2.
-  EXPECT_EQ(778, store_.gauge("whywassixafraidofseven").value());
-
-  // The parent's gauge drops by 1, and its counter increases by 1.
-  gauges["whywassixafraidofseven"] = 99;
-  stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_EQ(777, store_.gauge("whywassixafraidofseven").value());
-
-  // Our own gauge increases by 12, while the parent's stays constant. Total increase of 12.
-  // Our own counter increases by 4, while the parent's stays constant. Total increase of 4.
-  store_.gauge("whywassixafraidofseven").add(12);
-  stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
-
-  // Our gauge decreases by 5, parent's increases by 5. Net zero change.
-  // Our counter and the parent's counter both increase by 1, total increase of 2.
-  store_.gauge("whywassixafraidofseven").sub(5);
-  gauges["whywassixafraidofseven"] = 104;
-  stat_merger_.mergeStats(empty_counter_deltas_, gauges);
-  EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
+  {
+    Protobuf::Map<std::string, uint64_t> gauges;
+    gauges["whywassixafraidofseven"] = 100;
+    stat_merger_.mergeStats(empty_counter_deltas_, gauges);
+    // Initial combined values: 678+100 and 1+2.
+    EXPECT_EQ(778, store_.gauge("whywassixafraidofseven").value());
+  }
+  {
+    Protobuf::Map<std::string, uint64_t> gauges;
+    // The parent's gauge drops by 1, and its counter increases by 1.
+    gauges["whywassixafraidofseven"] = 99;
+    stat_merger_.mergeStats(empty_counter_deltas_, gauges);
+    EXPECT_EQ(777, store_.gauge("whywassixafraidofseven").value());
+  }
+  {
+    Protobuf::Map<std::string, uint64_t> gauges;
+    // Our own gauge increases by 12, while the parent's stays constant. Total increase of 12.
+    // Our own counter increases by 4, while the parent's stays constant. Total increase of 4.
+    store_.gauge("whywassixafraidofseven").add(12);
+    stat_merger_.mergeStats(empty_counter_deltas_, gauges);
+    EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
+  }
+  {
+    Protobuf::Map<std::string, uint64_t> gauges;
+    // Our gauge decreases by 5, parent's increases by 5. Net zero change.
+    // Our counter and the parent's counter both increase by 1, total increase of 2.
+    store_.gauge("whywassixafraidofseven").sub(5);
+    gauges["whywassixafraidofseven"] = 104;
+    stat_merger_.mergeStats(empty_counter_deltas_, gauges);
+    EXPECT_EQ(789, store_.gauge("whywassixafraidofseven").value());
+  }
 }
 
 // Stat names that have NoImport logic should leave the child gauge value alone upon import, even if
