@@ -150,6 +150,11 @@ void EdsClusterImpl::onAssignmentTimeout() {
   info_->stats().assignment_stale_.inc();
 }
 
+void EdsClusterImpl::onHealthCheckHostRemoval(const HostSharedPtr& host) {
+  ASSERT(all_hosts_.find(host->address()->asString()) != all_hosts_.end());
+  all_hosts_.erase(host->address()->asString());
+}
+
 bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, const uint32_t overprovisioning_factor, const HostVector& new_hosts,
     LocalityWeightsMap& locality_weights_map, LocalityWeightsMap& new_locality_weights_map,

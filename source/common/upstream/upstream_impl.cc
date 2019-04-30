@@ -777,7 +777,7 @@ void ClusterImplBase::finishInitialization() {
   initialization_complete_callback_ = nullptr;
 
   if (health_checker_ != nullptr) {
-    reloadHealthyHosts();
+    reloadHealthyHosts(nullptr);
   }
 
   if (snapped_callback != nullptr) {
@@ -790,11 +790,11 @@ void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_chec
   health_checker_ = health_checker;
   health_checker_->start();
   health_checker_->addHostCheckCompleteCb(
-      [this](HostSharedPtr, HealthTransition changed_state) -> void {
+      [this](HostSharedPtr host, HealthTransition changed_state) -> void {
         // If we get a health check completion that resulted in a state change, signal to
         // update the host sets on all threads.
         if (changed_state == HealthTransition::Changed) {
-          reloadHealthyHosts();
+          reloadHealthyHosts(host);
         }
       });
 }
@@ -805,10 +805,11 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
   }
 
   outlier_detector_ = outlier_detector;
-  outlier_detector_->addChangedStateCb([this](HostSharedPtr) -> void { reloadHealthyHosts(); });
+  outlier_detector_->addChangedStateCb(
+      [this](const HostSharedPtr& host) -> void { reloadHealthyHosts(host); });
 }
 
-void ClusterImplBase::reloadHealthyHosts() {
+void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   // Every time a host changes Health Check state we cause a full healthy host recalculation which
   // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
   // can also block worker threads by doing this repeatedly. There is no reason to do this
@@ -818,15 +819,52 @@ void ClusterImplBase::reloadHealthyHosts() {
     return;
   }
 
+  // Here we will see if we have a host that has been marked for deletion by service discovery
+  // but has been stabilized due to passing active health checking. If such a host is now
+  // failing active health checking we can remove it during this health check update.
+  HostSharedPtr host_to_exclude = host;
+  if (host_to_exclude != nullptr &&
+      host_to_exclude->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
+      host_to_exclude->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)) {
+    // Empty for clarity.
+  } else {
+    // Do not exclude and remove the host during the update.
+    host_to_exclude = nullptr;
+  }
+
   const auto& host_sets = prioritySet().hostSetsPerPriority();
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
-    // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
-    HostVectorConstSharedPtr hosts_copy(new HostVector(host_set->hosts()));
-    HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
+
+    // Filter current hosts in case we need to exclude a host.
+    HostVectorSharedPtr hosts_copy(new HostVector());
+    std::copy_if(host_set->hosts().begin(), host_set->hosts().end(),
+                 std::back_inserter(*hosts_copy),
+                 [&host_to_exclude](const HostSharedPtr& host) { return host_to_exclude != host; });
+
+    // Setup a hosts to remove vector in case we need to exclude a host.
+    HostVector hosts_to_remove;
+    if (hosts_copy->size() != host_set->hosts().size()) {
+      ASSERT(hosts_copy->size() == host_set->hosts().size() - 1);
+      hosts_to_remove.emplace_back(host_to_exclude);
+    }
+
+    // Filter hosts per locality in case we need to exclude a host.
+    HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().filter(
+        {[&host_to_exclude](const Host& host) { return &host != host_to_exclude.get(); }})[0];
+
     prioritySet().updateHosts(priority,
                               HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-                              host_set->localityWeights(), {}, {}, absl::nullopt);
+                              host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt);
+
+    if (!hosts_to_remove.empty()) {
+      // TODO(mattklein123): I'm not proud of this, but we need a way for clusters that keep track
+      // of all_hosts_ to update that map to remove this host. This is implemented right now
+      // only for EDS and static DNS. Optimally we could somehow stop storing all_hosts_ in those
+      // clusters and perhaps move a bunch of this logic into the base dynamic cluster. Needs
+      // more thinking.
+      onHealthCheckHostRemoval(host_to_exclude);
+    }
   }
 }
 
@@ -1129,6 +1167,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     auto existing_host = all_hosts.find(host->address()->asString());
     const bool existing_host_found = existing_host != all_hosts.end();
 
+    // Clear any pending deletion flag on an existing host in case it came back while it was
+    // being stabilized. We will set it again below if needed.
+    if (existing_host_found) {
+      existing_host->second->healthFlagClear(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+    }
+
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
     // (currently there is only one criterion, but we might add more in the future):
     // - The cluster health checker is activated and a new host is matched with the existing one,
@@ -1233,6 +1277,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
         final_hosts.push_back(*i);
         updated_hosts[(*i)->address()->asString()] = *i;
+        (*i)->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
         i = current_priority_hosts.erase(i);
       } else {
         i++;
@@ -1351,6 +1396,12 @@ StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
     active_query_->cancel();
+  }
+}
+
+void StrictDnsClusterImpl::onHealthCheckHostRemoval(const HostSharedPtr& host) {
+  for (const auto& target : resolve_targets_) {
+    target->all_hosts_.erase(host->address()->asString());
   }
 }
 

@@ -410,6 +410,73 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   EXPECT_EQ(1UL, hosts.size());
 }
 
+// Verify that a host is removed if it is removed from DNS but still passing active health
+// checking, and then active health checking fails.
+TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+  )EOF";
+
+  ResolverData resolver(*dns_resolver_, dispatcher_);
+  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_,
+      singleton_manager_, tls_, *api_);
+  StrictDnsClusterImpl cluster(cluster_config, runtime_, dns_resolver_, factory_context,
+                               std::move(scope), false);
+  std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  cluster.setHealthChecker(health_checker);
+  ReadyWatcher initialized;
+  cluster.initialize([&initialized]() { initialized.ready(); });
+
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
+  EXPECT_CALL(*resolver.timer_, enableTimer(_)).Times(2);
+  resolver.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+
+  // Verify that both endpoints are initially marked with FAILED_ACTIVE_HC, then
+  // clear the flag to simulate that these endpoints have been successfully health
+  // checked.
+  {
+    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(2UL, hosts.size());
+
+    for (size_t i = 0; i < hosts.size(); ++i) {
+      EXPECT_TRUE(hosts[i]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+      hosts[i]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      if (i == 1) {
+        EXPECT_CALL(initialized, ready());
+      }
+      health_checker->runCallbacks(hosts[i], HealthTransition::Changed);
+    }
+  }
+
+  // Re-resolve the DNS name with only one record, we should still have 2 hosts.
+  resolver.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1"}));
+
+  {
+    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(2UL, hosts.size());
+    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+
+    hosts[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+    health_checker->runCallbacks(hosts[1], HealthTransition::Changed);
+  }
+
+  {
+    const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(1UL, hosts.size());
+  }
+}
+
 TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver3(*dns_resolver_, dispatcher_);
