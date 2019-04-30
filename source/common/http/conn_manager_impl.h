@@ -222,6 +222,8 @@ private:
     void sendLocalReply(Code code, absl::string_view body,
                         std::function<void(HeaderMap& headers)> modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
+      // TODO(#6542): add an extra parameter for setting rc details
+      parent_.stream_info_.setResponseCodeDetails("");
       parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
                              grpc_status);
     }
@@ -501,7 +503,7 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
-    DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
+    std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};

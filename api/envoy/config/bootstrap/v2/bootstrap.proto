@@ -118,6 +118,14 @@ message Bootstrap {
 
   // Optional overload manager configuration.
   envoy.config.overload.v2alpha.OverloadManager overload_manager = 15;
+
+  // Enable :ref:`stats for event dispatcher <operations_performance>`, defaults to false.
+  // Note that this records a value for each iteration of the event loop on every thread. This
+  // should normally be minimal overhead, but when using
+  // :ref:`statsd <envoy_api_msg_config.metrics.v2.StatsdSink>`, it will send each observed value
+  // over the wire individually because the statsd protocol doesn't have any way to represent a
+  // histogram summary. Be aware that this can be a very large volume of data.
+  bool enable_dispatcher_stats = 16;
 }
 
 // Administration interface :ref:`operations documentation

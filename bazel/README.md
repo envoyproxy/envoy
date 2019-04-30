@@ -33,7 +33,7 @@ for how to update or override dependencies.
     sudo apt-get install \
        libtool \
        cmake \
-       clang-format-7 \
+       clang-format-8 \
        automake \
        autoconf \
        make \
@@ -50,9 +50,9 @@ for how to update or override dependencies.
 
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
-    brew install coreutils wget cmake libtool go bazel automake ninja llvm@7 autoconf
+    brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
     ```
-    _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`; `llvm@7` is used for `clang-format`
+    _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
     Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
     Apple LLVM version 9.1.0 (clang-902.0.30).
@@ -366,6 +366,8 @@ The following optional features can be enabled on the Bazel build command-line:
   release builds so that the condition is not evaluated. This option has no effect in debug builds.
 * memory-debugging (scribbling over memory after allocation and before freeing) with
   `--define tcmalloc=debug`. Note this option cannot be used with FIPS-compliant mode BoringSSL.
+* Default [path normalization](https://github.com/envoyproxy/envoy/issues/6435) with
+  `--define path_normalization_by_default=true`. Note this still could be disable by explicit xDS config.
 
 ## Disabling extensions
 

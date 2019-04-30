@@ -396,11 +396,11 @@ TEST_P(StatNameTest, RacingSymbolCreation) {
           // Block each thread on waking up a common condition variable,
           // so we make it likely to race on creation.
           creation.wait();
-          StatNameTempStorage initial(stat_name_string, *table_);
+          StatNameManagedStorage initial(stat_name_string, *table_);
           creates.DecrementCount();
 
           access.wait();
-          StatNameTempStorage second(stat_name_string, *table_);
+          StatNameManagedStorage second(stat_name_string, *table_);
           accesses.DecrementCount();
 
           wait.wait();
@@ -462,11 +462,11 @@ TEST_P(StatNameTest, MutexContentionOnExistingSymbols) {
           // Block each thread on waking up a common condition variable,
           // so we make it likely to race on creation.
           creation.wait();
-          StatNameTempStorage initial(stat_name_string, *table_);
+          StatNameManagedStorage initial(stat_name_string, *table_);
           creates.DecrementCount();
 
           access.wait();
-          StatNameTempStorage second(stat_name_string, *table_);
+          StatNameManagedStorage second(stat_name_string, *table_);
           accesses.DecrementCount();
 
           wait.wait();
@@ -505,6 +505,33 @@ TEST_P(StatNameTest, MutexContentionOnExistingSymbols) {
   for (auto& thread : threads) {
     thread->join();
   }
+}
+
+TEST_P(StatNameTest, SharedStatNameStorageSetInsertAndFind) {
+  StatNameStorageSet set;
+  const int iters = 10;
+  for (int i = 0; i < iters; ++i) {
+    std::string foo = absl::StrCat("foo", i);
+    auto insertion = set.insert(StatNameStorage(foo, *table_));
+    StatNameManagedStorage temp_foo(foo, *table_);
+    auto found = set.find(temp_foo.statName());
+    EXPECT_EQ(found->statName().data(), insertion.first->statName().data());
+  }
+  StatNameManagedStorage bar("bar", *table_);
+  EXPECT_EQ(set.end(), set.find(bar.statName()));
+  EXPECT_EQ(iters, set.size());
+  set.free(*table_);
+}
+
+TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
+  StatNameStorageSet set1, set2;
+  set1.insert(StatNameStorage("foo", *table_));
+  EXPECT_EQ(1, set1.size());
+  EXPECT_EQ(0, set2.size());
+  set1.swap(set2);
+  EXPECT_EQ(0, set1.size());
+  EXPECT_EQ(1, set2.size());
+  set2.free(*table_);
 }
 
 // Tests the memory savings realized from using symbol tables with 1k

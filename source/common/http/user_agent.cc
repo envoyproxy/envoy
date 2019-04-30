@@ -36,10 +36,10 @@ void UserAgent::initializeFromHeaders(const HeaderMap& headers, const std::strin
   const HeaderEntry* user_agent = headers.UserAgent();
   if (user_agent) {
     prefix_ = prefix;
-    if (user_agent->value().find("iOS")) {
+    if (user_agent->value().getStringView().find("iOS") != absl::string_view::npos) {
       type_ = Type::iOS;
       prefix_ += "user_agent.ios.";
-    } else if (user_agent->value().find("android")) {
+    } else if (user_agent->value().getStringView().find("android") != absl::string_view::npos) {
       type_ = Type::Android;
       prefix_ += "user_agent.android.";
     }

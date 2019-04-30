@@ -32,15 +32,15 @@ laid out below, but custom filter chains can only be configured on a per-HttpCon
 | F                     | F                       | F                 |
 +-----------------------+-------------------------+-------------------+
 
-Note that the statistics for upgrades are all bundled together so websocket
+Note that the statistics for upgrades are all bundled together so WebSocket
 :ref:`statistics <config_http_conn_man_stats>` are tracked by stats such as
 downstream_cx_upgrades_total and downstream_cx_upgrades_active
 
 Handling H2 hops
 ^^^^^^^^^^^^^^^^
 
-Envoy currently has an alpha implementation of tunneling websockets over H2 streams for deployments
-that prefer a uniform H2 mesh throughout, for example, for a deployment of the form:
+Envoy supports tunneling WebSockets over H2 streams for deployments that prefer a uniform
+H2 mesh throughout; this enables, for example, a deployment of the form:
 
 [Client] ---- HTTP/1.1 ---- [Front Envoy] ---- HTTP/2 ---- [Sidecar Envoy ---- H1  ---- App]
 
@@ -48,7 +48,7 @@ In this case, if a client is for example using WebSocket, we want the Websocket 
 upstream server functionally intact, which means it needs to traverse the HTTP/2 hop.
 
 This is accomplished via
-`extended CONNECT <https://tools.ietf.org/html/draft-mcmanus-httpbis-h2-websockets>`_ support. The
+`extended CONNECT <https://tools.ietf.org/html/rfc8441>`_ support. The
 WebSocket request will be transformed into an HTTP/2 CONNECT stream, with :protocol header
 indicating the original upgrade, traverse the HTTP/2 hop, and be downgraded back into an HTTP/1
 WebSocket Upgrade. This same Upgrade-CONNECT-Upgrade transformation will be performed on any

@@ -117,8 +117,10 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
   if (downstream_headers &&
       downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost) != nullptr) {
-    const std::string& request_override_host =
-        downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost)->value().c_str();
+    const std::string request_override_host(
+        downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost)
+            ->value()
+            .getStringView());
     try {
       request_host = Network::Utility::parseInternetAddressAndPort(request_override_host, false);
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
@@ -175,7 +177,7 @@ void OriginalDstCluster::cleanup() {
     }
   }
 
-  if (to_be_removed.size() > 0) {
+  if (!to_be_removed.empty()) {
     priority_set_.updateHosts(0,
                               HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
                               {}, {}, to_be_removed, absl::nullopt);

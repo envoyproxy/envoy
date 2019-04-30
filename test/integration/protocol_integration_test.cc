@@ -113,7 +113,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("404", response->headers().Status()->value().c_str());
+  EXPECT_EQ("404", response->headers().Status()->value().getStringView());
 }
 
 // Add a route that uses unknown cluster (expect 503 Service Unavailable).
@@ -128,7 +128,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
@@ -141,9 +141,9 @@ TEST_P(ProtocolIntegrationTest, RouterRedirect) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/foo", "", downstream_protocol_, version_, "www.redirect.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("301", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("https://www.redirect.com/foo",
-               response->headers().get(Http::Headers::get().Location)->value().c_str());
+  EXPECT_EQ("301", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("https://www.redirect.com/foo",
+            response->headers().get(Http::Headers::get().Location)->value().getStringView());
 }
 
 // Add a health check filter and verify correct computation of health based on upstream status.
@@ -163,7 +163,7 @@ config:
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
 // Add a health check filter and verify correct computation of health based on upstream status.
@@ -183,7 +183,7 @@ config:
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
@@ -201,12 +201,12 @@ config: {}
   response->waitForEndStream();
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
-    EXPECT_STREQ("decode", upstream_request_->trailers()->GrpcMessage()->value().c_str());
+    EXPECT_EQ("decode", upstream_request_->trailers()->GrpcMessage()->value().getStringView());
   }
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    EXPECT_STREQ("encode", response->trailers()->GrpcMessage()->value().c_str());
+    EXPECT_EQ("encode", response->trailers()->GrpcMessage()->value().getStringView());
   }
 }
 
@@ -222,7 +222,7 @@ TEST_P(ProtocolIntegrationTest, DrainClose) {
   codec_client_->waitForDisconnect();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   }
@@ -259,7 +259,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 }
 
@@ -282,7 +282,10 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
 
-  EXPECT_EQ(atoi(upstream_request_->headers().EnvoyAttemptCount()->value().c_str()), 1);
+  EXPECT_EQ(
+      atoi(std::string(upstream_request_->headers().EnvoyAttemptCount()->value().getStringView())
+               .c_str()),
+      1);
 
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -291,7 +294,10 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
   waitForNextUpstreamRequest();
-  EXPECT_EQ(atoi(upstream_request_->headers().EnvoyAttemptCount()->value().c_str()), 2);
+  EXPECT_EQ(
+      atoi(std::string(upstream_request_->headers().EnvoyAttemptCount()->value().getStringView())
+               .c_str()),
+      2);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
 
@@ -300,7 +306,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 }
 
@@ -378,7 +384,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 }
 
@@ -436,7 +442,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   EXPECT_EQ(1024U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(512U, response->body().size());
 }
 
@@ -464,7 +470,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
   EXPECT_EQ(66560U, upstream_request_->bodyLength());
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
 // Test hitting the dynamo filter with too many request bytes to buffer. Ensure the connection
@@ -497,7 +503,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
     ASSERT_TRUE(response->complete());
   }
   if (response->complete()) {
-    EXPECT_STREQ("413", response->headers().Status()->value().c_str());
+    EXPECT_EQ("413", response->headers().Status()->value().getStringView());
   }
 }
 
@@ -528,7 +534,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingEncoderFilterLimit) {
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("500", response->headers().Status()->value().c_str());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(ProtocolIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
@@ -562,7 +568,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
@@ -586,7 +592,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
   } else {
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
@@ -612,7 +618,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     ASSERT_TRUE(response->complete());
-    EXPECT_STREQ("400", response->headers().Status()->value().c_str());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
   } else {
     ASSERT_TRUE(response->reset());
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->reset_reason());
@@ -645,7 +651,7 @@ name: encode-headers-only
   }
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   EXPECT_EQ(0, response->body().size());
 }
 
@@ -668,7 +674,7 @@ name: decode-headers-only
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   EXPECT_EQ(128, response->body().size());
 }
 
@@ -703,7 +709,7 @@ name: passthrough-filter
   }
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   EXPECT_EQ(0, response->body().size());
 }
 
@@ -732,7 +738,7 @@ name: passthrough-filter
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   EXPECT_EQ(128, response->body().size());
 }
 
@@ -769,7 +775,7 @@ name: decode-headers-only
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   EXPECT_EQ(0, upstream_request_->body().length());
 }
 
