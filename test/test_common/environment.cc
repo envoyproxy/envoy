@@ -196,7 +196,7 @@ std::string TestEnvironment::substitute(const std::string& str,
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
   out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
-                                       Network::Test::getLoopbackAddressUrlString(version));
+                                       Network::Test::getLoopbackAddressString(version));
   const std::regex ntop_loopback_address_regex("\\{\\{ ntop_ip_loopback_address \\}\\}");
   out_json_string = std::regex_replace(out_json_string, ntop_loopback_address_regex,
                                        Network::Test::getLoopbackAddressString(version));
