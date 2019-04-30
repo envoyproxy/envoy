@@ -52,6 +52,22 @@ genrule(
 
 quiche_copt = ["-Wno-unused-parameter"]
 
+envoy_cc_test_library(
+    name = "http2_platform_reconstruct_object",
+    hdrs = ["quiche/http2/platform/api/http2_reconstruct_object.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:http2_platform_reconstruct_object_impl_lib"],
+)
+
+envoy_cc_test_library(
+    name = "http2_test_tools_random",
+    srcs = ["quiche/http2/test_tools/http2_random.cc"],
+    hdrs = ["quiche/http2/test_tools/http2_random.h"],
+    external_deps = ["ssl"],
+    repository = "@envoy",
+    deps = [":http2_platform"],
+)
+
 envoy_cc_library(
     name = "http2_platform",
     hdrs = [
@@ -67,7 +83,6 @@ envoy_cc_library(
         "quiche/http2/platform/api/http2_string_piece.h",
         # TODO: uncomment the following files as implementations are added.
         # "quiche/http2/platform/api/http2_flags.h",
-        # "quiche/http2/platform/api/http2_reconstruct_object.h",
         # "quiche/http2/platform/api/http2_test_helpers.h",
     ] + envoy_select_quiche(
         [
@@ -116,6 +131,13 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [":spdy_platform"],
+)
+
+envoy_cc_test_library(
+    name = "spdy_platform_test_helpers",
+    hdrs = ["quiche/spdy/platform/api/spdy_test_helpers.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:spdy_platform_test_helpers_impl_lib"],
 )
 
 envoy_cc_library(
@@ -198,6 +220,13 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_platform_system_event_loop",
+    hdrs = ["quiche/quic/platform/api/quic_system_event_loop.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_system_event_loop_impl_lib"],
+)
+
+envoy_cc_test_library(
     name = "quic_platform_thread",
     hdrs = ["quiche/quic/platform/api/quic_thread.h"],
     repository = "@envoy",
@@ -226,7 +255,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
-        # "quiche/quic/platform/api/quic_clock.h",
         # "quiche/quic/platform/api/quic_flags.h",
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
         # "quiche/quic/platform/api/quic_goog_cc_sender.h",
@@ -276,6 +304,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_platform_clock_lib",
+    srcs = ["quiche/quic/platform/api/quic_clock.cc"],
+    hdrs = ["quiche/quic/platform/api/quic_clock.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":quic_time_lib"],
+)
+
+envoy_cc_library(
     name = "quic_buffer_allocator_lib",
     srcs = [
         "quiche/quic/core/quic_buffer_allocator.cc",
@@ -322,6 +359,13 @@ envoy_cc_test_library(
     deps = [":epoll_server_platform"],
 )
 
+envoy_cc_test_library(
+    name = "quic_platform_epoll_lib",
+    hdrs = ["quiche/quic/platform/api/quic_epoll.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_epoll_impl_lib"],
+)
+
 envoy_cc_test(
     name = "epoll_server_test",
     srcs = ["quiche/epoll_server/simple_epoll_server_test.cc"],
@@ -332,12 +376,15 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "http2_platform_api_test",
-    srcs = envoy_select_quiche(
-        ["quiche/http2/platform/api/http2_string_utils_test.cc"],
-        "@envoy",
-    ),
+    srcs = [
+        "quiche/http2/platform/api/http2_string_utils_test.cc",
+        "quiche/http2/test_tools/http2_random_test.cc",
+    ],
     repository = "@envoy",
-    deps = [":http2_platform"],
+    deps = [
+        ":http2_platform",
+        ":http2_test_tools_random",
+    ],
 )
 
 envoy_cc_test(
