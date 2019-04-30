@@ -216,6 +216,7 @@ public:
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_numerator(0);
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_denominator(
         envoy::type::FractionalPercent::HUNDRED);
+    EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, allowRequestHedging).WillRepeatedly(Return(true));
   }
 
   Event::SimulatedTimeSystem test_time_;

@@ -202,6 +202,7 @@ FilterUtility::finalHedgingParams(const RouteEntry& route, Http::HeaderMap& requ
                                   const Upstream::ClusterInfo& cluster) {
   HedgingParams hedgingParams;
   if (!cluster.allowRequestHedging()) {
+    hedgingParams.hedge_on_per_try_timeout_ = false;
     return hedgingParams;
   }
 
