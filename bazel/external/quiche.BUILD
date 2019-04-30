@@ -136,6 +136,13 @@ envoy_cc_library(
     deps = [":spdy_platform"],
 )
 
+envoy_cc_test_library(
+    name = "spdy_platform_test_helpers",
+    hdrs = ["quiche/spdy/platform/api/spdy_test_helpers.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:spdy_platform_test_helpers_impl_lib"],
+)
+
 envoy_cc_library(
     name = "spdy_platform_unsafe_arena_lib",
     hdrs = ["quiche/spdy/platform/api/spdy_unsafe_arena.h"],
@@ -223,6 +230,13 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_platform_system_event_loop",
+    hdrs = ["quiche/quic/platform/api/quic_system_event_loop.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_system_event_loop_impl_lib"],
+)
+
+envoy_cc_test_library(
     name = "quic_platform_thread",
     hdrs = ["quiche/quic/platform/api/quic_thread.h"],
     repository = "@envoy",
@@ -262,7 +276,6 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_uint128.h",
         # TODO: uncomment the following files as implementations are added.
-        # "quiche/quic/platform/api/quic_clock.h",
         # "quiche/quic/platform/api/quic_fuzzed_data_provider.h",
         # "quiche/quic/platform/api/quic_goog_cc_sender.h",
         # "quiche/quic/platform/api/quic_ip_address_family.h",
@@ -302,6 +315,15 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [":quic_platform"],
+)
+
+envoy_cc_library(
+    name = "quic_platform_clock_lib",
+    srcs = ["quiche/quic/platform/api/quic_clock.cc"],
+    hdrs = ["quiche/quic/platform/api/quic_clock.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":quic_time_lib"],
 )
 
 envoy_cc_library(
@@ -349,6 +371,13 @@ envoy_cc_test_library(
     copts = quiche_copt,
     repository = "@envoy",
     deps = [":epoll_server_platform"],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_epoll_lib",
+    hdrs = ["quiche/quic/platform/api/quic_epoll.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_epoll_impl_lib"],
 )
 
 envoy_cc_test(
