@@ -1,4 +1,4 @@
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "extensions/filters/network/common/multiplexing/conn_pool_impl.h"
 
 #include <cstdint>
 #include <memory>
@@ -10,7 +10,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Multiplexing {
 namespace ConnPool {
 
 InstanceImpl::InstanceImpl(
@@ -254,7 +255,8 @@ absl::string_view InstanceImpl::LbContextImpl::hashtag(absl::string_view v, bool
 }
 
 } // namespace ConnPool
-} // namespace RedisProxy
+} // namespace Multiplexing
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

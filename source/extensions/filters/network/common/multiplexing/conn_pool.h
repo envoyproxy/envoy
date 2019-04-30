@@ -12,7 +12,8 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Multiplexing {
 namespace ConnPool {
 
 /**
@@ -53,7 +54,8 @@ public:
 typedef std::shared_ptr<Instance> InstanceSharedPtr;
 
 } // namespace ConnPool
-} // namespace RedisProxy
+} // namespace Multiplexing
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

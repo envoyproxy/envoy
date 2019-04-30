@@ -13,20 +13,20 @@ using testing::Invoke;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
-namespace CommandSplitter {
+namespace Common {
+namespace Multiplexing {
 
-MockSplitRequest::MockSplitRequest() {}
-MockSplitRequest::~MockSplitRequest() {}
+MockRouter::MockRouter() {}
+MockRouter::~MockRouter() {}
 
-MockSplitCallbacks::MockSplitCallbacks() {}
-MockSplitCallbacks::~MockSplitCallbacks() {}
+namespace ConnPool {
 
 MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 
-} // namespace CommandSplitter
-} // namespace RedisProxy
+} // namespace ConnPool
+} // namespace Multiplexing
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

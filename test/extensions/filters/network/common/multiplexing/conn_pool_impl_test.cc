@@ -4,11 +4,11 @@
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
 
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "extensions/filters/network/common/multiplexing/conn_pool_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
-#include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/extensions/filters/network/common/multiplexing/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -31,7 +31,8 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Multiplexing {
 namespace ConnPool {
 
 class RedisConnPoolImplTest : public testing::Test, public Common::Redis::Client::ClientFactory {
@@ -379,7 +380,8 @@ TEST_F(RedisConnPoolImplTest, makeRequestToHost) {
 }
 
 } // namespace ConnPool
-} // namespace RedisProxy
+} // namespace Multiplexing
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

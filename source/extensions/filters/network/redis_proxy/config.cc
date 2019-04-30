@@ -10,9 +10,10 @@
 
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
+#include "extensions/filters/network/common/multiplexing/conn_pool_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
-#include "extensions/filters/network/redis_proxy/router_impl.h"
+#include "extensions/filters/network/common/multiplexing/router_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,15 +48,15 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   }
   unique_clusters.emplace(prefix_routes.catch_all_cluster());
 
-  Upstreams upstreams;
+  Common::Multiplexing::Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
-    upstreams.emplace(cluster, std::make_shared<ConnPool::InstanceImpl>(
+    upstreams.emplace(cluster, std::make_shared<Common::Multiplexing::ConnPool::InstanceImpl>(
                                    cluster, context.clusterManager(),
                                    Common::Redis::Client::ClientFactoryImpl::instance_,
                                    context.threadLocal(), proto_config.settings()));
   }
 
-  auto router = std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams));
+  auto router = std::make_unique<Common::Multiplexing::PrefixRoutes>(prefix_routes, std::move(upstreams));
 
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(

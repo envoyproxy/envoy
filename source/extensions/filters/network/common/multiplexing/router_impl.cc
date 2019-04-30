@@ -1,11 +1,12 @@
-#include "extensions/filters/network/redis_proxy/router_impl.h"
+#include "extensions/filters/network/common/multiplexing/router_impl.h"
 
 #include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Multiplexing {
 
 PrefixRoutes::PrefixRoutes(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes& config,
@@ -55,7 +56,8 @@ ConnPool::InstanceSharedPtr PrefixRoutes::upstreamPool(std::string& key) {
   return catch_all_upstream_;
 }
 
-} // namespace RedisProxy
+} // namespace Multiplexing
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

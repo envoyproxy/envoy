@@ -16,8 +16,8 @@
 
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
-#include "extensions/filters/network/redis_proxy/conn_pool.h"
-#include "extensions/filters/network/redis_proxy/router.h"
+#include "extensions/filters/network/common/multiplexing/conn_pool.h"
+#include "extensions/filters/network/common/multiplexing/router.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,9 +69,9 @@ public:
 
 class CommandHandlerBase {
 protected:
-  CommandHandlerBase(Router& router) : router_(router) {}
+  CommandHandlerBase(Common::Multiplexing::Router& router) : router_(router) {}
 
-  Router& router_;
+  Common::Multiplexing::Router& router_;
 };
 
 class SplitRequestBase : public SplitRequest {
@@ -115,7 +115,7 @@ protected:
       : SplitRequestBase(command_stats, time_source, latency_in_micros), callbacks_(callbacks) {}
 
   SplitCallbacks& callbacks_;
-  ConnPool::InstanceSharedPtr conn_pool_;
+  Common::Multiplexing::ConnPool::InstanceSharedPtr conn_pool_;
   Common::Redis::Client::PoolRequest* handle_{};
   Common::Redis::RespValuePtr incoming_request_;
 };
@@ -125,7 +125,7 @@ protected:
  */
 class SimpleRequest : public SingleServerRequest {
 public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Common::Multiplexing::Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -140,7 +140,7 @@ private:
  */
 class EvalRequest : public SingleServerRequest {
 public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Common::Multiplexing::Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -183,13 +183,13 @@ protected:
     FragmentedRequest& parent_;
     const uint32_t index_;
     Common::Redis::Client::PoolRequest* handle_{};
-    ConnPool::InstanceSharedPtr conn_pool_;
+    Common::Multiplexing::ConnPool::InstanceSharedPtr conn_pool_;
   };
 
   virtual void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) PURE;
   void onChildFailure(uint32_t index);
   bool onChildRedirection(const Common::Redis::RespValue& value, uint32_t index,
-                          const ConnPool::InstanceSharedPtr& conn_pool);
+                          const Common::Multiplexing::ConnPool::InstanceSharedPtr& conn_pool);
   virtual void recreate(Common::Redis::RespValue& request, uint32_t index) PURE;
 
   SplitCallbacks& callbacks_;
@@ -207,7 +207,7 @@ protected:
  */
 class MGETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Common::Multiplexing::Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -229,7 +229,7 @@ private:
  */
 class SplitKeysSumResultRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Common::Multiplexing::Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -252,7 +252,7 @@ private:
  */
 class MSETRequest : public FragmentedRequest, Logger::Loggable<Logger::Id::redis> {
 public:
-  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+  static SplitRequestPtr create(Common::Multiplexing::Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
                                 TimeSource& time_source, bool latency_in_micros);
 
@@ -273,7 +273,7 @@ private:
 template <class RequestClass>
 class CommandHandlerFactory : public CommandHandler, CommandHandlerBase {
 public:
-  CommandHandlerFactory(Router& router) : CommandHandlerBase(router) {}
+  CommandHandlerFactory(Common::Multiplexing::Router& router) : CommandHandlerBase(router) {}
   SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
                                CommandStats& command_stats, TimeSource& time_source,
                                bool latency_in_micros) {
@@ -300,7 +300,7 @@ struct InstanceStats {
 
 class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
-  InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
+  InstanceImpl(Common::Multiplexing::RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                TimeSource& time_source, bool latency_in_micros);
 
   // RedisProxy::CommandSplitter::Instance
@@ -319,7 +319,7 @@ private:
                   CommandHandler& handler);
   void onInvalidRequest(SplitCallbacks& callbacks);
 
-  RouterPtr router_;
+  Common::Multiplexing::RouterPtr router_;
   CommandHandlerFactory<SimpleRequest> simple_command_handler_;
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;

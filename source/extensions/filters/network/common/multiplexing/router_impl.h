@@ -13,13 +13,14 @@
 
 #include "common/common/to_lower_table.h"
 
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
-#include "extensions/filters/network/redis_proxy/router.h"
+#include "extensions/filters/network/common/multiplexing/conn_pool_impl.h"
+#include "extensions/filters/network/common/multiplexing/router.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Multiplexing {
 
 typedef std::map<std::string, ConnPool::InstanceSharedPtr> Upstreams;
 
@@ -47,7 +48,8 @@ private:
   ConnPool::InstanceSharedPtr catch_all_upstream_;
 };
 
-} // namespace RedisProxy
+} // namespace Multiplexing
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

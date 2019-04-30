@@ -7,8 +7,6 @@
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"
-#include "extensions/filters/network/redis_proxy/conn_pool.h"
-#include "extensions/filters/network/redis_proxy/router.h"
 
 #include "test/test_common/printers.h"
 
@@ -18,34 +16,6 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
-
-class MockRouter : public Router {
-public:
-  MockRouter();
-  ~MockRouter();
-
-  MOCK_METHOD1(upstreamPool, ConnPool::InstanceSharedPtr(std::string& key));
-};
-
-namespace ConnPool {
-
-class MockInstance : public Instance {
-public:
-  MockInstance();
-  ~MockInstance();
-
-  MOCK_METHOD3(makeRequest,
-               Common::Redis::Client::PoolRequest*(
-                   const std::string& hash_key, const Common::Redis::RespValue& request,
-                   Common::Redis::Client::PoolCallbacks& callbacks));
-  MOCK_METHOD3(makeRequestToHost,
-               Common::Redis::Client::PoolRequest*(
-                   const std::string& host_address, const Common::Redis::RespValue& request,
-                   Common::Redis::Client::PoolCallbacks& callbacks));
-};
-
-} // namespace ConnPool
-
 namespace CommandSplitter {
 
 class MockSplitRequest : public SplitRequest {

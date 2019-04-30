@@ -23,12 +23,13 @@
 
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
-#include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/common/multiplexing/conn_pool.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Multiplexing {
 namespace ConnPool {
 
 // TODO(mattklein123): Circuit breaking
@@ -113,7 +114,8 @@ private:
 };
 
 } // namespace ConnPool
-} // namespace RedisProxy
+} // namespace Multiplexing
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

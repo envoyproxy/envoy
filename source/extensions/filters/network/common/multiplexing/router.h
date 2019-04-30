@@ -6,12 +6,13 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 
-#include "extensions/filters/network/redis_proxy/conn_pool.h"
+#include "extensions/filters/network/common/multiplexing/conn_pool.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Multiplexing {
 
 /*
  * Decorator of a connection pool in order to enable key based routing.
@@ -31,7 +32,8 @@ public:
 
 typedef std::unique_ptr<Router> RouterPtr;
 
-} // namespace RedisProxy
+} // namespace Multiplexing
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

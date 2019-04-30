@@ -1,10 +1,10 @@
 #include <string>
 
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
-#include "extensions/filters/network/redis_proxy/router_impl.h"
+#include "extensions/filters/network/common/multiplexing/conn_pool_impl.h"
+#include "extensions/filters/network/common/multiplexing/router_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
-#include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/extensions/filters/network/common/multiplexing/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -20,7 +20,8 @@ using testing::StrEq;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace RedisProxy {
+namespace Common {
+namespace Multiplexing {
 
 envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes createPrefixRoutes() {
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes prefix_routes;
@@ -177,7 +178,8 @@ TEST(PrefixRoutesTest, DuplicatePrefix) {
                             EnvoyException, "prefix `ab` already exists.")
 }
 
-} // namespace RedisProxy
+} // namespace Multiplexing
+} // namespace Common
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

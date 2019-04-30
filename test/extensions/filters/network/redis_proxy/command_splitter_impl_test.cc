@@ -10,6 +10,7 @@
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
+#include "test/extensions/filters/network/common/multiplexing/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
@@ -38,14 +39,14 @@ namespace NetworkFilters {
 namespace RedisProxy {
 namespace CommandSplitter {
 
-class PassthruRouter : public Router {
+class PassthruRouter : public Common::Multiplexing::Router {
 public:
-  PassthruRouter(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(conn_pool) {}
+  PassthruRouter(Common::Multiplexing::ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(conn_pool) {}
 
-  ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return conn_pool_; }
+  Common::Multiplexing::ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return conn_pool_; }
 
 private:
-  ConnPool::InstanceSharedPtr conn_pool_;
+  Common::Multiplexing::ConnPool::InstanceSharedPtr conn_pool_;
 };
 
 class RedisCommandSplitterImplTest : public testing::Test {
@@ -62,10 +63,10 @@ public:
     value.asArray().swap(values);
   }
 
-  ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
+  Common::Multiplexing::ConnPool::MockInstance* conn_pool_{new Common::Multiplexing::ConnPool::MockInstance()};
   NiceMock<Stats::MockIsolatedStatsStore> store_;
   Event::SimulatedTimeSystem time_system_;
-  InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
+  InstanceImpl splitter_{std::make_unique<PassthruRouter>(Common::Multiplexing::ConnPool::InstanceSharedPtr{conn_pool_}),
                          store_, "redis.foo.", time_system_, false};
   MockSplitCallbacks callbacks_;
   SplitRequestPtr handle_;
@@ -1440,8 +1441,8 @@ public:
     handle_ = splitter_.makeRequest(std::move(request), callbacks_);
   }
 
-  ConnPool::MockInstance* conn_pool_{new ConnPool::MockInstance()};
-  InstanceImpl splitter_{std::make_unique<PassthruRouter>(ConnPool::InstanceSharedPtr{conn_pool_}),
+  Common::Multiplexing::ConnPool::MockInstance* conn_pool_{new Common::Multiplexing::ConnPool::MockInstance()};
+  InstanceImpl splitter_{std::make_unique<PassthruRouter>(Common::Multiplexing::ConnPool::InstanceSharedPtr{conn_pool_}),
                          store_, "redis.foo.", time_system_, true};
 };
 
