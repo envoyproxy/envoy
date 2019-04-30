@@ -62,12 +62,12 @@ void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& count
 
 void StatMerger::mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges) {
   for (const auto& gauge : gauges) {
-    uint64_t& parent_value_ref = parent_gauge_values_[gauge.first];
+    auto& gauge_ref = target_store_.gauge(gauge.first);
+    uint64_t& parent_value_ref = parent_gauge_values_[gauge_ref.statName()];
     uint64_t old_parent_value = parent_value_ref;
     uint64_t new_parent_value = gauge.second;
     parent_value_ref = new_parent_value;
 
-    auto& gauge_ref = target_store_.gauge(gauge.first);
     if (!StatMerger::shouldImport(gauge_ref, gauge.first)) {
       continue;
     }
