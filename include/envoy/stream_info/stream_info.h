@@ -76,6 +76,7 @@ enum ResponseFlag {
 struct ResponseCodeDetailValues {
   // Response code was set by the upstream.
   const std::string ViaUpstream = "via_upstream";
+  // Envoy is doing non-streaming proxying, and the request payload exceeded
   // configured limits.
   const std::string RequestPayloadTooLarge = "request_payload_too_large";
   // Envoy is doing non-streaming proxying, and the response payload exceeded
@@ -91,7 +92,7 @@ struct ResponseCodeDetailValues {
   const std::string LowVersion = "low_version";
   // The request was rejected due to the Host: or :authority field missing
   const std::string MissingHost = "missing_host_header";
-  // The request was rejected due to the Host: or :authority field missing
+  // The request was rejected due to the request headers being larger than the configured limit.
   const std::string RequestHeadersTooLarge = "request_headers_too_large";
   // The request was rejected due to the Path or :path header field missing.
   const std::string MissingPath = "missing_path_rejected";
