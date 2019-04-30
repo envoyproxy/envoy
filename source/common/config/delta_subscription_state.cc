@@ -174,7 +174,6 @@ void DeltaSubscriptionState::disableInitFetchTimeoutTimer() {
   }
 }
 
-// Use these helpers to avoid forgetting to update both at once.
 void DeltaSubscriptionState::setResourceVersion(const std::string& resource_name,
                                                 const std::string& resource_version) {
   resource_versions_[resource_name] = ResourceVersion(resource_version);

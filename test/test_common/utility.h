@@ -583,9 +583,17 @@ MATCHER_P(ProtoEq, expected, "") {
 MATCHER_P2(ProtoEqIgnoringField, expected, ignored_field, "") {
   const bool equal = TestUtility::protoEqualIgnoringField(arg, expected, ignored_field);
   if (!equal) {
+    int line_fill_len =
+        (68 - (std::string(ignored_field).length() + std::string("(but ignoring )").length()));
+    int first_half_len = line_fill_len / 2;
+    int second_half_len = line_fill_len - first_half_len;
+    std::string first_half(first_half_len, '=');
+    std::string second_half(second_half_len, '=');
+
     *result_listener << "\n"
                      << "==========================Expected proto:===========================\n"
-                     << "==========(but ignoring " << ignored_field << ")==========\n"
+                     << first_half << "(but ignoring " << ignored_field << ")" << second_half
+                     << "\n"
                      << expected.DebugString()
                      << "------------------is not equal to actual proto:---------------------\n"
                      << arg.DebugString()

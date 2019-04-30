@@ -1,3 +1,5 @@
+#include "envoy/api/v2/discovery.pb.h"
+
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -25,6 +27,78 @@ TEST(headerMapEqualIgnoreOrder, NotEqual) {
   Http::TestHeaderMapImpl lhs{{":method", "GET"}, {":authority", "host"}, {":authority", "host"}};
   Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":authority", "host"}};
   EXPECT_FALSE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
+}
+
+TEST(protoEqIgnoreField, ActuallyEqual) {
+  // Ignored field equal
+  {
+    envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
+    lhs.set_response_nonce("nonce");
+    rhs.set_response_nonce("nonce");
+    lhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    rhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    EXPECT_TRUE(TestUtility::protoEqualIgnoringField(lhs, rhs, "response_nonce"));
+  }
+  // Ignored field not equal
+  {
+    envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
+    lhs.set_response_nonce("nonce");
+    rhs.set_response_nonce("noncense");
+    lhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    rhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    EXPECT_TRUE(TestUtility::protoEqualIgnoringField(lhs, rhs, "response_nonce"));
+  }
+  // Ignored field not present
+  {
+    envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
+    lhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    rhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    EXPECT_TRUE(TestUtility::protoEqualIgnoringField(lhs, rhs, "response_nonce"));
+  }
+  // Ignored field only present in one
+  {
+    envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
+    rhs.set_response_nonce("noncense");
+    lhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    rhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    EXPECT_TRUE(TestUtility::protoEqualIgnoringField(lhs, rhs, "response_nonce"));
+  }
+}
+
+TEST(protoEqIgnoreField, NotEqual) {
+  // Ignored field equal
+  {
+    envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
+    lhs.set_response_nonce("nonce");
+    rhs.set_response_nonce("nonce");
+    lhs.set_type_url("type.googleapis.com/envoy.api.v2.Listener");
+    rhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    EXPECT_FALSE(TestUtility::protoEqualIgnoringField(lhs, rhs, "response_nonce"));
+  }
+  // Ignored field not equal
+  {
+    envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
+    lhs.set_response_nonce("nonce");
+    rhs.set_response_nonce("noncense");
+    lhs.set_type_url("type.googleapis.com/envoy.api.v2.Listener");
+    rhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    EXPECT_FALSE(TestUtility::protoEqualIgnoringField(lhs, rhs, "response_nonce"));
+  }
+  // Ignored field not present
+  {
+    envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
+    lhs.set_type_url("type.googleapis.com/envoy.api.v2.Listener");
+    rhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    EXPECT_FALSE(TestUtility::protoEqualIgnoringField(lhs, rhs, "response_nonce"));
+  }
+  // Ignored field only present in one
+  {
+    envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
+    rhs.set_response_nonce("noncense");
+    lhs.set_type_url("type.googleapis.com/envoy.api.v2.Listener");
+    rhs.set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
+    EXPECT_FALSE(TestUtility::protoEqualIgnoringField(lhs, rhs, "response_nonce"));
+  }
 }
 
 TEST(buffersEqual, Aligned) {
