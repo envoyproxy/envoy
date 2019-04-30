@@ -13,6 +13,7 @@
 #include "common/network/utility.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/extensions/quic_listeners/quiche/platform/quic_epoll_clock.h"
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
@@ -23,6 +24,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
@@ -487,6 +489,63 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
                           QuicRecordTestOutput("quic_test_output.2", "output 2 content\n"));
   EXPECT_LOG_CONTAINS("info", "Recorded test output into",
                       QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
+}
+
+TEST_F(QuicPlatformTest, ApproximateNowInUsec) {
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
+  QuicEpollClock clock(&epoll_server);
+
+  epoll_server.set_now_in_usec(1000000);
+  EXPECT_EQ(1000000, (clock.ApproximateNow() - QuicTime::Zero()).ToMicroseconds());
+  EXPECT_EQ(1u, clock.WallNow().ToUNIXSeconds());
+  EXPECT_EQ(1000000u, clock.WallNow().ToUNIXMicroseconds());
+
+  epoll_server.AdvanceBy(5);
+  EXPECT_EQ(1000005, (clock.ApproximateNow() - QuicTime::Zero()).ToMicroseconds());
+  EXPECT_EQ(1u, clock.WallNow().ToUNIXSeconds());
+  EXPECT_EQ(1000005u, clock.WallNow().ToUNIXMicroseconds());
+
+  epoll_server.AdvanceBy(10 * 1000000);
+  EXPECT_EQ(11u, clock.WallNow().ToUNIXSeconds());
+  EXPECT_EQ(11000005u, clock.WallNow().ToUNIXMicroseconds());
+}
+
+TEST_F(QuicPlatformTest, NowInUsec) {
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
+  QuicEpollClock clock(&epoll_server);
+
+  epoll_server.set_now_in_usec(1000000);
+  EXPECT_EQ(1000000, (clock.Now() - QuicTime::Zero()).ToMicroseconds());
+
+  epoll_server.AdvanceBy(5);
+  EXPECT_EQ(1000005, (clock.Now() - QuicTime::Zero()).ToMicroseconds());
+}
+
+TEST_F(QuicPlatformTest, MonotonicityWithRealEpollClock) {
+  epoll_server::SimpleEpollServer epoll_server;
+  QuicEpollClock clock(&epoll_server);
+
+  quic::QuicTime last_now = clock.Now();
+  for (int i = 0; i < 1e5; ++i) {
+    quic::QuicTime now = clock.Now();
+
+    ASSERT_LE(last_now, now);
+
+    last_now = now;
+  }
+}
+
+TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
+  epoll_server::test::FakeSimpleEpollServer epoll_server;
+  QuicEpollClock clock(&epoll_server);
+
+  epoll_server.set_now_in_usec(100);
+  quic::QuicTime last_now = clock.Now();
+
+  epoll_server.set_now_in_usec(90);
+  quic::QuicTime now = clock.Now();
+
+  ASSERT_EQ(last_now, now);
 }
 
 class FileUtilsTest : public testing::Test {
