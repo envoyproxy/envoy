@@ -28,9 +28,9 @@ public:
 
 class HttpPerRequestTapperImpl : public HttpPerRequestTapper, Logger::Loggable<Logger::Id::tap> {
 public:
-  HttpPerRequestTapperImpl(HttpTapConfigSharedPtr config, uint64_t stream_id)
+  HttpPerRequestTapperImpl(HttpTapConfigSharedPtr config, Extensions::Common::Tap::PerTapSinkHandleManagerPtr&& sink_handle, uint64_t stream_id)
       : config_(std::move(config)), stream_id_(stream_id),
-        sink_handle_(config_->createPerTapSinkHandleManager(stream_id)),
+        sink_handle_(std::move(sink_handle)),
         statuses_(config_->createMatchStatusVector()) {
     config_->rootMatcher().onNewStream(statuses_);
   }

@@ -11,9 +11,10 @@ namespace Tap {
 namespace TapCommon = Extensions::Common::Tap;
 
 PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigSharedPtr config,
+                                         Extensions::Common::Tap::PerTapSinkHandleManagerPtr&& sink_handle,
                                          const Network::Connection& connection)
     : config_(std::move(config)),
-      sink_handle_(config_->createPerTapSinkHandleManager(connection.id())),
+      sink_handle_(std::move(sink_handle)),
       connection_(connection), statuses_(config_->createMatchStatusVector()) {
   config_->rootMatcher().onNewStream(statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {

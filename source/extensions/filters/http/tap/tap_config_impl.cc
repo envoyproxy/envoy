@@ -33,8 +33,11 @@ HttpTapConfigImpl::HttpTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& p
                                    cluster_manager, scope, local_info) {}
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(uint64_t stream_id) {
-
-  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), stream_id);
+  auto sink_handle = createPerTapSinkHandleManager(stream_id);
+  if (sink_handle) {
+    return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), std::move(sink_handle), stream_id);
+  }
+  return {};
 }
 
 void HttpPerRequestTapperImpl::streamRequestHeaders() {

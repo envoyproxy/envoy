@@ -12,7 +12,7 @@ namespace Tap {
 
 class PerSocketTapperImpl : public PerSocketTapper {
 public:
-  PerSocketTapperImpl(SocketTapConfigSharedPtr config, const Network::Connection& connection);
+  PerSocketTapperImpl(SocketTapConfigSharedPtr config, Extensions::Common::Tap::PerTapSinkHandleManagerPtr&& sink_handle, const Network::Connection& connection);
 
   // PerSocketTapper
   void closeSocket(Network::ConnectionEvent event) override;
@@ -59,7 +59,11 @@ public:
 
   // SocketTapConfig
   PerSocketTapperPtr createPerSocketTapper(const Network::Connection& connection) override {
-    return std::make_unique<PerSocketTapperImpl>(shared_from_this(), connection);
+    auto sink_handle = createPerTapSinkHandleManager(connection.id());
+    if (sink_handle) {
+      return std::make_unique<PerSocketTapperImpl>(shared_from_this(), std::move(sink_handle), connection);
+    }
+    return {};
   }
   TimeSource& timeSource() const override { return time_source_; }
 
