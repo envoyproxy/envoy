@@ -1585,6 +1585,9 @@ TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
   EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_));
   Http::HeaderMapPtr continue_headers(new Http::TestHeaderMapImpl{{":status", "100"}});
   response_decoder->decode100ContinueHeaders(std::move(continue_headers));
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }

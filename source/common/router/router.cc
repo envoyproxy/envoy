@@ -720,7 +720,9 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
   }
 }
 
-void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers) {
+void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+                                          UpstreamRequest& upstream_request) {
+  chargeUpstreamCode(100, *headers, upstream_request.upstream_host_, false);
   ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
 
   downstream_response_started_ = true;
@@ -1030,7 +1032,7 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 
 void Filter::UpstreamRequest::decode100ContinueHeaders(Http::HeaderMapPtr&& headers) {
   ASSERT(100 == Http::Utility::getResponseStatus(*headers));
-  parent_.onUpstream100ContinueHeaders(std::move(headers));
+  parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
 }
 
 void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool end_stream) {

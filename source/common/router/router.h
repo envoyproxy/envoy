@@ -382,7 +382,8 @@ private:
   void onPerTryTimeout(UpstreamRequest& upstream_request);
   void onRequestComplete();
   void onResponseTimeout();
-  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
+  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+                                    UpstreamRequest& upstream_request);
   // Handle an upstream request aborted due to a local timeout.
   void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag);
   // Handle an "aborted" upstream request, meaning we didn't see response
