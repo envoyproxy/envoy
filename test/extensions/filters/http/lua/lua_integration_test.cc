@@ -156,32 +156,34 @@ config:
   encoder.encodeData(request_data2, true);
 
   waitForNextUpstreamRequest();
-  EXPECT_STREQ("10", upstream_request_->headers()
-                         .get(Http::LowerCaseString("request_body_size"))
+  EXPECT_EQ("10", upstream_request_->headers()
+                      .get(Http::LowerCaseString("request_body_size"))
+                      ->value()
+                      .getStringView());
+
+  EXPECT_EQ("bar", upstream_request_->headers()
+                       .get(Http::LowerCaseString("request_metadata_foo"))
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("bat", upstream_request_->headers()
+                       .get(Http::LowerCaseString("request_metadata_baz"))
+                       ->value()
+                       .getStringView());
+  EXPECT_EQ("false", upstream_request_->headers()
+                         .get(Http::LowerCaseString("request_secure"))
                          ->value()
-                         .c_str());
+                         .getStringView());
 
-  EXPECT_STREQ("bar", upstream_request_->headers()
-                          .get(Http::LowerCaseString("request_metadata_foo"))
-                          ->value()
-                          .c_str());
+  EXPECT_EQ("HTTP/1.1", upstream_request_->headers()
+                            .get(Http::LowerCaseString("request_protocol"))
+                            ->value()
+                            .getStringView());
 
-  EXPECT_STREQ("bat", upstream_request_->headers()
-                          .get(Http::LowerCaseString("request_metadata_baz"))
-                          ->value()
-                          .c_str());
-  EXPECT_STREQ(
-      "false",
-      upstream_request_->headers().get(Http::LowerCaseString("request_secure"))->value().c_str());
-
-  EXPECT_STREQ(
-      "HTTP/1.1",
-      upstream_request_->headers().get(Http::LowerCaseString("request_protocol"))->value().c_str());
-
-  EXPECT_STREQ("bar", upstream_request_->headers()
-                          .get(Http::LowerCaseString("request_dynamic_metadata_value"))
-                          ->value()
-                          .c_str());
+  EXPECT_EQ("bar", upstream_request_->headers()
+                       .get(Http::LowerCaseString("request_dynamic_metadata_value"))
+                       ->value()
+                       .getStringView());
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
@@ -192,16 +194,21 @@ config:
 
   response->waitForEndStream();
 
-  EXPECT_STREQ(
-      "7", response->headers().get(Http::LowerCaseString("response_body_size"))->value().c_str());
-  EXPECT_STREQ(
-      "bar",
-      response->headers().get(Http::LowerCaseString("response_metadata_foo"))->value().c_str());
-  EXPECT_STREQ(
-      "bat",
-      response->headers().get(Http::LowerCaseString("response_metadata_baz"))->value().c_str());
-  EXPECT_STREQ("HTTP/1.1",
-               response->headers().get(Http::LowerCaseString("request_protocol"))->value().c_str());
+  EXPECT_EQ("7", response->headers()
+                     .get(Http::LowerCaseString("response_body_size"))
+                     ->value()
+                     .getStringView());
+  EXPECT_EQ("bar", response->headers()
+                       .get(Http::LowerCaseString("response_metadata_foo"))
+                       ->value()
+                       .getStringView());
+  EXPECT_EQ("bat", response->headers()
+                       .get(Http::LowerCaseString("response_metadata_baz"))
+                       ->value()
+                       .getStringView());
+  EXPECT_EQ(
+      "HTTP/1.1",
+      response->headers().get(Http::LowerCaseString("request_protocol"))->value().getStringView());
   EXPECT_EQ(nullptr, response->headers().get(Http::LowerCaseString("foo")));
 
   cleanup();
@@ -249,13 +256,14 @@ config:
   lua_request_->encodeData(response_data1, true);
 
   waitForNextUpstreamRequest();
-  EXPECT_STREQ(
-      "bar",
-      upstream_request_->headers().get(Http::LowerCaseString("upstream_foo"))->value().c_str());
-  EXPECT_STREQ("4", upstream_request_->headers()
-                        .get(Http::LowerCaseString("upstream_body_size"))
-                        ->value()
-                        .c_str());
+  EXPECT_EQ("bar", upstream_request_->headers()
+                       .get(Http::LowerCaseString("upstream_foo"))
+                       ->value()
+                       .getStringView());
+  EXPECT_EQ("4", upstream_request_->headers()
+                     .get(Http::LowerCaseString("upstream_body_size"))
+                     ->value()
+                     .getStringView());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
@@ -308,7 +316,7 @@ config:
   cleanup();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("403", response->headers().Status()->value().c_str());
+  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
   EXPECT_EQ("nope", response->body());
 }
 
@@ -341,7 +349,7 @@ config:
   cleanup();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
 // Should survive from 30 calls when calling streamInfo():dynamicMetadata(). This is a regression
@@ -374,7 +382,7 @@ config:
     response->waitForEndStream();
 
     EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
 
   cleanup();

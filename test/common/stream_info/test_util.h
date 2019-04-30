@@ -31,6 +31,12 @@ public:
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
+  const absl::optional<std::string>& responseCodeDetails() const override {
+    return response_code_details_;
+  }
+  void setResponseCodeDetails(absl::string_view rc_details) override {
+    response_code_details_.emplace(rc_details);
+  }
   void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesSent() const override { return 2; }
   bool intersectResponseFlags(uint64_t response_flags) const override {
@@ -188,6 +194,7 @@ public:
 
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
   absl::optional<uint32_t> response_code_;
+  absl::optional<std::string> response_code_details_;
   uint64_t response_flags_{};
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};

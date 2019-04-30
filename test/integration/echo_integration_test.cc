@@ -63,13 +63,14 @@ TEST_P(EchoIntegrationTest, Hello) {
 
 TEST_P(EchoIntegrationTest, AddRemoveListener) {
   const std::string json = TestEnvironment::substitute(R"EOF(
-  {
-    "name": "new_listener",
-    "address": "tcp://{{ ip_loopback_address }}:0",
-    "filters": [
-      { "name": "echo", "config": {} }
-    ]
-  }
+name: new_listener
+address:
+  socket_address:
+    address: "{{ ip_loopback_address }}"
+    port_value: 0
+filter_chains:
+- filters:
+  - name: envoy.echo
   )EOF",
                                                        GetParam());
 
@@ -80,7 +81,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
       [&listener_added_by_worker]() -> void { listener_added_by_worker.setReady(); });
   test_server_->server().dispatcher().post([this, json, &listener_added_by_manager]() -> void {
     EXPECT_TRUE(test_server_->server().listenerManager().addOrUpdateListener(
-        Server::parseListenerFromJson(json), "", true));
+        Server::parseListenerFromV2Yaml(json), "", true));
     listener_added_by_manager.setReady();
   });
   listener_added_by_worker.waitReady();

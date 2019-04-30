@@ -221,9 +221,11 @@ private:
 
     void sendLocalReply(Code code, absl::string_view body,
                         std::function<void(HeaderMap& headers)> modify_headers,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        absl::string_view details) override {
+      parent_.stream_info_.setResponseCodeDetails(details);
       parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
-                             grpc_status);
+                             grpc_status, details);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -357,7 +359,8 @@ private:
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(HeaderMap& headers)>& modify_headers,
                         bool is_head_request,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which
@@ -501,7 +504,7 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
-    DownstreamWatermarkCallbacks* watermark_callbacks_{nullptr};
+    std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_{};
     uint32_t buffer_limit_{0};
     uint32_t high_watermark_count_{0};
     const std::string* decorated_operation_{nullptr};

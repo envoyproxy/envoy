@@ -107,12 +107,15 @@ void CheckRequestUtils::setHttpRequest(
   auto mutable_headers = httpreq.mutable_headers();
   headers.iterate(
       [](const Envoy::Http::HeaderEntry& e, void* ctx) {
-        Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*
-            mutable_headers = static_cast<
-                Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*>(
-                ctx);
-        (*mutable_headers)[std::string(e.key().getStringView())] =
-            std::string(e.value().getStringView());
+        // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
+        if (e.key().getStringView() != Http::Headers::get().EnvoyAuthPartialBody.get()) {
+          Envoy::Protobuf::Map<Envoy::ProtobufTypes::String, Envoy::ProtobufTypes::String>*
+              mutable_headers =
+                  static_cast<Envoy::Protobuf::Map<Envoy::ProtobufTypes::String,
+                                                   Envoy::ProtobufTypes::String>*>(ctx);
+          (*mutable_headers)[std::string(e.key().getStringView())] =
+              std::string(e.value().getStringView());
+        }
         return Envoy::Http::HeaderMap::Iterate::Continue;
       },
       mutable_headers);
@@ -124,6 +127,10 @@ void CheckRequestUtils::setHttpRequest(
     std::string data(length, 0);
     buffer->copyOut(0, length, &data[0]);
     httpreq.set_body(std::move(data));
+
+    // Add in a header to detect when a partial body is used.
+    (*mutable_headers)[Http::Headers::get().EnvoyAuthPartialBody.get()] =
+        length != buffer->length() ? "true" : "false";
   }
 }
 

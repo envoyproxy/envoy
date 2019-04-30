@@ -166,7 +166,7 @@ void IntegrationTestServer::onRuntimeCreated() {
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
-    Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+    Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
   Stats::FakeSymbolTableImpl symbol_table;
@@ -200,7 +200,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
         admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
     EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
 }
 

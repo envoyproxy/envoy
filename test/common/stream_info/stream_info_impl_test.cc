@@ -142,6 +142,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     ASSERT_TRUE(stream_info.responseCode());
     EXPECT_EQ(200, stream_info.responseCode().value());
 
+    EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
+    stream_info.setResponseCodeDetails(ResponseCodeDetails::get().ViaUpstream);
+    ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+    EXPECT_EQ(ResponseCodeDetails::get().ViaUpstream, stream_info.responseCodeDetails().value());
+
     EXPECT_EQ(nullptr, stream_info.upstreamHost());
     Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
     stream_info.onUpstreamHostSelected(host);
