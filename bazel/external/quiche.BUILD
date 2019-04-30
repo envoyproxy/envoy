@@ -133,6 +133,13 @@ envoy_cc_library(
     deps = [":spdy_platform"],
 )
 
+envoy_cc_test_library(
+    name = "spdy_platform_test_helpers",
+    hdrs = ["quiche/spdy/platform/api/spdy_test_helpers.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:spdy_platform_test_helpers_impl_lib"],
+)
+
 envoy_cc_library(
     name = "spdy_platform_unsafe_arena_lib",
     hdrs = ["quiche/spdy/platform/api/spdy_unsafe_arena.h"],
@@ -210,6 +217,13 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_test_output.h"],
     repository = "@envoy",
     deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_test_output_impl_lib"],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_system_event_loop",
+    hdrs = ["quiche/quic/platform/api/quic_system_event_loop.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_system_event_loop_impl_lib"],
 )
 
 envoy_cc_test_library(

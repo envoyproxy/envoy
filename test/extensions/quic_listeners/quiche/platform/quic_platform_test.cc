@@ -46,6 +46,7 @@
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
 #include "quiche/quic/platform/api/quic_string_piece.h"
+#include "quiche/quic/platform/api/quic_system_event_loop.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
 #include "quiche/quic/platform/api/quic_thread.h"
 #include "quiche/quic/platform/api/quic_uint128.h"
@@ -588,6 +589,13 @@ TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
   if (deterministic_stats) {
     EXPECT_EQ(start_mem, Envoy::Memory::Stats::totalCurrentlyAllocated());
   }
+}
+
+TEST_F(QuicPlatformTest, TestSystemEventLoop) {
+  // These two interfaces are no-op in Envoy. The test just makes sure they
+  // build.
+  QuicRunSystemEventLoopIteration();
+  QuicSystemEventLoop("dummy");
 }
 
 } // namespace
