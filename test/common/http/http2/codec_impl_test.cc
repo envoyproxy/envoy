@@ -847,7 +847,12 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
       ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
                         Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
-INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
+typedef Http2CodecImplTest Http2CodecImplTestAll;
+
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
+                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            HTTP2SETTINGS_DEFAULT_COMBINE));
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE,
                                             HTTP2SETTINGS_EDGE_COMBINE));
 
@@ -1001,7 +1006,7 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtMaxConfigurable) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestCodecHeaderCompression) {
+TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
   initialize();
 
   TestHeaderMapImpl request_headers;
