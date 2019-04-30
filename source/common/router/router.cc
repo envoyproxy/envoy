@@ -623,7 +623,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
       // back.
       upstream_request.retried_ = true;
 
-      cluster_->stats().upstream_rq_hedge_attempted_.inc();
+      // TODO: cluster stat for hedge attempted.
     } else if (retry_status == RetryStatus::NoOverflow) {
       callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
     } else if (retry_status == RetryStatus::NoRetryLimitExceeded) {
@@ -826,10 +826,8 @@ void Filter::resetOtherUpstreams(UpstreamRequest& upstream_request) {
   for (auto& upstream_request_tmp : upstream_requests_) {
     if (upstream_request_tmp.get() != &upstream_request) {
       upstream_request_tmp->resetStream();
-      if (upstream_request_tmp->upstream_host_) {
-        upstream_request_tmp->upstream_host_->stats().rq_hedge_abandoned_.inc();
-      }
-      cluster_->stats().upstream_rq_hedge_abandoned_.inc();
+      // TODO: per-host stat for hedge abandoned.
+      // TODO: cluster stat for hedge abandoned.
     }
   }
 }
