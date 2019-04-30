@@ -154,27 +154,44 @@ TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeout) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
-TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutWithBodyNoBuffer) {
-  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 512);
+TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutWithBodyNoBufferFirstRequestWins) {
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 512, true);
 }
 
-TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequest) {
+TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutWithBodyNoBufferSecondRequestWins) {
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 512, false);
+}
+
+TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestFirstRequestWins) {
   config_helper_.setBufferLimits(1024, 1024 * 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024);
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024, true);
 }
 
-TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponse) {
+TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowUpstreamBufferLimitLargeRequestSecondRequestWins) {
+  config_helper_.setBufferLimits(1024, 1024 * 1024); // Set buffer limits upstream and downstream.
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024 * 1024, 1024, false);
+}
+
+TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseFirstRequestWins) {
   config_helper_.setBufferLimits(1024 * 1024, 1024); // Set buffer limits upstream and downstream.
-  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024);
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024, true);
+}
+
+TEST_P(HttpTimeoutIntegrationTest, HedgedPerTryTimeoutLowDownstreamBufferLimitLargeResponseSecondRequestWins) {
+  config_helper_.setBufferLimits(1024 * 1024, 1024); // Set buffer limits upstream and downstream.
+  testRouterRequestAndResponseWithHedgedPerTryTimeout(1024, 1024 * 1024, false);
 }
 
 // Sends a request with x-envoy-hedge-on-per-try-timeout, sleeps (with
 // simulated time) for longer than the per try timeout but shorter than the
 // global timeout, asserts that a retry is sent, and then responds with a 200
 // response on the original request and ensures the downstream sees it.
-// Request/response/header size are configurable to test flow control.
+// Request/response/header size are configurable to test flow control. If
+// first_request_wins is true, then the "winning" response will be sent in
+// response to the first (timed out) request. If false, the second request will
+// get the good response.
 void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTimeout(
-    uint64_t request_size, uint64_t response_size) {
+    uint64_t request_size, uint64_t response_size, bool first_request_wins) {
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -212,17 +229,31 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
   ASSERT_TRUE(upstream_request2->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
-  // Encode 200 response headers for the first (timed out) request.
   Http::TestHeaderMapImpl response_headers{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, response_size == 0);
+  if (first_request_wins) {
+    // Encode 200 response headers for the first (timed out) request.
+    upstream_request_->encodeHeaders(response_headers, response_size == 0);
+  } else {
+    // Encode 200 response headers for the second request.
+    upstream_request2->encodeHeaders(response_headers, response_size == 0);
+  }
 
   response->waitForHeaders();
 
-  // The second request should be reset since we used the response from the first request.
-  ASSERT_TRUE(upstream_request2->waitForReset(std::chrono::seconds(15)));
+  if (first_request_wins) {
+    // The second request should be reset since we used the response from the first request.
+    ASSERT_TRUE(upstream_request2->waitForReset(std::chrono::seconds(15)));
+  } else {
+    // The first request should be reset since we used the response from the second request.
+    ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
+  }
 
   if (response_size) {
-    upstream_request_->encodeData(response_size, true);
+    if (first_request_wins) {
+      upstream_request_->encodeData(response_size, true);
+    } else {
+      upstream_request2->encodeData(response_size, true);
+    }
   }
 
   response->waitForEndStream();
@@ -230,7 +261,12 @@ void HttpTimeoutIntegrationTest::testRouterRequestAndResponseWithHedgedPerTryTim
   codec_client_->close();
 
   EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  EXPECT_TRUE(upstream_request2->complete());
+  if (first_request_wins) {
+    EXPECT_EQ(request_size, upstream_request_->bodyLength());
+  } else {
+    EXPECT_EQ(request_size, upstream_request2->bodyLength());
+  }
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());

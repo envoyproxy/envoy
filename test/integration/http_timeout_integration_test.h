@@ -23,7 +23,8 @@ public:
   }
 
   void testRouterRequestAndResponseWithHedgedPerTryTimeout(uint64_t request_size,
-                                                           uint64_t response_size);
+                                                           uint64_t response_size,
+                                                           bool first_request_wins);
 };
 
 } // namespace Envoy
