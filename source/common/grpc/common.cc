@@ -301,27 +301,27 @@ static void derefBufferInstanceContainer(void* container_ptr) {
   }
 }
 
-grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr bufferInstance) {
-  if (!bufferInstance) {
+grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr&& buffer_instance) {
+  if (!buffer_instance) {
     return {};
   }
-  Buffer::RawSlice oneRawSlice;
+  Buffer::RawSlice on_raw_slice;
   // NB: we need to pass in >= 1 in order to get the real "n" (see Buffer::Instance for details).
-  int nSlices = bufferInstance->getRawSlices(&oneRawSlice, 1);
-  if (nSlices <= 0) {
+  int n_slices = buffer_instance->getRawSlices(&on_raw_slice, 1);
+  if (n_slices <= 0) {
     return {};
   }
-  auto container = new BufferInstanceContainer{nSlices, std::move(bufferInstance)};
-  if (nSlices == 1) {
-    grpc::Slice oneSlice(oneRawSlice.mem_, oneRawSlice.len_, &derefBufferInstanceContainer,
+  auto container = new BufferInstanceContainer{n_slices, std::move(buffer_instance)};
+  if (n_slices == 1) {
+    grpc::Slice oneSlice(on_raw_slice.mem_, on_raw_slice.len_, &derefBufferInstanceContainer,
                          container);
     return {&oneSlice, 1};
   }
-  STACK_ARRAY(manyRawSlices, Buffer::RawSlice, nSlices);
-  container->buffer_->getRawSlices(manyRawSlices.begin(), nSlices);
+  STACK_ARRAY(manyRawSlices, Buffer::RawSlice, n_slices);
+  container->buffer_->getRawSlices(manyRawSlices.begin(), n_slices);
   std::vector<grpc::Slice> slices;
-  slices.reserve(nSlices);
-  for (int i = 0; i < nSlices; i++) {
+  slices.reserve(n_slices);
+  for (int i = 0; i < n_slices; i++) {
     slices.emplace_back(manyRawSlices[i].mem_, manyRawSlices[i].len_, &derefBufferInstanceContainer,
                         container);
   }
@@ -330,21 +330,21 @@ grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr bufferInstance) {
 
 struct ByteBufferContainer {
   ByteBufferContainer(int ref_count) : ref_count_(ref_count) {}
-  ~ByteBufferContainer() { ::free(fragments); }
+  ~ByteBufferContainer() { ::free(fragments_); }
   std::atomic<int> ref_count_;
-  Buffer::BufferFragmentImpl* fragments = nullptr;
+  Buffer::BufferFragmentImpl* fragments_ = nullptr;
   std::vector<grpc::Slice> slices_;
 };
 
-Buffer::InstancePtr Common::makeBufferInstance(const grpc::ByteBuffer& byteBuffer) {
+Buffer::InstancePtr Common::makeBufferInstance(const grpc::ByteBuffer& byte_buffer) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
-  if (byteBuffer.Length() == 0) {
+  if (byte_buffer.Length() == 0) {
     return buffer;
   }
   // NB: ByteBuffer::Dump moves the data out of the ByteBuffer so we need to ensure that the
   // lifetime of the Slice(s) exceeds our Buffer::Instance.
   std::vector<grpc::Slice> slices;
-  byteBuffer.Dump(&slices);
+  byte_buffer.Dump(&slices);
   if (slices.size() == 0) {
     return buffer;
   }
@@ -358,14 +358,14 @@ Buffer::InstancePtr Common::makeBufferInstance(const grpc::ByteBuffer& byteBuffe
       };
   // NB: addBufferFragment takes a pointer alias to the BufferFragmentImpl which is passed in so we
   // need to ensure that the lifetime of those objects exceeds that of the Buffer::Instance.
-  container->fragments = static_cast<Buffer::BufferFragmentImpl*>(
+  container->fragments_ = static_cast<Buffer::BufferFragmentImpl*>(
       ::malloc(sizeof(Buffer::BufferFragmentImpl) * slices.size()));
   for (size_t i = 0; i < slices.size(); i++) {
-    new (&container->fragments[i])
+    new (&container->fragments_[i])
         Buffer::BufferFragmentImpl(slices[i].begin(), slices[i].size(), releaser);
   }
   for (size_t i = 0; i < slices.size(); i++) {
-    buffer->addBufferFragment(container->fragments[i]);
+    buffer->addBufferFragment(container->fragments_[i]);
   }
   container->slices_ = std::move(slices);
   return buffer;

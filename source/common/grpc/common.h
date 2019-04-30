@@ -160,7 +160,7 @@ public:
    * @return byteBuffer target container aliased to the data in Buffer::Instance and owning the
    * Buffer::Instance.
    */
-  static grpc::ByteBuffer makeByteBuffer(Buffer::InstancePtr bufferInstance);
+  static grpc::ByteBuffer makeByteBuffer(Buffer::InstancePtr&& bufferInstance);
 
   /**
    * Build Buffer::Instance which aliases the data in a grpc::ByteBuffer.

@@ -412,7 +412,7 @@ TEST(GrpcCommonTest, ByteBufferInstanceRoundTrip) {
   EXPECT_EQ(bufferInstance2->toString(), "test this");
 }
 
-TEST(GrpcCommonTest, PreependGrpcFrameHeader) {
+TEST(GrpcCommonTest, PrependGrpcFrameHeader) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add("test", 4);
   char expected_header[5];

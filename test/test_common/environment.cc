@@ -148,6 +148,8 @@ bool TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion type
 
 std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest() {
   std::vector<Network::Address::IpVersion> parameters;
+  parameters.push_back(Network::Address::IpVersion::v4);
+#if 0
   for (auto version : {Network::Address::IpVersion::v4, Network::Address::IpVersion::v6}) {
     if (TestEnvironment::shouldRunTestForIpVersion(version)) {
       parameters.push_back(version);
@@ -159,6 +161,7 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
       }
     }
   }
+#endif
   return parameters;
 }
 
