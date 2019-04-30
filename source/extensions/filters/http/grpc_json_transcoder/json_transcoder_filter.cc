@@ -121,7 +121,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       auto method = service->method(i);
       auto http_rule = method->options().GetExtension(google::api::http);
 
-      if (!http_rule.pattern_case() && proto_config.auto_mapping()) {
+      if (!method->options().HasExtension(google::api::http) && proto_config.auto_mapping()) {
         auto post = "/" + service->full_name() + "/" + method->name();
         http_rule.set_post(post);
         http_rule.set_body("*");
