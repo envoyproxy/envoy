@@ -8,7 +8,11 @@ system tree that contains re-loadable configuration elements. Values can be view
 :ref:`/runtime admin endpoint <operations_admin_interface_runtime>`. Values can be modified and
 added at the :ref:`/runtime_modify admin endpoint <operations_admin_interface_runtime_modify>`. If
 runtime is not configured, an empty provider is used which has the effect of using all defaults
-built into the code, except for any values added via `/runtime_modify`.
+built into the code, except for any values added via `/runtime_modify`. A static base runtime
+may be specified in the :ref:`bootstrap configuration
+<envoy_api_field_config.bootstrap.v2.Runtime.base>`
+via a :ref:`protobuf JSON representation <config_runtime_proto_json>`.
+
 
 .. attention::
 
@@ -18,6 +22,8 @@ built into the code, except for any values added via `/runtime_modify`.
 
 
 * :ref:`v2 API reference <envoy_api_msg_config.bootstrap.v2.Runtime>`
+
+.. _config_runtime_file_system:
 
 File system layout
 ------------------
@@ -54,6 +60,14 @@ that :option:`--service-cluster` has been set to ``my-cluster``. Envoy will firs
 If found, the value will override any value found in the primary lookup path. This allows the user
 to customize the runtime values for individual clusters on top of global defaults.
 
+.. _config_runtime_restrictions:
+
+Restrictions
+------------
+
+*numerator* or *denominator* are reserved keywords and may not be used for the purpose of runtime
+keys.
+
 .. _config_runtime_comments:
 
 Comments
@@ -78,6 +92,35 @@ old tree to the new runtime tree, using the equivalent of the following command:
   /srv/runtime:~$ ln -s /srv/runtime/v2 new && mv -Tf new current
 
 It's beyond the scope of this document how the file system data is deployed, garbage collected, etc.
+
+.. _config_runtime_layering:
+
+Layering
+--------
+
+The runtime can be viewed as virtual filesystem consisting of multiple layers:
+
+1. :ref:`Static bootstrap configuration <envoy_api_field_config.bootstrap.v2.Runtime.base>`
+2. :ref:`Disk file system <config_runtime_file_system>`
+3. Disk file system override
+4. :ref:`Admin interface overrides <operations_admin_interface_runtime_modify>`
+
+with higher layers overriding corresponding values in lower layers.
+
+.. _config_runtime_proto_json:
+
+Protobuf and JSON representation
+--------------------------------
+
+The runtime :ref:`file system <config_runtime_file_system>` can be represented inside a proto3
+message as a `google.protobuf.Struct
+<https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#google.protobuf.Struct>`_
+modeling a JSON object with the following rules:
+
+* Dot separators map to tree edges.
+* Scalar leaves (integer, strings, booleans) are represented with their respective JSON type.
+* :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` is represented with via its
+  `canonical JSON encoding <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
 
 Using runtime overrides for deprecated features
 -----------------------------------------------
