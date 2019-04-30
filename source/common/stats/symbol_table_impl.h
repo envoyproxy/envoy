@@ -287,6 +287,8 @@ public:
    */
   inline StatName statName() const;
 
+  uint8_t* bytes() { return bytes_.get(); }
+
 private:
   SymbolTable::StoragePtr bytes_;
 };
@@ -353,9 +355,14 @@ public:
 #endif
 
   /**
-   * @return uint8_t* A pointer to the first byte of data (skipping over size bytes).
+   * @return A pointer to the first byte of data (skipping over size bytes).
    */
   const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
+
+  /**
+   * @return whether this is empty.
+   */
+  bool empty() const { return size_and_data_ == nullptr || dataSize() == 0; }
 
 private:
   const uint8_t* size_and_data_;
@@ -398,6 +405,29 @@ public:
 
 private:
   SymbolTable& symbol_table_;
+};
+
+class StatNameManagedContainer {
+public:
+  explicit StatNameManagedContainer(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~StatNameManagedContainer();
+
+  /**
+   * @param name the name to add the container.
+   * @return the StatName held in the container for this name.
+   */
+  StatName add(absl::string_view name);
+
+  /**
+   * @param name the name to add the container.
+   * @return a pointer to the bytes held in the container for this name, suitable for
+   *         using to construct a StatName.
+   */
+  uint8_t* addReturningStorage(absl::string_view name);
+
+private:
+  SymbolTable& symbol_table_;
+  std::vector<StatNameStorage> storage_vector_;
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName
