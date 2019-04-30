@@ -138,5 +138,6 @@ message LocalityLbEndpoints {
   // information (lower the value, closer it is to the source locality).
   // This will be consumed by Load balancing schemes that need proximity order
   // to determine where to route the requests.
+  // [#not-implemented-hide:]
   google.protobuf.UInt32Value proximity_weight = 6;
 }
