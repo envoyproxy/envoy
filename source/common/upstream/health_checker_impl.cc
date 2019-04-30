@@ -264,7 +264,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     break;
   }
 
-  if ((response_headers_->Connection() &&
+  if ((response_headers_->Connection() && protocol_ != Http::Protocol::Http2 &&
        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
                               Http::Headers::get().ConnectionValues.Close)) ||
       (response_headers_->ProxyConnection() &&
