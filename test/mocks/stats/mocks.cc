@@ -32,6 +32,25 @@ void MockMetric::setTagExtractedName(absl::string_view name) {
       std::make_unique<StatNameManagedStorage>(tagExtractedName(), *symbol_table_);
 }
 
+void MockMetric::iterateTags(const TagIterFn& fn) const {
+  for (const Tag& tag : tags_) {
+    if (!fn(tag)) {
+      return;
+    }
+  }
+}
+
+void MockMetric::iterateTagStatNames(const TagStatNameIterFn& fn) const {
+  SymbolTable& symbol_table = const_cast<SymbolTable&>(symbolTable());
+  for (const Tag& tag : tags_) {
+    StatNameManagedStorage name(tag.name_, symbol_table);
+    StatNameManagedStorage value(tag.value_, symbol_table);
+    if (!fn(name.statName(), value.statName())) {
+      return;
+    }
+  }
+}
+
 void MockMetric::MetricName::MetricName::operator=(absl::string_view name) {
   name_ = std::string(name);
   stat_name_storage_ = std::make_unique<StatNameStorage>(name, mock_metric_.symbolTable());
