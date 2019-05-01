@@ -63,12 +63,10 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
-        uint64_t rq_issued = 0;
         for (auto host : hosts) {
           rq_success += host->stats().rq_success_.latch();
           rq_error += host->stats().rq_error_.latch();
           rq_active += host->stats().rq_active_.value();
-          rq_issued += host->stats().rq_total_.latch();
         }
         if (rq_success + rq_error + rq_active != 0) {
           auto* locality_stats = cluster_stats->add_upstream_locality_stats();
@@ -77,7 +75,6 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           locality_stats->set_total_successful_requests(rq_success);
           locality_stats->set_total_error_requests(rq_error);
           locality_stats->set_total_requests_in_progress(rq_active);
-          locality_stats->set_total_issued_requests(rq_issued);
         }
       }
     }
@@ -157,7 +154,6 @@ void LoadStatsReporter::startLoadReportPeriod() {
       for (auto host : host_set->hosts()) {
         host->stats().rq_success_.latch();
         host->stats().rq_error_.latch();
-        host->stats().rq_total_.latch();
       }
     }
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();

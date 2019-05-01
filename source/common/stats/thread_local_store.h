@@ -135,11 +135,11 @@ public:
 
 /**
  * Store implementation with thread local caching. For design details see
- * https://github.com/envoyproxy/envoy/blob/master/docs/stats.md
+ * https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
-  ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options, StatDataAllocator& alloc);
+  ThreadLocalStoreImpl(StatDataAllocator& alloc);
   ~ThreadLocalStoreImpl() override;
 
   // Stats::Scope
@@ -183,9 +183,6 @@ public:
 
   Source& source() override { return source_; }
 
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
-  absl::string_view truncateStatNameIfNeeded(absl::string_view name);
-
 private:
   template <class Stat> using StatMap = StatNameHashMap<Stat>;
 
@@ -221,7 +218,6 @@ private:
     Gauge& gaugeFromStatName(StatName name) override;
     Histogram& histogramFromStatName(StatName name) override;
     Histogram& tlsHistogram(StatName name, ParentHistogramImpl& parent) override;
-    const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
     ScopePtr createScope(const std::string& name) override {
       return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
     }
@@ -300,7 +296,6 @@ private:
   bool checkAndRememberRejection(StatName name, StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
 
-  const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
@@ -312,8 +307,6 @@ private:
   StatsMatcherPtr stats_matcher_;
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
-  StatNameStorage stats_overflow_;
-  Counter& num_last_resort_stats_;
   HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
 
