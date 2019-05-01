@@ -149,9 +149,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
   uint64_t header_timeout;
   if (header_timeout_entry) {
-    // TODO(dnoe): Migrate to pure string_view (#6580)
-    if (StringUtil::atoull(std::string(header_timeout_entry->value().getStringView()).c_str(),
-                           header_timeout)) {
+    if (absl::SimpleAtoi(header_timeout_entry->value().getStringView(), &header_timeout)) {
       timeout.global_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestTimeoutMs();
@@ -160,9 +158,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
   Http::HeaderEntry* per_try_timeout_entry = request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
   if (per_try_timeout_entry) {
-    // TODO(dnoe): Migrate to pure string_view (#6580)
-    if (StringUtil::atoull(std::string(per_try_timeout_entry->value().getStringView()).c_str(),
-                           header_timeout)) {
+    if (absl::SimpleAtoi(per_try_timeout_entry->value().getStringView(), &header_timeout)) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -321,7 +317,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
                      headers.Path()->value().getStringView());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
-    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt);
+    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt,
+                               StreamInfo::ResponseCodeDetails::get().RouteNotFound);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -340,7 +337,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
         },
-        absl::nullopt);
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -353,7 +350,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound);
     callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", nullptr,
-                               absl::nullopt);
+                               absl::nullopt,
+                               StreamInfo::ResponseCodeDetails::get().ClusterNotFound);
     return Http::FilterHeadersStatus::StopIteration;
   }
   cluster_ = cluster->info();
@@ -380,7 +378,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
             headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
           }
         },
-        absl::nullopt);
+        absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaintenanceMode);
     cluster_->stats().upstream_rq_maintenance_mode_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -456,7 +454,8 @@ void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream);
   chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
   callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", nullptr,
-                             absl::nullopt);
+                             absl::nullopt,
+                             StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -607,7 +606,8 @@ void Filter::onResponseTimeout() {
     }
   }
 
-  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
+  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
+                         StreamInfo::ResponseCodeDetails::get().UpstreamTimeout);
 }
 
 // Called when the per try timeout is hit but we didn't reset the request
@@ -659,7 +659,8 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
   }
 
   chargeUpstreamAbort(timeout_response_code_, false, upstream_request);
-  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout);
+  onUpstreamTimeoutAbort(StreamInfo::ResponseFlag::UpstreamRequestTimeout,
+                         StreamInfo::ResponseCodeDetails::get().UpstreamPerTryTimeout);
 }
 
 void Filter::updateOutlierDetection(Http::Code code, UpstreamRequest& upstream_request) {
@@ -688,18 +689,20 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
   }
 }
 
-void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags) {
+void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
+                                    absl::string_view details) {
   const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
-  onUpstreamAbort(timeout_response_code_, response_flags, body, false);
+  onUpstreamAbort(timeout_response_code_, response_flags, body, false, details);
 }
 
 void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flags,
-                             absl::string_view body, bool dropped) {
+                             absl::string_view body, bool dropped, absl::string_view details) {
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   if (downstream_response_started_) {
     // This will destroy any created retry timers.
+    callbacks_->streamInfo().setResponseCodeDetails(details);
     cleanup();
     callbacks_->resetStream();
   } else {
@@ -715,7 +718,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
             headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
           }
         },
-        absl::nullopt);
+        absl::nullopt, details);
   }
 }
 
@@ -764,7 +767,13 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                    Http::Utility::resetReasonToString(reset_reason));
 
   callbacks_->streamInfo().setUpstreamTransportFailureReason(transport_failure_reason);
-  onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped);
+  const std::string& basic_details =
+      downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
+                                   : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
+  const std::string details = absl::StrCat(
+      basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
+      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}");
+  onUpstreamAbort(Http::Code::ServiceUnavailable, response_flags, body, dropped, details);
 }
 
 StreamInfo::ResponseFlag
@@ -810,6 +819,7 @@ void Filter::handleNon5xxResponseHeaders(const Http::HeaderMap& headers,
 
 void Filter::onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
                                           UpstreamRequest& upstream_request) {
+  chargeUpstreamCode(100, *headers, upstream_request.upstream_host_, false);
   ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
 
   if (!downstream_response_started_) {

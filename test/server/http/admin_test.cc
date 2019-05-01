@@ -1269,13 +1269,13 @@ protected:
   PrometheusStatsFormatterTest() : alloc_(symbol_table_) {}
 
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    std::string tname = std::string(name);
-    counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
+    Stats::StatNameManagedStorage storage(name, symbol_table_);
+    counters_.push_back(alloc_.makeCounter(storage.statName(), name, cluster_tags));
   }
 
   void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
-    std::string tname = std::string(name);
-    gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
+    Stats::StatNameManagedStorage storage(name, symbol_table_);
+    gauges_.push_back(alloc_.makeGauge(storage.statName(), name, cluster_tags));
   }
 
   void addHistogram(const Stats::ParentHistogramSharedPtr histogram) {

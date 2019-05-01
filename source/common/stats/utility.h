@@ -14,7 +14,7 @@ class Utility {
 public:
   // ':' is a reserved char in statsd. Do a character replacement to avoid costly inline
   // translations later.
-  static std::string sanitizeStatsName(const absl::string_view name);
+  static std::string sanitizeStatsName(absl::string_view name);
 };
 
 } // namespace Stats
