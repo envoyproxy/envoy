@@ -98,8 +98,8 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
-    Stats::StatName vhost_name = stat_name_storage.add(info.request_vhost_name_);
-    Stats::StatName vcluster_name = stat_name_storage.add(info.request_vcluster_name_);
+    Stats::StatName vhost_name = info.request_vhost_name_;
+    Stats::StatName vcluster_name = info.request_vcluster_name_;
 
     incCounter(info.global_scope_,
                {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_completed_});
@@ -109,8 +109,8 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    Stats::StatName from_zone = stat_name_storage.add(info.from_zone_);
-    Stats::StatName to_zone = stat_name_storage.add(info.to_zone_);
+    Stats::StatName from_zone = info.from_zone_;
+    Stats::StatName to_zone = info.to_zone_;
 
     incCounter(info.cluster_scope_,
                {info.prefix_, zone_, from_zone, to_zone, upstream_rq_completed_});
@@ -136,16 +136,16 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   }
 
   if (!info.request_vcluster_name_.empty()) {
-    Stats::StatName vhost_name = stat_name_storage.add(info.request_vhost_name_);
-    Stats::StatName vcluster_name = stat_name_storage.add(info.request_vcluster_name_);
+    Stats::StatName vhost_name = info.request_vhost_name_;
+    Stats::StatName vcluster_name = info.request_vcluster_name_;
     recordHistogram(info.global_scope_,
                     {vhost_, vhost_name, vcluster_, vcluster_name, upstream_rq_time_}, count);
   }
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
-    Stats::StatName from_zone = stat_name_storage.add(info.from_zone_);
-    Stats::StatName to_zone = stat_name_storage.add(info.to_zone_);
+    Stats::StatName from_zone = info.from_zone_;
+    Stats::StatName to_zone = info.to_zone_;
 
     recordHistogram(info.cluster_scope_,
                     {info.prefix_, zone_, from_zone, to_zone, upstream_rq_time_}, count);

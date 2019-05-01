@@ -25,18 +25,23 @@ namespace Http {
 class CodeUtilityTest : public testing::Test {
 public:
   CodeUtilityTest()
-      : global_store_(*symbol_table_), cluster_scope_(*symbol_table_), code_stats_(*symbol_table_) {
-  }
+      : global_store_(*symbol_table_), cluster_scope_(*symbol_table_), code_stats_(*symbol_table_),
+        stat_name_storage_(*symbol_table_) {}
+
 
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    const std::string& request_vhost_name = EMPTY_STRING,
                    const std::string& request_vcluster_name = EMPTY_STRING,
                    const std::string& from_az = EMPTY_STRING,
                    const std::string& to_az = EMPTY_STRING) {
-    Stats::StatNameManagedStorage prefix("prefix", *symbol_table_);
+    Stats::StatName prefix = stat_name_storage_.add("prefix");
+    Stats::StatName from_zone = stat_name_storage_.add(from_az);
+    Stats::StatName to_zone = stat_name_storage_.add(to_az);
+    Stats::StatName vhost_name = stat_name_storage_.add(request_vhost_name);
+    Stats::StatName vcluster_name = stat_name_storage_.add(request_vcluster_name);
     Http::CodeStats::ResponseStatInfo info{
-        global_store_,      cluster_scope_,        prefix.statName(), code,  internal_request,
-        request_vhost_name, request_vcluster_name, from_az,           to_az, canary};
+        global_store_, cluster_scope_, prefix,    code,    internal_request,
+        vhost_name,    vcluster_name,  from_zone, to_zone, canary};
 
     code_stats_.chargeResponseStat(info);
   }
@@ -45,6 +50,7 @@ public:
   Stats::IsolatedStoreImpl global_store_;
   Stats::IsolatedStoreImpl cluster_scope_;
   Http::CodeStatsImpl code_stats_;
+  Stats::StatNameManagedContainer stat_name_storage_;
 };
 
 TEST_F(CodeUtilityTest, GroupStrings) {
@@ -209,9 +215,10 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
 
   Stats::StatNameManagedStorage prefix("prefix", *symbol_table_);
   Http::CodeStats::ResponseTimingInfo info{
-      global_store, cluster_scope, prefix.statName(), std::chrono::milliseconds(5),
-      true,         true,          "vhost_name",      "req_vcluster_name",
-      "from_az",    "to_az"};
+      global_store, cluster_scope, stat_name_storage_.add("prefix"), std::chrono::milliseconds(5),
+      true,         true,          stat_name_storage_.add("vhost_name"),
+      stat_name_storage_.add("req_vcluster_name"), stat_name_storage_.add("from_az"),
+      stat_name_storage_.add("to_az")};
 
   EXPECT_CALL(cluster_scope, histogram("prefix.upstream_rq_time"));
   EXPECT_CALL(cluster_scope, deliverHistogramToSinks(

@@ -19,10 +19,10 @@ struct CodeStats::ResponseStatInfo {
   Stats::StatName prefix_;
   uint64_t response_status_code_;
   bool internal_request_;
-  const std::string& request_vhost_name_;
-  const std::string& request_vcluster_name_;
-  const std::string& from_zone_;
-  const std::string& to_zone_;
+  Stats::StatName request_vhost_name_;
+  Stats::StatName request_vcluster_name_;
+  Stats::StatName from_zone_;
+  Stats::StatName to_zone_;
   bool upstream_canary_;
 };
 
@@ -33,10 +33,10 @@ struct CodeStats::ResponseTimingInfo {
   std::chrono::milliseconds response_time_;
   bool upstream_canary_;
   bool internal_request_;
-  const std::string& request_vhost_name_;
-  const std::string& request_vcluster_name_;
-  const std::string& from_zone_;
-  const std::string& to_zone_;
+  Stats::StatName request_vhost_name_;
+  Stats::StatName request_vcluster_name_;
+  Stats::StatName from_zone_;
+  Stats::StatName to_zone_;
 };
 
 class CodeStatsImpl : public CodeStats {
