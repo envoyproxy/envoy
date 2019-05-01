@@ -154,11 +154,6 @@ config_setting(
     values = {"define": "quiche=enabled"},
 )
 
-config_setting(
-    name = "remote_execution",
-    values = {"define": "EXECUTOR=remote"},
-)
-
 # Alias pointing to the selected version of BoringSSL:
 # - BoringSSL FIPS from @boringssl_fips//:ssl,
 # - non-FIPS BoringSSL from @boringssl//:ssl.
