@@ -3,7 +3,6 @@
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/json/json_object.h"
-#include "envoy/stats/stats_options.h"
 
 namespace Envoy {
 namespace Config {
@@ -65,8 +64,7 @@ public:
    * @param route_config destination v2 envoy::api::v2::RouteConfiguration.
    */
   static void translateRouteConfiguration(const Json::Object& json_route_config,
-                                          envoy::api::v2::RouteConfiguration& route_config,
-                                          const Stats::StatsOptions& stats_options);
+                                          envoy::api::v2::RouteConfiguration& route_config);
 
   /**
    * Translate a v1 JSON virtual host object to v2 envoy::api::v2::route::VirtualHost.
@@ -74,8 +72,7 @@ public:
    * @param virtual_host destination v2 envoy::api::v2::route::VirtualHost.
    */
   static void translateVirtualHost(const Json::Object& json_virtual_host,
-                                   envoy::api::v2::route::VirtualHost& virtual_host,
-                                   const Stats::StatsOptions& stats_options);
+                                   envoy::api::v2::route::VirtualHost& virtual_host);
 
   /**
    * Translate a v1 JSON decorator object to v2 envoy::api::v2::route::Decorator.

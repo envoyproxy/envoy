@@ -50,8 +50,8 @@ namespace Server {
 
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminStatsTest() : alloc_(options_, symbol_table_) {
-    store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, alloc_);
+  AdminStatsTest() : alloc_(symbol_table_) {
+    store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
   }
 
@@ -66,8 +66,7 @@ public:
   Stats::FakeSymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::StatsOptionsImpl options_;
-  Stats::MockedTestAllocator alloc_;
+  Stats::HeapStatDataAllocator alloc_;
   Stats::MockSink sink_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
@@ -114,14 +113,11 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(alloc_, free(_));
-
-  std::map<std::string, uint64_t> all_stats;
-
   std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
   std::sort(histograms.begin(), histograms.end(),
             [](const Stats::ParentHistogramSharedPtr& a,
                const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
+  std::map<std::string, uint64_t> all_stats;
   std::string actual_json = statsAsJsonHandler(all_stats, histograms, false);
 
   const std::string expected_json = R"EOF({
@@ -263,10 +259,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(alloc_, free(_));
-
   std::map<std::string, uint64_t> all_stats;
-
   std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), true);
 
   // Expected JSON should not have h2 values as it is not used.
@@ -364,10 +357,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(alloc_, free(_));
-
   std::map<std::string, uint64_t> all_stats;
-
   std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false,
                                                absl::optional<std::regex>{std::regex("[a-z]1")});
 
@@ -473,10 +463,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(alloc_, free(_));
-
   std::map<std::string, uint64_t> all_stats;
-
   std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), true,
                                                absl::optional<std::regex>{std::regex("h[12]")});
 
@@ -1283,7 +1270,6 @@ protected:
   }
 
   Stats::FakeSymbolTableImpl symbol_table_;
-  Stats::StatsOptionsImpl stats_options_;
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;

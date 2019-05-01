@@ -49,7 +49,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                Thread::ThreadFactory& thread_factory,
                                Filesystem::Instance& file_system)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
-      file_system_(file_system) {
+      file_system_(file_system), stats_allocator_(symbol_table_) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
@@ -60,11 +60,11 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
   case Server::Mode::Serve: {
 #ifdef ENVOY_HOT_RESTART
     if (!options.hotRestartDisabled()) {
-      restarter_ = std::make_unique<Server::HotRestartImpl>(options_, symbol_table_);
+      restarter_ = std::make_unique<Server::HotRestartImpl>(options_);
     }
 #endif
     if (restarter_ == nullptr) {
-      restarter_ = std::make_unique<Server::HotRestartNopImpl>(symbol_table_);
+      restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     }
 
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
@@ -80,8 +80,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     // block or not.
     std::set_new_handler([]() { PANIC("out of memory"); });
 
-    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
-                                                                 restarter_->statsAllocator());
+    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
     server_ = std::make_unique<Server::InstanceImpl>(
         options_, time_system, local_address, listener_hooks, *restarter_, *stats_store_,
@@ -91,7 +90,7 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
     break;
   }
   case Server::Mode::Validate:
-    restarter_ = std::make_unique<Server::HotRestartNopImpl>(symbol_table_);
+    restarter_ = std::make_unique<Server::HotRestartNopImpl>();
     logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
                                                          restarter_->logLock());
     break;
@@ -143,16 +142,13 @@ MainCommon::MainCommon(int argc, const char* const* argv)
             std::make_unique<Runtime::RandomGeneratorImpl>(), platform_impl_.threadFactory(),
             platform_impl_.fileSystem()) {}
 
-std::string MainCommon::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
-                                          bool hot_restart_enabled) {
+std::string MainCommon::hotRestartVersion(bool hot_restart_enabled) {
 #ifdef ENVOY_HOT_RESTART
   if (hot_restart_enabled) {
-    return Server::HotRestartImpl::hotRestartVersion(max_num_stats, max_stat_name_len);
+    return Server::HotRestartImpl::hotRestartVersion();
   }
 #else
   UNREFERENCED_PARAMETER(hot_restart_enabled);
-  UNREFERENCED_PARAMETER(max_num_stats);
-  UNREFERENCED_PARAMETER(max_stat_name_len);
 #endif
   return "disabled";
 }
