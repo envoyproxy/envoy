@@ -18,7 +18,6 @@
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
 #include "common/http/context_impl.h"
@@ -44,7 +43,6 @@
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -75,8 +73,6 @@ public:
   MOCK_CONST_METHOD0(serviceClusterName, const std::string&());
   MOCK_CONST_METHOD0(serviceNodeName, const std::string&());
   MOCK_CONST_METHOD0(serviceZone, const std::string&());
-  MOCK_CONST_METHOD0(maxStats, uint64_t());
-  MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
@@ -92,7 +88,6 @@ public:
   std::string service_zone_name_;
   spdlog::level::level_enum log_level_{spdlog::level::trace};
   std::string log_path_;
-  Stats::StatsOptionsImpl stats_options_;
   uint32_t concurrency_{1};
   uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};
@@ -199,10 +194,11 @@ public:
   // Server::HotRestart
   MOCK_METHOD0(drainParentListeners, void());
   MOCK_METHOD1(duplicateParentListenSocket, int(const std::string& address));
-  MOCK_METHOD1(getParentStats, void(GetParentStatsInfo& info));
+  MOCK_METHOD0(getParentStats, std::unique_ptr<envoy::HotRestartMessage>());
   MOCK_METHOD2(initialize, void(Event::Dispatcher& dispatcher, Server::Instance& server));
-  MOCK_METHOD1(shutdownParentAdmin, void(ShutdownParentAdminInfo& info));
-  MOCK_METHOD0(terminateParent, void());
+  MOCK_METHOD1(sendParentAdminShutdownRequest, void(time_t& original_start_time));
+  MOCK_METHOD0(sendParentTerminateRequest, void());
+  MOCK_METHOD1(mergeParentStatsIfAny, ServerStatsFromParent(Stats::StoreRoot& stats_store));
   MOCK_METHOD0(shutdown, void());
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
@@ -348,7 +344,7 @@ public:
   MOCK_METHOD0(drainManager, DrainManager&());
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD1(failHealthcheck, void(bool fail));
-  MOCK_METHOD1(getParentStats, void(HotRestart::GetParentStatsInfo&));
+  MOCK_METHOD1(exportStatsToChild, void(envoy::HotRestartMessage::Reply::Stats*));
   MOCK_METHOD0(healthCheckFailed, bool());
   MOCK_METHOD0(hotRestart, HotRestart&());
   MOCK_METHOD0(initManager, Init::Manager&());
