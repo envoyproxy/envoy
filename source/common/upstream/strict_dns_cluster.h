@@ -27,11 +27,66 @@ private:
                   const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
                   const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint);
     ~ResolveTarget();
+
+    template <typename AddressInstance>
+    void updateHosts(
+        const std::list<DnsResponse>&& response,
+        std::function<Network::Address::InstanceConstSharedPtr(const AddressInstance&)> translate) {
+      active_query_ = nullptr;
+      ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
+      parent_.info_->stats().update_success_.inc();
+
+      std::unordered_map<std::string, HostSharedPtr> updated_hosts;
+      HostVector new_hosts;
+      std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
+      for (const auto& resp : response) {
+        ASSERT(resp.address_ != nullptr);
+        new_hosts.emplace_back(new HostImpl(
+            parent_.info_, dns_address_, translate(resp.address_), lb_endpoint_.metadata(),
+            lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoint_.locality(),
+            lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoint_.priority(),
+            lb_endpoint_.health_status()));
+        ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
+      }
+
+      HostVector hosts_added;
+      HostVector hosts_removed;
+      if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
+                                        updated_hosts, all_hosts_)) {
+        ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+        ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
+          return host->priority() == locality_lb_endpoint_.priority();
+        }));
+        parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
+      } else {
+        parent_.info_->stats().update_no_rebuild_.inc();
+      }
+
+      all_hosts_ = std::move(updated_hosts);
+
+      // If there is an initialize callback, fire it now. Note that if the cluster refers to
+      // multiple DNS names, this will return initialized after a single DNS resolution
+      // completes. This is not perfect but is easier to code and unclear if the extra
+      // complexity is needed so will start with this.
+      parent_.onPreInitComplete();
+
+      std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
+
+      if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0)) {
+        final_refresh_rate = ttl_refresh_rate;
+        ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
+                  final_refresh_rate.count());
+      }
+
+      resolve_timer_->enableTimer(final_refresh_rate);
+    }
+
     void startResolve();
 
     StrictDnsClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};
     std::string dns_address_;
+    bool srv_;
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;

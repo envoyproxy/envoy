@@ -75,9 +75,14 @@ StrictDnsClusterImpl::ResolveTarget::ResolveTarget(
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint)
     : parent_(parent), dns_address_(Network::Utility::hostFromTcpUrl(url)),
-      port_(Network::Utility::portFromTcpUrl(url)),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
-      locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
+      locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {
+  if (absl::EndsWithIgnoreCase(url, ":srv")) {
+    srv_ = true;
+  } else {
+    port_ = Network::Utility::portFromTcpUrl(url);
+  }
+}
 
 StrictDnsClusterImpl::ResolveTarget::~ResolveTarget() {
   if (active_query_) {
@@ -89,63 +94,29 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   parent_.info_->stats().update_attempt_.inc();
 
-  active_query_ = parent_.dns_resolver_->resolve(
-      dns_address_, parent_.dns_lookup_family_,
-      [this](std::list<Network::DnsResponse>&& response) -> void {
-        active_query_ = nullptr;
-        ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
-        parent_.info_->stats().update_success_.inc();
-
-        std::unordered_map<std::string, HostSharedPtr> updated_hosts;
-        HostVector new_hosts;
-        std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
-        for (const auto& resp : response) {
-          // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
-          // make a new address that has port in it. We need to both support IPv6 as well as
-          // potentially move port handling into the DNS interface itself, which would work better
-          // for SRV.
-          ASSERT(resp.address_ != nullptr);
-          new_hosts.emplace_back(new HostImpl(
-              parent_.info_, dns_address_,
-              Network::Utility::getAddressWithPort(*(resp.address_), port_),
-              lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
-              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
-              locality_lb_endpoint_.priority(), lb_endpoint_.health_status()));
-
-          ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
-        }
-
-        HostVector hosts_added;
-        HostVector hosts_removed;
-        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                          updated_hosts, all_hosts_)) {
-          ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
-          ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
-            return host->priority() == locality_lb_endpoint_.priority();
-          }));
-          parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
-        } else {
-          parent_.info_->stats().update_no_rebuild_.inc();
-        }
-
-        all_hosts_ = std::move(updated_hosts);
-
-        // If there is an initialize callback, fire it now. Note that if the cluster refers to
-        // multiple DNS names, this will return initialized after a single DNS resolution
-        // completes. This is not perfect but is easier to code and unclear if the extra
-        // complexity is needed so will start with this.
-        parent_.onPreInitComplete();
-
-        std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
-
-        if (parent_.respect_dns_ttl_ && ttl_refresh_rate != std::chrono::seconds(0)) {
-          final_refresh_rate = ttl_refresh_rate;
-          ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
-                    final_refresh_rate.count());
-        }
-
-        resolve_timer_->enableTimer(final_refresh_rate);
-      });
+  if (srv_) {
+    active_query_ = parent_.dns_resolver_->resolveSrv(
+        dns_address_, parent_.dns_lookup_family_,
+        [this](std::list<Network::DnsResponse>&& response) -> void {
+          updateHosts(std::move(response),
+                      static_cast<std::function<Network::Address::InstanceConstSharedPtr(
+                          const Network::Address::SrvInstanceConstSharedPtr&)>>(
+                          [this](const Network::Address::SrvInstanceConstSharedPtr& srv) {
+                            return srv->address();
+                          }));
+        });
+  } else {
+    active_query_ = parent_.dns_resolver_->resolve(
+        dns_address_, parent_.dns_lookup_family_,
+        [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+          updateHosts(std::move(address_list),
+                      static_cast<std::function<Network::Address::InstanceConstSharedPtr(
+                          const Network::Address::InstanceConstSharedPtr&)>>(
+                          [this](const Network::Address::InstanceConstSharedPtr& address) {
+                            return Network::Utility::getAddressWithPort(*address, port_);
+                          }));
+        });
+  }
 }
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
