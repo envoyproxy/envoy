@@ -52,8 +52,13 @@ LogicalDnsCluster::LogicalDnsCluster(
 
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
-  Network::Utility::portFromTcpUrl(dns_url_);
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
+
+  if (absl::EndsWithIgnoreCase(dns_url_, ":srv")) {
+    srv_ = true;
+  } else {
+    Network::Utility::portFromTcpUrl(dns_url_);
+  }
 }
 
 void LogicalDnsCluster::startPreInit() { startResolve(); }
@@ -69,52 +74,31 @@ void LogicalDnsCluster::startResolve() {
   ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_address);
   info_->stats().update_attempt_.inc();
 
-  active_dns_query_ = dns_resolver_->resolve(
-      dns_address, dns_lookup_family_,
-      [this, dns_address](std::list<Network::DnsResponse>&& response) -> void {
-        active_dns_query_ = nullptr;
-        ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
-        info_->stats().update_success_.inc();
-
-        std::chrono::milliseconds refresh_rate = dns_refresh_rate_ms_;
-        if (!response.empty()) {
-          // TODO(mattklein123): Move port handling into the DNS interface.
-          ASSERT(response.front().address_ != nullptr);
-          Network::Address::InstanceConstSharedPtr new_address =
-              Network::Utility::getAddressWithPort(*(response.front().address_),
-                                                   Network::Utility::portFromTcpUrl(dns_url_));
-
-          if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds(0)) {
-            refresh_rate = response.front().ttl_;
-          }
-
-          if (!logical_host_) {
-            logical_host_.reset(new LogicalHost(info_, hostname_, new_address, localityLbEndpoint(),
-                                                lbEndpoint(), nullptr));
-
-            const auto& locality_lb_endpoint = localityLbEndpoint();
-            PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
-            priority_state_manager.initializePriorityFor(locality_lb_endpoint);
-            priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
-
-            const uint32_t priority = locality_lb_endpoint.priority();
-            priority_state_manager.updateClusterPrioritySet(
-                priority, std::move(priority_state_manager.priorityState()[priority].first),
-                absl::nullopt, absl::nullopt, absl::nullopt);
-          }
-
-          if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
-            current_resolved_address_ = new_address;
-
-            // Make sure that we have an updated address for admin display, health
-            // checking, and creating real host connections.
-            logical_host_->setNewAddress(new_address, lbEndpoint());
-          }
-        }
-
-        onPreInitComplete();
-        resolve_timer_->enableTimer(refresh_rate);
-      });
+  if (srv_) {
+    active_dns_query_ = dns_resolver_->resolveSrv(
+        dns_address, dns_lookup_family_,
+        [this, dns_address](std::list<Network::DnsResponse>&& response) -> void {
+          updateHosts(dns_address, std::move(response),
+                      static_cast<std::function<Network::Address::InstanceConstSharedPtr(
+                          const Network::Address::SrvInstanceConstSharedPtr&)>>(
+                          [this](const Network::Address::SrvInstanceConstSharedPtr& srv) {
+                            return srv->address();
+                          }));
+        });
+  } else {
+    active_dns_query_ = dns_resolver_->resolve(
+        dns_address, dns_lookup_family_,
+        [this, dns_address](
+            const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+          updateHosts(dns_address, std::move(address_list),
+                      static_cast<std::function<Network::Address::InstanceConstSharedPtr(
+                          const Network::Address::InstanceConstSharedPtr&)>>(
+                          [this](const Network::Address::InstanceConstSharedPtr& address) {
+                            return Network::Utility::getAddressWithPort(
+                                *address, Network::Utility::portFromTcpUrl(dns_url_));
+                          }));
+        });
+  }
 }
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>

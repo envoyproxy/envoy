@@ -55,6 +55,52 @@ private:
     return localityLbEndpoint().lb_endpoints()[0];
   }
 
+  template <typename AddressInstance>
+  void updateHosts(
+      std::string dns_address, const std::list<DnsResponse>&& response,
+      std::function<Network::Address::InstanceConstSharedPtr(const AddressInstance&)> translate) {
+    active_dns_query_ = nullptr;
+    ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address);
+    info_->stats().update_success_.inc();
+
+    std::chrono::milliseconds refresh_rate = dns_refresh_rate_ms_;
+    if (!response.empty()) {
+      // TODO(mattklein123): Move port handling into the DNS interface.
+      ASSERT(response.front().address_ != nullptr);
+      Network::Address::InstanceConstSharedPtr new_address = translate(response.front().address_);
+
+      if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds(0)) {
+        refresh_rate = response.front().ttl_;
+      }
+
+      if (!logical_host_) {
+        logical_host_.reset(new LogicalHost(info_, hostname_, new_address, localityLbEndpoint(),
+                                            lbEndpoint()));
+
+        const auto& locality_lb_endpoint = localityLbEndpoint();
+        PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
+        priority_state_manager.initializePriorityFor(locality_lb_endpoint);
+        priority_state_manager.registerHostForPriority(logical_host_, locality_lb_endpoint);
+
+        const uint32_t priority = locality_lb_endpoint.priority();
+        priority_state_manager.updateClusterPrioritySet(
+            priority, std::move(priority_state_manager.priorityState()[priority].first),
+            absl::nullopt, absl::nullopt, absl::nullopt);
+      }
+
+      if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
+        current_resolved_address_ = new_address;
+
+        // Make sure that we have an updated address for admin display, health
+        // checking, and creating real host connections.
+        logical_host_->setNewAddress(new_address, lbEndpoint());
+      }
+    }
+
+    onPreInitComplete();
+    resolve_timer_->enableTimer(refresh_rate);
+  }
+
   void startResolve();
 
   // ClusterImplBase
@@ -67,6 +113,7 @@ private:
   Event::TimerPtr resolve_timer_;
   std::string dns_url_;
   std::string hostname_;
+  bool srv_;
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
   LogicalHostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
