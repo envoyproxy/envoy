@@ -8,14 +8,14 @@ using Envoy::Http::HeaderMap;
 
 namespace Envoy {
 
-TEST(headerMapEqualIgnoreOrder, ActuallyEqual) {
+TEST(HeaderMapEqualIgnoreOrder, ActuallyEqual) {
   Http::TestHeaderMapImpl lhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
   EXPECT_EQ(lhs, rhs);
 }
 
-TEST(headerMapEqualIgnoreOrder, IgnoreOrder) {
+TEST(HeaderMapEqualIgnoreOrder, IgnoreOrder) {
   Http::TestHeaderMapImpl lhs{{":method", "GET"}, {":authority", "host"}, {":path", "/"}};
   Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
@@ -23,13 +23,13 @@ TEST(headerMapEqualIgnoreOrder, IgnoreOrder) {
   EXPECT_FALSE(lhs == rhs);
 }
 
-TEST(headerMapEqualIgnoreOrder, NotEqual) {
+TEST(HeaderMapEqualIgnoreOrder, NotEqual) {
   Http::TestHeaderMapImpl lhs{{":method", "GET"}, {":authority", "host"}, {":authority", "host"}};
   Http::TestHeaderMapImpl rhs{{":method", "GET"}, {":authority", "host"}};
   EXPECT_FALSE(TestUtility::headerMapEqualIgnoreOrder(lhs, rhs));
 }
 
-TEST(protoEqIgnoreField, ActuallyEqual) {
+TEST(ProtoEqIgnoreField, ActuallyEqual) {
   // Ignored field equal
   {
     envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
@@ -65,7 +65,7 @@ TEST(protoEqIgnoreField, ActuallyEqual) {
   }
 }
 
-TEST(protoEqIgnoreField, NotEqual) {
+TEST(ProtoEqIgnoreField, NotEqual) {
   // Ignored field equal
   {
     envoy::api::v2::DeltaDiscoveryRequest lhs, rhs;
@@ -101,7 +101,7 @@ TEST(protoEqIgnoreField, NotEqual) {
   }
 }
 
-TEST(buffersEqual, Aligned) {
+TEST(BuffersEqual, Aligned) {
   Buffer::OwnedImpl buffer1, buffer2;
   EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
 
@@ -116,7 +116,7 @@ TEST(buffersEqual, Aligned) {
   EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
 }
 
-TEST(buffersEqual, NonAligned) {
+TEST(BuffersEqual, NonAligned) {
   Buffer::OwnedImpl buffer1, buffer2;
   EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
 

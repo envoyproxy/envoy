@@ -29,7 +29,7 @@ public:
 
   void pause();
   void resume();
-  bool paused() { return paused_; }
+  bool paused() const { return paused_; }
 
   // Returns true if there is any meaningful change in our subscription interest, worth reporting to
   // the server.
@@ -70,7 +70,7 @@ private:
   // Use these helpers to ensure resource_versions_ and resource_names_ get updated together.
   void setResourceVersion(const std::string& resource_name, const std::string& resource_version);
   void setResourceWaitingForServer(const std::string& resource_name);
-  void lostInterestInResource(const std::string& resource_name);
+  void setLostInterestInResource(const std::string& resource_name);
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have

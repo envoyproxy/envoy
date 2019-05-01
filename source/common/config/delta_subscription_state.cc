@@ -63,7 +63,7 @@ bool DeltaSubscriptionState::updateResourceInterest(
     names_added_.insert(a);
   }
   for (const auto& r : cur_removed) {
-    lostInterestInResource(r);
+    setLostInterestInResource(r);
     // Ideally, when a resource is added-then-removed in between requests, we would avoid putting
     // a superfluous "unsubscribe [resource that was never subscribed]" in the request. However,
     // the removed-then-added case *does* need to go in the request, and due to how we accomplish
@@ -185,7 +185,7 @@ void DeltaSubscriptionState::setResourceWaitingForServer(const std::string& reso
   resource_names_.insert(resource_name);
 }
 
-void DeltaSubscriptionState::lostInterestInResource(const std::string& resource_name) {
+void DeltaSubscriptionState::setLostInterestInResource(const std::string& resource_name) {
   resource_versions_.erase(resource_name);
   resource_names_.erase(resource_name);
 }

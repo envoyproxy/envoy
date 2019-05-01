@@ -228,6 +228,20 @@ public:
   }
 
   /**
+   * Symmetrically pad a string with '=' out to a desired length.
+   * @param to_pad the string being padded around.
+   * @param desired_length the length we want the padding to bring the string up to.
+   * @return the padded string.
+   */
+  static std::string addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {
+    int line_fill_len = desired_length - to_pad.length();
+    int first_half_len = line_fill_len / 2;
+    int second_half_len = line_fill_len - first_half_len;
+    return absl::StrCat(std::string(first_half_len, '='), to_pad,
+                        std::string(second_half_len, '='));
+  }
+
+  /**
    * Split a string.
    * @param source supplies the string to split.
    * @param split supplies the char to split on.
@@ -583,17 +597,11 @@ MATCHER_P(ProtoEq, expected, "") {
 MATCHER_P2(ProtoEqIgnoringField, expected, ignored_field, "") {
   const bool equal = TestUtility::protoEqualIgnoringField(arg, expected, ignored_field);
   if (!equal) {
-    int line_fill_len =
-        (68 - (std::string(ignored_field).length() + std::string("(but ignoring )").length()));
-    int first_half_len = line_fill_len / 2;
-    int second_half_len = line_fill_len - first_half_len;
-    std::string first_half(first_half_len, '=');
-    std::string second_half(second_half_len, '=');
-
+    std::string padded_ignored_field =
+        TestUtility::addLeftAndRightPadding(absl::StrCat("(but ignoring ", ignored_field, ")"), 68);
     *result_listener << "\n"
                      << "==========================Expected proto:===========================\n"
-                     << first_half << "(but ignoring " << ignored_field << ")" << second_half
-                     << "\n"
+                     << padded_ignored_field << "\n"
                      << expected.DebugString()
                      << "------------------is not equal to actual proto:---------------------\n"
                      << arg.DebugString()

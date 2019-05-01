@@ -41,12 +41,8 @@ public:
         type_url_(type_url), local_info_(local_info), stats_(stats), dispatcher_(dispatcher),
         init_fetch_timeout_(init_fetch_timeout) {}
 
-  void pause() {
-    ASSERT(state_, "Must call start() on DeltaSubscriptionImpl before doing anything with it.");
-    state_->pause();
-  }
+  void pause() { state_->pause(); }
   void resume() {
-    ASSERT(state_, "Must call start() on DeltaSubscriptionImpl before doing anything with it.");
     state_->resume();
     trySendDiscoveryRequests();
   }
@@ -61,7 +57,6 @@ public:
 
   void updateResources(const std::set<std::string>& update_to_these_names) override {
     // Tell the server about our new interests (but only if there are any).
-    ASSERT(state_, "Must call start() on DeltaSubscriptionImpl before doing anything with it.");
     if (state_->updateResourceInterest(update_to_these_names)) {
       kickOffDiscoveryRequest();
     }
@@ -69,21 +64,16 @@ public:
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override {
-    ASSERT(state_, "Must call start() on DeltaSubscriptionImpl before doing anything with it.");
     state_->set_first_request_of_new_stream(true);
     kickOffDiscoveryRequest();
   }
 
-  void onEstablishmentFailure() override {
-    ASSERT(state_, "Must call start() on DeltaSubscriptionImpl before doing anything with it.");
-    state_->handleEstablishmentFailure();
-  }
+  void onEstablishmentFailure() override { state_->handleEstablishmentFailure(); }
 
   void
   onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override {
     ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
               message->system_version_info());
-    ASSERT(state_, "Must call start() on DeltaSubscriptionImpl before doing anything with it.");
     kickOffDiscoveryRequestWithAck(state_->handleResponse(*message));
   }
 
@@ -98,7 +88,6 @@ private:
   }
 
   bool shouldSendDiscoveryRequest() {
-    ASSERT(state_, "Must call start() on DeltaSubscriptionImpl before doing anything with it.");
     if (state_->paused()) {
       ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url_);
       return false;
@@ -113,7 +102,6 @@ private:
   }
 
   void trySendDiscoveryRequests() {
-    ASSERT(state_, "Must call start() on DeltaSubscriptionImpl before doing anything with it.");
     while (!ack_queue_.empty() && shouldSendDiscoveryRequest()) {
       envoy::api::v2::DeltaDiscoveryRequest request = state_->getNextRequest();
       if (ack_queue_.front().has_value()) {
