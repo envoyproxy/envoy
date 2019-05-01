@@ -309,7 +309,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
                             request_status.error_message().size()),
           nullptr, absl::nullopt,
           absl::StrCat(StreamInfo::ResponseCodeDetails::get().GrpcTranscodeFailedEarly, "{",
-                       request_status.code().ToString(), "}"));
+                       CodeEnumToString(request_status.code()), "}"));
 
       return Http::FilterHeadersStatus::StopIteration;
     }
