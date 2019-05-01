@@ -269,7 +269,9 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
     read_end_stream_raised_ = true;
   }
 
-  filter_manager_.onRead();
+  if (!inDelayedClose()) {
+    filter_manager_.onRead();
+  }
 }
 
 void ConnectionImpl::enableHalfClose(bool enabled) {
