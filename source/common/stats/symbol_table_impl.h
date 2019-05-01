@@ -412,6 +412,13 @@ private:
  * StatNameManagedStorage, this has an RAII usage model, taking
  * care of decrementing ref-counts in the SymbolTable for all
  * contained StatNames on destruction or on clear();
+ *
+ * Example usage:
+ *   StatNamePool pool(symbol_table);
+ *   StatName name1 = pool.add("name1");
+ *   StatName name2 = pool.add("name2");
+ *   uint8_t* storage = pool.addReturningStorage("name3");
+ *   StatName name3(storage);
  */
 class StatNamePool {
 public:
