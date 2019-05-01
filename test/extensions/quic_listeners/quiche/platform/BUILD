@@ -29,11 +29,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "quic_platform_test",
     srcs = ["quic_platform_test.cc"],
+    copts = ["-Wno-unused-parameter"],
     data = [
         "//test/extensions/transport_sockets/tls/test_data:certs",
     ],
     external_deps = ["quiche_quic_platform"],
     deps = [
+        ":quic_platform_epoll_clock_lib",
         "//source/common/memory:stats_lib",
         "//source/extensions/quic_listeners/quiche/platform:flags_impl_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -42,10 +44,12 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@com_googlesource_quiche//:epoll_server_lib",
         "@com_googlesource_quiche//:quic_platform_expect_bug",
         "@com_googlesource_quiche//:quic_platform_mock_log",
         "@com_googlesource_quiche//:quic_platform_port_utils",
         "@com_googlesource_quiche//:quic_platform_sleep",
+        "@com_googlesource_quiche//:quic_platform_system_event_loop",
         "@com_googlesource_quiche//:quic_platform_test_output",
         "@com_googlesource_quiche//:quic_platform_thread",
     ],
@@ -92,6 +96,22 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_platform_epoll_clock_lib",
+    srcs = ["quic_epoll_clock.cc"],
+    hdrs = ["quic_epoll_clock.h"],
+    deps = [
+        "@com_googlesource_quiche//:quic_platform_clock_lib",
+        "@com_googlesource_quiche//:quic_platform_epoll_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_epoll_impl_lib",
+    hdrs = ["quic_epoll_impl.h"],
+    deps = ["@com_googlesource_quiche//:epoll_server_lib"],
+)
+
+envoy_cc_test_library(
     name = "quic_platform_expect_bug_impl_lib",
     hdrs = ["quic_expect_bug_impl.h"],
     deps = [
@@ -114,6 +134,11 @@ envoy_cc_test_library(
         "//source/common/network:utility_lib",
         "//test/test_common:environment_lib",
     ],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_system_event_loop_impl_lib",
+    hdrs = ["quic_system_event_loop_impl.h"],
 )
 
 envoy_cc_test_library(
