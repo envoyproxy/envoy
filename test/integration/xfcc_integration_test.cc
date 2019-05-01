@@ -640,7 +640,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.admin.downstream_rq_tx_reset", "http.downstream_rq_tx_reset"},
       {"http.admin.downstream_flow_control_resumed_reading_total",
        "http.downstream_flow_control_resumed_reading_total"},
-      {"stats.overflow", "stats.overflow"},
       {"http.admin.downstream_cx_total", "http.downstream_cx_total"},
       {"http.admin.downstream_rq_3xx", "http.downstream_rq_xx"},
       {"http.admin.downstream_cx_idle_timeout", "http.downstream_cx_idle_timeout"},
