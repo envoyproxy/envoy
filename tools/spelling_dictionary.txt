@@ -617,6 +617,7 @@ ptr
 ptrs
 pwd
 py
+qps
 quantile
 quantiles
 queueing
@@ -659,6 +660,7 @@ retriable
 rpcs
 rq
 rtrim
+rtt
 sanitization
 sanitizer
 scala

@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+
 #include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
@@ -13,6 +15,7 @@
 #include "quiche/http2/platform/api/http2_bug_tracker.h"
 #include "quiche/http2/platform/api/http2_containers.h"
 #include "quiche/http2/platform/api/http2_estimate_memory_usage.h"
+#include "quiche/http2/platform/api/http2_flags.h"
 #include "quiche/http2/platform/api/http2_logging.h"
 #include "quiche/http2/platform/api/http2_macros.h"
 #include "quiche/http2/platform/api/http2_optional.h"
@@ -119,6 +122,36 @@ TEST(Http2PlatformTest, Http2StringPiece) {
 TEST(Http2PlatformTest, Http2Macro) {
   EXPECT_DEBUG_DEATH(HTTP2_UNREACHABLE(), "");
   EXPECT_DEATH(HTTP2_DIE_IF_NULL(nullptr), "");
+}
+
+TEST(Http2PlatformTest, Http2Flags) {
+  auto& flag_registry = quiche::FlagRegistry::GetInstance();
+  flag_registry.ResetFlags();
+  EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+  SetHttp2ReloadableFlag(http2_testonly_default_false, true);
+  EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+
+  for (std::string s : {"1", "t", "true", "TRUE", "y", "yes", "Yes"}) {
+    SetHttp2ReloadableFlag(http2_testonly_default_false, false);
+    EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+    EXPECT_TRUE(flag_registry.FindFlag("http2_reloadable_flag_http2_testonly_default_false")
+                    ->SetValueFromString(s));
+    EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+  }
+  for (std::string s : {"0", "f", "false", "FALSE", "n", "no", "No"}) {
+    SetHttp2ReloadableFlag(http2_testonly_default_false, true);
+    EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+    EXPECT_TRUE(flag_registry.FindFlag("http2_reloadable_flag_http2_testonly_default_false")
+                    ->SetValueFromString(s));
+    EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+  }
+  for (std::string s : {"some", "invalid", "values", ""}) {
+    SetHttp2ReloadableFlag(http2_testonly_default_false, false);
+    EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+    EXPECT_FALSE(flag_registry.FindFlag("http2_reloadable_flag_http2_testonly_default_false")
+                     ->SetValueFromString(s));
+    EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+  }
 }
 
 } // namespace
