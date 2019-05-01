@@ -434,7 +434,10 @@ envoy_cc_test(
         "echo_integration_test.cc",
     ],
     # This test must be run in exclusive mode: see comments in AddRemoveListener
-    tags = ["exclusive"],
+    tags = select({
+        "//bazel:remote_execution": [],
+        "//conditions:default": ["exclusive"],
+    }),
     deps = [
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
