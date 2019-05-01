@@ -41,8 +41,49 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
-
 namespace {
+
+// TODO(alyssawilk) see if we can get proto to expose this code.
+// If not, move it to a common utility.
+inline std::string CodeEnumToString(ProtobufUtil::error::Code code) {
+  switch (code) {
+  case ProtobufUtil::error::OK:
+    return "OK";
+  case ProtobufUtil::error::CANCELLED:
+    return "CANCELLED";
+  case ProtobufUtil::error::UNKNOWN:
+    return "UNKNOWN";
+  case ProtobufUtil::error::INVALID_ARGUMENT:
+    return "INVALID_ARGUMENT";
+  case ProtobufUtil::error::DEADLINE_EXCEEDED:
+    return "DEADLINE_EXCEEDED";
+  case ProtobufUtil::error::NOT_FOUND:
+    return "NOT_FOUND";
+  case ProtobufUtil::error::ALREADY_EXISTS:
+    return "ALREADY_EXISTS";
+  case ProtobufUtil::error::PERMISSION_DENIED:
+    return "PERMISSION_DENIED";
+  case ProtobufUtil::error::UNAUTHENTICATED:
+    return "UNAUTHENTICATED";
+  case ProtobufUtil::error::RESOURCE_EXHAUSTED:
+    return "RESOURCE_EXHAUSTED";
+  case ProtobufUtil::error::FAILED_PRECONDITION:
+    return "FAILED_PRECONDITION";
+  case ProtobufUtil::error::ABORTED:
+    return "ABORTED";
+  case ProtobufUtil::error::OUT_OF_RANGE:
+    return "OUT_OF_RANGE";
+  case ProtobufUtil::error::UNIMPLEMENTED:
+    return "UNIMPLEMENTED";
+  case ProtobufUtil::error::INTERNAL:
+    return "INTERNAL";
+  case ProtobufUtil::error::UNAVAILABLE:
+    return "UNAVAILABLE";
+  case ProtobufUtil::error::DATA_LOSS:
+    return "DATA_LOSS";
+  }
+  return "UNKNOWN";
+}
 
 // Transcoder:
 // https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/master/src/include/grpc_transcoding/transcoder.h
@@ -262,10 +303,13 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     if (!request_status.ok()) {
       ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
       error_ = true;
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                         absl::string_view(request_status.error_message().data(),
-                                                           request_status.error_message().size()),
-                                         nullptr, absl::nullopt);
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::BadRequest,
+          absl::string_view(request_status.error_message().data(),
+                            request_status.error_message().size()),
+          nullptr, absl::nullopt,
+          absl::StrCat(StreamInfo::ResponseCodeDetails::get().GrpcTranscodeFailedEarly, "{",
+                       request_status.code().ToString(), "}"));
 
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -300,10 +344,13 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   if (!request_status.ok()) {
     ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
     error_ = true;
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                       absl::string_view(request_status.error_message().data(),
-                                                         request_status.error_message().size()),
-                                       nullptr, absl::nullopt);
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::BadRequest,
+        absl::string_view(request_status.error_message().data(),
+                          request_status.error_message().size()),
+        nullptr, absl::nullopt,
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().GrpcTranscodeFailed, "{",
+                     CodeEnumToString(request_status.code()), "}"));
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
