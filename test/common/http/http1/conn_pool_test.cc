@@ -601,7 +601,7 @@ TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
 
-  // Response with 'connection: close' which should cause the connection to go away.
+  // Response with 'proxy-connection: close' which should cause the connection to go away.
   EXPECT_CALL(conn_pool_, onClientDestroy());
   Http::HeaderMapPtr response_headers(
       new TestHeaderMapImpl{{":status", "200"}, {"Proxy-Connection", "Close"}});
