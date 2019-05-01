@@ -407,10 +407,21 @@ private:
   SymbolTable& symbol_table_;
 };
 
-class StatNameManagedContainer {
+/**
+ * Maintains storage for a collection of StatName objects. Like
+ * StatNameManagedStorage, this has an RAII usage model, taking
+ * care of decrementing ref-counts in the SymbolTable for all
+ * contained StatNames on destruction or on clear();
+ */
+class StatNamePool {
 public:
-  explicit StatNameManagedContainer(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
-  ~StatNameManagedContainer();
+  explicit StatNamePool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+  ~StatNamePool() { clear(); }
+
+  /**
+   * Removes all StatNames from the pool.
+   */
+  void clear();
 
   /**
    * @param name the name to add the container.

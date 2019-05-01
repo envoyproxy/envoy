@@ -317,20 +317,19 @@ void StatNameStorage::free(SymbolTable& table) {
   bytes_.reset();
 }
 
-StatNameManagedContainer::~StatNameManagedContainer() {
+void StatNamePool::clear() {
   for (StatNameStorage& storage : storage_vector_) {
     storage.free(symbol_table_);
   }
+  storage_vector_.clear();
 }
 
-uint8_t* StatNameManagedContainer::addReturningStorage(absl::string_view str) {
+uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
   storage_vector_.push_back(Stats::StatNameStorage(str, symbol_table_));
   return storage_vector_.back().bytes();
 }
 
-StatName StatNameManagedContainer::add(absl::string_view str) {
-  return StatName(addReturningStorage(str));
-}
+StatName StatNamePool::add(absl::string_view str) { return StatName(addReturningStorage(str)); }
 
 StatNameStorageSet::~StatNameStorageSet() {
   // free() must be called before destructing StatNameStorageSet to decrement
