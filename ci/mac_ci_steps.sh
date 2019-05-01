@@ -23,4 +23,4 @@ BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_output=all --flaky_test_attemp
 # is somewhat more deterministic (rather than interleaving the build
 # and test steps).
 
-bazel test ${BAZEL_TEST_OPTIONS} //test/integration/... --test_arg="-l trace"
+bazel test ${BAZEL_TEST_OPTIONS} //test/integration/...
