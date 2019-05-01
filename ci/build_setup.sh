@@ -82,6 +82,7 @@ if [[ -d /bazel-prebuilt-output && ! -d "${TEST_TMPDIR}/_bazel_${USER}" ]]; then
   mkdir -p "${TEST_TMPDIR}/_bazel_${USER}/install"
   rsync -a /bazel-prebuilt-root/install/* "${TEST_TMPDIR}/_bazel_${USER}/install/"
   rsync -a /bazel-prebuilt-output "${BAZEL_OUTPUT_BASE}"
+  bazel shutdown
 fi
 
 if [ "$1" != "-nofetch" ]; then
