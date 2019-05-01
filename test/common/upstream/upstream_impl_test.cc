@@ -465,6 +465,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   {
     const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(2UL, hosts.size());
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
 
     hosts[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
