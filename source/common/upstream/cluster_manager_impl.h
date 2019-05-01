@@ -330,6 +330,7 @@ private:
                                         LocalityWeightsConstSharedPtr locality_weights,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed, ThreadLocal::Slot& tls,
+                                        uint32_t warmed_host_count,
                                         uint64_t overprovisioning_factor);
     static void onHostHealthFailure(const HostSharedPtr& host, ThreadLocal::Slot& tls);
 

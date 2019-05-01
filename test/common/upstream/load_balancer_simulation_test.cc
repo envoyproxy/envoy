@@ -59,7 +59,7 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
       HostSetImpl::updateHostsParams(updated_hosts, updated_locality_hosts,
                                      std::make_shared<const HealthyHostVector>(*updated_hosts),
                                      updated_locality_hosts),
-      {}, hosts, {}, absl::nullopt);
+      {}, hosts, {}, updated_hosts->size(), absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterStats stats{ClusterInfoImpl::generateStats(stats_store)};
@@ -165,7 +165,7 @@ public:
           HostSetImpl::updateHostsParams(
               originating_hosts, per_zone_local_shared,
               std::make_shared<const HealthyHostVector>(*originating_hosts), per_zone_local_shared),
-          {}, empty_vector_, empty_vector_, absl::nullopt);
+          {}, empty_vector_, empty_vector_, originating_hosts->size(), absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr);
       hits[selected->address()->asString()]++;

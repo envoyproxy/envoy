@@ -1308,7 +1308,7 @@ TEST_F(ClusterManagerImplTest, HostsPostedToTlsCluster) {
 
   cluster1->priority_set_.updateHosts(
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
-      100);
+      hosts.size(), 100);
 
   auto* tls_cluster = cluster_manager_->get(cluster1->info_->name());
 
@@ -2177,7 +2177,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -2189,13 +2189,13 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   cluster.prioritySet().updateHosts(
       0,
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -2214,7 +2214,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -2228,7 +2228,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
 
   (*hosts)[0]->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
   cluster.prioritySet().updateHosts(
@@ -2236,7 +2236,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
 
   (*hosts)[0]->weight(100);
   cluster.prioritySet().updateHosts(
@@ -2244,7 +2244,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
 
   // Updates not delivered yet.
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -2258,7 +2258,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
 
   EXPECT_EQ(3, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -2295,7 +2295,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
@@ -2323,7 +2323,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
@@ -2359,7 +2359,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindowDisabled) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
@@ -2426,7 +2426,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -2438,13 +2438,13 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   cluster.prioritySet().updateHosts(
       0,
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                      std::make_shared<const HealthyHostVector>(*hosts),
                                      hosts_per_locality),
-      {}, hosts_added, hosts_removed, absl::nullopt);
+      {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
