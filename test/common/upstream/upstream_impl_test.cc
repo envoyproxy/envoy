@@ -410,8 +410,8 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   EXPECT_EQ(1UL, hosts.size());
 }
 
-// Verify that a host is removed if it is removed from DNS but still passing active health
-// checking, and then active health checking fails.
+// Verify that a host is not removed if it is removed from DNS but still passing active health
+// checking.
 TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   const std::string yaml = R"EOF(
     name: name
@@ -471,9 +471,11 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
     health_checker->runCallbacks(hosts[1], HealthTransition::Changed);
   }
 
+  // Unlike EDS we will not remove if HC is failing but will wait until the next polling interval.
+  // This may change in the future.
   {
     const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(1UL, hosts.size());
+    EXPECT_EQ(2UL, hosts.size());
   }
 }
 

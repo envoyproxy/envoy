@@ -523,8 +523,36 @@ TEST_F(EdsTest, EndpoingRemovalAfterHcFail) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+
+  // Add both hosts back, make sure pending removal is gone.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  add_endpoint(81);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+    EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+
+  // Remove endpoints and add back the port 80 one. Both hosts should be present due to
+  // being stabilized, but one of them should be marked pending removal.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  HostSharedPtr not_removed_host;
+  HostSharedPtr removed_host;
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
 
     // Mark the host is failing active HC and then run callbacks.
+    not_removed_host = hosts[0];
+    removed_host = hosts[1];
     hosts[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
     health_checker->runCallbacks(hosts[1], HealthTransition::Changed);
   }
@@ -532,6 +560,21 @@ TEST_F(EdsTest, EndpoingRemovalAfterHcFail) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 1);
+  }
+
+  // Add back 81. Verify that we have a new host. This will show that the all_hosts_ was updated
+  // correctly.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  add_endpoint(81);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+    EXPECT_EQ(not_removed_host, hosts[0]);
+    EXPECT_EQ(removed_host->address()->asString(), hosts[1]->address()->asString());
+    EXPECT_NE(removed_host, hosts[1]);
   }
 }
 

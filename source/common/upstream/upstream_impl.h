@@ -698,12 +698,8 @@ protected:
 
 private:
   void finishInitialization();
-  virtual void onHealthCheckHostRemoval(const HostSharedPtr&) {
-    // See the comment in the implementation for why this is here. Will try to clean this up
-    // in a follow up.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
   void reloadHealthyHosts(const HostSharedPtr& host);
+  virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
 
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
@@ -852,7 +848,6 @@ private:
                       uint32_t priority);
 
   // ClusterImplBase
-  void onHealthCheckHostRemoval(const HostSharedPtr& host) override;
   void startPreInit() override;
 
   const LocalInfo::LocalInfo& local_info_;
