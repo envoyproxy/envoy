@@ -34,13 +34,6 @@ public:
   void iterateTags(const TagIterFn& fn) const override;
 
 protected:
-  /**
-   * Flags used by all stats types to figure out whether they have been used.
-   */
-  struct Flags {
-    static const uint8_t Used = 0x1;
-  };
-
   void clear();
 
 private:

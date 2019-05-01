@@ -110,7 +110,6 @@ MockStore::MockStore() : StoreImpl(*fake_symbol_table_) {
     histograms_.emplace_back(histogram);
     return *histogram;
   }));
-  ON_CALL(*this, statsOptions()).WillByDefault(ReturnRef(stats_options_));
 }
 MockStore::~MockStore() {}
 

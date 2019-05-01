@@ -289,16 +289,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "block_memory_hash_set_lib",
-    hdrs = ["block_memory_hash_set.h"],
-    deps = [
-        ":assert_lib",
-        ":logger_lib",
-        "//source/common/stats:stats_options_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "perf_annotation_lib",
     srcs = ["perf_annotation.cc"],
     hdrs = ["perf_annotation.h"],
