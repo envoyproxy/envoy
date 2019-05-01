@@ -13,16 +13,7 @@ OriginalSrcFilter::OriginalSrcFilter(const Config& config) : config_(config) {}
 
 void OriginalSrcFilter::onDestroy() {}
 
-Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::HeaderMap&, bool end_stream) {
-
-  // We wait until the end of all the headers to ensure any that affect that downstream remote
-  // address have been parsed. Further, if there's no downstream connection, we can't do anything
-  // so just continue.
-  if (!end_stream || !callbacks_->connection()) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  auto connection_options = callbacks_->connection()->socketOptions();
+Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::HeaderMap&, bool) {
   auto address = callbacks_->streamInfo().downstreamRemoteAddress();
   ASSERT(address);
 
@@ -34,9 +25,10 @@ Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::HeaderMap&, boo
     // Nothing we can do with this.
     return Http::FilterHeadersStatus::Continue;
   }
+
   auto options_to_add =
       Filters::Common::OriginalSrc::buildOriginalSrcOptions(std::move(address), config_.mark());
-  Network::Socket::appendOptions(connection_options, options_to_add);
+  callbacks_->addUpstreamSocketOptions(options_to_add);
   return Http::FilterHeadersStatus::Continue;
 }
 
