@@ -21,6 +21,10 @@ load("//bazel:envoy_build_system.bzl", "envoy_package")
 
 envoy_package()
 
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+
+envoy_package()
+
 cc_library(
     name = "malloc",
 )
