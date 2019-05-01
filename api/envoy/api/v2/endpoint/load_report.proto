@@ -25,6 +25,15 @@ message UpstreamLocalityStats {
   // collected from. Zone and region names could be empty if unknown.
   core.Locality locality = 1;
 
+  // The total number of requests sent by this Envoy since the last report. This
+  // information is aggregated over all the upstream Endpoints. total_requests
+  // can be inferred from:
+  //
+  // .. code-block:: none
+  //
+  //   total_requests = total_successful_requests + total_requests_in_progress +
+  //     total_error_requests
+  //
   // The total number of requests successfully completed by the endpoints in the
   // locality.
   uint64 total_successful_requests = 2;
@@ -35,11 +44,6 @@ message UpstreamLocalityStats {
   // The total number of requests that failed due to errors at the endpoint,
   // aggregated over all endpoints in the locality.
   uint64 total_error_requests = 4;
-
-  // The total number of requests that were issued by this Envoy since
-  // the last report. This information is aggregated over all the
-  // upstream endpoints in the locality.
-  uint64 total_issued_requests = 8;
 
   // Stats for multi-dimensional load balancing.
   repeated EndpointLoadMetricStats load_metric_stats = 5;
@@ -62,6 +66,16 @@ message UpstreamEndpointStats {
   // endpoint. Envoy will pass this directly to the management server.
   google.protobuf.Struct metadata = 6;
 
+  // The total number of requests successfully completed by the endpoint. A
+  // single HTTP or gRPC request or stream is counted as one request. A TCP
+  // connection is also treated as one request. There is no explicit
+  // total_requests field below for an endpoint, but it may be inferred from:
+  //
+  // .. code-block:: none
+  //
+  //   total_requests = total_successful_requests + total_requests_in_progress +
+  //     total_error_requests
+  //
   // The total number of requests successfully completed by the endpoints in the
   // locality. These include non-5xx responses for HTTP, where errors
   // originate at the client and the endpoint responded successfully. For gRPC,
@@ -82,11 +96,6 @@ message UpstreamEndpointStats {
   //   - Unknown
   //   - DataLoss
   uint64 total_error_requests = 4;
-
-  // The total number of requests that were issued to this endpoint
-  // since the last report. A single TCP connection, HTTP or gRPC
-  // request or stream is counted as one request.
-  uint64 total_issued_requests = 7;
 
   // Stats for multi-dimensional load balancing.
   repeated EndpointLoadMetricStats load_metric_stats = 5;
@@ -129,7 +138,8 @@ message ClusterStats {
   //
   // .. code-block:: none
   //
-  //   sum_locality(total_issued_requests) + total_dropped_requests`
+  //   sum_locality(total_successful_requests) + sum_locality(total_requests_in_progress) +
+  //     sum_locality(total_error_requests) + total_dropped_requests`
   //
   // The total number of dropped requests. This covers requests
   // deliberately dropped by the drop_overload policy and circuit breaking.
