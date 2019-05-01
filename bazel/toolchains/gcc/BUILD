@@ -17,6 +17,9 @@ licenses(["notice"])  # Apache 2
 # This becomes the BUILD file for @local_config_cc// under non-FreeBSD unixes.
 
 load(":cc_toolchain_config.bzl", "cc_toolchain_config")
+load("//bazel:envoy_build_system.bzl", "envoy_package")
+
+envoy_package()
 
 cc_library(
     name = "malloc",
