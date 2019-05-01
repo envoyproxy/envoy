@@ -72,14 +72,27 @@ jobs:
            path: /build/envoy/generated
            destination: /
    rbe:
-     executor: ubuntu-build
+     machine: true
      steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
-       - run: ci/do_circle_ci.sh bazel.rbe
-       - store_artifacts:
-           path: /build/envoy/generated
-           destination: /
+     - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
+     - checkout
+     - run:
+         name: enable ipv6
+         command: |
+           echo '{
+             "ipv6": true,
+             "fixed-cidr-v6": "2001:db8:1::/64"
+           }' | sudo tee /etc/docker/daemon.json
+
+           sudo service docker restart
+     - run: dig go.googlesource.com A go.googlesource.com AAAA # Debug IPv6 network issues
+     - run: ifconfig
+     - run: route -A inet -A inet6
+     - run: curl -v https://go.googlesource.com
+     - run: curl -6 -v https://go.googlesource.com || true
+     - run: ./ci/run_envoy_docker.sh 'ci/do_ci.sh bazel.rbe'
+     - store_artifacts:
+         path: /tmp/envoy-docker/envoy/generated/failed-testlogs
    api:
      executor: ubuntu-build
      steps:
