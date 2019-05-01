@@ -150,6 +150,10 @@ elif [[ "$1" == "bazel.tsan" ]]; then
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan \
     //:echo2_integration_test //:envoy_binary_test
   exit 0
+elif [[ "$1" == "bazel.rbe" ]]; then
+  bazel_with_collection --host_jvm_args=-Xmx4096m test --config=remote-clang //test/... \
+    --remote_instance_name=projects/envoy-ci/instances/default_instance --jobs=200 \
+    --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_FILE}
 elif [[ "$1" == "bazel.dev" ]]; then
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.
