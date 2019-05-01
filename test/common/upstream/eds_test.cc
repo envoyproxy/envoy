@@ -546,6 +546,8 @@ TEST_F(EdsTest, EndpoingRemovalAfterHcFail) {
   HostSharedPtr not_removed_host;
   HostSharedPtr removed_host;
   {
+    EXPECT_EQ(2,
+              cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get()[0].size());
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
@@ -558,8 +560,9 @@ TEST_F(EdsTest, EndpoingRemovalAfterHcFail) {
   }
 
   {
-    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(hosts.size(), 1);
+    EXPECT_EQ(1,
+              cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get()[0].size());
+    EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   }
 
   // Add back 81. Verify that we have a new host. This will show that the all_hosts_ was updated
