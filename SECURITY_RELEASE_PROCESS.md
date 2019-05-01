@@ -164,8 +164,8 @@ issue fixed for your respective distribution's users.
 Before any information from the list is shared with respective members of your team required to fix
 said issue, they must agree to the same terms and only find out information on a need-to-know basis.
 
-The embargo applies to information shared, source code and binary images. It is a violation of the
-embargo policy to share binary distributions of the security fixes before the public release date.
+The embargo applies to information shared, source code and binary images. **It is a violation of the
+embargo policy to share binary distributions of the security fixes before the public release date.**
 This includes, but is not limited to, Envoy binaries and Docker images. It is expected that
 distributors have a method to stage and validate new binaries without exposing them publicly.
 
