@@ -437,6 +437,11 @@ public:
   StatName add(absl::string_view name);
 
   /**
+   * Does essentially the same thing as add(), but returns the storage as a
+   * pointer which can later be used to create a StatName. This can be used
+   * to accumulate a vector of uint8_t* which can later be used to create
+   * StatName objects on demand.
+   *
    * @param name the name to add the container.
    * @return a pointer to the bytes held in the container for this name, suitable for
    *         using to construct a StatName.
