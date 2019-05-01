@@ -18,6 +18,7 @@ public:
                const HealthyAndDegradedLoad&(const PrioritySet&, const HealthyAndDegradedLoad&));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
   MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
+  MOCK_CONST_METHOD0(usptreamSocketOptions, Network::Socket::OptionsSharedPtr());
 };
 
 } // namespace Upstream
