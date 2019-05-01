@@ -129,65 +129,6 @@ TEST(UtilityTest, createTagProducer) {
   ASSERT_EQ(tags.size(), 1);
 }
 
-TEST(UtilityTest, ObjNameLength) {
-  Stats::StatsOptionsImpl stats_options;
-  std::string name = "listenerwithareallyreallyreallyreallyreallyreallyreallyreallyreallyreallyreal"
-                     "lyreallyreallyreallyreallyreallylongnamemorethanmaxcharsallowedbyschema";
-  std::string err_prefix;
-  std::string err_suffix = fmt::format(": Length of {} ({}) exceeds allowed maximum length ({})",
-                                       name, name.length(), stats_options.maxNameLength());
-  {
-    err_prefix = "test";
-    EXPECT_THROW_WITH_MESSAGE(Utility::checkObjNameLength(err_prefix, name, stats_options),
-                              EnvoyException, err_prefix + err_suffix);
-  }
-
-  {
-    err_prefix = "Invalid listener name";
-    std::string json =
-        R"EOF({ "name": ")EOF" + name + R"EOF(", "address": "foo", "filters":[]})EOF";
-    auto json_object_ptr = Json::Factory::loadFromString(json);
-
-    envoy::api::v2::Listener listener;
-    EXPECT_THROW_WITH_MESSAGE(
-        Config::LdsJson::translateListener(*json_object_ptr, listener, stats_options),
-        EnvoyException, err_prefix + err_suffix);
-  }
-
-  {
-    err_prefix = "Invalid virtual host name";
-    std::string json = R"EOF({ "name": ")EOF" + name + R"EOF(", "domains": [], "routes": []})EOF";
-    auto json_object_ptr = Json::Factory::loadFromString(json);
-    envoy::api::v2::route::VirtualHost vhost;
-    EXPECT_THROW_WITH_MESSAGE(
-        Config::RdsJson::translateVirtualHost(*json_object_ptr, vhost, stats_options),
-        EnvoyException, err_prefix + err_suffix);
-  }
-
-  {
-    err_prefix = "Invalid cluster name";
-    std::string json =
-        R"EOF({ "name": ")EOF" + name +
-        R"EOF(", "type": "static", "lb_type": "random", "connect_timeout_ms" : 1})EOF";
-    auto json_object_ptr = Json::Factory::loadFromString(json);
-    envoy::api::v2::Cluster cluster;
-    envoy::api::v2::core::ConfigSource eds_config;
-    EXPECT_THROW_WITH_MESSAGE(
-        Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options),
-        EnvoyException, err_prefix + err_suffix);
-  }
-
-  {
-    err_prefix = "Invalid route_config name";
-    std::string json = R"EOF({ "route_config_name": ")EOF" + name + R"EOF(", "cluster": "foo"})EOF";
-    auto json_object_ptr = Json::Factory::loadFromString(json);
-    envoy::config::filter::network::http_connection_manager::v2::Rds rds;
-    EXPECT_THROW_WITH_MESSAGE(
-        Config::Utility::translateRdsConfig(*json_object_ptr, rds, stats_options), EnvoyException,
-        err_prefix + err_suffix);
-  }
-}
-
 TEST(UtilityTest, UnixClusterDns) {
 
   std::string cluster_type;
@@ -198,10 +139,9 @@ TEST(UtilityTest, UnixClusterDns) {
   auto json_object_ptr = Json::Factory::loadFromString(json);
   envoy::api::v2::Cluster cluster;
   envoy::api::v2::core::ConfigSource eds_config;
-  Stats::StatsOptionsImpl stats_options;
   EXPECT_THROW_WITH_MESSAGE(
-      Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options),
-      EnvoyException, "unresolved URL must be TCP scheme, got: unix:///test.sock");
+      Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster), EnvoyException,
+      "unresolved URL must be TCP scheme, got: unix:///test.sock");
 }
 
 TEST(UtilityTest, UnixClusterStatic) {
@@ -214,8 +154,7 @@ TEST(UtilityTest, UnixClusterStatic) {
   auto json_object_ptr = Json::Factory::loadFromString(json);
   envoy::api::v2::Cluster cluster;
   envoy::api::v2::core::ConfigSource eds_config;
-  Stats::StatsOptionsImpl stats_options;
-  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options);
+  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
   EXPECT_EQ("/test.sock", cluster.hosts(0).pipe().path());
 }
 

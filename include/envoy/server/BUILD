@@ -80,6 +80,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/thread:thread_interface",
+        "//source/server:hot_restart_cc",
     ],
 )
 
