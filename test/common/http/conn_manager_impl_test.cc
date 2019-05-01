@@ -2166,6 +2166,7 @@ TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
         EXPECT_NE(nullptr, headers.Connection());
         EXPECT_EQ("close", headers.Connection()->value().getStringView());
+        EXPECT_EQ(nullptr, headers.ProxyConnection());
       }));
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
   EXPECT_CALL(filter_callbacks_.connection_,

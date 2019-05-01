@@ -264,10 +264,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
     break;
   }
 
-  if ((response_headers_->Connection() && protocol_ != Http::Protocol::Http2 &&
+  if ((response_headers_->Connection() &&
        absl::EqualsIgnoreCase(response_headers_->Connection()->value().getStringView(),
                               Http::Headers::get().ConnectionValues.Close)) ||
-      (response_headers_->ProxyConnection() &&
+      (response_headers_->ProxyConnection() && protocol_ != Http::Protocol::Http2 &&
        absl::EqualsIgnoreCase(response_headers_->ProxyConnection()->value().getStringView(),
                               Http::Headers::get().ConnectionValues.Close)) ||
       !parent_.reuse_connection_) {
