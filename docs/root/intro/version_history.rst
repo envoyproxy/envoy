@@ -9,6 +9,7 @@ Version history
 * event: added :ref:`loop duration and poll delay statistics <operations_performance>`.
 * ext_authz: added a `x-envoy-auth-partial-body` metadata header set to `false|true` indicating if there is a partial body sent in the authorization request message.
 * ext_authz: added option to `ext_authz` that allows the filter clearing route cache.
+* hot restart: stats are no longer shared between hot restart parent/child via shared memory, but rather by RPC. Hot restart version incremented to 11.
 * http: mitigated a race condition with the :ref:`delayed_close_timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` where it could trigger while actively flushing a pending write buffer for a downstream connection.
 * jwt_authn: make filter's parsing of JWT more flexible, allowing syntax like ``jwt=eyJhbGciOiJS...ZFnFIw,extra=7,realm=123``
 * redis: added :ref:`prefix routing <envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.prefix_routes>` to enable routing commands based on their key's prefix to different upstream.
@@ -22,6 +23,13 @@ Version history
   in full by the router. This ensures that the per try timeout does not account for slow
   downstreams and that will not start before the global timeout.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
+* upstream: an EDS management server can now force removal of a host that is still passing active
+  health checking by first marking the host as failed via EDS health check and subsequently removing
+  it in a future update. This is a mechanism to work around a race condition in which an EDS
+  implementation may remove a host before it has stopped passing active HC, thus causing the host
+  to become stranded until a future update.
+* grpc-json: added support for :ref:`auto mapping
+  <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
 
 1.10.0 (Apr 5, 2019)
 ====================
@@ -636,7 +644,7 @@ Version history
 * runtime: added :ref:`comment capability <config_runtime_comments>`.
 * server: change default log level (:option:`-l`) to `info`.
 * stats: maximum stat/name sizes and maximum number of stats are now variable via the
-  :option:`--max-obj-name-len` and :option:`--max-stats` options.
+  `--max-obj-name-len` and `--max-stats` options.
 * tcp proxy: added :ref:`access logging <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.access_log>`.
 * tcp proxy: added :ref:`configurable connect retries
   <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.max_connect_attempts>`.

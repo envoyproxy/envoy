@@ -6,10 +6,8 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/server/options.h"
-#include "envoy/stats/stats_options.h"
 
 #include "common/common/logger.h"
-#include "common/stats/stats_options_impl.h"
 
 #include "spdlog/spdlog.h"
 
@@ -20,9 +18,9 @@ namespace Envoy {
 class OptionsImpl : public Server::Options, protected Logger::Loggable<Logger::Id::config> {
 public:
   /**
-   * Parameters are max_num_stats, max_stat_name_len, hot_restart_enabled
+   * Parameters are max_stat_name_len, hot_restart_enabled
    */
-  typedef std::function<std::string(uint64_t, uint64_t, bool)> HotRestartVersionCb;
+  typedef std::function<std::string(bool)> HotRestartVersionCb;
 
   /**
    * @throw NoServingException if Envoy has already done everything specified by the argv (e.g.
@@ -66,8 +64,6 @@ public:
   }
   void setServiceNodeName(const std::string& service_node) { service_node_ = service_node; }
   void setServiceZone(const std::string& service_zone) { service_zone_ = service_zone; }
-  void setMaxStats(uint64_t max_stats) { max_stats_ = max_stats; }
-  void setStatsOptions(Stats::StatsOptionsImpl stats_options) { stats_options_ = stats_options; }
   void setHotRestartDisabled(bool hot_restart_disabled) {
     hot_restart_disabled_ = hot_restart_disabled;
   }
@@ -102,8 +98,6 @@ public:
   const std::string& serviceClusterName() const override { return service_cluster_; }
   const std::string& serviceNodeName() const override { return service_node_; }
   const std::string& serviceZone() const override { return service_zone_; }
-  uint64_t maxStats() const override { return max_stats_; }
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
@@ -136,8 +130,6 @@ private:
   std::chrono::seconds drain_time_;
   std::chrono::seconds parent_shutdown_time_;
   Server::Mode mode_;
-  uint64_t max_stats_;
-  Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
