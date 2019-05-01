@@ -242,6 +242,14 @@ private:
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
     bool recreateStream() override;
 
+    void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
+      Network::Socket::appendOptions(upstream_options_, options);
+    }
+
+    Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override {
+      return upstream_options_;
+    }
+
     // Each decoder filter instance checks if the request passed to the filter is gRPC
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
     // called here may change the content type, so we must check it before the call.
@@ -259,6 +267,7 @@ private:
 
     StreamDecoderFilterSharedPtr handle_;
     bool is_grpc_request_{};
+    Network::Socket::OptionsSharedPtr upstream_options_;
   };
 
   typedef std::unique_ptr<ActiveStreamDecoderFilter> ActiveStreamDecoderFilterPtr;
