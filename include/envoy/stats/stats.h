@@ -60,7 +60,7 @@ public:
    */
   virtual StatName tagExtractedStatName() const PURE;
 
-  // Function to be called from iterateTags passing name and value as StatNames.
+  // Function to be called from iterateTagStatNames passing name and value as StatNames.
   using TagStatNameIterFn = std::function<bool(StatName, StatName)>;
 
   /**
