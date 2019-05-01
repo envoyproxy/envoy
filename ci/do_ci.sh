@@ -152,6 +152,7 @@ elif [[ "$1" == "bazel.tsan" ]]; then
   exit 0
 elif [[ "$1" == "bazel.rbe" ]]; then
   bazel_with_collection --host_jvm_args=-Xmx4096m test --config=remote-clang //test/... \
+    --curses=no --show_task_finish --verbose_failures --nocache_test_results \
     --remote_instance_name=projects/envoy-ci/instances/default_instance --jobs=200 \
     --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_FILE}
 elif [[ "$1" == "bazel.dev" ]]; then
