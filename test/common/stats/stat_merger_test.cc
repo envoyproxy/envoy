@@ -52,8 +52,9 @@ TEST_F(StatMergerTest, counterMerge) {
   EXPECT_EQ(4, store_.counter("draculaer").latch());
 }
 
-// It should be fine for the parent to send us stats we haven't ourselves instantiated.
-// TODO(6756) This is how things currently work, but this is actually what 6756 is looking to avoid.
+// When the parent sends us counters we haven't ourselves instantiated, they should stay
+// uninstantiated unless/until we ourselves do something that would cause them to be instantiated.
+// At that point, the deltas received so far should be added in.
 TEST_F(StatMergerTest, newStatFromParent) {
   Protobuf::Map<std::string, uint64_t> counter_values;
   Protobuf::Map<std::string, uint64_t> counter_deltas;
@@ -62,11 +63,28 @@ TEST_F(StatMergerTest, newStatFromParent) {
   counter_deltas["newcounter1"] = 1;
   gauges["newgauge"] = 5;
   stat_merger_.mergeStats(counter_deltas, gauges);
-  EXPECT_EQ(0, store_.counter("newcounter0").value());
-  EXPECT_EQ(0, store_.counter("newcounter0").latch());
-  EXPECT_EQ(1, store_.counter("newcounter1").value());
-  EXPECT_EQ(1, store_.counter("newcounter1").latch());
-  EXPECT_EQ(5, store_.gauge("newgauge").value());
+  EXPECT_FALSE(store_.counterExists("newcounter0"));
+  EXPECT_FALSE(store_.counterExists("newcounter1"));
+
+  counter_deltas["newcounter0"] = 10;
+  counter_deltas["newcounter1"] = 10;
+  stat_merger_.mergeStats(counter_deltas, gauges);
+  EXPECT_FALSE(store_.counterExists("newcounter0"));
+  EXPECT_FALSE(store_.counterExists("newcounter1"));
+
+  // When we instantiate one of these pending-import counters, we initially just have the value that
+  // we ourselves add...
+  store_.counter("newcounter1").add(1000);
+  EXPECT_FALSE(store_.counterExists("newcounter0"));
+  EXPECT_EQ(1000, store_.counter("newcounter1").value());
+  EXPECT_EQ(1000, store_.counter("newcounter1").latch());
+
+  // ...but the next merge will import all previously received values.
+  counter_deltas["newcounter1"] = 100;
+  stat_merger_.mergeStats(counter_deltas, gauges);
+  EXPECT_FALSE(store_.counterExists("newcounter0"));
+  EXPECT_EQ(1111, store_.counter("newcounter1").value());
+  EXPECT_EQ(111, store_.counter("newcounter1").latch());
 }
 
 TEST_F(StatMergerTest, basicDefaultAccumulationImport) {

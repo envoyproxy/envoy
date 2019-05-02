@@ -47,7 +47,7 @@ public:
   /**
    * @return whether any known counter exists with this name.
    */
-  virtual bool counterExists(const std::string& counter_name) const PURE;
+  virtual bool counterExists(const std::string& counter_name) PURE;
 };
 
 typedef std::unique_ptr<Store> StorePtr;

@@ -36,7 +36,7 @@ private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas);
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges);
   StatNameHashMap<uint64_t> parent_gauge_values_;
-  StatNameHashMap<uint64_t> pending_counter_deltas_;
+  absl::flat_hash_map<std::string, uint64_t> pending_counter_deltas_;
   Stats::Store& target_store_;
 };
 

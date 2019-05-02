@@ -58,10 +58,10 @@ void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& count
   // TODO comment about what and why we're doing (to avoid leaks)
   for (const auto& counter : counter_deltas) {
     if (target_store_.counterExists(counter.first)) {
-      auto delta = pending_counter_deltas_.find(counter.first);
       uint64_t delta_value = 0;
+      auto delta = pending_counter_deltas_.find(counter.first);
       if (delta != pending_counter_deltas_.end()) {
-        delta_value = delta.second;
+        delta_value = delta->second;
         pending_counter_deltas_.erase(counter.first);
       }
       target_store_.counter(counter.first).add(counter.second + delta_value);
