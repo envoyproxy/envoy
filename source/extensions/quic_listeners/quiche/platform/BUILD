@@ -155,6 +155,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_platform_impl_lib",
+    hdrs = [
+        "quiche_logging_impl.h",
+        "quiche_ptr_util_impl.h",
+        "quiche_unordered_containers_impl.h",
+    ],
+    external_deps = [
+        "abseil_node_hash_map",
+    ],
+    deps = [":quic_platform_base_impl_lib"],
+)
+
+envoy_cc_library(
     name = "quic_platform_sleep_impl_lib",
     hdrs = ["quic_sleep_impl.h"],
     visibility = ["//visibility:public"],
@@ -193,6 +206,7 @@ envoy_cc_library(
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
+        "@com_googlesource_quiche//:quiche_common_lib",
     ]),
 )
 

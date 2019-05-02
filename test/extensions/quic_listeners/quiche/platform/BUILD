@@ -165,6 +165,11 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quiche_common_platform_test_impl_lib",
+    hdrs = ["quiche_test_impl.h"],
+)
+
+envoy_cc_test_library(
     name = "spdy_platform_test_helpers_impl_lib",
     hdrs = ["spdy_test_helpers_impl.h"],
     deps = [

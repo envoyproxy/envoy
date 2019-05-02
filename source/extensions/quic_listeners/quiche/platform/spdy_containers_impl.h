@@ -1,5 +1,11 @@
 #pragma once
 
+// NOLINT(namespace-envoy)
+
+// This file is part of the QUICHE platform implementation, and is not to be
+// consumed or referenced directly by other Envoy code. It serves purely as a
+// porting layer for QUICHE.
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
@@ -14,12 +20,7 @@
 // TODO(mpw): fix includes to use full paths.
 #include "spdy_string_impl.h"
 #include "spdy_string_piece_impl.h"
-
-// NOLINT(namespace-envoy)
-
-// This file is part of the QUICHE platform implementation, and is not to be
-// consumed or referenced directly by other Envoy code. It serves purely as a
-// porting layer for QUICHE.
+#include "quiche/common/simple_linked_hash_map.h"
 
 namespace spdy {
 
@@ -31,8 +32,8 @@ using SpdyHashMapImpl = absl::flat_hash_map<KeyType, ValueType, Hash>;
 template <typename ElementType, typename Hasher, typename Eq>
 using SpdyHashSetImpl = absl::flat_hash_set<ElementType, Hasher, Eq>;
 
-// TODO: implement
-template <typename Key, typename Value, typename Hash> class SpdyLinkedHashMapImpl {};
+template <typename Key, typename Value, typename Hash>
+using SpdyLinkedHashMapImpl = quiche::SimpleLinkedHashMap<Key, Value, Hash>;
 
 template <typename T, size_t N, typename A = std::allocator<T>>
 using SpdyInlinedVectorImpl = absl::InlinedVector<T, N, A>;

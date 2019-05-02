@@ -30,11 +30,7 @@ load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_cc_test",
-<<<<<<< HEAD
-    "envoy_copts",
-=======
     "envoy_cc_test_library",
->>>>>>> master
     "envoy_select_quiche",
 )
 
@@ -109,7 +105,7 @@ envoy_cc_library(
         "quiche/spdy/platform/api/spdy_endianness_util.h",
         "quiche/spdy/platform/api/spdy_estimate_memory_usage.h",
         "quiche/spdy/platform/api/spdy_export.h",
-	"quiche/spdy/platform/api/spdy_macros.h",
+        "quiche/spdy/platform/api/spdy_macros.h",
         "quiche/spdy/platform/api/spdy_mem_slice.h",
         "quiche/spdy/platform/api/spdy_ptr_util.h",
         "quiche/spdy/platform/api/spdy_string.h",
@@ -129,27 +125,15 @@ envoy_cc_library(
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib"],
 )
 
-<<<<<<< HEAD
-cc_library(
-    name = "spdy_simple_arena_lib",
-    srcs = ["quiche/spdy/core/spdy_simple_arena.cc"],
-    hdrs = ["quiche/spdy/core/spdy_simple_arena.h"],
-=======
 envoy_cc_library(
     name = "spdy_simple_arena_lib",
     srcs = ["quiche/spdy/core/spdy_simple_arena.cc"],
     hdrs = ["quiche/spdy/core/spdy_simple_arena.h"],
     repository = "@envoy",
->>>>>>> master
     visibility = ["//visibility:public"],
     deps = [":spdy_platform"],
 )
 
-<<<<<<< HEAD
-cc_library(
-    name = "spdy_platform_unsafe_arena_lib",
-    hdrs = ["quiche/spdy/platform/api/spdy_unsafe_arena.h"],
-=======
 envoy_cc_test_library(
     name = "spdy_platform_test_helpers",
     hdrs = ["quiche/spdy/platform/api/spdy_test_helpers.h"],
@@ -161,38 +145,34 @@ envoy_cc_library(
     name = "spdy_platform_unsafe_arena_lib",
     hdrs = ["quiche/spdy/platform/api/spdy_unsafe_arena.h"],
     repository = "@envoy",
->>>>>>> master
     visibility = ["//visibility:public"],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_unsafe_arena_impl_lib"],
 )
 
-<<<<<<< HEAD
-cc_library(
+envoy_cc_library(
     name = "quiche_spdy_core_lib",
-    hdrs = [
-    	"quiche/spdy/core/spdy_header_block.cc",
-    	"quiche/spdy/core/spdy_test_utils.cc",
-    ],
     srcs = [
-        "quiche/spdy/core/spdy_alt_svc_wire_format.h",
-	"quiche/spdy/core/spdy_bitmasks.h",
-    	"quiche/spdy/core/spdy_header_block.h",
-        "quiche/spdy/core/spdy_headers_handler_interface.h",
-	"quiche/spdy/core/spdy_protocol.h",
-    	"quiche/spdy/core/spdy_test_utils.h",
+        "quiche/spdy/core/spdy_header_block.cc",
+        "quiche/spdy/core/spdy_test_utils.cc",
     ],
-    copts = envoy_copts("@envoy") + ["-Wno-unused-parameter",],
+    hdrs = [
+        "quiche/spdy/core/spdy_alt_svc_wire_format.h",
+        "quiche/spdy/core/spdy_bitmasks.h",
+        "quiche/spdy/core/spdy_header_block.h",
+        "quiche/spdy/core/spdy_headers_handler_interface.h",
+        "quiche/spdy/core/spdy_protocol.h",
+        "quiche/spdy/core/spdy_test_utils.h",
+    ],
+    copts = quiche_copt,
+    repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-    	":spdy_platform",
-    	":spdy_platform_unsafe_arena_lib",
+        ":spdy_platform",
+        ":spdy_platform_unsafe_arena_lib",
     ],
 )
 
-cc_library(
-=======
 envoy_cc_library(
->>>>>>> master
     name = "quic_platform",
     srcs = ["quiche/quic/platform/api/quic_mutex.cc"] + envoy_select_quiche(
         [
@@ -410,12 +390,49 @@ envoy_cc_test_library(
     deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_epoll_impl_lib"],
 )
 
+envoy_cc_library(
+    name = "quiche_common_platform",
+    hdrs = [
+        "quiche/common/platform/api/quiche_logging.h",
+        "quiche/common/platform/api/quiche_ptr_util.h",
+        "quiche/common/platform/api/quiche_unordered_containers.h",
+    ],
+    repository = "@envoy",
+    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quiche_common_platform_impl_lib"],
+)
+
+envoy_cc_test_library(
+    name = "quiche_common_platform_test",
+    hdrs = ["quiche/common/platform/api/quiche_test.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quiche_common_platform_test_impl_lib"],
+)
+
+envoy_cc_library(
+    name = "quiche_common_lib",
+    hdrs = ["quiche/common/simple_linked_hash_map.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":quiche_common_platform"],
+)
+
 envoy_cc_test(
     name = "epoll_server_test",
     srcs = ["quiche/epoll_server/simple_epoll_server_test.cc"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [":epoll_server_lib"],
+)
+
+envoy_cc_test(
+    name = "quiche_common_test",
+    srcs = ["quiche/common/simple_linked_hash_map_test.cc"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":quiche_common_lib",
+        ":quiche_common_platform_test",
+    ],
 )
 
 envoy_cc_test(
@@ -443,11 +460,12 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "quiche_spdy_core_test",
-    srcs = ["quiche/spdy/core/spdy_header_block_test.cc",],
+    srcs = ["quiche/spdy/core/spdy_header_block_test.cc"],
+    copts = quiche_copt,
     repository = "@envoy",
     deps = [
-    	":spdy_platform",
-	":quiche_spdy_core_lib",
+        ":quiche_spdy_core_lib",
+        ":spdy_platform",
     ],
 )
 

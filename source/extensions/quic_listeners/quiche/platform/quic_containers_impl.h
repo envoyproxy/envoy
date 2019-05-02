@@ -10,6 +10,7 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
+#include "quiche/common/simple_linked_hash_map.h"
 
 // NOLINT(namespace-envoy)
 
@@ -26,14 +27,11 @@ using QuicUnorderedMapImpl = absl::node_hash_map<Key, Value, Hash>;
 
 template <typename Key, typename Hash> using QuicUnorderedSetImpl = absl::node_hash_set<Key, Hash>;
 
-// TODO: implement
-template <typename Key, typename Value, typename Hash> class QuicLinkedHashMapImpl {};
+template <typename Key, typename Value, typename Hash>
+using QuicLinkedHashMapImpl = quiche::SimpleLinkedHashMap<Key, Value, Hash>;
 
-// TODO: implement
-template <typename Key, typename Value, int Size> class QuicSmallMapImpl {};
-
-// TODO: implement
-template <typename T> class QuicIntervalSetImpl;
+template <typename Key, typename Value, int Size>
+using QuicSmallMapImpl = std::unordered_map<Key, Value>;
 
 template <typename T> using QuicQueueImpl = std::queue<T>;
 
