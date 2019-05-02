@@ -80,9 +80,9 @@ void DeltaConfigSubscriptionInstance::applyConfigUpdate(
   // provider will be sufficient.
   if (mutable_config_providers_.size() > 1) {
     ASSERT(static_cast<DeltaMutableConfigProviderBase*>(*mutable_config_providers_.begin())
-               ->getConfig() ==
-           static_cast<DeltaMutableConfigProviderBase*>(*++mutable_config_providers_.begin())
-               ->getConfig());
+               ->getConfig() == static_cast<DeltaMutableConfigProviderBase*>(
+                                    *std::next(mutable_config_providers_.begin()))
+                                    ->getConfig());
   }
 
   auto* typed_provider =

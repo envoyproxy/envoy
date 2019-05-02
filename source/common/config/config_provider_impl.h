@@ -400,6 +400,10 @@ public:
   // in the public API (ConfigProvider::config<T>()).
   ConfigConstSharedPtr getConfig() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
+  /**
+   * Non-const overload for use within the framework.
+   * @return ConfigSharedPtr the config implementation associated with the provider.
+   */
   virtual ConfigSharedPtr getConfig() PURE;
 
   /**
