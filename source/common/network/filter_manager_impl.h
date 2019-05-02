@@ -65,8 +65,6 @@ public:
   FixedReadBufferSource(Buffer::Instance& data, bool end_stream)
       : data_(data), end_stream_(end_stream) {}
 
-  ~FixedReadBufferSource() {}
-
   StreamBuffer getReadBuffer() override { return {data_, end_stream_}; }
 
 private:
@@ -81,8 +79,6 @@ class FixedWriteBufferSource : public WriteBufferSource {
 public:
   FixedWriteBufferSource(Buffer::Instance& data, bool end_stream)
       : data_(data), end_stream_(end_stream) {}
-
-  ~FixedWriteBufferSource() {}
 
   StreamBuffer getWriteBuffer() override { return {data_, end_stream_}; }
 
