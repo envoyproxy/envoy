@@ -526,8 +526,8 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
                      << *expected
                      << TestUtility::addLeftAndRightPadding("is not equal to actual header map:")
                      << "\n"
-                     << *arg << TestUtility::addLeftAndRightPadding("")
-                     << "\n"; // line full of padding
+                     << *arg << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
   }
   return equal;
 }
@@ -539,8 +539,9 @@ MATCHER_P(ProtoEq, expected, "") {
                      << TestUtility::addLeftAndRightPadding("Expected proto:") << "\n"
                      << expected.DebugString()
                      << TestUtility::addLeftAndRightPadding("is not equal to actual proto:") << "\n"
-                     << arg.DebugString() << TestUtility::addLeftAndRightPadding("")
-                     << "\n"; // line full of padding
+                     << arg.DebugString()
+                     << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
   }
   return equal;
 }
@@ -554,8 +555,9 @@ MATCHER_P2(ProtoEqIgnoringField, expected, ignored_field, "") {
                      << TestUtility::addLeftAndRightPadding(but_ignoring) << "\n"
                      << expected.DebugString()
                      << TestUtility::addLeftAndRightPadding("is not equal to actual proto:") << "\n"
-                     << arg.DebugString() << TestUtility::addLeftAndRightPadding("")
-                     << "\n"; // line full of padding
+                     << arg.DebugString()
+                     << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
   }
   return equal;
 }
@@ -569,7 +571,8 @@ MATCHER_P(RepeatedProtoEq, expected, "") {
                      << TestUtility::addLeftAndRightPadding("is not equal to actual repeated:")
                      << "\n"
                      << RepeatedPtrUtil::debugString(arg) << "\n"
-                     << TestUtility::addLeftAndRightPadding("") << "\n"; // line full of padding
+                     << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
   }
   return equal;
 }
