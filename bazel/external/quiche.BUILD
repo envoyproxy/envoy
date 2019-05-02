@@ -401,6 +401,7 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_unordered_containers.h",
     ],
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quiche_common_platform_impl_lib"],
 )
 
