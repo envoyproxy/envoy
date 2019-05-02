@@ -48,26 +48,26 @@ StatName MetricImpl::tagExtractedStatName() const {
 
 void MetricImpl::iterateTagStatNames(const TagStatNameIterFn& fn) const {
   enum { TagExtractedName, TagName, TagValue } state = TagExtractedName;
-  StatName key;
+  StatName tag_name;
 
   // StatNameList maintains a linear ordered collection of StatNames, and we
   // are mapping that into a tag-extracted name (the first element), followed
   // by alternating TagName and TagValue. So we use a little state machine
   // as we iterate through the stat_names_.
-  stat_names_.iterate([&state, &key, &fn](StatName stat_name) -> bool {
+  stat_names_.iterate([&state, &tag_name, &fn](StatName stat_name) -> bool {
     switch (state) {
     case TagExtractedName:
       state = TagName;
       break;
     case TagName:
-      key = stat_name;
+      tag_name = stat_name;
       state = TagValue;
       break;
     case TagValue:
-      if (!fn(key, stat_name)) {
+      state = TagName;
+      if (!fn(tag_name, stat_name)) {
         return false; // early exit.
       }
-      state = TagName;
       break;
     }
     return true;
@@ -84,11 +84,6 @@ void MetricImpl::iterateTags(const TagIterFn& fn) const {
 
 std::vector<Tag> MetricImpl::tags() const {
   std::vector<Tag> tags;
-
-  // StatNameList maintains a linear ordered collection of StatNames, and we
-  // are mapping that into a tag-extracted name (the first element), followed
-  // by alternating TagName and TagValue. So we use a little state machine
-  // as we iterate through the stat_names_.
   iterateTags([&tags](const Tag& tag) -> bool {
     tags.emplace_back(tag);
     return true;
