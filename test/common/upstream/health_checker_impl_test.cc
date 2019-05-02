@@ -2537,6 +2537,33 @@ TEST_F(TcpHealthCheckerImplTest, PassiveFailureCrossThreadRemoveClusterRace) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
 }
 
+TEST_F(TcpHealthCheckerImplTest, ConnectionLocalFailure) {
+  InSequence s;
+
+  setupData();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_, _));
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  // Expect the LocalClose to be handled as a health check failure
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  EXPECT_CALL(*timeout_timer_, disableTimer());
+  EXPECT_CALL(*interval_timer_, enableTimer(_));
+
+  // Raise a LocalClose that is not triggered by the health monitor itself.
+  // e.g. a failure to setsockopt().
+  connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
+
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.passive_failure").value());
+}
+
 class TestGrpcHealthCheckerImpl : public GrpcHealthCheckerImpl {
 public:
   using GrpcHealthCheckerImpl::GrpcHealthCheckerImpl;
