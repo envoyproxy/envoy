@@ -21,6 +21,7 @@ CHACHA
 CIDR
 CLA
 CLI
+CMSG
 CN
 CNAME
 CORS
@@ -230,6 +231,7 @@ SPIFFE
 SPKI
 SQL
 SR
+SRDS
 SRV
 SS
 SSL
@@ -274,6 +276,7 @@ WS
 Welford's
 Werror
 XDS
+vip
 xDSes
 XFCC
 XFF
@@ -615,6 +618,7 @@ ptr
 ptrs
 pwd
 py
+qps
 quantile
 quantiles
 queueing
@@ -657,6 +661,7 @@ retriable
 rpcs
 rq
 rtrim
+rtt
 sanitization
 sanitizer
 scala
@@ -717,6 +722,7 @@ tokenize
 tokenizes
 tokenizing
 traceid
+transferral
 trie
 tuple
 tuples

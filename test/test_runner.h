@@ -14,6 +14,10 @@
 
 #include "gmock/gmock.h"
 
+#ifdef ENVOY_GOOGLE_GRPC
+#include "grpc/grpc.h"
+#endif
+
 namespace Envoy {
 namespace {
 
@@ -65,6 +69,9 @@ class TestRunner {
 public:
   static int RunTests(int argc, char** argv) {
     ::testing::InitGoogleMock(&argc, argv);
+#ifdef ENVOY_GOOGLE_GRPC
+    grpc_init();
+#endif
     Event::Libevent::Global::initialize();
     Http::Http2::initializeNghttp2Logging();
 

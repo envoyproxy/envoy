@@ -51,7 +51,10 @@ public:
   /* The host is currently marked as degraded through active health checking. */ \
   m(DEGRADED_ACTIVE_HC, 0x08)                                                    \
   /* The host is currently marked as degraded by EDS. */                         \
-  m(DEGRADED_EDS_HEALTH, 0x10)
+  m(DEGRADED_EDS_HEALTH, 0x10)                                                   \
+  /* The host is pending removal from discovery but is stabilized due to */      \
+  /* active HC. */                                                               \
+  m(PENDING_DYNAMIC_REMOVAL, 0x20)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,

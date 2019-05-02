@@ -3,14 +3,6 @@
 Statistics
 ==========
 
-A few statistics are emitted to report statistics system behavior:
-
-.. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 2
-
-  stats.overflow, Counter, Total number of times Envoy cannot allocate a statistic due to a shortage of shared memory
-
 Server
 ------
 

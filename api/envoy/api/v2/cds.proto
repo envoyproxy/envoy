@@ -58,9 +58,6 @@ message Cluster {
   // :ref:`statistics <config_cluster_manager_cluster_stats>` if :ref:`alt_stat_name
   // <envoy_api_field_Cluster.alt_stat_name>` is not provided.
   // Any ``:`` in the cluster name will be converted to ``_`` when emitting statistics.
-  // By default, the maximum length of a cluster name is limited to 60
-  // characters. This limit can be increased by setting the
-  // :option:`--max-obj-name-len` command line argument to the desired value.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // An optional alternative to the cluster name to be used while emitting stats.

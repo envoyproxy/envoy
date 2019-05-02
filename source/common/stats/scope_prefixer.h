@@ -10,28 +10,39 @@ namespace Stats {
 class ScopePrefixer : public Scope {
 public:
   ScopePrefixer(absl::string_view prefix, Scope& scope);
+  ScopePrefixer(StatName prefix, Scope& scope);
+  ~ScopePrefixer() override;
+
+  ScopePtr createScopeFromStatName(StatName name);
 
   // Scope
   ScopePtr createScope(const std::string& name) override;
-  Counter& counter(const std::string& name) override { return scope_.counter(prefix_ + name); }
-  Gauge& gauge(const std::string& name) override { return scope_.gauge(prefix_ + name); }
-  Histogram& histogram(const std::string& name) override {
-    return scope_.histogram(prefix_ + name);
-  }
-  void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
   Counter& counterFromStatName(StatName name) override;
   Gauge& gaugeFromStatName(StatName name) override;
   Histogram& histogramFromStatName(StatName name) override;
+  void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
 
-  const Stats::StatsOptions& statsOptions() const override { return scope_.statsOptions(); }
+  Counter& counter(const std::string& name) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return counterFromStatName(storage.statName());
+  }
+  Gauge& gauge(const std::string& name) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return gaugeFromStatName(storage.statName());
+  }
+  Histogram& histogram(const std::string& name) override {
+    StatNameManagedStorage storage(name, symbolTable());
+    return histogramFromStatName(storage.statName());
+  }
+
   const SymbolTable& symbolTable() const override { return scope_.symbolTable(); }
   virtual SymbolTable& symbolTable() override { return scope_.symbolTable(); }
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
 
 private:
-  std::string prefix_;
   Scope& scope_;
+  StatNameStorage prefix_;
 };
 
 } // namespace Stats

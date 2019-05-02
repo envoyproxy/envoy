@@ -202,10 +202,6 @@ public:
     outlier_detector_ = std::move(outlier_detector);
   }
   Host::Health health() const override {
-    if (!health_flags_) {
-      return Host::Health::Healthy;
-    }
-
     // If any of the unhealthy flags are set, host is unhealthy.
     if (healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) ||
         healthFlagGet(HealthFlag::FAILED_OUTLIER_CHECK) ||
@@ -213,10 +209,15 @@ public:
       return Host::Health::Unhealthy;
     }
 
-    // Only possible option at this point is that the host is degraded.
-    ASSERT(healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC) ||
-           healthFlagGet(HealthFlag::DEGRADED_EDS_HEALTH));
-    return Host::Health::Degraded;
+    // If any of the degraded flags are set, host is degraded.
+    if (healthFlagGet(HealthFlag::DEGRADED_ACTIVE_HC) ||
+        healthFlagGet(HealthFlag::DEGRADED_EDS_HEALTH)) {
+      return Host::Health::Degraded;
+    }
+
+    // The host must have no flags or be pending removal.
+    ASSERT(health_flags_ == 0 || healthFlagGet(HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    return Host::Health::Healthy;
   }
 
   uint32_t weight() const override { return weight_; }
@@ -401,7 +402,6 @@ typedef std::unique_ptr<HostSetImpl> HostSetImplPtr;
 /**
  * A class for management of the set of hosts in a given cluster.
  */
-
 class PrioritySetImpl : public PrioritySet {
 public:
   PrioritySetImpl() : batch_update_(false) {}
@@ -698,7 +698,8 @@ protected:
 
 private:
   void finishInitialization();
-  void reloadHealthyHosts();
+  void reloadHealthyHosts(const HostSharedPtr& host);
+  virtual void reloadHealthyHostsHelper(const HostSharedPtr& host);
 
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
