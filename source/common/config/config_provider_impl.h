@@ -189,7 +189,7 @@ public:
    * @return const MutableConfigProviderCommonBase* a const pointer to a
    *         bound MutableConfigProviderCommonBase or nullptr when there are none.
    */
-  const MutableConfigProviderCommonBase* getAnyBoundMutableConfigProvider() const {
+  MutableConfigProviderCommonBase* getAnyBoundMutableConfigProvider() const {
     return !mutable_config_providers_.empty() ? *mutable_config_providers_.begin() : nullptr;
   }
 
@@ -269,6 +269,8 @@ protected:
                                  const std::string& config_name, const std::string& version_info);
 };
 
+using ConfigSharedPtr = std::shared_ptr<Envoy::Config::ConfigProvider::Config>;
+
 /**
  * Provides common subscription functionality required by ConfigProvider::ApiType::Delta DS APIs.
  */
@@ -284,13 +286,12 @@ protected:
   ~DeltaConfigSubscriptionInstance() override = default;
 
   /**
-   * Propagates a config update to all config providers and worker threads associated with the
+   * Propagates a config update to the config providers and worker threads associated with the
    * subscription.
    *
-   * @param updateFn the callback to run on each provider and worker thread.
+   * @param updateFn the callback to run on each worker thread.
    */
-  void applyConfigUpdate(
-      const std::function<void(const ConfigProvider::ConfigConstSharedPtr&)>& updateFn);
+  void applyConfigUpdate(const std::function<void(const ConfigSharedPtr&)>& updateFn);
 };
 
 /**
@@ -398,6 +399,8 @@ public:
   // This promotes getConfig() to public so that internal uses can avoid an unnecessary dynamic_cast
   // in the public API (ConfigProvider::config<T>()).
   ConfigConstSharedPtr getConfig() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  virtual ConfigSharedPtr getConfig() PURE;
 
   /**
    * Propagates a delta config update to all workers.

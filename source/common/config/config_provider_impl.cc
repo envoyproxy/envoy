@@ -74,12 +74,21 @@ bool ConfigSubscriptionInstance::checkAndApplyConfigUpdate(const Protobuf::Messa
 }
 
 void DeltaConfigSubscriptionInstance::applyConfigUpdate(
-    const std::function<void(const ConfigProvider::ConfigConstSharedPtr&)>& updateFn) {
-  for (auto* provider : mutable_config_providers_) {
-    auto* typed_provider = static_cast<DeltaMutableConfigProviderBase*>(provider);
-    ConfigProvider::ConfigConstSharedPtr config = typed_provider->getConfig();
-    typed_provider->onConfigUpdate([config, updateFn]() { updateFn(config); });
+    const std::function<void(const ConfigSharedPtr&)>& updateFn) {
+  // The Config implementation is assumed to be shared across the config providers bound to this
+  // subscription, therefore, simply propagating the update to all worker threads for a single bound
+  // provider will be sufficient.
+  if (mutable_config_providers_.size() > 1) {
+    ASSERT(static_cast<DeltaMutableConfigProviderBase*>(*mutable_config_providers_.begin())
+               ->getConfig() ==
+           static_cast<DeltaMutableConfigProviderBase*>(*++mutable_config_providers_.begin())
+               ->getConfig());
   }
+
+  auto* typed_provider =
+      static_cast<DeltaMutableConfigProviderBase*>(getAnyBoundMutableConfigProvider());
+  ConfigSharedPtr config = typed_provider->getConfig();
+  typed_provider->onConfigUpdate([config, updateFn]() { updateFn(config); });
 }
 
 ConfigProviderManagerImplBase::ConfigProviderManagerImplBase(Server::Admin& admin,

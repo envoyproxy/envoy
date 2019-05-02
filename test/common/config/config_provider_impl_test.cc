@@ -441,6 +441,8 @@ public:
     protos_.push_back(config_proto);
   }
 
+  uint32_t numProtos() const { return protos_.size(); }
+
 private:
   std::vector<test::common::config::DummyConfig> protos_;
 };
@@ -448,13 +450,14 @@ private:
 class DeltaDummyDynamicConfigProvider : public Envoy::Config::DeltaMutableConfigProviderBase {
 public:
   DeltaDummyDynamicConfigProvider(DeltaDummyConfigSubscriptionSharedPtr&& subscription,
-                                  Server::Configuration::FactoryContext& factory_context)
+                                  Server::Configuration::FactoryContext& factory_context,
+                                  std::shared_ptr<ThreadLocalDummyConfig> dummy_config)
       : DeltaMutableConfigProviderBase(std::move(subscription), factory_context,
                                        ConfigProvider::ApiType::Delta),
         subscription_(static_cast<DeltaDummyConfigSubscription*>(
             MutableConfigProviderCommonBase::subscription_.get())) {
-    initialize([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalDummyConfig>();
+    initialize([&dummy_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      return (dummy_config != nullptr) ? dummy_config : std::make_shared<ThreadLocalDummyConfig>();
     });
   }
 
@@ -475,6 +478,15 @@ public:
   }
   ConfigConstSharedPtr getConfig() const override {
     return std::dynamic_pointer_cast<const Envoy::Config::ConfigProvider::Config>(tls_->get());
+  }
+
+  // Envoy::Config::DeltaMutableConfigProviderBase
+  ConfigSharedPtr getConfig() override {
+    return std::dynamic_pointer_cast<Envoy::Config::ConfigProvider::Config>(tls_->get());
+  }
+
+  std::shared_ptr<ThreadLocalDummyConfig> getThreadLocalDummyConfig() {
+    return std::dynamic_pointer_cast<ThreadLocalDummyConfig>(tls_->get());
   }
 
 private:
@@ -527,8 +539,11 @@ public:
                   static_cast<DeltaDummyConfigProviderManager&>(config_provider_manager));
             });
 
-    return std::make_unique<DeltaDummyDynamicConfigProvider>(std::move(subscription),
-                                                             factory_context);
+    auto* existing_provider = static_cast<DeltaDummyDynamicConfigProvider*>(
+        subscription->getAnyBoundMutableConfigProvider());
+    return std::make_unique<DeltaDummyDynamicConfigProvider>(
+        std::move(subscription), factory_context,
+        (existing_provider != nullptr) ? existing_provider->getThreadLocalDummyConfig() : nullptr);
   }
 };
 
@@ -546,12 +561,16 @@ void DeltaDummyConfigSubscription::onConfigUpdate(
     return;
   }
 
+  // For simplicity, there is no logic here to track updates and/or removals to the existing config
+  // proto set (i.e., this is append only). Real xDS APIs will need to track additions, updates and
+  // removals to the config set and apply the diffs to the underlying config implementations.
   for (const auto& resource_any : resources) {
     auto dummy_config = MessageUtil::anyConvert<test::common::config::DummyConfig>(resource_any);
     proto_map_[version_info] = dummy_config;
-    applyConfigUpdate([&dummy_config](const ConfigProvider::ConfigConstSharedPtr& config) {
-      auto* thread_local_dummy_config = const_cast<ThreadLocalDummyConfig*>(
-          static_cast<const ThreadLocalDummyConfig*>(config.get()));
+    // Propagate the new config proto to all worker threads.
+    applyConfigUpdate([&dummy_config](const ConfigSharedPtr& config) {
+      auto* thread_local_dummy_config = static_cast<ThreadLocalDummyConfig*>(config.get());
+      // Per above, append only for now.
       thread_local_dummy_config->addProto(dummy_config);
     });
   }
@@ -575,6 +594,8 @@ protected:
   std::unique_ptr<DeltaDummyConfigProviderManager> provider_manager_;
 };
 
+// Validate that delta config subscriptions are shared across delta dynamic config providers and
+// that the underlying Config implementation can be shared as well.
 TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
   envoy::api::v2::core::ApiConfigSource config_source_proto;
   config_source_proto.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
@@ -599,6 +620,8 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
       config_source_proto, factory_context_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
 
+  // Providers, config implementations (i.e., the ThreadLocalDummyConfig) and config protos are
+  // expected to be shared for a given subscription.
   EXPECT_EQ(&dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider1).subscription(),
             &dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider2).subscription());
   ASSERT_TRUE(provider2->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
@@ -607,6 +630,17 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
       provider2->configProtoInfoVector<test::common::config::DummyConfig>().value().config_protos_);
   EXPECT_EQ(provider1->config<const ThreadLocalDummyConfig>().get(),
             provider2->config<const ThreadLocalDummyConfig>().get());
+  // Validate that the config protos are propagated to the thread local config implementation.
+  EXPECT_EQ(provider1->config<const ThreadLocalDummyConfig>()->numProtos(), 2);
+
+  // Issue a second config update to validate that having multiple providers bound to the
+  // subscription causes a single update to the underlying shared config implementation.
+  subscription.onConfigUpdate(untyped_dummy_configs, "2");
+  // NOTE: the config implementation is append only and _does not_ track updates/removals to the
+  // config proto set, so the expectation is to double the size of the set.
+  EXPECT_EQ(provider1->config<const ThreadLocalDummyConfig>()->numProtos(), 4);
+  EXPECT_EQ(provider1->configProtoInfoVector<test::common::config::DummyConfig>().value().version_,
+            "2");
 }
 
 } // namespace
