@@ -683,6 +683,10 @@ def envoy_select_google_grpc(xs, repository = ""):
         "//conditions:default": xs,
     })
 
+# Dependencies on Google grpc should be wrapped with this function.
+def envoy_google_grpc_external_deps():
+    return envoy_select_google_grpc([envoy_external_dep_path("grpc")])
+
 # Select the given values if exporting is enabled in the current build.
 def envoy_select_exported_symbols(xs):
     return select({
