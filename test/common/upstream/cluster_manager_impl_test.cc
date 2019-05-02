@@ -2123,7 +2123,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
 // Tests that all the HC/weight/metadata changes are delivered in one go, as long as
 // there's no hosts changes in between.
 // Also tests that if hosts are added/removed between mergeable updates, delivery will
-// happen and the scheduled update will be canceled.
+// happen and the scheduled update will be cancelled.
 TEST_F(ClusterManagerImplTest, MergedUpdates) {
   createWithLocalClusterUpdate();
 
@@ -2495,7 +2495,7 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToConnPool) {
 
   Http::ConnectionPool::MockInstance* to_create = new Http::ConnectionPool::MockInstance();
   Network::Socket::OptionsSharedPtr options_to_return =
-      std::move(Network::SocketOptionFactory::buildIpTransparentOptions());
+      Network::SocketOptionFactory::buildIpTransparentOptions();
 
   EXPECT_CALL(context, upstreamSocketOptions()).WillOnce(Return(options_to_return));
   EXPECT_CALL(factory_, allocateConnPool_(_, _)).WillOnce(Return(to_create));
@@ -2514,9 +2514,9 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
   Http::ConnectionPool::MockInstance* to_create1 = new Http::ConnectionPool::MockInstance();
   Http::ConnectionPool::MockInstance* to_create2 = new Http::ConnectionPool::MockInstance();
   Network::Socket::OptionsSharedPtr options1 =
-      std::move(Network::SocketOptionFactory::buildIpTransparentOptions());
+      Network::SocketOptionFactory::buildIpTransparentOptions();
   Network::Socket::OptionsSharedPtr options2 =
-      std::move(Network::SocketOptionFactory::buildSocketMarkOptions(3));
+      Network::SocketOptionFactory::buildSocketMarkOptions(3);
 
   EXPECT_CALL(context1, upstreamSocketOptions()).WillRepeatedly(Return(options1));
   EXPECT_CALL(context2, upstreamSocketOptions()).WillRepeatedly(Return(options2));
