@@ -9,6 +9,7 @@
 #include "envoy/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -65,6 +66,20 @@ public:
    */
   virtual bool used() const PURE;
 
+  /**
+   * Flags:
+   * Used: used by all stats types to figure out whether they have been used.
+   * Logic...: used by gauges to cache how they should be combined with a parent's value.
+   */
+  struct Flags {
+    static const uint8_t Used = 0x01;
+    // TODO(fredlas) these logic flags should be removed if we move to indicating combine logic in
+    // the stat declaration macros themselves. (Now that stats no longer use shared memory, it's
+    // safe to mess with what these flag bits mean whenever we want).
+    static const uint8_t LogicAccumulate = 0x02;
+    static const uint8_t LogicNeverImport = 0x04;
+    static const uint8_t LogicCached = LogicAccumulate | LogicNeverImport;
+  };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& symbolTable() const PURE;
 };
@@ -99,6 +114,16 @@ public:
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
   virtual uint64_t value() const PURE;
+
+  /**
+   * Returns the stat's combine logic, if known.
+   */
+  virtual absl::optional<bool> cachedShouldImport() const PURE;
+
+  /**
+   * Sets the value to be returned by cachedCombineLogic().
+   */
+  virtual void setShouldImport(bool should_import) PURE;
 };
 
 typedef std::shared_ptr<Gauge> GaugeSharedPtr;

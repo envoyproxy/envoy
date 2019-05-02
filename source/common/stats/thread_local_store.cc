@@ -10,7 +10,6 @@
 #include "envoy/stats/sink.h"
 #include "envoy/stats/stat_data_allocator.h"
 #include "envoy/stats/stats.h"
-#include "envoy/stats/stats_options.h"
 
 #include "common/common/lock_guard.h"
 #include "common/stats/scope_prefixer.h"
@@ -22,21 +21,21 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
-                                           StatDataAllocator& alloc)
-    : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
+    : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
-      stats_matcher_(std::make_unique<StatsMatcherImpl>()),
-      stats_overflow_("stats.overflow", alloc.symbolTable()),
-      num_last_resort_stats_(default_scope_->counterFromStatName(stats_overflow_.statName())),
-      heap_allocator_(alloc.symbolTable()), source_(*this), null_counter_(alloc.symbolTable()),
-      null_gauge_(alloc.symbolTable()), null_histogram_(alloc.symbolTable()) {}
+      stats_matcher_(std::make_unique<StatsMatcherImpl>()), heap_allocator_(alloc.symbolTable()),
+      source_(*this), null_counter_(alloc.symbolTable()), null_gauge_(alloc.symbolTable()),
+      null_histogram_(alloc.symbolTable()) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
-  stats_overflow_.free(symbolTable());
+  for (StatNameStorageSet* rejected_stats : rejected_stats_purgatory_) {
+    rejected_stats->free(symbolTable());
+    delete rejected_stats;
+  }
 }
 
 void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
@@ -193,7 +192,7 @@ void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
 }
 
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
-  Thread::LockGuard lock(lock_);
+  Thread::ReleasableLockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
 
@@ -203,22 +202,40 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // reference elements of SharedStatNameStorageSet. So simply swap out the set
   // contents into a local that we can hold onto until the TLS cache is cleared
   // of all references.
+  //
+  // We use a raw pointer here as it's easier to capture it in in the lambda.
   auto rejected_stats = new StatNameStorageSet;
   rejected_stats->swap(scope->central_cache_.rejected_stats_);
-  const uint64_t scope_id = scope->scope_id_;
-  auto clean_central_cache = [this, rejected_stats]() {
-    rejected_stats->free(symbolTable());
-    delete rejected_stats;
-  };
 
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
+    const uint64_t scope_id = scope->scope_id_;
+
+    // We must delay the cleanup of the rejected stats storage until all the
+    // thread-local caches are cleared. This happens by post(), and it's
+    // possible that post() will not run, such as when an exception is thrown
+    // during startup. To avoid leaking memory and thus failing tests when
+    // this occurs, we hold the rejected stats in 'purgatory', so they can
+    // be cleared out in the ThreadLocalStoreImpl destructor. We'd prefer
+    // to release the memory immediately, however, in which case we remove
+    // the rejected stats set from purgatory.
+    rejected_stats_purgatory_.insert(rejected_stats);
+    auto clean_central_cache = [this, rejected_stats]() {
+      {
+        Thread::LockGuard lock(lock_);
+        rejected_stats_purgatory_.erase(rejected_stats);
+      }
+      rejected_stats->free(symbolTable());
+      delete rejected_stats;
+    };
+    lock.release();
     main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {
       clearScopeFromCaches(scope_id, clean_central_cache);
     });
   } else {
-    clean_central_cache();
+    rejected_stats->free(symbolTable());
+    delete rejected_stats;
   }
 }
 
@@ -232,23 +249,6 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
         [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); },
         clean_central_cache);
   }
-}
-
-absl::string_view ThreadLocalStoreImpl::truncateStatNameIfNeeded(absl::string_view name) {
-  // If the main allocator requires stat name truncation, do so now, though any
-  // warnings will be printed only if the truncated stat requires a new
-  // allocation.
-  if (alloc_.requiresBoundedStatNameSize()) {
-    const uint64_t max_length = stats_options_.maxNameLength();
-    if (name.size() > max_length) {
-      ENVOY_LOG_MISC(
-          warn,
-          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
-          name, name.size(), max_length);
-      name = name.substr(0, max_length);
-    }
-  }
-  return name;
 }
 
 std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
@@ -343,12 +343,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     TagExtraction extraction(parent_, name);
     std::shared_ptr<StatType> stat =
         make_stat(parent_.alloc_, name, extraction.tagExtractedName(), extraction.tags());
-    if (stat == nullptr) {
-      parent_.num_last_resort_stats_.inc();
-      stat = make_stat(parent_.heap_allocator_, name, extraction.tagExtractedName(),
-                       extraction.tags());
-      ASSERT(stat != nullptr);
-    }
+    ASSERT(stat != nullptr);
     central_ref = &central_cache_map[stat->statName()];
     *central_ref = stat;
   }

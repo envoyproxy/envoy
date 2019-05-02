@@ -74,8 +74,6 @@ public:
   void free(HeapStatData& data) override;
 
   // StatDataAllocator
-  bool requiresBoundedStatNameSize() const override { return false; }
-
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
                                const std::vector<Tag>& tags) override {
     return std::make_shared<HeapStat<CounterImpl<HeapStatData>>>(alloc(name), *this,

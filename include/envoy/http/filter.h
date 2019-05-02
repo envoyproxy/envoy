@@ -284,6 +284,18 @@ public:
   virtual HeaderMap& addDecodedTrailers() PURE;
 
   /**
+   * A wrapper for legacy sendLocalReply replies without the details parameter.
+   * See sendLocalReply below for usage
+   */
+  // TODO(alyssawilk) send an email to envoy-dev for API change, add for all other filters, and
+  // delete this placeholder.
+  void sendLocalReply(Code response_code, absl::string_view body_text,
+                      std::function<void(HeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status) {
+    sendLocalReply(response_code, body_text, modify_headers, grpc_status, "");
+  }
+
+  /**
    * Create a locally generated response using the provided response_code and body_text parameters.
    * If the request was a gRPC request the local reply will be encoded as a gRPC response with a 200
    * HTTP response code and grpc-status and grpc-message headers mapped from the provided
@@ -295,10 +307,12 @@ public:
    * @param modify_headers supplies an optional callback function that can modify the
    *                       response headers.
    * @param grpc_status the gRPC status code to override the httpToGrpcStatus mapping with.
+   * @param details a string detailing why this local reply was sent.
    */
   virtual void sendLocalReply(Code response_code, absl::string_view body_text,
                               std::function<void(HeaderMap& headers)> modify_headers,
-                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status) PURE;
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
 
   /**
    * Called with 100-Continue headers to be encoded.
