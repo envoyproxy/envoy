@@ -36,6 +36,10 @@ private:
   void mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas);
   void mergeGauges(const Protobuf::Map<std::string, uint64_t>& gauges);
   StatNameHashMap<uint64_t> parent_gauge_values_;
+  // pending_counter_deltas_ is used to prevent no-longer-used counters from "leaking" across hot
+  // restart. Until a child has on its own caused a counter to be created, the parent's deltas for
+  // that counter are saved in this map, to be addded into the child's counter if/when it is
+  // created.
   absl::flat_hash_map<std::string, uint64_t> pending_counter_deltas_;
   Stats::Store& target_store_;
 };

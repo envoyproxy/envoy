@@ -55,7 +55,6 @@ bool StatMerger::shouldImport(Gauge& gauge, const std::string& gauge_name) {
 }
 
 void StatMerger::mergeCounters(const Protobuf::Map<std::string, uint64_t>& counter_deltas) {
-  // TODO comment about what and why we're doing (to avoid leaks)
   for (const auto& counter : counter_deltas) {
     if (target_store_.counterExists(counter.first)) {
       uint64_t delta_value = 0;
