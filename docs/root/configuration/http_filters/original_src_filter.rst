@@ -4,7 +4,7 @@ Original Source
 ===============
 
 * :ref:`HTTP filter v2 API reference <envoy_api_msg_config.filter.http.original_src.v2alpha1.OriginalSrc>`
-* This filter should be configured with the name *envoy.original_src*.
+* This filter should be configured with the name *envoy.filters.http.original_src*.
 
 The original source http filter replicates the downstream remote address of the connection on
 the upstream side of Envoy. For example, if a downstream connection connects to Envoy with IP
@@ -60,6 +60,6 @@ The following example configures Envoy to use the original source for all connec
 .. code-block:: yaml
 
   http_filters:
-    - name: envoy..original_src
+    - name: envoy.filters.http.original_src
       config:
         mark: 123
