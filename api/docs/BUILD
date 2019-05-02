@@ -49,6 +49,7 @@ proto_library(
         "//envoy/config/filter/http/rate_limit/v2:rate_limit",
         "//envoy/config/filter/http/rbac/v2:rbac",
         "//envoy/config/filter/http/router/v2:router",
+        "//envoy/config/filter/http/original_src/v2alpha1:original_src",
         "//envoy/config/filter/http/squash/v2:squash",
         "//envoy/config/filter/http/tap/v2alpha:tap",
         "//envoy/config/filter/http/transcoder/v2:transcoder",
