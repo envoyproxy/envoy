@@ -42,6 +42,8 @@ public:
   MOCK_CONST_METHOD0(requestComplete, absl::optional<std::chrono::nanoseconds>());
   MOCK_METHOD1(addBytesReceived, void(uint64_t));
   MOCK_CONST_METHOD0(bytesReceived, uint64_t());
+  MOCK_METHOD1(setRouteName, void(std::string route_name));
+  MOCK_CONST_METHOD0(getRouteName, const std::string&());
   MOCK_CONST_METHOD0(protocol, absl::optional<Http::Protocol>());
   MOCK_METHOD1(protocol, void(Http::Protocol protocol));
   MOCK_CONST_METHOD0(responseCode, absl::optional<uint32_t>());

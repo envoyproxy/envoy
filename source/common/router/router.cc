@@ -308,11 +308,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
+    callbacks_->streamInfo().setRouteName(direct_response->routeName());
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
+  callbacks_->streamInfo().setRouteName(route_entry_->routeName());
+
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
   if (!cluster) {
     config_.stats_.no_cluster_.inc();

@@ -128,6 +128,10 @@ struct StreamInfoImpl : public StreamInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
+  void setRouteName(std::string route_name) { route_name_ = route_name; }
+
+  const std::string& getRouteName() const { return route_name_; }
+
   void setUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {
     upstream_local_address_ = upstream_local_address;
@@ -220,6 +224,7 @@ struct StreamInfoImpl : public StreamInfo {
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
   FilterStateImpl filter_state_{};
+  std::string route_name_;
 
 private:
   uint64_t bytes_received_{};

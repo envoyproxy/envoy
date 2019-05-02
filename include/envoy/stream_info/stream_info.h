@@ -202,6 +202,9 @@ public:
    */
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
 
+  virtual void setRouteName(std::string name) PURE;
+
+  virtual const std::string& getRouteName() const PURE;
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
    */
