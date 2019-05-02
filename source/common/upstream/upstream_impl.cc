@@ -777,7 +777,7 @@ void ClusterImplBase::finishInitialization() {
   initialization_complete_callback_ = nullptr;
 
   if (health_checker_ != nullptr) {
-    reloadHealthyHosts();
+    reloadHealthyHosts(nullptr);
   }
 
   if (snapped_callback != nullptr) {
@@ -790,11 +790,11 @@ void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_chec
   health_checker_ = health_checker;
   health_checker_->start();
   health_checker_->addHostCheckCompleteCb(
-      [this](HostSharedPtr, HealthTransition changed_state) -> void {
+      [this](const HostSharedPtr& host, HealthTransition changed_state) -> void {
         // If we get a health check completion that resulted in a state change, signal to
         // update the host sets on all threads.
         if (changed_state == HealthTransition::Changed) {
-          reloadHealthyHosts();
+          reloadHealthyHosts(host);
         }
       });
 }
@@ -805,10 +805,11 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
   }
 
   outlier_detector_ = outlier_detector;
-  outlier_detector_->addChangedStateCb([this](HostSharedPtr) -> void { reloadHealthyHosts(); });
+  outlier_detector_->addChangedStateCb(
+      [this](const HostSharedPtr& host) -> void { reloadHealthyHosts(host); });
 }
 
-void ClusterImplBase::reloadHealthyHosts() {
+void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   // Every time a host changes Health Check state we cause a full healthy host recalculation which
   // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
   // can also block worker threads by doing this repeatedly. There is no reason to do this
@@ -818,6 +819,10 @@ void ClusterImplBase::reloadHealthyHosts() {
     return;
   }
 
+  reloadHealthyHostsHelper(host);
+}
+
+void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
   const auto& host_sets = prioritySet().hostSetsPerPriority();
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
@@ -1129,6 +1134,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     auto existing_host = all_hosts.find(host->address()->asString());
     const bool existing_host_found = existing_host != all_hosts.end();
 
+    // Clear any pending deletion flag on an existing host in case it came back while it was
+    // being stabilized. We will set it again below if needed.
+    if (existing_host_found) {
+      existing_host->second->healthFlagClear(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+    }
+
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
     // (currently there is only one criterion, but we might add more in the future):
     // - The cluster health checker is activated and a new host is matched with the existing one,
@@ -1233,6 +1244,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
         final_hosts.push_back(*i);
         updated_hosts[(*i)->address()->asString()] = *i;
+        (*i)->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
         i = current_priority_hosts.erase(i);
       } else {
         i++;

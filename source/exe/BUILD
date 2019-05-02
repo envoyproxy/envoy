@@ -7,6 +7,7 @@ load(
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
+    "envoy_google_grpc_external_deps",
     "envoy_package",
 )
 load(
@@ -81,7 +82,7 @@ envoy_cc_library(
             ":sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }) + envoy_cc_platform_dep("platform_impl_lib"),
+    }) + envoy_cc_platform_dep("platform_impl_lib") + envoy_google_grpc_external_deps(),
 )
 
 envoy_cc_posix_library(
