@@ -52,17 +52,58 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
                                   uint32_t current_priority) {
   Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
 
-  priority_state_manager.initializePriorityFor(redis_discovery_session_->locality_lb_endpoint_);
-  for (const Upstream::HostSharedPtr& host : redis_discovery_session_->hosts_) {
-    if (redis_discovery_session_->locality_lb_endpoint_.priority() == current_priority) {
-      priority_state_manager.registerHostForPriority(
-          host, redis_discovery_session_->locality_lb_endpoint_);
+  auto locality_lb_endpoint = localityLbEndpoint();
+  priority_state_manager.initializePriorityFor(locality_lb_endpoint);
+  for (const Upstream::HostSharedPtr& host : hosts_) {
+    if (locality_lb_endpoint.priority() == current_priority) {
+      priority_state_manager.registerHostForPriority(host, locality_lb_endpoint);
     }
   }
 
   priority_state_manager.updateClusterPrioritySet(
       current_priority, std::move(priority_state_manager.priorityState()[current_priority].first),
       hosts_added, hosts_removed, absl::nullopt);
+}
+
+void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
+  Upstream::HostVector new_hosts;
+  std::array<Upstream::HostSharedPtr, 16384> slots_;
+
+  // loop through the cluster slot response and error checks for each field
+  for (ClusterSlot slot : slots) {
+    new_hosts.emplace_back(new RedisHost(info(), "", slot.master_, *this, true));
+  }
+
+  std::unordered_map<std::string, Upstream::HostSharedPtr> updated_hosts;
+  Upstream::HostVector hosts_added;
+  Upstream::HostVector hosts_removed;
+  if (updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, updated_hosts,
+                            all_hosts_)) {
+    ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
+      return host->priority() == localityLbEndpoint().priority();
+    }));
+    updateAllHosts(hosts_added, hosts_removed, localityLbEndpoint().priority());
+  } else {
+    info_->stats().update_no_rebuild_.inc();
+  }
+
+  for (ClusterSlot slot : slots) {
+    auto host = updated_hosts.find(slot.master_->asString());
+    ASSERT(host != updated_hosts.end(), "we expect all address to be found in the updated_hosts");
+    // Add to the slot
+    for (auto i = slot.start_; i <= slot.end_; ++i) {
+      slots_[i] = host->second;
+    }
+  }
+
+  all_hosts_ = std::move(updated_hosts);
+  cluster_slots_map_.swap(slots_);
+
+  // TODO(hyang): If there is an initialize callback, fire it now. Note that if the
+  // cluster refers to multiple DNS names, this will return initialized after a single
+  // DNS resolution completes. This is not perfect but is easier to code and it is unclear
+  // if the extra complexity is needed so will start with this.
+  onPreInitComplete();
 }
 
 // DnsDiscoveryResolveTarget
@@ -166,14 +207,14 @@ void RedisCluster::RedisDiscoverySession::startResolve() {
   // If hosts is empty, we haven't received a successful result from the CLUSTER SLOTS call yet.
   // So, pick a random discovery address from dns and make a request.
   Upstream::HostSharedPtr host;
-  if (hosts_.empty()) {
+  if (parent_.hosts_.empty()) {
     const int rand_idx = parent_.random_.random() % discovery_address_list_.size();
     auto it = discovery_address_list_.begin();
     std::next(it, rand_idx);
     host = Upstream::HostSharedPtr{new RedisHost(parent_.info(), "", *it, parent_, true)};
   } else {
-    const int rand_idx = parent_.random_.random() % hosts_.size();
-    host = hosts_[rand_idx];
+    const int rand_idx = parent_.random_.random() % parent_.hosts_.size();
+    host = parent_.hosts_[rand_idx];
   }
 
   current_host_address_ = host->address()->asString();
@@ -198,8 +239,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     return;
   }
 
-  Upstream::HostVector new_hosts;
-  std::array<Upstream::HostSharedPtr, 16384> slots_;
+  std::vector<ClusterSlot> slots_;
 
   // loop through the cluster slot response and error checks for each field
   for (const NetworkFilters::Common::Redis::RespValue& part : value->asArray()) {
@@ -228,51 +268,10 @@ void RedisCluster::RedisDiscoverySession::onResponse(
       onUnexpectedResponse(value);
       return;
     }
-    new_hosts.emplace_back(
-        new RedisHost(parent_.info(), "", std::move(master_address), parent_, true));
+    slots_.emplace_back(slot_range[0].asInteger(), slot_range[1].asInteger(), master_address);
   }
 
-  std::unordered_map<std::string, Upstream::HostSharedPtr> updated_hosts;
-  Upstream::HostVector hosts_added;
-  Upstream::HostVector hosts_removed;
-  if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, updated_hosts,
-                                    all_hosts_)) {
-    ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
-      return host->priority() == locality_lb_endpoint_.priority();
-    }));
-    parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
-  } else {
-    parent_.info_->stats().update_no_rebuild_.inc();
-  }
-
-  // build the slot lookup array in a second pass, so that it can referenced the updated_hosts.
-  for (const NetworkFilters::Common::Redis::RespValue& part : value->asArray()) {
-    const std::vector<NetworkFilters::Common::Redis::RespValue>& slot_range = part.asArray();
-
-    // Field 0: Start slot range
-    auto start_field = slot_range[0].asInteger();
-
-    // Field 1: End slot range
-    auto end_field = slot_range[1].asInteger();
-
-    // Field 2: Master address for slot range
-    auto master_address = ProcessCluster(slot_range[2]);
-    auto host = updated_hosts.find(master_address->asString());
-    ASSERT(host != updated_hosts.end(), "we expect all address to be found in the updated_hosts");
-    // Add to the slot
-    for (auto i = start_field; i <= end_field; ++i) {
-      slots_[i] = host->second;
-    }
-  }
-
-  all_hosts_ = std::move(updated_hosts);
-  cluster_slots_map_.swap(slots_);
-
-  // TODO(hyang): If there is an initialize callback, fire it now. Note that if the
-  // cluster refers to multiple DNS names, this will return initialized after a single
-  // DNS resolution completes. This is not perfect but is easier to code and it is unclear
-  // if the extra complexity is needed so will start with this.
-  parent_.onPreInitComplete();
+  parent_.onClusterSlotUpdate(slots_);
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
 }
 

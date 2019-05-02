@@ -119,6 +119,16 @@ private:
   void updateAllHosts(const Upstream::HostVector& hosts_added,
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
 
+  struct ClusterSlot {
+    int64_t start_;
+    int64_t end_;
+    Network::Address::InstanceConstSharedPtr master_;
+    ClusterSlot(int64_t start, int64_t end, Network::Address::InstanceConstSharedPtr master)
+        : start_(start), end_(end), master_(std::move(master)) {}
+  };
+
+  void onClusterSlotUpdate(const std::vector<ClusterSlot>&);
+
   const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
     // always use the first endpoint
     return load_assignment_.endpoints()[0];
@@ -226,12 +236,7 @@ private:
     std::unordered_map<std::string, RedisDiscoveryClientPtr> client_map_;
 
     std::list<Network::Address::InstanceConstSharedPtr> discovery_address_list_;
-    // the slot to master node map
-    std::array<Upstream::HostSharedPtr, 16384> cluster_slots_map_;
 
-    Upstream::HostVector hosts_;
-    const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
-    Upstream::HostMap all_hosts_;
     Event::TimerPtr resolve_timer_;
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
     const std::chrono::milliseconds buffer_timeout_;
@@ -248,6 +253,11 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Runtime::RandomGenerator& random_;
   std::unique_ptr<RedisDiscoverySession> redis_discovery_session_;
+  // the slot to master node map
+  std::array<Upstream::HostSharedPtr, 16384> cluster_slots_map_;
+
+  Upstream::HostVector hosts_;
+  Upstream::HostMap all_hosts_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
