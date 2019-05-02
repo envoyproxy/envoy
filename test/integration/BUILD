@@ -685,12 +685,8 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "h1_fuzz_lib",
-    srcs = [
-        "h1_fuzz.cc",
-    ],
-    hdrs = [
-        "h1_fuzz.h",
-    ],
+    srcs = ["h1_fuzz.cc"],
+    hdrs = ["h1_fuzz.h"],
     deps = [
         ":capture_fuzz_proto_cc",
         ":http_integration_lib",
@@ -704,22 +700,14 @@ envoy_cc_test_library(
 
 envoy_cc_fuzz_test(
     name = "h1_capture_fuzz_test",
-    srcs = [
-        "h1_capture_fuzz_test.cc",
-    ],
+    srcs = ["h1_capture_fuzz_test.cc"],
     corpus = "h1_corpus",
-    deps = [
-        ":h1_fuzz_lib",
-    ],
+    deps = [":h1_fuzz_lib"],
 )
 
 envoy_cc_fuzz_test(
     name = "h1_capture_direct_response_fuzz_test",
-    srcs = [
-        "h1_capture_direct_response_fuzz_test.cc",
-    ],
+    srcs = ["h1_capture_direct_response_fuzz_test.cc"],
     corpus = "h1_corpus",
-    deps = [
-        ":h1_fuzz_lib",
-    ],
+    deps = [":h1_fuzz_lib"],
 )

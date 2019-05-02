@@ -81,6 +81,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hot_restarting_parent_test",
+    srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
+    deps = [
+        "//source/common/stats:stats_lib",
+        "//source/server:hot_restart_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "guarddog_impl_test",
     srcs = ["guarddog_impl_test.cc"],
     deps = [
