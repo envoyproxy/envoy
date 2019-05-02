@@ -77,7 +77,7 @@ following information:
 * Nodes entering or leaving the cluster.
 
 For topology configuration details, see the Redis Cluster
-:ref:`v2 API reference <envoy_api_msg_config.cluster.redis.RedisClusterConfig>`
+:ref:`v2 API reference <envoy_api_msg_config.cluster.redis.RedisClusterConfig>`.
 
 Supported commands
 ------------------

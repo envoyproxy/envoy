@@ -809,7 +809,7 @@ protected:
 };
 
 /**
- * Utility function to get Dns from cluster
+ * Utility function to get Dns from cluster.
  */
 Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster);
 

@@ -82,8 +82,9 @@ protected:
         MessageUtil::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
         *this, cm, runtime_, dns_resolver_, factory_context, std::move(scope), false));
-    // this allows us to create expectation on cluster slot response without waiting for makeRequest
-    pool_callbacks_ = &*(cluster_->redis_discovery_session_);
+    // This allows us to create expectation on cluster slot response without waiting for
+    // makeRequest.
+    pool_callbacks_ = &cluster_->redis_discovery_session_;
     cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const Upstream::HostVector&, const Upstream::HostVector&) -> void {
           membership_updated_.ready();
@@ -271,7 +272,7 @@ protected:
     return respValue;
   }
 
-  // create a redis cluster slot response. If a bit is set in the bitset, then that part of
+  // Create a redis cluster slot response. If a bit is set in the bitset, then that part of
   // of the response is correct, otherwise it's incorrect.
   NetworkFilters::Common::Redis::RespValuePtr createResponse(std::bitset<12> flags) const {
     int64_t idx(0);
@@ -290,9 +291,9 @@ protected:
 
     std::vector<NetworkFilters::Common::Redis::RespValue> master_1_array;
     if (flags.test(master_size)) {
-      // ip field
+      // Ip field.
       master_1_array.push_back(createStringField(flags.test(master_ip_type), "127.0.0.1"));
-      // port field
+      // Port field.
       master_1_array.push_back(createIntegerField(flags.test(master_port_type), 22120));
     }
 
@@ -355,20 +356,20 @@ protected:
     // TODO(hyang): this will change once we register slaves as well
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
-    // add new host
+    // Add new host.
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->callback_();
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
-    // no change
+    // No change.
     expectRedisResolve();
     resolve_timer_->callback_();
     expectClusterSlotResponse(twoSlotsMasters());
     expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120", "127.0.0.2:22120"}));
 
-    // remove host
+    // Remove host.
     expectRedisResolve();
     EXPECT_CALL(membership_updated_, ready());
     resolve_timer_->callback_();
@@ -442,7 +443,8 @@ class RedisDnsParamTest : public RedisClusterTest,
 INSTANTIATE_TEST_SUITE_P(DnsParam, RedisDnsParamTest, testing::ValuesIn(generateRedisDnsParams()));
 
 // Validate that if the DNS and CLUSTER SLOT resolve immediately, we have the expected
-// host state and initialization callback invocation
+// host state and initialization callback invocation.
+
 TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   const std::string config = R"EOF(
   name: name
@@ -500,7 +502,7 @@ TEST_F(RedisClusterTest, Basic) {
         cluster_refresh_timeout: 0.25s
   )EOF";
 
-  // using load assignment
+  // Using load assignment.
   const std::string basic_yaml_load_assignment = R"EOF(
   name: name
   connect_timeout: 0.25s
@@ -553,7 +555,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
 
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
-  // initialization will wait til the redis cluster succeed
+  // Initialization will wait til the redis cluster succeed.
   expectClusterSlotFailure();
   EXPECT_EQ(1U, cluster_->info()->stats().update_attempt_.value());
   EXPECT_EQ(1U, cluster_->info()->stats().update_failure_.value());
@@ -565,7 +567,7 @@ TEST_F(RedisClusterTest, RedisResolveFailure) {
   expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
-  // expect no change if resolve failed
+  // Expect no change if resolve failed.
   expectRedisResolve();
   resolve_timer_->callback_();
   expectClusterSlotFailure();
@@ -640,7 +642,7 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
 
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
-  // initialization will wait til the redis cluster succeed
+  // Initialization will wait til the redis cluster succeed.
   std::vector<NetworkFilters::Common::Redis::RespValue> hello_world(2);
   hello_world[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
   hello_world[0].asString() = "hello";
@@ -663,10 +665,10 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   expectClusterSlotResponse(singleSlotMasterSlave("127.0.0.1", "127.0.0.2", 22120));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
-  // expect no change if resolve failed
+  // Expect no change if resolve failed.
   uint64_t update_attempt = 2;
   uint64_t update_failure = 1;
-  // test every combination of
+  // Test every combination the cluster slots response.
   for (uint64_t i = 0; i < (1 << 12); i++) {
     std::bitset<12> flags(i);
     expectRedisResolve();

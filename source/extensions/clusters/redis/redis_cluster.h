@@ -85,6 +85,8 @@ namespace Redis {
  * proxy filter for load balancing purpose.
  */
 
+typedef std::array<Upstream::HostSharedPtr, 16384> SlotArray;
+
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
   RedisCluster(const envoy::api::v2::Cluster& cluster,
@@ -120,22 +122,23 @@ private:
                       const Upstream::HostVector& hosts_removed, uint32_t priority);
 
   struct ClusterSlot {
+    ClusterSlot(int64_t start, int64_t end, Network::Address::InstanceConstSharedPtr master)
+        : start_(start), end_(end), master_(std::move(master)) {}
+
     int64_t start_;
     int64_t end_;
     Network::Address::InstanceConstSharedPtr master_;
-    ClusterSlot(int64_t start, int64_t end, Network::Address::InstanceConstSharedPtr master)
-        : start_(start), end_(end), master_(std::move(master)) {}
   };
 
   void onClusterSlotUpdate(const std::vector<ClusterSlot>&);
 
   const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
-    // always use the first endpoint
+    // Always use the first endpoint.
     return load_assignment_.endpoints()[0];
   }
 
   const envoy::api::v2::endpoint::LbEndpoint& lbEndpoint() const {
-    // always use the first endpoint
+    // Always use the first endpoint.
     return localityLbEndpoint().lb_endpoints()[0];
   }
 
@@ -158,7 +161,7 @@ private:
     const bool master_;
   };
 
-  // Resolve the discovery endpoint
+  // Resolves the discovery endpoint.
   struct DnsDiscoveryResolveTarget {
     DnsDiscoveryResolveTarget(
         RedisCluster& parent, const std::string& dns_address, const uint32_t port,
@@ -171,8 +174,8 @@ private:
 
     RedisCluster& parent_;
     Network::ActiveDnsQuery* active_query_{};
-    std::string dns_address_;
-    uint32_t port_;
+    const std::string dns_address_;
+    const uint32_t port_;
     const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
     const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
   };
@@ -252,9 +255,9 @@ private:
   const envoy::api::v2::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::RandomGenerator& random_;
-  std::unique_ptr<RedisDiscoverySession> redis_discovery_session_;
-  // the slot to master node map
-  std::array<Upstream::HostSharedPtr, 16384> cluster_slots_map_;
+  RedisDiscoverySession redis_discovery_session_;
+  // The slot to master node map.
+  SlotArray cluster_slots_map_;
 
   Upstream::HostVector hosts_;
   Upstream::HostMap all_hosts_;

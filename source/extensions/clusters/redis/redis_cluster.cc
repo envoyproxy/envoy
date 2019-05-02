@@ -28,8 +28,7 @@ RedisCluster::RedisCluster(
                            ? cluster.load_assignment()
                            : Config::Utility::translateClusterHosts(cluster.hosts())),
       local_info_(factory_context.localInfo()), random_(factory_context.random()),
-      redis_discovery_session_(
-          std::make_unique<RedisDiscoverySession>(*this, redis_client_factory)) {
+      redis_discovery_session_(*this, redis_client_factory) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -67,10 +66,9 @@ void RedisCluster::updateAllHosts(const Upstream::HostVector& hosts_added,
 
 void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
   Upstream::HostVector new_hosts;
-  std::array<Upstream::HostSharedPtr, 16384> slots_;
+  SlotArray slots_;
 
-  // loop through the cluster slot response and error checks for each field
-  for (ClusterSlot slot : slots) {
+  for (const ClusterSlot& slot : slots) {
     new_hosts.emplace_back(new RedisHost(info(), "", slot.master_, *this, true));
   }
 
@@ -87,10 +85,9 @@ void RedisCluster::onClusterSlotUpdate(const std::vector<ClusterSlot>& slots) {
     info_->stats().update_no_rebuild_.inc();
   }
 
-  for (ClusterSlot slot : slots) {
+  for (const ClusterSlot& slot : slots) {
     auto host = updated_hosts.find(slot.master_->asString());
     ASSERT(host != updated_hosts.end(), "we expect all address to be found in the updated_hosts");
-    // Add to the slot
     for (auto i = slot.start_; i <= slot.end_; ++i) {
       slots_[i] = host->second;
     }
@@ -128,8 +125,8 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolve() {
       [this](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
-        parent_.redis_discovery_session_->registerDiscoveryAddress(address_list, port_);
-        parent_.redis_discovery_session_->startResolve();
+        parent_.redis_discovery_session_.registerDiscoveryAddress(address_list, port_);
+        parent_.redis_discovery_session_.startResolve();
       });
 }
 
@@ -143,7 +140,7 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
 
 namespace {
 // Convert the cluster slot IP/Port response to and address, return null if the response does not
-// match the expected type
+// match the expected type.
 Network::Address::InstanceConstSharedPtr
 ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value) {
   if (value.type() != NetworkFilters::Common::Redis::RespType::Array) {
@@ -233,7 +230,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
 
-  // do nothing if the cluster is empty
+  // Do nothing if the cluster is empty.
   if (value->type() != NetworkFilters::Common::Redis::RespType::Array || value->asArray().empty()) {
     onUnexpectedResponse(value);
     return;
@@ -241,7 +238,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
 
   std::vector<ClusterSlot> slots_;
 
-  // loop through the cluster slot response and error checks for each field
+  // Loop through the cluster slot response and error checks for each field.
   for (const NetworkFilters::Common::Redis::RespValue& part : value->asArray()) {
     if (part.type() != NetworkFilters::Common::Redis::RespType::Array) {
       onUnexpectedResponse(value);
@@ -250,11 +247,12 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     const std::vector<NetworkFilters::Common::Redis::RespValue>& slot_range = part.asArray();
     if (slot_range.size() < 3 ||
         slot_range[0].type() !=
-            NetworkFilters::Common::Redis::RespType::Integer || // start slot range as an integer
+            NetworkFilters::Common::Redis::RespType::Integer || // Start slot range is an integer.
         slot_range[1].type() !=
-            NetworkFilters::Common::Redis::RespType::Integer || // end slot range as an integer
+            NetworkFilters::Common::Redis::RespType::Integer || // End slot range is an integer.
         slot_range[2].type() !=
-            NetworkFilters::Common::Redis::RespType::Array) { // master ip and port pair as an array
+            NetworkFilters::Common::Redis::RespType::Array) { // Master ip and port pair is a
+                                                              // sub-array.
       onUnexpectedResponse(value);
       return;
     }

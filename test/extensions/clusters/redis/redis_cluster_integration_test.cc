@@ -83,7 +83,7 @@ public:
     setDeterministic();
     config_helper_.renameListener("redis_proxy");
 
-    // change the port for each of the discovery host in cluster_0
+    // Change the port for each of the discovery host in cluster_0.
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       uint32_t upstream_idx = 0;
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -158,7 +158,7 @@ protected:
    * Simple response for a single slot redis cluster with a master and slave.
    * @param master the ip of the master node.
    * @param slave the ip of the slave node.
-   * @return The cluster slot response
+   * @return The cluster slot response.
    */
   std::string singleSlotMasterSlave(const Network::Address::Ip* master,
                                     const Network::Address::Ip* slave) {
@@ -180,7 +180,7 @@ protected:
    * Simple response for 2 slot redis cluster with 2 nodes.
    * @param slot1 the ip of the master node of slot1.
    * @param slot2 the ip of the master node of slot2.
-   * @return The cluster slot response
+   * @return The cluster slot response.
    */
   std::string twoSlots(const Network::Address::Ip* slot1, const Network::Address::Ip* slot2) {
     int64_t start_slot1 = 0;
