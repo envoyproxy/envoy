@@ -56,16 +56,15 @@ public:
   }
 
   void updateResources(const std::set<std::string>& update_to_these_names) override {
-    // Tell the server about our new interests (but only if there are any).
-    if (state_->updateResourceInterest(update_to_these_names)) {
-      kickOffDiscoveryRequest();
-    }
+    state_->updateResourceInterest(update_to_these_names);
+    // Tell the server about our new interests, if there are any.
+    trySendDiscoveryRequests();
   }
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override {
     state_->markStreamFresh();
-    kickOffDiscoveryRequest();
+    trySendDiscoveryRequests();
   }
 
   void onEstablishmentFailure() override { state_->handleEstablishmentFailure(); }
@@ -74,20 +73,20 @@ public:
   onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override {
     ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url_,
               message->system_version_info());
-    kickOffDiscoveryRequestWithAck(state_->handleResponse(*message));
+    kickOffAck(state_->handleResponse(*message));
   }
 
   void onWriteable() override { trySendDiscoveryRequests(); }
 
 private:
-  void kickOffDiscoveryRequest() { kickOffDiscoveryRequestWithAck(absl::nullopt); }
-
-  void kickOffDiscoveryRequestWithAck(absl::optional<UpdateAck> ack) {
+  void kickOffAck(UpdateAck ack) {
     ack_queue_.push(ack);
     trySendDiscoveryRequests();
   }
 
-  bool shouldSendDiscoveryRequest() {
+  // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
+  // whether we *want* to send a DeltaDiscoveryRequest).
+  bool canSendDiscoveryRequest() {
     if (state_->paused()) {
       ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url_);
       return false;
@@ -101,21 +100,26 @@ private:
     return true;
   }
 
+  // Checks whether we have something to say in a DeltaDiscoveryRequest, which can be an ACK and/or
+  // a subscription update. (Does not check whether we *can* send a DeltaDiscoveryRequest).
+  bool wantToSendDiscoveryRequest() {
+    return !ack_queue_.empty() || state_->subscriptionUpdatePending();
+  }
+
   void trySendDiscoveryRequests() {
-    while (!ack_queue_.empty() && shouldSendDiscoveryRequest()) {
+    while (wantToSendDiscoveryRequest() && canSendDiscoveryRequest()) {
       envoy::api::v2::DeltaDiscoveryRequest request = state_->getNextRequest();
-      if (ack_queue_.front().has_value()) {
-        const UpdateAck& ack = ack_queue_.front().value();
+      if (!ack_queue_.empty()) {
+        const UpdateAck& ack = ack_queue_.front();
         request.set_response_nonce(ack.nonce_);
         if (ack.error_detail_.code() != Grpc::Status::GrpcStatus::Ok) {
           // Don't needlessly make the field present-but-empty if status is ok.
           request.mutable_error_detail()->CopyFrom(ack.error_detail_);
         }
+        ack_queue_.pop();
       }
       ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url_, request.DebugString());
-
       grpc_stream_.sendMessage(request);
-      ack_queue_.pop();
     }
     grpc_stream_.maybeUpdateQueueSizeStat(ack_queue_.size());
   }
@@ -137,7 +141,7 @@ private:
   // mixed in with an ACK request. In that case, the entry that the subscription change originally
   // queued up *does* still get sent, just empty and pointless. (TODO(fredlas) we would like to skip
   // those no-op requests).
-  std::queue<absl::optional<UpdateAck>> ack_queue_;
+  std::queue<UpdateAck> ack_queue_;
 
   const LocalInfo::LocalInfo& local_info_;
   SubscriptionStats stats_;

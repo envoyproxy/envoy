@@ -94,7 +94,6 @@ TEST_F(DeltaSubscriptionImplTest, RemoveThenAdd) {
   subscription_->updateResources({"name1", "name2", "name3"});
   InSequence s;
   expectSendMessage({"name3"}, {}, Grpc::Status::GrpcStatus::Ok, "", {});
-  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, "", {}); // no-op due to the second update
   subscription_->resume();
 }
 
@@ -113,7 +112,6 @@ TEST_F(DeltaSubscriptionImplTest, AddThenRemove) {
   subscription_->updateResources({"name1", "name2", "name3"});
   InSequence s;
   expectSendMessage({}, {"name4"}, Grpc::Status::GrpcStatus::Ok, "", {});
-  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, "", {}); // no-op due to the second update
   subscription_->resume();
 }
 
@@ -126,8 +124,6 @@ TEST_F(DeltaSubscriptionImplTest, AddRemoveAdd) {
   subscription_->updateResources({"name1", "name2", "name3", "name4"});
   InSequence s;
   expectSendMessage({"name4"}, {}, Grpc::Status::GrpcStatus::Ok, "", {});
-  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, "", {}); // no-op due to the second update
-  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, "", {}); // no-op due to the third update
   subscription_->resume();
 }
 
@@ -140,8 +136,6 @@ TEST_F(DeltaSubscriptionImplTest, RemoveAddRemove) {
   subscription_->updateResources({"name1", "name2"});
   InSequence s;
   expectSendMessage({}, {"name3"}, Grpc::Status::GrpcStatus::Ok, "", {});
-  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, "", {}); // no-op due to the second update
-  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, "", {}); // no-op due to the third update
   subscription_->resume();
 }
 
@@ -155,8 +149,6 @@ TEST_F(DeltaSubscriptionImplTest, BothAddAndRemove) {
   subscription_->updateResources({"name4"});
   InSequence s;
   expectSendMessage({"name4"}, {"name1", "name2", "name3"}, Grpc::Status::GrpcStatus::Ok, "", {});
-  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, "", {}); // no-op due to the second update
-  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, "", {}); // no-op due to the third update
   subscription_->resume();
 }
 
@@ -167,7 +159,6 @@ TEST_F(DeltaSubscriptionImplTest, CumulativeUpdates) {
   subscription_->updateResources({"name1", "name2", "name3"});
   InSequence s;
   expectSendMessage({"name2", "name3"}, {}, Grpc::Status::GrpcStatus::Ok, "", {});
-  expectSendMessage({}, {}, Grpc::Status::GrpcStatus::Ok, "", {}); // no-op due to the second update
   subscription_->resume();
 }
 

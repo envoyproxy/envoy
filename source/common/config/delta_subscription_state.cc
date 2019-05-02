@@ -43,7 +43,7 @@ void DeltaSubscriptionState::resume() {
 
 // Returns true if there is any meaningful change in our subscription interest, worth reporting to
 // the server.
-bool DeltaSubscriptionState::updateResourceInterest(
+void DeltaSubscriptionState::updateResourceInterest(
     const std::set<std::string>& update_to_these_names) {
   std::vector<std::string> cur_added;
   std::vector<std::string> cur_removed;
@@ -72,9 +72,13 @@ bool DeltaSubscriptionState::updateResourceInterest(
     names_added_.erase(r);
     names_removed_.insert(r);
   }
+}
 
-  // Tell the server about our new interests only if there are any.
-  return !names_added_.empty() || !names_removed_.empty();
+// Not having sent any requests yet counts as an "update pending" since you're supposed to resend
+// the entirety of your interest at the start of a stream, even if nothing has changed.
+bool DeltaSubscriptionState::subscriptionUpdatePending() const {
+  return !names_added_.empty() || !names_removed_.empty() ||
+         !any_request_sent_yet_in_current_stream_;
 }
 
 UpdateAck

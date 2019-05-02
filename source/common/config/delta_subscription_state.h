@@ -31,9 +31,11 @@ public:
   void resume();
   bool paused() const { return paused_; }
 
-  // Returns true if there is any meaningful change in our subscription interest, worth reporting to
-  // the server.
-  bool updateResourceInterest(const std::set<std::string>& update_to_these_names);
+  // Update which resources we're interested in subscribing to.
+  void updateResourceInterest(const std::set<std::string>& update_to_these_names);
+
+  // Whether there was a change in our subscription interest we have yet to inform the server of.
+  bool subscriptionUpdatePending() const;
 
   void markStreamFresh() { any_request_sent_yet_in_current_stream_ = false; }
 
@@ -90,9 +92,9 @@ private:
   bool paused_{};
   bool any_request_sent_yet_in_current_stream_{};
 
-  // Tracking of the delta in our subscription interest since the previous DeltaDiscoveryRequest was
-  // sent. Can't use unordered_set due to ordering issues in gTest expectation matching. Feel free
-  // to change if you can figure out how to make it work.
+  // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
+  // Can't use unordered_set due to ordering issues in gTest expectation matching.
+  // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
 
