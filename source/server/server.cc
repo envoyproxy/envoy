@@ -42,14 +42,14 @@
 #include "server/configuration_impl.h"
 #include "server/connection_handler_impl.h"
 #include "server/guarddog_impl.h"
-#include "server/test_hooks.h"
+#include "server/listener_hooks.h"
 
 namespace Envoy {
 namespace Server {
 
 InstanceImpl::InstanceImpl(const Options& options, Event::TimeSystem& time_system,
-                           Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
-                           HotRestart& restarter, Stats::StoreRoot& store,
+                           Network::Address::InstanceConstSharedPtr local_address,
+                           ListenerHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
@@ -148,14 +148,16 @@ void InstanceImpl::flushStats() {
   // A shutdown initiated before this callback may prevent this from being called as per
   // the semantics documented in ThreadLocal's runOnAllThreads method.
   stats_store_.mergeHistograms([this]() -> void {
-    HotRestart::GetParentStatsInfo info;
-    restarter_.getParentStats(info);
+    // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
+    HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
+
     server_stats_->uptime_.set(time(nullptr) - original_start_time_);
     server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
-                                         info.memory_allocated_);
+                                         parent_stats.parent_memory_allocated_);
     server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
-    server_stats_->parent_connections_.set(info.num_connections_);
-    server_stats_->total_connections_.set(numConnections() + info.num_connections_);
+    server_stats_->parent_connections_.set(parent_stats.parent_connections_);
+    server_stats_->total_connections_.set(listener_manager_->numConnections() +
+                                          parent_stats.parent_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
     InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_.source());
@@ -164,11 +166,6 @@ void InstanceImpl::flushStats() {
       stat_flush_timer_->enableTimer(config_.statsFlushInterval());
     }
   });
-}
-
-void InstanceImpl::getParentStats(HotRestart::GetParentStatsInfo& info) {
-  info.memory_allocated_ = Memory::Stats::totalCurrentlyAllocated();
-  info.num_connections_ = numConnections();
 }
 
 bool InstanceImpl::healthCheckFailed() { return server_stats_->live_.value() == 0; }
@@ -200,7 +197,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
 
 void InstanceImpl::initialize(const Options& options,
                               Network::Address::InstanceConstSharedPtr local_address,
-                              ComponentFactory& component_factory, TestHooks& hooks) {
+                              ComponentFactory& component_factory, ListenerHooks& hooks) {
   ENVOY_LOG(info, "initializing epoch {} (hot restart version={})", options.restartEpoch(),
             restarter_.version());
 
@@ -269,10 +266,8 @@ void InstanceImpl::initialize(const Options& options,
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
-  HotRestart::ShutdownParentAdminInfo info;
-  info.original_start_time_ = original_start_time_;
-  restarter_.shutdownParentAdmin(info);
-  original_start_time_ = info.original_start_time_;
+  // Learn original_start_time_ if our parent is still around to inform us of it.
+  restarter_.sendParentAdminShutdownRequest(original_start_time_);
   admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
   if (initial_config.admin().address()) {
     if (initial_config.admin().accessLogPath().empty()) {
@@ -301,8 +296,8 @@ void InstanceImpl::initialize(const Options& options,
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_ =
-      std::make_unique<ListenerManagerImpl>(*this, listener_component_factory_, worker_factory_);
+  listener_manager_ = std::make_unique<ListenerManagerImpl>(
+      *this, listener_component_factory_, worker_factory_, bootstrap_.enable_dispatcher_stats());
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -310,6 +305,11 @@ void InstanceImpl::initialize(const Options& options,
 
   // We can now initialize stats for threading.
   stats_store_.initializeThreading(*dispatcher_, thread_local_);
+
+  // It's now safe to start writing stats from the main thread's dispatcher.
+  if (bootstrap_.enable_dispatcher_stats()) {
+    dispatcher_->initializeStats(stats_store_, "server.");
+  }
 
   // Runtime gets initialized before the main configuration since during main configuration
   // load things may grab a reference to the loader for later use.
@@ -407,8 +407,6 @@ void InstanceImpl::loadServerFlags(const absl::optional<std::string>& flags_path
     InstanceImpl::failHealthcheck(true);
   }
 }
-
-uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnections(); }
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
                      Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
@@ -528,7 +526,7 @@ Runtime::Loader& InstanceImpl::runtime() { return Runtime::LoaderSingleton::get(
 void InstanceImpl::shutdown() {
   ENVOY_LOG(info, "shutting down server instance");
   shutdown_ = true;
-  restarter_.terminateParent();
+  restarter_.sendParentTerminateRequest();
   notifyCallbacksForStage(Stage::ShutdownExit, [this] { dispatcher_->exit(); });
 }
 
@@ -541,8 +539,9 @@ void InstanceImpl::shutdownAdmin() {
   handler_->stopListeners();
   admin_->closeSocket();
 
+  // If we still have a parent, it should be terminated now that we have a child.
   ENVOY_LOG(warn, "terminating parent process");
-  restarter_.terminateParent();
+  restarter_.sendParentTerminateRequest();
 }
 
 void InstanceImpl::registerCallback(Stage stage, StageCallback callback) {

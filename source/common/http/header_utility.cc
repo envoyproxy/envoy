@@ -97,9 +97,7 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
     break;
   case HeaderMatchType::Range: {
     int64_t header_value = 0;
-    // TODO(dnoe): Migrate to pure string_view to eliminate std:string instance (#6580)
-    const std::string header_string(header_view);
-    match = StringUtil::atoll(header_string.c_str(), header_value, 10) &&
+    match = absl::SimpleAtoi(header_view, &header_value) &&
             header_value >= header_data.range_.start() && header_value < header_data.range_.end();
     break;
   }

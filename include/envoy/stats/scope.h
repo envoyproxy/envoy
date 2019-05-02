@@ -5,7 +5,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/stats_options.h"
 #include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
@@ -15,7 +14,6 @@ class Counter;
 class Gauge;
 class Histogram;
 class Scope;
-class StatsOptions;
 class NullGaugeImpl;
 
 typedef std::unique_ptr<Scope> ScopePtr;
@@ -49,7 +47,7 @@ public:
   virtual Counter& counterFromStatName(StatName name) PURE;
 
   /**
-   * TODO(jmarantz): this variant is deprecated: use counterFromStatName.
+   * TODO(#6667): this variant is deprecated: use counterFromStatName.
    * @param name The name, expressed as a string.
    * @return a counter within the scope's namespace.
    */
@@ -62,7 +60,7 @@ public:
   virtual Gauge& gaugeFromStatName(StatName name) PURE;
 
   /**
-   * TODO(jmarantz): this variant is deprecated: use gaugeFromStatName.
+   * TODO(#6667): this variant is deprecated: use gaugeFromStatName.
    * @param name The name, expressed as a string.
    * @return a gauge within the scope's namespace.
    */
@@ -80,17 +78,11 @@ public:
   virtual Histogram& histogramFromStatName(StatName name) PURE;
 
   /**
-   * TODO(jmarantz): this variant is deprecated: use histogramFromStatName.
+   * TODO(#6667): this variant is deprecated: use histogramFromStatName.
    * @param name The name, expressed as a string.
    * @return a histogram within the scope's namespace with a particular value type.
    */
   virtual Histogram& histogram(const std::string& name) PURE;
-
-  /**
-   * @return a reference to the top-level StatsOptions struct, containing information about the
-   * maximum allowable object name length and stat suffix length.
-   */
-  virtual const Stats::StatsOptions& statsOptions() const PURE;
 
   /**
    * @return a reference to the symbol table.

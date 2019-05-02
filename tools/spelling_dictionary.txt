@@ -21,6 +21,7 @@ CHACHA
 CIDR
 CLA
 CLI
+CMSG
 CN
 CNAME
 CORS
@@ -34,6 +35,8 @@ CREAT
 CRL
 CRLFs
 CRT
+CSRF
+CSRFPOLICY
 CSS
 CSV
 CTX
@@ -221,12 +224,14 @@ SIGFPE
 SIGILL
 SIGSEGV
 SIGTERM
+SimpleAtoi
 SNI
 SPDY
 SPIFFE
 SPKI
 SQL
 SR
+SRDS
 SRV
 SS
 SSL
@@ -271,6 +276,7 @@ WS
 Welford's
 Werror
 XDS
+vip
 xDSes
 XFCC
 XFF
@@ -427,6 +433,7 @@ evbuffer
 evbuffers
 evconnlistener
 evthread
+evwatch
 exe
 execlp
 facto
@@ -611,6 +618,7 @@ ptr
 ptrs
 pwd
 py
+qps
 quantile
 quantiles
 queueing
@@ -653,6 +661,7 @@ retriable
 rpcs
 rq
 rtrim
+rtt
 sanitization
 sanitizer
 scala
@@ -713,6 +722,7 @@ tokenize
 tokenizes
 tokenizing
 traceid
+transferral
 trie
 tuple
 tuples

@@ -152,7 +152,9 @@ public:
   // Http::StreamDecoderFilterCallbacks
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) override {
+    details_ = std::string(details);
     Utility::sendLocalReply(
         is_grpc_request_,
         [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
@@ -191,6 +193,7 @@ public:
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
+  std::string details_;
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool stream_destroyed_{};
