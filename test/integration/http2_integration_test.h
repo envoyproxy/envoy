@@ -55,5 +55,9 @@ public:
   }
 
   void testRequestMetadataWithStopAllFilter();
+
+  void verifyHeadersOnlyTest();
+
+  void runHeaderOnlyTest(bool send_request_body, size_t body_size);
 };
 } // namespace Envoy

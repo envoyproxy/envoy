@@ -612,8 +612,7 @@ name: decode-headers-only
 config: {}
 )EOF";
 
-TEST_P(Http2MetadataIntegrationTest, DecodeHeaderOnlyRequestWithRequestMetadata) {
-  addFilters({request_metadata_filter, decode_headers_only});
+void Http2MetadataIntegrationTest::runHeaderOnlyTest(bool send_request_body, size_t body_size) {
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void { hcm.set_proxy_100_continue(true); });
@@ -622,17 +621,29 @@ TEST_P(Http2MetadataIntegrationTest, DecodeHeaderOnlyRequestWithRequestMetadata)
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Sends a request with body. Only headers will pass through filters.
-  auto response =
-      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}},
-                                         128);
+  IntegrationStreamDecoderPtr response;
+  if (send_request_body) {
+    response =
+        codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                   {":path", "/test/long/url"},
+                                                                   {":scheme", "http"},
+                                                                   {":authority", "host"}},
+                                           body_size);
+  } else {
+    response =
+        codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                     {":path", "/test/long/url"},
+                                                                     {":scheme", "http"},
+                                                                     {":authority", "host"}});
+  }
   waitForNextUpstreamRequest();
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
+}
+
+void Http2MetadataIntegrationTest::verifyHeadersOnlyTest() {
   // Verifies a headers metadata added.
   std::set<std::string> expected_metadata_keys = {"headers"};
   expected_metadata_keys.insert("metadata");
@@ -642,6 +653,35 @@ TEST_P(Http2MetadataIntegrationTest, DecodeHeaderOnlyRequestWithRequestMetadata)
   EXPECT_EQ(true, upstream_request_->receivedData());
   EXPECT_EQ(0, upstream_request_->bodyLength());
   EXPECT_EQ(true, upstream_request_->complete());
+}
+
+TEST_P(Http2MetadataIntegrationTest, DecodingHeadersOnlyRequestWithRequestMetadataEmptyData) {
+  addFilters({request_metadata_filter, decode_headers_only});
+
+  // Send a request with body, and body size is 0.
+  runHeaderOnlyTest(true, 0);
+  verifyHeadersOnlyTest();
+}
+
+TEST_P(Http2MetadataIntegrationTest, DecodingHeadersOnlyRequestWithRequestMetadataNoneEmptyData) {
+  addFilters({request_metadata_filter, decode_headers_only});
+  // Send a request with body, and body size is 128.
+  runHeaderOnlyTest(true, 128);
+  verifyHeadersOnlyTest();
+}
+
+TEST_P(Http2MetadataIntegrationTest, DecodingHeadersOnlyRequestWithRequestMetadataDiffFilterOrder) {
+  addFilters({decode_headers_only, request_metadata_filter});
+  // Send a request with body, and body size is 128.
+  runHeaderOnlyTest(true, 128);
+  verifyHeadersOnlyTest();
+}
+
+TEST_P(Http2MetadataIntegrationTest, HeadersOnlyRequestWithRequestMetadata) {
+  addFilters({request_metadata_filter});
+  // Send a headers only request.
+  runHeaderOnlyTest(false, 0);
+  verifyHeadersOnlyTest();
 }
 
 void Http2MetadataIntegrationTest::testRequestMetadataWithStopAllFilter() {

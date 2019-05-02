@@ -828,12 +828,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
     // after the new metadata.
-    if ((*entry)->end_stream_ && new_metadata_added && !empty_data_end_stream_sent_) {
+    if ((*entry)->end_stream_ && new_metadata_added && !buffered_request_data_) {
       Buffer::OwnedImpl empty_data("");
       ENVOY_STREAM_LOG(
           trace, "inserting an empty data frame for end_stream due metadata being added.", *this);
       addDecodedData(*((*entry).get()), empty_data, true);
-      empty_data_end_stream_sent_ = true;
     }
 
     (*entry)->decode_headers_called_ = true;

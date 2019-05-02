@@ -402,6 +402,7 @@ private:
   void onUpstreamReset(Http::StreamResetReason reset_reason, absl::string_view transport_failure,
                        UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
+  // TODO(soya3129): Save metadata for retry, redirect and shadowing case.
   bool setupRetry(bool end_stream);
   bool setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upstream_request);
   void updateOutlierDetection(Http::Code code, UpstreamRequest& upstream_request);

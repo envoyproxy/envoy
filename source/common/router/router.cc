@@ -478,7 +478,7 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
   ASSERT(upstream_requests_.size() == 1);
   if (upstream_requests_.front() == nullptr) {
     ENVOY_STREAM_LOG(trace,
-                     "the upstream_request_ not ready. Storing metadata_map to encode later: {}",
+                     "the upstream_request_ is not ready. Storing metadata_map to encode later: {}",
                      *callbacks_, metadata_map);
     downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
     return Http::FilterMetadataStatus::Continue;

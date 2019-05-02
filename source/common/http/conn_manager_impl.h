@@ -403,7 +403,7 @@ private:
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void maybeEndEncode(bool end_stream);
-    // Returns true if new metadata is inserted. Otherwise, returns false.
+    // Returns true if new metadata decoded. Otherwise, returns false.
     bool processNewlyAddedMetadata();
     uint64_t streamId() { return stream_id_; }
     // Returns true if filter has stopped iteration for all frame types. Otherwise, returns false.
@@ -558,8 +558,6 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
-    // If an empty data frame with end_stream true is sent.
-    bool empty_data_end_stream_sent_{false};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
