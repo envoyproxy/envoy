@@ -128,9 +128,9 @@ struct StreamInfoImpl : public StreamInfo {
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
 
-  void setRouteName(std::string route_name) { route_name_ = route_name; }
+  void setRouteName(std::string route_name) override { route_name_ = route_name; }
 
-  const std::string& getRouteName() const { return route_name_; }
+  const std::string& getRouteName() const override { return route_name_; }
 
   void setUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {

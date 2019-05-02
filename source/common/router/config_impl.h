@@ -380,7 +380,7 @@ public:
   Http::Code clusterNotFoundResponseCode() const override {
     return cluster_not_found_response_code_;
   }
-  const std::string& routeName() const { return route_name_; }
+  const std::string& routeName() const override { return route_name_; }
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
   void finalizeRequestHeaders(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
