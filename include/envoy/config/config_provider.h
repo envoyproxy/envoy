@@ -117,6 +117,7 @@ public:
       return absl::nullopt;
     }
     std::vector<const P*> ret_protos;
+    ret_protos.reserve(config_protos.size());
     for (const auto* elem : config_protos) {
       ret_protos.push_back(static_cast<const P*>(elem));
     }

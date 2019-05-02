@@ -614,8 +614,6 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
       dynamic_cast<DeltaDummyDynamicConfigProvider&>(*provider1).subscription();
   subscription.onConfigUpdate(untyped_dummy_configs, "1");
 
-  // Check that a newly created provider with the same config source will share
-  // the subscription, config proto and resulting ConfigProvider::Config.
   ConfigProviderPtr provider2 = provider_manager_->createXdsConfigProvider(
       config_source_proto, factory_context_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
