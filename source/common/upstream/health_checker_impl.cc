@@ -347,7 +347,9 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
 
 TcpHealthCheckerImpl::TcpActiveHealthCheckSession::~TcpActiveHealthCheckSession() {
   if (client_) {
-    client_->close(Network::ConnectionCloseType::NoFlush);
+    Network::ClientConnectionPtr clientToDestroy(std::move(client_));
+    clientToDestroy->close(Network::ConnectionCloseType::NoFlush);
+    parent_.dispatcher_.deferredDelete(std::move(clientToDestroy));
   }
 }
 
@@ -358,7 +360,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
     data.drain(data.length());
     handleSuccess(false);
     if (!parent_.reuse_connection_) {
-      client_->close(Network::ConnectionCloseType::NoFlush);
+      Network::ClientConnectionPtr clientToDestroy(std::move(client_));
+      clientToDestroy->close(Network::ConnectionCloseType::NoFlush);
+      parent_.dispatcher_.deferredDelete(std::move(clientToDestroy));
     }
   } else {
     host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
@@ -366,13 +370,13 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose) {
+  // If !client_, then we are already handling a failure/teardown
+  if (client_ &&
+      (event == Network::ConnectionEvent::RemoteClose ||
+       event == Network::ConnectionEvent::LocalClose)) {
+    Network::ClientConnectionPtr clientToDestroy(std::move(client_));
     handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
-  }
-
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
-    parent_.dispatcher_.deferredDelete(std::move(client_));
+    parent_.dispatcher_.deferredDelete(std::move(clientToDestroy));
   }
 
   if (event == Network::ConnectionEvent::Connected && parent_.receive_bytes_.empty()) {
@@ -390,7 +394,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
     // TODO(mattklein123): In the case that a user configured bytes to write, they will not be
     // be written, since we currently have no way to know if the bytes actually get written via
     // the connection interface. We might want to figure out how to handle this better later.
-    client_->close(Network::ConnectionCloseType::NoFlush);
+    Network::ClientConnectionPtr clientToDestroy(std::move(client_));
+    clientToDestroy->close(Network::ConnectionCloseType::NoFlush);
+    parent_.dispatcher_.deferredDelete(std::move(clientToDestroy));
     handleSuccess(false);
   }
 }
@@ -418,8 +424,10 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
+  Network::ClientConnectionPtr clientToDestroy(std::move(client_));
   host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
-  client_->close(Network::ConnectionCloseType::NoFlush);
+  clientToDestroy->close(Network::ConnectionCloseType::NoFlush);
+  parent_.dispatcher_.deferredDelete(std::move(clientToDestroy));
 }
 
 GrpcHealthCheckerImpl::GrpcHealthCheckerImpl(const Cluster& cluster,
