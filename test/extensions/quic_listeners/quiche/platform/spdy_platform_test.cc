@@ -1,5 +1,7 @@
 #include <functional>
 
+#include "extensions/quic_listeners/quiche/platform/flags_impl.h"
+
 #include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
@@ -8,6 +10,7 @@
 #include "quiche/spdy/platform/api/spdy_containers.h"
 #include "quiche/spdy/platform/api/spdy_endianness_util.h"
 #include "quiche/spdy/platform/api/spdy_estimate_memory_usage.h"
+#include "quiche/spdy/platform/api/spdy_flags.h"
 #include "quiche/spdy/platform/api/spdy_logging.h"
 #include "quiche/spdy/platform/api/spdy_ptr_util.h"
 #include "quiche/spdy/platform/api/spdy_string.h"
@@ -111,6 +114,24 @@ TEST(SpdyPlatformTest, SpdyTestHelpers) {
 
   EXPECT_SPDY_BUG(bug("bug one is expected"), "bug one");
   EXPECT_SPDY_BUG(bug("bug two is expected"), "bug two");
+}
+
+TEST(SpdyPlatformTest, SpdyFlags) {
+  auto& flag_registry = quiche::FlagRegistry::GetInstance();
+  flag_registry.ResetFlags();
+  EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
+  EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
+
+  flag_registry.FindFlag("spdy_reloadable_flag_spdy_testonly_default_false")
+      ->SetValueFromString("true");
+  EXPECT_TRUE(GetSpdyReloadableFlag(spdy_testonly_default_false));
+  EXPECT_FALSE(GetSpdyRestartFlag(spdy_testonly_default_false));
+
+  flag_registry.ResetFlags();
+  flag_registry.FindFlag("spdy_restart_flag_spdy_testonly_default_false")
+      ->SetValueFromString("yes");
+  EXPECT_FALSE(GetSpdyReloadableFlag(spdy_testonly_default_false));
+  EXPECT_TRUE(GetSpdyRestartFlag(spdy_testonly_default_false));
 }
 
 } // namespace

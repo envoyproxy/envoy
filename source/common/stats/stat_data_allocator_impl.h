@@ -23,11 +23,8 @@ namespace Stats {
 // hot restart stat continuity, and heap allocation for more efficient RAM usage
 // for when hot-restart is not required.
 //
-// Also note that RawStatData needs to live in a shared memory block, and it's
-// possible, but not obvious, that a vptr would be usable across processes. In
-// any case, RawStatData is allocated from a shared-memory block rather than via
-// new, so the usual C++ compiler assistance for setting up vptrs will not be
-// available. This could be resolved with placed new, or another nesting level.
+// TODO(fredlas) the above paragraph is obsolete; it's now only heap. So, this
+// interface can hopefully be collapsed down a bit.
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   explicit StatDataAllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
@@ -133,24 +130,41 @@ public:
   }
 
   // Stats::Gauge
-  virtual void add(uint64_t amount) override {
+  void add(uint64_t amount) override {
     data_.value_ += amount;
     data_.flags_ |= Flags::Used;
   }
-  virtual void dec() override { sub(1); }
-  virtual void inc() override { add(1); }
-  virtual void set(uint64_t value) override {
+  void dec() override { sub(1); }
+  void inc() override { add(1); }
+  void set(uint64_t value) override {
     data_.value_ = value;
     data_.flags_ |= Flags::Used;
   }
-  virtual void sub(uint64_t amount) override {
+  void sub(uint64_t amount) override {
     ASSERT(data_.value_ >= amount);
     ASSERT(used() || amount == 0);
     data_.value_ -= amount;
   }
-  virtual uint64_t value() const override { return data_.value_; }
+  uint64_t value() const override { return data_.value_; }
   bool used() const override { return data_.flags_ & Flags::Used; }
 
+  // Returns true if values should be added, false if no import.
+  absl::optional<bool> cachedShouldImport() const override {
+    if ((data_.flags_ & Flags::LogicCached) == 0) {
+      return absl::nullopt;
+    }
+    return (data_.flags_ & Flags::LogicAccumulate) != 0;
+  }
+
+  void setShouldImport(bool should_import) override {
+    if (should_import) {
+      data_.flags_ |= Flags::LogicAccumulate;
+    } else {
+      data_.flags_ |= Flags::LogicNeverImport;
+    }
+  }
+
+private:
   const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
 
@@ -180,6 +194,8 @@ public:
   void set(uint64_t) override {}
   void sub(uint64_t) override {}
   uint64_t value() const override { return 0; }
+  absl::optional<bool> cachedShouldImport() const override { return absl::nullopt; }
+  void setShouldImport(bool) override {}
 };
 
 } // namespace Stats
