@@ -279,6 +279,12 @@ void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end
     saw_close_header_ = true;
     parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
   }
+  if (!saw_close_header_ && headers->ProxyConnection() &&
+      absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
+                             Headers::get().ConnectionValues.Close)) {
+    saw_close_header_ = true;
+    parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
+  }
 
   StreamDecoderWrapper::decodeHeaders(std::move(headers), end_stream);
 }
