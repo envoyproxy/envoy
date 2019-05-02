@@ -86,6 +86,11 @@ config_setting(
 )
 
 config_setting(
+    name = "coverage_llvm_build",
+    values = {"define": "ENVOY_CONFIG_COVERAGE=llvm"},
+)
+
+config_setting(
     name = "disable_tcmalloc",
     values = {"define": "tcmalloc=disabled"},
 )

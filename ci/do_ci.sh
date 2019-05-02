@@ -239,6 +239,13 @@ elif [[ "$1" == "bazel.coverage" ]]; then
   test/run_envoy_bazel_coverage.sh
   collect_build_profile coverage
   exit 0
+elif [[ "$1" == "bazel.llvm_coverage" ]]; then
+  setup_clang_toolchain
+  echo "bazel coverage build with tests..."
+
+  test/run_envoy_bazel_llvm_coverage.sh
+  collect_build_profile coverage
+  exit 0
 elif [[ "$1" == "bazel.clang_tidy" ]]; then
   setup_clang_toolchain
   ci/run_clang_tidy.sh
