@@ -7,8 +7,8 @@
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
-#include "test/mocks/network/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -32,7 +32,8 @@ public:
     return makeFilterWithCallbacks(callbacks_);
   }
 
-  std::unique_ptr<OriginalSrcFilter> makeFilterWithCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
+  std::unique_ptr<OriginalSrcFilter>
+  makeFilterWithCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
     Config default_config;
     auto filter = std::make_unique<OriginalSrcFilter>(default_config);
     filter->setDecoderFilterCallbacks(callbacks);
@@ -58,7 +59,6 @@ protected:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnectionSocket> socket_;
   Http::TestHeaderMapImpl headers_;
-
 
   absl::optional<Network::Socket::Option::Details>
   findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
@@ -95,7 +95,8 @@ TEST_F(OriginalSrcTest, decodeHeadersIpv4AddressAddsOption) {
   ASSERT_NE(options->at(0), nullptr);
 
   NiceMock<Network::MockConnectionSocket> socket;
-  EXPECT_CALL(socket, setLocalAddress(PointeesEq(callbacks_.stream_info_.downstream_remote_address_)));
+  EXPECT_CALL(socket,
+              setLocalAddress(PointeesEq(callbacks_.stream_info_.downstream_remote_address_)));
   options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
 }
 

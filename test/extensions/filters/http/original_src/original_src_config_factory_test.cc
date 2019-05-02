@@ -29,8 +29,7 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
 
   Server::Configuration::MockFactoryContext context;
 
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*proto_config, "", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "", context);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   Http::StreamDecoderFilterSharedPtr added_filter;
