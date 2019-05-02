@@ -119,7 +119,7 @@ void CodecClient::onData(Buffer::Instance& data) {
     close();
     protocol_error = true;
   } catch (PrematureResponseException& e) {
-    ENVOY_CONN_LOG(info, "premature response", *connection_);
+    ENVOY_CONN_LOG(debug, "premature response", *connection_);
     close();
 
     // Don't count 408 responses where we have no active requests as protocol errors
