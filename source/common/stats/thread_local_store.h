@@ -163,7 +163,13 @@ public:
   const SymbolTable& symbolTable() const override { return alloc_.symbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
-
+  const Counter* getCounter(StatName name) const override {
+    return default_scope_->getCounter(name);
+  }
+  const Gauge* getGauge(StatName name) const override { return default_scope_->getGauge(name); }
+  const Histogram* getHistogram(StatName name) const override {
+    return default_scope_->getHistogram(name);
+  }
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
@@ -239,6 +245,10 @@ private:
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
 
+    const Counter* getCounter(StatName name) const override;
+    const Gauge* getGauge(StatName name) const override;
+    const Histogram* getHistogram(StatName name) const override;
+
     template <class StatType>
     using MakeStatFn = std::function<std::shared_ptr<StatType>(StatDataAllocator&, StatName name,
                                                                absl::string_view tag_extracted_name,
@@ -262,6 +272,19 @@ private:
                            StatMap<std::shared_ptr<StatType>>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
+    /**
+     * Looks up an existing stat, populating the local cache if necessary.
+     *
+     * @param name the full name of the stat (not tag extracted).
+     * @param central_cache_map a map from name to the desired object in the central cache.
+     * @return a pointer to the named stat, or nullptr if it doesn't exist.
+     */
+    template <class StatType>
+    const StatType* safeGetStat(StatName name,
+                                StatMap<std::shared_ptr<StatType>>& central_cache_map,
+                                StatMap<std::shared_ptr<StatType>>* tls_cache,
+                                StatNameHashSet* tls_rejected_stats) const;
+
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
                                 std::vector<Tag>& tags, std::string& tag_extracted_name);
@@ -271,7 +294,7 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
-    CentralCacheEntry central_cache_;
+    mutable CentralCacheEntry central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {

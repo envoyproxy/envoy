@@ -85,6 +85,27 @@ public:
   virtual Histogram& histogram(const std::string& name) PURE;
 
   /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a pointer to a counter within the scope's namespace, or nullptr if
+   * no counter with that name exists.
+   */
+  virtual const Counter* getCounter(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a pointer to a gauge within the scope's namespace, or nullptr if
+   * no gauge with that name exists.
+   */
+  virtual const Gauge* getGauge(StatName name) const PURE;
+
+  /**
+   * @param The name of the stat, obtained from the SymbolTable.
+   * @return a pointer to a histogram within the scope's namespace, or nullptr if
+   * no histogram with that name exists.
+   */
+  virtual const Histogram* getHistogram(StatName name) const PURE;
+
+  /**
    * @return a reference to the symbol table.
    */
   virtual const SymbolTable& symbolTable() const PURE;

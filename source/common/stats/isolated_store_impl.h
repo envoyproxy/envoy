@@ -39,6 +39,14 @@ public:
     return *new_stat;
   }
 
+  const Base* get(StatName name) const {
+    auto stat = stats_.find(name);
+    if (stat == stats_.end()) {
+      return nullptr;
+    }
+    return stat->second.get();
+  }
+
   std::vector<std::shared_ptr<Base>> toVector() const {
     std::vector<std::shared_ptr<Base>> vec;
     vec.reserve(stats_.size());
@@ -69,6 +77,9 @@ public:
     Histogram& histogram = histograms_.get(name);
     return histogram;
   }
+  const Counter* getCounter(StatName name) const override { return counters_.get(name); }
+  const Gauge* getGauge(StatName name) const override { return gauges_.get(name); }
+  const Histogram* getHistogram(StatName name) const override { return histograms_.get(name); }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }

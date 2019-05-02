@@ -106,6 +106,19 @@ public:
     return histogramFromStatName(storage.statName());
   }
 
+  const Counter* getCounter(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->getCounter(name);
+  }
+  const Gauge* getGauge(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->getGauge(name);
+  }
+  const Histogram* getHistogram(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return wrapped_scope_->getHistogram(name);
+  }
+
   const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
 
@@ -151,6 +164,18 @@ public:
   Histogram& histogram(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
+  }
+  const Counter* getCounter(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.getCounter(name);
+  }
+  const Gauge* getGauge(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.getGauge(name);
+  }
+  const Histogram* getHistogram(StatName name) const override {
+    Thread::LockGuard lock(lock_);
+    return store_.getHistogram(name);
   }
   const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
