@@ -243,11 +243,11 @@ private:
     bool recreateStream() override;
 
     void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override {
-      Network::Socket::appendOptions(upstream_options_, options);
+      Network::Socket::appendOptions(parent_.upstream_options_, options);
     }
 
     Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override {
-      return upstream_options_;
+      return parent_.upstream_options_;
     }
 
     // Each decoder filter instance checks if the request passed to the filter is gRPC
@@ -267,7 +267,6 @@ private:
 
     StreamDecoderFilterSharedPtr handle_;
     bool is_grpc_request_{};
-    Network::Socket::OptionsSharedPtr upstream_options_;
   };
 
   typedef std::unique_ptr<ActiveStreamDecoderFilter> ActiveStreamDecoderFilterPtr;
@@ -525,6 +524,7 @@ private:
     // Whether a filter has indicated that the response should be treated as a headers only
     // response.
     bool encoding_headers_only_{};
+    Network::Socket::OptionsSharedPtr upstream_options_;
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;
