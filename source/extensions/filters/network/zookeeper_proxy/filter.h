@@ -102,7 +102,6 @@ public:
 
   // Network::WriteFilter
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
-  void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks&) override{};
 
   // ZooKeeperProxy::DecoderCallback
   void onDecodeError() override;

@@ -127,7 +127,6 @@ public:
 
   // Network::WriteFilter
   Network::FilterStatus onWrite(Buffer::Instance& data, bool end_stream) override;
-  void initializeWriteFilterCallbacks(Network::WriteFilterCallbacks&) override{};
 
   // Mongo::DecoderCallback
   void decodeGetMore(GetMoreMessagePtr&& message) override;
