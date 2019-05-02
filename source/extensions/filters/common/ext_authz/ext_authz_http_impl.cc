@@ -216,9 +216,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::MessagePtr message) {
   // Set an error status if parsing status code fails. A Forbidden response is sent to the client
   // if the filter has not been configured with failure_mode_allow.
   uint64_t status_code{};
-  // TODO(dnoe): Migrate to pure string_view to eliminate std:string instance (#6580)
-  const std::string status_string(message->headers().Status()->value().getStringView());
-  if (!StringUtil::atoull(status_string.c_str(), status_code)) {
+  if (!absl::SimpleAtoi(message->headers().Status()->value().getStringView(), &status_code)) {
     ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
     return std::make_unique<Response>(errorResponse());
   }

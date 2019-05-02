@@ -40,6 +40,38 @@ TEST(RdsJsonTest, TestRuntimeFractionTranslation) {
   EXPECT_EQ(route.match().runtime_fraction().runtime_key(), "some_key");
 }
 
+TEST(RdsJsonTest, TestWeightedClusterTranslation) {
+  const std::string json_string = R"EOF(
+  {
+    "prefix": "/new_endpoint",
+    "prefix_rewrite": "/api/new_endpoint",
+    "weighted_clusters": {
+      "clusters": [
+        {
+          "name": "foo",
+          "weight": 80
+        },
+        {
+          "name": "bar",
+          "weight": 20
+        }
+      ]
+    }
+  }
+  )EOF";
+  envoy::api::v2::route::Route route;
+  auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Envoy::Config::RdsJson::translateRoute(*json_object_ptr, route);
+
+  EXPECT_TRUE(route.has_route());
+  EXPECT_TRUE(route.route().has_weighted_clusters());
+  EXPECT_EQ(2, route.route().weighted_clusters().clusters_size());
+  EXPECT_EQ("foo", route.route().weighted_clusters().clusters(0).name());
+  EXPECT_EQ(80, route.route().weighted_clusters().clusters(0).weight().value());
+  EXPECT_EQ("bar", route.route().weighted_clusters().clusters(1).name());
+  EXPECT_EQ(20, route.route().weighted_clusters().clusters(1).weight().value());
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

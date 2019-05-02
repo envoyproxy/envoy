@@ -221,11 +221,11 @@ private:
 
     void sendLocalReply(Code code, absl::string_view body,
                         std::function<void(HeaderMap& headers)> modify_headers,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
-      // TODO(#6542): add an extra parameter for setting rc details
-      parent_.stream_info_.setResponseCodeDetails("");
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        absl::string_view details) override {
+      parent_.stream_info_.setResponseCodeDetails(details);
       parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers, parent_.is_head_request_,
-                             grpc_status);
+                             grpc_status, details);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -359,7 +359,8 @@ private:
     void sendLocalReply(bool is_grpc_request, Code code, absl::string_view body,
                         const std::function<void(HeaderMap& headers)>& modify_headers,
                         bool is_head_request,
-                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                        absl::string_view details);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     // Sends data through encoding filter chains. filter_iteration_start_state indicates which

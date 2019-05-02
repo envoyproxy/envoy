@@ -82,6 +82,12 @@ score](https://www.first.org/cvss/specification-document#i5)) the Fix Team can d
 release process down in the face of holidays, developer bandwidth, etc. These decisions must be
 discussed on the envoy-security mailing list.
 
+A two week window will be provided to members of the private distributor list from candidate patch
+availability until the security release date. It is expected that distributors will normally be able
+to perform a release within this time window. If there are exceptional circumstances, the Envoy
+security team will raise this window to four weeks. The release window will be reduced if the
+security issue is public or embargo is broken.
+
 ### Fix Disclosure Process
 
 With the fix development underway, the Fix Lead needs to come up with an overall communication plan
@@ -200,7 +206,9 @@ distribution should:
 5. Be a participant and active contributor in the community.
 6. Accept the [Embargo Policy](#embargo-policy) that is outlined above.
 7. Be willing to [contribute back](#contributing-back) as outlined above.
-8. Have someone already on the list vouch for the person requesting membership
+8. Be able to perform a security release of your product within a two week window from candidate fix
+   patch availability.
+9. Have someone already on the list vouch for the person requesting membership
    on behalf of your distribution.
 
 ### Requesting to Join
