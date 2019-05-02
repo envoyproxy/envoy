@@ -253,7 +253,6 @@ TSI
 TTL
 TX
 TXT
-Twemproxy
 UA
 UBSAN
 UC
