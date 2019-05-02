@@ -325,6 +325,8 @@ private:
   std::vector<CounterSharedPtr> deleted_counters_;
   std::vector<GaugeSharedPtr> deleted_gauges_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
+
+  absl::flat_hash_set<StatNameStorageSet*> rejected_stats_purgatory_ GUARDED_BY(lock_);
 };
 
 } // namespace Stats

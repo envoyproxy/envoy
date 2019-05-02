@@ -32,6 +32,10 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
+  for (StatNameStorageSet* rejected_stats : rejected_stats_purgatory_) {
+    rejected_stats->free(symbolTable());
+    delete rejected_stats;
+  }
 }
 
 void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
@@ -188,7 +192,7 @@ void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
 }
 
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
-  Thread::LockGuard lock(lock_);
+  Thread::ReleasableLockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
 
@@ -200,20 +204,27 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // of all references.
   auto rejected_stats = new StatNameStorageSet;
   rejected_stats->swap(scope->central_cache_.rejected_stats_);
-  const uint64_t scope_id = scope->scope_id_;
-  auto clean_central_cache = [this, rejected_stats]() {
-    rejected_stats->free(symbolTable());
-    delete rejected_stats;
-  };
 
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
+    const uint64_t scope_id = scope->scope_id_;
+    rejected_stats_purgatory_.insert(rejected_stats);
+    auto clean_central_cache = [this, rejected_stats]() {
+      {
+        Thread::LockGuard lock(lock_);
+        rejected_stats_purgatory_.erase(rejected_stats);
+      }
+      rejected_stats->free(symbolTable());
+      delete rejected_stats;
+    };
+    lock.release();
     main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {
       clearScopeFromCaches(scope_id, clean_central_cache);
     });
   } else {
-    clean_central_cache();
+    rejected_stats->free(symbolTable());
+    delete rejected_stats;
   }
 }
 
