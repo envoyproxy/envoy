@@ -1,4 +1,5 @@
 #include "extensions/common/tap/extension_config_base.h"
+#include "extensions/common/tap/tds.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +16,11 @@ case grpc:
 
 // we might not even need manager................. as we don't have more than one name per tap filter!
   //
-  TapSub tsb := new_subscribe(config_source, name, *this...)
+  TapSub tsb := new_subscribe(
+    config_source,
+    name,
+    *this
+    )
   // save sub inside us
 }
 
@@ -36,7 +41,17 @@ ExtensionConfigBase::ExtensionConfigBase(
     const envoy::config::common::tap::v2alpha::CommonExtensionConfig proto_config,
     TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-    Event::Dispatcher& main_thread_dispatcher)
+    Event::Dispatcher& main_thread_dispatcher,
+    
+    
+    
+      const std::string& stat_prefix,
+      Stats::Scope& stats,
+      Upstream::ClusterManager& cluster_Manager,
+      const LocalInfo::LocalInfo& local_info,
+      Envoy::Runtime::RandomGenerator& random,
+      Api::Api& api
+    )
     : proto_config_(proto_config), config_factory_(std::move(config_factory)),
       tls_slot_(tls.allocateSlot()) {
   tls_slot_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
@@ -57,20 +72,23 @@ ExtensionConfigBase::ExtensionConfigBase(
     break;
   }
   case envoy::config::common::tap::v2alpha::CommonExtensionConfig::kTdsConfig: {
-/*
   std::shared_ptr<TapConfigProviderManager> tap_config_provider_manager =
-      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(tap_config_provider_manager), [&context] {
-            
-      //       factory_context.localInfo(), factory_context.dispatcher(),
-      // factory_context.clusterManager(), factory_context.random()
-      // `factory_context.api(), factory_context.initManager()
-            
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context);
+      singleton_manager.getTyped<TapConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(tap_config_provider_manager), [&admin] {            
+            return std::make_shared<TapConfigProviderManagerImpl>(admin);
           });
 
-          subscription_ = tap_config_provider_manager->subscribe(config_source, name, *this...)
-*/
+          subscription_ = tap_config_provider_manager->subscribeTap(
+            proto_config_.tds_config(),
+            *this,
+            stat_prefix,
+            stats,
+            cluster_Manager,
+            local_info,
+            main_thread_dispatcher,
+            random,
+            api
+            );
   }
   default: {
     NOT_REACHED_GCOVR_EXCL_LINE;

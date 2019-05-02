@@ -37,7 +37,7 @@ envoy_cc_library(
     hdrs = ["tap.h"],
     deps = [
         ":tap_config_interface",
-        "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/common/tap:extension_config_base",
         "@envoy_api//envoy/config/transport_socket/tap/v2alpha:tap_cc",

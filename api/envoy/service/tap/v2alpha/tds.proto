@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+import "envoy/api/v2/discovery.proto";
+import "envoy/service/tap/v2alpha/common.proto";
+
+package envoy.service.tap.v2alpha;
+
+import "google/api/annotations.proto";
+
+option java_outer_classname = "CommonProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
+
+// Tap configuration.
+// Return list of all clusters this proxy will load balance to.
+service TapDiscoveryService {
+  rpc StreamTapConfigs(stream envoy.api.v2.DiscoveryRequest)
+      returns (stream envoy.api.v2.DiscoveryResponse) {
+  }
+
+  rpc DeltaTapConfigs(stream envoy.api.v2.DeltaDiscoveryRequest)
+      returns (stream envoy.api.v2.DeltaDiscoveryResponse) {
+  }
+
+  rpc FetchTapConfigs(envoy.api.v2.DiscoveryRequest) returns (envoy.api.v2.DiscoveryResponse) {
+    option (google.api.http) = {
+      post: "/v2/discovery:tap_configs"
+      body: "*"
+    };
+  }
+}
+
+message TapConfiguration {
+  // The name of the route configuration. For example, it might match
+  // :ref:`route_config_name
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.Rds.route_config_name>` in
+  // :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v2.Rds`.
+  string name = 1;
+
+
+  TapConfig config = 2;
+
+}

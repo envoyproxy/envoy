@@ -41,6 +41,7 @@ envoy_cc_library(
         ":tap_config_interface",
         "//include/envoy/http:filter_interface",
         "//source/extensions/common/tap:extension_config_base",
+        "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/http/tap/v2alpha:tap_cc",
     ],
 )

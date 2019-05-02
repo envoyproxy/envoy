@@ -37,8 +37,7 @@ Http::FilterFactoryCb TapFilterFactory::createFilterFactoryFromProtoTyped(
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   FilterConfigSharedPtr filter_config(new FilterConfigImpl(
       proto_config, stats_prefix, std::make_unique<HttpTapConfigFactoryImpl>(context),
-      context.scope(), context.admin(), context.singletonManager(), context.threadLocal(),
-      context.dispatcher()));
+      context));
   return [/* tap_config_provider_manager,*/&clusterManager = context.clusterManager(), filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(clusterManager, filter_config);
     callbacks.addStreamFilter(filter);

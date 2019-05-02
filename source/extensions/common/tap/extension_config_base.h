@@ -2,7 +2,9 @@
 
 #include "envoy/config/common/tap/v2alpha/common.pb.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/local_info/local_info.h"
 
+#include "extensions/common/tap/tds.h"
 #include "extensions/common/tap/admin.h"
 #include "extensions/common/tap/tap.h"
 
@@ -26,7 +28,17 @@ protected:
   ExtensionConfigBase(const envoy::config::common::tap::v2alpha::CommonExtensionConfig proto_config,
                       TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
                       Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-                      Event::Dispatcher& main_thread_dispatcher);
+                      Event::Dispatcher& main_thread_dispatcher,
+                      
+                      
+      const std::string& stat_prefix,
+      Stats::Scope& stats,
+      Upstream::ClusterManager& cluster_Manager,
+      const LocalInfo::LocalInfo& local_info,
+      Envoy::Runtime::RandomGenerator& random,
+      Api::Api& api
+                      
+                      );
   ~ExtensionConfigBase();
 
   // All tap configurations derive from TapConfig for type safety. In order to use a common
@@ -45,6 +57,8 @@ private:
   TapConfigFactoryPtr config_factory_;
   ThreadLocal::SlotPtr tls_slot_;
   AdminHandlerSharedPtr admin_handler_;
+
+  TdsTapConfigSubscriptionHandlePtr subscription_;
 };
 
 } // namespace Tap

@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "envoy/service/tap/v2alpha/common.proto";
+import "envoy/api/v2/core/config_source.proto";
 
 import "validate/validate.proto";
 
@@ -14,6 +15,18 @@ option java_package = "io.envoyproxy.envoy.config.common.tap.v2alpha";
 
 // Common configuration for all tap extensions.
 message CommonExtensionConfig {
+
+  // Only valid when discovery type is EDS.
+  message TDSConfig {
+    // Configuration for the source of EDS updates for this Cluster.
+    envoy.api.v2.core.ConfigSource config_source = 1;
+
+    // Optional alternative to cluster name to present to EDS. This does not
+    // have the same restrictions as cluster name, i.e. it may be arbitrary
+    // length.
+    string name = 2;
+  }
+
   oneof config_type {
     option (validate.required) = true;
 
@@ -23,6 +36,9 @@ message CommonExtensionConfig {
     // If specified, the tap filter will be configured via a static configuration that cannot be
     // changed.
     service.tap.v2alpha.TapConfig static_config = 2;
+
+    // Configuration to use for TDS updates for the filter.
+    TDSConfig tds_config = 3;
   }
 }
 

@@ -61,6 +61,21 @@ envoy_cc_library(
     deps = [
         "//include/envoy/thread_local:thread_local_interface",
         "//source/extensions/common/tap:admin",
+        ":tds",
         "@envoy_api//envoy/config/common/tap/v2alpha:common_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "tds",
+    srcs = ["tds.cc"],
+    hdrs = ["tds.h"],
+    deps = [
+        "//include/envoy/thread_local:thread_local_interface",
+        "//source/extensions/common/tap:admin",
+        "//source/common/init:target_lib",
+        "//source/common/config:subscription_factory_lib",
+        "@envoy_api//envoy/config/common/tap/v2alpha:common_cc",
+        "@envoy_api//envoy/service/tap/v2alpha:tds_cc",
     ],
 )

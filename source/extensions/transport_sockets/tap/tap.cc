@@ -1,5 +1,5 @@
+#include "envoy/server/transport_socket_config.h"
 #include "extensions/transport_sockets/tap/tap.h"
-
 #include "common/buffer/buffer_impl.h"
 
 namespace Envoy {
@@ -54,12 +54,16 @@ const Ssl::ConnectionInfo* TapSocket::ssl() const { return transport_socket_->ss
 
 TapSocketFactory::TapSocketFactory(
     const envoy::config::transport_socket::tap::v2alpha::Tap& proto_config,
-    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
-    Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-    Event::Dispatcher& main_thread_dispatcher,
+    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Configuration::TransportSocketFactoryContext& context,
     Network::TransportSocketFactoryPtr&& transport_socket_factory)
-    : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
-                          singleton_manager, tls, main_thread_dispatcher),
+    : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), context.admin(),
+                          context.singletonManager(), context.threadLocal(), context.dispatcher(),
+                          "tap-socket", // TODO: un-hardcode
+                          context.statsScope(),
+                          context.clusterManager(),
+                          context.localInfo(),
+                          context.random(),
+                          context.api()),
       transport_socket_factory_(std::move(transport_socket_factory)) {}
 
 Network::TransportSocketPtr

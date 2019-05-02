@@ -5,6 +5,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/common/tap/extension_config_base.h"
 #include "extensions/filters/http/tap/tap_config.h"
 
@@ -58,8 +59,7 @@ public:
   FilterConfigImpl(const envoy::config::filter::http::tap::v2alpha::Tap& proto_config,
                    const std::string& stats_prefix,
                    Extensions::Common::Tap::TapConfigFactoryPtr&& config_factory,
-                   Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,
-                   ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher);
+                   Server::Configuration::FactoryContext& context);
 
   // FilterConfig
   HttpTapConfigSharedPtr currentConfig() override;

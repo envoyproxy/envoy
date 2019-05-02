@@ -28,6 +28,7 @@ api_proto_library_internal(
 api_proto_library_internal(
     name = "wrapper",
     srcs = ["wrapper.proto"],
+    visibility = ["//visibility:public"],
     deps = [
         ":http",
         ":transport",

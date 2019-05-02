@@ -38,9 +38,7 @@ class TapSocketFactory : public Network::TransportSocketFactory,
                          public Common::Tap::ExtensionConfigBase {
 public:
   TapSocketFactory(const envoy::config::transport_socket::tap::v2alpha::Tap& proto_config,
-                   Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
-                   Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-                   Event::Dispatcher& main_thread_dispatcher,
+                   Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Configuration::TransportSocketFactoryContext& context,
                    Network::TransportSocketFactoryPtr&& transport_socket_factory);
 
   // Network::TransportSocketFactory
