@@ -137,8 +137,8 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
 
 envoy::api::v2::DeltaDiscoveryRequest DeltaSubscriptionState::getNextRequest() {
   envoy::api::v2::DeltaDiscoveryRequest request;
-  if (!any_request_sent_yet_this_stream_) {
-    any_request_sent_yet_this_stream_ = true;
+  if (!any_request_sent_yet_in_current_stream_) {
+    any_request_sent_yet_in_current_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
