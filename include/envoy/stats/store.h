@@ -43,6 +43,11 @@ public:
    * @return a list of all known histograms.
    */
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
+
+  /**
+   * @return whether any known counter exists with this name.
+   */
+  virtual bool counterExists(const std::string& counter_name) const PURE;
 };
 
 typedef std::unique_ptr<Store> StorePtr;

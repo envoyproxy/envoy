@@ -101,6 +101,19 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
+bool ThreadLocalStoreImpl::counterExists(const std::string& counter_name) const {
+  // TODO TODO when merging, will call this many times. would it be better to redo this function to
+  // take a set of names, look them all up at once, and return the set found?
+  Thread::LockGuard lock(lock_);
+  for (ScopeImpl* scope : scopes_) {
+    if (scope->central_cache_.counters_.find(StatName(counter_name)) !=
+        scope->central_cache_.counters_.end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   auto new_scope = std::make_unique<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
