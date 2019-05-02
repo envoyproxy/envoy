@@ -1,3 +1,5 @@
+#include <bits/stdc++.h>
+
 #include <chrono>
 #include <memory>
 #include <vector>
@@ -230,6 +232,101 @@ protected:
     return response;
   }
 
+  NetworkFilters::Common::Redis::RespValue
+  createStringField(bool is_correct_type, const std::string& correct_value) const {
+    NetworkFilters::Common::Redis::RespValue respValue;
+    if (is_correct_type) {
+      respValue.type(NetworkFilters::Common::Redis::RespType::BulkString);
+      respValue.asString() = correct_value;
+    } else {
+      respValue.type(NetworkFilters::Common::Redis::RespType::Integer);
+      respValue.asInteger() = 10;
+    }
+    return respValue;
+  }
+
+  NetworkFilters::Common::Redis::RespValue createIntegerField(bool is_correct_type,
+                                                              int64_t correct_value) const {
+    NetworkFilters::Common::Redis::RespValue respValue;
+    if (is_correct_type) {
+      respValue.type(NetworkFilters::Common::Redis::RespType::Integer);
+      respValue.asInteger() = correct_value;
+    } else {
+      respValue.type(NetworkFilters::Common::Redis::RespType::BulkString);
+      respValue.asString() = "bad_value";
+    }
+    return respValue;
+  }
+
+  NetworkFilters::Common::Redis::RespValue
+  createArrayField(bool is_correct_type,
+                   std::vector<NetworkFilters::Common::Redis::RespValue>& correct_value) const {
+    NetworkFilters::Common::Redis::RespValue respValue;
+    if (is_correct_type) {
+      respValue.type(NetworkFilters::Common::Redis::RespType::Array);
+      respValue.asArray().swap(correct_value);
+    } else {
+      respValue.type(NetworkFilters::Common::Redis::RespType::BulkString);
+      respValue.asString() = "bad value";
+    }
+    return respValue;
+  }
+
+  // create a redis cluster slot response. If a bit is set in the bitset, then that part of
+  // of the response is correct, otherwise it's incorrect.
+  NetworkFilters::Common::Redis::RespValuePtr createResponse(std::bitset<12> flags) const {
+    int64_t idx(0);
+    int64_t resp_type = idx++;
+    int64_t resp_size = idx++;
+    int64_t slots_type = idx++;
+    int64_t slots_size = idx++;
+    int64_t slot1_type = idx++;
+    int64_t slot1_size = idx++;
+    int64_t slot1_range_start_type = idx++;
+    int64_t slot1_range_end_type = idx++;
+    int64_t master_type = idx++;
+    int64_t master_size = idx++;
+    int64_t master_ip_type = idx++;
+    int64_t master_port_type = idx++;
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> master_1_array;
+    if (flags.test(master_size)) {
+      // ip field
+      master_1_array.push_back(createStringField(flags.test(master_ip_type), "127.0.0.1"));
+      // port field
+      master_1_array.push_back(createIntegerField(flags.test(master_port_type), 22120));
+    }
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slot_1_array;
+    if (flags.test(slot1_size)) {
+      slot_1_array.push_back(createIntegerField(flags.test(slot1_range_start_type), 0));
+      slot_1_array.push_back(createIntegerField(flags.test(slot1_range_end_type), 16383));
+      slot_1_array.push_back(createArrayField(flags.test(master_type), master_1_array));
+    }
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> slots_array;
+    if (flags.test(slots_size)) {
+      slots_array.push_back(createArrayField(flags.test(slot1_type), slot_1_array));
+    }
+
+    std::vector<NetworkFilters::Common::Redis::RespValue> response_array;
+    if (flags.test(resp_size)) {
+      slots_array.push_back(createArrayField(flags.test(slots_type), slots_array));
+    }
+
+    NetworkFilters::Common::Redis::RespValuePtr response{
+        new NetworkFilters::Common::Redis::RespValue()};
+    if (flags.test(resp_type)) {
+      response->type(NetworkFilters::Common::Redis::RespType::Array);
+      response->asArray().swap(response_array);
+    } else {
+      response->type(NetworkFilters::Common::Redis::RespType::BulkString);
+      response->asString() = "Pong";
+    }
+
+    return response;
+  }
+
   void
   expectHealthyHosts(const std::list<std::string, std::allocator<std::string>>& healthy_hosts) {
     EXPECT_THAT(healthy_hosts, ContainerEq(hostListToAddresses(
@@ -245,7 +342,6 @@ protected:
   }
 
   void testBasicSetup(const std::string& config, const std::string& expected_discovery_address) {
-
     setupFromV2Yaml(config);
     const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
     expectResolveDiscovery(Network::DnsLookupFamily::V4Only, expected_discovery_address,
@@ -435,7 +531,6 @@ TEST_F(RedisClusterTest, Basic) {
 }
 
 TEST_F(RedisClusterTest, RedisResolveFailure) {
-
   const std::string basic_yaml_hosts = R"EOF(
   name: name
   connect_timeout: 0.25s
@@ -523,7 +618,6 @@ TEST_F(RedisClusterTest, FactoryInitRedisClusterTypeSuccess) {
 }
 
 TEST_F(RedisClusterTest, RedisErrorResponse) {
-
   const std::string basic_yaml_hosts = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -571,35 +665,20 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
 
   // expect no change if resolve failed
-  std::vector<NetworkFilters::Common::Redis::RespValue> master_1(2);
-  master_1[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
-  master_1[0].asString() = "wrong_ip";
-  master_1[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
-  master_1[1].asString() = "wrong_port";
-
-  std::vector<NetworkFilters::Common::Redis::RespValue> slot_1(3);
-  slot_1[0].type(NetworkFilters::Common::Redis::RespType::Integer);
-  slot_1[0].asInteger() = 0;
-  slot_1[1].type(NetworkFilters::Common::Redis::RespType::Integer);
-  slot_1[1].asInteger() = 16383;
-  slot_1[2].type(NetworkFilters::Common::Redis::RespType::Array);
-  slot_1[2].asArray().swap(master_1);
-
-  std::vector<NetworkFilters::Common::Redis::RespValue> slots(1);
-  slots[0].type(NetworkFilters::Common::Redis::RespType::Array);
-  slots[0].asArray().swap(slot_1);
-
-  NetworkFilters::Common::Redis::RespValuePtr response_with_wrong_ip(
-      new NetworkFilters::Common::Redis::RespValue());
-  response_with_wrong_ip->type(NetworkFilters::Common::Redis::RespType::Array);
-  response_with_wrong_ip->asArray().swap(slots);
-
-  expectRedisResolve();
-  resolve_timer_->callback_();
-  expectClusterSlotResponse(std::move(response_with_wrong_ip));
-  expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
-  EXPECT_EQ(3U, cluster_->info()->stats().update_attempt_.value());
-  EXPECT_EQ(2U, cluster_->info()->stats().update_failure_.value());
+  uint64_t update_attempt = 2;
+  uint64_t update_failure = 1;
+  // test every combination of
+  for (uint64_t i = 0; i < (1 << 12); i++) {
+    std::bitset<12> flags(i);
+    expectRedisResolve();
+    resolve_timer_->callback_();
+    expectClusterSlotResponse(createResponse(flags));
+    expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
+    EXPECT_EQ(++update_attempt, cluster_->info()->stats().update_attempt_.value());
+    if (!flags.all()) {
+      EXPECT_EQ(++update_failure, cluster_->info()->stats().update_failure_.value());
+    }
+  }
 }
 
 } // namespace Redis

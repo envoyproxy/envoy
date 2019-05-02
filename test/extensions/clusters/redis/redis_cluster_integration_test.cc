@@ -73,11 +73,6 @@ public:
       : BaseIntegrationTest(GetParam(), config), num_upstreams_(num_upstreams),
         version_(GetParam()) {}
 
-  ~RedisClusterIntegrationTest() override {
-    test_server_.reset();
-    fake_upstreams_.clear();
-  }
-
   void TearDown() override {
     test_server_.reset();
     fake_upstreams_.clear();
@@ -227,7 +222,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterIntegrationTest,
 // proxy server code unchanged.
 
 TEST_P(RedisClusterIntegrationTest, SingleSlotMasterSlave) {
-
   random_index_ = 0;
 
   on_server_init_function_ = [this]() {
@@ -248,7 +242,6 @@ TEST_P(RedisClusterIntegrationTest, SingleSlotMasterSlave) {
 // make it through the envoy proxy server code unchanged.
 
 TEST_P(RedisClusterIntegrationTest, TwoSlot) {
-
   random_index_ = 0;
 
   on_server_init_function_ = [this]() {

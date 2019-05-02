@@ -62,21 +62,19 @@ Redis Cluster Support (Experimental)
 
 Envoy currently offers experimental support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
 
-Why do we need a new system? Beside the expected benefits of a sidecar
-proxy such as unified retries and so on, it allows us to essentially build a common client for 
-all services to talk to Redis. This is important because while Redis non-cluster clients are 
-performant and have feature parity across various implementations, Redis Cluster clients do not! 
-Notably, support for spreading load across read replicas differs between various clients, 
-something very important if one wants to scale a Redis fleet to handle heavy read traffic coming 
-from services implemented in different languages, each with their own redis client. Hence, these 
-services can use a Redis non-cluster client and get all the benefits of Redis Cluster without 
-worrying about different or unexpected behaviors due to client differences.
+When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client
+implemented in any language to connect to the proxy as if it's a single node Redis instance.
+The Envoy proxy will keep track of the cluster topology and send commands to the correct Redis node in the
+cluster according to the `spec <https://redis.io/topics/cluster-spec>`_. Advance features such as reading
+from replicas can also be added to the Envoy proxy instead of updating redis clients in each language.
 
-Envoy will track the topology of the cluster through periodic cluster slots commands to get following:
+Envoy proxy tracks the topology of the cluster by sending periodic
+`cluster slots <https://redis.io/commands/cluster-slots>`_ commands to a random node in the cluster, and maintains the
+following information:
 
 * List of known nodes.
 * The masters for each shard.
-* Nodes enter or leave the cluster.
+* Nodes entering or leaving the cluster.
 
 For topology configuration details, see the Redis Cluster
 :ref:`v2 API reference <envoy_api_msg_config.cluster.redis.RedisClusterConfig>`

@@ -192,7 +192,8 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
   current_request_ = nullptr;
 
-  if (value->type() != NetworkFilters::Common::Redis::RespType::Array) {
+  // do nothing if the cluster is empty
+  if (value->type() != NetworkFilters::Common::Redis::RespType::Array || value->asArray().empty()) {
     onUnexpectedResponse(value);
     return;
   }
