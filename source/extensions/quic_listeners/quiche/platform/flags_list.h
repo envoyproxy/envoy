@@ -292,6 +292,9 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_validate_packet_number_post_decrypti
             "If true, a QUIC endpoint will valid a received packet number after "
             "successfully decrypting the packet.")
 
+QUICHE_FLAG(bool, quic_reloadable_flag_quic_v44_disable_trial_decryption, false,
+            "Disables trial decryption in QUIC v44 and above.")
+
 QUICHE_FLAG(bool, quic_restart_flag_quic_allow_loas_multipacket_chlo, false,
             "If true, inspects QUIC CHLOs for kLOAS and early creates sessions "
             "to allow multi-packet CHLOs")

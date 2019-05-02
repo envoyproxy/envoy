@@ -149,25 +149,20 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "quic_platform",
-    srcs = ["quiche/quic/platform/api/quic_mutex.cc"] + envoy_select_quiche(
-        [
-            "quiche/quic/platform/api/quic_file_utils.cc",
-            "quiche/quic/platform/api/quic_hostname_utils.cc",
-        ],
-        "@envoy",
-    ),
+    srcs = [
+        "quiche/quic/platform/api/quic_clock.cc",
+        "quiche/quic/platform/api/quic_file_utils.cc",
+        "quiche/quic/platform/api/quic_hostname_utils.cc",
+        "quiche/quic/platform/api/quic_mutex.cc",
+    ],
     hdrs = [
         "quiche/quic/platform/api/quic_cert_utils.h",
+        "quiche/quic/platform/api/quic_clock.h",
+        "quiche/quic/platform/api/quic_file_utils.h",
+        "quiche/quic/platform/api/quic_hostname_utils.h",
         "quiche/quic/platform/api/quic_mutex.h",
         "quiche/quic/platform/api/quic_pcc_sender.h",
-        "quiche/quic/platform/api/quic_str_cat.h",
-    ] + envoy_select_quiche(
-        [
-            "quiche/quic/platform/api/quic_file_utils.h",
-            "quiche/quic/platform/api/quic_hostname_utils.h",
-        ],
-        "@envoy",
-    ),
+    ],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
@@ -252,6 +247,7 @@ envoy_cc_library(
         "quiche/quic/platform/api/quic_ptr_util.h",
         "quiche/quic/platform/api/quic_reference_counted.h",
         "quiche/quic/platform/api/quic_server_stats.h",
+        "quiche/quic/platform/api/quic_str_cat.h",
         "quiche/quic/platform/api/quic_stream_buffer_allocator.h",
         "quiche/quic/platform/api/quic_string_piece.h",
         "quiche/quic/platform/api/quic_uint128.h",
@@ -291,24 +287,6 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_sleep_impl_lib"],
-)
-
-envoy_cc_library(
-    name = "quic_time_lib",
-    srcs = ["quiche/quic/core/quic_time.cc"],
-    hdrs = ["quiche/quic/core/quic_time.h"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
-    deps = [":quic_platform"],
-)
-
-envoy_cc_library(
-    name = "quic_platform_clock_lib",
-    srcs = ["quiche/quic/platform/api/quic_clock.cc"],
-    hdrs = ["quiche/quic/platform/api/quic_clock.h"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
-    deps = [":quic_time_lib"],
 )
 
 envoy_cc_library(
@@ -374,6 +352,7 @@ envoy_cc_library(
         "quiche/quic/core/quic_error_codes.cc",
         "quiche/quic/core/quic_packet_number.cc",
         "quiche/quic/core/quic_tag.cc",
+        "quiche/quic/core/quic_time.cc",
         "quiche/quic/core/quic_types.cc",
         "quiche/quic/core/quic_versions.cc",
     ],
@@ -386,6 +365,7 @@ envoy_cc_library(
         "quiche/quic/core/quic_interval_set.h",
         "quiche/quic/core/quic_packet_number.h",
         "quiche/quic/core/quic_tag.h",
+        "quiche/quic/core/quic_time.h",
         "quiche/quic/core/quic_types.h",
         "quiche/quic/core/quic_versions.h",
     ],
@@ -394,7 +374,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_base",
-        ":quic_time_lib",
+        # ":quic_time_lib",
         "//external:ssl",
     ],
 )

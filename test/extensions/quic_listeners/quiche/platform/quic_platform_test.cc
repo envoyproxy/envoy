@@ -44,6 +44,7 @@
 #include "quiche/quic/platform/api/quic_map_util.h"
 #include "quiche/quic/platform/api/quic_mock_log.h"
 #include "quiche/quic/platform/api/quic_mutex.h"
+#include "quiche/quic/platform/api/quic_pcc_sender.h"
 #include "quiche/quic/platform/api/quic_port_utils.h"
 #include "quiche/quic/platform/api/quic_ptr_util.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
@@ -566,7 +567,7 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
 
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  SetQuicFlag(&FLAGS_quic_time_wait_list_seconds, 100);
+  SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
 
   flag_registry.ResetFlags();
@@ -580,6 +581,13 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
+}
+
+TEST_F(QuicPlatformTest, QuicPccSender) {
+  EXPECT_EQ(nullptr, quic::CreatePccSender(/*clock=*/nullptr, /*rtt_stats=*/nullptr,
+                                           /*unacked_packets=*/nullptr, /*random=*/nullptr,
+                                           /*stats=*/nullptr, /*initial_congestion_window=*/0,
+                                           /*max_congestion_window=*/0));
 }
 
 class FileUtilsTest : public testing::Test {
