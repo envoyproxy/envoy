@@ -378,13 +378,16 @@ void InstanceImpl::startWorkers() {
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
                                                Server::Configuration::Initial& config) {
+  if (!config.baseRuntime().fields().empty()) {
+    ENVOY_LOG(info, "non-empty base runtime layer specified in bootstrap");
+  }
   if (config.diskRuntime()) {
-    ENVOY_LOG(info, "runtime symlink: {}", config.diskRuntime()->symlinkRoot());
-    ENVOY_LOG(info, "runtime subdirectory: {}", config.diskRuntime()->subdirectory());
+    ENVOY_LOG(info, "disk runtime symlink: {}", config.diskRuntime()->symlinkRoot());
+    ENVOY_LOG(info, "disk runtime subdirectory: {}", config.diskRuntime()->subdirectory());
 
     std::string override_subdirectory =
         config.diskRuntime()->overrideSubdirectory() + "/" + server.localInfo().clusterName();
-    ENVOY_LOG(info, "runtime override subdirectory: {}", override_subdirectory);
+    ENVOY_LOG(info, "disk runtime override subdirectory: {}", override_subdirectory);
 
     return std::make_unique<Runtime::DiskBackedLoaderImpl>(
         server.dispatcher(), server.threadLocal(), config.baseRuntime(),
