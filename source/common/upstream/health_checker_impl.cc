@@ -371,9 +371,8 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::ConnectionEvent event) {
   // If !client_, then we are already handling a failure/teardown
-  if (client_ &&
-      (event == Network::ConnectionEvent::RemoteClose ||
-       event == Network::ConnectionEvent::LocalClose)) {
+  if (client_ && (event == Network::ConnectionEvent::RemoteClose ||
+                  event == Network::ConnectionEvent::LocalClose)) {
     Network::ClientConnectionPtr clientToDestroy(std::move(client_));
     handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
     parent_.dispatcher_.deferredDelete(std::move(clientToDestroy));
