@@ -231,13 +231,7 @@ public:
    * @param desired_length the length we want the padding to bring the string up to.
    * @return the padded string.
    */
-  static std::string addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {
-    int line_fill_len = desired_length - to_pad.length();
-    int first_half_len = line_fill_len / 2;
-    int second_half_len = line_fill_len - first_half_len;
-    return absl::StrCat(std::string(first_half_len, '='), to_pad,
-                        std::string(second_half_len, '='));
-  }
+  static std::string addLeftAndRightPadding(absl::string_view to_pad, int desired_length = 80);
 
   /**
    * Split a string.
@@ -528,11 +522,12 @@ MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {
   const bool equal = TestUtility::headerMapEqualIgnoreOrder(*arg, *expected);
   if (!equal) {
     *result_listener << "\n"
-                     << "========================Expected header map:========================\n"
+                     << TestUtility::addLeftAndRightPadding("Expected header map:") << "\n"
                      << *expected
-                     << "-----------------is not equal to actual header map:-----------------\n"
-                     << *arg
-                     << "====================================================================\n";
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual header map:")
+                     << "\n"
+                     << *arg << TestUtility::addLeftAndRightPadding("")
+                     << "\n"; // line full of padding
   }
   return equal;
 }
@@ -541,11 +536,11 @@ MATCHER_P(ProtoEq, expected, "") {
   const bool equal = TestUtility::protoEqual(arg, expected);
   if (!equal) {
     *result_listener << "\n"
-                     << "==========================Expected proto:===========================\n"
+                     << TestUtility::addLeftAndRightPadding("Expected proto:") << "\n"
                      << expected.DebugString()
-                     << "------------------is not equal to actual proto:---------------------\n"
-                     << arg.DebugString()
-                     << "====================================================================\n";
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual proto:") << "\n"
+                     << arg.DebugString() << TestUtility::addLeftAndRightPadding("")
+                     << "\n"; // line full of padding
   }
   return equal;
 }
@@ -553,15 +548,14 @@ MATCHER_P(ProtoEq, expected, "") {
 MATCHER_P2(ProtoEqIgnoringField, expected, ignored_field, "") {
   const bool equal = TestUtility::protoEqualIgnoringField(arg, expected, ignored_field);
   if (!equal) {
-    std::string padded_ignored_field =
-        TestUtility::addLeftAndRightPadding(absl::StrCat("(but ignoring ", ignored_field, ")"), 68);
+    std::string but_ignoring = absl::StrCat("(but ignoring ", ignored_field, ")");
     *result_listener << "\n"
-                     << "==========================Expected proto:===========================\n"
-                     << padded_ignored_field << "\n"
+                     << TestUtility::addLeftAndRightPadding("Expected proto:") << "\n"
+                     << TestUtility::addLeftAndRightPadding(but_ignoring) << "\n"
                      << expected.DebugString()
-                     << "------------------is not equal to actual proto:---------------------\n"
-                     << arg.DebugString()
-                     << "====================================================================\n";
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual proto:") << "\n"
+                     << arg.DebugString() << TestUtility::addLeftAndRightPadding("")
+                     << "\n"; // line full of padding
   }
   return equal;
 }
@@ -570,11 +564,12 @@ MATCHER_P(RepeatedProtoEq, expected, "") {
   const bool equal = TestUtility::repeatedPtrFieldEqual(arg, expected);
   if (!equal) {
     *result_listener << "\n"
-                     << "=======================Expected repeated:===========================\n"
+                     << TestUtility::addLeftAndRightPadding("Expected repeated:") << "\n"
                      << RepeatedPtrUtil::debugString(expected) << "\n"
-                     << "-----------------is not equal to actual repeated:-------------------\n"
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual repeated:")
+                     << "\n"
                      << RepeatedPtrUtil::debugString(arg) << "\n"
-                     << "====================================================================\n";
+                     << TestUtility::addLeftAndRightPadding("") << "\n"; // line full of padding
   }
   return equal;
 }
