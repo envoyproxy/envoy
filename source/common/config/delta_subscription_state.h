@@ -35,7 +35,7 @@ public:
   // the server.
   bool updateResourceInterest(const std::set<std::string>& update_to_these_names);
 
-  void set_first_request_of_new_stream(bool val) { first_request_of_new_stream_ = val; }
+  void markStreamFresh() { any_request_sent_yet_this_stream_ = false; }
 
   UpdateAck handleResponse(const envoy::api::v2::DeltaDiscoveryResponse& message);
 
@@ -88,7 +88,7 @@ private:
   Event::TimerPtr init_fetch_timeout_timer_;
 
   bool paused_{};
-  bool first_request_of_new_stream_{true};
+  bool any_request_sent_yet_this_stream_{};
 
   // Tracking of the delta in our subscription interest since the previous DeltaDiscoveryRequest was
   // sent. Can't use unordered_set due to ordering issues in gTest expectation matching. Feel free

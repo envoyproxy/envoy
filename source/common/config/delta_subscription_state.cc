@@ -137,7 +137,8 @@ void DeltaSubscriptionState::handleEstablishmentFailure() {
 
 envoy::api::v2::DeltaDiscoveryRequest DeltaSubscriptionState::getNextRequest() {
   envoy::api::v2::DeltaDiscoveryRequest request;
-  if (first_request_of_new_stream_) {
+  if (!any_request_sent_yet_this_stream_) {
+    any_request_sent_yet_this_stream_ = true;
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
@@ -153,7 +154,6 @@ envoy::api::v2::DeltaDiscoveryRequest DeltaSubscriptionState::getNextRequest() {
       names_added_.insert(resource.first);
     }
     names_removed_.clear();
-    first_request_of_new_stream_ = false;
   }
   std::copy(names_added_.begin(), names_added_.end(),
             Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_subscribe()));

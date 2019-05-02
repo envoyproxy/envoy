@@ -64,7 +64,7 @@ public:
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override {
-    state_->set_first_request_of_new_stream(true);
+    state_->markStreamFresh();
     kickOffDiscoveryRequest();
   }
 
