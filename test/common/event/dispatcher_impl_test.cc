@@ -96,6 +96,8 @@ protected:
   TimerPtr keepalive_timer_;
 };
 
+// TODO(mergeconflict): We also need integration testing to validate that the expected histograms
+// are written when `enable_dispatcher_stats` is true. See issue #6582.
 TEST_F(DispatcherImplTest, InitializeStats) {
   EXPECT_CALL(scope_, histogram("test.dispatcher.loop_duration_us"));
   EXPECT_CALL(scope_, histogram("test.dispatcher.poll_delay_us"));

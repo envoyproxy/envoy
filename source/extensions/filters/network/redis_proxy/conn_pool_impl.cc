@@ -170,9 +170,9 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
   if (!ipv6) {
     host_address_map_key = host_address;
   } else {
-    const std::string ip_port = host_address.substr(colon_pos + 1);
+    const auto ip_port = absl::string_view(host_address).substr(colon_pos + 1);
     uint64_t ip_port_number;
-    if (!StringUtil::atoull(ip_port.c_str(), ip_port_number) || (ip_port_number > 65535)) {
+    if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
       return nullptr;
     }
     try {
@@ -191,9 +191,9 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
 
     if (!ipv6) {
       // Only create an IPv4 address instance if we need a new Upstream::HostImpl.
-      const std::string ip_port = host_address.substr(colon_pos + 1);
+      const auto ip_port = absl::string_view(host_address).substr(colon_pos + 1);
       uint64_t ip_port_number;
-      if (!StringUtil::atoull(ip_port.c_str(), ip_port_number) || (ip_port_number > 65535)) {
+      if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
         return nullptr;
       }
       try {

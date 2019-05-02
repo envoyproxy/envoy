@@ -156,6 +156,7 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
                                          const std::string& separator, std::string& main,
                                          std::vector<std::string>& sub_items,
                                          absl::optional<size_t>& max_length) {
+  // TODO(dnoe): Convert this to use string_view throughout.
   size_t end_request = token.find(')', start);
   sub_items.clear();
   if (end_request != token.length() - 1) {
@@ -169,10 +170,10 @@ void AccessLogFormatParser::parseCommand(const std::string& token, const size_t 
       throw EnvoyException(fmt::format("Incorrect position of ')' in token: {}", token));
     }
 
-    std::string length_str = token.substr(end_request + 2);
+    const auto length_str = absl::string_view(token).substr(end_request + 2);
     uint64_t length_value;
 
-    if (!StringUtil::atoull(length_str.c_str(), length_value)) {
+    if (!absl::SimpleAtoi(length_str, &length_value)) {
       throw EnvoyException(fmt::format("Length must be an integer, given: {}", length_str));
     }
 
@@ -309,6 +310,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       return stream_info.responseCode() ? fmt::format_int(stream_info.responseCode().value()).str()
                                         : "0";
+    };
+  } else if (field_name == "RESPONSE_CODE_DETAILS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.responseCodeDetails() ? stream_info.responseCodeDetails().value()
+                                               : UnspecifiedValueString;
     };
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {

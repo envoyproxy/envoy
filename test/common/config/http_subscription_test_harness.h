@@ -56,7 +56,7 @@ public:
     }
   }
 
-  void expectSendMessage(const std::vector<std::string>& cluster_names,
+  void expectSendMessage(const std::set<std::string>& cluster_names,
                          const std::string& version) override {
     EXPECT_CALL(cm_, httpAsyncClientForCluster("eds_cluster"));
     EXPECT_CALL(cm_.async_client_, send_(_, _, _))
@@ -76,8 +76,16 @@ public:
           }
           expected_request += "\"node\":{\"id\":\"fo0\"},";
           if (!cluster_names.empty()) {
-            expected_request +=
-                "\"resource_names\":[\"" + StringUtil::join(cluster_names, "\",\"") + "\"]";
+            std::string joined_cluster_names;
+            {
+              std::string delimiter = "\",\"";
+              std::ostringstream buf;
+              std::copy(cluster_names.begin(), cluster_names.end(),
+                        std::ostream_iterator<std::string>(buf, delimiter.c_str()));
+              std::string with_comma = buf.str();
+              joined_cluster_names = with_comma.substr(0, with_comma.length() - delimiter.length());
+            }
+            expected_request += "\"resource_names\":[\"" + joined_cluster_names + "\"]";
           }
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
@@ -88,14 +96,14 @@ public:
         }));
   }
 
-  void startSubscription(const std::vector<std::string>& cluster_names) override {
+  void startSubscription(const std::set<std::string>& cluster_names) override {
     version_ = "";
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, "");
     subscription_->start(cluster_names, callbacks_);
   }
 
-  void updateResources(const std::vector<std::string>& cluster_names) override {
+  void updateResources(const std::set<std::string>& cluster_names) override {
     cluster_names_ = cluster_names;
     expectSendMessage(cluster_names, version_);
     subscription_->updateResources(cluster_names);
@@ -154,7 +162,7 @@ public:
 
   bool request_in_progress_{};
   std::string version_;
-  std::vector<std::string> cluster_names_;
+  std::set<std::string> cluster_names_;
   const Protobuf::MethodDescriptor* method_descriptor_;
   Upstream::MockClusterManager cm_;
   Event::MockDispatcher dispatcher_;

@@ -357,6 +357,9 @@ private:
     bool upstream_canary_ : 1;
     bool encode_complete_ : 1;
     bool encode_trailers_ : 1;
+    // Tracks whether we deferred a per try timeout because the downstream request
+    // had not been completed yet.
+    bool create_per_try_timeout_on_request_complete_ : 1;
   };
 
   typedef std::unique_ptr<UpstreamRequest> UpstreamRequestPtr;
@@ -381,14 +384,15 @@ private:
   void onPerTryTimeout(UpstreamRequest& upstream_request);
   void onRequestComplete();
   void onResponseTimeout();
-  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
+  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+                                    UpstreamRequest& upstream_request);
   // Handle an upstream request aborted due to a local timeout.
-  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag);
+  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag, absl::string_view details);
   // Handle an "aborted" upstream request, meaning we didn't see response
   // headers (e.g. due to a reset). Handles recording stats and responding
   // downstream if appropriate.
   void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
-                       absl::string_view body, bool dropped);
+                       absl::string_view body, bool dropped, absl::string_view details);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request, bool end_stream);

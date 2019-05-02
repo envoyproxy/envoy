@@ -765,6 +765,15 @@ message RouteAction {
   // time gaps between gRPC request and response in gRPC streaming mode.
   google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
 
+  // If present, Envoy will adjust the timeout provided by the `grpc-timeout` header by subtracting
+  // the provided duration from the header. This is useful in allowing Envoy to set its global
+  // timeout to be less than that of the deadline imposed by the calling client, which makes it more
+  // likely that Envoy will handle the timeout instead of having the call canceled by the client.
+  // The offset will only be applied if the provided grpc_timeout is greater than the offset. This
+  // ensures that the offset will only ever decrease the timeout and never set it to 0 (meaning
+  // infinity).
+  google.protobuf.Duration grpc_timeout_offset = 28 [(gogoproto.stdduration) = true];
+
   // Allows enabling and disabling upgrades on a per-route basis.
   // This overrides any enabled/disabled upgrade filter chain specified in the
   // HttpConnectionManager

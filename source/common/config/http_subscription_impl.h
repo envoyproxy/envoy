@@ -48,7 +48,7 @@ public:
   }
 
   // Config::Subscription
-  void start(const std::vector<std::string>& resources,
+  void start(const std::set<std::string>& resources,
              Config::SubscriptionCallbacks& callbacks) override {
     ASSERT(callbacks_ == nullptr);
 
@@ -67,9 +67,9 @@ public:
     initialize();
   }
 
-  void updateResources(const std::vector<std::string>& resources) override {
-    Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(resources.begin(),
-                                                                       resources.end());
+  void updateResources(const std::set<std::string>& update_to_these_names) override {
+    Protobuf::RepeatedPtrField<ProtobufTypes::String> resources_vector(
+        update_to_these_names.begin(), update_to_these_names.end());
     request_.mutable_resource_names()->Swap(&resources_vector);
   }
 

@@ -238,8 +238,7 @@ bool Utility::hasSetCookie(const HeaderMap& headers, const std::string& key) {
 uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   const HeaderEntry* header = headers.Status();
   uint64_t response_code;
-  if (!header || !StringUtil::atoull(std::string(headers.Status()->value().getStringView()).c_str(),
-                                     response_code)) {
+  if (!header || !absl::SimpleAtoi(headers.Status()->value().getStringView(), &response_code)) {
     throw CodecClientException(":status must be specified and a valid unsigned long");
   }
   return response_code;

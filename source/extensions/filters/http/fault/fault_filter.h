@@ -151,6 +151,7 @@ private:
   const std::function<void()> continue_cb_;
   TokenBucketImpl token_bucket_;
   Event::TimerPtr token_timer_;
+  bool saw_data_{};
   bool saw_end_stream_{};
   bool saw_trailers_{};
   Buffer::WatermarkBuffer buffer_;

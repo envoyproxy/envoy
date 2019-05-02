@@ -134,6 +134,7 @@ http_logs:
     response:
       response_code:
         value: 404
+      response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF",
                                                   VersionInfo::version())));
@@ -157,6 +158,7 @@ http_logs:
     response:
       response_code:
         value: 404
+      response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF"));
 
@@ -204,6 +206,7 @@ http_logs:
     response:
       response_code:
         value: 404
+      response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF",
                                                   VersionInfo::version())));
