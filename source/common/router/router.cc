@@ -1053,7 +1053,7 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
-  if (parent_.config_.upstream_logs_.size() != 0) {
+  if (!parent_.config_.upstream_logs_.empty()) {
     upstream_headers_ = std::make_unique<Http::HeaderMapImpl>(*headers);
   }
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
@@ -1069,7 +1069,7 @@ void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream
 
 void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   maybeEndDecode(true);
-  if (parent_.config_.upstream_logs_.size() != 0) {
+  if (!parent_.config_.upstream_logs_.empty()) {
     upstream_trailers_ = std::make_unique<Http::HeaderMapImpl>(*trailers);
   }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
