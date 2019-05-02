@@ -15,6 +15,7 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
@@ -74,8 +75,13 @@ protected:
   }
 
   void setup() {
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
-        .WillOnce(ReturnNew<NiceMock<Filesystem::MockWatcher>>());
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(InvokeWithoutArgs([this] {
+      Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
+          .WillOnce(Invoke([this](const std::string&, uint32_t,
+                                  Filesystem::Watcher::OnChangedCb cb) { on_changed_cb_ = cb; }));
+      return mock_watcher;
+    }));
   }
 
   void run(const std::string& primary_dir, const std::string& override_dir) {
@@ -84,9 +90,16 @@ protected:
         override_dir, store_, generator_, *api_);
   }
 
+  void write(const std::string& path, const std::string& value) {
+    TestEnvironment::writeStringToFileForTest(path, value);
+  }
+
+  void updateDiskLayer() { on_changed_cb_(Filesystem::Watcher::Events::MovedTo); }
+
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
 
+  Filesystem::Watcher::OnChangedCb on_changed_cb_;
   Stats::IsolatedStoreImpl store_;
   MockRandomGenerator generator_;
   std::unique_ptr<LoaderImpl> loader_;
@@ -338,6 +351,17 @@ TEST_F(DiskBackedLoaderImplTest, LayersOverride) {
   EXPECT_EQ("pluto", loader_->snapshot().get("file2"));
   EXPECT_EQ("day soon", loader_->snapshot().get("some"));
   EXPECT_EQ("thang", loader_->snapshot().get("other"));
+  // Admin overrides stick over filesystem updates.
+  EXPECT_EQ("Layer cake", loader_->snapshot().get("file14"));
+  EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15"));
+  loader_->mergeValues({{"file14", "Mega layer cake"}});
+  EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14"));
+  EXPECT_EQ("Cheese cake", loader_->snapshot().get("file15"));
+  write("test/common/runtime/test_data/current/envoy/file14", "Sad cake");
+  write("test/common/runtime/test_data/current/envoy/file15", "Happy cake");
+  updateDiskLayer();
+  EXPECT_EQ("Mega layer cake", loader_->snapshot().get("file14"));
+  EXPECT_EQ("Happy cake", loader_->snapshot().get("file15"));
 }
 
 class LoaderImplTest : public testing::Test {
