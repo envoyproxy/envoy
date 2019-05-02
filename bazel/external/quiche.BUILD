@@ -121,7 +121,10 @@ envoy_cc_library(
     ),
     repository = "@envoy",
     visibility = ["//visibility:public"],
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib"],
+    deps = [
+        ":quiche_common_lib",
+        "@envoy//source/extensions/quic_listeners/quiche/platform:spdy_platform_impl_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -305,6 +308,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_export",
+        ":quiche_common_lib",
         "@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_base_impl_lib",
     ],
 )
