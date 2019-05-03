@@ -2342,6 +2342,36 @@ TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
 }
 
+// Verifies that we handle the case when there are no warmed hosts in a set with unhealthy hosts.
+TEST_F(HostSetImplLocalityTest, ZeroWarmedHostsLocality) {
+  // We need a health checker in order for hosts to be considered not warmed.
+  ON_CALL(*info_, healthChecker()).WillByDefault(Return(true));
+
+  // We have two localities with 2 hosts in L1, 2 hosts in L2. The two hosts in L1 are not warmed.
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{hosts_[1], hosts_[2]}, {hosts_[3], hosts_[4]}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
+  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  HostsPerLocalitySharedPtr healthy_hosts_per_locality =
+      makeHostsPerLocality({{}, {hosts_[3], hosts_[4]}});
+
+  // Mark hosts 1 and 2 as not warmed.
+  hosts_[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts_[1]->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNKNOWN);
+  hosts_[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts_[2]->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNKNOWN);
+
+  host_set_.updateHosts(
+      HostSetImpl::updateHostsParams(
+          hosts, hosts_per_locality,
+          makeHostsFromHostsPerLocality<HealthyHostVector>(healthy_hosts_per_locality),
+          healthy_hosts_per_locality),
+      locality_weights, {}, {}, hosts->size(), absl::nullopt);
+  // We should only target the second locality since there are no healthy in the first.
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+}
+
 // When a locality has zero hosts, it should be treated as if it has zero healthy.
 TEST_F(HostSetImplLocalityTest, EmptyLocality) {
   HostsPerLocalitySharedPtr hosts_per_locality =
