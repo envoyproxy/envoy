@@ -784,7 +784,12 @@ public:
    * @return whether to skip waiting for health checking before draining connections
    *         after a host is removed from service discovery.
    */
-  virtual bool drainConnectionsOnHostRemoval() const PURE;
+ virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+  /**
+   * @return true if this cluster has a health checker installed.
+   */
+  virtual bool healthChecker() const PURE;
 
   /**
    * @return eds cluster service_name of the cluster.

@@ -568,6 +568,41 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
 }
 
+// Verifies that the number of warmed hosts is used to compute priority spillover.
+TEST_P(FailoverTest, PrioritiesWithNotAllWarmedHosts) {
+  // To begin with we set up the following:
+  // P0: 1 healthy, 1 unhealthy, 1 warmed.
+  // P1: 1 healthy.
+  // We then expect no spillover, since P0 is still overprovisioned.
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
+  ON_CALL(host_set_, warmedHostCount()).WillByDefault(Return(2));
+  init(true);
+
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+}
+
+// Verifies that we handle zero warmed hosts.
+TEST_P(FailoverTest, PrioritiesWithZeroWarmedHosts) {
+  // To begin with we set up the following:
+  // P0: 2 unhealthy, 0 warmed.
+  // P1: 1 healthy.
+  // We then expect all the traffic to spill over to P1 since P0 has an effective load of zero.
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")};
+  failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
+  failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
+  ON_CALL(host_set_, warmedHostCount()).WillByDefault(Return(0));
+  init(true);
+
+  EXPECT_EQ(failover_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(failover_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(failover_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+}
+
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, FailoverTest, ::testing::Values(true));
 
 TEST_P(RoundRobinLoadBalancerTest, NoHosts) {

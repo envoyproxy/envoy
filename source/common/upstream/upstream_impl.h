@@ -225,6 +225,12 @@ public:
   bool used() const override { return used_; }
   void used(bool new_used) override { used_ = new_used; }
   bool warmed() const override {
+    // If there is no health checker, there is no warming process.
+    if (!cluster_->healthChecker()) {
+      return true;
+    }
+
+    // Otherwise, the host is warming.
     return !(healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) &&
              getActiveHealthFailureType() == ActiveHealthFailureType::UNKNOWN);
   }
@@ -331,7 +337,8 @@ public:
                     HealthyHostVectorConstSharedPtr healthy_hosts,
                     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                     DegradedHostVectorConstSharedPtr degraded_hosts,
-                    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality);
+                    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
+                    std::shared_ptr<const std::vector<uint32_t>> warmed_counts_per_locality);
   static PrioritySet::UpdateHostsParams
   partitionHosts(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality);
 
@@ -558,6 +565,7 @@ public:
   };
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
+  bool healthChecker() const override { return health_checker_; }
 
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
@@ -603,6 +611,7 @@ private:
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
+  const bool health_checker_;
   absl::optional<std::string> eds_service_name_;
 };
 

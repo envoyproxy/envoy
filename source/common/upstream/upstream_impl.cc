@@ -420,26 +420,29 @@ HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HealthyHostVectorConstSharedPtr healthy_hosts,
                                HostsPerLocalityConstSharedPtr healthy_hosts_per_locality) {
 
+  // Note that we cannot do this in general on any threads due to potential changes to the host
+  // health between now and when the list of healthy hosts was calculated. At the moment this is
+  // only called in test: in prod we always use the overload with all the parameters, either
+  // directly or through partitionHosts.
+
+  auto warmed_per_locality = std::make_shared<std::vector<uint32_t>>();
+  for (const auto& hosts : hosts_per_locality->get()) {
+    warmed_per_locality->emplace_back(
+        std::count_if(hosts.begin(), hosts.end(), [](const auto& host) { return host->warmed(); }));
+  }
   return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
                            std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
                            std::make_shared<const DegradedHostVector>(),
-                           HostsPerLocalityImpl::empty());
+                           HostsPerLocalityImpl::empty(), std::move(warmed_per_locality));
 }
 
-PrioritySet::UpdateHostsParams
-HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
-                               HostsPerLocalityConstSharedPtr hosts_per_locality,
-                               HealthyHostVectorConstSharedPtr healthy_hosts,
-                               HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
-                               DegradedHostVectorConstSharedPtr degraded_hosts,
-                               HostsPerLocalityConstSharedPtr degraded_hosts_per_locality) {
-  auto warmed_counts_per_locality = std::make_shared<std::vector<uint32_t>>();
-
-  for (const auto& hosts : hosts_per_locality->get()) {
-    warmed_counts_per_locality->emplace_back(
-        std::count_if(hosts.begin(), hosts.end(), [](const auto& host) { return host->warmed(); }));
-  }
-
+PrioritySet::UpdateHostsParams HostSetImpl::updateHostsParams(
+    HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality,
+    HealthyHostVectorConstSharedPtr healthy_hosts,
+    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
+    DegradedHostVectorConstSharedPtr degraded_hosts,
+    HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
+    std::shared_ptr<const std::vector<uint32_t>> warmed_counts_per_locality) {
   return PrioritySet::UpdateHostsParams{std::move(hosts),
                                         std::move(healthy_hosts),
                                         std::move(degraded_hosts),
@@ -456,11 +459,18 @@ HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
   auto healthy_and_degraded_hosts_per_locality =
       ClusterImplBase::partitionHostsPerLocality(*hosts_per_locality);
 
+  auto warmed_counts_per_locality = std::make_shared<std::vector<uint32_t>>();
+  for (const auto& hosts : hosts_per_locality->get()) {
+    warmed_counts_per_locality->emplace_back(
+        std::count_if(hosts.begin(), hosts.end(), [](const auto& host) { return host->warmed(); }));
+  }
+
   return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
                            std::move(healthy_and_degraded_hosts.first),
                            std::move(healthy_and_degraded_hosts_per_locality.first),
                            std::move(healthy_and_degraded_hosts.second),
-                           std::move(healthy_and_degraded_hosts_per_locality.second));
+                           std::move(healthy_and_degraded_hosts_per_locality.second),
+                           std::move(warmed_counts_per_locality));
 }
 
 double HostSetImpl::effectiveLocalityWeight(uint32_t index,
@@ -584,7 +594,8 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       metadata_(config.metadata()), typed_metadata_(config.metadata()),
       common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
-      drain_connections_on_host_removal_(config.drain_connections_on_host_removal()) {
+      drain_connections_on_host_removal_(config.drain_connections_on_host_removal()),
+      health_checker_(!config.health_checks().empty()) {
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;
@@ -848,10 +859,8 @@ void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
 
     uint32_t warmed_hosts_count = host_set->hosts().size();
     if (health_checker_ != nullptr) {
-      warmed_hosts_count -=
-          std::count_if(host_set->hosts().begin(), host_set->hosts().end(), [](const auto& host) {
-            return host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN;
-          });
+      warmed_hosts_count -= std::count_if(host_set->hosts().begin(), host_set->hosts().end(),
+                                          [](const auto& host) { return !host->warmed(); });
     }
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().clone();
     prioritySet().updateHosts(
@@ -1019,8 +1028,7 @@ void PriorityStateManager::updateClusterPrioritySet(
   uint32_t warmed_host_count = hosts->size();
 
   for (const HostSharedPtr& host : *hosts) {
-    if (parent_.healthChecker() != nullptr &&
-        host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
+    if (parent_.healthChecker() != nullptr && !host->warmed()) {
       warmed_host_count--;
     }
     // Take into consideration when a non-EDS cluster has active health checking, i.e. to mark all

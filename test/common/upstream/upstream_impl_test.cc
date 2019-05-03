@@ -37,6 +37,7 @@ using testing::_;
 using testing::ContainerEq;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -2305,6 +2306,40 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   host_set_.updateHosts(HostSetImpl::updateHostsParams(hosts, hosts_per_locality), locality_weights,
                         {}, {}, hosts->size(), absl::nullopt);
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
+}
+
+// When a locality has endpoints that have not yet been warmed, weigth calculation should ignore
+// these hosts.
+TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
+  // We need a health checker in order for hosts to be considered not warmed.
+  ON_CALL(*info_, healthChecker()).WillByDefault(Return(true));
+
+  // We have two localities with 3 hosts in L1, 2 hosts in L2. Two of the hosts in L1 are not warmed
+  // yet, so even though they are unhealthy we should not adjust the locality weight.
+  HostsPerLocalitySharedPtr hosts_per_locality =
+      makeHostsPerLocality({{hosts_[0], hosts_[1], hosts_[2]}, {hosts_[3], hosts_[4]}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
+  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  HostsPerLocalitySharedPtr healthy_hosts_per_locality =
+      makeHostsPerLocality({{hosts_[0]}, {hosts_[3], hosts_[4]}});
+
+  // Mark hosts 1 and 2 as not warmed.
+  hosts_[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts_[1]->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNKNOWN);
+  hosts_[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts_[2]->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNKNOWN);
+
+  host_set_.updateHosts(
+      HostSetImpl::updateHostsParams(
+          hosts, hosts_per_locality,
+          makeHostsFromHostsPerLocality<HealthyHostVector>(healthy_hosts_per_locality),
+          healthy_hosts_per_locality),
+      locality_weights, {}, {}, hosts->size(), absl::nullopt);
+  // We should RR between localities with equal weight.
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
+  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
 }
 
 // When a locality has zero hosts, it should be treated as if it has zero healthy.
