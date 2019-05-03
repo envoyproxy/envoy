@@ -33,7 +33,7 @@ void adjustContentLength(Http::HeaderMap& headers,
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {
     uint64_t length;
-    if (StringUtil::atoull(length_header->value().c_str(), length)) {
+    if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
       length_header->value(adjustment(length));
     }
   }
@@ -56,7 +56,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
     // We keep track of the original content-type to ensure that we handle
     // gRPC content type variations such as application/grpc+proto.
-    content_type_ = headers.ContentType()->value().c_str();
+    content_type_ = std::string(headers.ContentType()->value().getStringView());
     headers.ContentType()->value(upstream_content_type_);
     headers.insertAccept().value(upstream_content_type_);
 

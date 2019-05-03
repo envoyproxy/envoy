@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/pure.h"
 #include "envoy/config/grpc_mux.h" // TODO TODO remove
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"

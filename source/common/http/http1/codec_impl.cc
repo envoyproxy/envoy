@@ -42,6 +42,9 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
   connection_.addCharToBuffer('\r');
   connection_.addCharToBuffer('\n');
 }
+void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
+  this->encodeHeader(key.data(), key.size(), value.data(), value.size());
+}
 
 void StreamEncoderImpl::encode100ContinueHeaders(const HeaderMap& headers) {
   ASSERT(headers.Status()->value() == "100");
@@ -54,11 +57,11 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
   bool saw_content_length = false;
   headers.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        const char* key_to_use = header.key().c_str();
+        absl::string_view key_to_use = header.key().getStringView();
         uint32_t key_size_to_use = header.key().size();
         // Translate :authority -> host so that upper layers do not need to deal with this.
         if (key_size_to_use > 1 && key_to_use[0] == ':' && key_to_use[1] == 'a') {
-          key_to_use = Headers::get().HostLegacy.get().c_str();
+          key_to_use = absl::string_view(Headers::get().HostLegacy.get());
           key_size_to_use = Headers::get().HostLegacy.get().size();
         }
 
@@ -67,8 +70,8 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
           return HeaderMap::Iterate::Continue;
         }
 
-        static_cast<StreamEncoderImpl*>(context)->encodeHeader(
-            key_to_use, key_size_to_use, header.value().c_str(), header.value().size());
+        static_cast<StreamEncoderImpl*>(context)->encodeHeader(key_to_use,
+                                                               header.value().getStringView());
         return HeaderMap::Iterate::Continue;
       },
       this);
@@ -265,14 +268,14 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   if (!method || !path) {
     throw CodecClientException(":method and :path must be specified");
   }
-  if (method->value() == Headers::get().MethodValues.Head.c_str()) {
+  if (method->value() == Headers::get().MethodValues.Head) {
     head_request_ = true;
   }
   connection_.onEncodeHeaders(headers);
   connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
-  connection_.copyToBuffer(method->value().c_str(), method->value().size());
+  connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
-  connection_.copyToBuffer(path->value().c_str(), path->value().size());
+  connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
   connection_.copyToBuffer(REQUEST_POSTFIX, sizeof(REQUEST_POSTFIX) - 1);
 
   StreamEncoderImpl::encodeHeaders(headers, end_stream);
@@ -328,7 +331,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, http_parser_type
 
 void ConnectionImpl::completeLastHeader() {
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
-                 current_header_field_.c_str(), current_header_value_.c_str());
+                 current_header_field_.getStringView(), current_header_value_.getStringView());
   if (!current_header_field_.empty()) {
     toLowerTable().toLowerCase(current_header_field_.buffer(), current_header_field_.size());
     current_header_map_->addViaMove(std::move(current_header_field_),
@@ -418,6 +421,13 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     // Ignore trailers.
     return;
   }
+  // http-parser should filter for this
+  // (https://tools.ietf.org/html/rfc7230#section-3.2.6), but it doesn't today. HeaderStrings
+  // have an invariant that they must not contain embedded zero characters
+  // (NUL, ASCII 0x0).
+  if (absl::string_view(data, length).find('\0') != absl::string_view::npos) {
+    throw CodecProtocolException("http/1.1 protocol error: header value contains NUL");
+  }
 
   header_parsing_state_ = HeaderParsingState::Value;
   current_header_value_.append(data, length);
@@ -501,8 +511,9 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
   bool is_connect = (method == HTTP_CONNECT);
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
-  if (active_request_->request_url_.c_str()[0] == '/' ||
-      ((method == HTTP_OPTIONS) && active_request_->request_url_.c_str()[0] == '*')) {
+  if (!active_request_->request_url_.getStringView().empty() &&
+      (active_request_->request_url_.getStringView()[0] == '/' ||
+       ((method == HTTP_OPTIONS) && active_request_->request_url_.getStringView()[0] == '*'))) {
     headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return;
   }
@@ -670,13 +681,11 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   if (resetStreamCalled()) {
     throw CodecClientException("cannot create new streams after calling reset");
   }
-  // Streams are responsible for unwinding any outstanding readDisable(true)
-  // calls done on the underlying connection as they are destroyed. As this is
-  // the only place a HTTP/1 stream is destroyed where the Network::Connection is
-  // reused, unwind any outstanding readDisable() calls here.
-  while (!connection_.readEnabled()) {
-    connection_.readDisable(false);
-  }
+
+  // If reads were disabled due to flow control, we expect reads to always be enabled again before
+  // reusing this connection. This is done when the final pipeline response is received.
+  ASSERT(connection_.readEnabled());
+
   request_encoder_ = std::make_unique<RequestStreamEncoderImpl>(*this);
   pending_responses_.emplace_back(&response_decoder);
   return *request_encoder_;
@@ -733,6 +742,18 @@ void ClientConnectionImpl::onMessageComplete() {
     // After calling decodeData() with end stream set to true, we should no longer be able to reset.
     PendingResponse response = pending_responses_.front();
     pending_responses_.pop_front();
+
+    // Streams are responsible for unwinding any outstanding readDisable(true)
+    // calls done on the underlying connection as they are destroyed. As this is
+    // the only place a HTTP/1 stream is destroyed where the Network::Connection is
+    // reused, unwind any outstanding readDisable() calls here. Only do this if there are no
+    // pipelined responses remaining. Also do this before we dispatch end_stream in case the caller
+    // immediately reuses the connection.
+    if (pending_responses_.empty()) {
+      while (!connection_.readEnabled()) {
+        connection_.readDisable(false);
+      }
+    }
 
     if (deferred_end_stream_headers_) {
       response.decoder_->decodeHeaders(std::move(deferred_end_stream_headers_), true);

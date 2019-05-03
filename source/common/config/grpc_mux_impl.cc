@@ -28,6 +28,8 @@ GrpcMuxImpl::~GrpcMuxImpl() {
   }
 }
 
+void GrpcMuxImpl::start() { grpc_stream_.establishStream(); }
+
 void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   if (!grpc_stream_.grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to sendDiscoveryRequest for {}", type_url);
@@ -61,6 +63,57 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
   // clear error_detail after the request is sent if it exists.
   if (api_state_[type_url].request_.has_error_detail()) {
     api_state_[type_url].request_.clear_error_detail();
+  }
+}
+
+GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
+                                       const std::vector<std::string>& resources,
+                                       GrpcMuxCallbacks& callbacks) {
+  auto watch =
+      std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
+  ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
+
+  // Lazily kick off the requests based on first subscription. This has the
+  // convenient side-effect that we order messages on the channel based on
+  // Envoy's internal dependency ordering.
+  // TODO(gsagula): move TokenBucketImpl params to a config.
+  if (!api_state_[type_url].subscribed_) {
+    api_state_[type_url].request_.set_type_url(type_url);
+    api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
+    api_state_[type_url].subscribed_ = true;
+    subscriptions_.emplace_back(type_url);
+  }
+
+  // This will send an updated request on each subscription.
+  // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
+  // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
+  // only send a single RDS/EDS update after the CDS/LDS update.
+  queueDiscoveryRequest(type_url);
+
+  // This is idempotent, so it's fine to just always call when we have a new subscription.
+  grpc_stream_.establishStream();
+
+  return watch;
+}
+
+void GrpcMuxImpl::pause(const std::string& type_url) {
+  ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url);
+  ApiState& api_state = api_state_[type_url];
+  ASSERT(!api_state.paused_);
+  ASSERT(!api_state.pending_);
+  api_state.paused_ = true;
+}
+
+void GrpcMuxImpl::resume(const std::string& type_url) {
+  ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
+  ApiState& api_state = api_state_[type_url];
+  ASSERT(api_state.paused_);
+  api_state.paused_ = false;
+
+  if (api_state.pending_) {
+    ASSERT(api_state.subscribed_);
+    queueDiscoveryRequest(type_url);
+    api_state.pending_ = false;
   }
 }
 
@@ -125,7 +178,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
       // onConfigUpdate should be called only on watches(clusters/routes) that have
       // updates in the message for EDS/RDS.
-      if (found_resources.size() > 0) {
+      if (!found_resources.empty()) {
         watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
       }
     }
@@ -142,57 +195,6 @@ void GrpcMuxImpl::onDiscoveryResponse(
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());
   queueDiscoveryRequest(type_url);
-}
-
-GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
-                                       const std::vector<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks) {
-  auto watch =
-      std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
-  ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
-
-  // Lazily kick off the requests based on first subscription. This has the
-  // convenient side-effect that we order messages on the channel based on
-  // Envoy's internal dependency ordering.
-  // TODO(gsagula): move TokenBucketImpl params to a config.
-  if (!api_state_[type_url].subscribed_) {
-    api_state_[type_url].request_.set_type_url(type_url);
-    api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
-    api_state_[type_url].subscribed_ = true;
-    subscriptions_.emplace_back(type_url);
-  }
-
-  // This will send an updated request on each subscription.
-  // TODO(htuch): For RDS/EDS, this will generate a new DiscoveryRequest on each resource we added.
-  // Consider in the future adding some kind of collation/batching during CDS/LDS updates so that we
-  // only send a single RDS/EDS update after the CDS/LDS update.
-  queueDiscoveryRequest(type_url);
-
-  // This is idempotent, so it's fine to just always call when we have a new subscription.
-  grpc_stream_.establishStream();
-
-  return watch;
-}
-
-void GrpcMuxImpl::pause(const std::string& type_url) {
-  ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url);
-  ApiState& api_state = api_state_[type_url];
-  ASSERT(!api_state.paused_);
-  ASSERT(!api_state.pending_);
-  api_state.paused_ = true;
-}
-
-void GrpcMuxImpl::resume(const std::string& type_url) {
-  ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url);
-  ApiState& api_state = api_state_[type_url];
-  ASSERT(api_state.paused_);
-  api_state.paused_ = false;
-
-  if (api_state.pending_) {
-    ASSERT(api_state.subscribed_);
-    queueDiscoveryRequest(type_url);
-    api_state.pending_ = false;
-  }
 }
 
 void GrpcMuxImpl::onStreamEstablished() {
@@ -215,6 +217,7 @@ void GrpcMuxImpl::queueDiscoveryRequest(const std::string& queue_item) {
   request_queue_.push(queue_item);
   drainRequests();
 }
+
 void GrpcMuxImpl::clearRequestQueue() {
   grpc_stream_.maybeUpdateQueueSizeStat(0);
   // TODO(fredlas) when we have C++17: request_queue_ = {};
@@ -222,6 +225,7 @@ void GrpcMuxImpl::clearRequestQueue() {
     request_queue_.pop();
   }
 }
+
 void GrpcMuxImpl::drainRequests() {
   while (!request_queue_.empty() && grpc_stream_.checkRateLimitAllowsDrain()) {
     // Process the request, if rate limiting is not enabled at all or if it is under rate limit.

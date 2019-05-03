@@ -85,4 +85,12 @@ TEST_F(TokenBucketImplTest, PartialConsumption) {
   EXPECT_EQ(std::chrono::milliseconds(63), token_bucket.nextTokenAvailable());
 }
 
+// Test reset functionality.
+TEST_F(TokenBucketImplTest, Reset) {
+  TokenBucketImpl token_bucket{16, time_system_, 16};
+  token_bucket.reset(1);
+  EXPECT_EQ(1, token_bucket.consume(2, true));
+  EXPECT_EQ(std::chrono::milliseconds(63), token_bucket.nextTokenAvailable());
+}
+
 } // namespace Envoy

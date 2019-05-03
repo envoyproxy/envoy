@@ -39,16 +39,15 @@ public:
     }
   }
 
-  void startSubscription(const std::vector<std::string>& cluster_names) {
+  void startSubscription(const std::set<std::string>& cluster_names) {
     test_harness_->startSubscription(cluster_names);
   }
 
-  void updateResources(const std::vector<std::string>& cluster_names) {
+  void updateResources(const std::set<std::string>& cluster_names) {
     test_harness_->updateResources(cluster_names);
   }
 
-  void expectSendMessage(const std::vector<std::string>& cluster_names,
-                         const std::string& version) {
+  void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version) {
     test_harness_->expectSendMessage(cluster_names, version);
   }
 

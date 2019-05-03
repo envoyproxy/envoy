@@ -32,14 +32,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "grpc_access_log_proto_descriptors_lib",
+    srcs = ["grpc_access_log_proto_descriptors.cc"],
+    hdrs = ["grpc_access_log_proto_descriptors.h"],
+    deps = [
+        "//source/common/protobuf",
+        "@envoy_api//envoy/service/accesslog/v2:als_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
         "//include/envoy/registry",
         "//include/envoy/server:access_log_config_interface",
+        "//source/common/common:assert_lib",
         "//source/common/protobuf",
         "//source/extensions/access_loggers:well_known_names",
         "//source/extensions/access_loggers/http_grpc:grpc_access_log_lib",
+        "//source/extensions/access_loggers/http_grpc:grpc_access_log_proto_descriptors_lib",
     ],
 )

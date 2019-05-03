@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
+#include "envoy/config/xds_grpc_context.h"
 
 #include "common/config/grpc_delta_xds_context.h"
 #include "common/config/utility.h"

@@ -89,7 +89,7 @@ feature deprecation in Envoy is in 3 phases: warn-by-default, fail-by-default, a
 
 In the first phase, Envoy logs a warning to the warning log that the feature is deprecated and
 increments the :ref:`deprecated_feature_use <runtime_stats>` runtime stat.
-Users are encouraged to go to :repo:`DEPRECATED.md <DEPRECATED.md>` to see how to
+Users are encouraged to go to :ref:`deprecated <deprecated>` to see how to
 migrate to the new code path and make sure it is suitable for their use case.
 
 In the second phase the message and filename will be added to

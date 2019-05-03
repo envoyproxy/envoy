@@ -31,16 +31,9 @@ public:
               const RateLimitSettings& rate_limit_settings);
   ~GrpcMuxImpl();
 
-  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
+  void start() override;
+  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
-
-  void sendDiscoveryRequest(const std::string& type_url);
-
-  // Config::GrpcStreamCallbacks
-  void onStreamEstablished() override;
-  void onEstablishmentFailure() override;
-  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
-  void onWriteable() override;
 
   // XdsGrpcContext
   void pause(const std::string& type_url) override;
@@ -55,6 +48,14 @@ public:
   void removeSubscription(const std::string&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
 
+  void sendDiscoveryRequest(const std::string& type_url);
+
+  // Config::GrpcStreamCallbacks
+  void onStreamEstablished() override;
+  void onEstablishmentFailure() override;
+  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
+  void onWriteable() override;
+
   GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>&
   grpcStreamForTest() {
     return grpc_stream_;
@@ -65,7 +66,7 @@ private:
   void setRetryTimer();
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
-    GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
+    GrpcMuxWatchImpl(const std::set<std::string>& resources, GrpcMuxCallbacks& callbacks,
                      const std::string& type_url, GrpcMuxImpl& parent)
         : resources_(resources), callbacks_(callbacks), type_url_(type_url), parent_(parent),
           inserted_(true) {
@@ -80,7 +81,7 @@ private:
         }
       }
     }
-    std::vector<std::string> resources_;
+    std::set<std::string> resources_;
     GrpcMuxCallbacks& callbacks_;
     const std::string type_url_;
     GrpcMuxImpl& parent_;
@@ -121,7 +122,8 @@ private:
 class NullGrpcMuxImpl : public XdsGrpcContext,
                         GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::vector<std::string>&,
+  void start() override {}
+  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
                             GrpcMuxCallbacks&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }

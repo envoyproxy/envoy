@@ -82,10 +82,9 @@ public:
       return;
     }
     std::set<std::string> HACK_resources_as_set(resources.begin(), resources.end());
-    if (sub->second.updateResourceInterest(
-            HACK_resources_as_set)) { // any changes worth mentioning?
-      kickOffDiscoveryRequest(type_url);
-    }
+    sub->second.updateResourceInterest(HACK_resources_as_set);
+    // Tell the server about our new interests, if there are any.
+    trySendDiscoveryRequests();
   }
 
   void removeSubscription(const std::string& type_url) override { subscriptions_.erase(type_url); }
@@ -121,14 +120,14 @@ public:
                 message->system_version_info(), message->type_url());
       return;
     }
-    kickOffDiscoveryRequestWithAck(message->type_url(), sub->second.handleResponse(message.get()));
+    kickOffAck(sub->second.handleResponse(message.get()));
   }
 
   void onStreamEstablished() override {
     for (auto& sub : subscriptions_) {
-      sub.second.set_first_request_of_new_stream(true);
-      kickOffDiscoveryRequest(sub.first);
+      sub.second.markStreamFresh();
     }
+    trySendDiscoveryRequests();
   }
 
   void onEstablishmentFailure() override {
@@ -139,12 +138,8 @@ public:
 
   void onWriteable() override { trySendDiscoveryRequests(); }
 
-  void kickOffDiscoveryRequest(const std::string& type_url) {
-    kickOffDiscoveryRequestWithAck(type_url, absl::nullopt);
-  }
-
-  void kickOffDiscoveryRequestWithAck(const std::string& type_url, absl::optional<UpdateAck> ack) {
-    request_queue_.push(PendingRequest(type_url, ack));
+  void kickOffAck(UpdateAck ack) {
+    request_queue_.push(ack);
     trySendDiscoveryRequests();
   }
 
@@ -161,34 +156,38 @@ public:
 
 private:
   void trySendDiscoveryRequests() {
-    while (!request_queue_.empty()) {
-      const PendingRequest& pending_request = request_queue_.front();
-      auto sub = subscriptions_.find(pending_request.type_url_);
-      if (sub == subscriptions_.end()) {
-        ENVOY_LOG(warn, "Not sending queued request for non-existent subscription {}.",
-                  pending_request.type_url_);
-        request_queue_.pop();
-        continue;
-      }
-      if (shouldSendDiscoveryRequest(sub->first, &sub->second)) {
-        // TODO TODO hmm maybe should pass the ack into getNextRequest, to accomodate the
-        // templatization goal.
-        envoy::api::v2::DeltaDiscoveryRequest request = sub->second.getNextRequest();
-        if (pending_request.ack_.has_value()) {
-          const UpdateAck& ack = pending_request.ack_.value();
-          request.set_response_nonce(ack.nonce_);
-          request.mutable_error_detail()->CopyFrom(ack.error_detail_);
-        }
-        grpc_stream_.sendMessage(request);
-        request_queue_.pop();
-      } else {
+    while (true) {
+      // Do any of our subscriptions (by type_url) even want to send a request?
+      absl::optional<std::string> next_request_type = wantToSendDiscoveryRequest();
+      if (!next_request_type.has_value()) {
         break;
       }
+      // Try again later if paused/rate limited/stream down.
+      if (!canSendDiscoveryRequest(next_request_type, &sub->second)) {
+        break;
+      }
+      // If this request's type_url is one we don't have, drop it.
+      auto sub = subscriptions_.find(pending_request.type_url_);
+      if (sub == subscriptions_.end()) {
+        ENVOY_LOG(warn, "Not sending queued ACK for non-existent subscription {}.",
+                  pending_request.type_url_);
+        ack_queue_.pop();
+        continue;
+      }
+      // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
+      if (!ack_queue_.empty()) {
+        grpc_stream_.sendMessage(sub->second.getNextRequestWithAck(ack_queue_.front()));
+        ack_queue_.pop();
+      } else {
+        grpc_stream_.sendMessage(sub->second.getNextRequestAckless());
+      }
     }
-    grpc_stream_.maybeUpdateQueueSizeStat(request_queue_.size());
+    grpc_stream_.maybeUpdateQueueSizeStat(ack_queue_.size());
   }
 
-  bool shouldSendDiscoveryRequest(absl::string_view type_url, DeltaSubscriptionState* sub) {
+  // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
+  // whether we *want* to send a DeltaDiscoveryRequest).
+  bool canSendDiscoveryRequest(absl::string_view type_url, DeltaSubscriptionState* sub) {
     if (sub->paused()) {
       ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url);
       return false;
@@ -202,25 +201,108 @@ private:
     return true;
   }
 
+  // Checks whether we have something to say in a DeltaDiscoveryRequest, which can be an ACK and/or
+  // a subscription update. (Does not check whether we *can* send that DeltaDiscoveryRequest).
+  // Returns the type_url of the resource type we should send for (if any).
+  absl::optional<std::string> wantToSendDiscoveryRequest() {
+    // All ACKs are sent before plain updates. trySendDiscoveryRequests() relies on this. So, choose
+    // type_url from ack_queue_ if possible, before looking at pending updates.
+    if (!ack_queue_.empty()) {
+      return ack_queue_.front().type_url_;
+    }
+    for (auto& sub : subscriptions_) {
+      if (sub.second.subscriptionUpdatePending()) {
+        return sub.first;
+      }
+    }
+    return absl::nullopt;
+  }
+
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
 
+  /* NOTE NOTE TODO TODO: all of this is just to support the eventual sotw+delta merger.
+   * for current purposes, just sticking with this grpc_stream_ is fine:*/
   GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
       grpc_stream_;
 
-  struct PendingRequest {
-    PendingRequest(absl::string_view type_url, absl::optional<UpdateAck> ack)
-        : type_url_(type_url), ack_(ack) {}
-    const std::string type_url_;
-    const absl::optional<UpdateAck> ack_;
+  /*
+  // A horrid little class that provides polymorphism for these two protobuf types.
+  class TypedGrpcStreamUnion {
+    static TypedGrpcStreamUnion
+  makeDelta(std::unique_ptr<GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
+  envoy::api::v2::DeltaDiscoveryResponse>>&& delta) { return TypedGrpcStreamUnion(std::move(delta));
+  }
+
+    static TypedGrpcStreamUnion
+  makeSotw(std::unique_ptr<GrpcStream<envoy::api::v2::DiscoveryRequest,
+  envoy::api::v2::DiscoveryResponse>>&& sotw) { return TypedGrpcStreamUnion(std::move(sotw)); }
+
+  void establishStream() {
+    delta_stream_ ? delta_stream_->establishStream();
+                  : sotw_stream_->establishStream();
+    }
+
+  bool grpcStreamAvailable() const {
+    return delta_stream_ ? delta_stream_->grpcStreamAvailable();
+                         : sotw_stream_->grpcStreamAvailable();
+    }
+
+  void sendMessage(const plain_ol_untyped_Message& request) {
+    delta_stream_
+        ? delta_stream_->sendMessage(
+            static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(request);
+        : sotw_stream_->sendMessage(
+            static_cast<const envoy::api::v2::DiscoveryRequest&>(request);
+  }
+
+  void onReceiveMessage(std::unique_ptr<plain ol untyped Message>&& message) {
+    delta_stream_
+        ? delta_stream_->onReceiveMessage(
+            static_cast<std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&&>(message);
+        : sotw_stream_->onReceiveMessage(
+            static_cast<std::unique_ptr<envoy::api::v2::DiscoveryResponse>&&>(message);
+  }
+
+  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
+    delta_stream_ ? delta_stream_->onRemoteClose(status, message);
+                  : sotw_stream_->onRemoteClose(status, message);
+    }
+
+  void maybeUpdateQueueSizeStat(uint64_t size) {
+    delta_stream_ ? delta_stream_->maybeUpdateQueueSizeStat(size);
+                  : sotw_stream_->maybeUpdateQueueSizeStat(size);
+    }
+
+  bool checkRateLimitAllowsDrain() {
+    return delta_stream_ ? delta_stream_->checkRateLimitAllowsDrain();
+                         : sotw_stream_->checkRateLimitAllowsDrain();
+    }
+
+  private:
+    explicit TypedGrpcStreamUnion(std::unique_ptr<GrpcStream<envoy::api::v2::DiscoveryRequest,
+  envoy::api::v2::DiscoveryResponse>>&& sotw) : delta_stream_(nullptr),
+  sotw_stream_(std::move(sotw)) {}
+
+    explicit TypedGrpcStreamUnion(std::unique_ptr<GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
+  envoy::api::v2::DeltaDiscoveryResponse>>&& delta) : delta_stream_(std::move(delta)),
+  sotw_stream_(nullptr) {}
+
+    std::unique_ptr<GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
+  envoy::api::v2::DeltaDiscoveryResponse>> delta_stream_;
+      std::unique_ptr<GrpcStream<envoy::api::v2::DiscoveryRequest,
+  envoy::api::v2::DiscoveryResponse>> sotw_stream_;
   };
 
-  // Discovery requests we're waiting to send, stored in the order that they should be sent in. All
-  // of our different API types are mixed together in this queue. Those that are ACKs have the ack_
-  // field filled.
-  std::queue<PendingRequest> request_queue_;
+      */
+
+  // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
+  // of our different resource types' ACKs are mixed together in this queue.
+  std::queue<UpdateAck> ack_queue_;
 
   // Map from type_url strings to a DeltaSubscriptionState for that type.
+  // TODO TODO to merge with SotW, State will become an interface, and this Context will need to
+  // hold a factory for building these States.
   std::unordered_map<std::string, DeltaSubscriptionState> subscriptions_;
 };
 

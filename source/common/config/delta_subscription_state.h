@@ -12,8 +12,10 @@ namespace Envoy {
 namespace Config {
 
 struct UpdateAck {
-  UpdateAck(absl::string_view nonce) : nonce_(nonce) {}
+  UpdateAck(absl::string_view nonce, absl::string_view type_url)
+      : nonce_(nonce), type_url_(type_url) {}
   std::string nonce_;
+  std::string type_url_;
   ::google::rpc::Status error_detail_;
 };
 
@@ -102,7 +104,7 @@ public:
   UpdateAck handleResponse(envoy::api::v2::DeltaDiscoveryResponse* message) {
     // We *always* copy the response's nonce into the next request, even if we're going to make that
     // request a NACK by setting error_detail.
-    UpdateAck ack(message->nonce());
+    UpdateAck ack(message->nonce(), type_url_);
     std::cerr << "handleResponse" << std::endl;
     try {
       disableInitFetchTimeoutTimer();
@@ -153,7 +155,7 @@ public:
     callbacks_.onConfigUpdateFailed(nullptr);
   }
 
-  envoy::api::v2::DeltaDiscoveryRequest getNextRequest() {
+  envoy::api::v2::DeltaDiscoveryRequest getNextRequestAckless() {
     envoy::api::v2::DeltaDiscoveryRequest request;
     if (first_request_of_new_stream_) {
       // initial_resource_versions "must be populated for first request in a stream".
@@ -183,6 +185,16 @@ public:
 
     request.set_type_url(type_url_);
     request.mutable_node()->MergeFrom(local_info_.node());
+    return request;
+  }
+
+  envoy::api::v2::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack) {
+    envoy::api::v2::DeltaDiscoveryRequest request = getNextRequestAckless();
+    request.set_response_nonce(ack.nonce_);
+    if (ack.error_detail_.code() != Grpc::Status::GrpcStatus::Ok) {
+      // Don't needlessly make the field present-but-empty if status is ok.
+      request.mutable_error_detail()->CopyFrom(ack.error_detail_);
+    }
     return request;
   }
 

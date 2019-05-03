@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/filters/network/common/redis/codec_impl.h"
@@ -41,6 +43,13 @@ public:
    * Called when a network/protocol error occurs and there is no response.
    */
   virtual void onFailure() PURE;
+
+  /**
+   * Called when a MOVED or ASK redirection error is received, and the request must be retried.
+   * @param value supplies the MOVED error response
+   * @return bool true if the request is successfully redirected, false otherwise
+   */
+  virtual bool onRedirection(const Common::Redis::RespValue& value) PURE;
 };
 
 /**
@@ -97,6 +106,22 @@ public:
    * same hash tag will be forwarded to the same upstream.
    */
   virtual bool enableHashtagging() const PURE;
+
+  /**
+   * @return when enabled, moved/ask redirection errors from upstream redis servers will be
+   * processed.
+   */
+  virtual bool enableRedirection() const PURE;
+
+  /**
+   * @return buffer size for batching commands for a single upstream host.
+   */
+  virtual uint32_t maxBufferSizeBeforeFlush() const PURE;
+
+  /**
+   * @return timeout for batching commands for a single upstream host.
+   */
+  virtual std::chrono::milliseconds bufferFlushTimeoutInMs() const PURE;
 };
 
 /**
