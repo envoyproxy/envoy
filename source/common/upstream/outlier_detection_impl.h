@@ -101,7 +101,6 @@ private:
 
 class SuccessRateMonitor {
 public:
-  SuccessRateMonitor() = delete;
   SuccessRateMonitor(envoy::data::cluster::v2alpha::OutlierEjectionType ejection_type)
       : ejection_type_(ejection_type), success_rate_(-1) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.

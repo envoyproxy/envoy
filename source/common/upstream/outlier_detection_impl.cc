@@ -112,7 +112,8 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
     http_code = Http::Code::InternalServerError;
     break;
   case Result::CONNECT_SUCCESS:
-    ASSERT(false); // SUCCESS is used to report connection level success, not transaction
+    NOT_REACHED_GCOVR_EXCL_LINE; // SUCCESS is used to report connection level success, not
+                                 // transaction
     break;
   }
 
