@@ -96,7 +96,7 @@ void FilterManagerImpl::onResumeWriting(ActiveWriteFilter* filter,
   auto status = onWrite(filter, buffer_source);
   if (status == FilterStatus::Continue) {
     BufferSource::StreamBuffer write_buffer = buffer_source.getWriteBuffer();
-    callbacks_.write(write_buffer.buffer, write_buffer.end_stream);
+    connection_.rawWrite(write_buffer.buffer, write_buffer.end_stream);
   }
 }
 

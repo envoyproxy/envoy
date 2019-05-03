@@ -47,10 +47,10 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
     : transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
-      filter_manager_(*this, *this, filter_manager_callbacks_),
-      stream_info_(dispatcher.timeSource()), write_buffer_(dispatcher.getWatermarkFactory().create(
-                                                 [this]() -> void { this->onLowWatermark(); },
-                                                 [this]() -> void { this->onHighWatermark(); })),
+      filter_manager_(*this, *this), stream_info_(dispatcher.timeSource()),
+      write_buffer_(
+          dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
+                                                  [this]() -> void { this->onHighWatermark(); })),
       dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
@@ -354,6 +354,10 @@ void ConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) { callbacks
 
 void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);
+}
+
+void ConnectionImpl::rawWrite(Buffer::Instance& data, bool end_stream) {
+  write(data, end_stream, false);
 }
 
 void ConnectionImpl::write(Buffer::Instance& data, bool end_stream) {

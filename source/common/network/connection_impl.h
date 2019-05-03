@@ -44,9 +44,9 @@ public:
 };
 
 /**
- * Implementation of Network::Connection.
+ * Implementation of Network::Connection and Network::FilterManagerConnection.
  */
-class ConnectionImpl : public virtual Connection,
+class ConnectionImpl : public virtual FilterManagerConnection,
                        public BufferSource,
                        public TransportSocketCallbacks,
                        protected Logger::Loggable<Logger::Id::connection> {
@@ -96,6 +96,9 @@ public:
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   absl::string_view transportFailureReason() const override;
+
+  // Network::FilterManagerConnection
+  void rawWrite(Buffer::Instance& data, bool end_stream) override;
 
   // Network::BufferSource
   BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
@@ -192,20 +195,6 @@ private:
     CloseAfterFlushAndWait
   };
   DelayedCloseState delayed_close_state_{DelayedCloseState::None};
-
-  class FilterManagerCallbacksImpl : public FilterManagerCallbacks {
-  public:
-    FilterManagerCallbacksImpl(ConnectionImpl& connection) : connection_(connection) {}
-    ~FilterManagerCallbacksImpl() {}
-    // Write data to the connection bypassing filter chain.
-    void write(Buffer::Instance& data, bool end_stream) override {
-      connection_.write(data, end_stream, false);
-    }
-
-  private:
-    ConnectionImpl& connection_;
-  };
-  FilterManagerCallbacksImpl filter_manager_callbacks_{*this};
 
   Event::Dispatcher& dispatcher_;
   const uint64_t id_;

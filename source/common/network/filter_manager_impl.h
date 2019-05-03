@@ -3,6 +3,7 @@
 #include <list>
 #include <memory>
 
+#include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 
 #include "common/common/linked_object.h"
@@ -88,23 +89,24 @@ private:
 };
 
 /**
- * Callbacks used by FilterManager to interact with Connection in advanced cases,
- * i.e. to pause and resume write operation.
+ * Connection enriched with methods for advanced cases, i.e. write data bypassing filter chain.
+ *
+ * Since FilterManager is only user of those methods for now, the class is named after it.
  */
-class FilterManagerCallbacks {
+class FilterManagerConnection : public virtual Connection {
 public:
-  virtual ~FilterManagerCallbacks() {}
+  virtual ~FilterManagerConnection() {}
 
   /**
    * Write data to the connection bypassing filter chain.
    *
    * I.e., consider a scenario where iteration over the filter chain is stopped at some point
-   * and then is resumed later via a call to WriteFilterCallbacks::injectDataToFilterChain().
+   * and later is resumed via a call to WriteFilterCallbacks::injectDataToFilterChain().
    *
    * @param data supplies the data to write to the connection.
    * @param end_stream supplies whether this is the last byte to write on the connection.
    */
-  virtual void write(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void rawWrite(Buffer::Instance& data, bool end_stream) PURE;
 };
 
 /**
@@ -112,9 +114,8 @@ public:
  */
 class FilterManagerImpl {
 public:
-  FilterManagerImpl(Connection& connection, BufferSource& buffer_source,
-                    FilterManagerCallbacks& callbacks)
-      : connection_(connection), buffer_source_(buffer_source), callbacks_(callbacks) {}
+  FilterManagerImpl(FilterManagerConnection& connection, BufferSource& buffer_source)
+      : connection_(connection), buffer_source_(buffer_source) {}
 
   void addWriteFilter(WriteFilterSharedPtr filter);
   void addFilter(FilterSharedPtr filter);
@@ -169,9 +170,8 @@ private:
   FilterStatus onWrite(ActiveWriteFilter* filter, WriteBufferSource& buffer_source);
   void onResumeWriting(ActiveWriteFilter* filter, WriteBufferSource& buffer_source);
 
-  Connection& connection_;
+  FilterManagerConnection& connection_;
   BufferSource& buffer_source_;
-  FilterManagerCallbacks& callbacks_;
   Upstream::HostDescriptionConstSharedPtr host_description_;
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<ActiveWriteFilterPtr> downstream_filters_;

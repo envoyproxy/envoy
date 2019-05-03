@@ -121,14 +121,6 @@ public:
   WriteFilterCallbacks* write_callbacks_{};
 };
 
-class MockFilterManagerCallbacks : public FilterManagerCallbacks {
-public:
-  MockFilterManagerCallbacks();
-  ~MockFilterManagerCallbacks();
-
-  MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
-};
-
 class MockListenerCallbacks : public ListenerCallbacks {
 public:
   MockListenerCallbacks();

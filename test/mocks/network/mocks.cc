@@ -88,9 +88,6 @@ MockFilter::MockFilter() {
 
 MockFilter::~MockFilter() {}
 
-MockFilterManagerCallbacks::MockFilterManagerCallbacks() {}
-MockFilterManagerCallbacks::~MockFilterManagerCallbacks() {}
-
 MockListenerCallbacks::MockListenerCallbacks() {}
 MockListenerCallbacks::~MockListenerCallbacks() {}
 
