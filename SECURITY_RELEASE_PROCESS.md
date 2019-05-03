@@ -196,18 +196,20 @@ distribution should:
 
 1. Be either:
    1. An actively maintained distribution of Envoy components. An example is
-   "SuperAwesomeLinuxDistro" which offers Envoy pre-built packages. Another example is
-   "SuperAwesomeServiceMesh" which offers a service mesh product that includes Envoy as a component.
+      "SuperAwesomeLinuxDistro" which offers Envoy pre-built packages. Another
+      example is "SuperAwesomeServiceMesh" which offers a service mesh product
+      that includes Envoy as a component.
 
    OR
 
-   2. Offer Envoy as a publicly available infrastructure or platform service, in which the
-   product clearly states that it is built on top of Envoy. E.g., "SuperAwesomeCloudProvider's
-   Envoy as a Service (EaaS)". An infrastructure service that uses Envoy for a product but does not
-   publicly say they are using Envoy does not qualify. This is essentially IaaS or PaaS, if you use
-   Envoy to support a SaaS, e.g. "SuperAwesomeCatVideoService", this does not
-   qualify. Examples of "clearly states" are public documentation, blog posts,
-   marketing copy, etc.
+   2. Offer Envoy as a publicly available infrastructure or platform service, in
+      which the product clearly states (e.g. public documentation, blog posts,
+      marketing copy, etc.) that it is built on top of Envoy. E.g.,
+      "SuperAwesomeCloudProvider's Envoy as a Service (EaaS)". An infrastructure
+      service that uses Envoy for a product but does not publicly say they are
+      using Envoy does not qualify. This is essentially IaaS or PaaS, if you use
+      Envoy to support a SaaS, e.g. "SuperAwesomeCatVideoService", this does not
+      qualify.
 2. Have a user or customer base not limited to your own organization. We will use the size
    of the user or customer base as part of the criteria to determine
    eligibility.
