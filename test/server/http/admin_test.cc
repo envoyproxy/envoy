@@ -1059,6 +1059,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       .WillByDefault(Return(true));
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
       .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL))
+      .WillByDefault(Return(true));
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
   ON_CALL(*host, weight()).WillByDefault(Return(5));
@@ -1118,7 +1120,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       "eds_health_status": "DEGRADED",
       "failed_active_health_check": true,
       "failed_outlier_check": true,
-      "failed_active_degraded_check": true
+      "failed_active_degraded_check": true,
+      "pending_dynamic_removal": true
      },
      "success_rate": {
       "value": 43.2

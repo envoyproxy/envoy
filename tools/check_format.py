@@ -122,7 +122,7 @@ def checkTools():
         "Examples:\n"
         "    export CLANG_FORMAT=clang-format-8.0.0\n"
         "    export CLANG_FORMAT=/opt/bin/clang-format-8\n"
-        "    export CLANG_FORMAT=/usr/local/opt/llvm@7/bin/clang-format".format(CLANG_FORMAT_PATH))
+        "    export CLANG_FORMAT=/usr/local/opt/llvm@8/bin/clang-format".format(CLANG_FORMAT_PATH))
 
   buildifier_abs_path = lookPath(BUILDIFIER_PATH)
   if buildifier_abs_path:
