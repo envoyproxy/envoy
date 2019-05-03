@@ -274,10 +274,8 @@ protected:
 
   // Create a redis cluster slot response. If a bit is set in the bitset, then that part of
   // of the response is correct, otherwise it's incorrect.
-  NetworkFilters::Common::Redis::RespValuePtr createResponse(std::bitset<12> flags) const {
+  NetworkFilters::Common::Redis::RespValuePtr createResponse(std::bitset<10> flags) const {
     int64_t idx(0);
-    int64_t resp_type = idx++;
-    int64_t resp_size = idx++;
     int64_t slots_type = idx++;
     int64_t slots_size = idx++;
     int64_t slot1_type = idx++;
@@ -309,16 +307,11 @@ protected:
       slots_array.push_back(createArrayField(flags.test(slot1_type), slot_1_array));
     }
 
-    std::vector<NetworkFilters::Common::Redis::RespValue> response_array;
-    if (flags.test(resp_size)) {
-      slots_array.push_back(createArrayField(flags.test(slots_type), slots_array));
-    }
-
     NetworkFilters::Common::Redis::RespValuePtr response{
         new NetworkFilters::Common::Redis::RespValue()};
-    if (flags.test(resp_type)) {
+    if (flags.test(slots_type)) {
       response->type(NetworkFilters::Common::Redis::RespType::Array);
-      response->asArray().swap(response_array);
+      response->asArray().swap(slots_array);
     } else {
       response->type(NetworkFilters::Common::Redis::RespType::BulkString);
       response->asString() = "Pong";
@@ -669,8 +662,8 @@ TEST_F(RedisClusterTest, RedisErrorResponse) {
   uint64_t update_attempt = 2;
   uint64_t update_failure = 1;
   // Test every combination the cluster slots response.
-  for (uint64_t i = 0; i < (1 << 12); i++) {
-    std::bitset<12> flags(i);
+  for (uint64_t i = 0; i < (1 << 10); i++) {
+    std::bitset<10> flags(i);
     expectRedisResolve();
     resolve_timer_->callback_();
     expectClusterSlotResponse(createResponse(flags));

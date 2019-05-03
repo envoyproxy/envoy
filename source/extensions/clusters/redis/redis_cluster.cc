@@ -249,10 +249,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
         slot_range[0].type() !=
             NetworkFilters::Common::Redis::RespType::Integer || // Start slot range is an integer.
         slot_range[1].type() !=
-            NetworkFilters::Common::Redis::RespType::Integer || // End slot range is an integer.
-        slot_range[2].type() !=
-            NetworkFilters::Common::Redis::RespType::Array) { // Master ip and port pair is a
-                                                              // sub-array.
+            NetworkFilters::Common::Redis::RespType::Integer) { // End slot range is an integer.
       onUnexpectedResponse(value);
       return;
     }
