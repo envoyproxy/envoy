@@ -24,6 +24,7 @@ MockHostSet::MockHostSet(uint32_t priority, uint32_t overprovisioning_factor)
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
   ON_CALL(*this, degradedHosts()).WillByDefault(ReturnRef(degraded_hosts_));
+  ON_CALL(*this, warmedHosts()).WillByDefault(ReturnRef(warmed_hosts_));
   ON_CALL(*this, hostsPerLocality()).WillByDefault(Invoke([this]() -> const HostsPerLocality& {
     return *hosts_per_locality_;
   }));
@@ -39,7 +40,6 @@ MockHostSet::MockHostSet(uint32_t priority, uint32_t overprovisioning_factor)
   ON_CALL(*this, localityWeights()).WillByDefault(Invoke([this]() -> LocalityWeightsConstSharedPtr {
     return locality_weights_;
   }));
-  ON_CALL(*this, warmedHostCount()).WillByDefault(Invoke([this]() { return hosts_.size(); }));
 }
 
 MockHostSet::~MockHostSet() = default;

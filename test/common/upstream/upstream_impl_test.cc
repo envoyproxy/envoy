@@ -1666,7 +1666,7 @@ public:
           HostSetImpl::updateHostsParams(hosts_, hosts_per_locality_,
                                          std::make_shared<const HealthyHostVector>(*hosts_),
                                          hosts_per_locality_),
-          {}, hosts_added, hosts_removed, hosts_->size(), absl::nullopt);
+          {}, hosts_added, hosts_removed, absl::nullopt);
     }
 
     // Remove the host from P1.
@@ -1679,7 +1679,7 @@ public:
           HostSetImpl::updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(),
                                          std::make_shared<const HealthyHostVector>(*empty_hosts),
                                          HostsPerLocalityImpl::empty()),
-          {}, hosts_added, hosts_removed, hosts_->size(), absl::nullopt);
+          {}, hosts_added, hosts_removed, absl::nullopt);
     }
   }
 
@@ -1734,7 +1734,7 @@ TEST(PrioritySet, Extend) {
         HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
                                        std::make_shared<const HealthyHostVector>(*hosts),
                                        hosts_per_locality),
-        {}, hosts_added, hosts_removed, hosts->size(), absl::nullopt);
+        {}, hosts_added, hosts_removed, absl::nullopt);
   }
   EXPECT_EQ(1, priority_changes);
   EXPECT_EQ(1, membership_changes);
@@ -2285,7 +2285,7 @@ TEST(HostsPerLocalityImpl, Filter) {
 class HostSetImplLocalityTest : public testing::Test {
 public:
   LocalityWeightsConstSharedPtr locality_weights_;
-  HostSetImpl host_set_{0, 0, kDefaultOverProvisioningFactor};
+  HostSetImpl host_set_{0, kDefaultOverProvisioningFactor};
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   HostVector hosts_{
       makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
@@ -2306,15 +2306,13 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(HostSetImpl::updateHostsParams(hosts, hosts_per_locality), locality_weights,
-                        {}, {}, hosts->size(), absl::nullopt);
+                        {}, {}, absl::nullopt);
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
 // When a locality has endpoints that have not yet been warmed, weight calculation should ignore
 // these hosts.
 TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
-  ON_CALL(*info_, warmHosts()).WillByDefault(Return(true));
-
   // We have two localities with 3 hosts in L1, 2 hosts in L2. Two of the hosts in L1 are not warmed
   // yet, so even though they are unhealthy we should not adjust the locality weight.
   HostsPerLocalitySharedPtr hosts_per_locality =
@@ -2324,18 +2322,15 @@ TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
   HostsPerLocalitySharedPtr healthy_hosts_per_locality =
       makeHostsPerLocality({{hosts_[0]}, {hosts_[3], hosts_[4]}});
 
-  // Mark hosts 1 and 2 as not warmed.
-  hosts_[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hosts_[1]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
-  hosts_[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hosts_[2]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
-
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(
           hosts, hosts_per_locality,
           makeHostsFromHostsPerLocality<HealthyHostVector>(healthy_hosts_per_locality),
+          healthy_hosts_per_locality, std::make_shared<const DegradedHostVector>(),
+          HostsPerLocalityImpl::empty(),
+          makeHostsFromHostsPerLocality<WarmedHostVector>(healthy_hosts_per_locality),
           healthy_hosts_per_locality),
-      locality_weights, {}, {}, hosts->size(), absl::nullopt);
+      locality_weights, {}, {}, absl::nullopt);
   // We should RR between localities with equal weight.
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
@@ -2366,7 +2361,7 @@ TEST_F(HostSetImplLocalityTest, ZeroWarmedHostsLocality) {
           hosts, hosts_per_locality,
           makeHostsFromHostsPerLocality<HealthyHostVector>(healthy_hosts_per_locality),
           healthy_hosts_per_locality),
-      locality_weights, {}, {}, hosts->size(), absl::nullopt);
+      locality_weights, {}, {}, absl::nullopt);
   // We should only target the second locality since there are no healthy in the first.
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
@@ -2381,7 +2376,7 @@ TEST_F(HostSetImplLocalityTest, EmptyLocality) {
   host_set_.updateHosts(HostSetImpl::updateHostsParams(
                             hosts, hosts_per_locality,
                             std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-                        locality_weights, {}, {}, hosts->size(), absl::nullopt);
+                        locality_weights, {}, {}, absl::nullopt);
   // Verify that we are not RRing between localities.
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
@@ -2395,7 +2390,7 @@ TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
   host_set_.updateHosts(HostSetImpl::updateHostsParams(
                             hosts, hosts_per_locality,
                             std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-                        locality_weights, {}, {}, hosts->size());
+                        locality_weights, {}, {});
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
@@ -2408,7 +2403,7 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
   host_set_.updateHosts(HostSetImpl::updateHostsParams(
                             hosts, hosts_per_locality,
                             std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-                        locality_weights, {}, {}, hosts->size(), absl::nullopt);
+                        locality_weights, {}, {}, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
@@ -2425,7 +2420,7 @@ TEST_F(HostSetImplLocalityTest, Weighted) {
   host_set_.updateHosts(HostSetImpl::updateHostsParams(
                             hosts, hosts_per_locality,
                             std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-                        locality_weights, {}, {}, hosts->size(), absl::nullopt);
+                        locality_weights, {}, {}, absl::nullopt);
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
@@ -2443,7 +2438,7 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   host_set_.updateHosts(HostSetImpl::updateHostsParams(
                             hosts, hosts_per_locality,
                             std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
-                        locality_weights, {}, {}, hosts->size(), absl::nullopt);
+                        locality_weights, {}, {}, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(2, host_set_.chooseHealthyLocality().value());
   EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
@@ -2471,7 +2466,7 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
             hosts, hosts_per_locality,
             makeHostsFromHostsPerLocality<HealthyHostVector>(healthy_hosts_per_locality),
             healthy_hosts_per_locality),
-        locality_weights, {}, {}, hosts->size(), absl::nullopt);
+        locality_weights, {}, {}, absl::nullopt);
   };
 
   const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {
@@ -2503,7 +2498,7 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
 TEST(OverProvisioningFactorTest, LocalityPickChanges) {
   auto setUpHostSetWithOPFAndTestPicks = [](const uint32_t overprovisioning_factor,
                                             const uint32_t pick_0, const uint32_t pick_1) {
-    HostSetImpl host_set(0, 0, overprovisioning_factor);
+    HostSetImpl host_set(0, overprovisioning_factor);
     std::shared_ptr<MockClusterInfo> cluster_info{new NiceMock<MockClusterInfo>()};
     HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80"),
                      makeTestHost(cluster_info, "tcp://127.0.0.1:81"),
@@ -2519,7 +2514,7 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
     host_set.updateHosts(HostSetImpl::updateHostsParams(std::make_shared<const HostVector>(hosts),
                                                         hosts_per_locality, healthy_hosts,
                                                         healthy_hosts_per_locality),
-                         locality_weights, {}, {}, hosts.size(), absl::nullopt);
+                         locality_weights, {}, {}, absl::nullopt);
     uint32_t cnts[] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
       absl::optional<uint32_t> locality_index = host_set.chooseHealthyLocality();

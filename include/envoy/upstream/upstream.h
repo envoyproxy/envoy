@@ -201,12 +201,14 @@ typedef std::shared_ptr<const Host> HostConstSharedPtr;
 typedef std::vector<HostSharedPtr> HostVector;
 typedef Phantom<HostVector, Healthy> HealthyHostVector;
 typedef Phantom<HostVector, Degraded> DegradedHostVector;
+typedef Phantom<HostVector, Warmed> WarmedHostVector;
 typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
 
 typedef std::shared_ptr<const HealthyHostVector> HealthyHostVectorConstSharedPtr;
 typedef std::shared_ptr<const DegradedHostVector> DegradedHostVectorConstSharedPtr;
+typedef std::shared_ptr<const WarmedHostVector> WarmedHostVectorConstSharedPtr;
 
 typedef std::unique_ptr<HostVector> HostListPtr;
 typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
@@ -289,6 +291,11 @@ public:
    */
   virtual const HostVector& degradedHosts() const PURE;
 
+  /*
+   * @return all warmed hosts contained in the set at the current time.
+   * */
+  virtual const HostVector& warmedHosts() const PURE;
+
   /**
    * @return hosts per locality.
    */
@@ -335,13 +342,6 @@ public:
    * @return uint32_t the overprovisioning factor of this host set.
    */
   virtual uint32_t overprovisioningFactor() const PURE;
-
-  /**
-   * @return uint32_t the number of warmed hosts in this host set. A host is considered warming
-   * if active health checking is enabled and the host has yet to be health checked for the first
-   * time.
-   */
-  virtual uint32_t warmedHostCount() const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;
@@ -394,6 +394,7 @@ public:
     HostVectorConstSharedPtr hosts;
     HealthyHostVectorConstSharedPtr healthy_hosts;
     DegradedHostVectorConstSharedPtr degraded_hosts;
+    WarmedHostVectorConstSharedPtr warmed_hosts;
     HostsPerLocalityConstSharedPtr hosts_per_locality;
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
@@ -413,7 +414,6 @@ public:
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
-                           uint32_t warmed_host_count,
                            absl::optional<uint32_t> overprovisioning_factor) PURE;
 
   /**
@@ -435,7 +435,6 @@ public:
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
-                             uint32_t warmed_host_count,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 

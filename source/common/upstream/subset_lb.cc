@@ -551,6 +551,14 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
+  auto warmed_hosts = std::make_shared<WarmedHostVector>();
+  warmed_hosts->get().reserve(original_host_set_.degradedHosts().size());
+  for (const auto& host : original_host_set_.warmedHosts()) {
+    if (cached_predicate(*host)) {
+      degraded_hosts->get().emplace_back(host);
+    }
+  }
+
   // If we only have one locality we can avoid the first call to filter() by
   // just creating a new HostsPerLocality from the list of all hosts.
   //
@@ -589,15 +597,12 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
-  // TODO(snowp): Right now we just pass hosts->size(), really this need to be filtering down the
-  // list of warmed hosts provided by the original_host_set_. We cannot compute the list of warmed
-  // hosts directly as subset updates happen on the worker threads.
-  HostSetImpl::updateHosts(
-      HostSetImpl::updateHostsParams(hosts, hosts_per_locality, healthy_hosts,
-                                     healthy_hosts_per_locality, degraded_hosts,
-                                     degraded_hosts_per_locality, warmed_hosts_per_locality),
-      determineLocalityWeights(*hosts_per_locality), filtered_added, filtered_removed,
-      hosts->size(), absl::nullopt);
+  HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
+                               hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
+                               degraded_hosts, degraded_hosts_per_locality, warmed_hosts,
+                               warmed_hosts_per_locality),
+                           determineLocalityWeights(*hosts_per_locality), filtered_added,
+                           filtered_removed, absl::nullopt);
 }
 
 LocalityWeightsConstSharedPtr SubsetLoadBalancer::HostSubsetImpl::determineLocalityWeights(

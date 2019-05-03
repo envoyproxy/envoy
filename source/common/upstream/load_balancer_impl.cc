@@ -136,7 +136,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // by the overprovisioning factor.
   HostSet& host_set = *priority_set.hostSetsPerPriority()[priority];
   per_priority_health.get()[priority] = 0;
-  if (!host_set.hosts().empty() && host_set.warmedHostCount() > 0) {
+  if (!host_set.warmedHosts().empty()) {
     // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
     // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
     // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
@@ -144,12 +144,12 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     // capped at 100%).
     per_priority_health.get()[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
-                                 host_set.healthyHosts().size() / host_set.warmedHostCount()));
+                                 host_set.healthyHosts().size() / host_set.warmedHosts().size()));
 
     // We perform the same computation for degraded hosts.
     per_priority_degraded.get()[priority] =
         std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
-                                 host_set.degradedHosts().size() / host_set.warmedHostCount()));
+                                 host_set.degradedHosts().size() / host_set.warmedHosts().size()));
   }
 
   // Now that we've updated health for the changed priority level, we need to calculate percentage
@@ -442,15 +442,14 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
 bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
   uint64_t global_panic_threshold = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
-  double healthy_percent =
-      host_set.warmedHostCount() == 0
-          ? 0
-          : 100.0 * host_set.healthyHosts().size() / host_set.warmedHostCount();
+  double healthy_percent = host_set.warmedHosts().empty() ? 0
+                                                          : 100.0 * host_set.healthyHosts().size() /
+                                                                host_set.warmedHosts().size();
 
   double degraded_percent =
-      host_set.warmedHostCount() == 0
+      host_set.warmedHosts().empty()
           ? 0
-          : 100.0 * host_set.degradedHosts().size() / host_set.warmedHostCount();
+          : 100.0 * host_set.degradedHosts().size() / host_set.warmedHosts().size();
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
   if ((healthy_percent + degraded_percent) < global_panic_threshold) {
     return true;

@@ -153,7 +153,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   new_hosts->emplace_back(host);
   priority_set_.updateHosts(0,
                             HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
-                            {}, {std::move(host)}, {}, new_hosts->size(), absl::nullopt);
+                            {}, {std::move(host)}, {}, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {
@@ -180,7 +180,7 @@ void OriginalDstCluster::cleanup() {
   if (!to_be_removed.empty()) {
     priority_set_.updateHosts(0,
                               HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
-                              {}, {}, to_be_removed, new_hosts->size(), absl::nullopt);
+                              {}, {}, to_be_removed, absl::nullopt);
   }
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
