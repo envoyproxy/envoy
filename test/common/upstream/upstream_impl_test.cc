@@ -2310,7 +2310,7 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   EXPECT_FALSE(host_set_.chooseHealthyLocality().has_value());
 }
 
-// When a locality has endpoints that have not yet been warmed, weigth calculation should ignore
+// When a locality has endpoints that have not yet been warmed, weight calculation should ignore
 // these hosts.
 TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
   ON_CALL(*info_, warmHosts()).WillByDefault(Return(true));

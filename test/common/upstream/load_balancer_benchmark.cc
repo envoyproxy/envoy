@@ -33,7 +33,7 @@ public:
         HostSetImpl::updateHostsParams(updated_hosts, nullptr,
                                        std::make_shared<const HealthyHostVector>(*updated_hosts),
                                        nullptr),
-        {}, hosts, {}, absl::nullopt);
+        {}, hosts, {}, hosts.size(), absl::nullopt);
   }
 
   PrioritySetImpl priority_set_;
