@@ -388,9 +388,8 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
               port_value: 8000
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      setupFromV2Yaml(custom_resolver_yaml), EnvoyException,
-      "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+  EXPECT_THROW_WITH_MESSAGE(setupFromV2Yaml(custom_resolver_yaml), EnvoyException,
+                            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 }
 
 TEST_F(LogicalDnsClusterTest, Basic) {
