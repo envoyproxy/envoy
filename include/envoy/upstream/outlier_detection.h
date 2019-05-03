@@ -42,6 +42,9 @@ enum class Result {
  */
 class DetectorHostMonitor {
 public:
+  // Types of Success Rate monitors.
+  using SuccessRateMonitorType = enum { externalOrigin, localOrigin };
+
   virtual ~DetectorHostMonitor() {}
 
   /**
@@ -90,7 +93,7 @@ public:
    *         -1 means that the host did not have enough request volume to calculate success rate
    *         or the cluster did not have enough hosts to run through success rate outlier ejection.
    */
-  virtual double successRate(envoy::data::cluster::v2alpha::OutlierEjectionType) const PURE;
+  virtual double successRate(SuccessRateMonitorType) const PURE;
 };
 
 typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
@@ -120,7 +123,7 @@ public:
    * @return the average success rate, or -1 if there were not enough hosts with enough request
    *         volume to proceed with success rate based outlier ejection.
    */
-  virtual double successRateAverage(envoy::data::cluster::v2alpha::OutlierEjectionType) const PURE;
+  virtual double successRateAverage(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
 
   /**
    * Returns the success rate threshold used in the last interval. The threshold is used to eject
@@ -129,7 +132,7 @@ public:
    *         proceed with success rate based outlier ejection.
    */
   virtual double
-      successRateEjectionThreshold(envoy::data::cluster::v2alpha::OutlierEjectionType) const PURE;
+      successRateEjectionThreshold(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
 };
 
 typedef std::shared_ptr<Detector> DetectorSharedPtr;

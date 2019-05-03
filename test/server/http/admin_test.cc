@@ -1035,12 +1035,10 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
   ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));
   ON_CALL(outlier_detector,
-          successRateEjectionThreshold(
-              envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN))
+          successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::externalOrigin))
       .WillByDefault(Return(6.0));
   ON_CALL(outlier_detector,
-          successRateEjectionThreshold(
-              envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN))
+          successRateEjectionThreshold(Upstream::Outlier::DetectorHostMonitor::localOrigin))
       .WillByDefault(Return(9.0));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
@@ -1080,14 +1078,11 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH))
       .WillByDefault(Return(true));
 
-  ON_CALL(
-      host->outlier_detector_,
-      successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN))
+  ON_CALL(host->outlier_detector_,
+          successRate(Upstream::Outlier::DetectorHostMonitor::externalOrigin))
       .WillByDefault(Return(43.2));
   ON_CALL(*host, weight()).WillByDefault(Return(5));
-  ON_CALL(
-      host->outlier_detector_,
-      successRate(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN))
+  ON_CALL(host->outlier_detector_, successRate(Upstream::Outlier::DetectorHostMonitor::localOrigin))
       .WillByDefault(Return(93.2));
 
   Buffer::OwnedImpl response;

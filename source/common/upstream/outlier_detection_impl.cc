@@ -37,14 +37,10 @@ DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> d
                                                  HostSharedPtr host)
     : detector_(detector), host_(host) {
   // add Success Rate monitors
-  success_rate_monitors_
-      [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN] =
-          std::make_unique<SuccessRateMonitor>(
-              envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN);
-  success_rate_monitors_
-      [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN] =
-          std::make_unique<SuccessRateMonitor>(
-              envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN);
+  success_rate_monitors_[externalOrigin] = std::make_unique<SuccessRateMonitor>(
+      envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN);
+  success_rate_monitors_[localOrigin] = std::make_unique<SuccessRateMonitor>(
+      envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN);
 
   // Setup method to call when putResult is invoked. Depending on the config's
   // split_external_local_origin_errors_ boolean value different method is called.
@@ -65,15 +61,12 @@ void DetectorHostMonitorImpl::uneject(MonotonicTime unejection_time) {
 }
 
 void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
-  getSRMonitor<envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN>()
-      ->updateCurrentSuccessRateBucket();
-  getSRMonitor<envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN>()
-      ->updateCurrentSuccessRateBucket();
+  getSRMonitor<DetectorHostMonitor::externalOrigin>()->updateCurrentSuccessRateBucket();
+  getSRMonitor<DetectorHostMonitor::localOrigin>()->updateCurrentSuccessRateBucket();
 }
 
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
-  getSRMonitor<envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN>()
-      ->incTotalReqCounter();
+  getSRMonitor<DetectorHostMonitor::externalOrigin>()->incTotalReqCounter();
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
@@ -96,8 +89,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
-    getSRMonitor<envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN>()
-        ->incSuccessReqCounter();
+    getSRMonitor<DetectorHostMonitor::externalOrigin>()->incSuccessReqCounter();
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
@@ -186,8 +178,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
     // It's possible for the cluster/detector to go away while we still have a host in use.
     return;
   }
-  getSRMonitor<envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN>()
-      ->incTotalReqCounter();
+  getSRMonitor<localOrigin>()->incTotalReqCounter();
   if (++consecutive_local_origin_failure_ ==
       detector->runtime().snapshot().getInteger(
           "outlier_detection.consecutive_local_origin_failure",
@@ -203,10 +194,8 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
     return;
   }
 
-  getSRMonitor<envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN>()
-      ->incTotalReqCounter();
-  getSRMonitor<envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN>()
-      ->incSuccessReqCounter();
+  getSRMonitor<localOrigin>()->incTotalReqCounter();
+  getSRMonitor<localOrigin>()->incSuccessReqCounter();
 
   resetConsecutiveLocalOriginFailure();
 }
@@ -251,10 +240,8 @@ DetectorImpl::DetectorImpl(const Cluster& cluster,
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger) {
   // Insert success rate initial numbers for each type of SR detector
-  success_rate_nums_
-      [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN] = {-1, -1};
-  success_rate_nums_
-      [envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN] = {-1, -1};
+  success_rate_nums_[DetectorHostMonitor::externalOrigin] = {-1, -1};
+  success_rate_nums_[DetectorHostMonitor::localOrigin] = {-1, -1};
 }
 
 DetectorImpl::~DetectorImpl() {
@@ -558,7 +545,7 @@ DetectorImpl::EjectionPair DetectorImpl::successRateEjectionThreshold(
 }
 
 void DetectorImpl::processSuccessRateEjections(
-    envoy::data::cluster::v2alpha::OutlierEjectionType monitor_type) {
+    DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
   uint64_t success_rate_minimum_hosts = runtime_.snapshot().getInteger(
       "outlier_detection.success_rate_minimum_hosts", config_.successRateMinimumHosts());
   uint64_t success_rate_request_volume = runtime_.snapshot().getInteger(
@@ -627,16 +614,12 @@ void DetectorImpl::onIntervalTimer() {
     host.second->updateCurrentSuccessRateBucket();
     // Refresh host success rate stat for the /clusters endpoint. If there is a new valid value, it
     // will get updated in processSuccessRateEjections().
-    host.second->successRate(
-        envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN, -1);
-    host.second->successRate(
-        envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN, -1);
+    host.second->successRate(DetectorHostMonitor::localOrigin, -1);
+    host.second->successRate(DetectorHostMonitor::externalOrigin, -1);
   }
 
-  processSuccessRateEjections(
-      envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN);
-  processSuccessRateEjections(
-      envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN);
+  processSuccessRateEjections(DetectorHostMonitor::externalOrigin);
+  processSuccessRateEjections(DetectorHostMonitor::localOrigin);
 
   armIntervalTimer();
 }
@@ -662,12 +645,16 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
 
   if ((type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN) ||
       (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN)) {
+    const DetectorHostMonitor::SuccessRateMonitorType monitor_type =
+        (type == envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN)
+            ? DetectorHostMonitor::externalOrigin
+            : DetectorHostMonitor::localOrigin;
     event.mutable_eject_success_rate_event()->set_cluster_average_success_rate(
-        detector.successRateAverage(type));
+        detector.successRateAverage(monitor_type));
     event.mutable_eject_success_rate_event()->set_cluster_success_rate_ejection_threshold(
-        detector.successRateEjectionThreshold(type));
+        detector.successRateEjectionThreshold(monitor_type));
     event.mutable_eject_success_rate_event()->set_host_success_rate(
-        host->outlierDetector().successRate(type));
+        host->outlierDetector().successRate(monitor_type));
   } else {
     event.mutable_eject_consecutive_event();
   }

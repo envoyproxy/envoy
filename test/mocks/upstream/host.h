@@ -27,9 +27,9 @@ public:
   MOCK_METHOD1(putResponseTime, void(std::chrono::milliseconds time));
   MOCK_METHOD0(lastEjectionTime, const absl::optional<MonotonicTime>&());
   MOCK_METHOD0(lastUnejectionTime, const absl::optional<MonotonicTime>&());
-  MOCK_CONST_METHOD1(successRate, double(envoy::data::cluster::v2alpha::OutlierEjectionType type));
-  MOCK_METHOD2(successRate, void(envoy::data::cluster::v2alpha::OutlierEjectionType type,
-                                 double new_success_rate));
+  MOCK_CONST_METHOD1(successRate, double(DetectorHostMonitor::SuccessRateMonitorType type));
+  MOCK_METHOD2(successRate,
+               void(DetectorHostMonitor::SuccessRateMonitorType type, double new_success_rate));
 };
 
 class MockEventLogger : public EventLogger {
@@ -55,10 +55,9 @@ public:
   }
 
   MOCK_METHOD1(addChangedStateCb, void(ChangeStateCb cb));
-  MOCK_CONST_METHOD1(successRateAverage,
-                     double(envoy::data::cluster::v2alpha::OutlierEjectionType));
+  MOCK_CONST_METHOD1(successRateAverage, double(DetectorHostMonitor::SuccessRateMonitorType));
   MOCK_CONST_METHOD1(successRateEjectionThreshold,
-                     double(envoy::data::cluster::v2alpha::OutlierEjectionType));
+                     double(DetectorHostMonitor::SuccessRateMonitorType));
 
   std::list<ChangeStateCb> callbacks_;
 };
