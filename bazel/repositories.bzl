@@ -479,7 +479,14 @@ def _com_google_absl():
     )
 
 def _com_google_protobuf():
-    _repository_impl("com_google_protobuf")
+    _repository_impl(
+        "com_google_protobuf",
+        # The patch is only needed until
+        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
+        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:protobuf.patch"],
+    )
 
     # Needed for cc_proto_library, Bazel doesn't support aliases today for repos,
     # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
@@ -487,6 +494,11 @@ def _com_google_protobuf():
     _repository_impl(
         "com_google_protobuf_cc",
         repository_key = "com_google_protobuf",
+        # The patch is only needed until
+        # https://github.com/protocolbuffers/protobuf/pull/5901 is available.
+        # TODO(htuch): remove this when > protobuf 3.7.1 is released.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:protobuf.patch"],
     )
     native.bind(
         name = "protobuf",

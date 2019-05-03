@@ -3,7 +3,6 @@
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/json/json_object.h"
-#include "envoy/stats/stats_options.h"
 
 namespace Envoy {
 namespace Config {
@@ -16,8 +15,7 @@ public:
    * @param listener destination v2 envoy::api::v2::Listener.
    */
   static void translateListener(const Json::Object& json_listener,
-                                envoy::api::v2::Listener& listener,
-                                const Stats::StatsOptions& stats_options);
+                                envoy::api::v2::Listener& listener);
 };
 
 } // namespace Config
