@@ -199,12 +199,25 @@ could be in the form of the following:
 To be eligible for the cncf-envoy-distributors-announce mailing list, your
 distribution should:
 
-1. Be an actively maintained distribution of Envoy components OR offer Envoy as a publicly
-   available service in which the product clearly states that it is built on top of Envoy. E.g.,
-   "SuperAwesomeLinuxDistro" which offers Envoy pre-built packages OR
-   "SuperAwesomeCloudProvider's Envoy as a Service (EaaS)". A cloud service that uses Envoy for a
-   product but does not publicly say they are using Envoy does not qualify.
-2. Have a user base not limited to your own organization.
+1. Be either:
+   1. An actively maintained distribution of Envoy components. An example is
+      "SuperAwesomeLinuxDistro" which offers Envoy pre-built packages. Another
+      example is "SuperAwesomeServiceMesh" which offers a service mesh product
+      that includes Envoy as a component.
+
+   OR
+
+   2. Offer Envoy as a publicly available infrastructure or platform service, in
+      which the product clearly states (e.g. public documentation, blog posts,
+      marketing copy, etc.) that it is built on top of Envoy. E.g.,
+      "SuperAwesomeCloudProvider's Envoy as a Service (EaaS)". An infrastructure
+      service that uses Envoy for a product but does not publicly say they are
+      using Envoy does not qualify. This is essentially IaaS or PaaS, if you use
+      Envoy to support a SaaS, e.g. "SuperAwesomeCatVideoService", this does not
+      qualify.
+2. Have a user or customer base not limited to your own organization. We will use the size
+   of the user or customer base as part of the criteria to determine
+   eligibility.
 3. Have a publicly verifiable track record up to present day of fixing security
    issues.
 4. Not be a downstream or rebuild of another distribution.
@@ -217,6 +230,11 @@ distribution should:
    patch availability.
 9. Have someone already on the list vouch for the person requesting membership
    on behalf of your distribution.
+
+Note that Envoy maintainers are members of the Envoy security team. [Members of the Envoy security
+team](OWNERS.md#envoy-security-team) and the organizations that they represents are implicitly
+included in the private distributor list. These organizations do not need to meet the above list of
+criteria with the exception of the acceptance of the embargo policy.
 
 ### Requesting to Join
 
@@ -239,10 +257,13 @@ Below are each criterion and why I think we, Seven-Corp, qualify.
 We distribute the "Seven" distribution of Envoy [link]. We have been doing
 this since 1999 before proxies were even cool.
 
-> 2. Have a user base not limited to your own organization.
+> 2. Have a user or customer base not limited to your own organization. Please specify an
+>    approximate size of your user or customer base, including the number of
+>    production deployments.
 
 Our user base spans of the extensive "Seven" community. We have a slack and
-GitHub repos and mailing lists where the community hangs out. [links]
+GitHub repos and mailing lists where the community hangs out. We have ~2000
+customers, of which approximately 400 are using Seven in production. [links]
 
 > 3. Have a publicly verifiable track record up to present day of fixing security
      issues.
