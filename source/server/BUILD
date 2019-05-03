@@ -107,11 +107,22 @@ envoy_cc_library(
     ],
 )
 
+cc_proto_library(
+    name = "hot_restart_cc",
+    deps = [":hot_restart_proto"],
+)
+
+proto_library(
+    name = "hot_restart_proto",
+    srcs = ["hot_restart.proto"],
+)
+
 envoy_cc_library(
-    name = "hot_restart_lib",
-    srcs = envoy_select_hot_restart(["hot_restart_impl.cc"]),
-    hdrs = envoy_select_hot_restart(["hot_restart_impl.h"]),
+    name = "hot_restarting_base",
+    srcs = envoy_select_hot_restart(["hot_restarting_base.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restarting_base.h"]),
     deps = [
+        ":hot_restart_cc",
         "//include/envoy/api:os_sys_calls_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:file_event_interface",
@@ -120,11 +131,47 @@ envoy_cc_library(
         "//include/envoy/server:options_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
-        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:raw_stat_data_lib",
-        "//source/common/stats:stats_options_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "hot_restarting_child",
+    srcs = envoy_select_hot_restart(["hot_restarting_child.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restarting_child.h"]),
+    deps = [
+        ":hot_restarting_base",
+        "//source/common/stats:stat_merger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "hot_restarting_parent",
+    srcs = envoy_select_hot_restart(["hot_restarting_parent.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restarting_parent.h"]),
+    deps = [
+        ":hot_restarting_base",
+        "//source/common/memory:stats_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "hot_restart_lib",
+    srcs = envoy_select_hot_restart(["hot_restart_impl.cc"]),
+    hdrs = envoy_select_hot_restart(["hot_restart_impl.h"]),
+    deps = [
+        ":hot_restarting_child",
+        ":hot_restarting_parent",
+        "//include/envoy/api:os_sys_calls_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:file_event_interface",
+        "//include/envoy/server:hot_restart_interface",
+        "//include/envoy/server:instance_interface",
+        "//include/envoy/server:options_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/stats:heap_stat_data_lib",
     ],
 )
 

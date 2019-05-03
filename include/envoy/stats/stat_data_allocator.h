@@ -23,6 +23,7 @@ namespace Stats {
  * be created utilizing a single fixed-size block suitable for
  * shared-memory, or in the heap, allowing for pointers and sharing of
  * substrings, with an opportunity for reduced memory consumption.
+ * TODO(fredlas) this interface can be deleted now that the shared memory version is gone.
  */
 class StatDataAllocator {
 public:
@@ -47,11 +48,6 @@ public:
    */
   virtual GaugeSharedPtr makeGauge(StatName name, absl::string_view tag_extracted_name,
                                    const std::vector<Tag>& tags) PURE;
-
-  /**
-   * Determines whether this stats allocator requires bounded stat-name size.
-   */
-  virtual bool requiresBoundedStatNameSize() const PURE;
 
   virtual const SymbolTable& symbolTable() const PURE;
   virtual SymbolTable& symbolTable() PURE;

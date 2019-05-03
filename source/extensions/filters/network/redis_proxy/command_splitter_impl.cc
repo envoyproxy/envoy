@@ -160,7 +160,7 @@ SplitRequestPtr SimpleRequest::create(Common::Multiplexing::Router& router,
   }
 
   request_ptr->incoming_request_ = std::move(incoming_request);
-  return std::move(request_ptr);
+  return request_ptr;
 }
 
 SplitRequestPtr EvalRequest::create(Common::Multiplexing::Router& router,
@@ -192,7 +192,7 @@ SplitRequestPtr EvalRequest::create(Common::Multiplexing::Router& router,
   }
 
   request_ptr->incoming_request_ = std::move(incoming_request);
-  return std::move(request_ptr);
+  return request_ptr;
 }
 
 FragmentedRequest::~FragmentedRequest() {
@@ -259,7 +259,7 @@ SplitRequestPtr MGETRequest::create(Common::Multiplexing::Router& router,
 
   if (request_ptr->num_pending_responses_ > 0) {
     request_ptr->incoming_request_ = std::move(incoming_request);
-    return std::move(request_ptr);
+    return request_ptr;
   }
 
   return nullptr;
@@ -393,7 +393,7 @@ SplitRequestPtr MSETRequest::create(Common::Multiplexing::Router& router,
 
   if (request_ptr->num_pending_responses_ > 0) {
     request_ptr->incoming_request_ = std::move(incoming_request);
-    return std::move(request_ptr);
+    return request_ptr;
   }
 
   return nullptr;
@@ -487,7 +487,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Common::Multiplexing::Router& 
 
   if (request_ptr->num_pending_responses_ > 0) {
     request_ptr->incoming_request_ = std::move(incoming_request);
-    return std::move(request_ptr);
+    return request_ptr;
   }
 
   return nullptr;
