@@ -2,11 +2,7 @@
 
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/heap_stat_data.h"
-<<<<<<< HEAD
-#include "common/stats/stats_options_impl.h"
 #include "common/stats/symbol_table_impl.h"
-=======
->>>>>>> master
 
 #include "test/test_common/logging.h"
 

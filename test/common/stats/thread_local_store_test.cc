@@ -166,14 +166,7 @@ public:
     }
   }
 
-<<<<<<< HEAD
-  MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
-  MOCK_METHOD1(free, void(RawStatData& data));
-
   SymbolTableImpl symbol_table_;
-=======
-  FakeSymbolTableImpl symbol_table_;
->>>>>>> master
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   HeapStatDataAllocator alloc_;
@@ -386,18 +379,16 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
 class LookupWithStatNameTest : public testing::Test {
 public:
-  LookupWithStatNameTest() : alloc_(symbol_table_), store_(alloc_) {}
+  LookupWithStatNameTest()
+      : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)) {}
   ~LookupWithStatNameTest() override {
-    store_.shutdownThreading();
-    clearStorage();
-  }
-
-  void clearStorage() {
+    store_->shutdownThreading();
     for (auto& stat_name_storage : stat_name_storage_) {
-      stat_name_storage.free(store_.symbolTable());
+      stat_name_storage.free(store_->symbolTable());
     }
     stat_name_storage_.clear();
-    EXPECT_EQ(0, store_.symbolTable().numSymbols());
+    store_.reset();
+    EXPECT_EQ(0, symbol_table_.numSymbols());
   }
 
   StatName makeStatName(absl::string_view name) {
@@ -406,18 +397,18 @@ public:
   }
 
   StatNameStorage makeStatStorage(absl::string_view name) {
-    return StatNameStorage(name, store_.symbolTable());
+    return StatNameStorage(name, symbol_table_);
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   HeapStatDataAllocator alloc_;
-  ThreadLocalStoreImpl store_;
+  std::unique_ptr<ThreadLocalStoreImpl> store_;
   std::vector<StatNameStorage> stat_name_storage_;
 };
 
 TEST_F(LookupWithStatNameTest, All) {
-  ScopePtr scope1 = store_.createScope("scope1.");
-  Counter& c1 = store_.counterFromStatName(makeStatName("c1"));
+  ScopePtr scope1 = store_->createScope("scope1.");
+  Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -426,7 +417,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"));
+  Gauge& g1 = store_->gaugeFromStatName(makeStatName("g1"));
   Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"));
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -435,7 +426,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g1.tags().size());
 
-  Histogram& h1 = store_.histogramFromStatName(makeStatName("h1"));
+  Histogram& h1 = store_->histogramFromStatName(makeStatName("h1"));
   Histogram& h2 = scope1->histogramFromStatName(makeStatName("h2"));
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
@@ -454,8 +445,8 @@ TEST_F(LookupWithStatNameTest, All) {
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
 
-  EXPECT_EQ(4UL, store_.counters().size());
-  EXPECT_EQ(2UL, store_.gauges().size());
+  EXPECT_EQ(4UL, store_->counters().size());
+  EXPECT_EQ(2UL, store_->gauges().size());
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
@@ -696,7 +687,7 @@ public:
     };
   }
 
-  Stats::FakeSymbolTableImpl symbol_table_;
+  Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   HeapStatDataAllocator heap_alloc_;
@@ -793,7 +784,7 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   }
 
   MockSink sink;
-  Stats::FakeSymbolTableImpl symbol_table;
+  Stats::SymbolTableImpl symbol_table;
   HeapStatDataAllocator alloc(symbol_table);
   auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
   store->addSink(sink);
@@ -811,11 +802,8 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
       1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-<<<<<<< HEAD
-  EXPECT_LT(end_mem - start_mem, 13 * million); // actual value: 12443472 as of Nov 7, 2018
-=======
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 20 * million); // actual value: 19601552 as of March 14, 2019
+  EXPECT_LT(end_mem - start_mem, 13 * million); // actual value: 12443472 as of Nov 7, 2018
 
   // HACK: doesn't like shutting down without threading having started.
   NiceMock<Event::MockDispatcher> main_thread_dispatcher;
@@ -823,14 +811,13 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTls) {
   store->initializeThreading(main_thread_dispatcher, tls);
   store->shutdownThreading();
   tls.shutdownThread();
->>>>>>> master
 }
 
 TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
   if (!TestUtil::hasDeterministicMallocStats()) {
     return;
   }
-  Stats::FakeSymbolTableImpl symbol_table;
+  Stats::SymbolTableImpl symbol_table;
   HeapStatDataAllocator alloc(symbol_table);
   auto store = std::make_unique<ThreadLocalStoreImpl>(alloc);
 
@@ -850,14 +837,10 @@ TEST(StatsThreadLocalStoreTestNoFixture, MemoryWithTls) {
       1000, [&store](absl::string_view name) { store->counter(std::string(name)); });
   const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
   EXPECT_LT(start_mem, end_mem);
-<<<<<<< HEAD
-  EXPECT_LT(end_mem - start_mem, 16 * million); // actual value: 15722832 as of Nov 7, 2018
-=======
   const size_t million = 1000 * 1000;
-  EXPECT_LT(end_mem - start_mem, 23 * million); // actual value: 22880912 as of March 14, 2019
+  EXPECT_LT(end_mem - start_mem, 16 * million); // actual value: 15722832 as of Nov 7, 2018
   store->shutdownThreading();
   tls.shutdownThread();
->>>>>>> master
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -902,7 +885,7 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
 }
 
 TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
-  Stats::FakeSymbolTableImpl symbol_table;
+  Stats::SymbolTableImpl symbol_table;
   Api::ApiPtr api = Api::createApiForTest();
   Event::DispatcherPtr dispatcher = api->allocateDispatcher();
   NiceMock<ThreadLocal::MockInstance> tls;
@@ -1083,62 +1066,5 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   }
 }
 
-<<<<<<< HEAD
-class TruncatingAllocTest : public HeapStatsThreadLocalStoreTest {
-protected:
-  TruncatingAllocTest()
-      : test_alloc_(options_, symbol_table_), long_name_(options_.maxNameLength() + 1, 'A') {}
-
-  void SetUp() override {
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, test_alloc_);
-    // Do not call superclass SetUp.
-  }
-
-  SymbolTableImpl symbol_table_;
-  TestAllocator test_alloc_;
-  std::string long_name_;
-};
-
-TEST_F(TruncatingAllocTest, CounterNotTruncated) {
-  EXPECT_NO_LOGS({
-    Counter& counter = store_->counter("simple");
-    EXPECT_EQ(&counter, &store_->counter("simple"));
-  });
-}
-
-TEST_F(TruncatingAllocTest, GaugeNotTruncated) {
-  EXPECT_NO_LOGS({
-    Gauge& gauge = store_->gauge("simple");
-    EXPECT_EQ(&gauge, &store_->gauge("simple"));
-  });
-}
-
-TEST_F(TruncatingAllocTest, CounterTruncated) {
-  Counter* counter = nullptr;
-  EXPECT_LOG_CONTAINS("warning", "is too long with", {
-    Counter& c = store_->counter(long_name_);
-    counter = &c;
-  });
-  EXPECT_NO_LOGS(EXPECT_EQ(counter, &store_->counter(long_name_)));
-}
-
-TEST_F(TruncatingAllocTest, GaugeTruncated) {
-  Gauge* gauge = nullptr;
-  EXPECT_LOG_CONTAINS("warning", "is too long with", {
-    Gauge& g = store_->gauge(long_name_);
-    gauge = &g;
-  });
-  EXPECT_NO_LOGS(EXPECT_EQ(gauge, &store_->gauge(long_name_)));
-}
-
-TEST_F(TruncatingAllocTest, HistogramWithLongNameNotTruncated) {
-  EXPECT_NO_LOGS({
-    Histogram& histogram = store_->histogram(long_name_);
-    EXPECT_EQ(&histogram, &store_->histogram(long_name_));
-  });
-}
-
-=======
->>>>>>> master
 } // namespace Stats
 } // namespace Envoy
