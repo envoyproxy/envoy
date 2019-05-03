@@ -7,7 +7,7 @@
 #include "common/upstream/health_checker_base_impl.h"
 
 #include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "extensions/filters/network/common/multiplexing/conn_pool_impl.h"
 
 namespace Envoy {
 namespace Extensions {
