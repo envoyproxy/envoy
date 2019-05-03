@@ -164,6 +164,11 @@ issue fixed for your respective distribution's users.
 Before any information from the list is shared with respective members of your team required to fix
 said issue, they must agree to the same terms and only find out information on a need-to-know basis.
 
+The embargo applies to information shared, source code and binary images. **It is a violation of the
+embargo policy to share binary distributions of the security fixes before the public release date.**
+This includes, but is not limited to, Envoy binaries and Docker images. It is expected that
+distributors have a method to stage and validate new binaries without exposing them publicly.
+
 In the unfortunate event you share the information beyond what is allowed by this policy, you _must_
 urgently inform the envoy-security@googlegroups.com mailing list of exactly what information leaked
 and to whom. A retrospective will take place after the leak so we can assess how to prevent making the
@@ -204,7 +209,9 @@ distribution should:
    issues.
 4. Not be a downstream or rebuild of another distribution.
 5. Be a participant and active contributor in the community.
-6. Accept the [Embargo Policy](#embargo-policy) that is outlined above.
+6. Accept the [Embargo Policy](#embargo-policy) that is outlined above. You must
+   have a way to privately stage and validate your updates that does not violate
+   the embargo.
 7. Be willing to [contribute back](#contributing-back) as outlined above.
 8. Be able to perform a security release of your product within a two week window from candidate fix
    patch availability.
@@ -253,7 +260,9 @@ Our members, Acidburn, Cereal, and ZeroCool are outstanding members and are well
 known throughout the Envoy community. Especially for their contributions
 in hacking the Gibson.
 
-> 6. Accept the Embargo Policy that is outlined above.
+> 6. Accept the Embargo Policy that is outlined above. You must
+     have a way to privately stage and validate your updates that does not violate
+     the embargo.
 
 We accept.
 
