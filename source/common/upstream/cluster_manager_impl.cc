@@ -44,7 +44,7 @@ namespace {
 
 void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
                          const Network::Socket::OptionsSharedPtr& to_add) {
-  if (to_add) {
+  if (to_add != nullptr) {
     Network::Socket::appendOptions(options, to_add);
   }
 }
