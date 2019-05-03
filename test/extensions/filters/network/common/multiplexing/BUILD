@@ -19,10 +19,10 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/extensions/filters/network/common/redis:client_interface",
-        "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/multiplexing:conn_pool_interface",
         "//source/extensions/filters/network/common/multiplexing:router_interface",
+        "//source/extensions/filters/network/common/redis:client_interface",
+        "//source/extensions/filters/network/common/redis:codec_lib",
     ],
 )
 

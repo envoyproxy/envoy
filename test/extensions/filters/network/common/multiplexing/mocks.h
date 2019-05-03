@@ -4,10 +4,10 @@
 #include <list>
 #include <string>
 
-#include "extensions/filters/network/common/redis/client.h"
-#include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/common/multiplexing/conn_pool.h"
 #include "extensions/filters/network/common/multiplexing/router.h"
+#include "extensions/filters/network/common/redis/client.h"
+#include "extensions/filters/network/common/redis/codec_impl.h"
 
 #include "test/test_common/printers.h"
 

@@ -6,9 +6,9 @@
 
 #include "extensions/filters/network/common/multiplexing/conn_pool_impl.h"
 
+#include "test/extensions/filters/network/common/multiplexing/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
-#include "test/extensions/filters/network/common/multiplexing/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"

@@ -52,11 +52,11 @@ envoy_cc_library(
     srcs = ["router_impl.cc"],
     hdrs = ["router_impl.h"],
     deps = [
+        ":conn_pool_lib",
         ":router_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:to_lower_table_lib",
-        ":conn_pool_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )

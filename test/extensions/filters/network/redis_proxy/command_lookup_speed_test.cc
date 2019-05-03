@@ -9,10 +9,10 @@
 #include "common/common/fmt.h"
 #include "common/stats/isolated_store_impl.h"
 
+#include "extensions/filters/network/common/multiplexing/conn_pool.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/supported_commands.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
-#include "extensions/filters/network/common/multiplexing/conn_pool.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/simulated_time_system.h"
@@ -33,7 +33,9 @@ public:
 };
 
 class NullRouterImpl : public Common::Multiplexing::Router {
-  Common::Multiplexing::ConnPool::InstanceSharedPtr upstreamPool(std::string&) override { return nullptr; }
+  Common::Multiplexing::ConnPool::InstanceSharedPtr upstreamPool(std::string&) override {
+    return nullptr;
+  }
 };
 
 class CommandLookUpSpeedTest {
@@ -67,8 +69,8 @@ public:
   Common::Multiplexing::Router* router_{new NullRouterImpl()};
   Stats::IsolatedStoreImpl store_;
   Event::SimulatedTimeSystem time_system_;
-  CommandSplitter::InstanceImpl splitter_{Common::Multiplexing::RouterPtr{router_}, store_, "redis.foo.", time_system_,
-                                          false};
+  CommandSplitter::InstanceImpl splitter_{Common::Multiplexing::RouterPtr{router_}, store_,
+                                          "redis.foo.", time_system_, false};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };

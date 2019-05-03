@@ -21,9 +21,9 @@
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/filters/network/common/multiplexing/conn_pool.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
-#include "extensions/filters/network/common/multiplexing/conn_pool.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -3,8 +3,8 @@
 #include "extensions/filters/network/common/multiplexing/conn_pool_impl.h"
 #include "extensions/filters/network/common/multiplexing/router_impl.h"
 
-#include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/multiplexing/mocks.h"
+#include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
