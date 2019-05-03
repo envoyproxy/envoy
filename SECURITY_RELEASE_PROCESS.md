@@ -261,8 +261,8 @@ known throughout the Envoy community. Especially for their contributions
 in hacking the Gibson.
 
 > 6. Accept the Embargo Policy that is outlined above. You must
-   have a way to privately stage and validate your updates that does not violate
-   the embargo.
+     have a way to privately stage and validate your updates that does not violate
+     the embargo.
 
 We accept.
 
