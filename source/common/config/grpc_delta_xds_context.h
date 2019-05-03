@@ -59,8 +59,11 @@ public:
                       const RateLimitSettings& rate_limit_settings,
                       const LocalInfo::LocalInfo& local_info)
       : local_info_(local_info), dispatcher_(dispatcher),
-        grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                     rate_limit_settings) {}
+        grpc_stream_(TypedGrpcStreamUnion::makeDelta(
+            std::make_unique<GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
+                                        envoy::api::v2::DeltaDiscoveryResponse>>(
+                this, std::move(async_client), service_method, random, dispatcher, scope,
+                rate_limit_settings))) {}
 
   void addSubscription(const std::set<std::string>& resources, const std::string& type_url,
                        SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
@@ -149,10 +152,10 @@ public:
     return nullptr;
   }
 
-  GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>&
-  grpcStreamForTest() {
-    return grpc_stream_;
-  }
+  //   GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>&
+  //   grpcStreamForTest() {
+  //     return grpc_stream_;
+  //   }
 
 private:
   void trySendDiscoveryRequests() {
@@ -223,79 +226,84 @@ private:
   Event::Dispatcher& dispatcher_;
 
   /* NOTE NOTE TODO TODO: all of this is just to support the eventual sotw+delta merger.
-   * for current purposes, just sticking with this grpc_stream_ is fine:*/
+   * for current purposes, just sticking with this grpc_stream_ is fine:
   GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
-      grpc_stream_;
-
-  /*
+      grpc_stream_;*/
   // A horrid little class that provides polymorphism for these two protobuf types.
   class TypedGrpcStreamUnion {
+  public:
     static TypedGrpcStreamUnion
-  makeDelta(std::unique_ptr<GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
-  envoy::api::v2::DeltaDiscoveryResponse>>&& delta) { return TypedGrpcStreamUnion(std::move(delta));
-  }
+    makeDelta(std::unique_ptr<GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
+                                         envoy::api::v2::DeltaDiscoveryResponse>>&& delta) {
+      return TypedGrpcStreamUnion(std::move(delta));
+    }
 
     static TypedGrpcStreamUnion
-  makeSotw(std::unique_ptr<GrpcStream<envoy::api::v2::DiscoveryRequest,
-  envoy::api::v2::DiscoveryResponse>>&& sotw) { return TypedGrpcStreamUnion(std::move(sotw)); }
-
-  void establishStream() {
-    delta_stream_ ? delta_stream_->establishStream();
-                  : sotw_stream_->establishStream();
+    makeSotw(std::unique_ptr<GrpcStream<envoy::api::v2::DiscoveryRequest,
+                                        envoy::api::v2::DiscoveryResponse>>&& sotw) {
+      return TypedGrpcStreamUnion(std::move(sotw));
     }
 
-  bool grpcStreamAvailable() const {
-    return delta_stream_ ? delta_stream_->grpcStreamAvailable();
-                         : sotw_stream_->grpcStreamAvailable();
+    void establishStream() {
+      delta_stream_ ? delta_stream_->establishStream() : sotw_stream_->establishStream();
     }
 
-  void sendMessage(const plain_ol_untyped_Message& request) {
-    delta_stream_
-        ? delta_stream_->sendMessage(
-            static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(request);
-        : sotw_stream_->sendMessage(
-            static_cast<const envoy::api::v2::DiscoveryRequest&>(request);
-  }
-
-  void onReceiveMessage(std::unique_ptr<plain ol untyped Message>&& message) {
-    delta_stream_
-        ? delta_stream_->onReceiveMessage(
-            static_cast<std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&&>(message);
-        : sotw_stream_->onReceiveMessage(
-            static_cast<std::unique_ptr<envoy::api::v2::DiscoveryResponse>&&>(message);
-  }
-
-  void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-    delta_stream_ ? delta_stream_->onRemoteClose(status, message);
-                  : sotw_stream_->onRemoteClose(status, message);
+    bool grpcStreamAvailable() const {
+      return delta_stream_ ? delta_stream_->grpcStreamAvailable()
+                           : sotw_stream_->grpcStreamAvailable();
     }
 
-  void maybeUpdateQueueSizeStat(uint64_t size) {
-    delta_stream_ ? delta_stream_->maybeUpdateQueueSizeStat(size);
-                  : sotw_stream_->maybeUpdateQueueSizeStat(size);
+    void sendMessage(const Protobuf::Message& request) {
+      delta_stream_ ? delta_stream_->sendMessage(
+                          static_cast<const envoy::api::v2::DeltaDiscoveryRequest&>(request))
+                    : sotw_stream_->sendMessage(
+                          static_cast<const envoy::api::v2::DiscoveryRequest&>(request));
     }
 
-  bool checkRateLimitAllowsDrain() {
-    return delta_stream_ ? delta_stream_->checkRateLimitAllowsDrain();
-                         : sotw_stream_->checkRateLimitAllowsDrain();
+    /*  void onReceiveMessage(std::unique_ptr<Protobuf::Message>&& message) {
+        void* ew = reinterpret_cast<void*>(message.release());
+        delta_stream_
+            ? delta_stream_->onReceiveMessage(
+                std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>(
+                  reinterpret_cast<envoy::api::v2::DeltaDiscoveryResponse*>(ew)))
+            : sotw_stream_->onReceiveMessage(
+                std::unique_ptr<envoy::api::v2::DiscoveryResponse>(
+                  reinterpret_cast<envoy::api::v2::DiscoveryResponse*>(ew)));
+      }
+
+      void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
+        delta_stream_ ? delta_stream_->onRemoteClose(status, message)
+                      : sotw_stream_->onRemoteClose(status, message);
+        }*/
+
+    void maybeUpdateQueueSizeStat(uint64_t size) {
+      delta_stream_ ? delta_stream_->maybeUpdateQueueSizeStat(size)
+                    : sotw_stream_->maybeUpdateQueueSizeStat(size);
+    }
+
+    bool checkRateLimitAllowsDrain() {
+      return delta_stream_ ? delta_stream_->checkRateLimitAllowsDrain()
+                           : sotw_stream_->checkRateLimitAllowsDrain();
     }
 
   private:
-    explicit TypedGrpcStreamUnion(std::unique_ptr<GrpcStream<envoy::api::v2::DiscoveryRequest,
-  envoy::api::v2::DiscoveryResponse>>&& sotw) : delta_stream_(nullptr),
-  sotw_stream_(std::move(sotw)) {}
+    explicit TypedGrpcStreamUnion(
+        std::unique_ptr<
+            GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>&& sotw)
+        : delta_stream_(nullptr), sotw_stream_(std::move(sotw)) {}
 
-    explicit TypedGrpcStreamUnion(std::unique_ptr<GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
-  envoy::api::v2::DeltaDiscoveryResponse>>&& delta) : delta_stream_(std::move(delta)),
-  sotw_stream_(nullptr) {}
+    explicit TypedGrpcStreamUnion(
+        std::unique_ptr<GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
+                                   envoy::api::v2::DeltaDiscoveryResponse>>&& delta)
+        : delta_stream_(std::move(delta)), sotw_stream_(nullptr) {}
 
-    std::unique_ptr<GrpcStream<envoy::api::v2::DeltaDiscoveryRequest,
-  envoy::api::v2::DeltaDiscoveryResponse>> delta_stream_;
-      std::unique_ptr<GrpcStream<envoy::api::v2::DiscoveryRequest,
-  envoy::api::v2::DiscoveryResponse>> sotw_stream_;
+    std::unique_ptr<
+        GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>>
+        delta_stream_;
+    std::unique_ptr<GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>>
+        sotw_stream_;
   };
-
-      */
+  TypedGrpcStreamUnion grpc_stream_;
 
   // Resource (N)ACKs we're waiting to send, stored in the order that they should be sent in. All
   // of our different resource types' ACKs are mixed together in this queue.
