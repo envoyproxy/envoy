@@ -42,6 +42,17 @@ LogicalDnsCluster::LogicalDnsCluster(
     }
   }
 
+  const envoy::api::v2::core::SocketAddress& socket_address =
+      lbEndpoint().endpoint().address().socket_address();
+
+  if (!socket_address.resolver_name().empty()) {
+    throw EnvoyException("LOGICAL_DNS clusters must NOT have a custom resolver name set");
+  }
+
+  dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
+  hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
+  Network::Utility::portFromTcpUrl(dns_url_);
+
   switch (cluster.dns_lookup_family()) {
   case envoy::api::v2::Cluster::V6_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
@@ -55,12 +66,6 @@ LogicalDnsCluster::LogicalDnsCluster(
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-
-  const envoy::api::v2::core::SocketAddress& socket_address =
-      lbEndpoint().endpoint().address().socket_address();
-  dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
-  hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
-  Network::Utility::portFromTcpUrl(dns_url_);
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();

@@ -1288,6 +1288,26 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
+  std::list<ResolveTargetPtr> resolve_targets;
+  const envoy::api::v2::ClusterLoadAssignment load_assignment(
+      cluster.has_load_assignment() ? cluster.load_assignment()
+                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
+  const auto& locality_lb_endpoints = load_assignment.endpoints();
+  for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
+    for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
+      if (!socket_address.resolver_name().empty()) {
+        throw EnvoyException("STRICT_DNS clusters must NOT have a custom resolver name set");
+      }
+
+      const std::string& url =
+          fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
+      resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.dispatcher(), url,
+                                                     locality_lb_endpoint, lb_endpoint));
+    }
+  }
+  resolve_targets_ = std::move(resolve_targets);
+
   switch (cluster.dns_lookup_family()) {
   case envoy::api::v2::Cluster::V6_ONLY:
     dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
@@ -1300,20 +1320,6 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
-  const envoy::api::v2::ClusterLoadAssignment load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
-  const auto& locality_lb_endpoints = load_assignment.endpoints();
-  for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
-    for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      const auto& host = lb_endpoint.endpoint().address();
-      const std::string& url = fmt::format("tcp://{}:{}", host.socket_address().address(),
-                                           host.socket_address().port_value());
-      resolve_targets_.emplace_back(new ResolveTarget(*this, factory_context.dispatcher(), url,
-                                                      locality_lb_endpoint, lb_endpoint));
-    }
   }
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
