@@ -168,13 +168,8 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
-<<<<<<< HEAD
   Stats::SymbolTableImpl symbol_table;
-  Server::HotRestartNopImpl restarter(symbol_table);
-=======
-  Stats::FakeSymbolTableImpl symbol_table;
   Server::HotRestartNopImpl restarter;
->>>>>>> master
   ThreadLocal::InstanceImpl tls;
   Stats::HeapStatDataAllocator stats_allocator(symbol_table);
   Stats::ThreadLocalStoreImpl stat_store(stats_allocator);

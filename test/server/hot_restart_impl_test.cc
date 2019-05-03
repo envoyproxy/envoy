@@ -46,10 +46,6 @@ public:
     hot_restart_->drainParentListeners();
   }
 
-<<<<<<< HEAD
-  Stats::SymbolTableImpl symbol_table_;
-=======
->>>>>>> master
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<MockOptions> options_;

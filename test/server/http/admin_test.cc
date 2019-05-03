@@ -1272,12 +1272,7 @@ protected:
     histograms_.push_back(histogram);
   }
 
-<<<<<<< HEAD
   Stats::SymbolTableImpl symbol_table_;
-  Stats::StatsOptionsImpl stats_options_;
-=======
-  Stats::FakeSymbolTableImpl symbol_table_;
->>>>>>> master
   Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
