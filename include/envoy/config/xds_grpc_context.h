@@ -33,7 +33,8 @@ public:
                                std::chrono::milliseconds init_fetch_timeout) PURE;
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
-  // added to the passed 'resources' argument, relative to resource_versions_.
+  // added to the passed 'resources' argument, relative to the resource subscription interest
+  // currently known for type_url.
   virtual void updateResources(const std::set<std::string>& resources,
                                const std::string& type_url) PURE;
 
