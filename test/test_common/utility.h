@@ -16,13 +16,11 @@
 #include "envoy/thread/thread.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/common/block_memory_hash_set.h"
 #include "common/common/c_smart_ptr.h"
 #include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/fake_symbol_table_impl.h"
-#include "common/stats/raw_stat_data.h"
 
 #include "test/test_common/file_system_for_test.h"
 #include "test/test_common/printers.h"
@@ -495,6 +493,7 @@ makeHeaderMap(const std::initializer_list<std::pair<std::string, std::string>>& 
 
 } // namespace Http
 
+<<<<<<< HEAD
 namespace Stats {
 
 /**
@@ -537,6 +536,8 @@ public:
 
 } // namespace Stats
 
+=======
+>>>>>>> master
 namespace Api {
 ApiPtr createApiForTest();
 ApiPtr createApiForTest(Stats::Store& stat_store);

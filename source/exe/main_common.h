@@ -69,6 +69,7 @@ protected:
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
   Filesystem::Instance& file_system_;
+  Stats::HeapStatDataAllocator stats_allocator_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
@@ -103,8 +104,7 @@ public:
     base_.adminRequest(path_and_query, method, handler);
   }
 
-  static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
-                                       bool hot_restart_enabled);
+  static std::string hotRestartVersion(bool hot_restart_enabled);
 
   /**
    * @return a pointer to the server instance, or nullptr if initialized into
