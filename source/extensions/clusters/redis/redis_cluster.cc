@@ -284,9 +284,7 @@ void RedisCluster::RedisDiscoverySession::onFailure() {
   current_request_ = nullptr;
   if (!current_host_address_.empty()) {
     auto client_to_delete = client_map_.find(current_host_address_);
-    if (client_to_delete != client_map_.end()) {
-      client_to_delete->second->client_->close();
-    }
+    client_to_delete->second->client_->close();
   }
   parent_.info()->stats().update_failure_.inc();
   resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
