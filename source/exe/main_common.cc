@@ -26,6 +26,9 @@
 #endif
 
 #include "ares.h"
+#ifdef ENVOY_GOOGLE_GRPC
+#include "grpc/grpc.h"
+#endif
 
 namespace Envoy {
 
@@ -50,6 +53,9 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
                                Filesystem::Instance& file_system)
     : options_(options), component_factory_(component_factory), thread_factory_(thread_factory),
       file_system_(file_system), stats_allocator_(symbol_table_) {
+#ifdef ENVOY_GOOGLE_GRPC
+  grpc_init();
+#endif
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
@@ -97,7 +103,12 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
   }
 }
 
-MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
+MainCommonBase::~MainCommonBase() {
+  ares_library_cleanup();
+#ifdef ENVOY_GOOGLE_GRPC
+  grpc_shutdown();
+#endif
+}
 
 void MainCommonBase::configureComponentLogLevels() {
   for (auto& component_log_level : options_.componentLogLevels()) {

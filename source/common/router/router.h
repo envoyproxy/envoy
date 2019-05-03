@@ -348,8 +348,10 @@ private:
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
     StreamInfo::UpstreamTiming upstream_timing_;
-    Http::HeaderMap* upstream_headers_{};
-    Http::HeaderMap* upstream_trailers_{};
+    // Copies of upstream headers/trailers. These are only set if upstream
+    // access logging is configured.
+    Http::HeaderMapPtr upstream_headers_;
+    Http::HeaderMapPtr upstream_trailers_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;

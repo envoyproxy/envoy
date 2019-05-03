@@ -6,6 +6,7 @@
 #include "envoy/config/metrics/v2/stats.pb.h"
 
 #include "common/common/c_smart_ptr.h"
+#include "common/event/dispatcher_impl.h"
 #include "common/memory/stats.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
@@ -883,6 +884,19 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
   EXPECT_TRUE(merge_called);
   store_->shutdownThreading();
   tls_.shutdownThread();
+}
+
+TEST(ThreadLocalStoreThreadTest, ConstructDestruct) {
+  Stats::FakeSymbolTableImpl symbol_table;
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher = api->allocateDispatcher();
+  NiceMock<ThreadLocal::MockInstance> tls;
+  HeapStatDataAllocator alloc(symbol_table);
+  ThreadLocalStoreImpl store(alloc);
+
+  store.initializeThreading(*dispatcher, tls);
+  { ScopePtr scope1 = store.createScope("scope1."); }
+  store.shutdownThreading();
 }
 
 // Histogram tests
