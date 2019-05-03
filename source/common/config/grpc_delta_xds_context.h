@@ -62,7 +62,7 @@ public:
         grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                      rate_limit_settings) {}
 
-  void addSubscription(const std::vector<std::string>& resources, const std::string& type_url,
+  void addSubscription(const std::set<std::string>& resources, const std::string& type_url,
                        SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
                        std::chrono::milliseconds init_fetch_timeout) override {
     std::set<std::string> HACK_resources_as_set(resources.begin(), resources.end());
@@ -74,7 +74,7 @@ public:
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
   // added to the passed 'resources' argument, relative to resource_versions_.
-  void updateResources(const std::vector<std::string>& resources,
+  void updateResources(const std::set<std::string>& resources,
                        const std::string& type_url) override {
     auto sub = subscriptions_.find(type_url);
     if (sub == subscriptions_.end()) {
@@ -139,12 +139,12 @@ public:
   void onWriteable() override { trySendDiscoveryRequests(); }
 
   void kickOffAck(UpdateAck ack) {
-    request_queue_.push(ack);
+    ack_queue_.push(ack);
     trySendDiscoveryRequests();
   }
 
   // TODO TODO remove, GrpcMux impersonation
-  virtual GrpcMuxWatchPtr subscribe(const std::string&, const std::vector<std::string>&,
+  virtual GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
                                     GrpcMuxCallbacks&) override {
     return nullptr;
   }
@@ -158,21 +158,22 @@ private:
   void trySendDiscoveryRequests() {
     while (true) {
       // Do any of our subscriptions (by type_url) even want to send a request?
-      absl::optional<std::string> next_request_type = wantToSendDiscoveryRequest();
-      if (!next_request_type.has_value()) {
+      absl::optional<std::string> maybe_request_type = wantToSendDiscoveryRequest();
+      if (!maybe_request_type.has_value()) {
         break;
       }
-      // Try again later if paused/rate limited/stream down.
-      if (!canSendDiscoveryRequest(next_request_type, &sub->second)) {
-        break;
-      }
+      std::string next_request_type_url = maybe_request_type.value();
       // If this request's type_url is one we don't have, drop it.
-      auto sub = subscriptions_.find(pending_request.type_url_);
+      auto sub = subscriptions_.find(next_request_type_url);
       if (sub == subscriptions_.end()) {
         ENVOY_LOG(warn, "Not sending queued ACK for non-existent subscription {}.",
-                  pending_request.type_url_);
+                  next_request_type_url);
         ack_queue_.pop();
         continue;
+      }
+      // Try again later if paused/rate limited/stream down.
+      if (!canSendDiscoveryRequest(next_request_type_url, &sub->second)) {
+        break;
       }
       // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
       if (!ack_queue_.empty()) {

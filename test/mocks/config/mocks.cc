@@ -13,18 +13,15 @@ MockGrpcMuxWatch::~MockGrpcMuxWatch() { cancel(); }
 MockGrpcMux::MockGrpcMux() {}
 MockGrpcMux::~MockGrpcMux() {}
 
-<<<<<<< HEAD
 MockXdsGrpcContext::MockXdsGrpcContext() {}
 MockXdsGrpcContext::~MockXdsGrpcContext() {}
 GrpcMuxWatchPtr MockXdsGrpcContext::subscribe(const std::string& type_url,
-                                              const std::vector<std::string>& resources,
+                                              const std::set<std::string>& resources,
                                               GrpcMuxCallbacks& callbacks) {
   return GrpcMuxWatchPtr(subscribe_(type_url, resources, callbacks));
 }
-=======
 MockGrpcStreamCallbacks::MockGrpcStreamCallbacks() {}
 MockGrpcStreamCallbacks::~MockGrpcStreamCallbacks() {}
->>>>>>> upstream/master
 
 GrpcMuxWatchPtr MockGrpcMux::subscribe(const std::string& type_url,
                                        const std::set<std::string>& resources,

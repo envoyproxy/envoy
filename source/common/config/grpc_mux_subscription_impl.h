@@ -50,7 +50,7 @@ public:
     // previously watched resources and the new ones (we may have lost interest in some of the
     // previously watched ones).
     watch_.reset();
-    watch_ = grpc_mux_.subscribe(type_url_, update_to_these_names, *this);
+    watch_ = grpc_mux_->subscribe(type_url_, update_to_these_names, *this);
     stats_.update_attempt_.inc();
   }
 

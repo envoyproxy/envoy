@@ -28,14 +28,13 @@ public:
    * @param init_fetch_timeout how long the first fetch has to complete before onConfigUpdateFailed
    * will be called.
    */
-  virtual void addSubscription(const std::vector<std::string>& resources,
-                               const std::string& type_url, SubscriptionCallbacks& callbacks,
-                               SubscriptionStats& stats,
+  virtual void addSubscription(const std::set<std::string>& resources, const std::string& type_url,
+                               SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
                                std::chrono::milliseconds init_fetch_timeout) PURE;
 
   // Enqueues and attempts to send a discovery request, (un)subscribing to resources missing from /
   // added to the passed 'resources' argument, relative to resource_versions_.
-  virtual void updateResources(const std::vector<std::string>& resources,
+  virtual void updateResources(const std::set<std::string>& resources,
                                const std::string& type_url) PURE;
 
   virtual void removeSubscription(const std::string& type_url) PURE;
@@ -45,7 +44,7 @@ public:
 
   // TODO TODO remove
   virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
-                                    const std::vector<std::string>& resources,
+                                    const std::set<std::string>& resources,
                                     GrpcMuxCallbacks& callbacks) PURE;
 };
 

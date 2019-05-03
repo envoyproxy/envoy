@@ -31,18 +31,17 @@ public:
               const RateLimitSettings& rate_limit_settings);
   ~GrpcMuxImpl();
 
-  void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
 
   // XdsGrpcContext
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
-  void addSubscription(const std::vector<std::string>&, const std::string&, SubscriptionCallbacks&,
+  void addSubscription(const std::set<std::string>&, const std::string&, SubscriptionCallbacks&,
                        SubscriptionStats&, std::chrono::milliseconds) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void updateResources(const std::vector<std::string>&, const std::string&) override {
+  void updateResources(const std::set<std::string>&, const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void removeSubscription(const std::string&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -122,7 +121,6 @@ private:
 class NullGrpcMuxImpl : public XdsGrpcContext,
                         GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
 public:
-  void start() override {}
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
                             GrpcMuxCallbacks&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
@@ -130,11 +128,11 @@ public:
   void pause(const std::string&) override {}
   void resume(const std::string&) override {}
 
-  void addSubscription(const std::vector<std::string>&, const std::string&, SubscriptionCallbacks&,
+  void addSubscription(const std::set<std::string>&, const std::string&, SubscriptionCallbacks&,
                        SubscriptionStats&, std::chrono::milliseconds) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
-  void updateResources(const std::vector<std::string>&, const std::string&) override {
+  void updateResources(const std::set<std::string>&, const std::string&) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
 

@@ -99,7 +99,14 @@ public:
     return !names_added_.empty() || !names_removed_.empty();
   }
 
-  void set_first_request_of_new_stream(bool val) { first_request_of_new_stream_ = val; }
+  void markStreamFresh() { any_request_sent_yet_in_current_stream_ = false; }
+
+  // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
+  // the entirety of your interest at the start of a stream, even if nothing has changed.
+  bool subscriptionUpdatePending() const {
+    return !names_added_.empty() || !names_removed_.empty() ||
+           !any_request_sent_yet_in_current_stream_;
+  }
 
   UpdateAck handleResponse(envoy::api::v2::DeltaDiscoveryResponse* message) {
     // We *always* copy the response's nonce into the next request, even if we're going to make that
@@ -157,7 +164,8 @@ public:
 
   envoy::api::v2::DeltaDiscoveryRequest getNextRequestAckless() {
     envoy::api::v2::DeltaDiscoveryRequest request;
-    if (first_request_of_new_stream_) {
+    if (!any_request_sent_yet_in_current_stream_) {
+      any_request_sent_yet_in_current_stream_ = true;
       // initial_resource_versions "must be populated for first request in a stream".
       // Also, since this might be a new server, we must explicitly state *all* of our subscription
       // interest.
@@ -174,7 +182,6 @@ public:
         names_added_.insert(resource.first);
       }
       names_removed_.clear();
-      first_request_of_new_stream_ = false;
     }
     std::copy(names_added_.begin(), names_added_.end(),
               Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_subscribe()));
@@ -257,7 +264,7 @@ private:
   Event::TimerPtr init_fetch_timeout_timer_;
 
   bool paused_{};
-  bool first_request_of_new_stream_{true};
+  bool any_request_sent_yet_in_current_stream_{};
 
   // Tracking of the delta in our subscription interest since the previous DeltaDiscoveryRequest was
   // sent. Can't use unordered_set due to ordering issues in gTest expectation matching. Feel free

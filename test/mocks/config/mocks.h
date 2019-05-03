@@ -74,11 +74,11 @@ public:
   virtual ~MockXdsGrpcContext();
 
   MOCK_METHOD5(addSubscription,
-               void(const std::vector<std::string>& resources, const std::string& type_url,
+               void(const std::set<std::string>& resources, const std::string& type_url,
                     SubscriptionCallbacks& callbacks, SubscriptionStats& stats,
                     std::chrono::milliseconds init_fetch_timeout));
   MOCK_METHOD2(updateResources,
-               void(const std::vector<std::string>& resources, const std::string& type_url));
+               void(const std::set<std::string>& resources, const std::string& type_url));
 
   MOCK_METHOD1(removeSubscription, void(const std::string& type_url));
   MOCK_METHOD1(pause, void(const std::string& type_url));
@@ -91,9 +91,9 @@ public:
   // GrpcMux TODO TODO remove
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
-               GrpcMuxWatch*(const std::string& type_url, const std::vector<std::string>& resources,
+               GrpcMuxWatch*(const std::string& type_url, const std::set<std::string>& resources,
                              GrpcMuxCallbacks& callbacks));
-  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
+  GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
                             GrpcMuxCallbacks& callbacks);
 };
 

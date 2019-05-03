@@ -42,12 +42,12 @@ public:
   void resume() { context_->resume(type_url_); }
 
   // Config::DeltaSubscription
-  void start(const std::vector<std::string>& resources, SubscriptionCallbacks& callbacks) override {
+  void start(const std::set<std::string>& resources, SubscriptionCallbacks& callbacks) override {
     context_->addSubscription(resources, type_url_, callbacks, stats_, init_fetch_timeout_);
   }
 
-  void updateResources(const std::vector<std::string>& resources) override {
-    context_->updateResources(resources, type_url_);
+  virtual void updateResources(const std::set<std::string>& update_to_these_names) override {
+    context_->updateResources(update_to_these_names, type_url_);
   }
 
 private:
