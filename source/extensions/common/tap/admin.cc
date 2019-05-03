@@ -100,11 +100,13 @@ void AdminHandler::unregisterConfig(ExtensionConfig& config) {
 }
 
 void AdminHandler::AdminPerTapSinkHandle::submitTrace(
-    const TraceWrapperSharedPtr& trace, envoy::service::tap::v2alpha::OutputSink::Format format) {
+    TraceWrapperPtr&& trace, envoy::service::tap::v2alpha::OutputSink::Format format) {
   ENVOY_LOG(debug, "admin submitting buffered trace to main thread");
+  // Convert to a shared_ptr, so we can send it to the main thread.
+  std::shared_ptr<envoy::data::tap::v2alpha::TraceWrapper> shared_trace{std::move(trace)};
   // The handle can be destroyed before the cross thread post is complete. Thus, we capture a
   // reference to our parent.
-  parent_.main_thread_dispatcher_.post([& parent = parent_, trace, format]() {
+  parent_.main_thread_dispatcher_.post([& parent = parent_, trace = shared_trace, format]() {
     if (!parent.attached_request_.has_value()) {
       return;
     }

@@ -123,8 +123,7 @@ TEST_F(StatsIsolatedStoreImplTest, AllWithSymbolTable) {
 }
 
 TEST_F(StatsIsolatedStoreImplTest, LongStatName) {
-  Stats::StatsOptionsImpl stats_options;
-  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
+  const std::string long_string(128, 'A');
 
   ScopePtr scope = store_.createScope("scope.");
   Counter& counter = scope->counter(long_string);

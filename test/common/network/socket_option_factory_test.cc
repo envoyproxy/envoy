@@ -6,6 +6,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -121,6 +122,52 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
                                             envoy::api::v2::core::SocketOption::STATE_PREBIND));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
                                             envoy::api::v2::core::SocketOption::STATE_BOUND));
+}
+
+TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
+  Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption> socket_options_proto;
+  Envoy::Protobuf::TextFormat::Parser parser;
+  envoy::api::v2::core::SocketOption socket_option_proto;
+  static const char linger_option_format[] = R"proto(
+    state: STATE_PREBIND
+    level: %d
+    name: %d
+    buf_value: "\x01\x00\x00\x00\x80\x0d\x00\x00"
+  )proto";
+  auto linger_option = absl::StrFormat(linger_option_format, SOL_SOCKET, SO_LINGER);
+  ASSERT_TRUE(parser.ParseFromString(linger_option, &socket_option_proto));
+  *socket_options_proto.Add() = socket_option_proto;
+  static const char keepalive_option_format[] = R"proto(
+    state: STATE_PREBIND
+    level: %d
+    name: %d
+    int_value: 1
+  )proto";
+  auto keepalive_option = absl::StrFormat(keepalive_option_format, SOL_SOCKET, SO_KEEPALIVE);
+  ASSERT_TRUE(parser.ParseFromString(keepalive_option, &socket_option_proto));
+  *socket_options_proto.Add() = socket_option_proto;
+
+  auto socket_options = SocketOptionFactory::buildLiteralOptions(socket_options_proto);
+  EXPECT_EQ(2, socket_options->size());
+  auto option_details = socket_options->at(0)->getOptionDetails(
+      socket_mock_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  EXPECT_TRUE(option_details.has_value());
+  EXPECT_EQ(SOL_SOCKET, option_details->name_->first);
+  EXPECT_EQ(SO_LINGER, option_details->name_->second);
+  EXPECT_EQ(sizeof(struct linger), option_details->value_.size());
+  const struct linger* linger_ptr =
+      reinterpret_cast<const struct linger*>(option_details->value_.data());
+  EXPECT_EQ(1, linger_ptr->l_onoff);
+  EXPECT_EQ(3456, linger_ptr->l_linger);
+
+  option_details = socket_options->at(1)->getOptionDetails(
+      socket_mock_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  EXPECT_TRUE(option_details.has_value());
+  EXPECT_EQ(SOL_SOCKET, option_details->name_->first);
+  EXPECT_EQ(SO_KEEPALIVE, option_details->name_->second);
+  EXPECT_EQ(sizeof(int), option_details->value_.size());
+  const int* flag_ptr = reinterpret_cast<const int*>(option_details->value_.data());
+  EXPECT_EQ(1, *flag_ptr);
 }
 
 } // namespace
