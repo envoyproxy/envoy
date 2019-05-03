@@ -54,7 +54,9 @@ public:
   m(DEGRADED_EDS_HEALTH, 0x10)                                                   \
   /* The host is pending removal from discovery but is stabilized due to */      \
   /* active HC. */                                                               \
-  m(PENDING_DYNAMIC_REMOVAL, 0x20)
+  m(PENDING_DYNAMIC_REMOVAL, 0x20)                                               \
+  /* The host is pending its initial active health check. */                     \
+  m(PENDING_ACTIVE_HC, 0x40)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -303,6 +305,11 @@ public:
   virtual const HostsPerLocality& degradedHostsPerLocality() const PURE;
 
   /**
+   * @return same as hostsPerLocality but only contains warmed hosts.
+   */
+  virtual const HostsPerLocality& warmedHostsPerLocality() const PURE;
+
+  /**
    * @return weights for each locality in the host set.
    */
   virtual LocalityWeightsConstSharedPtr localityWeights() const PURE;
@@ -331,7 +338,8 @@ public:
 
   /**
    * @return uint32_t the number of warmed hosts in this host set. A host is considered warming
-   * if active health checking is enabled and the host has yet to be health checked for the first time.
+   * if active health checking is enabled and the host has yet to be health checked for the first
+   * time.
    */
   virtual uint32_t warmedHostCount() const PURE;
 };
@@ -389,7 +397,7 @@ public:
     HostsPerLocalityConstSharedPtr hosts_per_locality;
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
-    std::shared_ptr<const std::vector<uint32_t>> warmed_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr warmed_hosts_per_locality;
   };
 
   /**
@@ -784,12 +792,13 @@ public:
    * @return whether to skip waiting for health checking before draining connections
    *         after a host is removed from service discovery.
    */
- virtual bool drainConnectionsOnHostRemoval() const PURE;
+  virtual bool drainConnectionsOnHostRemoval() const PURE;
 
   /**
-   * @return true if this cluster has a health checker installed.
+   * @return true if this cluster is configured to ignore hosts for the purpose of load balancing
+   * computations until they have been health checked for the first time.
    */
-  virtual bool healthChecker() const PURE;
+  virtual bool warmHosts() const PURE;
 
   /**
    * @return eds cluster service_name of the cluster.

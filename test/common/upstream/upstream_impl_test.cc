@@ -401,6 +401,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
     for (size_t i = 0; i < hosts.size(); ++i) {
       EXPECT_TRUE(hosts[i]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
       hosts[i]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      hosts[i]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
     }
   }
 
@@ -453,6 +454,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
     for (size_t i = 0; i < 2; ++i) {
       EXPECT_TRUE(hosts[i]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
       hosts[i]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      hosts[i]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
       if (i == 1) {
         EXPECT_CALL(initialized, ready());
       }
@@ -2311,8 +2313,7 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
 // When a locality has endpoints that have not yet been warmed, weigth calculation should ignore
 // these hosts.
 TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
-  // We need a health checker in order for hosts to be considered not warmed.
-  ON_CALL(*info_, healthChecker()).WillByDefault(Return(true));
+  ON_CALL(*info_, warmHosts()).WillByDefault(Return(true));
 
   // We have two localities with 3 hosts in L1, 2 hosts in L2. Two of the hosts in L1 are not warmed
   // yet, so even though they are unhealthy we should not adjust the locality weight.
@@ -2325,9 +2326,9 @@ TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
 
   // Mark hosts 1 and 2 as not warmed.
   hosts_[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hosts_[1]->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNKNOWN);
+  hosts_[1]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
   hosts_[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hosts_[2]->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNKNOWN);
+  hosts_[2]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
 
   host_set_.updateHosts(
       HostSetImpl::updateHostsParams(
@@ -2344,8 +2345,7 @@ TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
 
 // Verifies that we handle the case when there are no warmed hosts in a set with unhealthy hosts.
 TEST_F(HostSetImplLocalityTest, ZeroWarmedHostsLocality) {
-  // We need a health checker in order for hosts to be considered not warmed.
-  ON_CALL(*info_, healthChecker()).WillByDefault(Return(true));
+  ON_CALL(*info_, warmHosts()).WillByDefault(Return(true));
 
   // We have two localities with 2 hosts in L1, 2 hosts in L2. The two hosts in L1 are not warmed.
   HostsPerLocalitySharedPtr hosts_per_locality =

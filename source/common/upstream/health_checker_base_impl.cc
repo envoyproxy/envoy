@@ -230,6 +230,7 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degrade
     // it to healthy. This makes startup faster with a small reduction in overall reliability
     // depending on the HC settings.
     if (first_check_ || ++num_healthy_ == parent_.healthy_threshold_) {
+      host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
@@ -289,6 +290,11 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
     } else {
       changed_state = HealthTransition::ChangePending;
     }
+  }
+
+  if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+    host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    changed_state = HealthTransition::Changed;
   }
 
   if ((first_check_ || parent_.always_log_health_check_failures_) && parent_.event_logger_) {

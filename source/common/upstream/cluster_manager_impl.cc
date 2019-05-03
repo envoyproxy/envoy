@@ -688,9 +688,12 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_copy =
       host_set->degradedHostsPerLocality().clone();
 
+  auto warmed_hosts_per_locality_copy = host_set->warmedHostsPerLocality().clone();
+
   tls_->runOnAllThreads([this, name = cluster.info()->name(), priority, hosts_copy,
                          healthy_hosts_copy, degraded_hosts_copy, hosts_per_locality_copy,
                          healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy,
+                         warmed_hosts_per_locality_copy,
                          locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
                          overprovisioning_factor = host_set->overprovisioningFactor(),
                          warmed_host_count = host_set->warmedHostCount()]() {
@@ -698,8 +701,10 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
         name, priority,
         HostSetImpl::updateHostsParams(hosts_copy, hosts_per_locality_copy, healthy_hosts_copy,
                                        healthy_hosts_per_locality_copy, degraded_hosts_copy,
-                                       degraded_hosts_per_locality_copy),
-        locality_weights, hosts_added, hosts_removed, *tls_, warmed_host_count, overprovisioning_factor);
+                                       degraded_hosts_per_locality_copy,
+                                       warmed_hosts_per_locality_copy),
+        locality_weights, hosts_added, hosts_removed, *tls_, warmed_host_count,
+        overprovisioning_factor);
   });
 }
 
@@ -971,7 +976,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority,
     PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, ThreadLocal::Slot& tls, uint32_t warmed_host_count, uint64_t overprovisioning_factor) {
+    const HostVector& hosts_removed, ThreadLocal::Slot& tls, uint32_t warmed_host_count,
+    uint64_t overprovisioning_factor) {
 
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
 

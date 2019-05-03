@@ -185,9 +185,12 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
     HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().filter(
         {[&host_to_exclude](const Host& host) { return &host != host_to_exclude.get(); }})[0];
 
-    prioritySet().updateHosts(priority,
-                              HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
-                              host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt);
+    // TODO(snowp): Do this inside the loop over hosts above.
+    const uint32_t warmed_hosts = std::count_if(hosts_copy->begin(), hosts_copy->end(),
+                                                [](const auto& host) { return host->warmed(); });
+    prioritySet().updateHosts(
+        priority, HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+        host_set->localityWeights(), {}, hosts_to_remove, warmed_hosts, absl::nullopt);
   }
 
   if (host_to_exclude != nullptr) {

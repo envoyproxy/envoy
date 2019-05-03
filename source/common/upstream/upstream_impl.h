@@ -225,14 +225,7 @@ public:
   bool used() const override { return used_; }
   void used(bool new_used) override { used_ = new_used; }
   bool warmed() const override {
-    // If there is no health checker, there is no warming process.
-    if (!cluster_->healthChecker()) {
-      return true;
-    }
-
-    // Otherwise, the host is warming.
-    return !(healthFlagGet(HealthFlag::FAILED_ACTIVE_HC) &&
-             getActiveHealthFailureType() == ActiveHealthFailureType::UNKNOWN);
+    return !cluster_->warmHosts() || !healthFlagGet(HealthFlag::PENDING_ACTIVE_HC);
   }
 
 protected:
@@ -315,6 +308,9 @@ public:
   const HostsPerLocality& degradedHostsPerLocality() const override {
     return *degraded_hosts_per_locality_;
   }
+  const HostsPerLocality& warmedHostsPerLocality() const override {
+    return *warmed_hosts_per_locality_;
+  }
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseHealthyLocality() override;
   absl::optional<uint32_t> chooseDegradedLocality() override;
@@ -338,7 +334,7 @@ public:
                     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                     DegradedHostVectorConstSharedPtr degraded_hosts,
                     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
-                    std::shared_ptr<const std::vector<uint32_t>> warmed_counts_per_locality);
+                    HostsPerLocalityConstSharedPtr warmed_counts_per_locality);
   static PrioritySet::UpdateHostsParams
   partitionHosts(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality);
 
@@ -357,7 +353,7 @@ private:
   // locality.
   static double effectiveLocalityWeight(uint32_t index,
                                         const HostsPerLocality& eligible_hosts_per_locality,
-                                        const std::vector<uint32_t>& warmed_counts_per_locality,
+                                        const HostsPerLocality& warmed_counts_per_locality,
                                         const LocalityWeights& locality_weights,
                                         uint32_t overprovisioning_factor);
 
@@ -370,7 +366,7 @@ private:
   HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_{HostsPerLocalityImpl::empty()};
-  std::shared_ptr<const std::vector<uint32_t>> warmed_counts_per_locality_{};
+  HostsPerLocalityConstSharedPtr warmed_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       member_update_cb_helper_;
@@ -402,7 +398,7 @@ private:
       std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
       const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
       HostsPerLocalityConstSharedPtr all_hosts_per_locality,
-      std::shared_ptr<const std::vector<uint32_t>> warmed_counts_per_locality,
+      HostsPerLocalityConstSharedPtr warmed_counts_per_locality,
       LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
 
   static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
@@ -565,7 +561,7 @@ public:
   };
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
-  bool healthChecker() const override { return health_checker_; }
+  bool warmHosts() const override { return warm_hosts_; }
 
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
@@ -611,7 +607,7 @@ private:
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
-  const bool health_checker_;
+  const bool warm_hosts_;
   absl::optional<std::string> eds_service_name_;
 };
 
@@ -660,9 +656,10 @@ public:
   // hosts respectively.
   static std::pair<HealthyHostVectorConstSharedPtr, DegradedHostVectorConstSharedPtr>
   partitionHostList(const HostVector& hosts);
-  // Partitions the provided list of hosts per locality into two new lists containing the healthy
-  // and degraded hosts respectively.
-  static std::pair<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr>
+  // Partitions the provided list of hosts per locality into three new lists containing the healthy,
+  // degraded and warmed hosts respectively.
+  static std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
+                    HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);
 
   // Upstream::Cluster

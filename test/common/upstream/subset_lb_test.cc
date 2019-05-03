@@ -155,6 +155,7 @@ public:
 
     host_set.hosts_ = all_hosts;
     host_set.hosts_per_locality_ = makeHostsPerLocality({first_locality, second_locality});
+    host_set.warmed_hosts_per_locality_ = makeHostsPerLocality({first_locality, second_locality});
     host_set.healthy_hosts_ = host_set.hosts_;
     host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
     host_set.locality_weights_ = std::make_shared<const LocalityWeights>(locality_weights);
