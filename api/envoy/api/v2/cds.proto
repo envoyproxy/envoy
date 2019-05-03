@@ -541,8 +541,8 @@ message Cluster {
     // {healthy, healthy}
     // all traffic will still hit P0, as 1 / (3 - 2) = 1.
     //
-    // Enabling this will allow scaling up the number of hosts for a given cluster without entering panic
-    // mode or triggering priority spillover, assuming the hosts pass the first health check.
+    // Enabling this will allow scaling up the number of hosts for a given cluster without entering
+    // panic mode or triggering priority spillover, assuming the hosts pass the first health check.
     //
     // If panic mode is triggered, new hosts are still eligible for traffic; they simply do not
     // contribute to the calculation when deciding whether panic mode is enabled or not.

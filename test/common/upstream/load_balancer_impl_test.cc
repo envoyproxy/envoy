@@ -133,7 +133,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
   updateHostSet(tertiary_host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
   EXPECT_EQ(0, lb_.percentageLoad(0));
-  EXPECT_EQ(0, lb_.percentageLoad(1));  
+  EXPECT_EQ(0, lb_.percentageLoad(1));
   EXPECT_EQ(100, lb_.percentageLoad(2));
   priority_load.healthy_priority_load_ = HealthyLoad({0u, 0u, 100});
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context).first);
@@ -574,7 +574,8 @@ TEST_P(FailoverTest, PrioritiesWithNotAllWarmedHosts) {
   // P0: 1 healthy, 1 unhealthy, 1 warmed.
   // P1: 1 healthy.
   // We then expect no spillover, since P0 is still overprovisioned.
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
   host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
@@ -592,7 +593,8 @@ TEST_P(FailoverTest, PrioritiesWithZeroWarmedHosts) {
   // P0: 2 unhealthy, 0 warmed.
   // P1: 1 healthy.
   // We then expect all the traffic to spill over to P1 since P0 has an effective load of zero.
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
   ON_CALL(host_set_, warmedHostCount()).WillByDefault(Return(0));

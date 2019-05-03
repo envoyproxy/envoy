@@ -589,9 +589,9 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
-  // TODO(snowp): Right now we just pass hosts->size(), really this need to be filtering down the list
-  // of warmed hosts provided by the original_host_set_. We cannot compute the list of warmed hosts
-  // directly as subset updates happen on the worker threads.
+  // TODO(snowp): Right now we just pass hosts->size(), really this need to be filtering down the
+  // list of warmed hosts provided by the original_host_set_. We cannot compute the list of warmed
+  // hosts directly as subset updates happen on the worker threads.
   HostSetImpl::updateHosts(
       HostSetImpl::updateHostsParams(hosts, hosts_per_locality, healthy_hosts,
                                      healthy_hosts_per_locality, degraded_hosts,
