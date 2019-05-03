@@ -160,16 +160,17 @@ public:
 private:
   void trySendDiscoveryRequests() {
     while (true) {
-      // Do any of our subscriptions (by type_url) even want to send a request?
+      // Do any of our subscriptions even want to send a request?
       absl::optional<std::string> maybe_request_type = wantToSendDiscoveryRequest();
       if (!maybe_request_type.has_value()) {
         break;
       }
+      // If so, which one (by type_url)?
       std::string next_request_type_url = maybe_request_type.value();
-      // If this request's type_url is one we don't have, drop it.
+      // If we don't have a subscription object for this request's type_url, drop the request.
       auto sub = subscriptions_.find(next_request_type_url);
       if (sub == subscriptions_.end()) {
-        ENVOY_LOG(warn, "Not sending queued ACK for non-existent subscription {}.",
+        ENVOY_LOG(warn, "Not sending discovery request for non-existent subscription {}.",
                   next_request_type_url);
         ack_queue_.pop();
         continue;
@@ -196,10 +197,10 @@ private:
       ENVOY_LOG(trace, "API {} paused; discovery request on hold for now.", type_url);
       return false;
     } else if (!grpc_stream_.grpcStreamAvailable()) {
-      ENVOY_LOG(trace, "No stream available to send a DiscoveryRequest for {}.", type_url);
+      ENVOY_LOG(trace, "No stream available to send a discovery request for {}.", type_url);
       return false;
     } else if (!grpc_stream_.checkRateLimitAllowsDrain()) {
-      ENVOY_LOG(trace, "{} DiscoveryRequest hit rate limit; will try later.", type_url);
+      ENVOY_LOG(trace, "{} discovery request hit rate limit; will try later.", type_url);
       return false;
     }
     return true;
@@ -207,7 +208,8 @@ private:
 
   // Checks whether we have something to say in a DeltaDiscoveryRequest, which can be an ACK and/or
   // a subscription update. (Does not check whether we *can* send that DeltaDiscoveryRequest).
-  // Returns the type_url of the resource type we should send for (if any).
+  // Returns the type_url of the resource type we should send the DeltaDiscoveryRequest for (if
+  // any).
   absl::optional<std::string> wantToSendDiscoveryRequest() {
     // All ACKs are sent before plain updates. trySendDiscoveryRequests() relies on this. So, choose
     // type_url from ack_queue_ if possible, before looking at pending updates.

@@ -40,13 +40,8 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
   EXPECT_CALL(*timer_, enableTimer(_));
   EXPECT_CALL(random_, random());
-<<<<<<< HEAD
-  subscription_->grpcMux()->grpcStreamForTest()->onRemoteClose(Grpc::Status::GrpcStatus::Canceled,
-                                                               "");
-=======
   subscription_->grpcMux().grpcStreamForTest().onRemoteClose(Grpc::Status::GrpcStatus::Canceled,
                                                              "");
->>>>>>> upstream/master
   verifyStats(2, 0, 0, 1, 0);
   verifyControlPlaneStats(0);
 

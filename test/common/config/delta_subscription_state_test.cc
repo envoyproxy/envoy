@@ -27,7 +27,7 @@ void deliverDiscoveryResponse(
   *message.mutable_resources() = added_resources;
   *message.mutable_removed_resources() = removed_resources;
   message.set_system_version_info(version_info);
-  state.handleResponse(&message);
+  state.handleResponse(message);
 }
 
 TEST(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
@@ -40,7 +40,7 @@ TEST(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
   DeltaSubscriptionState state(TypeUrl, {"name1", "name2", "name3"}, callbacks, local_info,
                                std::chrono::milliseconds(0U), dispatcher, stats);
   {
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequest();
+    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(),
                 UnorderedElementsAre("name1", "name2", "name3"));
   }
@@ -55,8 +55,8 @@ TEST(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
     resource->set_name("name2");
     resource->set_version("version2A");
     deliverDiscoveryResponse(state, add1_2, {}, "debugversion1");
-    state.set_first_request_of_new_stream(true); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequest();
+    state.markStreamFresh(); // simulate a stream reconnection
+    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequestAckless();
     EXPECT_EQ("version1A", cur_request.initial_resource_versions().at("name1"));
     EXPECT_EQ("version2A", cur_request.initial_resource_versions().at("name2"));
     EXPECT_EQ(cur_request.initial_resource_versions().end(),
@@ -75,8 +75,8 @@ TEST(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
     Protobuf::RepeatedPtrField<std::string> remove2;
     *remove2.Add() = "name2";
     deliverDiscoveryResponse(state, add1_3, remove2, "debugversion2");
-    state.set_first_request_of_new_stream(true); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequest();
+    state.markStreamFresh(); // simulate a stream reconnection
+    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequestAckless();
     EXPECT_EQ("version1B", cur_request.initial_resource_versions().at("name1"));
     EXPECT_EQ(cur_request.initial_resource_versions().end(),
               cur_request.initial_resource_versions().find("name2"));
@@ -89,8 +89,8 @@ TEST(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
     *remove1_3.Add() = "name1";
     *remove1_3.Add() = "name3";
     deliverDiscoveryResponse(state, {}, remove1_3, "debugversion3");
-    state.set_first_request_of_new_stream(true); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequest();
+    state.markStreamFresh(); // simulate a stream reconnection
+    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequestAckless();
     EXPECT_TRUE(cur_request.initial_resource_versions().empty());
   }
 
@@ -98,9 +98,9 @@ TEST(DeltaSubscriptionImplTest, ResourceGoneLeadsToBlankInitialVersion) {
     // ...but our own map should remember our interest. In particular, losing interest in all 3
     // should cause their names to appear in the resource_names_unsubscribe field of a
     // DeltaDiscoveryRequest.
-    state.updateResourceInterest({"name4"});     // note the lack of 1, 2, and 3
-    state.set_first_request_of_new_stream(true); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequest();
+    state.updateResourceInterest({"name4"}); // note the lack of 1, 2, and 3
+    state.markStreamFresh();                 // simulate a stream reconnection
+    envoy::api::v2::DeltaDiscoveryRequest cur_request = state.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
     EXPECT_THAT(cur_request.resource_names_unsubscribe(),
                 UnorderedElementsAre("name1", "name2", "name3"));

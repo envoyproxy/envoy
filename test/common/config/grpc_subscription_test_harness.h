@@ -109,11 +109,7 @@ public:
       expectSendMessage(last_cluster_names_, version_, Grpc::Status::GrpcStatus::Internal,
                         "bad config");
     }
-<<<<<<< HEAD
-    subscription_->grpcMux()->grpcStreamForTest().onDiscoveryResponse(std::move(response));
-=======
-    subscription_->grpcMux().onDiscoveryResponse(std::move(response));
->>>>>>> upstream/master
+    subscription_->grpcMux()->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
