@@ -1038,8 +1038,8 @@ Filter::UpstreamRequest::~UpstreamRequest() {
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
-    upstream_log->log(parent_.downstream_headers_, upstream_headers_, upstream_trailers_,
-                      stream_info_);
+    upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
+                      upstream_trailers_.get(), stream_info_);
   }
 }
 
@@ -1053,7 +1053,9 @@ void Filter::UpstreamRequest::decodeHeaders(Http::HeaderMapPtr&& headers, bool e
   upstream_timing_.onFirstUpstreamRxByteReceived(parent_.callbacks_->dispatcher().timeSource());
   maybeEndDecode(end_stream);
 
-  upstream_headers_ = headers.get();
+  if (!parent_.config_.upstream_logs_.empty()) {
+    upstream_headers_ = std::make_unique<Http::HeaderMapImpl>(*headers);
+  }
   const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
   stream_info_.response_code_ = static_cast<uint32_t>(response_code);
   parent_.onUpstreamHeaders(response_code, std::move(headers), *this, end_stream);
@@ -1067,7 +1069,9 @@ void Filter::UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream
 
 void Filter::UpstreamRequest::decodeTrailers(Http::HeaderMapPtr&& trailers) {
   maybeEndDecode(true);
-  upstream_trailers_ = trailers.get();
+  if (!parent_.config_.upstream_logs_.empty()) {
+    upstream_trailers_ = std::make_unique<Http::HeaderMapImpl>(*trailers);
+  }
   parent_.onUpstreamTrailers(std::move(trailers), *this);
 }
 

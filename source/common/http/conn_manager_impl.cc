@@ -692,6 +692,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                              Http::Headers::get().ConnectionValues.Close)) {
     state_.saw_connection_close_ = true;
   }
+  // Note: Proxy-Connection is not a standard header, but is supported here
+  // since it is supported by http-parser the underlying parser for http
+  // requests.
+  if (protocol != Protocol::Http2 && !state_.saw_connection_close_ &&
+      request_headers_->ProxyConnection() &&
+      absl::EqualsIgnoreCase(request_headers_->ProxyConnection()->value().getStringView(),
+                             Http::Headers::get().ConnectionValues.Close)) {
+    state_.saw_connection_close_ = true;
+  }
 
   if (!state_.is_internally_created_) { // Only sanitize headers on first pass.
     // Modify the downstream remote address depending on configuration and headers.
