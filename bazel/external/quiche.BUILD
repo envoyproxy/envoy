@@ -477,7 +477,7 @@ envoy_cc_test(
     name = "quic_platform_api_test",
     srcs = envoy_select_quiche(
         [
-	    "quiche/quic/platform/api/quic_containers_test.cc",
+            "quiche/quic/platform/api/quic_containers_test.cc",
             "quiche/quic/platform/api/quic_endian_test.cc",
             "quiche/quic/platform/api/quic_reference_counted_test.cc",
             "quiche/quic/platform/api/quic_string_utils_test.cc",
