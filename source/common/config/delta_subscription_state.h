@@ -19,199 +19,39 @@ struct UpdateAck {
   ::google::rpc::Status error_detail_;
 };
 
+// Tracks the xDS protocol state of an individual ongoing delta xDS session.
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
   DeltaSubscriptionState(const std::string& type_url, const std::set<std::string>& resource_names,
                          SubscriptionCallbacks& callbacks, const LocalInfo::LocalInfo& local_info,
                          std::chrono::milliseconds init_fetch_timeout,
-                         Event::Dispatcher& dispatcher, SubscriptionStats& stats)
-      : type_url_(type_url), callbacks_(callbacks), local_info_(local_info),
-        init_fetch_timeout_(init_fetch_timeout), stats_(stats) {
-    // In normal usage of updateResourceInterest(), the caller is supposed to cause a discovery
-    // request to be queued if it returns true. We don't need to do that because we know that the
-    // subscription gRPC stream is not yet established, and establishment causes a request.
-    updateResourceInterest(resource_names);
-    setInitFetchTimeout(dispatcher);
+                         Event::Dispatcher& dispatcher, SubscriptionStats& stats);
 
-    // The attempt stat here is maintained for the purposes of having consistency between ADS and
-    // individual DeltaSubscriptions. Since ADS is push based and muxed, the notion of an
-    // "attempt" for a given xDS API combined by ADS is not really that meaningful.
-    stats_.update_attempt_.inc();
-  }
+  void setInitFetchTimeout(Event::Dispatcher& dispatcher);
 
-  void setInitFetchTimeout(Event::Dispatcher& dispatcher) {
-    if (init_fetch_timeout_.count() > 0 && !init_fetch_timeout_timer_) {
-      init_fetch_timeout_timer_ = dispatcher.createTimer([this]() -> void {
-        ENVOY_LOG(warn, "delta config: initial fetch timed out for {}", type_url_);
-        callbacks_.onConfigUpdateFailed(nullptr);
-      });
-      init_fetch_timeout_timer_->enableTimer(init_fetch_timeout_);
-    }
-  }
+  void pause();
+  void resume();
+  bool paused() const { return paused_; }
 
-  void pause() {
-    ENVOY_LOG(debug, "Pausing discovery requests for {}", type_url_);
-    ASSERT(!paused_);
-    paused_ = true;
-  }
+  // Update which resources we're interested in subscribing to.
+  void updateResourceInterest(const std::set<std::string>& update_to_these_names);
 
-  void resume() {
-    ENVOY_LOG(debug, "Resuming discovery requests for {}", type_url_);
-    ASSERT(paused_);
-    paused_ = false;
-  }
-
-  bool paused() { return paused_; }
-
-  // Returns true if there is any meaningful change in our subscription interest, worth reporting to
-  // the server.
-  bool updateResourceInterest(const std::set<std::string>& update_to_these_names) {
-    std::vector<std::string> cur_added;
-    std::vector<std::string> cur_removed;
-
-    std::set_difference(update_to_these_names.begin(), update_to_these_names.end(),
-                        resource_names_.begin(), resource_names_.end(),
-                        std::inserter(cur_added, cur_added.begin()));
-    std::set_difference(resource_names_.begin(), resource_names_.end(),
-                        update_to_these_names.begin(), update_to_these_names.end(),
-                        std::inserter(cur_removed, cur_removed.begin()));
-
-    for (const auto& a : cur_added) {
-      setResourceWaitingForServer(a);
-      // Removed->added requires us to keep track of it as a "new" addition, since our user may have
-      // forgotten its copy of the resource after instructing us to remove it, and so needs to be
-      // reminded of it.
-      names_removed_.erase(a);
-      names_added_.insert(a);
-    }
-    for (const auto& r : cur_removed) {
-      lostInterestInResource(r);
-      // Ideally, when a resource is added-then-removed in between requests, we would avoid putting
-      // a superfluous "unsubscribe [resource that was never subscribed]" in the request. However,
-      // the removed-then-added case *does* need to go in the request, and due to how we accomplish
-      // that, it's difficult to distinguish remove-add-remove from add-remove (because "remove-add"
-      // has to be treated as equivalent to just "add").
-      names_added_.erase(r);
-      names_removed_.insert(r);
-    }
-    stats_.update_attempt_.inc();
-    // Tell the server about our new interests only if there are any.
-    return !names_added_.empty() || !names_removed_.empty();
-  }
+  // Whether there was a change in our subscription interest we have yet to inform the server of.
+  bool subscriptionUpdatePending() const;
 
   void markStreamFresh() { any_request_sent_yet_in_current_stream_ = false; }
 
-  // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
-  // the entirety of your interest at the start of a stream, even if nothing has changed.
-  bool subscriptionUpdatePending() const {
-    return !names_added_.empty() || !names_removed_.empty() ||
-           !any_request_sent_yet_in_current_stream_;
-  }
+  UpdateAck handleResponse(const envoy::api::v2::DeltaDiscoveryResponse& message);
 
-  UpdateAck handleResponse(envoy::api::v2::DeltaDiscoveryResponse* message) {
-    // We *always* copy the response's nonce into the next request, even if we're going to make that
-    // request a NACK by setting error_detail.
-    UpdateAck ack(message->nonce(), type_url_);
-    std::cerr << "handleResponse" << std::endl;
-    try {
-      disableInitFetchTimeoutTimer();
-      callbacks_.onConfigUpdate(message->resources(), message->removed_resources(),
-                                message->system_version_info());
-      for (const auto& resource : message->resources()) {
-        std::cerr << "setResourceVersion " << resource.name() << " " << resource.version()
-                  << std::endl;
-        setResourceVersion(resource.name(), resource.version());
-      }
-      std::cerr << "done setting versions" << std::endl;
-      // If a resource is gone, there is no longer a meaningful version for it that makes sense to
-      // provide to the server upon stream reconnect: either it will continue to not exist, in which
-      // case saying nothing is fine, or the server will bring back something new, which we should
-      // receive regardless (which is the logic that not specifying a version will get you).
-      //
-      // So, leave the version map entry present but blank. It will be left out of
-      // initial_resource_versions messages, but will remind us to explicitly tell the server "I'm
-      // cancelling my subscription" when we lose interest.
-      for (const auto& resource_name : message->removed_resources()) {
-        if (resource_names_.find(resource_name) != resource_names_.end()) {
-          std::cerr << resource_name << " waiting for server" << std::endl;
-          setResourceWaitingForServer(resource_name);
-        }
-      }
-      stats_.update_success_.inc();
-      stats_.update_attempt_.inc();
-      stats_.version_.set(HashUtil::xxHash64(message->system_version_info()));
-      ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed",
-                type_url_, message->resources().size(), message->removed_resources().size());
-    } catch (const EnvoyException& e) {
-      std::cerr << "UH OH EXCEPTION" << std::endl;
-      // Note that error_detail being set is what indicates that a DeltaDiscoveryRequest is a NACK.
-      ack.error_detail_.set_code(Grpc::Status::GrpcStatus::Internal);
-      ack.error_detail_.set_message(e.what());
-      disableInitFetchTimeoutTimer();
-      stats_.update_rejected_.inc();
-      ENVOY_LOG(warn, "delta config for {} rejected: {}", type_url_, e.what());
-      stats_.update_attempt_.inc();
-      callbacks_.onConfigUpdateFailed(&e);
-    }
-    return ack;
-  }
+  void handleEstablishmentFailure();
 
-  void handleEstablishmentFailure() {
-    stats_.update_failure_.inc();
-    stats_.update_attempt_.inc();
-    callbacks_.onConfigUpdateFailed(nullptr);
-  }
-
-  envoy::api::v2::DeltaDiscoveryRequest getNextRequestAckless() {
-    envoy::api::v2::DeltaDiscoveryRequest request;
-    if (!any_request_sent_yet_in_current_stream_) {
-      any_request_sent_yet_in_current_stream_ = true;
-      // initial_resource_versions "must be populated for first request in a stream".
-      // Also, since this might be a new server, we must explicitly state *all* of our subscription
-      // interest.
-      for (auto const& resource : resource_versions_) {
-        // Populate initial_resource_versions with the resource versions we currently have.
-        // Resources we are interested in, but are still waiting to get any version of from the
-        // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-        if (!resource.second.waitingForServer()) {
-          (*request.mutable_initial_resource_versions())[resource.first] =
-              resource.second.version();
-        }
-        // As mentioned above, fill resource_names_subscribe with everything, including names we
-        // have yet to receive any resource for.
-        names_added_.insert(resource.first);
-      }
-      names_removed_.clear();
-    }
-    std::copy(names_added_.begin(), names_added_.end(),
-              Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_subscribe()));
-    std::copy(names_removed_.begin(), names_removed_.end(),
-              Protobuf::RepeatedFieldBackInserter(request.mutable_resource_names_unsubscribe()));
-    names_added_.clear();
-    names_removed_.clear();
-
-    request.set_type_url(type_url_);
-    request.mutable_node()->MergeFrom(local_info_.node());
-    return request;
-  }
-
-  envoy::api::v2::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack) {
-    envoy::api::v2::DeltaDiscoveryRequest request = getNextRequestAckless();
-    request.set_response_nonce(ack.nonce_);
-    if (ack.error_detail_.code() != Grpc::Status::GrpcStatus::Ok) {
-      // Don't needlessly make the field present-but-empty if status is ok.
-      request.mutable_error_detail()->CopyFrom(ack.error_detail_);
-    }
-    return request;
-  }
+  envoy::api::v2::DeltaDiscoveryRequest getNextRequestAckless();
+  envoy::api::v2::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack);
 
 private:
-  void disableInitFetchTimeoutTimer() {
-    if (init_fetch_timeout_timer_) {
-      init_fetch_timeout_timer_->disableTimer();
-      init_fetch_timeout_timer_.reset();
-    }
-  }
+  void handleGoodResponse(const envoy::api::v2::DeltaDiscoveryResponse& message);
+  void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
+  void disableInitFetchTimeoutTimer();
 
   class ResourceVersion {
   public:
@@ -232,21 +72,10 @@ private:
     absl::optional<std::string> version_;
   };
 
-  // Use these helpers to avoid forgetting to update both at once.
-  void setResourceVersion(const std::string& resource_name, const std::string& resource_version) {
-    resource_versions_[resource_name] = ResourceVersion(resource_version);
-    resource_names_.insert(resource_name);
-  }
-
-  void setResourceWaitingForServer(const std::string& resource_name) {
-    resource_versions_[resource_name] = ResourceVersion();
-    resource_names_.insert(resource_name);
-  }
-
-  void lostInterestInResource(const std::string& resource_name) {
-    resource_versions_.erase(resource_name);
-    resource_names_.erase(resource_name);
-  }
+  // Use these helpers to ensure resource_versions_ and resource_names_ get updated together.
+  void setResourceVersion(const std::string& resource_name, const std::string& resource_version);
+  void setResourceWaitingForServer(const std::string& resource_name);
+  void setLostInterestInResource(const std::string& resource_name);
 
   // A map from resource name to per-resource version. The keys of this map are exactly the resource
   // names we are currently interested in. Those in the waitingForServer state currently don't have
@@ -255,7 +84,7 @@ private:
   std::unordered_map<std::string, ResourceVersion> resource_versions_;
   // The keys of resource_versions_. Only tracked separately because std::map does not provide an
   // iterator into just its keys, e.g. for use in std::set_difference.
-  std::unordered_set<std::string> resource_names_;
+  std::set<std::string> resource_names_;
 
   const std::string type_url_;
   SubscriptionCallbacks& callbacks_;
@@ -266,9 +95,9 @@ private:
   bool paused_{};
   bool any_request_sent_yet_in_current_stream_{};
 
-  // Tracking of the delta in our subscription interest since the previous DeltaDiscoveryRequest was
-  // sent. Can't use unordered_set due to ordering issues in gTest expectation matching. Feel free
-  // to change if you can figure out how to make it work.
+  // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
+  // Can't use unordered_set due to ordering issues in gTest expectation matching.
+  // Feel free to change to unordered if you can figure out how to make it work.
   std::set<std::string> names_added_;
   std::set<std::string> names_removed_;
 

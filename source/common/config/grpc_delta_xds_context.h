@@ -120,7 +120,7 @@ public:
                 message->system_version_info(), message->type_url());
       return;
     }
-    kickOffAck(sub->second.handleResponse(message.get()));
+    kickOffAck(sub->second.handleResponse(*message));
   }
 
   void onStreamEstablished() override {
