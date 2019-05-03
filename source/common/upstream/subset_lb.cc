@@ -555,7 +555,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   warmed_hosts->get().reserve(original_host_set_.degradedHosts().size());
   for (const auto& host : original_host_set_.warmedHosts()) {
     if (cached_predicate(*host)) {
-      degraded_hosts->get().emplace_back(host);
+      warmed_hosts->get().emplace_back(host);
     }
   }
 

@@ -468,7 +468,7 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
         second.updateHosts(0,
                            HostSetImpl::updateHostsParams(new_hosts, empty_hosts_per_locality,
                                                           healthy_hosts, empty_hosts_per_locality),
-                           {}, added, removed, new_hosts->size(), absl::nullopt);
+                           {}, added, removed, absl::nullopt);
       });
 
   EXPECT_CALL(membership_updated_, ready());

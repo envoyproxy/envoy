@@ -132,6 +132,7 @@ public:
     host_set.hosts_ = hosts;
     host_set.hosts_per_locality_ = makeHostsPerLocality({hosts});
     host_set.healthy_hosts_ = host_set.hosts_;
+    host_set.warmed_hosts_ = host_set.hosts_;
     host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
   }
 
@@ -157,6 +158,7 @@ public:
     host_set.hosts_per_locality_ = makeHostsPerLocality({first_locality, second_locality});
     host_set.warmed_hosts_per_locality_ = makeHostsPerLocality({first_locality, second_locality});
     host_set.healthy_hosts_ = host_set.hosts_;
+    host_set.warmed_hosts_ = host_set.hosts_;
     host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
     host_set.locality_weights_ = std::make_shared<const LocalityWeights>(locality_weights);
   }
@@ -201,6 +203,8 @@ public:
 
     host_set_.healthy_hosts_ = host_set_.hosts_;
     host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
+    host_set_.warmed_hosts_ = host_set_.hosts_;
+    host_set_.warmed_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
     local_hosts_.reset(new HostVector());
     std::vector<HostVector> local_hosts_per_locality_vector;
@@ -217,10 +221,12 @@ public:
 
     local_priority_set_.updateHosts(
         0,
-        HostSetImpl::updateHostsParams(local_hosts_, local_hosts_per_locality_,
-                                       std::make_shared<HealthyHostVector>(*local_hosts_),
-                                       local_hosts_per_locality_),
-        {}, {}, {}, local_hosts_->size(), absl::nullopt);
+        HostSetImpl::updateHostsParams(
+            local_hosts_, local_hosts_per_locality_,
+            std::make_shared<HealthyHostVector>(*local_hosts_), local_hosts_per_locality_,
+            std::make_shared<DegradedHostVector>(), HostsPerLocalityImpl::empty(),
+            std::make_shared<WarmedHostVector>(*local_hosts_), local_hosts_per_locality_),
+        {}, {}, {}, absl::nullopt);
 
     lb_.reset(new SubsetLoadBalancer(
         lb_type_, priority_set_, &local_priority_set_, stats_, stats_store_, runtime_, random_,
@@ -269,6 +275,7 @@ public:
       }
       host_set.hosts_per_locality_ = makeHostsPerLocality(std::move(locality_hosts_copy));
       host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
+      host_set.warmed_hosts_per_locality_ = host_set.hosts_per_locality_;
     }
 
     if (GetParam() == REMOVES_FIRST && !remove.empty()) {
@@ -278,6 +285,7 @@ public:
     for (const auto& host : add) {
       host_set.hosts_.emplace_back(host);
       host_set.healthy_hosts_ = host_set.hosts_;
+      host_set.warmed_hosts_ = host_set.hosts_;
 
       if (add_in_locality) {
         std::vector<HostVector> locality_hosts_copy = host_set.hosts_per_locality_->get();
@@ -319,7 +327,7 @@ public:
           HostSetImpl::updateHostsParams(local_hosts_, local_hosts_per_locality_,
                                          std::make_shared<HealthyHostVector>(*local_hosts_),
                                          local_hosts_per_locality_),
-          {}, {}, remove, local_hosts_->size(), absl::nullopt);
+          {}, {}, remove, absl::nullopt);
     }
 
     for (const auto& host : add) {
@@ -336,7 +344,7 @@ public:
             HostSetImpl::updateHostsParams(local_hosts_, local_hosts_per_locality_,
                                            std::make_shared<HealthyHostVector>(*local_hosts_),
                                            local_hosts_per_locality_),
-            {}, add, {}, local_hosts_->size(), absl::nullopt);
+            {}, add, {}, absl::nullopt);
       }
     } else if (!add.empty() || !remove.empty()) {
       local_priority_set_.updateHosts(
@@ -344,7 +352,7 @@ public:
           HostSetImpl::updateHostsParams(local_hosts_, local_hosts_per_locality_,
                                          std::make_shared<const HealthyHostVector>(*local_hosts_),
                                          local_hosts_per_locality_),
-          {}, add, remove, local_hosts_->size(), absl::nullopt);
+          {}, add, remove, absl::nullopt);
     }
   }
 
