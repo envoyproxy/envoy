@@ -225,7 +225,11 @@ public:
   bool used() const override { return used_; }
   void used(bool new_used) override { used_ = new_used; }
   bool warmed() const override {
-    return !cluster_->warmHosts() || !healthFlagGet(HealthFlag::PENDING_ACTIVE_HC);
+    if (cluster_->warmHosts()) {
+      return !healthFlagGet(HealthFlag::PENDING_ACTIVE_HC);
+    }
+
+    return true;
   }
 
 protected:

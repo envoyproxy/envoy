@@ -302,7 +302,7 @@ std::vector<HostsPerLocalityConstSharedPtr> HostsPerLocalityImpl::filter(
     }
 
     for (size_t i = 0; i < predicates.size(); ++i) {
-      mutable_clones[i]->hosts_per_locality_.push_back(std::move(current_locality_hosts[0]));
+      mutable_clones[i]->hosts_per_locality_.push_back(std::move(current_locality_hosts[i]));
     }
   }
 
