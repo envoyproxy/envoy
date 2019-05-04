@@ -150,6 +150,52 @@ void EdsClusterImpl::onAssignmentTimeout() {
   info_->stats().assignment_stale_.inc();
 }
 
+void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
+  // Here we will see if we have a host that has been marked for deletion by service discovery
+  // but has been stabilized due to passing active health checking. If such a host is now
+  // failing active health checking we can remove it during this health check update.
+  HostSharedPtr host_to_exclude = host;
+  if (host_to_exclude != nullptr &&
+      host_to_exclude->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) &&
+      host_to_exclude->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)) {
+    // Empty for clarity.
+  } else {
+    // Do not exclude and remove the host during the update.
+    host_to_exclude = nullptr;
+  }
+
+  const auto& host_sets = prioritySet().hostSetsPerPriority();
+  for (size_t priority = 0; priority < host_sets.size(); ++priority) {
+    const auto& host_set = host_sets[priority];
+
+    // Filter current hosts in case we need to exclude a host.
+    HostVectorSharedPtr hosts_copy(new HostVector());
+    std::copy_if(host_set->hosts().begin(), host_set->hosts().end(),
+                 std::back_inserter(*hosts_copy),
+                 [&host_to_exclude](const HostSharedPtr& host) { return host_to_exclude != host; });
+
+    // Setup a hosts to remove vector in case we need to exclude a host.
+    HostVector hosts_to_remove;
+    if (hosts_copy->size() != host_set->hosts().size()) {
+      ASSERT(hosts_copy->size() == host_set->hosts().size() - 1);
+      hosts_to_remove.emplace_back(host_to_exclude);
+    }
+
+    // Filter hosts per locality in case we need to exclude a host.
+    HostsPerLocalityConstSharedPtr hosts_per_locality_copy = host_set->hostsPerLocality().filter(
+        {[&host_to_exclude](const Host& host) { return &host != host_to_exclude.get(); }})[0];
+
+    prioritySet().updateHosts(priority,
+                              HostSetImpl::partitionHosts(hosts_copy, hosts_per_locality_copy),
+                              host_set->localityWeights(), {}, hosts_to_remove, absl::nullopt);
+  }
+
+  if (host_to_exclude != nullptr) {
+    ASSERT(all_hosts_.find(host_to_exclude->address()->asString()) != all_hosts_.end());
+    all_hosts_.erase(host_to_exclude->address()->asString());
+  }
+}
+
 bool EdsClusterImpl::updateHostsPerLocality(
     const uint32_t priority, const uint32_t overprovisioning_factor, const HostVector& new_hosts,
     LocalityWeightsMap& locality_weights_map, LocalityWeightsMap& new_locality_weights_map,

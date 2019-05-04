@@ -116,8 +116,7 @@ the maintainers per the voting process below.
 # Extension addition policy
 
 Adding new [extensions](REPO_LAYOUT.md#sourceextensions-layout) has a dedicated policy. Please
-see [this](https://docs.google.com/document/d/1eDQQSxqx2khTXfa2vVm4vqkyRwXYkPzZCcbjxJ2_AvA) document
-for more information.
+see [this](./EXTENSION_POLICY.md) document for more information.
 
 # Conflict resolution and voting
 

@@ -20,6 +20,8 @@
 #include "grpcpp/impl/codegen/service_type.h"
 #include "gtest/gtest.h"
 
+using ::testing::ReturnRef;
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -73,6 +75,17 @@ public:
     fake_handshaker_server_ci_.waitReady();
 
     NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+    // We fake the singleton manager for the client, since it doesn't need to manage ALTS global
+    // state, this is done by the test server instead.
+    // TODO(htuch): Make this a proper mock.
+    class FakeSingletonManager : public Singleton::Manager {
+    public:
+      Singleton::InstanceSharedPtr get(const std::string&, Singleton::SingletonFactoryCb) override {
+        return nullptr;
+      }
+    };
+    FakeSingletonManager fsm;
+    ON_CALL(mock_factory_ctx, singletonManager()).WillByDefault(ReturnRef(fsm));
     UpstreamAltsTransportSocketConfigFactory factory;
 
     envoy::config::transport_socket::alts::v2alpha::Alts alts_config;

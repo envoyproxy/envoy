@@ -479,9 +479,175 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   EXPECT_EQ(rebuild_container + 1, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
+// Verify that a host is removed if it is removed from discovery, stabilized, and then later
+// fails active HC.
+TEST_F(EdsTest, EndpoingRemovalAfterHcFail) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto add_endpoint = [&cluster_load_assignment](int port) {
+    auto* endpoints = cluster_load_assignment.add_endpoints();
+
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  add_endpoint(80);
+  add_endpoint(81);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    // Mark the hosts as healthy
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+
+  // Remove endpoints and add back the port 80 one. Both hosts should be present due to
+  // being stabilized, but one of them should be marked pending removal.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+
+  // Add both hosts back, make sure pending removal is gone.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  add_endpoint(81);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  }
+
+  // Remove endpoints and add back the port 80 one. Both hosts should be present due to
+  // being stabilized, but one of them should be marked pending removal.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  HostSharedPtr not_removed_host;
+  HostSharedPtr removed_host;
+  {
+    EXPECT_EQ(2,
+              cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get()[0].size());
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+
+    // Mark the host is failing active HC and then run callbacks.
+    not_removed_host = hosts[0];
+    removed_host = hosts[1];
+    hosts[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+    health_checker->runCallbacks(hosts[1], HealthTransition::Changed);
+  }
+
+  {
+    EXPECT_EQ(1,
+              cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get()[0].size());
+    EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  }
+
+  // Add back 81. Verify that we have a new host. This will show that the all_hosts_ was updated
+  // correctly.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80);
+  add_endpoint(81);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+    EXPECT_EQ(not_removed_host, hosts[0]);
+    EXPECT_EQ(removed_host->address()->asString(), hosts[1]->address()->asString());
+    EXPECT_NE(removed_host, hosts[1]);
+  }
+}
+
+// Verify that a host is removed when it is still passing active HC, but has been previously
+// told by the EDS server to fail health check.
+TEST_F(EdsTest, EndpointRemovalEdsFailButActiveHcSuccess) {
+  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  auto add_endpoint = [endpoints](int port) {
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  add_endpoint(80);
+  add_endpoint(81);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    // Mark the hosts as healthy
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+
+  // Mark the first endpoint as unhealthy from EDS.
+  endpoints->mutable_lb_endpoints(0)->set_health_status(
+      envoy::api::v2::core::HealthStatus::UNHEALTHY);
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    EXPECT_EQ(hosts[0]->health(), Host::Health::Unhealthy);
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH));
+    EXPECT_EQ(hosts[1]->health(), Host::Health::Healthy);
+  }
+
+  // Now remove the first host. Even though it is still passing active HC, since EDS has
+  // previously explicitly failed it, we won't stabilize it anymore.
+  endpoints->mutable_lb_endpoints()->erase(endpoints->mutable_lb_endpoints()->begin());
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+  }
+}
+
 // Validate that onConfigUpdate() removes endpoints that are marked as healthy
-// when configured to do so.
-TEST_F(EdsTest, EndpointRemoval) {
+// when configured to drain on host removal.
+TEST_F(EdsTest, EndpointRemovalClusterDrainOnHostRemoval) {
   envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   resetClusterDrainOnHostRemoval();

@@ -15,9 +15,9 @@
 #include "common/common/thread.h"
 #include "common/stats/source_impl.h"
 
+#include "server/listener_hooks.h"
 #include "server/options_impl.h"
 #include "server/server.h"
-#include "server/test_hooks.h"
 
 #include "test/integration/server_stats.h"
 #include "test/integration/tcp_dump.h"
@@ -94,26 +94,24 @@ public:
   }
 
   Counter& counter(const std::string& name) override {
-    StatNameTempStorage storage(name, symbolTable());
+    StatNameManagedStorage storage(name, symbolTable());
     return counterFromStatName(storage.statName());
   }
   Gauge& gauge(const std::string& name) override {
-    StatNameTempStorage storage(name, symbolTable());
+    StatNameManagedStorage storage(name, symbolTable());
     return gaugeFromStatName(storage.statName());
   }
   Histogram& histogram(const std::string& name) override {
-    StatNameTempStorage storage(name, symbolTable());
+    StatNameManagedStorage storage(name, symbolTable());
     return histogramFromStatName(storage.statName());
   }
 
   const SymbolTable& symbolTable() const override { return wrapped_scope_->symbolTable(); }
   SymbolTable& symbolTable() override { return wrapped_scope_->symbolTable(); }
-  const StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
-  StatsOptionsImpl stats_options_;
 };
 
 /**
@@ -154,7 +152,6 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
-  const StatsOptions& statsOptions() const override { return stats_options_; }
   const SymbolTable& symbolTable() const override { return store_.symbolTable(); }
   SymbolTable& symbolTable() override { return store_.symbolTable(); }
 
@@ -186,7 +183,6 @@ private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   SourceImpl source_;
-  StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats
@@ -201,7 +197,7 @@ typedef std::unique_ptr<IntegrationTestServer> IntegrationTestServerPtr;
  * createAndRunEnvoyServer().
  */
 class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
-                              public TestHooks,
+                              public ListenerHooks,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
@@ -263,7 +259,7 @@ public:
 
   std::vector<Stats::GaugeSharedPtr> gauges() override { return stat_store().gauges(); }
 
-  // TestHooks
+  // ListenerHooks
   void onWorkerListenerAdded() override;
   void onWorkerListenerRemoved() override;
 
@@ -293,7 +289,7 @@ protected:
   // The subclass is also responsible for tearing down this server in its destructor.
   virtual void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
                                        Network::Address::InstanceConstSharedPtr local_address,
-                                       TestHooks& hooks, Thread::BasicLockable& access_log_lock,
+                                       ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                        Server::ComponentFactory& component_factory,
                                        Runtime::RandomGeneratorPtr&& random_generator) PURE;
 
@@ -344,7 +340,7 @@ public:
 private:
   void createAndRunEnvoyServer(OptionsImpl& options, Event::TimeSystem& time_system,
                                Network::Address::InstanceConstSharedPtr local_address,
-                               TestHooks& hooks, Thread::BasicLockable& access_log_lock,
+                               ListenerHooks& hooks, Thread::BasicLockable& access_log_lock,
                                Server::ComponentFactory& component_factory,
                                Runtime::RandomGeneratorPtr&& random_generator) override;
 

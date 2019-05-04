@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
+    "envoy_google_grpc_external_deps",
     "envoy_package",
 )
 
@@ -38,5 +39,5 @@ envoy_cc_test_library(
     ] + select({
         "//bazel:disable_signal_trace": [],
         "//conditions:default": ["//source/exe:sigaction_lib"],
-    }),
+    }) + envoy_google_grpc_external_deps(),
 )

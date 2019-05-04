@@ -48,7 +48,7 @@ new file mode 100755
 index 0000000..9c71271
 --- /dev/null
 +++ b/build.py
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,35 @@
 +#!/usr/bin/env python
 +
 +import argparse
@@ -72,6 +72,13 @@ index 0000000..9c71271
 +    # will cause LSAN detect its leak and fail the build, set exitcode to 0 to make LSAN doesn't
 +    # fail on it.
 +    os.environ["LSAN_OPTIONS"] = "exitcode=0"
++
++    # Blacklist LuaJIT from ASAN for now.
++    # TODO(htuch): Remove this when https://github.com/envoyproxy/envoy/issues/6084 is resolved.
++    if "ENVOY_CONFIG_ASAN" in os.environ:
++      os.environ["TARGET_CFLAGS"] += " -fsanitize-blacklist=%s/com_github_luajit_luajit/clang-asan-blacklist.txt" % os.environ["PWD"]
++      with open("clang-asan-blacklist.txt", "w") as f:
++        f.write("fun:*\n")
 +
 +    os.system('make V=1 PREFIX="{}" install'.format(args.prefix))
 +
