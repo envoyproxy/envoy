@@ -109,7 +109,7 @@ public:
   /**
    * Outlier detection change state callback.
    */
-  typedef std::function<void(HostSharedPtr host)> ChangeStateCb;
+  typedef std::function<void(const HostSharedPtr& host)> ChangeStateCb;
 
   /**
    * Add a changed state callback to the detector. The callback will be called whenever any host

@@ -57,10 +57,9 @@ void Common::chargeStat(const Upstream::ClusterInfo& cluster, const std::string&
                            grpc_status->value().getStringView()))
       .inc();
   uint64_t grpc_status_code;
-  const std::string grpc_status_string(grpc_status->value().getStringView());
   // TODO(dnoe): Migrate to pure string_view (#6580)
-  const bool success =
-      StringUtil::atoull(grpc_status_string.c_str(), grpc_status_code) && grpc_status_code == 0;
+  const bool success = absl::SimpleAtoi(grpc_status->value().getStringView(), &grpc_status_code) &&
+                       grpc_status_code == 0;
   chargeStat(cluster, protocol, grpc_service, grpc_method, success);
 }
 
@@ -88,9 +87,7 @@ absl::optional<Status::GrpcStatus> Common::getGrpcStatus(const Http::HeaderMap& 
   if (!grpc_status_header || grpc_status_header->value().empty()) {
     return absl::optional<Status::GrpcStatus>();
   }
-  // TODO(dnoe): Migrate to pure string_view (#6580)
-  std::string grpc_status_header_string(grpc_status_header->value().getStringView());
-  if (!StringUtil::atoull(grpc_status_header_string.c_str(), grpc_status_code) ||
+  if (!absl::SimpleAtoi(grpc_status_header->value().getStringView(), &grpc_status_code) ||
       grpc_status_code > Status::GrpcStatus::MaximumValid) {
     return absl::optional<Status::GrpcStatus>(Status::GrpcStatus::InvalidCode);
   }

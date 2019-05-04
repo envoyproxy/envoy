@@ -37,7 +37,6 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
   test_options.setDrainTime(std::chrono::seconds(1));
   test_options.setParentShutdownTime(std::chrono::seconds(2));
-  test_options.setMaxStats(16384u);
 
   return test_options;
 }
@@ -170,10 +169,10 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
   Stats::FakeSymbolTableImpl symbol_table;
-  Server::HotRestartNopImpl restarter(symbol_table);
+  Server::HotRestartNopImpl restarter;
   ThreadLocal::InstanceImpl tls;
   Stats::HeapStatDataAllocator stats_allocator(symbol_table);
-  Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
+  Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                               access_log_lock, component_factory, std::move(random_generator), tls,

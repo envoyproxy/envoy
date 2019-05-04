@@ -508,14 +508,10 @@ TEST_P(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.live")));
 }
 
-// TODO(ambuc): Find a cleaner way to test this. This test has two unfortunate compromises:
-//
-// - a) `listener_manager.listener_create_success` must be instantiated, because BaseIntegrationTest
-//      blocks on its creation (see waitForCounterGe and the suite of waitFor* functions), and
-// - b) `stats.overflow` isn't blocked from instantiation, because it occurs at ThreadLocalStore
-//      construction time, before setStatsMatcher() is called.
-//
-// If either of these invariants is changed, this test must be rewritten.
+// TODO(ambuc): Find a cleaner way to test this. This test has an unfortunate compromise:
+// `listener_manager.listener_create_success` must be instantiated, because BaseIntegrationTest
+// blocks on its creation (see waitForCounterGe and the suite of waitFor* functions).
+// If this invariant is changed, this test must be rewritten.
 TEST_P(StatsMatcherIntegrationTest, IncludeExact) {
   stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(
       "listener_manager.listener_create_success");

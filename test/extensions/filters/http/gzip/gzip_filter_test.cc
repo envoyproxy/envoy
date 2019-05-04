@@ -93,7 +93,7 @@ protected:
 
   void doResponseCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoull(headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(absl::SimpleAtoi(headers.get_("content-length"), &content_length));
     feedBuffer(content_length);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
     EXPECT_EQ("", headers.get_("content-length"));
@@ -106,7 +106,7 @@ protected:
 
   void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {
     uint64_t content_length;
-    ASSERT_TRUE(StringUtil::atoull(headers.get_("content-length").c_str(), content_length));
+    ASSERT_TRUE(absl::SimpleAtoi(headers.get_("content-length"), &content_length));
     feedBuffer(content_length);
     Http::TestHeaderMapImpl continue_headers;
     EXPECT_EQ(Http::FilterHeadersStatus::Continue,

@@ -348,8 +348,10 @@ private:
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
     StreamInfo::UpstreamTiming upstream_timing_;
-    Http::HeaderMap* upstream_headers_{};
-    Http::HeaderMap* upstream_trailers_{};
+    // Copies of upstream headers/trailers. These are only set if upstream
+    // access logging is configured.
+    Http::HeaderMapPtr upstream_headers_;
+    Http::HeaderMapPtr upstream_trailers_;
 
     bool calling_encode_headers_ : 1;
     bool upstream_canary_ : 1;
@@ -382,14 +384,15 @@ private:
   void onPerTryTimeout(UpstreamRequest& upstream_request);
   void onRequestComplete();
   void onResponseTimeout();
-  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers);
+  void onUpstream100ContinueHeaders(Http::HeaderMapPtr&& headers,
+                                    UpstreamRequest& upstream_request);
   // Handle an upstream request aborted due to a local timeout.
-  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag);
+  void onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flag, absl::string_view details);
   // Handle an "aborted" upstream request, meaning we didn't see response
   // headers (e.g. due to a reset). Handles recording stats and responding
   // downstream if appropriate.
   void onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_flag,
-                       absl::string_view body, bool dropped);
+                       absl::string_view body, bool dropped, absl::string_view details);
   void onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream);
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request, bool end_stream);
