@@ -42,6 +42,7 @@ public:
     ASSERT(count >= healthy_count + degraded_count);
 
     host_set->hosts_.resize(count);
+    host_set->warmed_hosts_.resize(count);
     host_set->healthy_hosts_.resize(healthy_count);
     host_set->degraded_hosts_.resize(degraded_count);
     host_set->runCallbacks({}, {});
