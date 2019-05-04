@@ -37,9 +37,9 @@ DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> d
                                                  HostSharedPtr host)
     : detector_(detector), host_(host) {
   // add Success Rate monitors
-  success_rate_monitors_[externalOrigin] = std::make_unique<SuccessRateMonitor>(
+  externalOriginSRMonitor_ = std::make_unique<SuccessRateMonitor>(
       envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_EXTERNAL_ORIGIN);
-  success_rate_monitors_[localOrigin] = std::make_unique<SuccessRateMonitor>(
+  localOriginSRMonitor_ = std::make_unique<SuccessRateMonitor>(
       envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE_LOCAL_ORIGIN);
 
   // Setup method to call when putResult is invoked. Depending on the config's
@@ -61,12 +61,12 @@ void DetectorHostMonitorImpl::uneject(MonotonicTime unejection_time) {
 }
 
 void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
-  getSRMonitor<DetectorHostMonitor::externalOrigin>()->updateCurrentSuccessRateBucket();
-  getSRMonitor<DetectorHostMonitor::localOrigin>()->updateCurrentSuccessRateBucket();
+  externalOriginSRMonitor_->updateCurrentSuccessRateBucket();
+  localOriginSRMonitor_->updateCurrentSuccessRateBucket();
 }
 
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
-  getSRMonitor<DetectorHostMonitor::externalOrigin>()->incTotalReqCounter();
+  externalOriginSRMonitor_->incTotalReqCounter();
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
@@ -89,7 +89,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
-    getSRMonitor<DetectorHostMonitor::externalOrigin>()->incSuccessReqCounter();
+    externalOriginSRMonitor_->incSuccessReqCounter();
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
@@ -179,7 +179,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
     // It's possible for the cluster/detector to go away while we still have a host in use.
     return;
   }
-  getSRMonitor<localOrigin>()->incTotalReqCounter();
+  localOriginSRMonitor_->incTotalReqCounter();
   if (++consecutive_local_origin_failure_ ==
       detector->runtime().snapshot().getInteger(
           "outlier_detection.consecutive_local_origin_failure",
@@ -195,8 +195,8 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
     return;
   }
 
-  getSRMonitor<localOrigin>()->incTotalReqCounter();
-  getSRMonitor<localOrigin>()->incSuccessReqCounter();
+  localOriginSRMonitor_->incTotalReqCounter();
+  localOriginSRMonitor_->incSuccessReqCounter();
 
   resetConsecutiveLocalOriginFailure();
 }
@@ -241,8 +241,8 @@ DetectorImpl::DetectorImpl(const Cluster& cluster,
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger) {
   // Insert success rate initial numbers for each type of SR detector
-  success_rate_nums_[DetectorHostMonitor::externalOrigin] = {-1, -1};
-  success_rate_nums_[DetectorHostMonitor::localOrigin] = {-1, -1};
+  external_origin_SR_num_ = {-1, -1};
+  local_origin_SR_num_ = {-1, -1};
 }
 
 DetectorImpl::~DetectorImpl() {
@@ -555,7 +555,7 @@ void DetectorImpl::processSuccessRateEjections(
   double success_rate_sum = 0;
 
   // Reset the Detector's success rate mean and stdev.
-  success_rate_nums_[monitor_type] = {-1, -1};
+  getSRNums(monitor_type) = {-1, -1};
 
   // Exit early if there are not enough hosts.
   if (host_monitors_.size() < success_rate_minimum_hosts) {
@@ -587,10 +587,9 @@ void DetectorImpl::processSuccessRateEjections(
         runtime_.snapshot().getInteger("outlier_detection.success_rate_stdev_factor",
                                        config_.successRateStdevFactor()) /
         1000.0;
-    success_rate_nums_[monitor_type] = successRateEjectionThreshold(
+    getSRNums(monitor_type) = successRateEjectionThreshold(
         success_rate_sum, valid_success_rate_hosts, success_rate_stdev_factor);
-    const double success_rate_ejection_threshold =
-        success_rate_nums_[monitor_type].ejection_threshold_;
+    const double success_rate_ejection_threshold = getSRNums(monitor_type).ejection_threshold_;
     for (const auto& host_success_rate_pair : valid_success_rate_hosts) {
       if (host_success_rate_pair.success_rate_ < success_rate_ejection_threshold) {
         stats_.ejections_success_rate_.inc(); // Deprecated.

@@ -155,13 +155,8 @@ public:
     return last_unejection_time_;
   }
 
-  // Template based and function based methods for managing SuccessRate detectors
-  template <SuccessRateMonitorType Type>
-  const std::unique_ptr<SuccessRateMonitor>& getSRMonitor() const {
-    return success_rate_monitors_.at(Type);
-  }
-  const std::unique_ptr<SuccessRateMonitor>& getSRMonitor(SuccessRateMonitorType Type) const {
-    return success_rate_monitors_.at(Type);
+  const std::unique_ptr<SuccessRateMonitor>& getSRMonitor(SuccessRateMonitorType type) const {
+    return (externalOrigin == type) ? externalOriginSRMonitor_ : localOriginSRMonitor_;
   }
 
   double successRate(SuccessRateMonitorType type) const override {
@@ -190,8 +185,14 @@ private:
   // counters for local origin failures
   std::atomic<uint32_t> consecutive_local_origin_failure_{0};
 
-  absl::flat_hash_map<SuccessRateMonitorType, std::unique_ptr<SuccessRateMonitor>>
-      success_rate_monitors_;
+  // success rate monitors:
+  // - external_origin: for all events when external/local are not split
+  //   and for external origin failures when external/local events are split
+  // - local origin: for local events when external/local events are split and
+  //   not used when external/local events are not split.
+  std::unique_ptr<SuccessRateMonitor> externalOriginSRMonitor_;
+  std::unique_ptr<SuccessRateMonitor> localOriginSRMonitor_;
+
   void putResultNoLocalExternalSplit(Result result, absl::optional<uint64_t> code);
   void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);
   std::function<void(DetectorHostMonitorImpl*, Result, absl::optional<uint64_t> code)>
@@ -296,11 +297,11 @@ public:
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
   double
   successRateAverage(DetectorHostMonitor::SuccessRateMonitorType monitor_type) const override {
-    return success_rate_nums_.at(monitor_type).success_rate_average_;
+    return getSRNums(monitor_type).success_rate_average_;
   }
   double successRateEjectionThreshold(
       DetectorHostMonitor::SuccessRateMonitorType monitor_type) const override {
-    return success_rate_nums_.at(monitor_type).ejection_threshold_;
+    return getSRNums(monitor_type).ejection_threshold_;
   }
 
   /**
@@ -353,7 +354,22 @@ private:
   std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
 
-  absl::flat_hash_map<DetectorHostMonitor::SuccessRateMonitorType, EjectionPair> success_rate_nums_;
+  // EjectionPair for external and local origin events.
+  // When external/local origin events are not split, external_origin_SR_num_ are used for
+  // both types of events: external and local. local_origin_SR_num_ is not used.
+  // When external/local origin events are split, external_origin_SR_num_ are used only
+  // for external events and local_origin_SR_num_ is used for local origin events.
+  EjectionPair external_origin_SR_num_;
+  EjectionPair local_origin_SR_num_;
+
+  const EjectionPair& getSRNums(DetectorHostMonitor::SuccessRateMonitorType monitor_type) const {
+    return (DetectorHostMonitor::externalOrigin == monitor_type) ? external_origin_SR_num_
+                                                                 : local_origin_SR_num_;
+  }
+  EjectionPair& getSRNums(DetectorHostMonitor::SuccessRateMonitorType monitor_type) {
+    return const_cast<EjectionPair&>(
+        static_cast<const DetectorImpl&>(*this).getSRNums(monitor_type));
+  }
 };
 
 class EventLoggerImpl : public EventLogger {
