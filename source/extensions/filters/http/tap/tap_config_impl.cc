@@ -53,6 +53,7 @@ void HttpPerRequestTapperImpl::streamRequestHeaders() {
 void HttpPerRequestTapperImpl::onConnectionMetadataKnown(const Network::Address::InstanceConstSharedPtr& remote_address, const Upstream::ClusterInfoConstSharedPtr& destination_cluster) {
   destination_cluster_ = destination_cluster;
   remote_address_ = remote_address;
+  config_->rootMatcher().onUpstreamCluster(destination_cluster->name(), statuses_);
 }
 
 void HttpPerRequestTapperImpl::onRequestHeaders(const Http::HeaderMap& headers) {

@@ -48,6 +48,10 @@ void buildMatcher(const envoy::service::tap::v2alpha::MatchPredicate& match_conf
     new_matcher = std::make_unique<HttpResponseTrailersMatcher>(
         match_config.http_response_trailers_match(), matchers);
     break;
+  case envoy::service::tap::v2alpha::MatchPredicate::kDestinationClusterMatch:
+    new_matcher = std::make_unique<UpstreamClusterMatcher>(
+        match_config.destination_cluster_match(), matchers);
+    break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
