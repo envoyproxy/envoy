@@ -687,21 +687,22 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
       host_set->healthyHostsPerLocality().clone();
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_copy =
       host_set->degradedHostsPerLocality().clone();
-  WarmedHostVectorConstSharedPtr warmed_hosts_copy(new WarmedHostVector(host_set->warmedHosts()));
-  auto warmed_hosts_per_locality_copy = host_set->warmedHostsPerLocality().clone();
+  ExcludedHostVectorConstSharedPtr excluded_hosts_copy(
+      new ExcludedHostVector(host_set->excludedHosts()));
+  auto excluded_hosts_per_locality_copy = host_set->excludedHostsPerLocality().clone();
 
   tls_->runOnAllThreads([this, name = cluster.info()->name(), priority, hosts_copy,
                          healthy_hosts_copy, degraded_hosts_copy, hosts_per_locality_copy,
                          healthy_hosts_per_locality_copy, degraded_hosts_per_locality_copy,
-                         warmed_hosts_copy, warmed_hosts_per_locality_copy,
+                         excluded_hosts_copy, excluded_hosts_per_locality_copy,
                          locality_weights = host_set->localityWeights(), hosts_added, hosts_removed,
                          overprovisioning_factor = host_set->overprovisioningFactor()]() {
     ThreadLocalClusterManagerImpl::updateClusterMembership(
         name, priority,
         HostSetImpl::updateHostsParams(hosts_copy, hosts_per_locality_copy, healthy_hosts_copy,
                                        healthy_hosts_per_locality_copy, degraded_hosts_copy,
-                                       degraded_hosts_per_locality_copy, warmed_hosts_copy,
-                                       warmed_hosts_per_locality_copy),
+                                       degraded_hosts_per_locality_copy, excluded_hosts_copy,
+                                       excluded_hosts_per_locality_copy),
         locality_weights, hosts_added, hosts_removed, *tls_, overprovisioning_factor);
   });
 }
