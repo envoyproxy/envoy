@@ -201,14 +201,14 @@ typedef std::shared_ptr<const Host> HostConstSharedPtr;
 typedef std::vector<HostSharedPtr> HostVector;
 typedef Phantom<HostVector, Healthy> HealthyHostVector;
 typedef Phantom<HostVector, Degraded> DegradedHostVector;
-typedef Phantom<HostVector, Warmed> WarmedHostVector;
+typedef Phantom<HostVector, Excluded> ExcludedHostVector;
 typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
 
 typedef std::shared_ptr<const HealthyHostVector> HealthyHostVectorConstSharedPtr;
 typedef std::shared_ptr<const DegradedHostVector> DegradedHostVectorConstSharedPtr;
-typedef std::shared_ptr<const WarmedHostVector> WarmedHostVectorConstSharedPtr;
+typedef std::shared_ptr<const ExcludedHostVector> ExcludedHostVectorConstSharedPtr;
 
 typedef std::unique_ptr<HostVector> HostListPtr;
 typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
@@ -292,9 +292,10 @@ public:
   virtual const HostVector& degradedHosts() const PURE;
 
   /*
-   * @return all warmed hosts contained in the set at the current time.
+   * @return all excluded hosts contained in the set at the current time. Excluded hosts should be
+   * ignored when computing load balancing weights, but may overlap with hosts in hosts().
    * */
-  virtual const HostVector& warmedHosts() const PURE;
+  virtual const HostVector& excludedHosts() const PURE;
 
   /**
    * @return hosts per locality.
@@ -312,9 +313,9 @@ public:
   virtual const HostsPerLocality& degradedHostsPerLocality() const PURE;
 
   /**
-   * @return same as hostsPerLocality but only contains warmed hosts.
+   * @return same as hostsPerLocality but only contains excluded hosts.
    */
-  virtual const HostsPerLocality& warmedHostsPerLocality() const PURE;
+  virtual const HostsPerLocality& excludedHostsPerLocality() const PURE;
 
   /**
    * @return weights for each locality in the host set.
@@ -394,11 +395,11 @@ public:
     HostVectorConstSharedPtr hosts;
     HealthyHostVectorConstSharedPtr healthy_hosts;
     DegradedHostVectorConstSharedPtr degraded_hosts;
-    WarmedHostVectorConstSharedPtr warmed_hosts;
+    ExcludedHostVectorConstSharedPtr excluded_hosts;
     HostsPerLocalityConstSharedPtr hosts_per_locality;
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
-    HostsPerLocalityConstSharedPtr warmed_hosts_per_locality;
+    HostsPerLocalityConstSharedPtr excluded_hosts_per_locality;
   };
 
   /**

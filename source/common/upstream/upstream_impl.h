@@ -289,7 +289,7 @@ public:
                                                           ? overprovisioning_factor.value()
                                                           : kDefaultOverProvisioningFactor),
         hosts_(new HostVector()), healthy_hosts_(new HealthyHostVector()),
-        degraded_hosts_(new DegradedHostVector()), warmed_hosts_(new WarmedHostVector()) {}
+        degraded_hosts_(new DegradedHostVector()), excluded_hosts_(new ExcludedHostVector()) {}
 
   /**
    * Install a callback that will be invoked when the host set membership changes.
@@ -304,7 +304,7 @@ public:
   const HostVector& hosts() const override { return *hosts_; }
   const HostVector& healthyHosts() const override { return healthy_hosts_->get(); }
   const HostVector& degradedHosts() const override { return degraded_hosts_->get(); }
-  const HostVector& warmedHosts() const override { return warmed_hosts_->get(); }
+  const HostVector& excludedHosts() const override { return excluded_hosts_->get(); }
   const HostsPerLocality& hostsPerLocality() const override { return *hosts_per_locality_; }
   const HostsPerLocality& healthyHostsPerLocality() const override {
     return *healthy_hosts_per_locality_;
@@ -312,8 +312,8 @@ public:
   const HostsPerLocality& degradedHostsPerLocality() const override {
     return *degraded_hosts_per_locality_;
   }
-  const HostsPerLocality& warmedHostsPerLocality() const override {
-    return *warmed_hosts_per_locality_;
+  const HostsPerLocality& excludedHostsPerLocality() const override {
+    return *excluded_hosts_per_locality_;
   }
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseHealthyLocality() override;
@@ -337,8 +337,8 @@ public:
                     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                     DegradedHostVectorConstSharedPtr degraded_hosts,
                     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
-                    WarmedHostVectorConstSharedPtr warmed_hosts,
-                    HostsPerLocalityConstSharedPtr warmed_counts_per_locality);
+                    ExcludedHostVectorConstSharedPtr excluded_hosts,
+                    HostsPerLocalityConstSharedPtr excluded_hosts_per_locality);
   static PrioritySet::UpdateHostsParams
   partitionHosts(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality);
 
@@ -357,7 +357,8 @@ private:
   // locality.
   static double effectiveLocalityWeight(uint32_t index,
                                         const HostsPerLocality& eligible_hosts_per_locality,
-                                        const HostsPerLocality& warmed_counts_per_locality,
+                                        const HostsPerLocality& excluded_hosts_per_locality,
+                                        const HostsPerLocality& all_hosts_per_locality,
                                         const LocalityWeights& locality_weights,
                                         uint32_t overprovisioning_factor);
 
@@ -366,11 +367,11 @@ private:
   HostVectorConstSharedPtr hosts_;
   HealthyHostVectorConstSharedPtr healthy_hosts_;
   DegradedHostVectorConstSharedPtr degraded_hosts_;
-  WarmedHostVectorConstSharedPtr warmed_hosts_;
+  ExcludedHostVectorConstSharedPtr excluded_hosts_;
   HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_{HostsPerLocalityImpl::empty()};
-  HostsPerLocalityConstSharedPtr warmed_hosts_per_locality_{HostsPerLocalityImpl::empty()};
+  HostsPerLocalityConstSharedPtr excluded_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   // TODO(mattklein123): Remove mutable.
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       member_update_cb_helper_;
@@ -402,7 +403,7 @@ private:
       std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
       const HostsPerLocality& eligible_hosts_per_locality, const HostVector& eligible_hosts,
       HostsPerLocalityConstSharedPtr all_hosts_per_locality,
-      HostsPerLocalityConstSharedPtr warmed_counts_per_locality,
+      HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
       LocalityWeightsConstSharedPtr locality_weights, uint32_t overprovisioning_factor);
 
   static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
@@ -656,13 +657,13 @@ public:
   resolveProtoAddress(const envoy::api::v2::core::Address& address);
 
   // Partitions the provided list of hosts into three new lists containing the healthy, degraded
-  // and warmed hosts respectively.
+  // and excluded hosts respectively.
   static std::tuple<HealthyHostVectorConstSharedPtr, DegradedHostVectorConstSharedPtr,
-                    WarmedHostVectorConstSharedPtr>
+                    ExcludedHostVectorConstSharedPtr>
   partitionHostList(const HostVector& hosts);
 
   // Partitions the provided list of hosts per locality into three new lists containing the healthy,
-  // degraded and warmed hosts respectively.
+  // degraded and excluded hosts respectively.
   static std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
                     HostsPerLocalityConstSharedPtr>
   partitionHostsPerLocality(const HostsPerLocality& hosts);

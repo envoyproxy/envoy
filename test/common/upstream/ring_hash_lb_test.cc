@@ -90,7 +90,6 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
       makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
       makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
   config_ = envoy::api::v2::Cluster::RingHashLbConfig();
@@ -162,10 +161,8 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(RingHashFailoverTest, BasicFailover) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  host_set_.warmed_hosts_ = host_set_.hosts_;
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
-  failover_host_set_.warmed_hosts_ = failover_host_set_.hosts_;
 
   config_ = envoy::api::v2::Cluster::RingHashLbConfig();
   config_.value().mutable_minimum_ring_size()->set_value(12);
@@ -193,7 +190,6 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
   host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
-  host_set_.warmed_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   lb = lb_->factory()->create();
   EXPECT_CALL(random_, random()).WillOnce(Return(69));
@@ -209,7 +205,6 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
       makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
       makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
   config_ = envoy::api::v2::Cluster::RingHashLbConfig();
@@ -263,7 +258,6 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
   config_ = envoy::api::v2::Cluster::RingHashLbConfig();
@@ -290,7 +284,6 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81"),
                       makeTestHost(info_, "tcp://127.0.0.1:82")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
   // hash ring:
@@ -315,7 +308,6 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
                       makeTestHost(info_, "tcp://127.0.0.1:91", 2),
                       makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
   // enforce a ring size of exactly six entries
@@ -345,7 +337,6 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
                       makeTestHost(info_, "tcp://127.0.0.1:91", 2),
                       makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
   config_ = envoy::api::v2::Cluster::RingHashLbConfig();
@@ -374,7 +365,6 @@ TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
                       makeTestHost(info_, "tcp://127.0.0.1:91")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ =
       makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}});
   hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
@@ -392,7 +382,6 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
       makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
       makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
   hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
@@ -427,7 +416,6 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
       makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
       makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
   hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
@@ -464,7 +452,6 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
       makeTestHost(info_, "tcp://127.0.0.1:90", 1), makeTestHost(info_, "tcp://127.0.0.1:91", 2),
       makeTestHost(info_, "tcp://127.0.0.1:92", 1), makeTestHost(info_, "tcp://127.0.0.1:93", 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
   hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
@@ -502,7 +489,6 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
       makeTestHost(info_, "tcp://127.0.0.1:90", 1), makeTestHost(info_, "tcp://127.0.0.1:91", 2),
       makeTestHost(info_, "tcp://127.0.0.1:92", 1), makeTestHost(info_, "tcp://127.0.0.1:93", 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
   hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
@@ -538,7 +524,6 @@ TEST_P(RingHashLoadBalancerTest, SmallFractionalScale) {
       makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
       makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
   config_ = envoy::api::v2::Cluster::RingHashLbConfig();
@@ -579,7 +564,6 @@ TEST_P(RingHashLoadBalancerTest, LargeFractionalScale) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
                       makeTestHost(info_, "tcp://127.0.0.1:91")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
   config_ = envoy::api::v2::Cluster::RingHashLbConfig();
@@ -614,7 +598,6 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
     (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
   }
   hostSet().healthy_hosts_ = hostSet().hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality({heavy_but_sparse, light_but_dense});
   hostSet().healthy_hosts_per_locality_ = hostSet().hosts_per_locality_;
   hostSet().locality_weights_ = makeLocalityWeights({127, 1});

@@ -81,7 +81,6 @@ public:
     for (; i < num_degraded_hosts; ++i) {
       host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
     }
-    host_set.warmed_hosts_ = host_set.hosts_;
     host_set.runCallbacks({}, {});
   }
 
@@ -460,10 +459,8 @@ typedef RoundRobinLoadBalancerTest FailoverTest;
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(FailoverTest, BasicFailover) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  host_set_.warmed_hosts_ = host_set_.hosts_;
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
-  failover_host_set_.warmed_hosts_ = failover_host_set_.hosts_;
   init(false);
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
@@ -472,7 +469,6 @@ TEST_P(FailoverTest, BasicFailover) {
 TEST_P(FailoverTest, BasicDegradedHosts) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
   host_set_.degraded_hosts_ = host_set_.hosts_;
-  host_set_.warmed_hosts_ = host_set_.hosts_;
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
   EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->chooseHost(nullptr));
@@ -483,10 +479,8 @@ TEST_P(FailoverTest, BasicDegradedHosts) {
 TEST_P(FailoverTest, BasicFailoverDegradedHosts) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
   host_set_.degraded_hosts_ = host_set_.hosts_;
-  host_set_.warmed_hosts_ = host_set_.hosts_;
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
-  failover_host_set_.warmed_hosts_ = failover_host_set_.hosts_;
   init(false);
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
@@ -494,9 +488,7 @@ TEST_P(FailoverTest, BasicFailoverDegradedHosts) {
 // Test that extending the priority set with an existing LB causes the correct updates.
 TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  host_set_.warmed_hosts_ = host_set_.hosts_;
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
-  failover_host_set_.warmed_hosts_ = failover_host_set_.hosts_;
   init(false);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -508,7 +500,6 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
   tertiary_host_set_.hosts_ = *hosts;
   tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
-  tertiary_host_set_.warmed_hosts_ = tertiary_host_set_.hosts_;
   HostVector add_hosts;
   add_hosts.push_back(tertiary_host_set_.hosts_[0]);
   tertiary_host_set_.runCallbacks(add_hosts, {});
@@ -528,9 +519,7 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
 // Test extending the priority set.
 TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  host_set_.warmed_hosts_ = host_set_.hosts_;
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
-  failover_host_set_.warmed_hosts_ = failover_host_set_.hosts_;
   init(true);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -542,7 +531,6 @@ TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82")}));
   tertiary_host_set_.hosts_ = *hosts;
   tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
-  tertiary_host_set_.warmed_hosts_ = tertiary_host_set_.hosts_;
   HostVector add_hosts;
   add_hosts.push_back(tertiary_host_set_.hosts_[0]);
   tertiary_host_set_.runCallbacks(add_hosts, {});
@@ -556,9 +544,7 @@ TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
 
 TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  host_set_.warmed_hosts_ = host_set_.hosts_;
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81")};
-  failover_host_set_.warmed_hosts_ = failover_host_set_.hosts_;
   init(true);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
@@ -569,7 +555,6 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   MockHostSet& tertiary_host_set_ = *priority_set_.getMockHostSet(2);
   HostVectorSharedPtr hosts2(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:84")}));
   tertiary_host_set_.hosts_ = *hosts2;
-  tertiary_host_set_.warmed_hosts_ = *hosts2;
   tertiary_host_set_.healthy_hosts_ = tertiary_host_set_.hosts_;
   HostVector add_hosts;
   add_hosts.push_back(tertiary_host_set_.hosts_[0]);
@@ -592,7 +577,6 @@ TEST_P(FailoverTest, PrioritiesWithNotAllWarmedHosts) {
   host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
   host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
-  host_set_.warmed_hosts_ = {host_set_.hosts_[0]};
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
   init(true);
@@ -612,7 +596,6 @@ TEST_P(FailoverTest, PrioritiesWithZeroWarmedHosts) {
                       makeTestHost(info_, "tcp://127.0.0.1:81")};
   failover_host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
-  failover_host_set_.warmed_hosts_ = failover_host_set_.hosts_;
 
   init(true);
 
@@ -631,7 +614,6 @@ TEST_P(RoundRobinLoadBalancerTest, NoHosts) {
 TEST_P(RoundRobinLoadBalancerTest, SingleHost) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   init(false);
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
 }
@@ -640,7 +622,6 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   init(false);
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
@@ -656,7 +637,6 @@ TEST_P(RoundRobinLoadBalancerTest, Seed) {
       makeTestHost(info_, "tcp://127.0.0.1:82"),
   };
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
   init(false);
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
@@ -672,7 +652,6 @@ TEST_P(RoundRobinLoadBalancerTest, Locality) {
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{(*hosts)[1]}, {(*hosts)[0]}, {(*hosts)[2]}});
   hostSet().hosts_ = *hosts;
-  hostSet().warmed_hosts_ = *hosts;
   hostSet().healthy_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(false);
@@ -709,7 +688,6 @@ TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
       makeHostsPerLocality({{}, {(*hosts)[1], (*hosts)[2]}});
 
   hostSet().hosts_ = *hosts;
-  hostSet().warmed_hosts_ = *hosts;
   hostSet().healthy_hosts_ = *healthy_hosts;
   hostSet().degraded_hosts_ = *degraded_hosts;
   hostSet().hosts_per_locality_ = hosts_per_locality;
@@ -730,7 +708,6 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   init(false);
   // Initial weights respected.
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
@@ -793,7 +770,6 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
   init(false);
   // Initial weights respected.
@@ -812,7 +788,6 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
       makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
       makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
       makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
-  hostSet().warmed_hosts_ = hostSet().hosts_;
 
   init(false);
   EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(nullptr));
@@ -842,7 +817,6 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
 
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_ = *hosts;
-  hostSet().warmed_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
 
   init(false);
@@ -888,7 +862,6 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
 
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_ = *hosts;
-  hostSet().warmed_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   common_config_.mutable_healthy_panic_threshold()->set_value(0);
   common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
@@ -937,7 +910,6 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareDifferentZoneSize) {
 
   hostSet().healthy_hosts_ = *hosts;
   hostSet().hosts_ = *hosts;
-  hostSet().warmed_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   common_config_.mutable_healthy_panic_threshold()->set_value(100);
   common_config_.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(98);
@@ -977,7 +949,6 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
 
   hostSet().healthy_hosts_ = *hosts;
   hostSet().hosts_ = *hosts;
-  hostSet().warmed_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
   updateHosts(hosts, hosts_per_locality);
@@ -1025,7 +996,6 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
 
   hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
-  hostSet().warmed_hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
@@ -1048,7 +1018,6 @@ TEST_P(RoundRobinLoadBalancerTest, LowPrecisionForDistribution) {
   // upstream_hosts and local_hosts do not matter, zone aware routing is based on per zone hosts.
   HostVectorSharedPtr upstream_hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80")}));
   hostSet().healthy_hosts_ = *upstream_hosts;
-  hostSet().warmed_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
   HostVectorSharedPtr local_hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0")}));
 
@@ -1129,7 +1098,6 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
       {{}, {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.2:80")}});
 
   hostSet().healthy_hosts_ = *hosts;
-  hostSet().warmed_hosts_ = *hosts;
   hostSet().hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
@@ -1161,7 +1129,6 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
 
   hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
-  hostSet().warmed_hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
@@ -1189,7 +1156,6 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
 
   hostSet().healthy_hosts_ = *upstream_hosts;
   hostSet().hosts_ = *upstream_hosts;
-  hostSet().warmed_hosts_ = *upstream_hosts;
   hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
@@ -1213,7 +1179,6 @@ TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHos
 
 TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -1254,7 +1219,6 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
   stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
@@ -1274,7 +1238,6 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
       makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
   stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(4);
@@ -1323,7 +1286,6 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
   stats_.max_host_weight_.set(2UL);
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
@@ -1366,7 +1328,6 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   stats_.max_host_weight_.set(2UL);
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
@@ -1398,7 +1359,6 @@ TEST_P(RandomLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
                               makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
-  hostSet().warmed_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));

@@ -551,11 +551,11 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
-  auto warmed_hosts = std::make_shared<WarmedHostVector>();
-  warmed_hosts->get().reserve(original_host_set_.degradedHosts().size());
-  for (const auto& host : original_host_set_.warmedHosts()) {
+  auto excluded_hosts = std::make_shared<ExcludedHostVector>();
+  excluded_hosts->get().reserve(original_host_set_.excludedHosts().size());
+  for (const auto& host : original_host_set_.excludedHosts()) {
     if (cached_predicate(*host)) {
-      warmed_hosts->get().emplace_back(host);
+      excluded_hosts->get().emplace_back(host);
     }
   }
 
@@ -576,8 +576,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
       original_host_set_.healthyHostsPerLocality().filter({cached_predicate})[0];
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality =
       original_host_set_.degradedHostsPerLocality().filter({cached_predicate})[0];
-  auto warmed_hosts_per_locality =
-      original_host_set_.warmedHostsPerLocality().filter({cached_predicate})[0];
+  auto excluded_hosts_per_locality =
+      original_host_set_.excludedHostsPerLocality().filter({cached_predicate})[0];
 
   // We can use the cached predicate here, since we trust that the hosts in hosts_added were also
   // present in the list of all hosts.
@@ -599,8 +599,8 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
 
   HostSetImpl::updateHosts(HostSetImpl::updateHostsParams(
                                hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality,
-                               degraded_hosts, degraded_hosts_per_locality, warmed_hosts,
-                               warmed_hosts_per_locality),
+                               degraded_hosts, degraded_hosts_per_locality, excluded_hosts,
+                               excluded_hosts_per_locality),
                            determineLocalityWeights(*hosts_per_locality), filtered_added,
                            filtered_removed, absl::nullopt);
 }
