@@ -495,7 +495,8 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
         // Fetch a connection pool for the upstream cluster.
         Http::ConnectionPool::Instance* conn_pool = getConnPool();
         if (!conn_pool) {
-          UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
+          UpstreamRequestPtr upstream_request =
+              std::make_unique<UpstreamRequest>(*this, *conn_pool);
           upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
         }
       }
