@@ -198,8 +198,9 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 
 void ConnectionImpl::StreamImpl::decodeHeaders() {
   maybeTransformUpgradeFromH2ToH1();
-  ASSERT(decoder_ != nullptr);
-  decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
+  if (decoder_ != nullptr) {
+    decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
+  }
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -446,8 +447,9 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
       if (stream->headers_->Status()->value() == "100") {
         ASSERT(!stream->remote_end_stream_);
-        ASSERT(stream->decoder_ != nullptr);
-        stream->decoder_->decode100ContinueHeaders(std::move(stream->headers_));
+        if (stream->decoder_ != nullptr) {
+          stream->decoder_->decode100ContinueHeaders(std::move(stream->headers_));
+        }
       } else {
         stream->decodeHeaders();
       }
@@ -474,8 +476,9 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
             stats_.too_many_header_frames_.inc();
             throw CodecProtocolException("Unexpected 'trailers' with no end stream.");
           } else {
-            ASSERT(stream->decoder_ != nullptr);
-            stream->decoder_->decodeTrailers(std::move(stream->headers_));
+            if (stream->decoder_ != nullptr) {
+              stream->decoder_->decodeTrailers(std::move(stream->headers_));
+            }
           }
         } else {
           ASSERT(!nghttp2_session_check_server_session(session_));
@@ -504,8 +507,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     // It's possible that we are waiting to send a deferred reset, so only raise data if local
     // is not complete.
-    if (!stream->deferred_reset_) {
-      ASSERT(stream->decoder_ != nullptr);
+    if (!stream->deferred_reset_ && stream->decoder_ != nullptr) {
       stream->decoder_->decodeData(stream->pending_recv_data_, stream->remote_end_stream_);
     }
 
@@ -557,16 +559,22 @@ int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
   ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, nghttp2_strerror(error_code),
                  stream_id);
 
+  StreamImpl* stream = getStream(stream_id);
   // The stream is about to be closed due to an invalid header or messaging. Don't kill the
   // entire connection if one stream has bad headers or messaging.
   if (error_code == NGHTTP2_ERR_HTTP_HEADER || error_code == NGHTTP2_ERR_HTTP_MESSAGING) {
     stats_.rx_messaging_error_.inc();
-    StreamImpl* stream = getStream(stream_id);
     if (stream != nullptr) {
       // See comment below in onStreamClose() for why we do this.
       stream->reset_due_to_messaging_error_ = true;
     }
     return 0;
+  }
+
+  if (stream != nullptr) {
+    // nghttp2 returns error, and ConnectionManager will call resetAllStreams(). Null out
+    // stream->decoder_ to avoid referring to it.
+    stream->decoder_ = nullptr;
   }
 
   // Cause dispatch to return with an error code.
