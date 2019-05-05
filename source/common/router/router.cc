@@ -353,11 +353,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Fetch a connection pool for the upstream cluster.
-  Http::ConnectionPool::Instance* conn_pool = getConnPool();
-  if (!conn_pool) {
-    sendNoHealthyUpstreamResponse();
-    return Http::FilterHeadersStatus::StopIteration;
+  if (upstream_requests_.front() == nullptr) {
+    // Fetch a connection pool for the upstream cluster.
+    Http::ConnectionPool::Instance* conn_pool = getConnPool();
+    if (!conn_pool) {
+      sendNoHealthyUpstreamResponse();
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
   timeout_ = FilterUtility::finalTimeout(*route_entry_, headers, !config_.suppress_envoy_headers_,
@@ -392,8 +394,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
-  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
-  upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  if (upstream_requests_.front() == nullptr) {
+    UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
+    upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+  }
+
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
     onRequestComplete();
@@ -475,15 +480,30 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
   metadata.insert(metadata_map.begin(), metadata_map.end());
   Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata);
 
-  ASSERT(upstream_requests_.size() == 1);
   if (upstream_requests_.front() == nullptr) {
     ENVOY_STREAM_LOG(trace,
                      "the upstream_request_ is not ready. Storing metadata_map to encode later: {}",
                      *callbacks_, metadata_map);
     downstream_metadata_map_vector_.emplace_back(std::move(metadata_map_ptr));
+
+    // Creates new upstream_request.
+    route_ = callbacks_->route();
+    if (route_ != nullptr) {
+      route_entry_ = route_->routeEntry();
+      Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
+      if (cluster != nullptr && !cluster->maintenanceMode()) {
+        // Fetch a connection pool for the upstream cluster.
+        Http::ConnectionPool::Instance* conn_pool = getConnPool();
+        if (!conn_pool) {
+          UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
+          upstream_request->moveIntoList(std::move(upstream_request), upstream_requests_);
+        }
+      }
+    }
     return Http::FilterMetadataStatus::Continue;
   }
 
+  ASSERT(upstream_requests_.size() == 1);
   upstream_requests_.front()->encodeMetadata(std::move(metadata_map_ptr));
   return Http::FilterMetadataStatus::Continue;
 }
