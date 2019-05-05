@@ -70,7 +70,6 @@ public:
       const envoy::config::common::tap::v2alpha::CommonExtensionConfig_TDSConfig& tds,
       ExtensionConfig& ptr,
 
-
       const std::string& stat_prefix,
       Stats::Scope& stats,
       Upstream::ClusterManager& cluster_Manager,
@@ -175,9 +174,13 @@ private:
 class TapConfigProviderManagerImpl : public TapConfigProviderManager,
                                        public Singleton::Instance {
 public:
-  TapConfigProviderManagerImpl(Server::Admin& admin): admin_(admin){
+      
+  TapConfigProviderManagerImpl(Server::Admin& admin, Init::Manager* init_manager = nullptr): admin_(admin), init_manager_(init_manager) {
     // keep admin as we'll use it for admin endpoint.
     static_cast<void>(admin_);
+  }
+  ~TapConfigProviderManagerImpl(){
+    static_cast<void>(1);
   }
 
   // std::unique_ptr<envoy::admin::v2alpha::RoutesConfigDump> dumpRouteConfigs() const;
@@ -189,7 +192,6 @@ public:
       /* Server::Configuration::FactoryContext& factory_context  be explicit here ... */
       // const std::string& stat_prefix
       Extensions::Common::Tap::ExtensionConfig& ptr,
-
 
 
       const std::string& stat_prefix,
@@ -211,8 +213,8 @@ private:
   std::unordered_map<uint64_t, std::weak_ptr<TdsTapConfigSubscription>>
       tap_config_subscriptions_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
-  Init::Manager* init_manager_;
   Server::Admin& admin_;
+  Init::Manager* init_manager_{};
 
 
   friend class TdsTapConfigSubscription;

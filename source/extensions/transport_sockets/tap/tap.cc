@@ -58,6 +58,8 @@ TapSocketFactory::TapSocketFactory(
     Network::TransportSocketFactoryPtr&& transport_socket_factory)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), context.admin(),
                           context.singletonManager(), context.threadLocal(), context.dispatcher(),
+
+                          context.initManager(),
                           "tap-socket", // TODO: un-hardcode
                           context.statsScope(),
                           context.clusterManager(),

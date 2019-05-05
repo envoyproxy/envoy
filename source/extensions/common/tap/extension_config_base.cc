@@ -43,8 +43,7 @@ ExtensionConfigBase::ExtensionConfigBase(
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher,
     
-    
-    
+      Init::Manager* init_manager,
       const std::string& stat_prefix,
       Stats::Scope& stats,
       Upstream::ClusterManager& cluster_Manager,
@@ -72,13 +71,13 @@ ExtensionConfigBase::ExtensionConfigBase(
     break;
   }
   case envoy::config::common::tap::v2alpha::CommonExtensionConfig::kTdsConfig: {
-  std::shared_ptr<TapConfigProviderManager> tap_config_provider_manager =
+  tap_config_provider_manager_ =
       singleton_manager.getTyped<TapConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(tap_config_provider_manager), [&admin] {            
-            return std::make_shared<TapConfigProviderManagerImpl>(admin);
+          SINGLETON_MANAGER_REGISTERED_NAME(tap_config_provider_manager), [&admin, init_manager] {            
+            return std::make_shared<TapConfigProviderManagerImpl>(admin, init_manager);
           });
 
-          subscription_ = tap_config_provider_manager->subscribeTap(
+          subscription_ = tap_config_provider_manager_->subscribeTap(
             proto_config_.tds_config(),
             *this,
             stat_prefix,
@@ -89,6 +88,7 @@ ExtensionConfigBase::ExtensionConfigBase(
             random,
             api
             );
+            break;
   }
   default: {
     NOT_REACHED_GCOVR_EXCL_LINE;

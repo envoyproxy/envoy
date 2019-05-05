@@ -14,6 +14,8 @@ FilterConfigImpl::FilterConfigImpl(
      Server::Configuration::FactoryContext& context)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), context.admin(),
                           context.singletonManager(), context.threadLocal(), context.dispatcher(),
+
+                          &context.initManager(),
                           stats_prefix,
                           context.scope(),
                           context.clusterManager(),

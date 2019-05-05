@@ -31,6 +31,7 @@ protected:
                       Event::Dispatcher& main_thread_dispatcher,
                       
                       
+      Init::Manager* init_manager,
       const std::string& stat_prefix,
       Stats::Scope& stats,
       Upstream::ClusterManager& cluster_Manager,
@@ -58,6 +59,8 @@ private:
   ThreadLocal::SlotPtr tls_slot_;
   AdminHandlerSharedPtr admin_handler_;
 
+  // manager must be before subscription so it is destructed after.
+  std::shared_ptr<TapConfigProviderManager> tap_config_provider_manager_;
   TdsTapConfigSubscriptionHandlePtr subscription_;
 };
 
