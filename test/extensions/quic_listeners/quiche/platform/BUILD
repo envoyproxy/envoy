@@ -137,6 +137,12 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_platform_sleep_impl_lib",
+    hdrs = ["quic_sleep_impl.h"],
+    deps = ["@com_googlesource_quiche//:quic_core_time_lib"],
+)
+
+envoy_cc_test_library(
     name = "quic_platform_system_event_loop_impl_lib",
     hdrs = ["quic_system_event_loop_impl.h"],
 )

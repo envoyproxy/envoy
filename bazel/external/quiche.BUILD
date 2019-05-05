@@ -172,6 +172,13 @@ envoy_cc_library(
 )
 
 envoy_cc_test_library(
+    name = "quic_platform_epoll_lib",
+    hdrs = ["quiche/quic/platform/api/quic_epoll.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_epoll_impl_lib"],
+)
+
+envoy_cc_test_library(
     name = "quic_platform_expect_bug",
     hdrs = ["quiche/quic/platform/api/quic_expect_bug.h"],
     repository = "@envoy",
@@ -198,6 +205,13 @@ envoy_cc_test_library(
     hdrs = ["quiche/quic/platform/api/quic_port_utils.h"],
     repository = "@envoy",
     deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_port_utils_impl_lib"],
+)
+
+envoy_cc_test_library(
+    name = "quic_platform_sleep",
+    hdrs = ["quiche/quic/platform/api/quic_sleep.h"],
+    repository = "@envoy",
+    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_sleep_impl_lib"],
 )
 
 envoy_cc_test_library(
@@ -282,15 +296,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_sleep",
-    hdrs = ["quiche/quic/platform/api/quic_sleep.h"],
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quic_platform_sleep_impl_lib"],
-)
-
-envoy_cc_library(
-    name = "quic_buffer_allocator_lib",
+    name = "quic_core_buffer_allocator_lib",
     srcs = [
         "quiche/quic/core/quic_buffer_allocator.cc",
         "quiche/quic/core/quic_simple_buffer_allocator.cc",
@@ -302,6 +308,46 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [":quic_platform_export"],
+)
+
+envoy_cc_library(
+    name = "quic_core_error_codes_lib",
+    srcs = ["quiche/quic/core/quic_error_codes.cc"],
+    hdrs = ["quiche/quic/core/quic_error_codes.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [":quic_platform_export"],
+)
+
+envoy_cc_library(
+    name = "quic_core_time_lib",
+    srcs = ["quiche/quic/core/quic_time.cc"],
+    hdrs = ["quiche/quic/core/quic_time.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":quic_platform_base"],
+)
+
+envoy_cc_library(
+    name = "quic_core_types_lib",
+    srcs = [
+        "quiche/quic/core/quic_connection_id.cc",
+        "quiche/quic/core/quic_packet_number.cc",
+        "quiche/quic/core/quic_types.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_connection_id.h",
+        "quiche/quic/core/quic_packet_number.h",
+        "quiche/quic/core/quic_types.h",
+    ],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_error_codes_lib",
+        ":quic_core_time_lib",
+        ":quic_platform_base",
+    ],
 )
 
 envoy_cc_test_library(
@@ -334,49 +380,6 @@ envoy_cc_test_library(
     copts = quiche_copt,
     repository = "@envoy",
     deps = [":epoll_server_platform"],
-)
-
-envoy_cc_test_library(
-    name = "quic_platform_epoll_lib",
-    hdrs = ["quiche/quic/platform/api/quic_epoll.h"],
-    repository = "@envoy",
-    deps = ["@envoy//test/extensions/quic_listeners/quiche/platform:quic_platform_epoll_impl_lib"],
-)
-
-envoy_cc_library(
-    name = "quic_core_base",
-    srcs = [
-        "quiche/quic/core/crypto/quic_random.cc",
-        "quiche/quic/core/quic_connection_id.cc",
-        "quiche/quic/core/quic_constants.cc",
-        "quiche/quic/core/quic_error_codes.cc",
-        "quiche/quic/core/quic_packet_number.cc",
-        "quiche/quic/core/quic_tag.cc",
-        "quiche/quic/core/quic_time.cc",
-        "quiche/quic/core/quic_types.cc",
-        "quiche/quic/core/quic_versions.cc",
-    ],
-    hdrs = [
-        "quiche/quic/core/crypto/quic_random.h",
-        "quiche/quic/core/quic_connection_id.h",
-        "quiche/quic/core/quic_constants.h",
-        "quiche/quic/core/quic_error_codes.h",
-        "quiche/quic/core/quic_interval.h",
-        "quiche/quic/core/quic_interval_set.h",
-        "quiche/quic/core/quic_packet_number.h",
-        "quiche/quic/core/quic_tag.h",
-        "quiche/quic/core/quic_time.h",
-        "quiche/quic/core/quic_types.h",
-        "quiche/quic/core/quic_versions.h",
-    ],
-    copts = quiche_copt,
-    repository = "@envoy",
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quic_platform_base",
-        # ":quic_time_lib",
-        "//external:ssl",
-    ],
 )
 
 envoy_cc_test(
