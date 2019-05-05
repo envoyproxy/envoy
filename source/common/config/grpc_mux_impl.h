@@ -40,8 +40,6 @@ public:
 
   void sendDiscoveryRequest(const std::string& type_url);
 
-  ProtobufTypes::MessagePtr dumpControlPlaneConfig() const;
-
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
@@ -55,7 +53,11 @@ public:
 
 private:
   void setRetryTimer();
-  void populateControlPlaneInfo(const envoy::api::v2::DiscoveryResponse& message);
+  void updateControlPlaneConfigDump(const envoy::api::v2::DiscoveryResponse& message);
+  void populateControlPlaneIdentifier(
+      envoy::admin::v2alpha::ControlPlaneConfigDump_ConfigSourceControlPlaneInfo*
+          config_source_info,
+      const std::string& identifier);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::set<std::string>& resources, GrpcMuxCallbacks& callbacks,
@@ -106,16 +108,9 @@ private:
   // Envoy's dependency ordering.
   std::list<std::string> subscriptions_;
   const std::string& xds_service_;
-  Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   TimeSource& time_source_;
+  Server::ConfigTracker& config_tracker_;
   envoy::api::v2::core::GrpcService grpc_service_;
-  // Per Service Control Plane configuration that Envoy is connected to. For services like
-  // RouteDiscoveryService and EndpointDiscovery the configuration allows to specify multiple config
-  // sources, for example a different RouteDiscoveryService can be specified for each listener.
-  static std::unordered_map<
-      std::string,
-      std::list<envoy::admin::v2alpha::ControlPlaneConfigDump::ConfigSourceControlPlaneInfo>>
-      per_service_control_plane_info_;
 
   // A queue to store requests while rate limited. Note that when requests cannot be sent due to the
   // gRPC stream being down, this queue does not store them; rather, they are simply dropped.

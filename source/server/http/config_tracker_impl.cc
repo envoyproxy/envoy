@@ -21,5 +21,24 @@ ConfigTrackerImpl::EntryOwnerImpl::~EntryOwnerImpl() {
   ASSERT(erased == 1);
 }
 
+void ConfigTrackerImpl::addOrUpdateManagedConfig(const std::string& key,
+                                                 ProtobufTypes::MessageSharedPtr message) {
+  const auto existing_message = managed_config_->find(key);
+  if (existing_message != managed_config_->end()) {
+    (*managed_config_)[key] = message;
+  } else {
+    managed_config_->insert(std::make_pair(key, message));
+  }
+}
+
+ProtobufTypes::MessageSharedPtr ConfigTrackerImpl::getManagedConfig(const std::string& key) const {
+  auto existing_message = managed_config_->find(key);
+  return existing_message != managed_config_->end() ? existing_message->second : nullptr;
+}
+
+const ConfigTracker::ManagedConfigMap& ConfigTrackerImpl::getManagedConfigMap() const {
+  return *managed_config_;
+}
+
 } // namespace Server
 } // namespace Envoy

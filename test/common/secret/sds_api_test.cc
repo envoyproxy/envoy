@@ -56,7 +56,8 @@ TEST_F(SdsApiTest, BasicTest) {
   google_grpc->set_stat_prefix("test");
   TlsCertificateSdsApi sds_api(
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_, config_tracker_);
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_,
+      config_tracker_);
 
   NiceMock<Grpc::MockAsyncClient>* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
   NiceMock<Grpc::MockAsyncClientFactory>* factory{new NiceMock<Grpc::MockAsyncClientFactory>()};
@@ -79,7 +80,8 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_, config_tracker_);
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_,
+      config_tracker_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -122,10 +124,10 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  CertificateValidationContextSdsApi sds_api(server.localInfo(), server.dispatcher(),
-                                             server.random(), server.stats(),
-                                             server.clusterManager(), init_manager, config_source,
-                                             "abc.com", []() {}, *api_, config_tracker_);
+  CertificateValidationContextSdsApi sds_api(
+      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_,
+      config_tracker_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -175,10 +177,10 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  CertificateValidationContextSdsApi sds_api(server.localInfo(), server.dispatcher(),
-                                             server.random(), server.stats(),
-                                             server.clusterManager(), init_manager, config_source,
-                                             "abc.com", []() {}, *api_, config_tracker_);
+  CertificateValidationContextSdsApi sds_api(
+      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_,
+      config_tracker_);
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -248,7 +250,8 @@ TEST_F(SdsApiTest, EmptyResource) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_, config_tracker_);
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_,
+      config_tracker_);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> secret_resources;
 
@@ -263,7 +266,8 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_, config_tracker_);
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_,
+      config_tracker_);
 
   std::string yaml =
       R"EOF(
@@ -293,7 +297,8 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   envoy::api::v2::core::ConfigSource config_source;
   TlsCertificateSdsApi sds_api(
       server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_, config_tracker_);
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {}, *api_,
+      config_tracker_);
 
   std::string yaml =
       R"EOF(

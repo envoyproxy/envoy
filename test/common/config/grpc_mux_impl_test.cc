@@ -185,60 +185,6 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
   grpc_mux_->pause("foo");
 }
 
-// Validate that controlplane config dump is generated correctly.
-TEST_F(GrpcMuxImplTest, DumpControlPlaneConfig) {
-  const std::string expected_config_dump = R"EOF({
- "service_control_plane_info": [
-    {
-     "xds_service": "envoy.service.discovery.v2.AggregatedDiscoveryService",
-     "config_source_control_plane": [
-      {
-       "grpc_service": {
-        "envoy_grpc": {
-         "cluster_name": "xds_cluster"
-        }
-       },
-       "control_plane": {
-        "identifier": "control_plane_1"
-       },
-      }
-     ]
-    }
-   ]
-  }
-  )EOF";
-  setup();
-
-  InSequence s;
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  NiceMock<MockGrpcMuxCallbacks> foo_callbacks;
-  auto foo_sub = grpc_mux_->subscribe(type_url, {"x", "y"}, foo_callbacks);
-
-  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(type_url, {"x", "y"}, "");
-  grpc_mux_->start();
-
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-      new envoy::api::v2::DiscoveryResponse());
-  response->mutable_control_plane()->set_identifier("control_plane_1");
-  response->set_type_url(type_url);
-  response->set_version_info("1");
-
-  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1")).Times(0);
-  expectSendMessage(type_url, {"x", "y"}, "1");
-  grpc_mux_->onDiscoveryResponse(std::move(response));
-
-  expectSendMessage(type_url, {}, "1");
-
-  Protobuf::util::MessageDifferencer message_differencer;
-  message_differencer.set_scope(Protobuf::util::MessageDifferencer::Scope::PARTIAL);
-
-  envoy::admin::v2alpha::ControlPlaneConfigDump control_plane_config_dump;
-  MessageUtil::loadFromJson(expected_config_dump, control_plane_config_dump);
-  EXPECT_TRUE(
-      message_differencer.Compare(control_plane_config_dump, *grpc_mux_->dumpControlPlaneConfig()));
-}
-
 // Validate behavior when type URL mismatches occur.
 TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   setup();

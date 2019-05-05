@@ -468,6 +468,12 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
     any_message.PackFrom(*message);
   }
 
+  for (const auto& managed_config_pair : config_tracker_.getManagedConfigMap()) {
+    RELEASE_ASSERT(managed_config_pair.second, "");
+    auto& any_message = *(dump.add_configs());
+    any_message.PackFrom(*managed_config_pair.second);
+  }
+
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
   response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print

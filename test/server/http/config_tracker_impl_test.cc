@@ -80,5 +80,16 @@ TEST_F(ConfigTrackerImplTest, OperationsWithinCallback) {
   EXPECT_EQ(0, cbs_map.count("test_key"));
 }
 
+TEST_F(ConfigTrackerImplTest, ManagedConfigTest) {
+  tracker.addOrUpdateManagedConfig("test_key", test_msg());
+  EXPECT_EQ(1, tracker.getManagedConfigMap().size());
+  tracker.addOrUpdateManagedConfig("test_key_1", test_msg());
+  EXPECT_EQ(2, tracker.getManagedConfigMap().size());
+  tracker.addOrUpdateManagedConfig("test_key_1", test_msg());
+  EXPECT_EQ(2, tracker.getManagedConfigMap().size());
+  EXPECT_NE(nullptr, tracker.getManagedConfig("test_key_1"));
+  EXPECT_EQ(nullptr, tracker.getManagedConfig("test_key_2"));
+}
+
 } // namespace Server
 } // namespace Envoy
