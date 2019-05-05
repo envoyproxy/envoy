@@ -353,9 +353,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  Http::ConnectionPool::Instance* conn_pool = nullptr;
   if (upstream_requests_.front() == nullptr) {
     // Fetch a connection pool for the upstream cluster.
-    Http::ConnectionPool::Instance* conn_pool = getConnPool();
+    conn_pool = getConnPool();
     if (!conn_pool) {
       sendNoHealthyUpstreamResponse();
       return Http::FilterHeadersStatus::StopIteration;
@@ -491,7 +492,7 @@ Http::FilterMetadataStatus Filter::decodeMetadata(Http::MetadataMap& metadata_ma
     if (route_ != nullptr) {
       route_entry_ = route_->routeEntry();
       Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
-      if (cluster != nullptr && !cluster->maintenanceMode()) {
+      if (cluster != nullptr && !cluster->info()->maintenanceMode()) {
         // Fetch a connection pool for the upstream cluster.
         Http::ConnectionPool::Instance* conn_pool = getConnPool();
         if (!conn_pool) {
