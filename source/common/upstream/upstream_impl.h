@@ -302,18 +302,34 @@ public:
 
   // Upstream::HostSet
   const HostVector& hosts() const override { return *hosts_; }
+  HostVectorConstSharedPtr hostsPtr() const override { return hosts_; }
   const HostVector& healthyHosts() const override { return healthy_hosts_->get(); }
+  HealthyHostVectorConstSharedPtr healthyHostsPtr() const override { return healthy_hosts_; }
   const HostVector& degradedHosts() const override { return degraded_hosts_->get(); }
+  DegradedHostVectorConstSharedPtr degradedHostsPtr() const override { return degraded_hosts_; }
   const HostVector& excludedHosts() const override { return excluded_hosts_->get(); }
+  ExcludedHostVectorConstSharedPtr excludedHostsPtr() const override { return excluded_hosts_; }
   const HostsPerLocality& hostsPerLocality() const override { return *hosts_per_locality_; }
+  HostsPerLocalityConstSharedPtr hostsPerLocalityPtr() const override {
+    return hosts_per_locality_;
+  }
   const HostsPerLocality& healthyHostsPerLocality() const override {
     return *healthy_hosts_per_locality_;
+  }
+  HostsPerLocalityConstSharedPtr healthyHostsPerLocalityPtr() const override {
+    return healthy_hosts_per_locality_;
   }
   const HostsPerLocality& degradedHostsPerLocality() const override {
     return *degraded_hosts_per_locality_;
   }
+  HostsPerLocalityConstSharedPtr degradedHostsPerLocalityPtr() const override {
+    return degraded_hosts_per_locality_;
+  }
   const HostsPerLocality& excludedHostsPerLocality() const override {
     return *excluded_hosts_per_locality_;
+  }
+  HostsPerLocalityConstSharedPtr excludedHostsPerLocalityPtr() const override {
+    return excluded_hosts_per_locality_;
   }
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseHealthyLocality() override;
@@ -339,6 +355,7 @@ public:
                     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality,
                     ExcludedHostVectorConstSharedPtr excluded_hosts,
                     HostsPerLocalityConstSharedPtr excluded_hosts_per_locality);
+  static PrioritySet::UpdateHostsParams updateHostsParams(const HostSet& host_set);
   static PrioritySet::UpdateHostsParams
   partitionHosts(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality);
 

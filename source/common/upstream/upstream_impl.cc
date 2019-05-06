@@ -445,6 +445,12 @@ HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                         std::move(excluded_hosts_per_locality)};
 }
 
+PrioritySet::UpdateHostsParams HostSetImpl::updateHostsParams(const HostSet& host_set) {
+  return updateHostsParams(host_set.hostsPtr(), host_set.hostsPerLocalityPtr(),
+                           host_set.healthyHostsPtr(), host_set.healthyHostsPerLocalityPtr(),
+                           host_set.degradedHostsPtr(), host_set.degradedHostsPerLocalityPtr(),
+                           host_set.excludedHostsPtr(), host_set.excludedHostsPerLocalityPtr());
+}
 PrioritySet::UpdateHostsParams
 HostSetImpl::partitionHosts(HostVectorConstSharedPtr hosts,
                             HostsPerLocalityConstSharedPtr hosts_per_locality) {

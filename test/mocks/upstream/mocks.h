@@ -50,13 +50,21 @@ public:
 
   // Upstream::HostSet
   MOCK_CONST_METHOD0(hosts, const HostVector&());
+  MOCK_CONST_METHOD0(hostsPtr, HostVectorConstSharedPtr());
   MOCK_CONST_METHOD0(healthyHosts, const HostVector&());
+  MOCK_CONST_METHOD0(healthyHostsPtr, HealthyHostVectorConstSharedPtr());
   MOCK_CONST_METHOD0(degradedHosts, const HostVector&());
+  MOCK_CONST_METHOD0(degradedHostsPtr, DegradedHostVectorConstSharedPtr());
   MOCK_CONST_METHOD0(excludedHosts, const HostVector&());
+  MOCK_CONST_METHOD0(excludedHostsPtr, ExcludedHostVectorConstSharedPtr());
   MOCK_CONST_METHOD0(hostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(hostsPerLocalityPtr, HostsPerLocalityConstSharedPtr());
   MOCK_CONST_METHOD0(healthyHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(healthyHostsPerLocalityPtr, HostsPerLocalityConstSharedPtr());
   MOCK_CONST_METHOD0(degradedHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(degradedHostsPerLocalityPtr, HostsPerLocalityConstSharedPtr());
   MOCK_CONST_METHOD0(excludedHostsPerLocality, const HostsPerLocality&());
+  MOCK_CONST_METHOD0(excludedHostsPerLocalityPtr, HostsPerLocalityConstSharedPtr());
   MOCK_CONST_METHOD0(localityWeights, LocalityWeightsConstSharedPtr());
   MOCK_METHOD0(chooseHealthyLocality, absl::optional<uint32_t>());
   MOCK_METHOD0(chooseDegradedLocality, absl::optional<uint32_t>());

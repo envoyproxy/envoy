@@ -276,12 +276,22 @@ public:
   virtual const HostVector& hosts() const PURE;
 
   /**
+   * @return a shared ptr to the vector returned by hosts().
+   */
+  virtual HostVectorConstSharedPtr hostsPtr() const PURE;
+
+  /**
    * @return all healthy hosts contained in the set at the current time. NOTE: This set is
    *         eventually consistent. There is a time window where a host in this set may become
    *         unhealthy and calling healthy() on it will return false. Code should be written to
    *         deal with this case if it matters.
    */
   virtual const HostVector& healthyHosts() const PURE;
+
+  /**
+   * @return a shared ptr to the vector returned by healthyHosts().
+   */
+  virtual HealthyHostVectorConstSharedPtr healthyHostsPtr() const PURE;
 
   /**
    * @return all degraded hosts contained in the set at the current time. NOTE: This set is
@@ -291,6 +301,11 @@ public:
    */
   virtual const HostVector& degradedHosts() const PURE;
 
+  /**
+   * @return a shared ptr to the vector returned by degradedHosts().
+   */
+  virtual DegradedHostVectorConstSharedPtr degradedHostsPtr() const PURE;
+
   /*
    * @return all excluded hosts contained in the set at the current time. Excluded hosts should be
    * ignored when computing load balancing weights, but may overlap with hosts in hosts().
@@ -298,9 +313,19 @@ public:
   virtual const HostVector& excludedHosts() const PURE;
 
   /**
+   * @return a shared ptr to the vector returned by excludedHosts().
+   */
+  virtual ExcludedHostVectorConstSharedPtr excludedHostsPtr() const PURE;
+
+  /**
    * @return hosts per locality.
    */
   virtual const HostsPerLocality& hostsPerLocality() const PURE;
+
+  /**
+   * @return a shared ptr to the HostsPerLocality returned by hostsPerLocality().
+   */
+  virtual HostsPerLocalityConstSharedPtr hostsPerLocalityPtr() const PURE;
 
   /**
    * @return same as hostsPerLocality but only contains healthy hosts.
@@ -308,14 +333,29 @@ public:
   virtual const HostsPerLocality& healthyHostsPerLocality() const PURE;
 
   /**
+   * @return a shared ptr to the HostsPerLocality returned by healthyHostsPerLocality().
+   */
+  virtual HostsPerLocalityConstSharedPtr healthyHostsPerLocalityPtr() const PURE;
+
+  /**
    * @return same as hostsPerLocality but only contains degraded hosts.
    */
   virtual const HostsPerLocality& degradedHostsPerLocality() const PURE;
 
   /**
+   * @return a shared ptr to the HostsPerLocality returned by degradedHostsPerLocality().
+   */
+  virtual HostsPerLocalityConstSharedPtr degradedHostsPerLocalityPtr() const PURE;
+
+  /**
    * @return same as hostsPerLocality but only contains excluded hosts.
    */
   virtual const HostsPerLocality& excludedHostsPerLocality() const PURE;
+
+  /**
+   * @return a shared ptr to the HostsPerLocality returned by excludedHostsPerLocality().
+   */
+  virtual HostsPerLocalityConstSharedPtr excludedHostsPerLocalityPtr() const PURE;
 
   /**
    * @return weights for each locality in the host set.
