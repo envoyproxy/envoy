@@ -21,6 +21,7 @@ envoy_cc_test(
     ],
     external_deps = ["ssl"],
     deps = [
+        ":rsa_private_key_method_provider_test_lib",
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
@@ -37,14 +38,17 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
         "//source/extensions/transport_sockets/tls:utility_lib",
+        "//source/extensions/transport_sockets/tls/private_key:private_key_manager_lib",
         "//test/extensions/transport_sockets/tls/test_data:cert_infos",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
@@ -71,6 +75,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
@@ -103,5 +108,25 @@ envoy_cc_test_library(
     deps = [
         "//source/extensions/transport_sockets/tls:utility_lib",
         "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "rsa_private_key_method_provider_test_lib",
+    srcs = [
+        "rsa_private_key_method_provider.cc",
+    ],
+    hdrs = [
+        "rsa_private_key_method_provider.h",
+    ],
+    external_deps = ["ssl"],
+    deps = [
+        "//include/envoy/api:api_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//include/envoy/ssl/private_key:private_key_config_interface",
+        "//include/envoy/ssl/private_key:private_key_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )

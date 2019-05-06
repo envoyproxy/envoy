@@ -12,5 +12,11 @@ MockConnectionInfo::~MockConnectionInfo() {}
 MockClientContext::MockClientContext() {}
 MockClientContext::~MockClientContext() {}
 
+MockPrivateKeyMethodManager::MockPrivateKeyMethodManager() {}
+MockPrivateKeyMethodManager::~MockPrivateKeyMethodManager() {}
+
+MockPrivateKeyMethodProvider::MockPrivateKeyMethodProvider() {}
+MockPrivateKeyMethodProvider::~MockPrivateKeyMethodProvider() {}
+
 } // namespace Ssl
 } // namespace Envoy

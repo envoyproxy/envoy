@@ -16,8 +16,10 @@
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
+#include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
+#include "test/extensions/transport_sockets/tls/rsa_private_key_method_provider.h"
 #include "test/extensions/transport_sockets/tls/ssl_certs_test.h"
 #include "test/extensions/transport_sockets/tls/test_data/no_san_cert_info.h"
 #include "test/extensions/transport_sockets/tls/test_data/password_protected_cert_info.h"
@@ -29,9 +31,11 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_replace.h"
@@ -197,12 +201,20 @@ public:
     return expected_expiration_peer_cert_;
   }
 
+  TestUtilOptions& setPrivateKeyMethodExpected(bool expected_method) {
+    expect_private_key_method_ = expected_method;
+    return *this;
+  }
+
+  bool expectedPrivateKeyMethod() const { return expect_private_key_method_; }
+
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
 
   bool expect_no_cert_;
   bool expect_no_cert_chain_;
+  bool expect_private_key_method_{};
   std::string expected_digest_;
   std::vector<std::string> expected_local_uri_;
   std::string expected_serial_number_;
@@ -210,6 +222,7 @@ private:
   std::string expected_local_subject_;
   std::string expected_peer_cert_;
   std::string expected_peer_cert_chain_;
+  std::string expected_private_key_path_;
   std::string expected_valid_from_peer_cert_;
   std::string expected_expiration_peer_cert_;
 };
@@ -222,6 +235,18 @@ void testUtil(const TestUtilOptions& options) {
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       server_factory_context;
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
+
+  // For private key method testing.
+  NiceMock<Ssl::MockContextManager> context_manager;
+  Extensions::PrivateKeyMethodProvider::RsaPrivateKeyMethodFactory rsa_factory;
+  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory> private_key_method_factory(
+      rsa_factory);
+  PrivateKeyMethodManagerImpl private_key_method_manager;
+  if (options.expectedPrivateKeyMethod()) {
+    EXPECT_CALL(server_factory_context, sslContextManager()).WillOnce(ReturnRef(context_manager));
+    EXPECT_CALL(context_manager, privateKeyMethodManager())
+        .WillOnce(ReturnRef(private_key_method_manager));
+  }
 
   envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
   MessageUtil::loadFromYaml(TestEnvironment::substitute(options.serverCtxYaml()),
@@ -4003,6 +4028,205 @@ TEST_P(SslReadBufferLimitTest, TestBind) {
   EXPECT_EQ(address_string, server_connection_->remoteAddress()->ip()->addressAsString());
 
   disconnect();
+}
+
+// TODO(ipuustin): The following tests are needed:
+//   success cases:
+//     * test multi-cert (does this require a ECDSA provider?)
+//   failure cases:
+//     * test private key method error return in
+//        * sign
+//        * decrypt
+//        * complete
+//     * test incorrect decryption
+//     * test returning failure in complete() function
+
+// Test asynchronous signing (ECDHE)
+TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: sign
+          sync_mode: false
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string successful_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+)EOF";
+
+  TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
+                                          GetParam());
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+}
+
+// Test asynchronous decryption (RSA)
+TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncDecryptSuccess) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: decrypt
+          sync_mode: false
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string successful_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - TLS_RSA_WITH_AES_128_GCM_SHA256
+)EOF";
+
+  TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
+                                          GetParam());
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+}
+
+// Test synchronous signing (ECDHE)
+TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignSuccess) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: sign
+          sync_mode: true
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string successful_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+)EOF";
+
+  TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
+                                          GetParam());
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+}
+
+// Test synchronous decryption (RSA)
+TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncDecryptSuccess) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: decrypt
+          sync_mode: true
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string successful_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - TLS_RSA_WITH_AES_128_GCM_SHA256
+)EOF";
+
+  TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
+                                          GetParam());
+  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+}
+
+// Test asynchronous signing (ECDHE) failure (invalid signature)
+TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignFailure) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: sign
+          sync_mode: false
+          crypto_error: true
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string failing_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+)EOF";
+
+  TestUtilOptions failing_test_options(failing_client_ctx_yaml, server_ctx_yaml, false, GetParam());
+  testUtil(failing_test_options.setPrivateKeyMethodExpected(true).setExpectedServerStats(
+      "ssl.connection_error"));
+}
+
+// Test synchronous signing (ECDHE) failure (invalid signature)
+TEST_P(SslSocketTest, RsaPrivateKeyProviderSyncSignFailure) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key_method:
+        provider_name: rsa_test
+        config:
+          private_key_file: "{{ test_tmpdir }}/unittestkey.pem"
+          expected_operation: sign
+          sync_mode: true
+          crypto_error: true
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+      crl:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.crl"
+)EOF";
+  const std::string failing_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      cipher_suites:
+      - ECDHE-RSA-AES128-GCM-SHA256
+)EOF";
+
+  TestUtilOptions failing_test_options(failing_client_ctx_yaml, server_ctx_yaml, false, GetParam());
+  testUtil(failing_test_options.setPrivateKeyMethodExpected(true).setExpectedServerStats(
+      "ssl.connection_error"));
 }
 
 } // namespace Tls
