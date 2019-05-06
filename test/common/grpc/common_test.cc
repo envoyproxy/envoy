@@ -424,7 +424,7 @@ TEST(GrpcCommonTest, PrependGrpcFrameHeader) {
   const uint32_t nsize = htonl(4);
   std::memcpy(&expected_header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
   std::string header_string(expected_header, 5);
-  Common::PrependGrpcFrameHeader(buffer.get());
+  Common::PrependGrpcFrameHeader(*buffer);
   EXPECT_EQ(buffer->toString(), header_string + "test");
 }
 
