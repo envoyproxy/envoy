@@ -127,11 +127,12 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstra
     flags_path_ = bootstrap.flags_path();
   }
 
-  if (bootstrap.has_runtime()) {
-    runtime_ = std::make_unique<RuntimeImpl>();
-    runtime_->symlink_root_ = bootstrap.runtime().symlink_root();
-    runtime_->subdirectory_ = bootstrap.runtime().subdirectory();
-    runtime_->override_subdirectory_ = bootstrap.runtime().override_subdirectory();
+  base_runtime_ = bootstrap.runtime().base();
+  if (!bootstrap.runtime().symlink_root().empty()) {
+    disk_runtime_ = std::make_unique<DiskRuntimeImpl>();
+    disk_runtime_->symlink_root_ = bootstrap.runtime().symlink_root();
+    disk_runtime_->subdirectory_ = bootstrap.runtime().subdirectory();
+    disk_runtime_->override_subdirectory_ = bootstrap.runtime().override_subdirectory();
   }
 }
 

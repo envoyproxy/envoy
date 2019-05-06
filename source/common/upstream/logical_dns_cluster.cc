@@ -42,13 +42,17 @@ LogicalDnsCluster::LogicalDnsCluster(
     }
   }
 
-  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
-
   const envoy::api::v2::core::SocketAddress& socket_address =
       lbEndpoint().endpoint().address().socket_address();
+
+  if (!socket_address.resolver_name().empty()) {
+    throw EnvoyException("LOGICAL_DNS clusters must NOT have a custom resolver name set");
+  }
+
   dns_url_ = fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
   hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   Network::Utility::portFromTcpUrl(dns_url_);
+  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<PerThreadCurrentHostData>();

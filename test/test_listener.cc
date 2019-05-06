@@ -11,7 +11,9 @@ void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
   std::string active_singletons = Envoy::Test::Globals::describeActiveSingletons();
   RELEASE_ASSERT(active_singletons.empty(),
                  absl::StrCat("FAIL [", test_info.test_suite_name(), ".", test_info.name(),
-                              "]: Active singletons exist:\n", active_singletons));
+                              "]: Active singletons exist. Something is leaking. Consider "
+                              "commenting out this assert and letting the heap checker run:\n",
+                              active_singletons));
 }
 
 } // namespace Envoy
