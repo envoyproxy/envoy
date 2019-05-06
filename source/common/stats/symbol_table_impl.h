@@ -417,8 +417,6 @@ private:
  *   StatNamePool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
- *   uint8_t* storage = pool.addReturningStorage("name3");
- *   StatName name3(storage);
  */
 class StatNamePool {
 public:
@@ -436,19 +434,10 @@ public:
    */
   StatName add(absl::string_view name);
 
-  /**
-   * Does essentially the same thing as add(), but returns the storage as a
-   * pointer which can later be used to create a StatName. This can be used
-   * to accumulate a vector of uint8_t* which can later be used to create
-   * StatName objects on demand.
-   *
-   * @param name the name to add the container.
-   * @return a pointer to the bytes held in the container for this name, suitable for
-   *         using to construct a StatName.
-   */
-  uint8_t* addReturningStorage(absl::string_view name);
-
 private:
+  // We keep the stat names in a vector of StatNameStorage, storing the
+  // SymbolTable reference separately. This saves 8 bytes per StatName,
+  // at the cost of having a destructor that calls clear().
   SymbolTable& symbol_table_;
   std::vector<StatNameStorage> storage_vector_;
 };
