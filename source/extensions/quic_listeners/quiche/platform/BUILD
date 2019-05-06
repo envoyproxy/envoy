@@ -180,7 +180,10 @@ envoy_cc_library(
         "quiche_ptr_util_impl.h",
         "quiche_unordered_containers_impl.h",
     ],
-    external_deps = ["abseil_node_hash_map"],
+    external_deps = [
+        "abseil_hash",
+        "abseil_node_hash_map",
+    ],
     visibility = ["//visibility:public"],
     deps = [":quic_platform_base_impl_lib"],
 )
