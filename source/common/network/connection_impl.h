@@ -46,8 +46,7 @@ public:
 /**
  * Implementation of Network::Connection and Network::FilterManagerConnection.
  */
-class ConnectionImpl : public virtual FilterManagerConnection,
-                       public BufferSource,
+class ConnectionImpl : public FilterManagerConnection,
                        public TransportSocketCallbacks,
                        protected Logger::Loggable<Logger::Id::connection> {
 public:
@@ -100,9 +99,10 @@ public:
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
 
-  // Network::BufferSource
-  BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
-  BufferSource::StreamBuffer getWriteBuffer() override {
+  // Network::ReadBufferSource
+  StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
+  // Network::WriteBufferSource
+  StreamBuffer getWriteBuffer() override {
     return {*current_write_buffer_, current_write_end_stream_};
   }
 

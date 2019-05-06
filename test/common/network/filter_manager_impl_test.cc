@@ -35,10 +35,18 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-class NetworkFilterManagerTest : public testing::Test, public BufferSource {
+class NetworkFilterManagerTest : public testing::Test {
 public:
-  StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
-  StreamBuffer getWriteBuffer() override { return {write_buffer_, write_end_stream_}; }
+  void SetUp() override {
+    EXPECT_CALL(connection_, getReadBuffer).WillRepeatedly(Invoke([this]() {
+      return StreamBuffer{read_buffer_, read_end_stream_};
+    }));
+    EXPECT_CALL(connection_, getWriteBuffer).WillRepeatedly(Invoke([this]() {
+      return StreamBuffer{write_buffer_, write_end_stream_};
+    }));
+  }
+
+  NiceMock<MockFilterManagerConnection> connection_;
 
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
@@ -62,8 +70,7 @@ TEST_F(NetworkFilterManagerTest, All) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  NiceMock<MockFilterManagerConnection> connection;
-  FilterManagerImpl manager(connection, *this);
+  FilterManagerImpl manager(connection_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -112,8 +119,7 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  NiceMock<MockFilterManagerConnection> connection;
-  FilterManagerImpl manager(connection, *this);
+  FilterManagerImpl manager(connection_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -154,10 +160,9 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
 TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   InSequence s;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<MockFilterManagerConnection> connection;
   NiceMock<MockClientConnection> upstream_connection;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool;
-  FilterManagerImpl manager(connection, *this);
+  FilterManagerImpl manager(connection_);
 
   std::string rl_json = R"EOF(
     {
@@ -220,7 +225,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   read_buffer_.add("hello");
   manager.onRead();
 
-  connection.raiseEvent(ConnectionEvent::RemoteClose);
+  connection_.raiseEvent(ConnectionEvent::RemoteClose);
 }
 
 TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {
@@ -230,8 +235,7 @@ TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new MockFilter());
 
-  NiceMock<MockFilterManagerConnection> connection;
-  FilterManagerImpl manager(connection, *this);
+  FilterManagerImpl manager(connection_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -263,8 +267,7 @@ TEST_F(NetworkFilterManagerTest, InjectWriteDataToFilterChain) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new MockFilter());
 
-  NiceMock<MockFilterManagerConnection> connection;
-  FilterManagerImpl manager(connection, *this);
+  FilterManagerImpl manager(connection_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -272,13 +275,13 @@ TEST_F(NetworkFilterManagerTest, InjectWriteDataToFilterChain) {
   Buffer::OwnedImpl injected_buffer("greetings");
   EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("greetings"), false))
       .WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(connection, rawWrite(BufferStringEqual("greetings"), false));
+  EXPECT_CALL(connection_, rawWrite(BufferStringEqual("greetings"), false));
   filter->write_callbacks_->injectWriteDataToFilterChain(injected_buffer, false);
 
   injected_buffer.add(" everyone!");
   EXPECT_CALL(*write_filter, onWrite(BufferStringEqual(" everyone!"), true))
       .WillOnce(Return(FilterStatus::Continue));
-  EXPECT_CALL(connection, rawWrite(BufferStringEqual(" everyone!"), true));
+  EXPECT_CALL(connection_, rawWrite(BufferStringEqual(" everyone!"), true));
   filter->write_callbacks_->injectWriteDataToFilterChain(injected_buffer, true);
 }
 

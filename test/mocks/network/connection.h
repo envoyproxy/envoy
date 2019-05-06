@@ -182,6 +182,8 @@ public:
   MOCK_CONST_METHOD0(transportFailureReason, absl::string_view());
 
   // Network::FilterManagerConnection
+  MOCK_METHOD0(getReadBuffer, StreamBuffer());
+  MOCK_METHOD0(getWriteBuffer, StreamBuffer());
   MOCK_METHOD2(rawWrite, void(Buffer::Instance& data, bool end_stream));
 };
 

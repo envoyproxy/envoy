@@ -32,7 +32,7 @@ bool FilterManagerImpl::initializeReadFilters() {
   if (upstream_filters_.empty()) {
     return false;
   }
-  onContinueReading(nullptr, buffer_source_);
+  onContinueReading(nullptr, connection_);
   return true;
 }
 
@@ -54,7 +54,7 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
       }
     }
 
-    BufferSource::StreamBuffer read_buffer = buffer_source.getReadBuffer();
+    StreamBuffer read_buffer = buffer_source.getReadBuffer();
     if (read_buffer.buffer.length() > 0 || read_buffer.end_stream) {
       FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
       if (status == FilterStatus::StopIteration) {
@@ -66,10 +66,10 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
 
 void FilterManagerImpl::onRead() {
   ASSERT(!upstream_filters_.empty());
-  onContinueReading(nullptr, buffer_source_);
+  onContinueReading(nullptr, connection_);
 }
 
-FilterStatus FilterManagerImpl::onWrite() { return onWrite(nullptr, buffer_source_); }
+FilterStatus FilterManagerImpl::onWrite() { return onWrite(nullptr, connection_); }
 
 FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
                                         WriteBufferSource& buffer_source) {
@@ -81,7 +81,7 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
   }
 
   for (; entry != downstream_filters_.end(); entry++) {
-    BufferSource::StreamBuffer write_buffer = buffer_source.getWriteBuffer();
+    StreamBuffer write_buffer = buffer_source.getWriteBuffer();
     FilterStatus status = (*entry)->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
     if (status == FilterStatus::StopIteration) {
       return status;
@@ -95,7 +95,7 @@ void FilterManagerImpl::onResumeWriting(ActiveWriteFilter* filter,
                                         WriteBufferSource& buffer_source) {
   auto status = onWrite(filter, buffer_source);
   if (status == FilterStatus::Continue) {
-    BufferSource::StreamBuffer write_buffer = buffer_source.getWriteBuffer();
+    StreamBuffer write_buffer = buffer_source.getWriteBuffer();
     connection_.rawWrite(write_buffer.buffer, write_buffer.end_stream);
   }
 }

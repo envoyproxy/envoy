@@ -11,24 +11,18 @@
 namespace Envoy {
 namespace Network {
 
-/**
- * Declaration of StreamBuffer backwards compatible with the former BufferSource::StreamBuffer.
- */
-class StreamBufferSource {
-public:
-  virtual ~StreamBufferSource() {}
-
-  struct StreamBuffer {
-    Buffer::Instance& buffer;
-    bool end_stream;
-  };
+struct StreamBuffer {
+  Buffer::Instance& buffer;
+  const bool end_stream;
 };
 
 /**
  * Interface used to obtain read buffers.
  */
-class ReadBufferSource : public virtual StreamBufferSource {
+class ReadBufferSource {
 public:
+  virtual ~ReadBufferSource() {}
+
   /**
    * Fetch the read buffer for the source.
    */
@@ -38,20 +32,14 @@ public:
 /**
  * Interface used to obtain write buffers.
  */
-class WriteBufferSource : public virtual StreamBufferSource {
+class WriteBufferSource {
 public:
+  virtual ~WriteBufferSource() {}
+
   /**
    * Fetch the write buffer for the source.
    */
   virtual StreamBuffer getWriteBuffer() PURE;
-};
-
-/**
- * Interface used to obtain read/write buffers.
- */
-class BufferSource : public ReadBufferSource, public WriteBufferSource {
-public:
-  virtual ~BufferSource() {}
 };
 
 /**
@@ -89,7 +77,9 @@ private:
  *
  * Since FilterManager is only user of those methods for now, the class is named after it.
  */
-class FilterManagerConnection : public virtual Connection {
+class FilterManagerConnection : public virtual Connection,
+                                public ReadBufferSource,
+                                public WriteBufferSource {
 public:
   virtual ~FilterManagerConnection() {}
 
@@ -110,8 +100,7 @@ public:
  */
 class FilterManagerImpl {
 public:
-  FilterManagerImpl(FilterManagerConnection& connection, BufferSource& buffer_source)
-      : connection_(connection), buffer_source_(buffer_source) {}
+  FilterManagerImpl(FilterManagerConnection& connection) : connection_(connection) {}
 
   void addWriteFilter(WriteFilterSharedPtr filter);
   void addFilter(FilterSharedPtr filter);
@@ -126,7 +115,7 @@ private:
         : parent_(parent), filter_(filter) {}
 
     Connection& connection() override { return parent_.connection_; }
-    void continueReading() override { parent_.onContinueReading(this, parent_.buffer_source_); }
+    void continueReading() override { parent_.onContinueReading(this, parent_.connection_); }
     void injectReadDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
       FixedReadBufferSource buffer_source{data, end_stream};
       parent_.onContinueReading(this, buffer_source);
@@ -167,7 +156,6 @@ private:
   void onResumeWriting(ActiveWriteFilter* filter, WriteBufferSource& buffer_source);
 
   FilterManagerConnection& connection_;
-  BufferSource& buffer_source_;
   Upstream::HostDescriptionConstSharedPtr host_description_;
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<ActiveWriteFilterPtr> downstream_filters_;
