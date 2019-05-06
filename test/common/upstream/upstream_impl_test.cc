@@ -2509,6 +2509,46 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
   setUpHostSetWithOPFAndTestPicks(200, 50, 50);
 };
 
+// Verifies that partionHosts correctly splits hosts based on their health flags.
+TEST(HostPartitionTest, PartitionHosts) {
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostVector hosts{
+      makeTestHost(info, "tcp://127.0.0.1:80"), makeTestHost(info, "tcp://127.0.0.1:81"),
+      makeTestHost(info, "tcp://127.0.0.1:82"), makeTestHost(info, "tcp://127.0.0.1:83")};
+
+  hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  hosts[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  hosts[2]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+  hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  auto hosts_per_locality = makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3]}});
+
+  auto update_hosts_params =
+      HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
+
+  EXPECT_EQ(4, update_hosts_params.hosts->size());
+  EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
+  EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
+  EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
+  EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts->get()[0]);
+  EXPECT_EQ(1, update_hosts_params.excluded_hosts->get().size());
+  EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts->get()[0]);
+
+  EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[0].size());
+  EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[1].size());
+
+  EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
+  EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts_per_locality->get()[1][0]);
+
+  EXPECT_EQ(1, update_hosts_params.degraded_hosts_per_locality->get()[0].size());
+  EXPECT_EQ(0, update_hosts_params.degraded_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts_per_locality->get()[0][0]);
+
+  EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
+  EXPECT_EQ(1, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
+  EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
