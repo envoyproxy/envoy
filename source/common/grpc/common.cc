@@ -289,7 +289,7 @@ std::string Common::typeUrl(const std::string& qualified_name) {
 struct BufferInstanceContainer {
   BufferInstanceContainer(int ref_count, Buffer::InstancePtr buffer)
       : ref_count_(ref_count), buffer_(std::move(buffer)) {}
-  std::atomic<int> ref_count_; // In case gPRC dereferences in a different threads.
+  std::atomic<uint32_t> ref_count_; // In case gPRC dereferences in a different threads.
   Buffer::InstancePtr buffer_;
 
   static void derefBufferInstanceContainer(void* container_ptr) {
@@ -332,7 +332,7 @@ grpc::ByteBuffer Common::makeByteBuffer(Buffer::InstancePtr&& buffer_instance) {
 struct ByteBufferContainer {
   ByteBufferContainer(int ref_count) : ref_count_(ref_count) {}
   ~ByteBufferContainer() { ::free(fragments_); }
-  std::atomic<int> ref_count_; // In case gPRC dereferences in a different threads.
+  uint32_t ref_count_;
   Buffer::BufferFragmentImpl* fragments_ = 0;
   std::vector<grpc::Slice> slices_;
 };
