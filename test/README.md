@@ -68,13 +68,13 @@ Example:
 
 ```cpp
 envoy::api::v2::DeltaDiscoveryRequest expected_request;
-// set some fields of expected_request
+// (not shown: set some fields of expected_request...)
 EXPECT_CALL(async_stream_, sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false));
 
 response->mutable_resources()->Add();
 response->mutable_resources()->Add();
 response->mutable_resources()->Add();
-// and do something to fill those empty added items in
+// (not shown: do something to populate those empty added items...)
 EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response->resources()), version));
 ```
 
