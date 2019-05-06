@@ -142,6 +142,11 @@ void HttpPerRequestTapperImpl::streamBufferedResponseBody() {
   }
 }
 
+void HttpPerRequestTapperImpl::streamEnd() {
+  // send empty trace to signal the end of the stream. 
+  sink_handle_->submitTrace(std::move(makeTraceSegment()));
+}
+
 void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
   onBody(data, buffered_streamed_response_body_, config_->maxBufferedTxBytes(),
          &envoy::data::tap::v2alpha::HttpStreamedTraceSegment::mutable_response_body_chunk,
@@ -171,8 +176,13 @@ void HttpPerRequestTapperImpl::onResponseTrailers(const Http::HeaderMap& trailer
 }
 
 bool HttpPerRequestTapperImpl::onDestroyLog() {
-  if (config_->streaming() || !config_->rootMatcher().matchStatus(statuses_).matches_) {
-    return config_->rootMatcher().matchStatus(statuses_).matches_;
+  if (started_streaming_trace_) {
+    streamEnd();
+  }
+
+  bool matches = config_->rootMatcher().matchStatus(statuses_).matches_;
+  if (config_->streaming() || !matches) {
+    return matches;
   }
 
   makeBufferedFullTraceIfNeeded();

@@ -74,6 +74,7 @@ private:
   void streamRequestTrailers();
   void streamResponseHeaders();
   void streamBufferedResponseBody();
+  void streamEnd();
 
   void setConnectionMetadata(Extensions::Common::Tap::TraceWrapperPtr& trace);
   void setDestinationHost(Extensions::Common::Tap::TraceWrapperPtr& trace);

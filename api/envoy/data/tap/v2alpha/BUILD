@@ -32,5 +32,6 @@ api_proto_library_internal(
     deps = [
         ":http",
         ":transport",
+        "//envoy/api/v2/core:address",
     ],
 )
