@@ -359,8 +359,9 @@ Buffer::InstancePtr Common::makeBufferInstance(const grpc::ByteBuffer& byte_buff
       };
   // NB: addBufferFragment takes a pointer alias to the BufferFragmentImpl which is passed in so we
   // need to ensure that the lifetime of those objects exceeds that of the Buffer::Instance.
-  container->fragments_ = static_cast<Buffer::BufferFragmentImpl*>(
-      ::malloc(sizeof(Buffer::BufferFragmentImpl) * slices.size()));
+  ASSERT(!::posix_memalign(reinterpret_cast<void**>(&container->fragments_),
+                           alignof(Buffer::BufferFragmentImpl),
+                           sizeof(Buffer::BufferFragmentImpl) * slices.size()));
   for (size_t i = 0; i < slices.size(); i++) {
     new (&container->fragments_[i])
         Buffer::BufferFragmentImpl(slices[i].begin(), slices[i].size(), releaser);
