@@ -532,8 +532,8 @@ message Cluster {
     // active health checking is also configured.
     //
     // Ignoring a host means that for any load balancing calculations that adjust weights based
-    // on the ratio of eligible hosts and total hosts (priority spillover, locality weighting, etc.)
-    // will exclude these hosts in the denominator.
+    // on the ratio of eligible hosts and total hosts (priority spillover, locality weighting and
+    // panic mode) Envoy will exclude these hosts in the denominator.
     //
     // For example, with hosts in two priorities P0 and P1, where P0 looks like
     // {healthy, unhealthy (new), unhealthy (new)}

@@ -406,28 +406,6 @@ HostSetImpl::chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler) {
 
 PrioritySet::UpdateHostsParams
 HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
-                               HostsPerLocalityConstSharedPtr hosts_per_locality) {
-  return updateHostsParams(std::move(hosts), std::move(hosts_per_locality),
-                           std::make_shared<const HealthyHostVector>(),
-                           HostsPerLocalityImpl::empty());
-}
-
-PrioritySet::UpdateHostsParams
-HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
-                               HostsPerLocalityConstSharedPtr hosts_per_locality,
-                               HealthyHostVectorConstSharedPtr healthy_hosts,
-                               HostsPerLocalityConstSharedPtr healthy_hosts_per_locality) {
-  // TODO(snowp): Move this function into test/
-  // This overload is only used as a convenience method in test, so it should live there.
-
-  return updateHostsParams(
-      hosts, hosts_per_locality, std::move(healthy_hosts), std::move(healthy_hosts_per_locality),
-      std::make_shared<const DegradedHostVector>(), HostsPerLocalityImpl::empty(),
-      std::make_shared<const ExcludedHostVector>(), HostsPerLocalityImpl::empty());
-}
-
-PrioritySet::UpdateHostsParams
-HostSetImpl::updateHostsParams(HostVectorConstSharedPtr hosts,
                                HostsPerLocalityConstSharedPtr hosts_per_locality,
                                HealthyHostVectorConstSharedPtr healthy_hosts,
                                HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,

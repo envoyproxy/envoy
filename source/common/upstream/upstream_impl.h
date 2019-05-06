@@ -330,15 +330,6 @@ public:
   uint32_t priority() const override { return priority_; }
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
 
-  // Utility methods for creating UpdateHostsParams.
-  static PrioritySet::UpdateHostsParams
-  updateHostsParams(HostVectorConstSharedPtr hosts,
-                    HostsPerLocalityConstSharedPtr hosts_per_locality);
-  static PrioritySet::UpdateHostsParams
-  updateHostsParams(HostVectorConstSharedPtr hosts,
-                    HostsPerLocalityConstSharedPtr hosts_per_locality,
-                    HealthyHostVectorConstSharedPtr healthy_hosts,
-                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality);
   static PrioritySet::UpdateHostsParams
   updateHostsParams(HostVectorConstSharedPtr hosts,
                     HostsPerLocalityConstSharedPtr hosts_per_locality,

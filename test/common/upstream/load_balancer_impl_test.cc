@@ -464,9 +464,8 @@ public:
                    HostsPerLocalityConstSharedPtr hosts_per_locality) {
     local_priority_set_->updateHosts(
         0,
-        HostSetImpl::updateHostsParams(hosts, hosts_per_locality,
-                                       std::make_shared<const HealthyHostVector>(*hosts),
-                                       hosts_per_locality),
+        updateHostsParams(hosts, hosts_per_locality,
+                          std::make_shared<const HealthyHostVector>(*hosts), hosts_per_locality),
         {}, empty_host_vector_, empty_host_vector_, absl::nullopt);
   }
 

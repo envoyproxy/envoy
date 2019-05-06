@@ -307,7 +307,7 @@ public:
   /*
    * @return all excluded hosts contained in the set at the current time. Excluded hosts should be
    * ignored when computing load balancing weights, but may overlap with hosts in hosts().
-   * */
+   */
   virtual const HostVector& excludedHosts() const PURE;
 
   /**
