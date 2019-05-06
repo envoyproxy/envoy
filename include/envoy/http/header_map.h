@@ -119,6 +119,8 @@ public:
   char* buffer() { return buffer_.dynamic_; }
 
   /**
+   * Get an absl::string_view. It will NOT be NUL terminated!
+   *
    * @return an absl::string_view.
    */
   absl::string_view getStringView() const {
