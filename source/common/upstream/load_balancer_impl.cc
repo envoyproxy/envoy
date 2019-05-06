@@ -136,6 +136,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   // by the overprovisioning factor.
   HostSet& host_set = *priority_set.hostSetsPerPriority()[priority];
   per_priority_health.get()[priority] = 0;
+  per_priority_degraded.get()[priority] = 0;
   const auto host_count = host_set.hosts().size() - host_set.excludedHosts().size();
 
   if (host_count > 0) {

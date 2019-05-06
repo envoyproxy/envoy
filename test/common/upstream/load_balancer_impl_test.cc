@@ -65,12 +65,13 @@ public:
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
 public:
   void updateHostSet(MockHostSet& host_set, uint32_t num_hosts, uint32_t num_healthy_hosts,
-                     uint32_t num_degraded_hosts = 0) {
-    ASSERT(num_healthy_hosts + num_degraded_hosts <= num_hosts);
+                     uint32_t num_degraded_hosts = 0, uint32_t num_excluded_hosts = 0) {
+    ASSERT(num_healthy_hosts + num_degraded_hosts + num_excluded_hosts <= num_hosts);
 
     host_set.hosts_.clear();
     host_set.healthy_hosts_.clear();
     host_set.degraded_hosts_.clear();
+    host_set.excluded_hosts_.clear();
     for (uint32_t i = 0; i < num_hosts; ++i) {
       host_set.hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
     }
@@ -78,8 +79,13 @@ public:
     for (; i < num_healthy_hosts; ++i) {
       host_set.healthy_hosts_.push_back(host_set.hosts_[i]);
     }
-    for (; i < num_degraded_hosts; ++i) {
+    for (; i < (num_healthy_hosts + num_degraded_hosts); ++i) {
       host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
+    }
+
+    for (; i < (num_healthy_hosts + num_degraded_hosts + num_excluded_hosts); ++i) {
+      host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
+      host_set.excluded_hosts_.push_back(host_set.hosts_[i]);
     }
     host_set.runCallbacks({}, {});
   }
@@ -282,6 +288,24 @@ TEST_P(LoadBalancerBaseTest, GentleFailover) {
   updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true));
+
+  // Health P=0 == 100*1.4 == 35 P=1 == 35
+  // Since 3 hosts are excluded, P=0 should be considered fully healthy.
+  // Total health = 100% + 35% is greater than 100%. Panic should not trigger.
+  updateHostSet(host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */, 0 /* num_degraded_hosts */,
+                3 /* num_excluded_hosts */);
+  updateHostSet(failover_host_set_, 5 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(100, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(false, false));
+
+  // Health P=0 == 100*1.4 == 35 P=1 == 35
+  // Since 4 hosts are excluded and are unhealthy, P=0 should be considered fully unavailable.
+  // Total health = 35% is less than 100%. Panic should trigger.
+  updateHostSet(host_set_, 4 /* num_hosts */, 0 /* num_healthy_hosts */, 0 /* num_degraded_hosts */,
+                4 /* num_excluded_hosts */);
+  updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 100));
   ASSERT_THAT(getPanic(), ElementsAre(true, true));
 }
 
