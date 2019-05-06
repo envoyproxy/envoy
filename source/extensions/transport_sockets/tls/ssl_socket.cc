@@ -148,7 +148,7 @@ void SslSocket::complete(Envoy::Ssl::PrivateKeyMethodStatus status) {
   if (status == Envoy::Ssl::PrivateKeyMethodStatus::Success) {
     ENVOY_CONN_LOG(debug, "async handshake complete", callbacks_->connection());
     if (!handshake_complete_) {
-      // It's possible that the async call comes in later, but the handshare has been retried from
+      // It's possible that the async call comes in later, but the handshake has been retried from
       // doWrite or similar. */
       doHandshake();
     }
