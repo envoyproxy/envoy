@@ -14,7 +14,7 @@ class ThreadId {
 public:
   virtual ~ThreadId() {}
 
-  virtual int64 tid() const PURE;
+  virtual int64_t tid() const PURE;
   virtual std::string debugString() const PURE;
   virtual bool isCurrentThreadId() const PURE;
 };
