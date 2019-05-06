@@ -70,7 +70,7 @@ TEST(HealthCheckerFactoryTest, GrpcHealthCheckHTTP2NotConfiguredException) {
                             "fake_cluster cluster must support HTTP/2 for gRPC healthchecking");
 }
 
-TEST(HealthCheckerFactoryTest, createGrpc) {
+TEST(HealthCheckerFactoryTest, CreateGrpc) {
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   EXPECT_CALL(*cluster.info_, features())
@@ -81,6 +81,7 @@ TEST(HealthCheckerFactoryTest, createGrpc) {
   Event::MockDispatcher dispatcher;
   AccessLog::MockAccessLogManager log_manager;
 
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_NE(nullptr, dynamic_cast<GrpcHealthCheckerImpl*>(
                          HealthCheckerFactory::create(createGrpcHealthCheckConfig(), cluster,
                                                       runtime, random, dispatcher, log_manager)
@@ -1195,6 +1196,28 @@ TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirst) {
 TEST_F(HttpHealthCheckerImplTest, SuccessStartFailedFailFirstLogError) {
   setupNoServiceValidationHCAlwaysLogFailure();
   expectSuccessStartFailedFailFirst();
+}
+
+// Verify that removal during a failure callback works.
+TEST_F(HttpHealthCheckerImplTest, HttpFailRemoveHostInCallback) {
+  setupNoServiceValidationHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed))
+      .WillOnce(Invoke([&](HostSharedPtr host, HealthTransition) {
+        cluster_->prioritySet().getMockHostSet(0)->hosts_ = {};
+        cluster_->prioritySet().runUpdateCallbacks(0, {}, {host});
+      }));
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_)).Times(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer()).Times(0);
+  EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
+  respond(0, "503", false);
 }
 
 TEST_F(HttpHealthCheckerImplTest, HttpFail) {

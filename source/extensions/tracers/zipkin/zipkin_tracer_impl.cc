@@ -119,7 +119,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
   }
 
   ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));
-  return std::move(active_span);
+  return active_span;
 }
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
