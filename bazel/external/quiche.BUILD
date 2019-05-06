@@ -152,18 +152,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quiche_spdy_core_lib",
+    name = "spdy_core_spdy_alt_svc_wire_format_lib",
+    srcs = ["quiche/spdy/core/spdy_alt_svc_wire_format.cc"],
+    hdrs = ["quiche/spdy/core/spdy_alt_svc_wire_format.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":spdy_platform",
+    ],
+)
+
+envoy_cc_library(
+    name = "spdy_core_spdy_header_block_lib",
     srcs = [
         "quiche/spdy/core/spdy_header_block.cc",
-        "quiche/spdy/core/spdy_test_utils.cc",
     ],
     hdrs = [
-        "quiche/spdy/core/spdy_alt_svc_wire_format.h",
-        "quiche/spdy/core/spdy_bitmasks.h",
         "quiche/spdy/core/spdy_header_block.h",
-        "quiche/spdy/core/spdy_headers_handler_interface.h",
-        "quiche/spdy/core/spdy_protocol.h",
-        "quiche/spdy/core/spdy_test_utils.h",
     ],
     copts = quiche_copt,
     repository = "@envoy",
@@ -171,6 +177,49 @@ envoy_cc_library(
     deps = [
         ":spdy_platform",
         ":spdy_platform_unsafe_arena_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "spdy_core_spdy_headers_handler_interface",
+    hdrs = ["quiche/spdy/core/spdy_headers_handler_interface.h"],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":spdy_platform"],
+)
+
+envoy_cc_library(
+    name = "spdy_core_spdy_protocol_lib",
+    hdrs = [
+        "quiche/spdy/core/spdy_bitmasks.h",
+        "quiche/spdy/core/spdy_protocol.h",
+    ],
+    copts = quiche_copt,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":spdy_core_spdy_alt_svc_wire_format_lib",
+        ":spdy_core_spdy_header_block_lib",
+        ":spdy_platform",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "spdy_core_spdy_test_utils_lib",
+    srcs = [
+        "quiche/spdy/core/spdy_test_utils.cc",
+    ],
+    hdrs = [
+        "quiche/spdy/core/spdy_test_utils.h",
+    ],
+    copts = quiche_copt,
+    repository = "@envoy",
+    deps = [
+        ":spdy_core_spdy_header_block_lib",
+        ":spdy_core_spdy_headers_handler_interface",
+        ":spdy_core_spdy_protocol_lib",
+        ":spdy_platform",
     ],
 )
 
@@ -463,13 +512,13 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "quiche_spdy_core_test",
+    name = "spdy_header_block_test",
     srcs = ["quiche/spdy/core/spdy_header_block_test.cc"],
     copts = quiche_copt,
     repository = "@envoy",
     deps = [
-        ":quiche_spdy_core_lib",
-        ":spdy_platform",
+        ":spdy_core_spdy_header_block_lib",
+        ":spdy_core_spdy_test_utils_lib",
     ],
 )
 

@@ -11,15 +11,11 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/hash/hash.h"
 
-// The following includes should be:
-//
-// #include "extensions/quic_listeners/quiche/platform/spdy_string_impl.h"
-// #include "extensions/quic_listeners/quiche/platform/spdy_string_piece_impl.h"
 //
 // However, for some reason, bazel.clang_tidy cannot resolve the files when specified this way.
-// TODO(mpw): fix includes to use full paths.
-#include "spdy_string_impl.h"
-#include "spdy_string_piece_impl.h"
+
+#include "extensions/quic_listeners/quiche/platform/spdy_string_impl.h"
+#include "extensions/quic_listeners/quiche/platform/spdy_string_piece_impl.h"
 #include "quiche/common/simple_linked_hash_map.h"
 
 namespace spdy {

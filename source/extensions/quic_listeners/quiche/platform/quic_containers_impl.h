@@ -3,8 +3,6 @@
 #include <deque>
 #include <memory>
 #include <queue>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/inlined_vector.h"
@@ -31,7 +29,7 @@ template <typename Key, typename Value, typename Hash>
 using QuicLinkedHashMapImpl = quiche::SimpleLinkedHashMap<Key, Value, Hash>;
 
 template <typename Key, typename Value, int Size>
-using QuicSmallMapImpl = std::unordered_map<Key, Value>;
+using QuicSmallMapImpl = absl::flat_hash_map<Key, Value>;
 
 template <typename T> using QuicQueueImpl = std::queue<T>;
 
