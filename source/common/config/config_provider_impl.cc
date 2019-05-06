@@ -85,6 +85,11 @@ void DeltaConfigSubscriptionInstance::applyConfigUpdate(
                                     ->getConfig());
   }
 
+  // TODO(AndresGuedez): currently, the caller has to compute the differences in resources between
+  // DS API config updates and passes a granular updateFn() that adds/modifies/removes resources as
+  // needed. Such logic could be generalized as part of this framework such that this function owns
+  // the diffing and issues the corresponding call to add/modify/remove a resource according to a
+  // vector of functions passed by the caller.
   auto* typed_provider =
       static_cast<DeltaMutableConfigProviderBase*>(getAnyBoundMutableConfigProvider());
   ConfigSharedPtr config = typed_provider->getConfig();

@@ -154,7 +154,7 @@ protected:
    * @return const ConfigProtoVector the config protos corresponding to the Config instantiated by
    *         the provider.
    */
-  virtual const ConfigProtoVector getConfigProtos() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual ConfigProtoVector getConfigProtos() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   /**
    * Returns the config version associated with the provider.

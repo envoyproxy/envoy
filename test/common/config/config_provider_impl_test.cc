@@ -464,7 +464,7 @@ public:
   DeltaDummyConfigSubscription& subscription() { return *subscription_; }
 
   // Envoy::Config::ConfigProvider
-  const ConfigProtoVector getConfigProtos() const override {
+  ConfigProtoVector getConfigProtos() const override {
     ConfigProtoVector proto_vector;
     for (const auto& value_type : subscription_->protoMap()) {
       proto_vector.push_back(&value_type.second);
