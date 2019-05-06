@@ -777,7 +777,7 @@ void ClusterImplBase::finishInitialization() {
   initialization_complete_callback_ = nullptr;
 
   if (health_checker_ != nullptr) {
-    reloadHealthyHosts();
+    reloadHealthyHosts(nullptr);
   }
 
   if (snapped_callback != nullptr) {
@@ -790,11 +790,11 @@ void ClusterImplBase::setHealthChecker(const HealthCheckerSharedPtr& health_chec
   health_checker_ = health_checker;
   health_checker_->start();
   health_checker_->addHostCheckCompleteCb(
-      [this](HostSharedPtr, HealthTransition changed_state) -> void {
+      [this](const HostSharedPtr& host, HealthTransition changed_state) -> void {
         // If we get a health check completion that resulted in a state change, signal to
         // update the host sets on all threads.
         if (changed_state == HealthTransition::Changed) {
-          reloadHealthyHosts();
+          reloadHealthyHosts(host);
         }
       });
 }
@@ -805,10 +805,11 @@ void ClusterImplBase::setOutlierDetector(const Outlier::DetectorSharedPtr& outli
   }
 
   outlier_detector_ = outlier_detector;
-  outlier_detector_->addChangedStateCb([this](HostSharedPtr) -> void { reloadHealthyHosts(); });
+  outlier_detector_->addChangedStateCb(
+      [this](const HostSharedPtr& host) -> void { reloadHealthyHosts(host); });
 }
 
-void ClusterImplBase::reloadHealthyHosts() {
+void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   // Every time a host changes Health Check state we cause a full healthy host recalculation which
   // for expensive LBs (ring, subset, etc.) can be quite time consuming. During startup, this
   // can also block worker threads by doing this repeatedly. There is no reason to do this
@@ -818,6 +819,10 @@ void ClusterImplBase::reloadHealthyHosts() {
     return;
   }
 
+  reloadHealthyHostsHelper(host);
+}
+
+void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
   const auto& host_sets = prioritySet().hostSetsPerPriority();
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
@@ -1129,6 +1134,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     auto existing_host = all_hosts.find(host->address()->asString());
     const bool existing_host_found = existing_host != all_hosts.end();
 
+    // Clear any pending deletion flag on an existing host in case it came back while it was
+    // being stabilized. We will set it again below if needed.
+    if (existing_host_found) {
+      existing_host->second->healthFlagClear(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+    }
+
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
     // (currently there is only one criterion, but we might add more in the future):
     // - The cluster health checker is activated and a new host is matched with the existing one,
@@ -1217,19 +1228,23 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // The remaining hosts are hosts that are not referenced in the config update. We remove them from
   // the priority if any of the following is true:
   // - Active health checking is not enabled.
-  // - The removed hosts are failing active health checking.
+  // - The removed hosts are failing active health checking OR have been explicitly marked as
+  //   unhealthy by a previous EDS update. We do not count outlier as a reason to remove a host
+  //   or any other future health condition that may be added so we do not use the health() API.
   // - We have explicitly configured the cluster to remove hosts regardless of active health status.
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
     for (auto i = current_priority_hosts.begin(); i != current_priority_hosts.end();) {
-      if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+      if (!((*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
+            (*i)->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
         if ((*i)->weight() > max_host_weight) {
           max_host_weight = (*i)->weight();
         }
 
         final_hosts.push_back(*i);
         updated_hosts[(*i)->address()->asString()] = *i;
+        (*i)->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
         i = current_priority_hosts.erase(i);
       } else {
         i++;
@@ -1273,20 +1288,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
-  switch (cluster.dns_lookup_family()) {
-  case envoy::api::v2::Cluster::V6_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
-    break;
-  case envoy::api::v2::Cluster::V4_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
-    break;
-  case envoy::api::v2::Cluster::AUTO:
-    dns_lookup_family_ = Network::DnsLookupFamily::Auto;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
+  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
   const envoy::api::v2::ClusterLoadAssignment load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
                                     : Config::Utility::translateClusterHosts(cluster.hosts()));
@@ -1303,6 +1305,19 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+}
+
+Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster) {
+  switch (cluster.dns_lookup_family()) {
+  case envoy::api::v2::Cluster::V6_ONLY:
+    return Network::DnsLookupFamily::V6Only;
+  case envoy::api::v2::Cluster::V4_ONLY:
+    return Network::DnsLookupFamily::V4Only;
+  case envoy::api::v2::Cluster::AUTO:
+    return Network::DnsLookupFamily::Auto;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 void StrictDnsClusterImpl::startPreInit() {

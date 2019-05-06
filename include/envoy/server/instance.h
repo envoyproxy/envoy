@@ -88,12 +88,6 @@ public:
   virtual void failHealthcheck(bool fail) PURE;
 
   /**
-   * Fetch server stats specific to this process vs. global shared stats in a hot restart scenario.
-   * @param info supplies the stats structure to fill.
-   */
-  virtual void getParentStats(HotRestart::GetParentStatsInfo& info) PURE;
-
-  /**
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() PURE;

@@ -7,6 +7,7 @@ load(
     "envoy_cc_platform_dep",
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
+    "envoy_google_grpc_external_deps",
     "envoy_package",
 )
 load(
@@ -41,7 +42,7 @@ envoy_cc_library(
         "//source/server:drain_manager_lib",
         "//source/server:options_lib",
         "//source/server:server_lib",
-        "//source/server:test_hooks_lib",
+        "//source/server:listener_hooks_lib",
     ] + select({
         "//bazel:windows_x86_64": envoy_windows_extensions(),
         "//bazel:linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
@@ -81,7 +82,7 @@ envoy_cc_library(
             ":sigaction_lib",
             ":terminate_handler_lib",
         ],
-    }) + envoy_cc_platform_dep("platform_impl_lib"),
+    }) + envoy_cc_platform_dep("platform_impl_lib") + envoy_google_grpc_external_deps(),
 )
 
 envoy_cc_posix_library(

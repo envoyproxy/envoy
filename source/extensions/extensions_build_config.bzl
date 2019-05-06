@@ -8,10 +8,15 @@ EXTENSIONS = {
     "envoy.access_loggers.http_grpc":                   "//source/extensions/access_loggers/http_grpc:config",
 
     #
+    # Clusters
+    #
+    "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
+
+    #
     # gRPC Credentials Plugins
     #
 
-    "envoy.grpc_credentials.file_based_metadata":      "//source/extensions/grpc_credentials/file_based_metadata:config",
+    "envoy.grpc_credentials.file_based_metadata":       "//source/extensions/grpc_credentials/file_based_metadata:config",
 
     #
     # Health checkers
@@ -25,6 +30,7 @@ EXTENSIONS = {
 
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
+    "envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     "envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     "envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",
@@ -151,6 +157,7 @@ WINDOWS_EXTENSIONS = {
 
     #"envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     #"envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
+    #"envoy.filters.http.csrf":                          "//source/extensions/filters/http/csrf:config",
     #"envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",
     #"envoy.filters.http.ext_authz":                     "//source/extensions/filters/http/ext_authz:config",
     #"envoy.filters.http.fault":                         "//source/extensions/filters/http/fault:config",

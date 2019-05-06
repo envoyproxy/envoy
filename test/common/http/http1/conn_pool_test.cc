@@ -579,6 +579,39 @@ TEST_F(Http1ConnPoolImplTest, ConnectionCloseHeader) {
 }
 
 /**
+ * Test when upstream sends us 'proxy-connection: close'
+ */
+TEST_F(Http1ConnPoolImplTest, ProxyConnectionCloseHeader) {
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  NiceMock<Http::MockStreamDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle = conn_pool_.newStream(outer_decoder, callbacks);
+
+  EXPECT_NE(nullptr, handle);
+
+  NiceMock<Http::MockStreamEncoder> request_encoder;
+  Http::StreamDecoder* inner_decoder;
+  EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
+      .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
+  EXPECT_CALL(callbacks.pool_ready_, ready());
+
+  conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
+  callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);
+
+  // Response with 'proxy-connection: close' which should cause the connection to go away.
+  EXPECT_CALL(conn_pool_, onClientDestroy());
+  Http::HeaderMapPtr response_headers(
+      new TestHeaderMapImpl{{":status", "200"}, {"Proxy-Connection", "Close"}});
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
+}
+
+/**
  * Test when we reach max requests per connection.
  */
 TEST_F(Http1ConnPoolImplTest, MaxRequestsPerConnection) {

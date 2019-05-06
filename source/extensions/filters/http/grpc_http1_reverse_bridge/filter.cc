@@ -33,8 +33,7 @@ void adjustContentLength(Http::HeaderMap& headers,
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {
     uint64_t length;
-    const std::string length_header_string(length_header->value().getStringView());
-    if (StringUtil::atoull(length_header_string.c_str(), length)) {
+    if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
       length_header->value(adjustment(length));
     }
   }

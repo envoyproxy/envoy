@@ -150,7 +150,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
     const auto ip_str = ip_address.substr(1, pos - 1);
     const auto port_str = ip_address.substr(pos + 2);
     uint64_t port64 = 0;
-    if (port_str.empty() || !StringUtil::atoull(port_str.c_str(), port64, 10) || port64 > 65535) {
+    if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
       throwWithMalformedIp(ip_address);
     }
     sockaddr_in6 sa6;
@@ -170,7 +170,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::
   const auto ip_str = ip_address.substr(0, pos);
   const auto port_str = ip_address.substr(pos + 1);
   uint64_t port64 = 0;
-  if (port_str.empty() || !StringUtil::atoull(port_str.c_str(), port64, 10) || port64 > 65535) {
+  if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
     throwWithMalformedIp(ip_address);
   }
   sockaddr_in sa4;

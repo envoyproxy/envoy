@@ -32,6 +32,13 @@ cc_library(
 configure_make(
     name = "luajit",
     configure_command = "build.py",
+    configure_env_vars = select({
+        # This shouldn't be needed! See
+        # https://github.com/envoyproxy/envoy/issues/6084
+        # TODO(htuch): Remove when #6084 is fixed
+        "//bazel:asan_build": {"ENVOY_CONFIG_ASAN": "1"},
+        "//conditions:default": {},
+    }),
     lib_source = "@com_github_luajit_luajit//:all",
     make_commands = [],
     static_libraries = [
