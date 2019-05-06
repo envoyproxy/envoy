@@ -1,5 +1,6 @@
 #pragma once
 
+#include "extensions/tracers/zipkin/span_serializer.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
 namespace Envoy {
@@ -57,7 +58,7 @@ public:
    * @return the contents of the buffer as a stringified array of JSONs, where
    * each JSON in the array corresponds to one Zipkin span.
    */
-  std::string toStringifiedJsonArray();
+  std::string toStringifiedJsonArray(SpanSerializer& span_serializer);
 
 private:
   // We use a pre-allocated vector to improve performance

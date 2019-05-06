@@ -122,14 +122,20 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
   return std::move(active_span);
 }
 
+V1SpanSerializer::V1SpanSerializer() {}
+
+const std::string V1SpanSerializer::serialize(const Span& span) { return span.toJson(); }
+
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
-                           const std::string& collector_endpoint)
+                           const std::string& collector_endpoint, SpanSerializer& span_serializer)
     : driver_(driver), collector_endpoint_(collector_endpoint) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     flushSpans();
     enableTimer();
   });
+
+  span_serializer_ = span_serializer;
 
   const uint64_t min_flush_spans =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.min_flush_spans", 5U);
@@ -140,7 +146,14 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
 
 ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                       const std::string& collector_endpoint) {
-  return ReporterPtr(new ReporterImpl(driver, dispatcher, collector_endpoint));
+  return ReporterPtr(
+      new ReporterImpl(driver, dispatcher, collector_endpoint, new V1SpanSerializer()));
+}
+
+ReporterPtr ReporterImpl::NewInstanceWithSerializer(Driver& driver, Event::Dispatcher& dispatcher,
+                                                    const std::string& collector_endpoint,
+                                                    SpanSerializer span_serializer) {
+  return ReporterPtr(new ReporterImpl(driver, dispatcher, collector_endpoint, span_serializer));
 }
 
 // TODO(fabolive): Need to avoid the copy to improve performance.
@@ -165,7 +178,7 @@ void ReporterImpl::flushSpans() {
   if (span_buffer_.pendingSpans()) {
     driver_.tracerStats().spans_sent_.add(span_buffer_.pendingSpans());
 
-    const std::string request_body = span_buffer_.toStringifiedJsonArray();
+    const std::string request_body = span_buffer_.toStringifiedJsonArray(span_serializer_);
     Http::MessagePtr message(new Http::RequestMessageImpl());
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     message->headers().insertPath().value(collector_endpoint_);
