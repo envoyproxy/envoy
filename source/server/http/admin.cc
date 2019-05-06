@@ -182,6 +182,10 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
     health_status.set_failed_active_degraded_check(
         host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC));
     break;
+  case Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL:
+    health_status.set_pending_dynamic_removal(
+        host.healthFlagGet(Upstream::Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+    break;
   }
 }
 } // namespace
@@ -586,7 +590,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
-  if (query_params.size() > 0 && !changeLogLevel(query_params)) {
+  if (!query_params.empty() && !changeLogLevel(query_params)) {
     response.add("usage: /logging?<name>=<level> (change single level)\n");
     response.add("usage: /logging?level=<level> (change all levels)\n");
     response.add("levels: ");

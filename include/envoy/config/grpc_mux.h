@@ -82,7 +82,7 @@ public:
    * Start a configuration subscription asynchronously for some API type and resources.
    * @param type_url type URL corresponding to xDS API, e.g.
    * type.googleapis.com/envoy.api.v2.Cluster.
-   * @param resources vector of resource names to watch for. If this is empty, then all
+   * @param resources set of resource names to watch for. If this is empty, then all
    *                  resources for type_url will result in callbacks.
    * @param callbacks the callbacks to be notified of configuration updates. These must be valid
    *                  until GrpcMuxWatch is destroyed.
@@ -90,7 +90,7 @@ public:
    * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
    */
   virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
-                                    const std::vector<std::string>& resources,
+                                    const std::set<std::string>& resources,
                                     GrpcMuxCallbacks& callbacks) PURE;
 
   /**

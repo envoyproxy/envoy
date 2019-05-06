@@ -14,6 +14,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
@@ -28,6 +29,7 @@ using Envoy::Protobuf::FileDescriptorSet;
 using Envoy::Protobuf::io::ZeroCopyInputStream;
 using Envoy::ProtobufUtil::Status;
 using Envoy::ProtobufUtil::error::Code;
+using google::api::HttpRule;
 using google::grpc::transcoding::JsonRequestTranslator;
 using google::grpc::transcoding::PathMatcherBuilder;
 using google::grpc::transcoding::PathMatcherUtility;
@@ -40,7 +42,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
-
 namespace {
 
 // Transcoder:
@@ -119,9 +120,18 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     }
     for (int i = 0; i < service->method_count(); ++i) {
       auto method = service->method(i);
-      if (!PathMatcherUtility::RegisterByHttpRule(pmb,
-                                                  method->options().GetExtension(google::api::http),
-                                                  ignored_query_parameters, method)) {
+
+      HttpRule http_rule;
+      if (method->options().HasExtension(google::api::http)) {
+        http_rule = method->options().GetExtension(google::api::http);
+      } else if (proto_config.auto_mapping()) {
+        auto post = "/" + service->full_name() + "/" + method->name();
+        http_rule.set_post(post);
+        http_rule.set_body("*");
+      }
+
+      if (!PathMatcherUtility::RegisterByHttpRule(pmb, http_rule, ignored_query_parameters,
+                                                  method)) {
         throw EnvoyException("transcoding_filter: Cannot register '" + method->full_name() +
                              "' to path matcher");
       }
@@ -155,8 +165,8 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
                                 "Request headers has application/grpc content-type");
   }
-  const ProtobufTypes::String method = headers.Method()->value().c_str();
-  ProtobufTypes::String path = headers.Path()->value().c_str();
+  const ProtobufTypes::String method(headers.Method()->value().getStringView());
+  ProtobufTypes::String path(headers.Path()->value().getStringView());
   ProtobufTypes::String args;
 
   const size_t pos = path.find('?');
@@ -252,10 +262,13 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     if (!request_status.ok()) {
       ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
       error_ = true;
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                         absl::string_view(request_status.error_message().data(),
-                                                           request_status.error_message().size()),
-                                         nullptr, absl::nullopt);
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::BadRequest,
+          absl::string_view(request_status.error_message().data(),
+                            request_status.error_message().size()),
+          nullptr, absl::nullopt,
+          absl::StrCat(StreamInfo::ResponseCodeDetails::get().GrpcTranscodeFailedEarly, "{",
+                       MessageUtil::CodeEnumToString(request_status.code()), "}"));
 
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -290,10 +303,13 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
   if (!request_status.ok()) {
     ENVOY_LOG(debug, "Transcoding request error {}", request_status.ToString());
     error_ = true;
-    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                       absl::string_view(request_status.error_message().data(),
-                                                         request_status.error_message().size()),
-                                       nullptr, absl::nullopt);
+    decoder_callbacks_->sendLocalReply(
+        Http::Code::BadRequest,
+        absl::string_view(request_status.error_message().data(),
+                          request_status.error_message().size()),
+        nullptr, absl::nullopt,
+        absl::StrCat(StreamInfo::ResponseCodeDetails::get().GrpcTranscodeFailed, "{",
+                     MessageUtil::CodeEnumToString(request_status.code()), "}"));
 
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }

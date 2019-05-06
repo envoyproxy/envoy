@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_quiche",
 )
@@ -16,6 +17,20 @@ envoy_package()
 # Bazel does not support limiting visibility to specific external dependencies.
 
 # TODO: add build target for quic_platform_impl_lib
+
+envoy_cc_library(
+    name = "flags_impl_lib",
+    srcs = ["flags_impl.cc"],
+    hdrs = [
+        "flags_impl.h",
+        "flags_list.h",
+    ],
+    external_deps = [
+        "abseil_base",
+        "abseil_synchronization",
+    ],
+    visibility = ["//visibility:public"],
+)
 
 envoy_cc_library(
     name = "string_utils_lib",
@@ -37,6 +52,7 @@ envoy_cc_library(
         "http2_estimate_memory_usage_impl.h",
         "http2_export_impl.h",
         "http2_flag_utils_impl.h",
+        "http2_flags_impl.h",
         "http2_macros_impl.h",
         "http2_optional_impl.h",
         "http2_ptr_util_impl.h",
@@ -53,7 +69,9 @@ envoy_cc_library(
         "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
-    deps = envoy_select_quiche([
+    deps = [
+        ":flags_impl_lib",
+    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
     ]),
@@ -87,6 +105,7 @@ envoy_cc_library(
         "quic_estimate_memory_usage_impl.h",
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
+        "quic_flags_impl.h",
         "quic_iovec_impl.h",
         "quic_map_util_impl.h",
         "quic_prefetch_impl.h",
@@ -94,14 +113,11 @@ envoy_cc_library(
         "quic_ptr_util_impl.h",
         "quic_server_stats_impl.h",
         "quic_string_piece_impl.h",
+        "quic_stream_buffer_allocator_impl.h",
         "quic_uint128_impl.h",
     ] + envoy_select_quiche([
-        "quic_expect_bug_impl.h",
         "quic_logging_impl.h",
-        "quic_mock_log_impl.h",
         "quic_stack_trace_impl.h",
-        "quic_test_impl.h",
-        "quic_thread_impl.h",
     ]),
     external_deps = [
         "abseil_base",
@@ -113,10 +129,14 @@ envoy_cc_library(
         "googletest",
     ],
     visibility = ["//visibility:public"],
-    deps = ["@com_googlesource_quiche//:quic_platform_export"] + envoy_select_quiche([
+    deps = [
+        "@com_googlesource_quiche//:quic_platform_export",
+        "@com_googlesource_quiche//:quic_buffer_allocator_lib",
+        ":flags_impl_lib",
+    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
-        "//include/envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:byte_order_lib",
         "//source/server:backtrace_lib",
     ]),
 )
@@ -126,7 +146,6 @@ envoy_cc_library(
     srcs = ["quic_cert_utils_impl.cc"] + envoy_select_quiche([
         "quic_file_utils_impl.cc",
         "quic_hostname_utils_impl.cc",
-        "quic_test_output_impl.cc",
     ]),
     hdrs = [
         "quic_cert_utils_impl.h",
@@ -136,7 +155,6 @@ envoy_cc_library(
         "quic_file_utils_impl.h",
         "quic_hostname_utils_impl.h",
         "quic_string_utils_impl.h",
-        "quic_test_output_impl.h",
         "quic_text_utils_impl.h",
     ]),
     external_deps = [
@@ -170,6 +188,7 @@ envoy_cc_library(
         "spdy_endianness_util_impl.h",
         "spdy_estimate_memory_usage_impl.h",
         "spdy_export_impl.h",
+        "spdy_flags_impl.h",
         "spdy_macros_impl.h",
         "spdy_mem_slice_impl.h",
         "spdy_ptr_util_impl.h",
@@ -177,7 +196,6 @@ envoy_cc_library(
         "spdy_string_piece_impl.h",
         "spdy_test_helpers_impl.h",
         "spdy_test_utils_prod_impl.h",
-        "spdy_unsafe_arena_impl.h",
     ] + envoy_select_quiche([
         "spdy_bug_tracker_impl.h",
         "spdy_logging_impl.h",
@@ -191,9 +209,22 @@ envoy_cc_library(
         "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
-    deps = envoy_select_quiche([
+    deps = [
+        ":flags_impl_lib",
+    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
+    ]),
+)
+
+envoy_cc_library(
+    name = "spdy_platform_unsafe_arena_impl_lib",
+    hdrs = [
+        "spdy_unsafe_arena_impl.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = envoy_select_quiche([
+        "@com_googlesource_quiche//:spdy_simple_arena_lib",
     ]),
 )

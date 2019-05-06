@@ -33,7 +33,7 @@ void adjustContentLength(Http::HeaderMap& headers,
   auto length_header = headers.ContentLength();
   if (length_header != nullptr) {
     uint64_t length;
-    if (StringUtil::atoull(length_header->value().c_str(), length)) {
+    if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
       length_header->value(adjustment(length));
     }
   }
@@ -56,7 +56,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
     // We keep track of the original content-type to ensure that we handle
     // gRPC content type variations such as application/grpc+proto.
-    content_type_ = headers.ContentType()->value().c_str();
+    content_type_ = std::string(headers.ContentType()->value().getStringView());
     headers.ContentType()->value(upstream_content_type_);
     headers.insertAccept().value(upstream_content_type_);
 
@@ -77,8 +77,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
   if (enabled_ && withhold_grpc_frames_ && !prefix_stripped_) {
     // Fail the request if the body is too small to possibly contain a gRPC frame.
     if (buffer.length() < Grpc::GRPC_FRAME_HEADER_SIZE) {
-      decoder_callbacks_->sendLocalReply(Http::Code::OK, "invalid request body", nullptr,
-                                         Grpc::Status::GrpcStatus::Unknown);
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::OK, "invalid request body", nullptr, Grpc::Status::GrpcStatus::Unknown,
+          StreamInfo::ResponseCodeDetails::get().GrpcBridgeFailedTooSmall);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
 
@@ -107,6 +108,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
       headers.insertStatus().value(enumToInt(Http::Code::OK));
       content_type->value(content_type_);
 
+      decoder_callbacks_->streamInfo().setResponseCodeDetails(
+          StreamInfo::ResponseCodeDetails::get().GrpcBridgeFailedContentType);
       return Http::FilterHeadersStatus::ContinueAndEndStream;
     }
 

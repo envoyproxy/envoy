@@ -34,12 +34,6 @@ namespace Http2 {
 using Http2SettingsTuple = ::testing::tuple<uint32_t, uint32_t, uint32_t, uint32_t>;
 using Http2SettingsTestParam = ::testing::tuple<Http2SettingsTuple, Http2SettingsTuple>;
 
-constexpr Http2SettingsTuple
-    DefaultHttp2SettingsTuple(Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
-                              Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-                              Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS,
-                              Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
-
 class Http2CodecImplTestFixture {
 public:
   struct ConnectionWrapper {
@@ -88,9 +82,6 @@ public:
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
           if (corrupt_metadata_frame_) {
             corruptMetadataFramePayload(data);
-          }
-          if (corrupt_at_offset_ >= 0) {
-            corruptAtOffset(data, corrupt_at_offset_, corrupt_with_char_);
           }
           server_wrapper_.dispatch(data, *server_);
         }));
@@ -148,9 +139,6 @@ public:
   MockStreamCallbacks server_stream_callbacks_;
   // Corrupt a metadata frame payload.
   bool corrupt_metadata_frame_ = false;
-  // Corrupt frame at a given offset (if positive).
-  ssize_t corrupt_at_offset_{-1};
-  char corrupt_with_char_{'\0'};
 
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
 };
@@ -859,7 +847,15 @@ INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
       ::testing::Values(Http2Settings::MIN_INITIAL_CONNECTION_WINDOW_SIZE,                         \
                         Http2Settings::MAX_INITIAL_CONNECTION_WINDOW_SIZE))
 
-INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTest,
+// Make sure we have coverage for high and low values for various  combinations and permutations
+// of HTTP settings in at least one test fixture.
+// Use with caution as any test using this runs 255 times.
+typedef Http2CodecImplTest Http2CodecImplTestAll;
+
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTestAll,
+                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                            HTTP2SETTINGS_DEFAULT_COMBINE));
+INSTANTIATE_TEST_SUITE_P(Http2CodecImplTestEdgeSettings, Http2CodecImplTestAll,
                          ::testing::Combine(HTTP2SETTINGS_EDGE_COMBINE,
                                             HTTP2SETTINGS_EDGE_COMBINE));
 
@@ -1013,7 +1009,9 @@ TEST_P(Http2CodecImplTest, TestLargeRequestHeadersAtMaxConfigurable) {
   request_encoder_->encodeHeaders(request_headers, true);
 }
 
-TEST_P(Http2CodecImplTest, TestCodecHeaderCompression) {
+// Note this is Http2CodecImplTestAll not Http2CodecImplTest, to test
+// compression with min and max HPACK table size.
+TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
   initialize();
 
   TestHeaderMapImpl request_headers;
@@ -1038,50 +1036,6 @@ TEST_P(Http2CodecImplTest, TestCodecHeaderCompression) {
   } else {
     EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(client_->session()));
     EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(server_->session()));
-  }
-}
-
-// Validate that nghttp2 rejects NUL/CR/LF as per
-// https://httpwg.org/specs/rfc7540.html#rfc.section.10.3.
-// TEST_P(Http2CodecImplTest, InvalidHeaderChars) {
-// TODO(htuch): Write me. Http2CodecImplMutationTest basically covers this,
-// but we could be a bit more specific and add a captured H2 HEADERS frame
-// here and inject it with mutation of just the header value, ensuring we get
-// the expected codec exception.
-// }
-
-class Http2CodecImplMutationTest : public ::testing::TestWithParam<::testing::tuple<char, int>>,
-                                   protected Http2CodecImplTestFixture {
-public:
-  Http2CodecImplMutationTest()
-      : Http2CodecImplTestFixture(DefaultHttp2SettingsTuple, DefaultHttp2SettingsTuple) {}
-
-  void initialize() override {
-    corrupt_with_char_ = ::testing::get<0>(GetParam());
-    corrupt_at_offset_ = ::testing::get<1>(GetParam());
-    Http2CodecImplTestFixture::initialize();
-  }
-};
-
-INSTANTIATE_TEST_SUITE_P(Http2CodecImplMutationTest, Http2CodecImplMutationTest,
-                         ::testing::Combine(::testing::ValuesIn({'\0', '\r', '\n'}),
-                                            ::testing::Range(0, 128)));
-
-// Mutate an arbitrary offset in the HEADERS frame with NUL/CR/LF. This should
-// either throw an exception or continue, but we shouldn't crash due to
-// validHeaderString() ASSERTs.
-TEST_P(Http2CodecImplMutationTest, HandleInvalidChars) {
-  initialize();
-
-  TestHeaderMapImpl request_headers;
-  request_headers.addCopy("foo", "barbaz");
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(AnyNumber());
-  EXPECT_CALL(client_callbacks_, onGoAway()).Times(AnyNumber());
-  try {
-    request_encoder_->encodeHeaders(request_headers, true);
-  } catch (const CodecProtocolException& e) {
-    ENVOY_LOG_MISC(trace, "CodecProtocolException: {}", e.what());
   }
 }
 

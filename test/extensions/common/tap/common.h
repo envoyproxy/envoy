@@ -39,7 +39,7 @@ public:
   MockPerTapSinkHandleManager();
   ~MockPerTapSinkHandleManager();
 
-  void submitTrace(const TraceWrapperSharedPtr& trace) override { submitTrace_(*trace); }
+  void submitTrace(TraceWrapperPtr&& trace) override { submitTrace_(*trace); }
 
   MOCK_METHOD1(submitTrace_, void(const envoy::data::tap::v2alpha::TraceWrapper& trace));
 };

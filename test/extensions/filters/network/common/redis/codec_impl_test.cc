@@ -65,6 +65,7 @@ TEST_F(RedisRespValueTest, EqualityTestingAndCopyingTest) {
   simplestring_value.type(RespType::SimpleString);
   error_value.type(RespType::Error);
   integer_value.type(RespType::Integer);
+  integer_value.asInteger() = 123;
 
   EXPECT_NE(bulkstring_value, simplestring_value);
   EXPECT_NE(bulkstring_value, error_value);

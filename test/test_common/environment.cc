@@ -167,7 +167,7 @@ std::vector<Network::Address::IpVersion> TestEnvironment::getIpVersionsForTest()
 
 Server::Options& TestEnvironment::getOptions() {
   static OptionsImpl* options = new OptionsImpl(
-      argc_, argv_, [](uint64_t, uint64_t, bool) { return "1"; }, spdlog::level::err);
+      argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);
   return *options;
 }
 
@@ -199,7 +199,7 @@ std::string TestEnvironment::substitute(const std::string& str,
   // Substitute IP loopback addresses.
   const std::regex loopback_address_regex("\\{\\{ ip_loopback_address \\}\\}");
   out_json_string = std::regex_replace(out_json_string, loopback_address_regex,
-                                       Network::Test::getLoopbackAddressUrlString(version));
+                                       Network::Test::getLoopbackAddressString(version));
   const std::regex ntop_loopback_address_regex("\\{\\{ ntop_ip_loopback_address \\}\\}");
   out_json_string = std::regex_replace(out_json_string, ntop_loopback_address_regex,
                                        Network::Test::getLoopbackAddressString(version));
@@ -229,11 +229,14 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   return temporaryFileSubstitute(path, ParamMap(), port_map, version);
 }
 
-std::string TestEnvironment::readFileToStringForTest(const std::string& filename) {
+std::string TestEnvironment::readFileToStringForTest(const std::string& filename,
+                                                     bool require_existence) {
   std::ifstream file(filename);
   if (file.fail()) {
-    std::cerr << "failed to open: " << filename << std::endl;
-    RELEASE_ASSERT(false, "");
+    if (!require_existence) {
+      return "";
+    }
+    RELEASE_ASSERT(false, absl::StrCat("failed to open: ", filename));
   }
 
   std::stringstream file_string_stream;

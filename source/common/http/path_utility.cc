@@ -45,10 +45,10 @@ bool PathUtil::canonicalPath(HeaderEntry& path_header) {
       query_pos == original_path.npos
           ? absl::string_view{}
           : absl::string_view{original_path.data() + query_pos, original_path.size() - query_pos};
-  if (query_suffix.size() > 0) {
+  if (!query_suffix.empty()) {
     normalized_path.insert(normalized_path.end(), query_suffix.begin(), query_suffix.end());
   }
-  path_header.value(std::move(normalized_path));
+  path_header.value(normalized_path);
   return true;
 }
 

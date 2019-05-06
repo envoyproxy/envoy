@@ -37,7 +37,6 @@ OptionsImpl createTestOptionsImpl(const std::string& config_path, const std::str
   test_options.setFileFlushIntervalMsec(std::chrono::milliseconds(50));
   test_options.setDrainTime(std::chrono::seconds(1));
   test_options.setParentShutdownTime(std::chrono::seconds(2));
-  test_options.setMaxStats(16384u);
 
   return test_options;
 }
@@ -166,14 +165,14 @@ void IntegrationTestServer::onRuntimeCreated() {
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
-    Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+    Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator) {
   Stats::FakeSymbolTableImpl symbol_table;
-  Server::HotRestartNopImpl restarter(symbol_table);
+  Server::HotRestartNopImpl restarter;
   ThreadLocal::InstanceImpl tls;
   Stats::HeapStatDataAllocator stats_allocator(symbol_table);
-  Stats::ThreadLocalStoreImpl stat_store(options.statsOptions(), stats_allocator);
+  Stats::ThreadLocalStoreImpl stat_store(stats_allocator);
 
   Server::InstanceImpl server(options, time_system, local_address, hooks, restarter, stat_store,
                               access_log_lock, component_factory, std::move(random_generator), tls,
@@ -200,7 +199,7 @@ IntegrationTestServerImpl::~IntegrationTestServerImpl() {
     BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
         admin_address, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
     EXPECT_TRUE(response->complete());
-    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   }
 }
 

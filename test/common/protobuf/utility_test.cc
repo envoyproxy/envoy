@@ -472,6 +472,7 @@ TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
   MessageUtil::checkForDeprecation(base);
+  EXPECT_EQ(0, store_.gauge("runtime.deprecated_feature_use").value());
 }
 
 TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecated) {
@@ -481,6 +482,7 @@ TEST_F(DeprecatedFieldsTest, IndividualFieldDeprecated) {
   EXPECT_LOG_CONTAINS("warning",
                       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
                       MessageUtil::checkForDeprecation(base));
+  EXPECT_EQ(1, store_.gauge("runtime.deprecated_feature_use").value());
 }
 
 // Use of a deprecated and disallowed field should result in an exception.
@@ -633,5 +635,14 @@ INSTANTIATE_TEST_SUITE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
                                            1000 * 60 * 60 * 24,    // day
                                            1000 * 60 * 60 * 24 * 7 // week
                                            ));
+
+TEST(StatusCode, Strings) {
+  int last_code = static_cast<int>(ProtobufUtil::error::UNAUTHENTICATED);
+  for (int i = 0; i < last_code; ++i) {
+    EXPECT_NE(MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(i)), "");
+  }
+  ASSERT_EQ("",
+            MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+}
 
 } // namespace Envoy

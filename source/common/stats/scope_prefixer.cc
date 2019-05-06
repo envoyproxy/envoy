@@ -9,22 +9,39 @@ namespace Envoy {
 namespace Stats {
 
 ScopePrefixer::ScopePrefixer(absl::string_view prefix, Scope& scope)
-    : prefix_(Utility::sanitizeStatsName(prefix)), scope_(scope) {}
+    : scope_(scope), prefix_(Utility::sanitizeStatsName(prefix), symbolTable()) {}
+
+ScopePrefixer::ScopePrefixer(StatName prefix, Scope& scope)
+    : scope_(scope), prefix_(prefix, symbolTable()) {}
+
+ScopePrefixer::~ScopePrefixer() { prefix_.free(symbolTable()); }
+
+ScopePtr ScopePrefixer::createScopeFromStatName(StatName name) {
+  SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
+  return std::make_unique<ScopePrefixer>(StatName(joined.get()), scope_);
+}
 
 ScopePtr ScopePrefixer::createScope(const std::string& name) {
-  return std::make_unique<ScopePrefixer>(prefix_ + name, scope_);
+  StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
+  return createScopeFromStatName(stat_name_storage.statName());
 }
 
 Counter& ScopePrefixer::counterFromStatName(StatName name) {
-  return counter(symbolTable().toString(name));
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_.symbolTable().join({prefix_.statName(), name});
+  return scope_.counterFromStatName(StatName(stat_name_storage.get()));
 }
 
 Gauge& ScopePrefixer::gaugeFromStatName(StatName name) {
-  return gauge(symbolTable().toString(name));
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_.symbolTable().join({prefix_.statName(), name});
+  return scope_.gaugeFromStatName(StatName(stat_name_storage.get()));
 }
 
 Histogram& ScopePrefixer::histogramFromStatName(StatName name) {
-  return histogram(symbolTable().toString(name));
+  Stats::SymbolTable::StoragePtr stat_name_storage =
+      scope_.symbolTable().join({prefix_.statName(), name});
+  return scope_.histogramFromStatName(StatName(stat_name_storage.get()));
 }
 
 void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_t val) {

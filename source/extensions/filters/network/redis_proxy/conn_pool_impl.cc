@@ -25,16 +25,16 @@ InstanceImpl::InstanceImpl(
 }
 
 Common::Redis::Client::PoolRequest*
-InstanceImpl::makeRequest(const std::string& key, const Common::Redis::RespValue& value,
+InstanceImpl::makeRequest(const std::string& key, const Common::Redis::RespValue& request,
                           Common::Redis::Client::PoolCallbacks& callbacks) {
-  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, value, callbacks);
+  return tls_->getTyped<ThreadLocalPool>().makeRequest(key, request, callbacks);
 }
 
 Common::Redis::Client::PoolRequest*
 InstanceImpl::makeRequestToHost(const std::string& host_address,
-                                const Common::Redis::RespValue& value,
+                                const Common::Redis::RespValue& request,
                                 Common::Redis::Client::PoolCallbacks& callbacks) {
-  return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, value, callbacks);
+  return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, request, callbacks);
 }
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher,
@@ -170,9 +170,9 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
   if (!ipv6) {
     host_address_map_key = host_address;
   } else {
-    const std::string ip_port = host_address.substr(colon_pos + 1);
+    const auto ip_port = absl::string_view(host_address).substr(colon_pos + 1);
     uint64_t ip_port_number;
-    if (!StringUtil::atoull(ip_port.c_str(), ip_port_number) || (ip_port_number > 65535)) {
+    if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
       return nullptr;
     }
     try {
@@ -191,9 +191,9 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(const std::string& host_address
 
     if (!ipv6) {
       // Only create an IPv4 address instance if we need a new Upstream::HostImpl.
-      const std::string ip_port = host_address.substr(colon_pos + 1);
+      const auto ip_port = absl::string_view(host_address).substr(colon_pos + 1);
       uint64_t ip_port_number;
-      if (!StringUtil::atoull(ip_port.c_str(), ip_port_number) || (ip_port_number > 65535)) {
+      if (!absl::SimpleAtoi(ip_port, &ip_port_number) || (ip_port_number > 65535)) {
         return nullptr;
       }
       try {

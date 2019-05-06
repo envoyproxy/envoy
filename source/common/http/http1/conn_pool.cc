@@ -107,7 +107,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     }
 
     // If we have no connections at all, make one no matter what so we don't starve.
-    if ((ready_clients_.size() == 0 && busy_clients_.size() == 0) || can_create_connection) {
+    if ((ready_clients_.empty() && busy_clients_.empty()) || can_create_connection) {
       createNewConnection();
     }
 
@@ -275,6 +275,12 @@ void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; 
 void ConnPoolImpl::StreamWrapper::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   if (headers->Connection() &&
       absl::EqualsIgnoreCase(headers->Connection()->value().getStringView(),
+                             Headers::get().ConnectionValues.Close)) {
+    saw_close_header_ = true;
+    parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();
+  }
+  if (!saw_close_header_ && headers->ProxyConnection() &&
+      absl::EqualsIgnoreCase(headers->ProxyConnection()->value().getStringView(),
                              Headers::get().ConnectionValues.Close)) {
     saw_close_header_ = true;
     parent_.parent_.host_->cluster().stats().upstream_cx_close_notify_.inc();

@@ -69,7 +69,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
       if (host) {
         ENVOY_LOG(debug, "Using existing host {}.", host->address()->asString());
         host->used(true); // Mark as used.
-        return std::move(host);
+        return host;
       }
       // Add a new host
       const Network::Address::Ip* dst_ip = dst_addr.ip();
@@ -100,7 +100,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
           });
         }
 
-        return std::move(host);
+        return host;
       } else {
         ENVOY_LOG(debug, "Failed to create host for {}.", dst_addr.asString());
       }
@@ -117,8 +117,10 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   const Http::HeaderMap* downstream_headers = context->downstreamHeaders();
   if (downstream_headers &&
       downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost) != nullptr) {
-    const std::string& request_override_host =
-        downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost)->value().c_str();
+    const std::string request_override_host(
+        downstream_headers->get(Http::Headers::get().EnvoyOriginalDstHost)
+            ->value()
+            .getStringView());
     try {
       request_host = Network::Utility::parseInternetAddressAndPort(request_override_host, false);
       ENVOY_LOG(debug, "Using request override host {}.", request_override_host);
@@ -175,7 +177,7 @@ void OriginalDstCluster::cleanup() {
     }
   }
 
-  if (to_be_removed.size() > 0) {
+  if (!to_be_removed.empty()) {
     priority_set_.updateHosts(0,
                               HostSetImpl::partitionHosts(new_hosts, HostsPerLocalityImpl::empty()),
                               {}, {}, to_be_removed, absl::nullopt);
