@@ -18,9 +18,9 @@ namespace {
 class Throttler {
 public:
   Throttler(Event::Dispatcher& dispatcher, std::chrono::milliseconds tick_interval,
-            uint64_t max_chunk_length_, std::function<void(Buffer::Instance&, bool)> next_chunk_cb)
+            uint64_t max_chunk_length, std::function<void(Buffer::Instance&, bool)> next_chunk_cb)
       : timer_(dispatcher.createTimer([this] { onTimerTick(); })), tick_interval_(tick_interval),
-        max_chunk_length_(max_chunk_length_), next_chunk_cb_(next_chunk_cb) {}
+        max_chunk_length_(max_chunk_length), next_chunk_cb_(next_chunk_cb) {}
 
   /**
    * Throttle given given request/response data.
