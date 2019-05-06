@@ -85,6 +85,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
 // then fails health checking is removed.
 TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
   initializeTest(true);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   setEndpoints(1, 0, 0, false);
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
