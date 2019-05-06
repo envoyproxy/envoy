@@ -310,6 +310,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 
   if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
     host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
+    // Even though the health value of the host changed, we set this to Changed to that the cluster
+    // can update its list of excluded hosts.
     changed_state = HealthTransition::Changed;
   }
 

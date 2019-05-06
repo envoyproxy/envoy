@@ -708,16 +708,18 @@ ClusterImplBase::ClusterImplBase(
 
         uint32_t healthy_hosts = 0;
         uint32_t degraded_hosts = 0;
+        uint32_t excluded_hosts = 0;
         uint32_t hosts = 0;
         for (const auto& host_set : prioritySet().hostSetsPerPriority()) {
           hosts += host_set->hosts().size();
           healthy_hosts += host_set->healthyHosts().size();
           degraded_hosts += host_set->degradedHosts().size();
+          excluded_hosts += host_set->excludedHosts().size();
         }
-        // TODO(snowp): Stats for excluded hosts?
         info_->stats().membership_total_.set(hosts);
         info_->stats().membership_healthy_.set(healthy_hosts);
         info_->stats().membership_degraded_.set(degraded_hosts);
+        info_->stats().membership_excluded_.set(excluded_hosts);
       });
 }
 
@@ -746,10 +748,10 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
 std::tuple<HostsPerLocalityConstSharedPtr, HostsPerLocalityConstSharedPtr,
            HostsPerLocalityConstSharedPtr>
 ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
-  auto filtered_clones =
-      hosts.filter({[](const Host& host) { return host.health() == Host::Health::Healthy; },
-                    [](const Host& host) { return host.health() == Host::Health::Degraded; },
-                    [](const Host& host) { return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC); }});
+  auto filtered_clones = hosts.filter(
+      {[](const Host& host) { return host.health() == Host::Health::Healthy; },
+       [](const Host& host) { return host.health() == Host::Health::Degraded; },
+       [](const Host& host) { return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC); }});
 
   return {std::move(filtered_clones[0]), std::move(filtered_clones[1]),
           std::move(filtered_clones[2])};

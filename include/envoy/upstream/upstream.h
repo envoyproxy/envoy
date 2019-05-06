@@ -575,6 +575,7 @@ public:
   COUNTER  (membership_change)                                                                     \
   GAUGE    (membership_healthy)                                                                    \
   GAUGE    (membership_degraded)                                                                   \
+  GAUGE    (membership_excluded)                                                                   \
   GAUGE    (membership_total)                                                                      \
   COUNTER  (retry_or_shadow_abandoned)                                                             \
   COUNTER  (update_attempt)                                                                        \
