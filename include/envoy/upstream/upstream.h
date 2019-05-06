@@ -192,8 +192,6 @@ public:
    * @param new_used supplies the new value of host being in use to be stored.
    */
   virtual void used(bool new_used) PURE;
-
-  virtual bool warmed() const PURE;
 };
 
 typedef std::shared_ptr<const Host> HostConstSharedPtr;

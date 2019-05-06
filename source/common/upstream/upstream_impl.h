@@ -224,13 +224,6 @@ public:
   void weight(uint32_t new_weight) override;
   bool used() const override { return used_; }
   void used(bool new_used) override { used_ = new_used; }
-  bool warmed() const override {
-    if (cluster_ != nullptr && cluster_->warmHosts()) {
-      return !healthFlagGet(HealthFlag::PENDING_ACTIVE_HC);
-    }
-
-    return true;
-  }
 
 protected:
   static Network::ClientConnectionPtr

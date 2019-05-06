@@ -735,7 +735,7 @@ ClusterImplBase::partitionHostList(const HostVector& hosts) {
     if (host->health() == Host::Health::Degraded) {
       degraded_list->get().emplace_back(host);
     }
-    if (!host->warmed()) {
+    if (host->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
       excluded_list->get().emplace_back(host);
     }
   }
@@ -749,7 +749,7 @@ ClusterImplBase::partitionHostsPerLocality(const HostsPerLocality& hosts) {
   auto filtered_clones =
       hosts.filter({[](const Host& host) { return host.health() == Host::Health::Healthy; },
                     [](const Host& host) { return host.health() == Host::Health::Degraded; },
-                    [](const Host& host) { return !host.warmed(); }});
+                    [](const Host& host) { return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC); }});
 
   return {std::move(filtered_clones[0]), std::move(filtered_clones[1]),
           std::move(filtered_clones[2])};
@@ -1230,11 +1230,15 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         max_host_weight = host->weight();
       }
 
-      // If we are depending on a health checker, we initialize to unhealthy and set the
-      // flag indicating that we have not performed any active health checks yet.
+      // If we are depending on a health checker, we initialize to unhealthy.
       if (health_checker_ != nullptr) {
         host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-        host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+
+        // If we want to exclude hosts until they have been health checked, mark them with
+        // a flag to indicate that they have not been health checked yet.
+        if (info_->warmHosts()) {
+          host->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+        }
       }
 
       updated_hosts[host->address()->asString()] = host;
