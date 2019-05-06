@@ -636,4 +636,13 @@ INSTANTIATE_TEST_SUITE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
                                            1000 * 60 * 60 * 24 * 7 // week
                                            ));
 
+TEST(StatusCode, Strings) {
+  int last_code = static_cast<int>(ProtobufUtil::error::UNAUTHENTICATED);
+  for (int i = 0; i < last_code; ++i) {
+    EXPECT_NE(MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(i)), "");
+  }
+  ASSERT_EQ("",
+            MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+}
+
 } // namespace Envoy
