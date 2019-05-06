@@ -18,6 +18,7 @@ public:
   ThreadIdImplWin32(DWORD id);
 
   // Thread::ThreadId
+  int tid() const override { return id_; };
   std::string debugString() const override;
   bool isCurrentThreadId() const override;
 
