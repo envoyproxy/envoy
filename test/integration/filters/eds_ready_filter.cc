@@ -12,15 +12,19 @@
 
 namespace Envoy {
 
-// A test filter that rejects all requests if CDS isn't ready yet.
-class CdsReadyFilter : public Http::PassThroughFilter {
+// A test filter that rejects all requests if EDS isn't healthy yet.
+class EdsReadyFilter : public Http::PassThroughFilter {
 public:
-  CdsReadyFilter(const Stats::Scope& root_scope)
+  EdsReadyFilter(const Stats::Scope& root_scope)
       : root_scope_(root_scope),
-        stat_name_("cluster_manager.cds.config_reload",
+        stat_name_("cluster.cluster_0.membership_healthy",
                    const_cast<Stats::SymbolTable&>(root_scope_.symbolTable())) {}
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
-    if (root_scope_.getCounter(stat_name_.statName())->value() == 0) {
+    // TODO(ahedberg): This seg-faults because it thinks this stat doesn't exist...because the test
+    // server and the API have different stats stores and symbol tables! :(
+    if (root_scope_.getGauge(stat_name_.statName())->value() == 0) {
+      decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError, "EDS not ready",
+                                         nullptr, absl::nullopt);
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
@@ -31,21 +35,21 @@ private:
   Stats::StatNameManagedStorage stat_name_;
 };
 
-class CdsReadyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class EdsReadyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  CdsReadyFilterConfig() : EmptyHttpFilterConfig("cds-ready-filter") {}
+  EdsReadyFilterConfig() : EmptyHttpFilterConfig("eds-ready-filter") {}
 
   Http::FilterFactoryCb
   createFilter(const std::string&,
                Server::Configuration::FactoryContext& factory_context) override {
     return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
       callbacks.addStreamFilter(
-          std::make_shared<CdsReadyFilter>(factory_context.api().rootScope()));
+          std::make_shared<EdsReadyFilter>(factory_context.api().rootScope()));
     };
   }
 };
 
-static Registry::RegisterFactory<CdsReadyFilterConfig,
+static Registry::RegisterFactory<EdsReadyFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 

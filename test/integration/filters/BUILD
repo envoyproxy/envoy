@@ -23,9 +23,9 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "cds_ready_filter_config_lib",
+    name = "eds_ready_filter_config_lib",
     srcs = [
-        "cds_ready_filter.cc",
+        "eds_ready_filter.cc",
     ],
     deps = [
         "//include/envoy/http:filter_interface",
