@@ -1307,23 +1307,23 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
     }
   }
   resolve_targets_ = std::move(resolve_targets);
-
-  switch (cluster.dns_lookup_family()) {
-  case envoy::api::v2::Cluster::V6_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
-    break;
-  case envoy::api::v2::Cluster::V4_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
-    break;
-  case envoy::api::v2::Cluster::AUTO:
-    dns_lookup_family_ = Network::DnsLookupFamily::Auto;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+}
+
+Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster) {
+  switch (cluster.dns_lookup_family()) {
+  case envoy::api::v2::Cluster::V6_ONLY:
+    return Network::DnsLookupFamily::V6Only;
+  case envoy::api::v2::Cluster::V4_ONLY:
+    return Network::DnsLookupFamily::V4Only;
+  case envoy::api::v2::Cluster::AUTO:
+    return Network::DnsLookupFamily::Auto;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 void StrictDnsClusterImpl::startPreInit() {

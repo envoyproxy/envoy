@@ -109,7 +109,7 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
   auto new_scope = std::make_unique<ScopeImpl>(*this, name);
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
-  return std::move(new_scope);
+  return new_scope;
 }
 
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {

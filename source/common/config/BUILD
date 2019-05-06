@@ -99,6 +99,7 @@ envoy_cc_library(
     name = "delta_subscription_lib",
     hdrs = ["delta_subscription_impl.h"],
     deps = [
+        ":delta_subscription_state_lib",
         ":grpc_stream_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
@@ -108,6 +109,22 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "delta_subscription_state_lib",
+    srcs = ["delta_subscription_state.cc"],
+    hdrs = ["delta_subscription_state.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:token_bucket_impl_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:discovery_cc",
     ],
 )
 
