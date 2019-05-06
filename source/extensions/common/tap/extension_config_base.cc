@@ -73,7 +73,11 @@ ExtensionConfigBase::ExtensionConfigBase(
   case envoy::config::common::tap::v2alpha::CommonExtensionConfig::kTdsConfig: {
   tap_config_provider_manager_ =
       singleton_manager.getTyped<TapConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(tap_config_provider_manager), [&admin, init_manager] {            
+          SINGLETON_MANAGER_REGISTERED_NAME(tap_config_provider_manager), [&admin, init_manager] {
+            // TODO: do we need different singletons for transport socket?
+            // as the init behavior may be different
+            // potentially - not support tds on sockets? just on l7?
+            // different type of manager?
             return std::make_shared<TapConfigProviderManagerImpl>(admin, init_manager);
           });
 

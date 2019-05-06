@@ -1,3 +1,4 @@
+#include "common/network/utility.h"
 #include "extensions/filters/http/tap/tap_config_impl.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -250,7 +251,9 @@ if (destination_cluster_) {
   }
 
   if (remote_address_) {
-    trace->set_source_address(remote_address_->asString());
+    Network::Utility::addressToProtobufAddress(
+            *remote_address_,
+            *trace->mutable_downstream_remote_address());
     remote_address_.reset();
   }
 }
@@ -258,7 +261,10 @@ if (destination_cluster_) {
 void HttpPerRequestTapperImpl::setDestinationHost(TapCommon::TraceWrapperPtr& trace) {
 if (destination_host_) {
     auto* destination = trace->mutable_destination();
-    destination->set_host_address(destination_host_->address()->asString());
+
+    Network::Utility::addressToProtobufAddress(
+            *destination_host_->address(),
+            *destination->mutable_host_address());
 
     auto&& metadata = destination_host_->metadata();
     if (metadata) {
