@@ -94,7 +94,7 @@ public:
    *
    * @param callbacks supplies the callbacks.
    */
-  virtual void initializeWriteFilterCallbacks(WriteFilterCallbacks&){};
+  virtual void initializeWriteFilterCallbacks(WriteFilterCallbacks&) {}
 };
 
 typedef std::shared_ptr<WriteFilter> WriteFilterSharedPtr;
