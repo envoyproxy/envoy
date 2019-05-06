@@ -198,13 +198,18 @@ TEST_P(InjectDataWithTcpProxyFilterIntegrationTest, UsageOfInjectDataMethodsShou
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   tcp_client->write("hello");
-  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+
+  std::string observed_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5, &observed_data));
+  EXPECT_EQ("hello", observed_data);
 
   ASSERT_TRUE(fake_upstream_connection->write("hi"));
   tcp_client->waitForData("hi");
 
-  tcp_client->write("world!", true);
-  ASSERT_TRUE(fake_upstream_connection->waitForData(11));
+  tcp_client->write(" world!", true);
+  observed_data.clear();
+  ASSERT_TRUE(fake_upstream_connection->waitForData(12, &observed_data));
+  EXPECT_EQ("hello world!", observed_data);
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
 
   ASSERT_TRUE(fake_upstream_connection->write("there!", true));
