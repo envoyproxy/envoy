@@ -5,6 +5,8 @@
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 
+#include "common/config/datasource.h"
+
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
 
@@ -19,10 +21,12 @@ public:
       const envoy::config::filter::network::redis_proxy::v2::RedisProtocolOptions& proto_config)
       : auth_password_(proto_config.auth_password()) {}
 
-  const std::string& auth_password() const { return auth_password_; }
+  std::string auth_password(Api::Api& api) const {
+    return Config::DataSource::read(auth_password_, true, api);
+  }
 
 private:
-  const std::string auth_password_;
+  envoy::api::v2::core::DataSource auth_password_;
 };
 
 /**

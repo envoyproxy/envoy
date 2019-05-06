@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/datasource.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
@@ -16,12 +17,13 @@ namespace RedisProxy {
 
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config, Stats::Scope& scope,
-    const Network::DrainDecision& drain_decision, Runtime::Loader& runtime)
+    const Network::DrainDecision& drain_decision, Runtime::Loader& runtime, Api::Api& api)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
-      downstream_auth_password_(config.downstream_auth_password()) {
-  auth_required_ = !config.downstream_auth_password().empty();
+      downstream_auth_password_(
+          Config::DataSource::read(config.downstream_auth_password(), true, api)) {
+  auth_required_ = !downstream_auth_password_.empty();
 }
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {

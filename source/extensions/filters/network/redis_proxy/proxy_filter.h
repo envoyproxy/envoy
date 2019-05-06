@@ -52,7 +52,7 @@ class ProxyFilterConfig {
 public:
   ProxyFilterConfig(const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config,
                     Stats::Scope& scope, const Network::DrainDecision& drain_decision,
-                    Runtime::Loader& runtime);
+                    Runtime::Loader& runtime, Api::Api& api);
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;

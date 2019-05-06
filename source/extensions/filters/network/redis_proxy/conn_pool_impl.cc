@@ -36,8 +36,10 @@ Common::Redis::RespValue makeAuthCommand(const std::string& password) {
 InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config)
-    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config) {
+    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
+    Api::Api& api)
+    : cm_(cm), client_factory_(client_factory), tls_(tls.allocateSlot()), config_(config),
+      api_(api) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -67,7 +69,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(InstanceImpl& parent, Event::Disp
     auto options = cluster->info()->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
     if (options) {
-      auth_password_ = options->auth_password();
+      auth_password_ = options->auth_password(parent_.api_);
     }
     onClusterAddOrUpdateNonVirtual(*cluster);
   }

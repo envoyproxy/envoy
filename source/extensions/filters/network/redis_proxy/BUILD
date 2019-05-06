@@ -24,6 +24,7 @@ envoy_cc_library(
     name = "config_interface",
     hdrs = ["config.h"],
     deps = [
+        "//source/common/config:datasource_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
@@ -99,6 +100,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network/common/redis:codec_interface",
         "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",

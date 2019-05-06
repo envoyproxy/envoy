@@ -154,7 +154,7 @@ static_resources:
 )EOF";
 
 const std::string CONFIG_WITH_DOWNSTREAM_AUTH_PASSWORD_SET = CONFIG + R"EOF(
-          downstream_auth_password: somepassword
+          downstream_auth_password: { inline_string: somepassword }
 )EOF";
 
 const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS = R"EOF(
@@ -169,7 +169,7 @@ static_resources:
     - name: cluster_0
       type: STATIC
       extension_protocol_options:
-        envoy.redis_proxy: { auth_password: cluster_0_password }
+        envoy.redis_proxy: { auth_password: { inline_string: cluster_0_password }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_0
@@ -184,7 +184,7 @@ static_resources:
       type: STATIC
       lb_policy: RANDOM
       extension_protocol_options:
-        envoy.redis_proxy: { auth_password: cluster_1_password }
+        envoy.redis_proxy: { auth_password: { inline_string: cluster_1_password }}
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -197,7 +197,7 @@ static_resources:
     - name: cluster_2
       type: STATIC
       extension_protocol_options:
-        envoy.redis_proxy: { auth_password: cluster_2_password }
+        envoy.redis_proxy: { auth_password: { inline_string: cluster_2_password }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_2

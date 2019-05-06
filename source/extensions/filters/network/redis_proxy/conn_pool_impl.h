@@ -39,7 +39,8 @@ public:
   InstanceImpl(
       const std::string& cluster_name, Upstream::ClusterManager& cm,
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config);
+      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
+      Api::Api& api);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, const Common::Redis::RespValue& request,
@@ -114,6 +115,7 @@ private:
   Common::Redis::Client::ClientFactory& client_factory_;
   ThreadLocal::SlotPtr tls_;
   Common::Redis::Client::ConfigImpl config_;
+  Api::Api& api_;
 };
 
 } // namespace ConnPool

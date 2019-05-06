@@ -9,6 +9,7 @@
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -58,7 +59,7 @@ public:
 
     std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
-        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true));
+        Common::Redis::Client::createConnPoolSettings(20, hashtagging, true), api_);
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
@@ -102,6 +103,7 @@ public:
   Common::Redis::Client::MockClient* client_{};
   Network::Address::InstanceConstSharedPtr test_address_;
   std::string auth_password_;
+  NiceMock<Api::MockApi> api_;
 };
 
 TEST_F(RedisConnPoolImplTest, Basic) {

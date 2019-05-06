@@ -7,6 +7,7 @@
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -38,6 +39,20 @@ parseProtoFromJson(const std::string& json_string) {
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   Config::FilterJson::translateRedisProxy(*json_object_ptr, config);
 
+  // Instead of adding v2 properties to the v1 translateRedisProxy()
+  // support function, v2 properties are processed separately here.
+  //
+  // Process only the inline_string specifier for DataSource downstream_auth_password,
+  // since that is the only form of the DataSource used in this test.
+
+  if (json_object_ptr->hasObject("downstream_auth_password")) {
+    auto downstream_auth_obj = json_object_ptr->getObject("downstream_auth_password");
+    if (downstream_auth_obj->hasObject("inline_string")) {
+      const std::string password = downstream_auth_obj->getString("inline_string");
+      config.mutable_downstream_auth_password()->set_inline_string(password);
+    }
+  }
+
   return config;
 }
 
@@ -46,6 +61,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   Network::MockDrainDecision drain_decision_;
   Runtime::MockLoader runtime_;
+  NiceMock<Api::MockApi> api_;
 };
 
 TEST_F(RedisProxyFilterConfigTest, Normal) {
@@ -59,7 +75,7 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       parseProtoFromJson(json_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_);
+  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
   EXPECT_EQ(config.auth_required_, false);
   EXPECT_TRUE(config.downstream_auth_password_.empty());
@@ -80,7 +96,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
   std::string json_string = R"EOF(
   {
     "cluster_name": "fake_cluster",
-    "downstream_auth_password": "somepassword",
+    "downstream_auth_password": { "inline_string": "somepassword" },
     "stat_prefix": "foo",
     "conn_pool": { "op_timeout_ms" : 10 }
   }
@@ -88,7 +104,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
       parseProtoFromJson(json_string);
-  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_);
+  ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
   EXPECT_EQ(config.auth_required_, true);
   EXPECT_EQ(config.downstream_auth_password_, "somepassword");
 }
@@ -106,7 +122,7 @@ public:
   RedisProxyFilterTest(const std::string& json_string) {
     envoy::config::filter::network::redis_proxy::v2::RedisProxy proto_config =
         parseProtoFromJson(json_string);
-    config_.reset(new ProxyFilterConfig(proto_config, store_, drain_decision_, runtime_));
+    config_.reset(new ProxyFilterConfig(proto_config, store_, drain_decision_, runtime_, api_));
     filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,
                                             config_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -144,6 +160,7 @@ public:
   ProxyFilterConfigSharedPtr config_;
   std::unique_ptr<ProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  NiceMock<Api::MockApi> api_;
 };
 
 TEST_F(RedisProxyFilterTest, OutOfOrderResponseWithDrainClose) {
@@ -310,7 +327,7 @@ TEST_F(RedisProxyFilterTest, AuthWhenNotRequired) {
 const std::string downstream_auth_password_config = R"EOF(
     {
       "cluster_name": "fake_cluster",
-      "downstream_auth_password": "somepassword",
+      "downstream_auth_password": { "inline_string": "somepassword" },
       "stat_prefix": "foo",
       "conn_pool": { "op_timeout_ms" : 10 }
     }
