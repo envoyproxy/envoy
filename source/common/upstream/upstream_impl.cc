@@ -1288,20 +1288,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
-  switch (cluster.dns_lookup_family()) {
-  case envoy::api::v2::Cluster::V6_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V6Only;
-    break;
-  case envoy::api::v2::Cluster::V4_ONLY:
-    dns_lookup_family_ = Network::DnsLookupFamily::V4Only;
-    break;
-  case envoy::api::v2::Cluster::AUTO:
-    dns_lookup_family_ = Network::DnsLookupFamily::Auto;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-
+  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
   const envoy::api::v2::ClusterLoadAssignment load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
                                     : Config::Utility::translateClusterHosts(cluster.hosts()));
@@ -1318,6 +1305,19 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
+}
+
+Network::DnsLookupFamily getDnsLookupFamilyFromCluster(const envoy::api::v2::Cluster& cluster) {
+  switch (cluster.dns_lookup_family()) {
+  case envoy::api::v2::Cluster::V6_ONLY:
+    return Network::DnsLookupFamily::V6Only;
+  case envoy::api::v2::Cluster::V4_ONLY:
+    return Network::DnsLookupFamily::V4Only;
+  case envoy::api::v2::Cluster::AUTO:
+    return Network::DnsLookupFamily::Auto;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 void StrictDnsClusterImpl::startPreInit() {
