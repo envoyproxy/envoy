@@ -98,6 +98,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "delta_subscription_lib",
+    srcs = ["delta_subscription_impl.cc"],
     hdrs = ["delta_subscription_impl.h"],
     deps = [
         ":delta_subscription_state_lib",
@@ -105,6 +106,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/grpc:async_client_interface",
+        "//include/envoy/local_info:local_info_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
