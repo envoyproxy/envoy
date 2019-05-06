@@ -63,6 +63,9 @@ public:
   IntDeserializer() : written_{0}, ready_(false){};
 
   size_t feed(absl::string_view& data) override {
+    if (data.empty()) {
+      return 0;
+    }
     const size_t available = std::min<size_t>(sizeof(buf_) - written_, data.size());
     memcpy(buf_ + written_, data.data(), available);
     written_ += available;
@@ -244,6 +247,9 @@ public:
    * Can throw EnvoyException if given string length is not valid.
    */
   size_t feed(absl::string_view& data) override {
+    if (data.empty()) {
+      return 0;
+    }
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // Break early: we still need to fill in length buffer.
@@ -272,6 +278,7 @@ public:
 
     const size_t data_consumed = std::min<size_t>(required_, data.size());
     const size_t written = data_buf_.size() - required_;
+
     memcpy(data_buf_.data() + written, data.data(), data_consumed);
     required_ -= data_consumed;
 
@@ -316,6 +323,9 @@ public:
    * Can throw EnvoyException if given bytes length is not valid.
    */
   size_t feed(absl::string_view& data) override {
+    if (data.empty()) {
+      return 0;
+    }
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // Break early: we still need to fill in length buffer.
@@ -375,6 +385,9 @@ public:
    * Can throw EnvoyException if given bytes length is not valid.
    */
   size_t feed(absl::string_view& data) override {
+    if (data.empty()) {
+      return 0;
+    }
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // Break early: we still need to fill in length buffer.
