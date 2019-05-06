@@ -29,8 +29,6 @@ public:
  */
 class ReadBufferSource : public virtual StreamBufferSource {
 public:
-  virtual ~ReadBufferSource() {}
-
   /**
    * Fetch the read buffer for the source.
    */
@@ -42,8 +40,6 @@ public:
  */
 class WriteBufferSource : public virtual StreamBufferSource {
 public:
-  virtual ~WriteBufferSource() {}
-
   /**
    * Fetch the write buffer for the source.
    */
