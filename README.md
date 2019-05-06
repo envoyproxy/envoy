@@ -9,6 +9,7 @@ involved and how Envoy plays a role, read the CNCF
 [announcement](https://www.cncf.io/blog/2017/09/13/cncf-hosts-envoy/).
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
+[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/envoyproxy.envoy.mac?branchName=master)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=2&branchName=master)
 [![CircleCI](https://circleci.com/gh/envoyproxy/envoy/tree/master.svg?style=shield)](https://circleci.com/gh/envoyproxy/envoy/tree/master)
 [![Jenkins](https://img.shields.io/jenkins/s/https/powerci.osuosl.org/job/build-envoy-master/badge/icon/.svg?label=ppc64le%20build)](http://powerci.osuosl.org/job/build-envoy-master/)
 

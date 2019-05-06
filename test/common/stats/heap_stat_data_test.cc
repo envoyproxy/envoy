@@ -2,7 +2,6 @@
 
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/heap_stat_data.h"
-#include "common/stats/stats_options_impl.h"
 
 #include "test/test_common/logging.h"
 
@@ -40,10 +39,8 @@ protected:
 };
 
 // No truncation occurs in the implementation of HeapStatData.
-// Note: a similar test using RawStatData* is in raw_stat_data_test.cc.
 TEST_F(HeapStatDataTest, HeapNoTruncate) {
-  StatsOptionsImpl stats_options;
-  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
+  const std::string long_string(128, 'A');
   StatName stat_name = makeStat(long_string);
   HeapStatData* stat{};
   EXPECT_NO_LOGS(stat = &alloc_.alloc(stat_name));
@@ -51,7 +48,6 @@ TEST_F(HeapStatDataTest, HeapNoTruncate) {
   alloc_.free(*stat);
 };
 
-// Note: a similar test using RawStatData* is in raw_stat_data_test.cc.
 TEST_F(HeapStatDataTest, HeapAlloc) {
   HeapStatData* stat_1 = &alloc_.alloc(makeStat("ref_name"));
   ASSERT_NE(stat_1, nullptr);

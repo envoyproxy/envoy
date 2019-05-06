@@ -52,6 +52,7 @@ private:
                               std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
 
   // ClusterImplBase
+  void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
   void startPreInit() override;
   void onAssignmentTimeout();
 

@@ -263,6 +263,7 @@ elif [[ "$1" == "bazel.coverity" ]]; then
 elif [[ "$1" == "fix_format" ]]; then
   echo "fix_format..."
   ./tools/check_format.py fix
+  ./tools/format_python_tools.sh fix
   exit 0
 elif [[ "$1" == "check_format" ]]; then
   echo "check_format_test..."

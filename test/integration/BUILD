@@ -228,6 +228,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
+        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
@@ -702,12 +703,8 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "h1_fuzz_lib",
-    srcs = [
-        "h1_fuzz.cc",
-    ],
-    hdrs = [
-        "h1_fuzz.h",
-    ],
+    srcs = ["h1_fuzz.cc"],
+    hdrs = ["h1_fuzz.h"],
     deps = [
         ":capture_fuzz_proto_cc",
         ":http_integration_lib",
@@ -721,22 +718,14 @@ envoy_cc_test_library(
 
 envoy_cc_fuzz_test(
     name = "h1_capture_fuzz_test",
-    srcs = [
-        "h1_capture_fuzz_test.cc",
-    ],
+    srcs = ["h1_capture_fuzz_test.cc"],
     corpus = "h1_corpus",
-    deps = [
-        ":h1_fuzz_lib",
-    ],
+    deps = [":h1_fuzz_lib"],
 )
 
 envoy_cc_fuzz_test(
     name = "h1_capture_direct_response_fuzz_test",
-    srcs = [
-        "h1_capture_direct_response_fuzz_test.cc",
-    ],
+    srcs = ["h1_capture_direct_response_fuzz_test.cc"],
     corpus = "h1_corpus",
-    deps = [
-        ":h1_fuzz_lib",
-    ],
+    deps = [":h1_fuzz_lib"],
 )

@@ -70,6 +70,7 @@ TEST_F(ReverseBridgeTest, InvalidGrcpRequest) {
       EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().GrpcMessage, "invalid request body"));
     }));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
+    EXPECT_EQ(decoder_callbacks_.details_, "grpc_bridge_data_too_small");
   }
 }
 
@@ -460,6 +461,9 @@ TEST_F(ReverseBridgeTest, GrpcRequestBadResponse) {
     buffer.add("abcdefgh", 8);
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, false));
     EXPECT_EQ("fgh", buffer.toString());
+    EXPECT_CALL(decoder_callbacks_, streamInfo());
+    EXPECT_CALL(decoder_callbacks_.stream_info_,
+                setResponseCodeDetails(absl::string_view("grpc_bridge_content_type_wrong")));
   }
 
   {

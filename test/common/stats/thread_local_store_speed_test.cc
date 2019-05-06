@@ -6,7 +6,6 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/heap_stat_data.h"
-#include "common/stats/stats_options_impl.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -23,7 +22,7 @@ namespace Envoy {
 class ThreadLocalStorePerf {
 public:
   ThreadLocalStorePerf()
-      : heap_alloc_(symbol_table_), store_(options_, heap_alloc_),
+      : heap_alloc_(symbol_table_), store_(heap_alloc_),
         api_(Api::createApiForTest(store_, time_system_)) {
     store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
 
@@ -57,7 +56,6 @@ public:
 private:
   Stats::FakeSymbolTableImpl symbol_table_;
   Event::SimulatedTimeSystem time_system_;
-  Stats::StatsOptionsImpl options_;
   Stats::HeapStatDataAllocator heap_alloc_;
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
@@ -95,9 +93,6 @@ BENCHMARK(BM_StatsWithTls);
 
 // TODO(jmarantz): add multi-threaded variant of this test, that aggressively
 // looks up stats in multiple threads to try to trigger contention issues.
-
-// TODO(jmarantz): add version using the RawStatDataAllocator, or better yet,
-// the full hot-restart mechanism so that actual shared-memory is used.
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {

@@ -19,6 +19,20 @@ envoy_package()
 # TODO: add build target for quic_platform_impl_lib
 
 envoy_cc_library(
+    name = "flags_impl_lib",
+    srcs = ["flags_impl.cc"],
+    hdrs = [
+        "flags_impl.h",
+        "flags_list.h",
+    ],
+    external_deps = [
+        "abseil_base",
+        "abseil_synchronization",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+envoy_cc_library(
     name = "string_utils_lib",
     srcs = ["string_utils.cc"],
     hdrs = ["string_utils.h"],
@@ -38,6 +52,7 @@ envoy_cc_library(
         "http2_estimate_memory_usage_impl.h",
         "http2_export_impl.h",
         "http2_flag_utils_impl.h",
+        "http2_flags_impl.h",
         "http2_macros_impl.h",
         "http2_optional_impl.h",
         "http2_ptr_util_impl.h",
@@ -54,7 +69,9 @@ envoy_cc_library(
         "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
-    deps = envoy_select_quiche([
+    deps = [
+        ":flags_impl_lib",
+    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
     ]),
@@ -88,6 +105,7 @@ envoy_cc_library(
         "quic_estimate_memory_usage_impl.h",
         "quic_fallthrough_impl.h",
         "quic_flag_utils_impl.h",
+        "quic_flags_impl.h",
         "quic_iovec_impl.h",
         "quic_map_util_impl.h",
         "quic_prefetch_impl.h",
@@ -114,6 +132,7 @@ envoy_cc_library(
     deps = [
         "@com_googlesource_quiche//:quic_platform_export",
         "@com_googlesource_quiche//:quic_buffer_allocator_lib",
+        ":flags_impl_lib",
     ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         "//source/common/common:assert_lib",
@@ -169,6 +188,7 @@ envoy_cc_library(
         "spdy_endianness_util_impl.h",
         "spdy_estimate_memory_usage_impl.h",
         "spdy_export_impl.h",
+        "spdy_flags_impl.h",
         "spdy_macros_impl.h",
         "spdy_mem_slice_impl.h",
         "spdy_ptr_util_impl.h",
@@ -189,7 +209,9 @@ envoy_cc_library(
         "abseil_str_format",
     ],
     visibility = ["//visibility:public"],
-    deps = envoy_select_quiche([
+    deps = [
+        ":flags_impl_lib",
+    ] + envoy_select_quiche([
         ":quic_platform_logging_impl_lib",
         ":string_utils_lib",
         "//source/common/common:assert_lib",
