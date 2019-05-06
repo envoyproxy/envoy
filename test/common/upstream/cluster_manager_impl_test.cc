@@ -2534,10 +2534,10 @@ TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsUsedInConnPoolHash) {
   Http::ConnectionPool::Instance* should_be_cp2 = cluster_manager_->httpConnPoolForCluster(
       "cluster_1", ResourcePriority::Default, Http::Protocol::Http11, &context2);
 
-  // The different upstream options should lead to different hashKeys, thus different pools
+  // The different upstream options should lead to different hashKeys, thus different pools.
   EXPECT_NE(cp1, cp2);
 
-  // reusing the same options should lead to the same connection pools.
+  // Reusing the same options should lead to the same connection pools.
   EXPECT_EQ(cp1, should_be_cp1);
   EXPECT_EQ(cp2, should_be_cp2);
 }

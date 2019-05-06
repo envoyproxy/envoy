@@ -2974,7 +2974,7 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
   router_.decodeHeaders(incoming_headers, true);
 }
 
-TEST_F(RouterTest, upstreamSocketOptionsReturnedEmpty) {
+TEST_F(RouterTest, UpstreamSocketOptionsReturnedEmpty) {
   EXPECT_CALL(callbacks_, getUpstreamSocketOptions())
       .WillOnce(Return(Network::Socket::OptionsSharedPtr()));
 
@@ -2983,7 +2983,7 @@ TEST_F(RouterTest, upstreamSocketOptionsReturnedEmpty) {
   EXPECT_EQ(options.get(), nullptr);
 }
 
-TEST_F(RouterTest, upstreamSocketOptionsReturnedNonEmpty) {
+TEST_F(RouterTest, UpstreamSocketOptionsReturnedNonEmpty) {
   Network::Socket::OptionsSharedPtr to_return =
       Network::SocketOptionFactory::buildIpTransparentOptions();
   EXPECT_CALL(callbacks_, getUpstreamSocketOptions()).WillOnce(Return(to_return));
