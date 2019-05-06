@@ -5,6 +5,11 @@
 # However, linkstamp is not available to non-binary bazel targets.
 # This means that if the topmost target being used to compile version_lib is a envoy_cc_library or related, linkstamp will not be in effect.
 # In turn this means that version_linkstamp.cc is not linked, and the build_scm_revision and build_scm_status are unknown symbols to the linker.
+
+# Unfortunately linkstamp is not well documented (https://github.com/bazelbuild/bazel/issues/2893).
+# But following the implicit trail one can deduce that linkstamp is in effect when "stamping" (https://github.com/bazelbuild/bazel/issues/2893) is on.
+# envoy_cc_library -- and the underlying cc_library rule -- does not support "stamping".
+# This makes sense as stamping mainly makes sense in the context of binaries for production releases, not static libraries.
 build_scm_revision=$(grep BUILD_SCM_REVISION bazel-out/volatile-status.txt | sed 's/^BUILD_SCM_REVISION //' | tr -d '\\n')
 
 echo "extern const char build_scm_revision[];"
