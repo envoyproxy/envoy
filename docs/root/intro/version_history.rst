@@ -25,6 +25,8 @@ Version history
 * router: per try timeouts will no longer start before the downstream request has been received
   in full by the router. This ensures that the per try timeout does not account for slow
   downstreams and that will not start before the global timeout.
+* runtime: added support for statically :ref:`specifying the runtime in the bootstrap configuration
+  <envoy_api_field_config.bootstrap.v2.Runtime.base>`.
 * upstream: added :ref:`upstream_cx_pool_overflow <config_cluster_manager_cluster_stats>` for the connection pool circuit breaker.
 * upstream: an EDS management server can now force removal of a host that is still passing active
   health checking by first marking the host as failed via EDS health check and subsequently removing
