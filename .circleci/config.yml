@@ -215,10 +215,3 @@ workflows:
             tags:
               only: /^v.*/
       - mac
-
-# Instructions from https://docs.opsgenie.com/docs/circleci-integration
-# Configuration at https://app.opsgenie.com/integration#/edit/CircleCi/d9585dd7-b9c5-4723-abee-647a623639e4
-# Deletion possible via https://app.opsgenie.com/integration#/configured-integrations
-notify:
-  webhooks:
-     -url: https://api.opsgenie.com/v1/json/circleci?apiKey=f45d58a7-15a4-4800-8d2c-f460ec02cf71
