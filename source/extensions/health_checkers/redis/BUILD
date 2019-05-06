@@ -16,8 +16,8 @@ envoy_cc_library(
     hdrs = ["redis.h"],
     deps = [
         "//source/common/upstream:health_checker_base_lib",
-        "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/multiplexing:conn_pool_lib",
+        "//source/extensions/filters/network/common/redis:client_lib",
         "@envoy_api//envoy/api/v2/core:health_check_cc",
         "@envoy_api//envoy/config/health_checker/redis/v2:redis_cc",
     ],
