@@ -65,7 +65,7 @@ public:
    * @param end_stream supplies the end_stream status to be propagated directly to further filters
    *                   in the filter chain.
    */
-  virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 };
 
 /**
@@ -136,7 +136,7 @@ public:
    * @param end_stream supplies the end_stream status to be propagated directly to further filters
    *                   in the filter chain.
    */
-  virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void injectReadDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
    * Return the currently selected upstream host, if any. This can be used for communication

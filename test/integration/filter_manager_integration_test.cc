@@ -14,18 +14,18 @@
 namespace Envoy {
 namespace {
 
-// Auxiliary network filter that makes use of ReadFilterCallbacks::injectDataToFilterChain()
-// and WriteFilterCallbacks::injectDataToFilterChain() methods outside of the context of
+// Auxiliary network filter that makes use of ReadFilterCallbacks::injectReadDataToFilterChain()
+// and WriteFilterCallbacks::injectWriteDataToFilterChain() methods outside of the context of
 // ReadFilter::onData() and WriteFilter::onWrite(), i.e. on timer event
 const std::string inject_data_outside_callback_filter = "inject-data-outside-filter-callback";
 
-// Auxiliary network filter that makes use of ReadFilterCallbacks::injectDataToFilterChain()
-// and WriteFilterCallbacks::injectDataToFilterChain() methods in the context of
+// Auxiliary network filter that makes use of ReadFilterCallbacks::injectReadDataToFilterChain()
+// and WriteFilterCallbacks::injectWriteDataToFilterChain() methods in the context of
 // ReadFilter::onData() and WriteFilter::onWrite()
 const std::string inject_data_inside_callback_filter = "inject-data-inside-filter-callback";
 
-// Do not use ReadFilterCallbacks::injectDataToFilterChain() and
-// WriteFilterCallbacks::injectDataToFilterChain() methods at all
+// Do not use ReadFilterCallbacks::injectReadDataToFilterChain() and
+// WriteFilterCallbacks::injectWriteDataToFilterChain() methods at all
 const std::string no_inject_data = "no-inject-data";
 
 // List of auxiliary filters to test against.
@@ -92,16 +92,16 @@ private:
   // one of auxiliary filters (listed at the top)
   const std::string auxiliary_filter_name_;
 
-  // Auxiliary network filter that makes use of ReadFilterCallbacks::injectDataToFilterChain()
-  // and WriteFilterCallbacks::injectDataToFilterChain() methods outside of the context of
+  // Auxiliary network filter that makes use of ReadFilterCallbacks::injectReadDataToFilterChain()
+  // and WriteFilterCallbacks::injectWriteDataToFilterChain() methods outside of the context of
   // ReadFilter::onData() and WriteFilter::onWrite(), i.e. on timer event
   ThrottlerFilterConfigFactory outside_callback_config_factory_{
       inject_data_outside_callback_filter};
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory>
       registered_outside_callback_config_factory_{outside_callback_config_factory_};
 
-  // Auxiliary network filter that makes use of ReadFilterCallbacks::injectDataToFilterChain()
-  // and WriteFilterCallbacks::injectDataToFilterChain() methods in the context of
+  // Auxiliary network filter that makes use of ReadFilterCallbacks::injectReadDataToFilterChain()
+  // and WriteFilterCallbacks::injectWriteDataToFilterChain() methods in the context of
   // ReadFilter::onData() and WriteFilter::onWrite()
   DispenserFilterConfigFactory inside_callback_config_factory_{inject_data_inside_callback_filter};
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory>

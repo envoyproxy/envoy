@@ -64,7 +64,7 @@ public:
 
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(continueReading, void());
-  MOCK_METHOD2(injectDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD2(injectReadDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
   MOCK_METHOD1(upstreamHost, void(Upstream::HostDescriptionConstSharedPtr host));
 
@@ -90,7 +90,7 @@ public:
   ~MockWriteFilterCallbacks();
 
   MOCK_METHOD0(connection, Connection&());
-  MOCK_METHOD2(injectDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD2(injectWriteDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
 
   testing::NiceMock<MockConnection> connection_;
 };

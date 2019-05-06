@@ -97,7 +97,7 @@ public:
    * Write data to the connection bypassing filter chain.
    *
    * I.e., consider a scenario where iteration over the filter chain is stopped at some point
-   * and later is resumed via a call to WriteFilterCallbacks::injectDataToFilterChain().
+   * and later is resumed via a call to WriteFilterCallbacks::injectWriteDataToFilterChain().
    *
    * @param data supplies the data to write to the connection.
    * @param end_stream supplies whether this is the last byte to write on the connection.
@@ -127,7 +127,7 @@ private:
 
     Connection& connection() override { return parent_.connection_; }
     void continueReading() override { parent_.onContinueReading(this, parent_.buffer_source_); }
-    void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
+    void injectReadDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
       FixedReadBufferSource buffer_source{data, end_stream};
       parent_.onContinueReading(this, buffer_source);
     }
@@ -150,7 +150,7 @@ private:
         : parent_(parent), filter_(filter) {}
 
     Connection& connection() override { return parent_.connection_; }
-    void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
+    void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
       FixedWriteBufferSource buffer_source{data, end_stream};
       parent_.onResumeWriting(this, buffer_source);
     }

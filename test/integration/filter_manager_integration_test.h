@@ -67,8 +67,9 @@ void Throttler::onTimerTick() {
 }
 
 /**
- * Auxiliary network filter that makes use of ReadFilterCallbacks::injectDataToFilterChain()
- * and WriteFilterCallbacks::injectDataToFilterChain() methods in the context of a timer callback.
+ * Auxiliary network filter that makes use of ReadFilterCallbacks::injectReadDataToFilterChain()
+ * and WriteFilterCallbacks::injectWriteDataToFilterChain() methods in the context of a timer
+ * callback.
  *
  * Emits a next chunk of the original request/response data on timer tick.
  */
@@ -88,7 +89,7 @@ public:
     read_throttler_ = std::make_unique<Throttler>(
         read_callbacks_->connection().dispatcher(), tick_interval_, max_chunk_length_,
         [this](Buffer::Instance& data, bool end_stream) {
-          read_callbacks_->injectDataToFilterChain(data, end_stream);
+          read_callbacks_->injectReadDataToFilterChain(data, end_stream);
         });
   }
 
@@ -100,7 +101,7 @@ public:
     write_throttler_ = std::make_unique<Throttler>(
         write_callbacks_->connection().dispatcher(), tick_interval_, max_chunk_length_,
         [this](Buffer::Instance& data, bool end_stream) {
-          write_callbacks_->injectDataToFilterChain(data, end_stream);
+          write_callbacks_->injectWriteDataToFilterChain(data, end_stream);
         });
   }
 
@@ -179,12 +180,13 @@ private:
 };
 
 /**
- * Auxiliary network filter that makes use of ReadFilterCallbacks::injectDataToFilterChain()
- * and WriteFilterCallbacks::injectDataToFilterChain() methods in the context of
+ * Auxiliary network filter that makes use of ReadFilterCallbacks::injectReadDataToFilterChain()
+ * and WriteFilterCallbacks::injectWriteDataToFilterChain() methods in the context of
  * ReadFilter::onData() and WriteFilter::onWrite().
  *
- * Calls ReadFilterCallbacks::injectDataToFilterChain() /
- * WriteFilterCallbacks::injectDataToFilterChain() to pass data to the next filter byte-by-byte.
+ * Calls ReadFilterCallbacks::injectReadDataToFilterChain() /
+ * WriteFilterCallbacks::injectWriteDataToFilterChain() to pass data to the next filter
+ * byte-by-byte.
  */
 class DispenserFilter : public Network::Filter {
 public:
@@ -215,7 +217,7 @@ Network::FilterStatus DispenserFilter::onNewConnection() { return Network::Filte
 
 Network::FilterStatus DispenserFilter::onData(Buffer::Instance& data, bool end_stream) {
   dispense(data, end_stream, [this](Buffer::Instance& data, bool end_stream) {
-    read_callbacks_->injectDataToFilterChain(data, end_stream);
+    read_callbacks_->injectReadDataToFilterChain(data, end_stream);
   });
   ASSERT(data.length() == 0);
   return Network::FilterStatus::StopIteration;
@@ -224,7 +226,7 @@ Network::FilterStatus DispenserFilter::onData(Buffer::Instance& data, bool end_s
 // Network::WriteFilter
 Network::FilterStatus DispenserFilter::onWrite(Buffer::Instance& data, bool end_stream) {
   dispense(data, end_stream, [this](Buffer::Instance& data, bool end_stream) {
-    write_callbacks_->injectDataToFilterChain(data, end_stream);
+    write_callbacks_->injectWriteDataToFilterChain(data, end_stream);
   });
   ASSERT(data.length() == 0);
   return Network::FilterStatus::StopIteration;

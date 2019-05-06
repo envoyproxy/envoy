@@ -223,7 +223,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   connection.raiseEvent(ConnectionEvent::RemoteClose);
 }
 
-TEST_F(NetworkFilterManagerTest, ReadFilterInjectDataToFilterChain) {
+TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {
   InSequence s;
 
   MockReadFilter* read_filter(new MockReadFilter());
@@ -248,15 +248,15 @@ TEST_F(NetworkFilterManagerTest, ReadFilterInjectDataToFilterChain) {
   Buffer::OwnedImpl injected_buffer("greetings");
   EXPECT_CALL(*filter, onData(BufferStringEqual("greetings"), false))
       .WillOnce(Return(FilterStatus::Continue));
-  read_filter->callbacks_->injectDataToFilterChain(injected_buffer, false);
+  read_filter->callbacks_->injectReadDataToFilterChain(injected_buffer, false);
 
   injected_buffer.add(" everyone");
   EXPECT_CALL(*filter, onData(BufferStringEqual("greetings everyone"), true))
       .WillOnce(Return(FilterStatus::Continue));
-  read_filter->callbacks_->injectDataToFilterChain(injected_buffer, true);
+  read_filter->callbacks_->injectReadDataToFilterChain(injected_buffer, true);
 }
 
-TEST_F(NetworkFilterManagerTest, WriteFilterInjectDataToFilterChain) {
+TEST_F(NetworkFilterManagerTest, InjectWriteDataToFilterChain) {
   InSequence s;
 
   MockReadFilter* read_filter(new MockReadFilter());
@@ -273,13 +273,13 @@ TEST_F(NetworkFilterManagerTest, WriteFilterInjectDataToFilterChain) {
   EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("greetings"), false))
       .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(connection, rawWrite(BufferStringEqual("greetings"), false));
-  filter->write_callbacks_->injectDataToFilterChain(injected_buffer, false);
+  filter->write_callbacks_->injectWriteDataToFilterChain(injected_buffer, false);
 
   injected_buffer.add(" everyone!");
   EXPECT_CALL(*write_filter, onWrite(BufferStringEqual(" everyone!"), true))
       .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(connection, rawWrite(BufferStringEqual(" everyone!"), true));
-  filter->write_callbacks_->injectDataToFilterChain(injected_buffer, true);
+  filter->write_callbacks_->injectWriteDataToFilterChain(injected_buffer, true);
 }
 
 } // namespace
