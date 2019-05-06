@@ -33,6 +33,7 @@ Version history
   it in a future update. This is a mechanism to work around a race condition in which an EDS
   implementation may remove a host before it has stopped passing active HC, thus causing the host
   to become stranded until a future update.
+* upstream: added runtime error checking to prevent setting dns type to STRICT_DNS or LOGICAL_DNS when custom resolver name is specified.
 * grpc-json: added support for :ref:`auto mapping
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.auto_mapping>`.
 
