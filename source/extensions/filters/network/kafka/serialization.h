@@ -180,6 +180,9 @@ public:
    * Can throw EnvoyException if given string length is not valid.
    */
   size_t feed(absl::string_view& data) override {
+    if (data.empty()) {
+      return 0;
+    }
     const size_t length_consumed = length_buf_.feed(data);
     if (!length_buf_.ready()) {
       // Break early: we still need to fill in length buffer.
