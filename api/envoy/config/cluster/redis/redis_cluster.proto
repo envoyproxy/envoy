@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package envoy.config.cluster.redis;
+
+option java_outer_classname = "RedisClusterProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.cluster.redis";
+option go_package = "v2";
+
+import "google/protobuf/duration.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: Redis Cluster Configuration]
+// This cluster adds support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_, as part
+// of :ref:`Envoy's support for Redis Cluster <arch_overview_redis>`.
+//
+// Redis Cluster is an extension of Redis which supports sharding and high availability (where a
+// shard that loses its master fails over to a replica, and designates it as the new master).
+// However, as there is no unified frontend or proxy service in front of Redis Cluster, the client
+// (in this case Envoy) must locally maintain the state of the Redis Cluster, specifically the
+// topology. A random node in the cluster is queried for the topology using the `CLUSTER SLOTS
+// command <https://redis.io/commands/cluster-slots>`_. This result is then stored locally, and
+// updated at user-configured intervals.
+//
+// Example:
+//
+// .. code-block:: yaml
+//
+//     name: name
+//     connect_timeout: 0.25s
+//     dns_lookup_family: V4_ONLY
+//     hosts:
+//     - socket_address:
+//       address: foo.bar.com
+//       port_value: 22120
+//     cluster_type:
+//     name: envoy.clusters.redis
+//     typed_config:
+//       "@type": type.googleapis.com/google.protobuf.Struct
+//       value:
+//         cluster_refresh_rate: 30s
+//         cluster_refresh_timeout: 0.5s
+
+message RedisClusterConfig {
+  // Interval between successive topology refresh requests. If not set, this defaults to 5s.
+  google.protobuf.Duration cluster_refresh_rate = 1
+      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+
+  // Timeout for topology refresh request. If not set, this defaults to 3s.
+  google.protobuf.Duration cluster_refresh_timeout = 2
+      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
+}

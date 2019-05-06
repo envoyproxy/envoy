@@ -41,8 +41,7 @@ public:
       argv.push_back(s.c_str());
     }
     return std::make_unique<OptionsImpl>(
-        argv.size(), argv.data(), [](uint64_t, uint64_t, bool) { return "1"; },
-        spdlog::level::warn);
+        argv.size(), argv.data(), [](bool) { return "1"; }, spdlog::level::warn);
   }
 };
 
@@ -106,9 +105,6 @@ TEST_F(OptionsImplTest, SetAll) {
   bool hot_restart_disabled = options->hotRestartDisabled();
   bool signal_handling_enabled = options->signalHandlingEnabled();
   bool cpuset_threads_enabled = options->cpusetThreadsEnabled();
-  Stats::StatsOptionsImpl stats_options;
-  stats_options.max_obj_name_length_ = 54321;
-  stats_options.max_stat_suffix_length_ = 1234;
 
   options->setBaseId(109876);
   options->setConcurrency(42);
@@ -127,8 +123,6 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setServiceClusterName("cluster_foo");
   options->setServiceNodeName("node_foo");
   options->setServiceZone("zone_foo");
-  options->setMaxStats(12345);
-  options->setStatsOptions(stats_options);
   options->setHotRestartDisabled(!options->hotRestartDisabled());
   options->setSignalHandling(!options->signalHandlingEnabled());
   options->setCpusetThreads(!options->cpusetThreadsEnabled());
@@ -150,9 +144,6 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ("cluster_foo", options->serviceClusterName());
   EXPECT_EQ("node_foo", options->serviceNodeName());
   EXPECT_EQ("zone_foo", options->serviceZone());
-  EXPECT_EQ(12345U, options->maxStats());
-  EXPECT_EQ(stats_options.max_obj_name_length_, options->statsOptions().maxObjNameLength());
-  EXPECT_EQ(stats_options.max_stat_suffix_length_, options->statsOptions().maxStatSuffixLength());
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
   EXPECT_EQ(!signal_handling_enabled, options->signalHandlingEnabled());
   EXPECT_EQ(!cpuset_threads_enabled, options->cpusetThreadsEnabled());
@@ -182,8 +173,6 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->serviceClusterName(), command_line_options->service_cluster());
   EXPECT_EQ(options->serviceNodeName(), command_line_options->service_node());
   EXPECT_EQ(options->serviceZone(), command_line_options->service_zone());
-  EXPECT_EQ(options->maxStats(), command_line_options->max_stats());
-  EXPECT_EQ(options->statsOptions().maxObjNameLength(), command_line_options->max_obj_name_len());
   EXPECT_EQ(options->hotRestartDisabled(), command_line_options->disable_hot_restart());
   EXPECT_EQ(options->mutexTracingEnabled(), command_line_options->enable_mutex_tracing());
   EXPECT_EQ(options->cpusetThreadsEnabled(), command_line_options->cpuset_threads());
@@ -229,16 +218,6 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
 TEST_F(OptionsImplTest, BadCliOption) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
                           MalformedArgvException, "error: unknown IP address version 'foo'");
-}
-
-TEST_F(OptionsImplTest, BadObjNameLenOption) {
-  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-obj-name-len 1"), MalformedArgvException,
-                          "'max-obj-name-len' value specified");
-}
-
-TEST_F(OptionsImplTest, BadMaxStatsOption) {
-  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-stats 1000000000"), MalformedArgvException,
-                          "'max-stats' value specified");
 }
 
 TEST_F(OptionsImplTest, ParseComponentLogLevels) {
@@ -314,13 +293,6 @@ TEST_F(OptionsImplTest, SaneTestConstructor) {
   EXPECT_EQ(regular_options_impl->mode(), test_options_impl.mode());
   EXPECT_EQ(regular_options_impl->fileFlushIntervalMsec(),
             test_options_impl.fileFlushIntervalMsec());
-  EXPECT_EQ(regular_options_impl->maxStats(), test_options_impl.maxStats());
-  EXPECT_EQ(regular_options_impl->statsOptions().maxNameLength(),
-            test_options_impl.statsOptions().maxNameLength());
-  EXPECT_EQ(regular_options_impl->statsOptions().maxObjNameLength(),
-            test_options_impl.statsOptions().maxObjNameLength());
-  EXPECT_EQ(regular_options_impl->statsOptions().maxStatSuffixLength(),
-            test_options_impl.statsOptions().maxStatSuffixLength());
   EXPECT_EQ(regular_options_impl->hotRestartDisabled(), test_options_impl.hotRestartDisabled());
   EXPECT_EQ(regular_options_impl->cpusetThreadsEnabled(), test_options_impl.cpusetThreadsEnabled());
 }

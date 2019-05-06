@@ -160,7 +160,7 @@ SplitRequestPtr SimpleRequest::create(Router& router,
   }
 
   request_ptr->incoming_request_ = std::move(incoming_request);
-  return std::move(request_ptr);
+  return request_ptr;
 }
 
 SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
@@ -191,7 +191,7 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
   }
 
   request_ptr->incoming_request_ = std::move(incoming_request);
-  return std::move(request_ptr);
+  return request_ptr;
 }
 
 FragmentedRequest::~FragmentedRequest() {
@@ -257,7 +257,7 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
 
   if (request_ptr->num_pending_responses_ > 0) {
     request_ptr->incoming_request_ = std::move(incoming_request);
-    return std::move(request_ptr);
+    return request_ptr;
   }
 
   return nullptr;
@@ -389,7 +389,7 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
 
   if (request_ptr->num_pending_responses_ > 0) {
     request_ptr->incoming_request_ = std::move(incoming_request);
-    return std::move(request_ptr);
+    return request_ptr;
   }
 
   return nullptr;
@@ -483,7 +483,7 @@ SplitRequestPtr SplitKeysSumResultRequest::create(Router& router,
 
   if (request_ptr->num_pending_responses_ > 0) {
     request_ptr->incoming_request_ = std::move(incoming_request);
-    return std::move(request_ptr);
+    return request_ptr;
   }
 
   return nullptr;

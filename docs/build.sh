@@ -77,12 +77,14 @@ PROTO_RST="
   /envoy/api/v2/cluster/circuit_breaker/envoy/api/v2/cluster/circuit_breaker.proto.rst
   /envoy/api/v2/rds/envoy/api/v2/rds.proto.rst
   /envoy/api/v2/route/route/envoy/api/v2/route/route.proto.rst
+  /envoy/api/v2/srds/envoy/api/v2/srds.proto.rst
   /envoy/api/v2/lds/envoy/api/v2/lds.proto.rst
   /envoy/api/v2/listener/listener/envoy/api/v2/listener/listener.proto.rst
   /envoy/api/v2/ratelimit/ratelimit/envoy/api/v2/ratelimit/ratelimit.proto.rst
   /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
   /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
   /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
+  /envoy/config/cluster/redis/redis_cluster/envoy/config/cluster/redis/redis_cluster.proto.rst
   /envoy/config/common/tap/v2alpha/common/envoy/config/common/tap/v2alpha/common.proto.rst
   /envoy/config/ratelimit/v2/rls/envoy/config/ratelimit/v2/rls.proto.rst
   /envoy/config/metrics/v2/metrics_service/envoy/config/metrics/v2/metrics_service.proto.rst

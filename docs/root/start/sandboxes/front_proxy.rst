@@ -216,8 +216,6 @@ statistics. For example inside ``frontenvoy`` we can get::
       "service_node": "",
       "service_zone": "",
       "mode": "Serve",
-      "max_stats": "16384",
-      "max_obj_name_len": "60",
       "disable_hot_restart": false,
       "enable_mutex_tracing": false,
       "restart_epoch": 0,
