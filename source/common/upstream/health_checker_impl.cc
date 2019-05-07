@@ -418,9 +418,9 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
     client_->addConnectionCallbacks(*session_callbacks_);
     client_->addReadFilter(session_callbacks_);
 
+    expect_reset_ = false;
     client_->connect();
     client_->noDelay(true);
-    expect_reset_ = false;
   }
 
   if (!parent_.send_bytes_.empty()) {
