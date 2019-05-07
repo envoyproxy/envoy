@@ -46,11 +46,11 @@ public:
   /**
    * @return the path to JSON file.
    */
-  const std::string& jsonPath() const { return json_path_; }
+  const std::string& jsonPath() const { return config_path_; }
 
 private:
   Schema::Type schema_type_;
-  std::string json_path_;
+  std::string config_path_;
 };
 
 /**
