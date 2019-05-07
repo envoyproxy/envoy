@@ -81,6 +81,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hot_restarting_parent_test",
+    srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
+    deps = [
+        "//source/common/stats:stats_lib",
+        "//source/server:hot_restart_lib",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "guarddog_impl_test",
     srcs = ["guarddog_impl_test.cc"],
     deps = [
@@ -197,10 +207,12 @@ envoy_cc_test(
         ":cluster_dupe_bootstrap.yaml",
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
-        ":empty_runtime.yaml",
+        ":invalid_bootstrap.yaml",
+        ":invalid_runtime_bootstrap.yaml",
         ":node_bootstrap.yaml",
         ":node_bootstrap_no_admin_port.yaml",
         ":node_bootstrap_without_access_log.yaml",
+        ":runtime_bootstrap.yaml",
         ":zipkin_tracing.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",

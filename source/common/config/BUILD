@@ -35,7 +35,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/stats:stats_lib",
         "//source/extensions/stat_sinks:well_known_names",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
@@ -67,7 +66,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
         "@envoy_api//envoy/api/v2:cds_cc",
         "@envoy_api//envoy/api/v2/cluster:circuit_breaker_cc",
     ],
@@ -101,6 +99,7 @@ envoy_cc_library(
     name = "delta_subscription_lib",
     hdrs = ["delta_subscription_impl.h"],
     deps = [
+        ":delta_subscription_state_lib",
         ":grpc_stream_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
@@ -110,6 +109,22 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "delta_subscription_state_lib",
+    srcs = ["delta_subscription_state.cc"],
+    hdrs = ["delta_subscription_state.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:token_bucket_impl_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:discovery_cc",
     ],
 )
 
@@ -252,7 +267,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/json:config_schemas_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
         "//source/extensions/filters/network:well_known_names",
         "@envoy_api//envoy/api/v2:lds_cc",
     ],
@@ -310,7 +324,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/json:config_schemas_lib",
-        "//source/common/stats:stats_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/api/v2:rds_cc",
     ],

@@ -69,7 +69,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
       if (host) {
         ENVOY_LOG(debug, "Using existing host {}.", host->address()->asString());
         host->used(true); // Mark as used.
-        return std::move(host);
+        return host;
       }
       // Add a new host
       const Network::Address::Ip* dst_ip = dst_addr.ip();
@@ -100,7 +100,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
           });
         }
 
-        return std::move(host);
+        return host;
       } else {
         ENVOY_LOG(debug, "Failed to create host for {}.", dst_addr.asString());
       }

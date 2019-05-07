@@ -320,6 +320,13 @@ public:
    * @param value the string value to associate with the key
    */
   static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
+
+  /**
+   * Utility method to print a human readable string of the code passed in.
+   *
+   * @param code the protobuf error code
+   */
+  static std::string CodeEnumToString(ProtobufUtil::error::Code code);
 };
 
 class ValueUtil {

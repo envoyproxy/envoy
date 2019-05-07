@@ -13,6 +13,7 @@ HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 HeapStatData* HeapStatData::alloc(StatName stat_name, SymbolTable& symbol_table) {
   void* memory = ::malloc(sizeof(HeapStatData) + stat_name.size());
   ASSERT(memory);
+  // TODO(fredlas) call StatMerger::verifyCombineLogicSpecified() here?
   symbol_table.incRefCount(stat_name);
   return new (memory) HeapStatData(stat_name);
 }
