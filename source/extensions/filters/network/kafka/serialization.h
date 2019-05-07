@@ -198,10 +198,11 @@ public:
 
     const size_t data_consumed = std::min<size_t>(required_, data.size());
     const size_t written = data_buf_.size() - required_;
-    memcpy(data_buf_.data() + written, data.data(), data_consumed);
-    required_ -= data_consumed;
-
-    data = {data.data() + data_consumed, data.size() - data_consumed};
+    if (data_consumed > 0) {
+      memcpy(data_buf_.data() + written, data.data(), data_consumed);
+      required_ -= data_consumed;
+      data = {data.data() + data_consumed, data.size() - data_consumed};
+    }
 
     if (required_ == 0) {
       ready_ = true;
@@ -269,10 +270,11 @@ public:
 
     const size_t data_consumed = std::min<size_t>(required_, data.size());
     const size_t written = data_buf_.size() - required_;
-    memcpy(data_buf_.data() + written, data.data(), data_consumed);
-    required_ -= data_consumed;
-
-    data = {data.data() + data_consumed, data.size() - data_consumed};
+    if (data_consumed > 0) {
+      memcpy(data_buf_.data() + written, data.data(), data_consumed);
+      required_ -= data_consumed;
+      data = {data.data() + data_consumed, data.size() - data_consumed};
+    }
 
     if (required_ == 0) {
       ready_ = true;
@@ -331,10 +333,11 @@ public:
 
     const size_t data_consumed = std::min<size_t>(required_, data.size());
     const size_t written = data_buf_.size() - required_;
-    memcpy(data_buf_.data() + written, data.data(), data_consumed);
-    required_ -= data_consumed;
-
-    data = {data.data() + data_consumed, data.size() - data_consumed};
+    if (data_consumed > 0) {
+      memcpy(data_buf_.data() + written, data.data(), data_consumed);
+      required_ -= data_consumed;
+      data = {data.data() + data_consumed, data.size() - data_consumed};
+    }
 
     if (required_ == 0) {
       ready_ = true;
@@ -400,10 +403,11 @@ public:
 
     const size_t data_consumed = std::min<size_t>(required_, data.size());
     const size_t written = data_buf_.size() - required_;
-    memcpy(data_buf_.data() + written, data.data(), data_consumed);
-    required_ -= data_consumed;
-
-    data = {data.data() + data_consumed, data.size() - data_consumed};
+    if (data_consumed > 0) {
+      memcpy(data_buf_.data() + written, data.data(), data_consumed);
+      required_ -= data_consumed;
+      data = {data.data() + data_consumed, data.size() - data_consumed};
+    }
 
     if (required_ == 0) {
       ready_ = true;
