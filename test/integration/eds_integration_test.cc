@@ -126,7 +126,7 @@ TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
   // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
-  // The other endpoint should stil be excluded.
+  // The other endpoint should still be excluded.
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
@@ -153,7 +153,7 @@ TEST_P(EdsIntegrationTest, EndpointWarmingFailedHc) {
   EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 
   // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
-  // The other endpoint should stil be excluded.
+  // The other endpoint should still be excluded.
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
   test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
