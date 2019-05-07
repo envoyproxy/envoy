@@ -22,12 +22,12 @@ const std::string& Schema::toString(Type type) {
 
 Options::Options(int argc, char** argv) {
   TCLAP::CmdLine cmd("schema_validator_tool", ' ', "none", false);
-  TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", true, "", "string",
-                                         cmd);
+  TCLAP::ValueArg<std::string> config_path("c", "config-path", "Path to configuration file.", true,
+                                           "", "string", cmd);
   TCLAP::ValueArg<std::string> schema_type(
       "t", "schema-type",
-      "Type of schema to validate the configuration against. Supported schema is: 'route'.", true, "",
-      "string", cmd);
+      "Type of schema to validate the configuration against. Supported schema is: 'route'.", true,
+      "", "string", cmd);
 
   try {
     cmd.parse(argc, argv);
