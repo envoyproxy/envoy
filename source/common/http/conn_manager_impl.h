@@ -223,7 +223,7 @@ private:
       }
       saved_request_metadata_.clear();
     }
-    // Calls this function after the filter calls decodeHeaders() to drain accumulated metadata.
+    // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
     void handleMetadataAfterHeadersCallback() override;
 
     // Http::StreamDecoderFilterCallbacks
@@ -403,7 +403,7 @@ private:
     void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void encodeMetadata(ActiveStreamEncoderFilter* filter, MetadataMapPtr&& metadata_map_ptr);
     void maybeEndEncode(bool end_stream);
-    // Returns true if new metadata decoded. Otherwise, returns false.
+    // Returns true if new metadata is decoded. Otherwise, returns false.
     bool processNewlyAddedMetadata();
     uint64_t streamId() { return stream_id_; }
     // Returns true if filter has stopped iteration for all frame types. Otherwise, returns false.
