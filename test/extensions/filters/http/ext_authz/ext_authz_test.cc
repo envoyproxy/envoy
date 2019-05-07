@@ -182,6 +182,7 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.error").value());
+  EXPECT_EQ("ext_authz_error", filter_callbacks_.details_);
 }
 
 // Test when failure_mode_allow is set and the response from the authorization service is Error that
@@ -714,6 +715,7 @@ TEST_F(HttpFilterTest, NoClearCacheRouteDeniedResponse) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()->statsScope().counter("ext_authz.denied").value());
+  EXPECT_EQ("ext_authz_denied", filter_callbacks_.details_);
 }
 
 // -------------------
