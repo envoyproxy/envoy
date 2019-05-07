@@ -158,7 +158,7 @@ public:
    * Prepend a gRPC frame header to a Buffer::Instance containing a single gRPC frame.
    * @param bufferInstance containing the frame data which will be modified.
    */
-  static void PrependGrpcFrameHeader(Buffer::Instance& buffer);
+  static void prependGrpcFrameHeader(Buffer::Instance& buffer);
 
 private:
   static void checkForHeaderOnlyError(Http::Message& http_response);

@@ -20,7 +20,7 @@ namespace Envoy {
 namespace Grpc {
 
 struct BufferInstanceContainer {
-  BufferInstanceContainer(int ref_count, Buffer::InstancePtr buffer)
+  BufferInstanceContainer(int ref_count, Buffer::InstancePtr&& buffer)
       : ref_count_(ref_count), buffer_(std::move(buffer)) {}
   std::atomic<uint32_t> ref_count_; // In case gPRC dereferences in a different threads.
   Buffer::InstancePtr buffer_;
@@ -47,16 +47,16 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
   }
   auto container = new BufferInstanceContainer{n_slices, std::move(buffer_instance)};
   if (n_slices == 1) {
-    grpc::Slice oneSlice(on_raw_slice.mem_, on_raw_slice.len_,
-                         &BufferInstanceContainer::derefBufferInstanceContainer, container);
-    return {&oneSlice, 1};
+    grpc::Slice one_slice(on_raw_slice.mem_, on_raw_slice.len_,
+                          &BufferInstanceContainer::derefBufferInstanceContainer, container);
+    return {&one_slice, 1};
   }
-  STACK_ARRAY(manyRawSlices, Buffer::RawSlice, n_slices);
-  container->buffer_->getRawSlices(manyRawSlices.begin(), n_slices);
+  STACK_ARRAY(many_raw_slices, Buffer::RawSlice, n_slices);
+  container->buffer_->getRawSlices(many_raw_slices.begin(), n_slices);
   std::vector<grpc::Slice> slices;
   slices.reserve(n_slices);
   for (int i = 0; i < n_slices; i++) {
-    slices.emplace_back(manyRawSlices[i].mem_, manyRawSlices[i].len_,
+    slices.emplace_back(many_raw_slices[i].mem_, many_raw_slices[i].len_,
                         &BufferInstanceContainer::derefBufferInstanceContainer, container);
   }
   return {&slices[0], slices.size()};
@@ -66,7 +66,7 @@ struct ByteBufferContainer {
   ByteBufferContainer(int ref_count) : ref_count_(ref_count) {}
   ~ByteBufferContainer() { ::free(fragments_); }
   uint32_t ref_count_;
-  Buffer::BufferFragmentImpl* fragments_ = 0;
+  Buffer::BufferFragmentImpl* fragments_ = nullptr;
   std::vector<grpc::Slice> slices_;
 };
 
@@ -79,7 +79,7 @@ Buffer::InstancePtr GoogleGrpcUtils::makeBufferInstance(const grpc::ByteBuffer& 
   // lifetime of the Slice(s) exceeds our Buffer::Instance.
   std::vector<grpc::Slice> slices;
   byte_buffer.Dump(&slices);
-  if (slices.size() == 0) {
+  if (slices.empty()) {
     return buffer;
   }
   auto* container = new ByteBufferContainer(static_cast<int>(slices.size()));

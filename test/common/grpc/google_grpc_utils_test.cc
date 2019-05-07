@@ -12,8 +12,8 @@ namespace Envoy {
 namespace Grpc {
 
 TEST(GoogleGrpcUtilsTest, MakeBufferInstanceEmpty) {
-  grpc::ByteBuffer byteBuffer;
-  GoogleGrpcUtils::makeBufferInstance(byteBuffer);
+  grpc::ByteBuffer byte_buffer;
+  GoogleGrpcUtils::makeBufferInstance(byte_buffer);
 }
 
 TEST(GoogleGrpcUtilsTest, MakeByteBufferEmpty) {
@@ -23,25 +23,26 @@ TEST(GoogleGrpcUtilsTest, MakeByteBufferEmpty) {
 
 TEST(GoogleGrpcUtilsTest, MakeBufferInstance1) {
   grpc::Slice slice("test");
-  grpc::ByteBuffer byteBuffer(&slice, 1);
-  auto bufferInstance = GoogleGrpcUtils::makeBufferInstance(byteBuffer);
-  EXPECT_EQ(bufferInstance->toString(), "test");
+  grpc::ByteBuffer byte_buffer(&slice, 1);
+  auto buffer_instance = GoogleGrpcUtils::makeBufferInstance(byte_buffer);
+  EXPECT_EQ(buffer_instance->toString(), "test");
 }
 
 // Test building a Buffer::Instance from 3 grpc::Slice(s).
 TEST(GoogleGrpcUtilsTest, MakeBufferInstance3) {
-  grpc::Slice slices[3] = {{"test"}, {" "}, {"this"}};
-  grpc::ByteBuffer byteBuffer(slices, 3);
-  auto bufferInstance = GoogleGrpcUtils::makeBufferInstance(byteBuffer);
-  EXPECT_EQ(bufferInstance->toString(), "test this");
+  std::array<grpc::Slice, 3> slices = {grpc::string("test"), grpc::string(" "),
+                                       grpc::string("this")};
+  grpc::ByteBuffer byte_buffer(&slices[0], 3);
+  auto buffer_instance = GoogleGrpcUtils::makeBufferInstance(byte_buffer);
+  EXPECT_EQ(buffer_instance->toString(), "test this");
 }
 
 TEST(GoogleGrpcUtilsTest, MakeByteBuffer1) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add("test", 4);
-  auto byteBuffer = GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
+  auto byte_buffer = GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
   std::vector<grpc::Slice> slices;
-  byteBuffer.Dump(&slices);
+  byte_buffer.Dump(&slices);
   std::string str;
   for (auto& s : slices) {
     str.append(std::string(reinterpret_cast<const char*>(s.begin()), s.size()));
@@ -55,9 +56,9 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer3) {
   buffer->add("test", 4);
   buffer->add(" ", 1);
   buffer->add("this", 4);
-  auto byteBuffer = GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
+  auto byte_buffer = GoogleGrpcUtils::makeByteBuffer(std::move(buffer));
   std::vector<grpc::Slice> slices;
-  byteBuffer.Dump(&slices);
+  byte_buffer.Dump(&slices);
   std::string str;
   for (auto& s : slices) {
     str.append(std::string(reinterpret_cast<const char*>(s.begin()), s.size()));
@@ -67,12 +68,13 @@ TEST(GoogleGrpcUtilsTest, MakeByteBuffer3) {
 
 // Test building a Buffer::Instance from a grpc::ByteBuffer from a Bufffer::Instance with 3 slices.
 TEST(GoogleGrpcUtilsTest, ByteBufferInstanceRoundTrip) {
-  grpc::Slice slices[3] = {{"test"}, {" "}, {"this"}};
-  grpc::ByteBuffer byteBuffer1(slices, 3);
-  auto bufferInstance1 = GoogleGrpcUtils::makeBufferInstance(byteBuffer1);
-  auto byteBuffer2 = GoogleGrpcUtils::makeByteBuffer(std::move(bufferInstance1));
-  auto bufferInstance2 = GoogleGrpcUtils::makeBufferInstance(byteBuffer2);
-  EXPECT_EQ(bufferInstance2->toString(), "test this");
+  std::array<grpc::Slice, 3> slices = {grpc::string("test"), grpc::string(" "),
+                                       grpc::string("this")};
+  grpc::ByteBuffer byte_buffer(&slices[0], 3);
+  auto buffer_instance1 = GoogleGrpcUtils::makeBufferInstance(byte_buffer);
+  auto byte_buffer2 = GoogleGrpcUtils::makeByteBuffer(std::move(buffer_instance1));
+  auto buffer_instance2 = GoogleGrpcUtils::makeBufferInstance(byte_buffer2);
+  EXPECT_EQ(buffer_instance2->toString(), "test this");
 }
 
 } // namespace Grpc

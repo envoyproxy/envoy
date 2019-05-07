@@ -285,12 +285,12 @@ std::string Common::typeUrl(const std::string& qualified_name) {
   return typeUrlPrefix() + "/" + qualified_name;
 }
 
-void Common::PrependGrpcFrameHeader(Buffer::Instance& buffer) {
-  char header[5];
+void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {
+  std::array<char, 5> header;
   header[0] = 0; // flags
   const uint32_t nsize = htonl(buffer.length());
   std::memcpy(&header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
-  buffer.prepend(absl::string_view(header, 5));
+  buffer.prepend(absl::string_view(&header[0], 5));
 }
 
 } // namespace Grpc

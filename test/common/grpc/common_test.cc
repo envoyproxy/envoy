@@ -355,12 +355,12 @@ TEST(GrpcCommonTest, ValidateResponse) {
 TEST(GrpcCommonTest, PrependGrpcFrameHeader) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add("test", 4);
-  char expected_header[5];
+  std::array<char, 5> expected_header;
   expected_header[0] = 0; // flags
   const uint32_t nsize = htonl(4);
   std::memcpy(&expected_header[1], reinterpret_cast<const void*>(&nsize), sizeof(uint32_t));
-  std::string header_string(expected_header, 5);
-  Common::PrependGrpcFrameHeader(*buffer);
+  std::string header_string(&expected_header[0], 5);
+  Common::prependGrpcFrameHeader(*buffer);
   EXPECT_EQ(buffer->toString(), header_string + "test");
 }
 
