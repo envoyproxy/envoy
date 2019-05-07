@@ -25,6 +25,10 @@ public:
     return Config::DataSource::read(auth_password_, true, api);
   }
 
+  const envoy::api::v2::core::DataSource& auth_password_datasource() const {
+    return auth_password_;
+  }
+
 private:
   envoy::api::v2::core::DataSource auth_password_;
 };

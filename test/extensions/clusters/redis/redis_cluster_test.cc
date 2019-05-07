@@ -81,7 +81,7 @@ protected:
         cluster_config,
         MessageUtil::downcastAndValidate<const envoy::config::cluster::redis::RedisClusterConfig&>(
             config),
-        *this, cm, runtime_, dns_resolver_, factory_context, std::move(scope), false));
+        *this, cm, runtime_, *api_, dns_resolver_, factory_context, std::move(scope), false));
     // This allows us to create expectation on cluster slot response without waiting for
     // makeRequest.
     pool_callbacks_ = &cluster_->redis_discovery_session_;
