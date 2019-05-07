@@ -3,6 +3,8 @@
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
 
+#include "common/protobuf/utility.h"
+
 #include "tclap/CmdLine.h"
 
 namespace Envoy {
