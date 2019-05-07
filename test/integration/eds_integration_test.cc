@@ -110,7 +110,7 @@ TEST_P(EdsIntegrationTest, RemoveAfterHcFail) {
 
 // Verifies that endpoints are ignored until health checked when configured to.
 TEST_P(EdsIntegrationTest, EndpointWarmingSuccessfulHc) {
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     // Switch predefined cluster_0 to EDS filesystem sourcing.
     auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster_0->mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
