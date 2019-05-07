@@ -379,36 +379,20 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
 
 class LookupWithStatNameTest : public testing::Test {
 public:
-  LookupWithStatNameTest()
-      : alloc_(symbol_table_), store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)) {}
-  ~LookupWithStatNameTest() override {
-    store_->shutdownThreading();
-    for (auto& stat_name_storage : stat_name_storage_) {
-      stat_name_storage.free(store_->symbolTable());
-    }
-    stat_name_storage_.clear();
-    store_.reset();
-    EXPECT_EQ(0, symbol_table_.numSymbols());
-  }
+  LookupWithStatNameTest() : alloc_(symbol_table_), store_(alloc_), pool_(symbol_table_) {}
+  ~LookupWithStatNameTest() override { store_.shutdownThreading(); }
 
-  StatName makeStatName(absl::string_view name) {
-    stat_name_storage_.emplace_back(makeStatStorage(name));
-    return stat_name_storage_.back().statName();
-  }
-
-  StatNameStorage makeStatStorage(absl::string_view name) {
-    return StatNameStorage(name, symbol_table_);
-  }
+  StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   Stats::SymbolTableImpl symbol_table_;
   HeapStatDataAllocator alloc_;
-  std::unique_ptr<ThreadLocalStoreImpl> store_;
-  std::vector<StatNameStorage> stat_name_storage_;
+  ThreadLocalStoreImpl store_;
+  StatNamePool pool_;
 };
 
 TEST_F(LookupWithStatNameTest, All) {
-  ScopePtr scope1 = store_->createScope("scope1.");
-  Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
+  ScopePtr scope1 = store_.createScope("scope1.");
+  Counter& c1 = store_.counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -417,7 +401,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_->gaugeFromStatName(makeStatName("g1"));
+  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"));
   Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"));
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -426,7 +410,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, g1.tags().size());
   EXPECT_EQ(0, g1.tags().size());
 
-  Histogram& h1 = store_->histogramFromStatName(makeStatName("h1"));
+  Histogram& h1 = store_.histogramFromStatName(makeStatName("h1"));
   Histogram& h2 = scope1->histogramFromStatName(makeStatName("h2"));
   scope1->deliverHistogramToSinks(h2, 0);
   EXPECT_EQ("h1", h1.name());
@@ -445,8 +429,8 @@ TEST_F(LookupWithStatNameTest, All) {
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
 
-  EXPECT_EQ(4UL, store_->counters().size());
-  EXPECT_EQ(2UL, store_->gauges().size());
+  EXPECT_EQ(4UL, store_.counters().size());
+  EXPECT_EQ(2UL, store_.gauges().size());
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {

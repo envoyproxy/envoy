@@ -253,6 +253,48 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const st
   return struct_obj;
 }
 
+// TODO(alyssawilk) see if we can get proto's CodeEnumToString made accessible
+// to avoid copying it. Otherwise change this to absl::string_view.
+std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
+  switch (code) {
+  case ProtobufUtil::error::OK:
+    return "OK";
+  case ProtobufUtil::error::CANCELLED:
+    return "CANCELLED";
+  case ProtobufUtil::error::UNKNOWN:
+    return "UNKNOWN";
+  case ProtobufUtil::error::INVALID_ARGUMENT:
+    return "INVALID_ARGUMENT";
+  case ProtobufUtil::error::DEADLINE_EXCEEDED:
+    return "DEADLINE_EXCEEDED";
+  case ProtobufUtil::error::NOT_FOUND:
+    return "NOT_FOUND";
+  case ProtobufUtil::error::ALREADY_EXISTS:
+    return "ALREADY_EXISTS";
+  case ProtobufUtil::error::PERMISSION_DENIED:
+    return "PERMISSION_DENIED";
+  case ProtobufUtil::error::UNAUTHENTICATED:
+    return "UNAUTHENTICATED";
+  case ProtobufUtil::error::RESOURCE_EXHAUSTED:
+    return "RESOURCE_EXHAUSTED";
+  case ProtobufUtil::error::FAILED_PRECONDITION:
+    return "FAILED_PRECONDITION";
+  case ProtobufUtil::error::ABORTED:
+    return "ABORTED";
+  case ProtobufUtil::error::OUT_OF_RANGE:
+    return "OUT_OF_RANGE";
+  case ProtobufUtil::error::UNIMPLEMENTED:
+    return "UNIMPLEMENTED";
+  case ProtobufUtil::error::INTERNAL:
+    return "INTERNAL";
+  case ProtobufUtil::error::UNAVAILABLE:
+    return "UNAVAILABLE";
+  case ProtobufUtil::error::DATA_LOSS:
+    return "DATA_LOSS";
+  }
+  return "";
+}
+
 bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2) {
   ProtobufWkt::Value::KindCase kind = v1.kind_case();
   if (kind != v2.kind_case()) {
