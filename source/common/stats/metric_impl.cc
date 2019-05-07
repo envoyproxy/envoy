@@ -46,33 +46,48 @@ StatName MetricImpl::tagExtractedStatName() const {
   return stat_name;
 }
 
-std::vector<Tag> MetricImpl::tags() const {
-  std::vector<Tag> tags;
+void MetricImpl::iterateTagStatNames(const TagStatNameIterFn& fn) const {
   enum { TagExtractedName, TagName, TagValue } state = TagExtractedName;
-  Tag tag;
-  const SymbolTable& symbol_table = symbolTable();
+  StatName tag_name;
 
   // StatNameList maintains a linear ordered collection of StatNames, and we
   // are mapping that into a tag-extracted name (the first element), followed
   // by alternating TagName and TagValue. So we use a little state machine
   // as we iterate through the stat_names_.
-  stat_names_.iterate([&tags, &state, &tag, &symbol_table](StatName stat_name) -> bool {
+  stat_names_.iterate([&state, &tag_name, &fn](StatName stat_name) -> bool {
     switch (state) {
     case TagExtractedName:
       state = TagName;
       break;
     case TagName:
-      tag.name_ = symbol_table.toString(stat_name);
+      tag_name = stat_name;
       state = TagValue;
       break;
     case TagValue:
-      tag.value_ = symbol_table.toString(stat_name);
-      tags.emplace_back(tag);
       state = TagName;
+      if (!fn(tag_name, stat_name)) {
+        return false; // early exit.
+      }
+      break;
     }
     return true;
   });
   ASSERT(state != TagValue);
+}
+
+void MetricImpl::iterateTags(const TagIterFn& fn) const {
+  const SymbolTable& symbol_table = symbolTable();
+  iterateTagStatNames([&fn, &symbol_table](StatName name, StatName value) -> bool {
+    return fn(Tag{symbol_table.toString(name), symbol_table.toString(value)});
+  });
+}
+
+std::vector<Tag> MetricImpl::tags() const {
+  std::vector<Tag> tags;
+  iterateTags([&tags](const Tag& tag) -> bool {
+    tags.emplace_back(tag);
+    return true;
+  });
   return tags;
 }
 
