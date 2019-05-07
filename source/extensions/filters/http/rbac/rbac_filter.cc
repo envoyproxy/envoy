@@ -107,7 +107,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     } else {
       ENVOY_LOG(debug, "enforced denied");
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
-                                 absl::nullopt);
+                                 absl::nullopt,
+                                 StreamInfo::ResponseCodeDetails::get().RbacAccessDenied);
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }

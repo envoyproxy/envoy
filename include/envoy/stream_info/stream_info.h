@@ -128,6 +128,30 @@ struct ResponseCodeDetailValues {
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
 
+  // The health check filter returned healthy to a health check.
+  const std::string HealthCheckOk = "health_check_ok";
+  // The health check filter responded with a failed health check.
+  const std::string HealthCheckFailed = "health_check_failed";
+  // The health check filter returned a cached health value.
+  const std::string HealthCheckCached = "health_check_cached";
+  // The health check filter failed due to health checking a nonexistent cluster.
+  const std::string HealthCheckNoCluster = "health_check_failed_no_cluster_found";
+  // The health check filter failed due to checking min_degraded against an empty cluster.
+  const std::string HealthCheckClusterEmpty = "health_check_failed_cluster_empty";
+  // The health check filter succeeded given the cluster health was sufficient.
+  const std::string HealthCheckClusterHealthy = "health_check_ok_cluster_healthy";
+  // The health check filter failed given the cluster health was not sufficient.
+  const std::string HealthCheckClusterUnhealthy = "health_check_failed_cluster_unhealthy";
+
+  // The rbac filter rejected the request
+  const std::string RbacAccessDenied = "rbac_access_denied";
+
+  // The jwt_authn filter rejected the request
+  const std::string JwtAuthnAccessDenied = "jwt_authn_access_denied";
+
+  // The csrf filter rejected the request due to source and target origin mismatch.
+  const std::string OriginMismatch = "csrf_origin_mismatch";
+
   // The grpc web filter couldn't decode the data as the size wasn't a multiple of 4.
   const std::string GrpcDecodeFailedDueToSize = "grpc_base_64_decode_failed_bad_size";
   // The grpc web filter couldn't decode the data provided.

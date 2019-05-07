@@ -101,7 +101,8 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::HeaderMap& headers, bo
     return Http::FilterHeadersStatus::Continue;
   }
 
-  callbacks_->sendLocalReply(Http::Code::Forbidden, "Invalid origin", nullptr, absl::nullopt);
+  callbacks_->sendLocalReply(Http::Code::Forbidden, "Invalid origin", nullptr, absl::nullopt,
+                             StreamInfo::ResponseCodeDetails::get().OriginMismatch);
   return Http::FilterHeadersStatus::StopIteration;
 }
 
