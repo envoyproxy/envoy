@@ -306,11 +306,11 @@ We affirm we can spin out new security releases within a 2 week window.
 
 CrashOverride will vouch for the "Seven" distribution joining the distribution list.
 
-10. Nominate an e-mail alias or list for your organization to receive updates. This should not be
-    an individual user address, but instead a list that can be maintained by your organization as
-    individuals come and go. A good example is envoy-security@seven.com, a bad example is
-    acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
-    e-mail updates. This e-mail address will be shared with the Envoy community.
+> 10. Nominate an e-mail alias or list for your organization to receive updates. This should not be
+      an individual user address, but instead a list that can be maintained by your organization as
+      individuals come and go. A good example is envoy-security@seven.com, a bad example is
+      acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
+      e-mail updates. This e-mail address will be shared with the Envoy community.
 ```
 
 ### Members
