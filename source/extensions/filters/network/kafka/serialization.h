@@ -470,6 +470,24 @@ public:
   EncodingContext(int16_t api_version) : api_version_{api_version} {};
 
   /**
+   * Compute size of given reference, if it were to be encoded.
+   * @return serialized size of argument.
+   */
+  template <typename T> size_t computeSize(const T& arg) const;
+
+  /**
+   * Compute size of given array, if it were to be encoded.
+   * @return serialized size of argument.
+   */
+  template <typename T> size_t computeSize(const std::vector<T>& arg) const;
+
+  /**
+   * Compute size of given nullable array, if it were to be encoded.
+   * @return serialized size of argument.
+   */
+  template <typename T> size_t computeSize(const NullableArray<T>& arg) const;
+
+  /**
    * Encode given reference in a buffer.
    * @return bytes written
    */
@@ -492,6 +510,82 @@ public:
 private:
   const int16_t api_version_;
 };
+
+/**
+ * For non-primitive types, call `computeSize` on them, to delegate the work to the entity itself.
+ * The entity may use the information in context to decide which fields are included etc.
+ */
+template <typename T> inline size_t EncodingContext::computeSize(const T& arg) const {
+  return arg.computeSize(*this);
+}
+
+/**
+ * For primitive types, Kafka size == sizeof(x).
+ */
+#define COMPUTE_SIZE_OF_NUMERIC_TYPE(TYPE)                                                         \
+  template <> constexpr size_t EncodingContext::computeSize(const TYPE&) const {                   \
+    return sizeof(TYPE);                                                                           \
+  }
+
+COMPUTE_SIZE_OF_NUMERIC_TYPE(bool)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(int8_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(int16_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(int32_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(uint32_t)
+COMPUTE_SIZE_OF_NUMERIC_TYPE(int64_t)
+
+/**
+ * Template overload for string.
+ * Kafka String's size is INT16 for header + N bytes.
+ */
+template <> inline size_t EncodingContext::computeSize(const std::string& arg) const {
+  return sizeof(int16_t) + arg.size();
+}
+
+/**
+ * Template overload for nullable string.
+ * Kafka NullableString's size is INT16 for header + N bytes (N >= 0).
+ */
+template <> inline size_t EncodingContext::computeSize(const NullableString& arg) const {
+  return sizeof(int16_t) + (arg ? arg->size() : 0);
+}
+
+/**
+ * Template overload for byte array.
+ * Kafka byte array size is INT32 for header + N bytes.
+ */
+template <> inline size_t EncodingContext::computeSize(const Bytes& arg) const {
+  return sizeof(int32_t) + arg.size();
+}
+
+/**
+ * Template overload for nullable byte array.
+ * Kafka nullable byte array size is INT32 for header + N bytes (N >= 0).
+ */
+template <> inline size_t EncodingContext::computeSize(const NullableBytes& arg) const {
+  return sizeof(int32_t) + (arg ? arg->size() : 0);
+}
+
+/**
+ * Template overload for Array of T.
+ * The size of array is size of header and all of its elements.
+ */
+template <typename T> inline size_t EncodingContext::computeSize(const std::vector<T>& arg) const {
+  size_t result = sizeof(int32_t);
+  for (const T& el : arg) {
+    result += computeSize(el);
+  }
+  return result;
+}
+
+/**
+ * Template overload for NullableArray of T.
+ * The size of array is size of header and all of its elements.
+ */
+template <typename T>
+inline size_t EncodingContext::computeSize(const NullableArray<T>& arg) const {
+  return arg ? computeSize(*arg) : sizeof(int32_t);
+}
 
 /**
  * For non-primitive types, call `encode` on them, to delegate the serialization to the entity
