@@ -62,7 +62,7 @@ public:
     int rc = pthread_mutex_lock(&mutex_);
     ASSERT(rc == 0 || rc == EOWNERDEAD);
     if (rc == EOWNERDEAD) {
-      pthread_mutex_consistent(&mutex_);
+      //pthread_mutex_consistent(&mutex_);
     }
   }
 
@@ -74,15 +74,15 @@ public:
 
     ASSERT(rc == 0 || rc == EOWNERDEAD);
     if (rc == EOWNERDEAD) {
-      pthread_mutex_consistent(&mutex_);
+      //pthread_mutex_consistent(&mutex_);
     }
 
     return true;
   }
 
   void unlock() UNLOCK_FUNCTION() override {
-    int rc = pthread_mutex_unlock(&mutex_);
-    ASSERT(rc == 0);
+    //int rc = pthread_mutex_unlock(&mutex_);
+    //ASSERT(rc == 0);
   }
 
 private:

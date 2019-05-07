@@ -29,5 +29,6 @@ envoy_cc_library(
         "os_sys_calls.h",
         "os_sys_calls_common.h",
         "os_sys_calls_linux.h",
+        "os_sys_calls_hot_restart.h"
     ],
 )

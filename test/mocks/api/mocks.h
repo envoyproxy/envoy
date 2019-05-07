@@ -9,6 +9,7 @@
 #include "envoy/event/timer.h"
 
 #include "common/api/os_sys_calls_impl.h"
+#include "common/api/os_sys_calls_impl_hot_restart.h"
 
 #if defined(__linux__)
 #include "common/api/os_sys_calls_impl_linux.h"
@@ -64,9 +65,6 @@ public:
   MOCK_METHOD4(recv, SysCallSizeResult(int socket, void* buffer, size_t length, int flags));
   MOCK_METHOD6(recvfrom, SysCallSizeResult(int sockfd, void* buffer, size_t length, int flags,
                                            struct sockaddr* addr, socklen_t* addrlen));
-
-  MOCK_METHOD3(shmOpen, SysCallIntResult(const char*, int, mode_t));
-  MOCK_METHOD1(shmUnlink, SysCallIntResult(const char*));
   MOCK_METHOD2(ftruncate, SysCallIntResult(int fd, off_t length));
   MOCK_METHOD6(mmap, SysCallPtrResult(void* addr, size_t length, int prot, int flags, int fd,
                                       off_t offset));
@@ -80,6 +78,12 @@ public:
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<int, int, int>;
   std::map<SockOptKey, bool> boolsockopts_;
+};
+
+class MockHotRestartOsSysCalls : public HotRestartOsSysCalls {
+  // Api::HotRestartOsSysCalls
+  MOCK_METHOD3(shmOpen, SysCallIntResult(const char*, int, mode_t));
+  MOCK_METHOD1(shmUnlink, SysCallIntResult(const char*));
 };
 
 #if defined(__linux__)
