@@ -5,7 +5,7 @@ cc_library(
     srcs = ["xxhash.c"],
     hdrs = [
         "xxh3.h",
-        "xxhash.h"
+        "xxhash.h",
     ],
     visibility = ["//visibility:public"],
 )
