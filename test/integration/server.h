@@ -225,6 +225,12 @@ public:
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization);
 
+  void waitForCounterEq(const std::string& name, uint64_t value) override {
+    while (counter(name) == nullptr || counter(name)->value() != value) {
+      time_system_.sleep(std::chrono::milliseconds(10));
+    }
+  }
+
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
       time_system_.sleep(std::chrono::milliseconds(10));

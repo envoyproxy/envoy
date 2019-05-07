@@ -75,6 +75,7 @@ private:
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     // Http::StreamDecoder
     void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
@@ -246,6 +247,7 @@ private:
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     TcpHealthCheckerImpl& parent_;
     Network::ClientConnectionPtr client_;
@@ -292,6 +294,7 @@ private:
     // ActiveHealthCheckSession
     void onInterval() override;
     void onTimeout() override;
+    void onDeferredDelete() final;
 
     // Http::StreamDecoder
     void decode100ContinueHeaders(Http::HeaderMapPtr&&) override {}
