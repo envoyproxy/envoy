@@ -230,6 +230,11 @@ distribution should:
    patch availability.
 9. Have someone already on the list vouch for the person requesting membership
    on behalf of your distribution.
+10. Nominate an e-mail alias or list for your organization to receive updates. This should not be
+    an individual user address, but instead a list that can be maintained by your organization as
+    individuals come and go. A good example is envoy-security@seven.com, a bad example is
+    acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
+    e-mail updates. This e-mail address will be [shared with the Envoy community](#Members).
 
 Note that Envoy maintainers are members of the Envoy security team. [Members of the Envoy security
 team](OWNERS.md#envoy-security-team) and the organizations that they represents are implicitly
@@ -291,14 +296,33 @@ We accept.
 
 We are definitely willing to help!
 
-> 8. Have someone already on the list vouch for the person requesting membership
-     on behalf of your distribution.
+> 8. Be able to perform a security release of your product within a two week window from candidate fix
+     patch availability.
+
+We affirm we can spin out new security releases within a 2 week window.
+
+> 9. Have someone already on the list vouch for the person requesting membership
+>    on behalf of your distribution.
 
 CrashOverride will vouch for the "Seven" distribution joining the distribution list.
 
-> 9. Nominate an e-mail alias or list for your organization to receive updates. This should not be
-     an individual user address, but instead a list that can be maintained by your organization as
-     individuals come and go. A good example is envoy-security@seven.com, a bad example is
-     acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
-     e-mail updates.
+> 10. Nominate an e-mail alias or list for your organization to receive updates. This should not be
+      an individual user address, but instead a list that can be maintained by your organization as
+      individuals come and go. A good example is envoy-security@seven.com, a bad example is
+      acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
+      e-mail updates. This e-mail address will be shared with the Envoy community.
 ```
+
+### Members
+
+| E-mail                                    | Organization  |
+|-------------------------------------------|:-------------:|
+| vulnerabilities@discuss.istio.io          | Istio         |
+| google-internal-envoy-security@google.com | Google        |
+| envoy-security@solo.io                    | solo.io       |
+| security@cilium.io                        | Cilium        |
+| secalert@redhat.com                       | Red Hat       |
+| aws-app-mesh-security@amazon.com          | AWS           |
+| vulnerabilityreports@cloudfoundry.org     | Cloud Foundry |
+| envoy-security@tetrate.io                 | Tetrate       |
+| secalert@datawire.io                      | Datawire      |
