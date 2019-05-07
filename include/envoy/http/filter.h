@@ -422,8 +422,7 @@ public:
   /**
    * Adds socket options to be applied to any connections used for upstream requests. Note that
    * unique values for the options will likely lead to many connection pools being created. The
-   * added options are appended to any previously added. They will later be combined with any
-   * options present on the downstream connection.
+   * added options are appended to any previously added.
    *
    * @param options The options to be added.
    */
