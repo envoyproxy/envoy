@@ -109,9 +109,8 @@ public:
   SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {
-      absl::string_view str = toStringView(name);
-      if (!str.empty()) {
-        strings.push_back(str);
+      if (!name.empty()) {
+        strings.push_back(toStringView(name));
       }
     }
     return encodeHelper(absl::StrJoin(strings, "."));
